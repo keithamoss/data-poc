@@ -8,6 +8,12 @@ have no YAML definition of their own to carry a `meta:`/`attributes:`
 block the way dbt/Soda/the contract do (see check_lifecycle.py's own
 docstring on this asymmetry), so this plain dict is where "alongside
 the check" means for this one tool.
+
+Writing the reader-facing prose (description/failure_indicates/
+technical_note): docs/check-authoring-rules.md is the standing
+authoring standard - read it before adding or editing any of the
+three. The lifecycle gate only checks that failure_indicates is
+present; nothing enforces the wording rules.
 """
 from __future__ import annotations
 
@@ -16,9 +22,9 @@ from __future__ import annotations
 # check_id (2026-09-16, Phase 4 prerequisite), so there's exactly one
 # place either string is spelled out, not a literal duplicated between
 # this file and the result-construction code.
-PSI_CHECK_ID = "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.drift_psi_evidently"
+PSI_CHECK_ID = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
 ROW_COUNT_GROWTH_CHECK_ID = (
-    "data-asset-1.registry-services.birth-registrations.stg_birth_registrations.row_count_growth_evidently")
+    "data-asset-1.registry-services.civil-registration.birth-registrations.row_count_growth_evidently")
 
 CHECK_LIFECYCLE = {
     PSI_CHECK_ID: {
@@ -29,7 +35,8 @@ CHECK_LIFECYCLE = {
         # cross-run logical consistency concern, not a new category.
         "category": "consistency",
         "introduced_date": "2026-01-15",
-        "description": "Population Stability Index on sex's value distribution vs. the reference run - flags a real distribution shift.",
+        "description": "The spread of values must stay close to the reference supply.",
+        "failure_indicates": "self-evident",
         "changelog": [],
     },
     ROW_COUNT_GROWTH_CHECK_ID: {
@@ -38,7 +45,8 @@ CHECK_LIFECYCLE = {
         # time concern read as timeliness, not completeness.
         "category": "timeliness",
         "introduced_date": "2026-01-15",
-        "description": "Row count should mostly grow run over run - a real drop signals a broken/partial extract.",
+        "description": "The number of rows must not drop sharply against the previous supply.",
+        "failure_indicates": "self-evident",
         "changelog": [],
     },
 }

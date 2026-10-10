@@ -27,12 +27,18 @@ by embed_dashboard_data.py as a JS const.
 from __future__ import annotations
 import json
 import os
-from datetime import date, datetime
+from datetime import datetime
 
 from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
+from qa_tools.common import schedule_ended
+from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
-from pipeline.cadence import classify_arrival, parse_cadence_from_contract
-from pipeline.dashboard_check_labels import rank_for_headline, display_name
+from qa_tools.common import agreement
+from qa_tools.common import asset_time
+from pipeline import (acknowledgements, closed_slots, excuses, file_check_panel, recorded_arrival,
+                      red_promoted, slot_timeline)
+from qa_tools.common import promotion_state
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
@@ -41,7 +47,29 @@ CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract
 
 
 def _parse_extract_timestamp(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace(" ", "T"))
+    """One committed arrival instant. Delegates to asset_time so a value
+    stored without an offset fails loudly here rather than being read as
+    UTC by whichever caller got to it first (REQ-PIPE-048)."""
+    return asset_time.parse_instant(s, "arrival.earliest_extract in committed qa_results/")
+
+
+def _run_date(entry: dict) -> str:
+    """One manifest entry's receipt DATE, as a string.
+
+    The manifest carries a receipt INSTANT since REQ-GEN-042 - the
+    generator's own `received_at` - and the two axes it separates
+    (which period a supply is for, when it actually turned up) are the
+    point of that change. Everything below wants a date, for a cadence
+    cycle or a row in a supply-history table, so it is derived here in
+    one place rather than at eleven call sites.
+
+    `run_date` survives as the DASHBOARD-FACING name deliberately. The
+    vocabulary change is the generator's; renaming a presentation field
+    the template, the JS tests and the e2e suite all key on would be
+    churn this requirement did not ask for, and `run_date` is not one
+    of the names it retires.
+    """
+    return asset_time.local_date(entry["received_at"]).isoformat()
 
 ENGINE_SHORT = {
     # Same short-name convention as build_cp_dashboard_data.py's own
@@ -49,6 +77,7 @@ ENGINE_SHORT = {
     # any more - there's nothing left to distinguish it from since
     # engines/*.py was removed (see plans/qa-pipeline.md #84's follow-up).
     "dbt-core 1.12 + dbt-duckdb": "dbt-core",
+    "dbt-core 1.12 + dbt-postgres": "dbt-core",
     "Soda Core 3.5": "Soda Core",
     "datacontract-cli 1.2.0": "datacontract-cli",
     "Evidently 0.7": "Evidently AI",
@@ -70,13 +99,77 @@ COLUMN_META = {
     "extract_timestamp": ("timestamp", "When the record was extracted at BDM's source system."),
 }
 
+# Two pseudo-columns, so a check that belongs to the whole table rather
+# than to any one column still has somewhere to live. Before these, the
+# builder dropped every "(table)" result on the floor - 13 real checks
+# across both datasets, carrying prose nobody could read
+# (REQ-DASH-032).
+#
+# Deliberately TWO rather than one (Keith, 2026-09-20). "Is this supply
+# the right size and current enough" is a different question from "do
+# these tables agree with each other", and lumping them together made a
+# grab-bag. Child Protection already had the second one under this exact
+# name, so that name is reused rather than invented.
+SUPPLY_LEVEL_PSEUDO_COLUMN = "Supply-level checks"
+TABLE_LEVEL_PSEUDO_COLUMN = "Table-level checks"
+
+# REQ-DASH-033. These two stopped being columns-in-disguise and became
+# real sections of the dataset page, so they need a name a person reads
+# (above) and a slug a URL carries (here) - which a bracketed
+# "(supply-level checks)" was doing badly as both: it rendered as a
+# column called something no column is called, and it encoded into
+# %28supply-level%20checks%29 in the address bar.
+#
+# Every column carries a `key` now, equal to its own name for a real
+# one, so nothing about real column URLs changes. Only these two differ
+# from their display name.
+COLUMN_SCOPE_KEY = {
+    SUPPLY_LEVEL_PSEUDO_COLUMN: "supply",
+    TABLE_LEVEL_PSEUDO_COLUMN: "table",
+}
+
+COLUMN_META[SUPPLY_LEVEL_PSEUDO_COLUMN] = (
+    "supply-level",
+    "Checks on the supply as a whole rather than on any one column - whether it "
+    "arrived the right size, and whether it is current.")
+COLUMN_META[TABLE_LEVEL_PSEUDO_COLUMN] = (
+    "table-level",
+    "Rules that span the whole table rather than any one column.")
+
+# datacontract-cli and Soda each spell the row-count check differently.
+_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count"}
+_PSEUDO_COLUMNS = (SUPPLY_LEVEL_PSEUDO_COLUMN, TABLE_LEVEL_PSEUDO_COLUMN)
+
+
+def _pseudo_column_for(check_name: str) -> str:
+    return (SUPPLY_LEVEL_PSEUDO_COLUMN if check_name in _SUPPLY_LEVEL_CHECK_NAMES
+            else TABLE_LEVEL_PSEUDO_COLUMN)
+
+
 ALL_COLUMNS = list(COLUMN_META.keys())
+
+
+def _schedule_not_agreed(dataset_id: str) -> str | None:
+    """Whether this dataset has declared it has no delivery calendar, and
+    which kind (REQ-PIPE-106 criteria 3, 8 and 9).
+
+    Carried onto the dataset so the page can say so IN WORDS beside the
+    dataset's own real verdict, and so every rollup above it can leave it
+    out. Read from CONFIGURATION, which is what makes it safe here: this
+    build may read recorded QA results and never supply rows, and a
+    declaration in contract/data-asset.yaml is neither.
+
+    None for every dataset that has a calendar, which today is all seven.
+    """
+    from qa_tools.common import schedule
+
+    return schedule.no_calendar(dataset_id)
 
 
 def build() -> dict:
     with open(REAL_RESULTS_PATH) as f:
         payload = json.load(f)
-    manifest = sorted(payload["runs"], key=lambda r: r["run_date"])
+    manifest = sorted(payload["runs"], key=_run_date)
     results = payload["results"]
     dataset_stats = payload["dataset_stats"]
 
@@ -93,25 +186,52 @@ def build() -> dict:
     for r in results:
         col = r["column_name"]
         if col == "(table)":
-            continue
-        key = (r["engine"], r["check_name"])
+            col = _pseudo_column_for(r["check_name"])
+        # Keyed on check_id, NOT (engine, check_name). Those two are a
+        # DISPLAY name, and two different checks can genuinely share one:
+        # datacontract-cli reports every `type: sql` rule as
+        # "datacontract:custom_sql", so date_of_birth's range check and
+        # its freshness check collided here and one silently swallowed
+        # the other - while both kept writing into the survivor's own
+        # by_run values, which disagree on 166 of the 352 committed runs.
+        # check_id is the identity this system already guarantees unique
+        # (REQ-QAC-023's grammar and tail-uniqueness gates).
+        key = r["check_id"]
         slot = by_column.setdefault(col, {}).setdefault(key, {
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
+            "engine": r["engine"], "check_name": r["check_name"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
+            "status_by_run": {}, "reference": {}, "not_evaluated": {},
         })
         slot["by_run"][r["run_id"]] = r["metric_value"]
+        # item 74 Bug A: the tool's own verdict, carried through rather
+        # than dropped here and re-derived from thresholds downstream.
+        slot["status_by_run"][r["run_id"]] = dashboard_status(r.get("status"))
+        # WHAT IT WAS COMPARED WITH, AND THE MEASURED VERDICT BESIDE A GAP'S
+        # RED (REQ-QAC-108 criteria 14 and 16).
+        slot["reference"][r["run_id"]] = drift_reference.reference_note(r, dashboard_status)
+        # A REAL TOOL THAT COULD NOT EVALUATE A CHECK it was handed says why
+        # (the road-testing sweep's #7, 2026-10-06).
+        slot["not_evaluated"][r["run_id"]] = r.get("not_evaluated_reason")
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
     run_ids_in_order = [m["run_id"] for m in manifest]
-    latest_run, prev_run = run_ids_in_order[-1], run_ids_in_order[-2]
+    # THE NEWEST RUNS THAT MEASURED THE TABLE - see the Child Protection
+    # builder's identical block. A same-day resupply beside an unpromoted
+    # red supply is contested (REQ-PIPE-105 criterion 6), measures
+    # nothing, and is not what "current" means.
+    measured = [r for r in run_ids_in_order
+                if (dataset_stats.get(r) or {}).get("row_count") is not None]
+    measured = measured or run_ids_in_order
+    latest_run, prev_run = measured[-1], (measured[-2] if len(measured) > 1 else measured[-1])
     # run_date alone can't key a run uniquely - a resupply run shares its
     # base run's run_date (e.g. run_54_2026-09-10 and
     # run_54_2026-09-10_resupply1) - so byRun below keys directly on
     # run_id via each history entry's own "run_id" field, not run_date.
-    row_count_by_run = {m["run_id"]: m["n_rows_generated"] for m in manifest}
+    row_count_by_run = {run_id: st.get("row_count") for run_id, st in dataset_stats.items()}
 
     columns_out = []
     for col in ALL_COLUMNS:
@@ -121,21 +241,31 @@ def build() -> dict:
         agg_spec = AGGREGATE_SPEC.get(col)
 
         checks_out = []
-        for (engine, check_name), slot in checks_for_col.items():
+        for slot in checks_for_col.values():
+            engine, check_name = slot["engine"], slot["check_name"]
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
             history = []
             for run_id in run_ids_in_order:
                 if run_id in slot["by_run"]:
-                    run_date = next(m["run_date"] for m in manifest if m["run_id"] == run_id)
+                    run_date = next(_run_date(m) for m in manifest if m["run_id"] == run_id)
                     aggregate_values = None
                     if attach_aggregate:
-                        aggregate_values = dataset_stats[run_id]["check_aggregates"].get(col)
+                        aggregate_values = (dataset_stats.get(run_id) or {}).get(
+                            "check_aggregates", {}).get(col)
                     history.append({
                         "run_id": run_id, "run_date": run_date, "value": slot["by_run"][run_id],
                         "row_count_total": slot["row_count_total"].get(run_id),
                         "row_count_invalid": slot["row_count_invalid"].get(run_id),
                         "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
                         "aggregate_values": aggregate_values,
+                        "status": slot["status_by_run"].get(run_id),
+                        "reference": slot["reference"].get(run_id),
+                        # Criterion 9's red is NOT EVALUATED, said in words.
+                        "not_evaluated": slot["not_evaluated"].get(run_id) or (
+                                         (slot["reference"].get(run_id) or {}).get("reason")
+                                          if slot["status_by_run"].get(run_id) == "red"
+                                          and slot["by_run"][run_id] is None
+                                          and slot["reference"].get(run_id) else None),
                     })
             if not history:
                 continue
@@ -143,28 +273,101 @@ def build() -> dict:
             lifecycle = lifecycle_by_id.get(slot["check_id"])
             checks_out.append({
                 "check_id": slot["check_id"],
-                "name": display_name(check_name, engine_short, slot["label"]),
+                # A hand-authored `name` in the check's own metadata wins
+                # over the derived label (REQ-DASH-026).
+                # The field already existed and was parsed but rendered
+                # nowhere - 16 checks carried one, and they are exactly
+                # the headings a reader wants: "Registered on or after
+                # birth", "Carer approval compliance".
+                "name": (lifecycle.name if lifecycle and lifecycle.name
+                         else display_name(check_name, engine_short, slot["label"])),
+                # The URL-facing identity, stable across heading rewrites
+                # (REQ-DASH-026). Never `name`.
+                # pooled_url_key() in a scope section, where checks
+                # from several real columns share one pseudo-column and
+                # a bare tail is no longer unique. See its own docstring.
+                "key": (pooled_url_key(slot["check_id"]) if col in COLUMN_SCOPE_KEY
+                        else url_key(slot["check_id"])),
+                # REQ-DASH-026: the terse "dbt:not_null" line under
+                # the headline. Same string as `key` above, tool
+                # moved to the front - deliberately, so the card and
+                # the address bar agree.
+                "tool_ref": tool_ref(slot["check_id"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
-                "warn": slot["warn"] if slot["warn"] is not None else 0,
-                "fail": slot["fail"] if slot["fail"] is not None else 0,
+                # item 74 Bug A: None stays None - it means "this check has
+                # no bound of that kind" (e.g. rowCount's two-sided
+                # mustBeBetween range), NOT "zero tolerance". Substituting
+                # 0 here is what fabricated a red on every run.
+                "warn": slot["warn"],
+                "fail": slot["fail"],
                 "current": slot["by_run"].get(latest_run, 0),
+                "current_status": slot["status_by_run"].get(latest_run),
                 "previous": slot["by_run"].get(prev_run, 0),
                 "history": history,
                 "note": f"Computed by {engine} against this run's real data — not a fabricated figure.",
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
                 "retired_reason": lifecycle.retired_reason if lifecycle else None,
                 "description": lifecycle.description if lifecycle else None,
+                # REQ-QAC-024. `description` is the plain-English WHAT;
+                # this is the plain-English SO-WHAT - what a failure most
+                # likely means happened upstream.
+                #
+                # `technical_note` is deliberately NOT here and must not
+                # be added. It is the one authored field written for
+                # contributors rather than viewers ("standing facts a
+                # contributor needs and a viewer must not see"), and this
+                # dict is published to a public site. Its absence is the
+                # requirement being met, not an oversight.
+                "failure_indicates": lifecycle.failure_indicates if lifecycle else None,
                 "changelog": lifecycle.changelog if lifecycle else [],
             })
 
+        if not checks_out and col in _PSEUDO_COLUMNS:
+            # A real column with no checks says so honestly below. A
+            # pseudo-column with none simply does not exist for this
+            # dataset, and an empty tile would be noise.
+            continue
         if not checks_out:
             # honest placeholder - no rule anywhere covers this column today
             checks_out = [{
+                # A REAL KEY, because everything downstream assumes one
+                # (plans/post-build-review.md #5 and #12). Without it the
+                # scope-section renderer wrote data-check="undefined",
+                # the re-lookup matched nothing, and dereferencing the
+                # result threw - taking out the rest of renderDataset()
+                # AND, because navigate() renders before it pushes
+                # history, the navigation itself. The check panel was
+                # also un-deep-linkable and un-closable with Back, for
+                # the same missing field.
+                #
+                # Unique within its column, which is the scope the
+                # /check/<key> route resolves in - and this placeholder
+                # is by definition the only check on its column.
+                "key": "no_rule_defined",
                 "name": "No automated quality rule defined",
-                "dimension": "", "unit": "count", "warn": 1, "fail": 1,
-                "current": 0, "previous": 0,
-                "history": [{"run_id": m["run_id"], "run_date": m["run_date"], "value": 0} for m in manifest],
+                # This check is synthesized HERE, not produced by any real
+                # tool - so it has to state its own status explicitly
+                # (item 74). Without it, it would be the only thing left
+                # in the whole app relying on the warn/fail fallback, and
+                # a fallback with exactly one synthetic caller is a trap,
+                # not a safety net: it keeps three status implementations
+                # alive to serve data this file makes up.
+                #
+                # `inactive`, NOT green (post-build-review #4, Keith's
+                # own direction: "a grey, as in a disabled kind of grey
+                # colour - kind of speaks to it's inactive"). The old
+                # comment here argued green was truthful BECAUSE the gap
+                # was labelled in `note` - and `note` renders in exactly
+                # one place, the check panel. So at every level a reader
+                # actually looks, an unchecked column read as a healthy
+                # one, and a table-scope placeholder rolled a whole
+                # section to green on its own. Green is a VERDICT, and
+                # nothing was checked here.
+                "dimension": "", "unit": "count", "warn": None, "fail": None,
+                "current": 0, "current_status": "inactive", "previous": 0,
+                "history": [{"run_id": m["run_id"], "run_date": _run_date(m), "value": 0,
+                             "status": "inactive"} for m in manifest],
                 "note": "Neither the ODCS contract nor the Soda/dbt check files define a rule for this "
                         "column today — this is a real gap, not a hidden failure.",
             }]
@@ -175,8 +378,8 @@ def build() -> dict:
         # generated row count for that run (every column shares one table,
         # so this is the same for all of them - what differs per column is
         # how many of those rows the *primary* check, checks[0], flagged).
-        total_latest_manifest = next(m for m in manifest if m["run_id"] == latest_run)["n_rows_generated"]
-        total_prev_manifest = next(m for m in manifest if m["run_id"] == prev_run)["n_rows_generated"]
+        total_latest_manifest = row_count_by_run.get(latest_run) or 0
+        total_prev_manifest = row_count_by_run.get(prev_run) or 0
 
         stats = {
             "current": {"total": total_latest_manifest, "invalid": 0, "valid": total_latest_manifest, "valueCounts": None},
@@ -187,13 +390,15 @@ def build() -> dict:
             for label, run_id, total_key in (("current", latest_run, "total_latest_manifest"), ("previous", prev_run, "total_prev_manifest")):
                 total = total_latest_manifest if label == "current" else total_prev_manifest
                 val = checks_out[0]["current"] if label == "current" else checks_out[0]["previous"]
+                if val is None:
+                    continue  # no number for that run - see the byRun loop below
                 n_invalid = int(round(total * val / 100)) if primary_unit == "%" else int(round(val))
                 stats[label]["invalid"] = max(0, n_invalid)
                 stats[label]["valid"] = max(0, total - stats[label]["invalid"])
 
         if col == "sex":
-            stats["current"]["valueCounts"] = dataset_stats[latest_run]["value_counts"]["sex"]
-            stats["previous"]["valueCounts"] = dataset_stats[prev_run]["value_counts"]["sex"]
+            stats["current"]["valueCounts"] = (dataset_stats[latest_run].get("value_counts") or {}).get("sex")
+            stats["previous"]["valueCounts"] = (dataset_stats[prev_run].get("value_counts") or {}).get("sex")
 
         # Full per-run fidelity, keyed by run_id (not an index-aligned
         # array like history - the as-of picker this serves needs direct
@@ -209,62 +414,73 @@ def build() -> dict:
         stats_by_run = {}
         for h in checks_out[0]["history"]:
             run_id = h["run_id"]
-            total = row_count_by_run[run_id]
+            total = row_count_by_run.get(run_id)
+            # NO NUMBER FOR THIS RUN - not evaluated, or measured against
+            # nothing - is no byRun entry, never a crash (exposed by
+            # REQ-QAC-108's gap rule making a drift check a headline).
+            if total is None or h["value"] is None:
+                continue
             n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
             n_invalid = max(0, n_invalid)
             stats_by_run[run_id] = {
                 "total": total, "invalid": n_invalid, "valid": max(0, total - n_invalid),
-                "valueCounts": dataset_stats[run_id]["value_counts"]["sex"] if col == "sex" else None,
+                "valueCounts": (dataset_stats[run_id].get("value_counts") or {}).get("sex")
+                               if col == "sex" else None,
             }
         stats["byRun"] = stats_by_run
 
-        status_rank = {"pass": 0, "warn": 1, "fail": 2}
-        # column status = worst status among its real checks (mirrors the
-        # dashboard's own worst-of rollup rule, computed here from real
-        # engine output rather than the client re-deriving it)
-        worst = "pass"
-        for r in results:
-            if r["column_name"] == col and status_rank.get(r["status"], 0) > status_rank.get(worst, 0):
-                worst = r["status"]
+        # (Removed 2026-09-19, plans/qa-pipeline.md item 74's follow-up: a
+        # `worst` column rollup used to be computed here, from each real
+        # engine's own `status` - the right idea - and then never used.
+        # `columns_out.append()` below never carried it, and nothing else
+        # in this file read it. Ruff couldn't flag it either: `worst` is
+        # read inside its own accumulating loop, so F841 never fires. The
+        # dashboard does this rollup client-side instead, because it has
+        # to - the as-of picker re-rolls status for an arbitrary date the
+        # viewer picks in the browser, which no build-time value can
+        # answer. Deleted rather than wired up for that reason.)
 
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,
+            # The URL-facing identity of a column, same split `key` vs
+            # `name` REQ-DASH-026 gave a check. Equal to the name for a
+            # real column, so no real column URL moves.
+            "key": COLUMN_SCOPE_KEY.get(col, col),
+            # Present only on the two section pseudo-columns, and what
+            # the dataset view keys its own split on - never a string
+            # match against a display name, which is what the bracketed
+            # names were being used for before.
+            "scope": COLUMN_SCOPE_KEY.get(col),
             "checks": checks_out, "stats": stats,
         })
 
     # dataset-level: row counts + arrival, from the real generated manifest
     # and extract_timestamp data.
     latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
-    prev_entry = next(m for m in manifest if m["run_id"] == prev_run)
 
-    cadence = parse_cadence_from_contract(CONTRACT_PATH)
+    # From the dataset's participation in contract/calendar.yaml
+    # (REQ-PIPE-110), named by dataset id.
+    cadence = agreement.cadence("birth-registrations")
 
-    max_lag_hours = dataset_stats[latest_run]["arrival"]["max_lag_hours"]
-    earliest_extract = dataset_stats[latest_run]["arrival"]["earliest_extract"]
-    latest_status = classify_arrival(
-        cadence, date.fromisoformat(latest_entry["run_date"]), _parse_extract_timestamp(earliest_extract))
-
-    # Genuinely per-run now, not a hardcoded True for every run but the
-    # latest - every run's own max_lag_hours/earliest_extract already
-    # exists in its committed dataset_stats.json (Phase 3), just not
-    # previously surfaced here. arrival_by_run mirrors stats["byRun"]
-    # above (run_id-keyed, for Thread C's as-of UI); arrival_history
-    # keeps its existing array shape (one entry per run, in order).
-    # arrivalStatus (Phase 5j, replacing the old onTime boolean) is a
-    # real 3-state classify_arrival() result against this run's own
-    # cadence-derived expected moment - see pipeline/cadence.py.
+    # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2). This block
+    # used to call cadence.classify_arrival() twice - once here and
+    # once per run below - deriving the cycle by looking BACKWARDS from
+    # the arrival date, which could never land on a slot that had not
+    # started. The verdict is recorded against the filing now, so the
+    # build reads it and the one derivation is gone.
+    #
+    # KEYED ON THE RUN'S OWN `received_at`, which the manifest has
+    # carried since REQ-GEN-042 and which IS our receipt instant - the
+    # same key `filing.period_of()` matches a supply on.
     arrival_by_run = {}
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
-        arrival = dataset_stats[run_id]["arrival"]
-        status = classify_arrival(
-            cadence, date.fromisoformat(m["run_date"]), _parse_extract_timestamp(arrival["earliest_extract"]))
-        arrival_by_run[run_id] = {
-            "arrivedAt": arrival["earliest_extract"], "arrivalStatus": status,
-            "maxLagHours": round(arrival["max_lag_hours"], 1),
-        }
-        arrival_history.append({"run_id": run_id, "run_date": m["run_date"], "arrivalStatus": status})
+        block = recorded_arrival.for_run("birth-registrations", m["received_at"])
+        arrival_by_run[run_id] = block
+        arrival_history.append({"run_id": run_id, "run_date": _run_date(m),
+                                 **block})
+    latest_block = arrival_by_run[latest_run]
 
     return {
         "id": "birth-registrations",
@@ -272,20 +488,80 @@ def build() -> dict:
         "provider": "Registry of Births, Deaths & Marriages (BDM)",
         "deliveryFormat": "CSV (S3 drop) — Parquet planned",
         "sla": {"cadence": cadence},
-        "lastArrival": {
-            "run_date": latest_entry["run_date"],
-            "arrivedAt": earliest_extract,
-            "arrivalStatus": latest_status,
-            "maxLagHours": round(max_lag_hours, 1),
-        },
+        # WHETHER ANYBODY HAS AGREED A SCHEDULE FOR THIS DATASET
+        # (REQ-PIPE-106). None for every dataset that has a calendar, so
+        # the page renders nothing extra in the ordinary case - which is
+        # the point at 30 datasets: a marker on every tile is noise that
+        # trains people to stop reading markers.
+        "scheduleNotAgreed": _schedule_not_agreed("birth-registrations"),
+        "lastArrival": {"run_date": _run_date(latest_entry),
+                        "run_id": latest_entry.get("run_id"), **latest_block},
+        # See build_cp_dashboard_data.py's identical block
+        # (REQ-DASH-056).
+        # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081
+        # criteria 1, 2, 3 and 6). The ANSWERS, not the rule - see
+        # pipeline/slot_timeline.py for why the page must not be taught
+        # to derive these for itself. Read from the decision log, with
+        # each entry tied to the run that checked it.
+        "slotTimeline": slot_timeline.with_runs(
+            slot_timeline.for_dataset("birth-registrations"), "birth-registrations"),
+        # EACH RUN'S SUPPLY, PROMOTED, AWAITING OR WITHDRAWN OVER TIME
+        # (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05): the
+        # page's verdict is the newest supply promoted or awaiting on the
+        # date on show. Answers from the decision log, looked up there.
+        "runStates": slot_timeline.run_states("birth-registrations"),
+        # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126): the status
+        # it was promoted on and its status after each run that read it, so
+        # the page can say "red promoted" on the dates it was, and when and
+        # after what it turned. See pipeline/red_promoted.py.
+        "promotedHealth": red_promoted.for_dataset("birth-registrations"),
+        # REQ-DASH-097 - see the Child Protection builder.
+        "fileChecks": file_check_panel.for_dataset("birth-registrations"),
+        # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
+        # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
+        # 10) - see pipeline/closed_slots.py. The page compares instants;
+        # it never re-derives closing.
+        "closedSlots": closed_slots.for_dataset("birth-registrations"),
+        # A SLOT LATE BUT STILL OPEN (REQ-DASH-133, Keith 2026-10-05): every
+        # slot that was ever late while open, so the page can name today's
+        # late file beside an older gap.
+        "lateSlots": closed_slots.late_slots("birth-registrations"),
+        # HELD BECAUSE ITS SCHEDULE ENDED (REQ-DASH-155): receipt and
+        # resolution instants from hold records only, for the notice.
+        "scheduleEndedHolds": schedule_ended.for_dataset("birth-registrations"),
+        # REQ-PIPE-081 criteria 14 and 15: what the RECORDED census found,
+        # as change points - never the warehouse as it stands now.
+        "census": census.for_datasets({"birth-registrations"}),
+        # REQ-PIPE-122 NFR 1: the amber setting in force over time, in
+        # words, from configuration only - the page shows the one in force
+        # on the date on show.
+        "amberSetting": amber_setting.timeline("birth-registrations"),
+        # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
+        # criterion 21), keyed by run - see pipeline/acknowledgements.py.
+        "acknowledgements": acknowledgements.for_dataset("birth-registrations"),
+        # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
+        # each with its withdrawal and lapse - see pipeline/excuses.py.
+        "excuses": excuses.for_dataset("birth-registrations"),
+        "promotionState": promotion_state.state_for(
+            "birth-registrations").as_record(),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
-        "rowCount": latest_entry["n_rows_generated"],
-        "prevRowCount": prev_entry["n_rows_generated"],
+        "rowCount": row_count_by_run.get(latest_run),
+        "prevRowCount": row_count_by_run.get(prev_run),
         # Per-run row counts aren't duplicated into their own dict here -
-        # "runs" (below) already carries n_rows_generated per manifest
+        # "runs" (below) already carries each arrival record per
         # entry, so Thread C's as-of UI can read it straight from there.
-        "runs": manifest,
+        # Each run as the PAGE sees it: the manifest entry plus a
+        # derived `run_date`. The manifest itself carries a receipt
+        # INSTANT since REQ-GEN-042 (`received_at`), and the template,
+        # the JS tests and the e2e suite all key supply history on a
+        # date - so the date is derived once, here, at the last
+        # transform before the page.
+        #
+        # Spread-then-add rather than a hand-listed copy, deliberately:
+        # a hand-maintained allowlist silently drops every field added
+        # later, which is CLAUDE.md's own standing lesson from item 74.
+        "runs": [{**m, "run_date": _run_date(m)} for m in manifest],
         "columns": columns_out,
         "_provenance": "Computed by qa_tools/bdm/orchestrate_bdm.py - actual dbt-core, Soda Core, datacontract-cli "
                         "and Evidently runs against real generated CSVs, the real ODCS contract, the real Soda "
@@ -299,3 +575,6 @@ if __name__ == "__main__":
     with open(OUT_PATH, "w") as f:
         json.dump(data, f, indent=2, default=str)
     print(f"Wrote {OUT_PATH} ({len(data['columns'])} columns)")
+    # Criterion 16: a WARNING, and the build still publishes.
+    for line in census.build_warnings():
+        print(line)

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import re
+import os
 import subprocess
 import sys
 import urllib.parse
@@ -33,6 +34,14 @@ from pathlib import Path
 import pytest
 
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats
+
+# NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
+# reads `reports/*.json`, which is built from the deployment's recorded
+# QA history - so it belongs in the CI job that bootstraps one. Nothing
+# in a signature says so, which is why the mark is here rather than
+# derived; tests/test_publish.py asserts it is not forgotten.
+pytestmark = pytest.mark.needs_deployment
+
 
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.html"
@@ -47,10 +56,76 @@ _BUILD_STEPS = [
 ]
 
 
+def _deployment_dsn():
+    import conftest
+    return getattr(conftest, "DEPLOYMENT_SUPPLY_DSN", None)
+
+
+def _deployment_environment():
+    import conftest
+    return getattr(conftest, "DEPLOYMENT_ENVIRONMENT", None)
+
+
+@pytest.fixture(autouse=True)
+def reads_the_deployments_history(supply_dsn, monkeypatch):
+    """Point THIS FILE's own reads at the deployment's database.
+
+    The same reasoning as `built_dashboard_html` below, one level up.
+    Several helpers here - `_real_amber_bdm_runs`, `status_by_run`,
+    the as-of date bounds - ask the reader for real QA history IN
+    PROCESS, and since REQ-PIPE-089 that reader goes to whatever
+    `MOTHMAN_SUPPLY_DSN` names. conftest points it at this worker's
+    own empty database, correctly, for every test that WRITES.
+
+    Autouse and scoped to this file, because this whole module is
+    about the real built dashboard and none of it writes supply data.
+    Restored by monkeypatch after each test, so nothing leaks to
+    another file sharing the worker.
+    """
+    dsn = _deployment_dsn()
+    if dsn:
+        monkeypatch.setenv("MOTHMAN_SUPPLY_DSN", dsn)
+        import conftest
+        conftest.use_deployment_environment(monkeypatch)
+
+
 @pytest.fixture(scope="session")
-def built_dashboard_html() -> Path:
+def built_dashboard_html(supply_dsn) -> Path:
+    """The real dashboard, built by the real chain.
+
+    IT BUILDS AGAINST THE DEPLOYMENT'S DATABASE, NOT THE WORKER'S, and
+    that is the point rather than a shortcut. This fixture's input is
+    recorded QA HISTORY - a shared, read-only corpus. It used to arrive
+    with the checkout as committed `qa_results/` files, so every worker
+    saw the same thing for free; REQ-PIPE-089 made it a database, and a
+    worker's database is empty by design, so building from one produces
+    an empty dashboard and 147 errors that name a subprocess rather
+    than the cause.
+
+    NOTHING HERE WRITES TO IT. The five build steps read recorded
+    results and write `reports/` and the built HTML; `--dist loadfile`
+    keeps this file on one worker, so there is no concurrent build
+    either. Reading a shared corpus is what this always did.
+
+    It needs the deployment's database POPULATED, which is
+    `mothman pipeline bootstrap` - see CLAUDE.md's setup section. That
+    is a real new requirement for running the suite, not an accident.
+    """
+    dsn = _deployment_dsn()
+    if not dsn:
+        pytest.fail(
+            "no deployment database to build the dashboard from. Set "
+            "MOTHMAN_SUPPLY_DSN and run `mothman pipeline bootstrap` - since "
+            "REQ-PIPE-089 the dashboard's input is recorded QA history in a "
+            "database rather than a committed tree, so a checkout alone is no "
+            "longer enough.")
+
+    env = {**os.environ, "MOTHMAN_SUPPLY_DSN": dsn}
+    # The environment the deployment's database is marked for (REQ-PIPE-107).
+    if _deployment_environment():
+        env["MOTHMAN_ENVIRONMENT"] = _deployment_environment()
     for module in _BUILD_STEPS:
-        subprocess.run([sys.executable, "-m", *module], cwd=ROOT, check=True)
+        subprocess.run([sys.executable, "-m", *module], cwd=ROOT, check=True, env=env)
     assert DASHBOARD_HTML.exists()
     return DASHBOARD_HTML
 
@@ -85,16 +160,59 @@ def _state_to_path(state: dict) -> str:
     if state["tier"] == "agency":
         return f"/agency/{quoted['agencyId']}"
     if state["tier"] == "dataset":
-        return f"/agency/{quoted['agencyId']}/collection/{quoted['collectionId']}/dataset/{quoted['datasetId']}"
+        path = (f"/agency/{quoted['agencyId']}/collection/{quoted['collectionId']}"
+                f"/dataset/{quoted['datasetId']}")
+        # The drill-down segments, added 2026-09-25 for
+        # post-build-review #11. They were missing, which made a test
+        # that passed a `columnName` silently drive a plain dataset URL
+        # - the assertion then measured the dataset page and said
+        # nothing about the column at all.
+        if state.get("columnName"):
+            path += f"/column/{quoted['columnName']}"
+            if state.get("checkKey"):
+                path += f"/check/{quoted['checkKey']}"
+        return path
     return "/"
 
 
-def _goto(page, html_path: Path, state: dict | None = None, as_of: str | None = None):
+def _goto(page, html_path: Path, state: dict | None = None, in_place_on: str | None = None):
+    """Navigate, and wait for the page to have actually RENDERED.
+
+    This used to end in `page.wait_for_timeout(500)`. With 126 call
+    sites that was over a minute of the gate spent asleep, and it was
+    wrong in both directions at once - slower than needed locally, and
+    too short on a loaded runner, which is how time-dependent flakes get
+    written. The template now bumps `data-render-count` at the end of
+    every render (the only thing that reads it is this function), so
+    there is a real condition to wait on.
+
+    THE FIDDLY PART IS TELLING THE TWO NAVIGATIONS APART. A goto to a
+    different path reloads the document, which resets the counter - so
+    the right condition is "has rendered at all". A goto that changes
+    only the fragment does NOT reload, so the counter keeps its value
+    and the right condition is "has rendered AGAIN". Waiting for the
+    wrong one of those either returns instantly on a stale render or
+    hangs forever. `window.__e2eMark` distinguishes them: set before
+    navigating, it survives a same-document hash change and does not
+    survive a reload.
+    """
     url = f"file://{html_path.resolve()}"
-    query = f"?asof={as_of}" if as_of else ""
+    query = f"?in-place-on={in_place_on}" if in_place_on else ""
     fragment = f"#{_state_to_path(state)}" if state else ""
+    try:
+        before = page.evaluate(
+            "() => { window.__e2eMark = true;"
+            "        return Number(document.documentElement.dataset.renderCount || 0); }")
+    except Exception:
+        before = 0  # no document yet - the first navigation of this page
     page.goto(url + query + fragment)
-    page.wait_for_timeout(500)
+    page.wait_for_function(
+        """(before) => {
+             const n = Number(document.documentElement.dataset.renderCount || 0);
+             if (!n) return false;
+             return !window.__e2eMark || n > before;
+           }""",
+        arg=before)
 
 
 class TestBuiltDashboardRenders:
@@ -112,21 +230,31 @@ class TestBuiltDashboardRenders:
 
 
 def test_raw_template_renders_with_zero_console_errors(clean_page):
-    """The raw-template-with-illustrative-mock-data scenario - stays its
-    own explicit test (module docstring) since TestBuiltDashboardRenders
-    above only ever exercises the real built output."""
+    """The raw, unembedded template - stays its own explicit test
+    (module docstring) since TestBuiltDashboardRenders above only ever
+    exercises the real built output.
+
+    WHAT THIS ASSERTS CHANGED with REQ-DASH-055. The template used to
+    fall back to an illustrative mock generator, so this checked that
+    agency cards appeared. That generator is gone and the whole tree now
+    comes from the embedded HIERARCHY, so an unembedded template
+    correctly renders NO cards - and has to say why, because a page
+    showing "0 agencies" claims something quite different from a page
+    nobody has built yet."""
     _goto(clean_page, TEMPLATE_HTML)
-    view_html = clean_page.locator("#view").inner_html()
-    assert view_html.strip()
-    assert clean_page.locator("#agency-grid .card").count() > 0
+    view_text = clean_page.locator("#view").inner_text()
+    assert view_text.strip()
+    assert clean_page.locator("#agency-grid .card").count() == 0
+    assert "no data embedded" in view_text.lower()
+    assert "0 agencies" not in view_text
 
 
-class TestAsOfDatePicking:
+class TestInPlaceOnDatePicking:
     def test_a_date_before_any_real_history_shows_no_data(self, clean_page, built_dashboard_html):
-        run_ids = list_run_ids("registry-services", "birth-registrations")
+        run_ids = list_run_ids("registry-services", "civil-registration")
         assert run_ids, "no real committed BDM history to test against"
         earliest_run_date = min(
-            read_dataset_stats("registry-services", "birth-registrations", rid)["manifest_entry"]["run_date"]
+            read_dataset_stats("registry-services", "civil-registration", rid)["arrival_record"]["received_at"][:10]
             for rid in run_ids
         )
         before_all_history = (date.fromisoformat(earliest_run_date) - timedelta(days=1000)).isoformat()
@@ -134,42 +262,147 @@ class TestAsOfDatePicking:
         _goto(
             clean_page, built_dashboard_html,
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-            as_of=before_all_history,
+            in_place_on=before_all_history,
         )
 
-        assert "No data" in clean_page.locator("#view h2").inner_text()
+        # `.view-head` rather than `#view h2` - see
+        # TestAnExhaustedScheduleIsLoud.test_it_is_not_rendered_as_red
+        # for why the pill moved (post-build-review #53).
+        assert "No data" in clean_page.locator(".view-head").first.inner_text()
+
+
+class TestTheInPlaceOnPanelSaysWhichPeriod:
+    """REQ-DASH-054 criteria 6, 8, 9 and 10, at the layer a reader sees.
+
+    THE DATA LAYER IS NOT ENOUGH HERE, and this project has the scar:
+    item 74 shipped a correct `reports/*.json` and a template whose own
+    transform silently dropped the new field, rendering a check with 14
+    real violations green. The lookups have their own unit tests in
+    tests-js/; what this holds is that the built page actually renders
+    what they answer.
+    """
+
+    def _open_panel(self, page):
+        page.click("#in-place-on-btn")
+        page.wait_for_selector("#in-place-on-panel.open")
+
+    def test_the_panel_names_the_period_per_calendar(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        self._open_panel(clean_page)
+        text = clean_page.locator("#in-place-on-periods").inner_text()
+        # This asset has two named calendars, and the same chosen date is a
+        # different period on each - which is the whole reason a reader
+        # needs telling rather than inferring it from the date.
+        assert "quarterly calendar" in text
+        assert "daily calendar" in text
+
+    def test_the_named_period_follows_the_date_the_reader_picks(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        self._open_panel(clean_page)
+        before = clean_page.locator("#in-place-on-periods").inner_text()
+        # A date inside the covered range but well away from the default,
+        # taken from the page's own embedded range rather than from a
+        # literal - a hard-coded date here would go stale the moment the
+        # calendars were re-authored.
+        first = clean_page.evaluate("() => coveredDateRange().first")
+        clean_page.evaluate("(d) => renderInPlaceOnPeriods(d)", first)
+        after = clean_page.locator("#in-place-on-periods").inner_text()
+        assert after != before, "the period statement did not follow the date"
+
+    def test_the_input_is_bounded_to_what_the_page_has_periods_for(self, clean_page, built_dashboard_html):
+        """Criterion 8. A native date input greys out anything outside
+        min/max, which puts the limit where the reader is choosing rather
+        than in a correction afterwards."""
+        _goto(clean_page, built_dashboard_html)
+        self._open_panel(clean_page)
+        bounds = clean_page.evaluate(
+            "() => ({min: document.getElementById('in-place-on-input').min,"
+            "        max: document.getElementById('in-place-on-input').max,"
+            "        range: coveredDateRange()})")
+        assert bounds["min"] == bounds["range"]["first"]
+        assert bounds["max"] == bounds["range"]["last"]
+        # And the maximum is NOT the future: criterion 3 embeds no period
+        # that has not begun, so there is nothing beyond it to offer.
+        assert bounds["max"] >= bounds["min"]
+
+    def test_an_out_of_range_date_by_url_says_so_and_offers_a_way_back(
+            self, clean_page, built_dashboard_html):
+        """Criteria 9 and 10. A URL is the way in - an old bookmark, a
+        hand-edited query string - and the input's own bounds cannot stop
+        any of those."""
+        _goto(clean_page, built_dashboard_html, in_place_on="1990-01-01")
+        notice = clean_page.locator("#in-place-on-range-notice")
+        assert notice.is_visible()
+        text = notice.inner_text()
+        assert "outside the dates" in text
+        # It states the covered range, so the reader knows what to ask for.
+        first = clean_page.evaluate("() => coveredDateRange().first")
+        assert first[:4] in text, "the notice does not state the covered range"
+
+        # The page itself is still there - every dataset resolved to a real
+        # state at that date, and hiding correct answers to make a point
+        # about the date is the empty view criterion 10 forbids.
+        assert clean_page.locator("#view").inner_html().strip()
+
+        clean_page.click("#in-place-on-range-reset")
+        # wait_for_function rather than wait_for_selector: the default
+        # selector state is "visible", and what is being waited for here is
+        # the element going hidden - which that condition can never see.
+        clean_page.wait_for_function(
+            "() => document.getElementById('in-place-on-range-notice').hidden")
+        assert "in-place-on=" not in clean_page.url
+
+    def test_a_date_inside_the_range_draws_no_notice_at_all(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.locator("#in-place-on-range-notice").is_hidden()
 
 
 class TestSupplyHistoryDrillDown:
-    def test_clicking_a_supply_history_entry_sets_the_as_of_date_to_that_run(self, clean_page, built_dashboard_html):
+    def test_clicking_a_supply_history_entry_sets_the_in_place_on_date_to_that_run(self, clean_page, built_dashboard_html):
         _goto(
             clean_page, built_dashboard_html,
             state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
         )
 
         # A run can legitimately land dated "today" (generator/anchor_date.py's
-        # own real wall-clock default), and setAsOfInUrl() deliberately drops
-        # the `asof` param entirely when it equals DEFAULT_AS_OF (today) - "a
+        # own real wall-clock default), and setInPlaceOnInUrl() deliberately drops
+        # the `in-place-on` param entirely when it equals DEFAULT_IN_PLACE_ON (today) - "a
         # plain shared link never implies someone deliberately chose a date"
         # (that function's own comment) - so this test needs a row whose
-        # run_date is NOT today, to actually exercise the asof=<date> case,
+        # run_date is NOT today, to actually exercise the in-place-on=<date> case,
         # not just whichever row happens to render first.
         toggle = clean_page.locator("#supply-history-toggle")
         if toggle.count():
             toggle.click()
 
-        rows = clean_page.locator(".supply-history tbody tr")
+        # RUN ROWS ONLY: a period with no supply (REQ-DASH-133) and a supply
+        # waiting for a person sit in the same history with no run to set.
+        rows = clean_page.locator(".supply-history tbody tr[data-run-date]")
         assert rows.count() > 0, "no real supply-history rows rendered - fixture/test drifted from real committed history"
-        today = date.today().isoformat()
+        # THE PAGE'S OWN DEFAULT, not `date.today()`. This read the
+        # CONTAINER's date until 2026-09-25, and the two are different
+        # calendar days for eight hours out of every twenty-four: the
+        # asset clock is Australia/Perth (REQ-PIPE-048), so between
+        # 16:00 and 24:00 UTC the page's default as-of is already
+        # tomorrow. The test then picked a row dated on the page's own
+        # default, setInPlaceOnInUrl() correctly dropped the parameter, and
+        # the assertion below failed on an entirely healthy page.
+        #
+        # Found by a real full-suite run in that window, 2026-09-25.
+        # Exactly the class of bug the requirement this suite covers
+        # exists to prevent, living in the test rather than the code -
+        # and unfixable by choosing a better hardcoded date, since the
+        # authoritative value is the one the code under test uses.
+        today = clean_page.evaluate("() => DEFAULT_IN_PLACE_ON")
         run_dates = rows.evaluate_all("els => els.map(el => el.dataset.runDate)")
         target_run_date = next((d for d in run_dates if d != today), None)
-        assert target_run_date, f"every real supply-history row is dated today ({today}) - can't exercise a real non-default as-of date"
+        assert target_run_date, f"every real supply-history row is dated on the page's own default as-of ({today}) - can't exercise a real non-default as-of date"
         target_index = run_dates.index(target_run_date)
 
         rows.nth(target_index).click()
         clean_page.wait_for_timeout(300)
 
-        assert f"asof={target_run_date}" in clean_page.url
+        assert f"in-place-on={target_run_date}" in clean_page.url
 
 
 class TestDarkModeToggle:
@@ -184,11 +417,71 @@ class TestDarkModeToggle:
         assert after_click in ("light", "dark")
 
         clean_page.reload()
-        clean_page.wait_for_timeout(300)
+        # WAITED FOR, NOT SLEPT FOR (2026-10-02). A fixed 300ms read the
+        # attribute before the reloaded ~8MB page had applied the stored
+        # theme when the full gate had every core busy - 'light' where
+        # 'dark' was stored, green alone and red under load. Waiting for
+        # the condition keeps the assertion exactly as strict: if the
+        # theme never comes back, this times out and the assert below
+        # reports what it found.
+        try:
+            clean_page.wait_for_function(
+                "t => document.documentElement.getAttribute('data-theme') === t",
+                arg=after_click, timeout=10_000)
+        except Exception:  # noqa: BLE001 - the assert below says what was found
+            pass
         after_reload = clean_page.evaluate("document.documentElement.getAttribute('data-theme')")
 
         assert after_reload == after_click
         assert clean_page.evaluate("localStorage.getItem('theme')") == after_click
+
+    def test_dark_mode_actually_renders_dark(self, clean_page, built_dashboard_html):
+        """The two tests either side of this one check that an ATTRIBUTE
+        flips and survives a reload. Neither checks that anything
+        renders differently - `data-theme="dark"` could be set on a page
+        whose CSS ignored it entirely and both would still pass.
+
+        Keith asked for this directly, 2026-09-20, after the same gap
+        turned up from the other end: REQ-DASH-012's only acceptance
+        criterion is that the choice persists, so the register could
+        claim dark mode was built and verified without anything ever
+        having looked at a colour.
+
+        So this measures real, resolved pixels in both themes -
+        `getComputedStyle` on `body`, via the WCAG relative-luminance
+        formula - and asserts the page is genuinely dark in one and
+        genuinely light in the other, with the text inverting to match.
+        """
+        _goto(clean_page, built_dashboard_html)
+
+        def render(theme: str) -> dict:
+            clean_page.evaluate(
+                "t => document.documentElement.setAttribute('data-theme', t)", theme)
+            clean_page.wait_for_timeout(250)
+            return clean_page.evaluate("""() => {
+              const lum = (s) => {
+                const [r, g, b] = s.match(/[\d.]+/g).slice(0, 3).map(Number);
+                const ch = (c) => {
+                  c = c / 255;
+                  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+                };
+                return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
+              };
+              const cs = getComputedStyle(document.body);
+              return {bg: lum(cs.backgroundColor), ink: lum(cs.color)};
+            }""")
+
+        light, dark = render("light"), render("dark")
+
+        # Genuinely dark/light, not merely different - a theme that
+        # swapped one mid-grey for another would pass a bare inequality.
+        assert dark["bg"] < 0.05, f"dark background is not dark (luminance {dark['bg']:.3f})"
+        assert light["bg"] > 0.5, f"light background is not light (luminance {light['bg']:.3f})"
+
+        # And the text inverts with it, rather than staying put and
+        # becoming unreadable against the new background.
+        assert dark["ink"] > dark["bg"], "dark mode renders dark text on a dark background"
+        assert light["ink"] < light["bg"], "light mode renders light text on a light background"
 
     def test_a_theme_url_param_never_overrides_localstorage_on_load(self, clean_page, built_dashboard_html):
         """Human-friendlier URLs (2026-09-18, running-thoughts.md #9) added
@@ -224,6 +517,20 @@ class TestRequirementsPanel:
         assert any(label in rows_text for label in ("Built", "In progress", "Not started"))
         assert "tests/" in rows_text or "tests-js/" in rows_text
 
+    def test_a_built_requirement_shows_who_signed_it_off(self, clean_page, built_dashboard_html):
+        """2026-09-20. Sign-off is enforced in CI, but CI is not where
+        anyone reads the register - the panel is, and a rule nobody can
+        see is the shape of the failure that prompted the field in the
+        first place. Asserted at the layer a human actually looks at,
+        per CLAUDE.md's own standing rule about verifying at the last
+        transform rather than the first."""
+        _goto(clean_page, built_dashboard_html)
+
+        clean_page.locator("#requirements-btn").click()
+        rows_text = clean_page.locator("#requirements-panel-body").inner_text()
+
+        assert "Signed off by" in rows_text
+
     def test_opening_it_is_a_real_history_entry_that_the_back_button_closes(self, clean_page, built_dashboard_html):
         """The 4 header side panels used to be DOM-only, outside browser
         history entirely - now unified under STATE.panel/?panel= (2026-09-18,
@@ -241,16 +548,43 @@ class TestRequirementsPanel:
         assert "panel=requirements" not in clean_page.url
         assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "true"
 
+    def test_the_status_filter_shows_only_the_chosen_status(self, clean_page, built_dashboard_html):
+        """REQ-DOCS-143 criterion 7 - retired requirements are filterable,
+        which needs a status filter at all. Asserted on the real register:
+        choosing 'Built' leaves only Built pills, and 'All' brings the rest
+        back."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#requirements-btn").click()
+        body = clean_page.locator("#requirements-panel-body")
+        everything = body.inner_text()
+
+        rows = body.locator("[data-req-row-status]")
+        all_rows = rows.count()
+
+        body.locator('[data-req-status="built"]').click()
+        statuses = {rows.nth(i).get_attribute("data-req-row-status") for i in range(rows.count())}
+        assert statuses == {"built"}, statuses
+        assert rows.count() < all_rows, "the real register has unbuilt requirements to hide"
+
+        body.locator('[data-req-status="all"]').click()
+        assert rows.count() == all_rows
+        assert body.inner_text() == everything
+
 
 class TestReleaseNotesPanel:
-    def test_opening_it_shows_real_entries_with_a_leading_timestamp(self, clean_page, built_dashboard_html):
-        """The 2026-09-18 CHANGELOG.md timestamp retrofit (plans/qa-
-        pipeline.md): every entry now carries a real AWST commit time,
-        parsed by dashboard/changelog_md.py and rendered by
-        renderChangelogPanel() ahead of the entry's own text - assert a
-        real `H:MMam`/`H:MMpm` timestamp actually renders, not just that
-        the panel has content (which the pre-timestamp version already
-        passed)."""
+    def test_it_reads_as_a_whats_new_page_not_an_engineering_log(self, clean_page, built_dashboard_html):
+        """Rewritten 2026-09-20 when CHANGELOG.md became CHANGELOG.yaml.
+
+        The previous version asserted a per-item `H:MMam` timestamp
+        rendered - a real assertion about the format that existed then,
+        and exactly the kind of detail the rewrite removed: entries are
+        grouped by day for an audience that does not need the minute.
+
+        What replaces it asserts what the new feed actually promises to a
+        reader: a dated day, one summary sentence they can stop at, real
+        headlines, and component tags. Plus the absence of the emoji that
+        used to lead each item - Keith's own call, and worth asserting
+        because nothing else would notice it creeping back."""
         _goto(clean_page, built_dashboard_html)
 
         clean_page.locator("#changelog-btn").click()
@@ -258,13 +592,36 @@ class TestReleaseNotesPanel:
         rows_text = body.inner_text()
 
         assert "No release notes yet" not in rows_text
-        assert re.search(r"\b\d{1,2}:\d{2}(am|pm)\b", rows_text), \
-            f"no real timestamp rendered in the release notes panel: {rows_text[:200]!r}"
+        # The day heading, in the one form this project writes a date in
+        # (REQ-DASH-071). It used to be the raw "2026-09-20" out of
+        # CHANGELOG.yaml, which criterion 7 rules out wherever a person
+        # can see it - so the ISO shape's ABSENCE is asserted too.
+        assert re.search(r"\b\w+day, \d{1,2} \w+ \d{4}\b", rows_text), \
+            f"no dated day rendered in the release notes panel: {rows_text[:200]!r}"
+        assert not re.search(r"\b\d{4}-\d{2}-\d{2}\b", rows_text), \
+            f"a raw ISO date reached the release notes panel: {rows_text[:200]!r}"
+        # A category heading and at least one component tag - the two
+        # things the rewrite explicitly KEPT.
+        assert any(c in rows_text for c in ("NEW", "IMPROVED", "FIXED")), rows_text[:300]
+        assert "QA checks & contract" in rows_text or "Docs & process" in rows_text
+
+        emoji = re.findall(r"[\U0001F300-\U0001FAFF]", rows_text)
+        assert not emoji, f"per-component emoji is back in the release notes: {emoji}"
 
 
-@pytest.fixture
-def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> Path:
-    """Item 76's UI-integration follow-up (plans/qa-pipeline.md,
+@pytest.fixture(scope="class")
+def dashboard_html_with_ticket(built_dashboard_html, tmp_path_factory) -> Path:
+    """CLASS-SCOPED (2026-09-27) because it rebuilds the dashboard, and
+    that costs ~6.5s every time. Function-scoped it was paid once per
+    TEST; the three fixtures of this shape accounted for about 65s of a
+    230s module. Nothing here mutates the built file, so one per class
+    is the same guarantee for a fraction of the cost.
+
+    It takes `tmp_path_factory` and its own `MonkeyPatch.context()`
+    rather than `tmp_path`/`monkeypatch`, which are function-scoped and
+    cannot be requested from a class-scoped fixture.
+
+    Item 76's UI-integration follow-up (plans/qa-pipeline.md,
     2026-09-18): a second built HTML, alongside the shared built_
     dashboard_html fixture, with a real (fake-for-the-test) open ticket
     injected via OPEN_TICKETS_JSON - the file only deploy-pages.yml's
@@ -289,6 +646,7 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> P
     here)."""
     from dashboard import embed_dashboard_data as edd
 
+    tmp_path = tmp_path_factory.mktemp("ticket")
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
     (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
@@ -300,9 +658,10 @@ def dashboard_html_with_ticket(built_dashboard_html, tmp_path, monkeypatch) -> P
         "updatedAt": "2026-09-18T00:00:00Z",
     }]))
     out_html = tmp_path / "dashboard_with_ticket.html"
-    monkeypatch.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
-    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
-    edd.embed()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(edd, "OPEN_TICKETS_JSON", tickets_path)
+        mp.setattr(edd, "DASHBOARD_HTML", out_html)
+        edd.embed()
     return out_html
 
 
@@ -325,102 +684,49 @@ class TestTicketBadge:
     def test_a_dataset_with_no_open_ticket_shows_no_badge(self, clean_page, dashboard_html_with_ticket):
         _goto(
             clean_page, dashboard_html_with_ticket,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "death-registrations"},
+            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "cp-clients"},
         )
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
 
-@pytest.fixture
-def dashboard_html_with_amber_decisions(built_dashboard_html, tmp_path, monkeypatch) -> Path:
-    """running-thoughts.md #6 ("read-only tension: accepting/rejecting
-    amber supplies") - same real-fake-injection shape as dashboard_html_
-    with_ticket above (a real gh call only deploy-pages.yml can make
-    locally), via QA_COMMENTS_JSON instead of OPEN_TICKETS_JSON. Targets
-    3 REAL, currently-amber committed runs (birth-registrations,
-    2026-05-22/23/24) - found by actually computing this dataset's own
-    per-run status from reports/birth_registrations_dashboard.json, not
-    assumed - so the decision badge's own real gating condition
-    (status==="amber") has genuine amber rows to attach to: one gets a
-    real /accept, one gets a real /reject, one gets neither."""
-    from dashboard import embed_dashboard_data as edd
+class TestAcknowledgementBadge:
+    """REQ-PIPE-122 criterion 21, which replaced REQ-QAC-017's per-run
+    /accept badge (retired by criterion 23): a promoted amber supply reads
+    "awaiting acknowledgement" from its promotion and "acknowledged by"
+    from the acknowledgement, judged as at the date on show. Injected onto
+    a real supply-history row, so it does not depend on which supplies a
+    bootstrap happened to promote under promote-and-acknowledge."""
 
-    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
-    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
+    PROMOTED = "2026-09-10T02:00:00+00:00"
+    ACKNOWLEDGED = "2026-09-15T02:00:00+00:00"
 
-    comments_path = tmp_path / "qa_comments.json"
-    comments_path.write_text(json.dumps([{
-        "number": 998, "labels": [{"name": "qa-ticket"}, {"name": "dataset:birth-registrations"}],
-        "comments": [
-            {
-                "author": {"login": "keithamoss"}, "body": "/accept",
-                "createdAt": "2026-05-22T10:00:00Z",
-                "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-1",
-            },
-            {
-                "author": {"login": "keithamoss"}, "body": "/reject",
-                "createdAt": "2026-05-24T10:00:00Z",
-                "url": "https://github.com/keithamoss/data-poc/issues/998#issuecomment-2",
-            },
-        ],
-    }]))
-    out_html = tmp_path / "dashboard_with_amber_decisions.html"
-    monkeypatch.setattr(edd, "QA_COMMENTS_JSON", comments_path)
-    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
-    edd.embed()
-    return out_html
+    def _page(self, built, tmp_path):
+        html = built.read_text()
+        start = html.index("const REAL_BIRTH_REG_DATA = ") + len("const REAL_BIRTH_REG_DATA = ")
+        end = html.index(";\n", start)
+        record = json.loads(html[start:end])
+        run_id = record["runs"][-1]["run_id"]
+        record["acknowledgements"] = {run_id: {
+            "supply": "birth-registrations@k", "period": "p", "promotedAt": self.PROMOTED,
+            "acknowledged": {"actor": "Keith Moss", "reason": "looked", "at": self.ACKNOWLEDGED},
+            "lapsedAt": None}}
+        out = tmp_path / "ack.html"
+        root = Path(__file__).resolve().parent.parent / "dashboard"
+        for name in ("fonts", "vendor"):
+            if not (tmp_path / name).exists():
+                (tmp_path / name).symlink_to((root / name).resolve())
+        out.write_text(html[:start] + json.dumps(record, separators=(",", ":")) + html[end:])
+        return out, run_id
 
+    def _badge(self, page, run_id, in_place_on):
+        return page.evaluate(f"() => acknowledgementBadge('birth-registrations', '{run_id}', '{in_place_on}')")
 
-class TestAmberDecisionBadge:
-    def test_a_real_accept_comment_shows_a_linked_badge_on_its_matching_amber_run(self, clean_page, dashboard_html_with_amber_decisions):
-        _goto(
-            clean_page, dashboard_html_with_amber_decisions,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-        )
-        toggle = clean_page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-
-        row = clean_page.locator('tr[data-run-date="2026-05-22"]')
-        assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
-        badge = row.locator("a.pill.tag[href*='issuecomment-1']")
-        assert badge.count() > 0, "no decision badge rendered on the real amber run it was accepted against"
-        assert "keithamoss" in badge.first.inner_text()
-        assert "Accepted" in badge.first.inner_text()
-
-    def test_a_real_reject_comment_shows_a_linked_rejection_badge_on_its_matching_amber_run(self, clean_page, dashboard_html_with_amber_decisions):
-        """Keith's own explicit call, 2026-09-19 (resolving plans/
-        conceptual-design.md Thread A's own parked amber-governance
-        question): a rejected run's pill still stays amber - only the
-        badge differs from accept's."""
-        _goto(
-            clean_page, dashboard_html_with_amber_decisions,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-        )
-        toggle = clean_page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-
-        row = clean_page.locator('tr[data-run-date="2026-05-24"]')
-        assert row.count() > 0, "the real amber run this test targets isn't in the rendered supply history"
-        status_pill_class = row.locator("td").nth(1).locator(".pill").first.get_attribute("class")
-        assert "amber" in status_pill_class, "reject must never repaint the pill away from amber"
-        badge = row.locator("a.pill.tag[href*='issuecomment-2']")
-        assert badge.count() > 0, "no rejection badge rendered on the real amber run it was rejected against"
-        assert "keithamoss" in badge.first.inner_text()
-        assert "Rejected" in badge.first.inner_text()
-
-    def test_a_different_amber_run_with_no_decision_comment_shows_no_badge(self, clean_page, dashboard_html_with_amber_decisions):
-        _goto(
-            clean_page, dashboard_html_with_amber_decisions,
-            state={"tier": "dataset", "agencyId": "registry-services", "collectionId": "civil-registration", "datasetId": "birth-registrations"},
-        )
-        toggle = clean_page.locator("#supply-history-toggle")
-        if toggle.count():
-            toggle.click()
-
-        row = clean_page.locator('tr[data-run-date="2026-05-23"]')  # a different real amber run, no comment
-        assert row.count() > 0
-        assert row.locator("a.pill.tag[href*='issuecomment']").count() == 0
+    def test_it_reads_as_at_the_date_on_show(self, page, tmp_path, built_dashboard_html):
+        out, run_id = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out)
+        assert self._badge(page, run_id, "2026-09-05") == ""
+        assert "awaiting acknowledgement" in self._badge(page, run_id, "2026-09-12")
+        assert "Acknowledged by Keith Moss" in self._badge(page, run_id, "2026-09-20")
 
 
 class TestDemoTab:
@@ -455,3 +761,3070 @@ class TestDemoTab:
 
         assert "#/demo" in clean_page.url
         assert clean_page.locator("h2", has_text="Demo").count() > 0
+
+
+class TestStatusMatchesEachToolsOwnVerdict:
+    """plans/qa-pipeline.md item 74's own follow-up, 2026-09-19 - the
+    test that would have caught the two bugs that shipped.
+
+    Item 74 made each check's real tool verdict authoritative and made
+    warn/fail thresholds nullable. That was verified by reading
+    reports/*.json and applying the rule in a throwaway script, which
+    proved the DATA layer and nothing else - it never exercised the
+    template's own buildRealDataset() transform, nor the Python mirror in
+    qa_tools/common/dataset_status.py. Both were wrong, and one of them
+    wrong in the dangerous direction: buildRealDataset() silently dropped
+    `current_status`, so a dbt not_null check with 14 real violations and
+    no configured fail threshold rendered GREEN.
+
+    So this asserts at the layer that was actually broken: it drives the
+    REAL built dashboard in a REAL browser and uses the page's OWN
+    buildRealDataset()/checkStatus()/historyStatus() against the real
+    embedded data, comparing every resulting status to the verdict the
+    real tool recorded for that same result. ~30k comparisons, a couple
+    of seconds - the whole point is that it crosses every transform
+    between committed qa_results/ history and what a human actually
+    sees, rather than stopping at the first one."""
+
+    _COMPARE_JS = """() => {
+      let compared = 0, missingVerdict = 0;
+      const disagreements = [];
+      for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+        if (!raw) continue;
+        for (const d of (raw.datasets ? raw.datasets : [raw])) {
+          const built = buildRealDataset(d);
+          d.columns.forEach((rawCol, ci) => {
+            rawCol.checks.forEach((rawCk, ki) => {
+              const builtCk = built.columns[ci].checks[ki];
+              rawCk.history.forEach((rawH, hi) => {
+                if (!rawH.status) { missingVerdict++; return; }
+                compared++;
+                const got = historyStatus(builtCk.history[hi], builtCk);
+                if (got !== rawH.status && disagreements.length < 10) {
+                  disagreements.push({check: rawCk.check_id, run: rawH.run_id,
+                                      tool: rawH.status, rendered: got, value: rawH.value,
+                                      warn: rawCk.warn, fail: rawCk.fail});
+                } else if (got !== rawH.status) { compared += 0; }
+              });
+              if (rawCk.current_status) {
+                compared++;
+                const got = checkStatus(builtCk);
+                if (got !== rawCk.current_status && disagreements.length < 10) {
+                  disagreements.push({check: rawCk.check_id, scope: "current",
+                                      tool: rawCk.current_status, rendered: got});
+                }
+              }
+            });
+          });
+        }
+      }
+      return {compared, missingVerdict, disagreements};
+    }"""
+
+    _IN_PLACE_ON_JS = """() => {
+      let compared = 0;
+      const disagreements = [];
+      for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+        if (!raw) continue;
+        for (const d of (raw.datasets ? raw.datasets : [raw])) {
+          for (const r of d.runs) {
+            const date = String(r.run_date).slice(0, 10);
+            const clipped = clipDatasetToInPlaceOn(d, date);
+            if (!clipped || !clipped.runs.length) continue;
+            const shown = clipped.runs[clipped.runs.length - 1].run_id;
+            const built = buildRealDataset(clipped);
+            built.columns.forEach(c => c.checks.forEach(ck => {
+              const h = ck.history.find(x => x.run_id === shown);
+              if (!h || !h.status) return;
+              compared++;
+              const got = checkStatus(ck);
+              if (got !== h.status && disagreements.length < 10) {
+                disagreements.push({dataset: d.id, inPlaceOn: date, check: ck.check_id || ck.id,
+                                    tool: h.status, rendered: got});
+              }
+            }));
+          }
+        }
+      }
+      return {compared, disagreements};
+    }"""
+
+    def test_on_every_past_date_too(self, clean_page, built_dashboard_html):
+        """dashboard UX critic on 8a942e7, H2: a past date kept each check's
+        NEWEST status, so 96 of 227 checks as of 2 May 2026 rendered a
+        colour their own run did not record - a check red that day read
+        green. This test only ever looked at the default date."""
+        _goto(clean_page, built_dashboard_html)
+        result = clean_page.evaluate(self._IN_PLACE_ON_JS)
+        assert result["compared"] > 100, result
+        assert result["disagreements"] == [], (
+            "on a past date the page disagrees with the run it shows:\n"
+            + "\n".join(str(d) for d in result["disagreements"]))
+
+    def test_every_rendered_status_matches_the_tool_that_produced_it(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        result = clean_page.evaluate(self._COMPARE_JS)
+
+        # This guard exists so a broken traversal cannot pass vacuously
+        # by comparing nothing. It used to read `> 10000`, a figure tied
+        # to BDM's 352-run history; cutting that to 30 deliveries on
+        # 2026-09-23 left 7,011 real comparisons and this fired BEFORE
+        # the disagreement check below - so the test reported a failure
+        # while the statuses it exists to police were in fact perfect.
+        #
+        # The floor is now derived from the data the page was built
+        # from: every committed run contributes statuses, so comparing
+        # fewer than one per run means the traversal, not the history.
+        committed_runs = sum(
+            len(list(d.iterdir()))
+            for d in (Path(__file__).resolve().parent.parent / "qa_results").glob("*/*")
+            if d.is_dir()
+        )
+        assert result["compared"] > committed_runs, (
+            f"only {result['compared']} statuses compared across {committed_runs} "
+            "committed runs - the embedded data or the traversal is wrong, "
+            "rather than the statuses being right"
+        )
+        assert result["disagreements"] == [], (
+            "the rendered dashboard disagrees with the tools' own verdicts:\n"
+            + "\n".join(str(d) for d in result["disagreements"])
+        )
+
+    def test_only_the_synthetic_placeholder_check_lacks_a_verdict(self, clean_page, built_dashboard_html):
+        """Every real result carries its own tool's verdict. The only
+        thing that legitimately doesn't is the "No automated quality rule
+        defined" placeholder the builders synthesize for a column no real
+        rule covers - and since 2026-09-19 even that states its own
+        status explicitly, so the threshold fallback has no live callers
+        at all. If this ever fails, some real result lost its verdict on
+        the way through - exactly the silent-drop class of bug this
+        whole class exists to catch."""
+        _goto(clean_page, built_dashboard_html)
+        names = clean_page.evaluate("""() => {
+          const out = new Set();
+          for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+            if (!raw) continue;
+            for (const d of (raw.datasets ? raw.datasets : [raw]))
+              for (const col of d.columns)
+                for (const ck of col.checks)
+                  for (const h of ck.history)
+                    if (!h.status) out.add(ck.name);
+          }
+          return [...out];
+        }""")
+        assert names == [], f"real checks are missing their tool verdict: {names}"
+
+
+# =====================================================================
+# REQ-DASH-026 - plain English as a check's primary headline.
+#
+# Driven in a real browser rather than jsdom for a specific reason:
+# renderCheckCard() is a closure inside openColumnDrawer(), so it never
+# becomes a window property the way a top-level function does, and half
+# of what this requirement asks for is not logic at all - a two-line
+# clamp is a computed style, and "a real link" means the BROWSER's
+# handling of a modifier-click, not ours.
+#
+# This is also the layer CLAUDE.md's own standing lesson points at: the
+# builders emitting a correct `tool_ref` says nothing about whether the
+# render layer, which has its own transform, puts it on the page.
+# =====================================================================
+
+_BDM = {"tier": "dataset", "agencyId": "registry-services",
+        "collectionId": "civil-registration", "datasetId": "birth-registrations"}
+
+
+def _open_first_column(page):
+    """Opens the first column drawer that actually has checks, and
+    returns that column's name."""
+    return page.evaluate("""() => {
+      const ctx = resolveContext(STATE);
+      const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+      openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+      return col.name;
+    }""")
+
+
+def _rewrite_checks(page, fields: dict):
+    """Overwrites hand-authored fields on every check of the first
+    column with checks, then re-renders. Used for the two cases no real
+    check can exercise - a description past the clamp, and prose
+    containing markup - both of which the requirement's own NFRs call
+    out as untestable against today's corpus."""
+    page.evaluate("""(fields) => {
+      const ctx = resolveContext(STATE);
+      const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+      col.checks.forEach(ck => Object.assign(ck, fields));
+      openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+    }""", fields)
+    page.wait_for_timeout(300)
+
+
+class TestCheckCardReadsAsPlainEnglish:
+    def test_the_headline_is_the_authored_name_with_description_and_tool_beneath(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        card = clean_page.locator(".check-card").first
+        headline = card.locator(".name").inner_text()
+        tool_ref = card.locator(".tool-ref").inner_text()
+
+        # The headline is prose a reader recognises, and carries no tool
+        # vocabulary at all - headings used to read "Invalid values -
+        # dbt:accepted_values (dbt-core)".
+        assert headline.strip()
+        assert not re.search(r"dbt|soda|datacontract|evidently", headline, re.I)
+        assert card.locator(".check-desc").inner_text().strip()
+        # ...and the tool trace is one line below, not a click away.
+        assert re.match(r"^(dbt|soda|datacontract|evidently):\S+$", tool_ref), tool_ref
+
+    def test_the_card_does_not_render_the_shared_category_label(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        assert clean_page.locator(".check-card .dim-tag").count() == 0
+
+    def test_the_tool_line_and_the_url_segment_are_the_same_string(
+            self, clean_page, built_dashboard_html):
+        """The reason for deriving the line from the check_id rather than
+        hand-authoring it: what a reader sees is what they can deep-link
+        to and grep the contract for."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        for i in range(clean_page.locator(".check-card").count()):
+            card = clean_page.locator(".check-card").nth(i)
+            tool, terse = card.locator(".tool-ref").inner_text().split(":", 1)
+            assert card.get_attribute("href").endswith(f"/check/{terse}_{tool}")
+
+
+class TestCheckCardIsARealLink:
+    def test_it_is_an_anchor_carrying_the_checks_own_deep_link(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        column = _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        card = clean_page.locator(".check-card").first
+        assert card.evaluate("e => e.tagName") == "A"
+        href = card.get_attribute("href")
+        assert f"/column/{column}/check/" in href
+
+    def test_a_plain_click_is_ours_but_a_modifier_click_is_the_browsers(
+            self, clean_page, built_dashboard_html):
+        """The whole point of the card being a link. If we swallowed
+        every click, cmd-click would silently do nothing instead of
+        opening a tab - which is worse than the div it replaced, because
+        the element now LOOKS like it should work."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        prevented = clean_page.evaluate("""() => {
+          const el = document.querySelector('.check-card');
+          const fire = init => {
+            const e = new MouseEvent('click', {bubbles: true, cancelable: true, ...init});
+            el.dispatchEvent(e);
+            return e.defaultPrevented;
+          };
+          return {plain: fire({button: 0}), meta: fire({button: 0, metaKey: true}),
+                  ctrl: fire({button: 0, ctrlKey: true}),
+                  shift: fire({button: 0, shiftKey: true})};
+        }""")
+
+        assert prevented == {"plain": True, "meta": False, "ctrl": False, "shift": False}
+
+    def test_a_plain_click_opens_that_exact_check(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.wait_for_timeout(300)
+
+        card = clean_page.locator(".check-card").first
+        headline = card.locator(".name").inner_text()
+        card.click()
+        clean_page.wait_for_timeout(400)
+
+        assert clean_page.locator("#check-panel-title").inner_text() == headline
+
+
+class TestLongDescriptionsAreClampedOnTheCardOnly:
+    _LONG = "long " * 62  # 310 chars; the longest real description is 156
+
+    def _lines(self, page, selector):
+        return page.locator(selector).first.evaluate("""e => {
+          const lh = parseFloat(getComputedStyle(e).lineHeight);
+          return {lines: Math.round(e.getBoundingClientRect().height / lh),
+                  clipped: e.scrollHeight > e.clientHeight + 1,
+                  chars: e.textContent.length};
+        }""")
+
+    def test_the_card_clamps_to_two_lines_and_the_panel_does_not(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        _rewrite_checks(clean_page, {"description": self._LONG})
+
+        card = self._lines(clean_page, ".check-card .check-desc")
+        assert card["chars"] == len(self._LONG)
+        assert card["lines"] == 2
+        assert card["clipped"] is True
+
+        clean_page.locator(".check-card").first.click()
+        clean_page.wait_for_timeout(400)
+        panel = self._lines(
+            clean_page,
+            "#check-panel-body .drawer-section:has(h4:text-is('What this check does')) div")
+        assert panel["chars"] == len(self._LONG)
+        assert panel["lines"] > 2
+        assert panel["clipped"] is False
+
+    def test_the_status_pill_holds_its_position_whatever_the_description(
+            self, clean_page, built_dashboard_html):
+        """Criterion's own wording. The clamp is what makes this true:
+        without it a long description would push each card's pill to a
+        different offset down the list."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        _rewrite_checks(clean_page, {"description": self._LONG})
+
+        offsets = clean_page.locator(".check-card").evaluate_all("""els => els.map(e => {
+          const pill = e.querySelector('.row1 .pill');
+          return Math.round(pill.getBoundingClientRect().top - e.getBoundingClientRect().top);
+        })""")
+        assert len(set(offsets)) == 1, offsets
+
+
+class TestAuthoredProseCannotAlterTheCard:
+    """No real check contains a quote or an angle bracket today - 6 of
+    257 contain an apostrophe and that is all. This is latent rather
+    than live, and it is covered precisely because the corpus is
+    hand-authored and growing: the protection has to hold for the check
+    somebody writes next year, not for the ones that exist now."""
+
+    _HOSTILE = {
+        "name": 'Quote " and <b>bold</b>',
+        "description": '</a><script>window.__pwned=1</script> & <img src=x onerror="window.__pwned=2">',
+    }
+
+    def test_markup_in_authored_fields_renders_as_text(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        before = clean_page.locator(".check-card").count()
+        _rewrite_checks(clean_page, self._HOSTILE)
+
+        card = clean_page.locator(".check-card").first
+        assert clean_page.locator(".check-card").count() == before
+        assert card.locator(".name").inner_text() == self._HOSTILE["name"]
+        assert card.locator(".name b").count() == 0
+        assert card.locator("img").count() == 0
+        assert clean_page.evaluate("() => window.__pwned ?? null") is None
+
+    def test_a_double_quote_in_a_name_does_not_break_out_of_the_aria_label(
+            self, clean_page, built_dashboard_html):
+        """The specific escape the requirement's NFR named. The label is
+        set with setAttribute rather than interpolated, so the quote is
+        simply part of the value."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        _rewrite_checks(clean_page, self._HOSTILE)
+
+        label = clean_page.locator(".check-card").first.get_attribute("aria-label")
+        assert label.startswith(self._HOSTILE["name"])
+
+
+class TestAuthoredProseCannotAlterTheDetailPanel:
+    """The card's own version of this is above. The panel has six more
+    hand-authored fields, and one of them is why an esc() helper was the
+    wrong shape: five were found by reading the panel's block builders,
+    and the sixth - the trend chart's SVG <title> annotations - was found
+    only by driving the real page and noticing a real <img> had appeared.
+    A helper protects the call sites somebody remembers to wrap, which is
+    the set you already know about.
+
+    Confirmed failing against the pre-fix build first: 1 injected <img>,
+    1 injected <b>, and window.__pwned set to 2 by the onerror handler.
+    An <img> inside an SVG <title> really does load.
+    """
+
+    _SCRIPTY = '</div><script>window.__pwned=1</script><img src=x onerror="window.__pwned=2">'
+    _QUOTED = 'Quote " and <b>bold</b>'
+
+    def _open_hostile_check(self, page):
+        page.evaluate("""([d, f]) => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          const ck = col.checks[0];
+          ck.description = d;
+          ck.failure_indicates = f;
+          // Two entries so BOTH chart annotations render - the breaking
+          // one draws a glyph between points, the non-breaking one a
+          // marker on a point, and they are built by separate code.
+          ck.changelog = [
+            {date: ck.history[Math.floor(ck.history.length / 2)].date,
+             description: d, author: f, breaking: true},
+            {date: ck.history[1].date, description: d, author: f, breaking: false},
+          ];
+          openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, ck);
+        }""", [self._SCRIPTY, self._QUOTED])
+        page.wait_for_timeout(600)
+
+    def test_nothing_authored_can_inject_an_element_into_the_panel(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        self._open_hostile_check(clean_page)
+
+        counts = clean_page.evaluate("""() => {
+          const body = document.getElementById('check-panel-body');
+          return {img: body.querySelectorAll('img').length,
+                  bold: body.querySelectorAll('b').length,
+                  script: body.querySelectorAll('script').length,
+                  pwned: window.__pwned ?? null};
+        }""")
+        assert counts == {"img": 0, "bold": 0, "script": 0, "pwned": None}
+
+    def test_the_authored_sections_still_show_their_real_text(
+            self, clean_page, built_dashboard_html):
+        """Rendering nothing would also pass the test above. The point is
+        that the prose appears, in full, as itself."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        self._open_hostile_check(clean_page)
+
+        shown = clean_page.evaluate("""() => {
+          const body = document.getElementById('check-panel-body');
+          const after = h => {
+            const head = [...body.querySelectorAll('h4')].find(x => x.textContent.includes(h));
+            return head ? head.nextElementSibling.textContent : null;
+          };
+          return {what: after('What this check does'),
+                  fail: after('What a failure means'),
+                  changelog_desc: body.querySelector('.changelog-desc').textContent,
+                  changelog_author: body.querySelector('.changelog-author').textContent};
+        }""")
+        assert shown["what"] == self._SCRIPTY
+        assert shown["fail"] == self._QUOTED
+        assert shown["changelog_desc"] == self._SCRIPTY
+        assert shown["changelog_author"].endswith(self._QUOTED)
+
+    def test_the_charts_own_annotations_hold_the_text_literally(
+            self, clean_page, built_dashboard_html):
+        """The one that was missed by reading the code. Both the breaking
+        glyph and the non-breaking marker build an SVG <title> from the
+        same authored description and author."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        self._open_hostile_check(clean_page)
+
+        titles = clean_page.locator("#check-panel-body svg title").all_text_contents()
+        annotations = [t for t in titles if t.startswith("Definition changed")]
+        assert len(annotations) == 2, titles
+        for t in annotations:
+            assert self._SCRIPTY in t
+            assert t.endswith(self._QUOTED)
+
+
+class TestSupplyAndTableLevelSections:
+    """REQ-DASH-033. Driven in a real browser because most of what this
+    requirement asks for only exists in a layout: where a section sits
+    relative to the column grid, whether it is absent rather than empty,
+    and what its own rollup pill says."""
+
+    _CP = {"tier": "dataset", "agencyId": "child-protection-family-support",
+           "collectionId": "child-protection", "datasetId": "cp-placements"}
+
+    def _sections(self, page):
+        return page.evaluate("""() => [...document.querySelectorAll('.scope-section')].map(s => ({
+            scope: s.dataset.scope,
+            title: s.querySelector('h3').textContent,
+            status: s.querySelector('.head .pill').textContent.trim(),
+            rows: [...s.querySelectorAll('.scope-check')].map(r => ({
+                name: r.querySelector('.nm').textContent,
+                tool: r.querySelector('.tr').textContent,
+            })),
+        }))""")
+
+    def test_every_section_renders_above_the_column_grid(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        sections = self._sections(clean_page)
+        # REQ-QAC-037 added the third. The ORDER is asserted, not just
+        # the set: supply, then table, then cross-table reads outward
+        # from the dataset, and a section appearing in a different place
+        # each page would be its own defect.
+        assert [s["scope"] for s in sections] == ["supply", "table", "cross-table"]
+        assert clean_page.evaluate("""() => {
+            const wrap = document.getElementById('scope-sections');
+            const grid = document.getElementById('col-grid');
+            return !!(wrap.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }""")
+
+    def test_a_section_is_omitted_rather_than_rendered_empty(
+            self, clean_page, built_dashboard_html):
+        """Real on today's data, not hypothetical - Birth Registrations
+        has supply-level checks and no table-level ones. This is the
+        case that choosing two sections over one grouped section made
+        load-bearing."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+
+        assert [s["scope"] for s in self._sections(clean_page)] == ["supply"]
+
+    def test_each_section_carries_its_own_status(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        by_scope = {s["scope"]: s["status"] for s in self._sections(clean_page)}
+        assert set(by_scope) == {"supply", "table", "cross-table"}
+        for status in by_scope.values():
+            assert status in {"Green", "Amber", "Red", "No rule defined", "No data"}
+        # they are genuinely rolled up independently, not all three
+        # showing the dataset's own status
+        assert len(set(by_scope.values())) > 1
+
+    def test_a_section_with_no_real_check_does_not_claim_green(
+            self, clean_page, built_dashboard_html):
+        """A real false green, found 2026-09-26.
+
+        post-build-review #4 already settled this - `rollupStatuses()`
+        carries a comment saying in as many words that "a section whose
+        only check is a placeholder rolls up GREEN ... precisely the
+        false green that finding is about". The fix went into that
+        function and the SECTION renderer kept its own reduce over
+        STATUS_ORDER, which has no entry for `inactive`, so the
+        comparison was always false and the seed value survived.
+
+        It became visible when REQ-QAC-037 moved cp-placements' two
+        table-level business rules into the cross-table section, leaving
+        its table section with nothing but the placeholder - and a Green
+        pill over the words "No automated quality rule defined".
+        """
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        table = next(s for s in self._sections(clean_page) if s["scope"] == "table")
+        assert [r["name"] for r in table["rows"]] == ["No automated quality rule defined"], (
+            "this dataset has a real table-level check now - the test needs a "
+            "different one, not deleting")
+        assert table["status"] == "No rule defined"
+
+    def test_the_pseudo_columns_no_longer_appear_among_the_real_columns(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        names = clean_page.locator("#col-grid .col-tile .name").all_text_contents()
+        assert names, "the column grid should still have real columns in it"
+        assert not [n for n in names if "level checks" in n.lower()]
+
+    def test_rows_sharing_a_name_are_told_apart_by_their_tool(
+            self, clean_page, built_dashboard_html):
+        """Three tools ask cp-placements' carer-approval question and
+        share one name by design (rule 19). Without the tool reference
+        the section reads as three identical rows."""
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        rows = [r for s in self._sections(clean_page) for r in s["rows"]]
+        by_name: dict[str, list[str]] = {}
+        for row in rows:
+            by_name.setdefault(row["name"], []).append(row["tool"])
+        shared = {name: tools for name, tools in by_name.items() if len(tools) > 1}
+        assert shared, "expected at least one name shared across tools"
+        # Per NAME, not across the whole section. Two differently-named
+        # rows may legitimately share a tool - "Client reference" and
+        # "Carer reference" are both soda:relationships - and an
+        # assertion over all repeated rows at once forbids that, which
+        # is a rule this page has never had.
+        for name, tools in shared.items():
+            assert len(set(tools)) == len(tools), f"{name!r} repeats a tool: {tools}"
+
+    def test_a_row_opens_that_check_directly_with_a_readable_url(
+            self, clean_page, built_dashboard_html):
+        """The column drawer exists to pick one check out of a column's
+        many; a section with three has already done that. And the URL
+        segment is the point of the rename - it used to encode as
+        %28table-level%20checks%29."""
+        _goto(clean_page, built_dashboard_html, self._CP)
+
+        clean_page.locator(".scope-section[data-scope='table'] .scope-check").first.click()
+        clean_page.wait_for_timeout(400)
+
+        assert clean_page.locator("#check-panel-title").inner_text()
+        assert not clean_page.evaluate(
+            "() => document.getElementById('drawer').classList.contains('open')")
+        assert "/column/table/check/" in clean_page.url
+        assert "%28" not in clean_page.url
+
+
+# =====================================================================
+# REQ-QAC-039 - the tree the page renders IS the tree in
+# contract/data-asset.yaml, not a second copy of it.
+#
+# Driven in a real browser for the reason CLAUDE.md's own shape-change
+# lesson gives: embed_dashboard_data.py writing a correct HIERARCHY
+# const says nothing about whether buildData(), which has its own
+# transform, actually uses it. Before this the two real agencies and
+# collections were literals in the template, and a rename in the config
+# would have left the real dataset tiles hanging under a stale id with a
+# dead URL - failing silently, in the direction that looks fine.
+# =====================================================================
+
+class TestTheRenderedTreeComesFromTheHierarchy:
+    def _config_tree(self):
+        from qa_tools.common import hierarchy
+        out = {}
+        for entry in hierarchy.all_datasets():
+            out.setdefault((entry.agency_id, entry.agency_name), set()).add(
+                (entry.collection_id, entry.collection_name))
+        return out
+
+    def test_the_real_agency_and_collection_nodes_match_the_config(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "executive"})
+        rendered = clean_page.evaluate("""() => buildData(CURRENT_IN_PLACE_ON).agencies.map(a => ({
+            id: a.id, name: a.name,
+            collections: a.collections.map(c => ({id: c.id, name: c.name})),
+        }))""")
+        by_id = {a["id"]: a for a in rendered}
+        for (agency_id, agency_name), collections in self._config_tree().items():
+            assert agency_id in by_id, f"{agency_id} is in the config but not on the page"
+            assert by_id[agency_id]["name"] == agency_name
+            on_page = {(c["id"], c["name"]) for c in by_id[agency_id]["collections"]}
+            assert collections <= on_page, (
+                f"{agency_id}: config has {collections - on_page} that the page does not")
+
+    def test_the_page_carries_the_hierarchy_const_at_all(
+            self, clean_page, built_dashboard_html):
+        """A guard against the const silently becoming null in the built
+        output - every assertion above would still pass on the
+        template's own illustrative fallback, which happens to agree
+        with the config today. That is exactly the shape of false green
+        this requirement exists to remove."""
+        _goto(clean_page, built_dashboard_html, {"tier": "executive"})
+        embedded = clean_page.evaluate("() => HIERARCHY")
+        assert embedded is not None, "the built dashboard embedded no HIERARCHY"
+        assert {a["id"] for a in embedded["agencies"]} == {
+            agency_id for agency_id, _ in self._config_tree()}
+
+
+# =====================================================================
+# REQ-PIPE-048 - "today" is answered on the ASSET's clock, not on
+# whichever clock the person looking at the page happens to be on.
+#
+# This was a live bug, not a hypothetical one. liveNowDateStr() used
+# toISOString(), which is UTC, so between midnight and 08:00 in Perth
+# the dashboard's default as-of date was YESTERDAY - every working
+# morning, for eight hours. It went unnoticed because the page tends to
+# get opened later in the day, which is exactly why it needs a test
+# rather than a careful reader.
+#
+# Driven in a real browser with the viewer's timezone pinned, because
+# that IS the variable: no amount of reading the Python side can tell
+# you what a browser in New York does with it.
+# =====================================================================
+
+class TestTodayIsTheAssetsToday:
+    def _asset_today(self) -> str:
+        from qa_tools.common import asset_time
+        return asset_time.now().date().isoformat()
+
+    @pytest.mark.parametrize("viewer_tz", [
+        "UTC",                 # the old behaviour's own zone
+        "America/New_York",    # a day behind Perth for most of the day
+        "Pacific/Kiritimati",  # UTC+14, a day AHEAD of Perth
+        "Australia/Perth",     # the asset's own
+    ])
+    def test_the_default_in_place_on_date_is_the_assets_date_whatever_zone_the_viewer_is_in(
+            self, browser, built_dashboard_html, viewer_tz):
+        context = browser.new_context(timezone_id=viewer_tz)
+        try:
+            page = context.new_page()
+            page.goto(f"file://{built_dashboard_html}")
+            page.wait_for_timeout(400)
+            got = page.evaluate("() => ({today: liveNowDateStr(), default: defaultInPlaceOn()})")
+        finally:
+            context.close()
+        assert got["today"] == self._asset_today(), (
+            f"a viewer in {viewer_tz} sees {got['today']} as today; the asset's date is "
+            f"{self._asset_today()}")
+        assert got["default"] == self._asset_today()
+
+    def test_the_page_knows_which_zone_that_is(self, clean_page, built_dashboard_html):
+        """Guards the assertions above against going green by accident.
+        With ASSET_TIMEZONES absent the page falls back to the viewer's
+        own clock, which agrees with the asset's for most of the day -
+        so every test above would pass on the broken build for sixteen
+        hours out of every twenty-four."""
+        from qa_tools.common import asset_time
+        _goto(clean_page, built_dashboard_html, {"tier": "executive"})
+        # EVERY VERSION (REQ-PIPE-112 criterion 11), as the config states them.
+        assert clean_page.evaluate("() => ASSET_TIMEZONES") == [
+            {"effective_from": v.effective_from.isoformat(), "zone": v.zone.key}
+            for v in asset_time.timezone_versions()]
+
+
+class TestAnExhaustedScheduleIsLoud:
+    """REQ-PIPE-053, asserted where a person actually looks.
+
+    The requirement exists because a schedule running out looks exactly
+    like a healthy feed: no periods, no slots, nothing owed, nothing
+    overdue, everything green. So the assertions here are about what is
+    ON THE PAGE, not about what the model computed - a correct
+    derivation nobody can see is the same failure in a different place.
+
+    The real quarterly calendar's last date is 2027-11-01, and
+    cp-case-workers takes only February and August, so it runs out at
+    2027-Q3 while its five siblings run to 2027-Q4. That gap gives a
+    real window - autumn 2027 - where exactly ONE dataset is exhausted
+    among five that are not, which is the case a rollup most wants to
+    swallow.
+
+    THE WINDOW STARTS WHEN ITS LAST SLOT CLOSES (REQ-DASH-155 criterion 6;
+    Keith, 2026-10-06), not at 2027-Q3's own date: the Q3 slot stays open
+    until Q4's claim window opens in late October, and its siblings' Q4
+    slot until early 2028. 15 September, the old date, is inside the open
+    Q3 slot, where the pipeline still files a supply.
+    """
+
+    ONE_EXHAUSTED = "2027-12-15"
+    ALL_EXHAUSTED = "2028-06-01"
+    NONE_EXHAUSTED = "2026-09-23"
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-case-workers"}
+
+    def test_nothing_is_said_while_the_calendar_still_has_dates(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.NONE_EXHAUSTED)
+        assert page.locator(".notice-exhausted").count() == 0
+
+    def test_the_executive_tier_says_how_many_above_the_grid(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
+        notice = page.locator(".notice-exhausted")
+        assert notice.count() == 1
+        text = " ".join(notice.inner_text().split())
+        assert "1 dataset cannot be filed" in text
+        assert "delivery dates have run out" in text
+        assert "Case Workers" in text, "the dataset is named (post-build-review #132 A4)"
+
+    def test_the_count_tracks_the_in_place_on_date(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ALL_EXHAUSTED)
+        text = " ".join(page.locator(".notice-exhausted").inner_text().split())
+        assert "6 datasets cannot be filed" in text
+
+    def test_the_notice_names_the_file_to_edit(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
+        text = " ".join(page.locator(".notice-exhausted").inner_text().split())
+        assert "contract/calendar.yaml" in text
+        assert "candidate-dates" in text, "and how to get the next dates proposed"
+
+    def test_the_notice_cannot_be_dismissed(self, page, dashboard_html_without_blockers):
+        """A dismissible notice about a task nobody has done is a notice
+        about a task nobody will do - and a dismissal persisted in
+        browser storage would hide it for that person permanently."""
+        _goto(page, dashboard_html_without_blockers, in_place_on=self.ONE_EXHAUSTED)
+        assert page.locator(".notice-exhausted button").count() == 0
+        assert page.locator(".notice-exhausted [role=button]").count() == 0
+        stored = page.evaluate(
+            "() => JSON.stringify({l: {...localStorage}, s: {...sessionStorage}})")
+        assert "exhaust" not in stored.lower(), stored
+        assert "dismiss" not in stored.lower(), stored
+
+    def test_one_exhausted_dataset_among_five_healthy_is_not_swallowed(self, page, dashboard_html_without_blockers):
+        """The nodata trap, at the tier it would vanish from."""
+        _goto(page, dashboard_html_without_blockers, state={"tier": "agency", "agencyId": self.CP},
+              in_place_on=self.ONE_EXHAUSTED)
+        rows = page.locator("tr", has=page.locator("td", has_text="Delivery schedule ended"))
+        assert rows.count() == 1
+        assert "Case Workers" in rows.first.inner_text()
+
+    def test_the_dataset_itself_says_so_in_its_own_words(self, page, dashboard_html_without_blockers):
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "delivery schedule has ended" in text.lower()
+        assert "contract/calendar.yaml" in text
+
+    def test_it_names_the_datasets_own_last_period_not_its_calendars(self, page, dashboard_html_without_blockers):
+        """cp-case-workers' last owed period is 2027-Q3; the quarterly
+        calendar runs to 2027-Q4. Naming the calendar's would tell a
+        reader their dataset ended after a period it never had."""
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "2027-Q3" in text
+        assert "2027-Q4" not in text
+
+    def test_it_reads_differently_from_a_dataset_that_simply_has_no_run(self, page, dashboard_html_without_blockers):
+        """Both are quiet tiles. Only one of them is somebody's job, and
+        identical wording is exactly what would hide that."""
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
+        ended = " ".join(page.locator("#view").inner_text().split())
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on="2023-01-01")
+        no_run = " ".join(page.locator("#view").inner_text().split())
+        assert ended != no_run
+        assert "schedule has ended" in ended.lower()
+        assert "schedule has ended" not in no_run.lower()
+
+    def test_it_is_not_rendered_as_red(self, page, dashboard_html_without_blockers):
+        """A supplier's clean dataset reading red because WE forgot to
+        type next year's dates is an attribution error, and the fastest
+        way to teach people that red does not mean what it says."""
+        _goto(page, dashboard_html_without_blockers, state=self.DS, in_place_on=self.ONE_EXHAUSTED)
+        # `.view-head` rather than `#view h2` since 2026-09-25: the
+        # status pill moved OUT of the heading and into the right-hand
+        # cluster every other dataset page puts it in
+        # (post-build-review #53 - a reader who has learned "status is
+        # top-right" was finding it top-left, 630px away). What this
+        # test is about is which status shows, not which element holds
+        # it.
+        head = page.locator(".view-head").first
+        assert head.locator(".pill.exhausted").count() == 1
+        assert head.locator(".pill.red").count() == 0
+
+    def test_the_page_still_has_zero_console_errors(self, clean_page, dashboard_html_without_blockers):
+        """`clean_page`, NOT `page` (plans/post-build-review.md #43).
+
+        This used to take the plain `page` fixture and register only a
+        `console` handler of its own - so an UNCAUGHT EXCEPTION slipped
+        straight past it. It passed while the very dataset page it
+        navigates to was throwing a TypeError (#5). The suite's own
+        `clean_page` fixture has registered both `console` and
+        `pageerror` all along, and asserts them empty in teardown.
+        """
+        for in_place_on in (self.NONE_EXHAUSTED, self.ONE_EXHAUSTED, self.ALL_EXHAUSTED):
+            _goto(clean_page, dashboard_html_without_blockers, in_place_on=in_place_on)
+            _goto(clean_page, dashboard_html_without_blockers, state=self.DS, in_place_on=in_place_on)
+
+
+def _contrast(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    """WCAG relative-luminance contrast ratio between two sRGB triples."""
+    def lum(rgb):
+        chan = []
+        for v in rgb:
+            v /= 255
+            chan.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * chan[0] + 0.7152 * chan[1] + 0.0722 * chan[2]
+    hi, lo = max(lum(a), lum(b)), min(lum(a), lum(b))
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _rgb(css: str) -> tuple[float, float, float]:
+    nums = [float(n) for n in re.findall(r"[\d.]+", css)]
+    return tuple(nums[:3])
+
+
+class TestQuietStatesAreVisiblyBuilt:
+    """Two post-build critic findings, verified at the layer a human
+    sees (plans/post-build-review.md #49 and #54, signed off by Keith
+    2026-09-24).
+
+    Both are asserted against RENDERED values in a real browser rather
+    than against the CSS rule that produces them, because both defects
+    were invisible in source and only turned up when something was
+    actually measured - which is CLAUDE.md's own "verify at the LAST
+    transform before the user" lesson, and the reason these live here
+    rather than in tests-js/ (jsdom computes no layout and no cascade).
+    """
+
+    def _cards(self, page):
+        return page.evaluate("""() => [...document.querySelectorAll('#agency-grid .card')].map(card => {
+            const meta = card.querySelector('.card-meta');
+            if(!meta) return null;
+            return Math.round(card.getBoundingClientRect().bottom - meta.getBoundingClientRect().bottom);
+        }).filter(v => v !== null)""")
+
+    def test_every_agency_card_pins_its_meta_row_to_the_same_place(self, clean_page, built_dashboard_html):
+        """A one-line agency title and a three-line one must not put the
+        meta row at two different heights.
+
+        The grid stretches every card in a row to one height, so a card
+        whose content is shorter gets the slack as dead space at the
+        BOTTOM unless the meta row is pushed down - which is what a
+        reader reads as "this card is unfinished". Measured 69px against
+        19px on the two real cards before the fix.
+        """
+        _goto(clean_page, built_dashboard_html)
+        gaps = self._cards(clean_page)
+        assert len(gaps) >= 2, "needs at least two real agency cards to compare"
+        assert len(set(gaps)) == 1, (
+            f"agency cards end their meta rows at {gaps} px above the card's own bottom edge - "
+            "they should all be the card's own padding, so the rows line up across cards")
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_the_nodata_pills_border_is_at_least_as_visible_as_its_own_label(
+            self, clean_page, dashboard_html_without_blockers, theme):
+        """`.pill.nodata` is distinguished from `.pill.exhausted` by a
+        DASHED rather than solid border - the template's own comment
+        says so. That distinction is only real if the border can be
+        seen: it measured 1.51:1 against its own fill in both themes,
+        which is not visible at all, while the label beside it measured
+        2.81:1 light / 3.55:1 dark.
+
+        The bar here is deliberately "at least as visible as the text
+        next to it" rather than WCAG's 3:1 for non-text contrast. The
+        muted tokens do not meet 3:1 yet and raising them is a separate,
+        wider decision (post-build-review #49, folded into one
+        accessibility pass with #8/#9/#10/#55) - this test guards the
+        narrower property that was actually signed off, and will keep
+        holding when that pass raises the token.
+
+        ON THE PAGE WITHOUT BLOCKERS OR GAPS (2026-10-05): on the real
+        corpus every dataset now has a closed, unmarked period by 2027 and
+        reads red (REQ-DASH-133), so no nodata pill is left to measure.
+        This is about the pill's styling, not the corpus.
+        """
+        _goto(clean_page, dashboard_html_without_blockers, in_place_on="2027-09-01")
+        clean_page.evaluate(f"document.documentElement.setAttribute('data-theme', '{theme}')")
+        pill = clean_page.locator(".pill.nodata").first
+        pill.wait_for(state="attached")
+        styles = pill.evaluate("""el => {
+            const s = getComputedStyle(el);
+            return {bg: s.backgroundColor, border: s.borderTopColor, text: s.color};
+        }""")
+        bg = _rgb(styles["bg"])
+        border_contrast = _contrast(_rgb(styles["border"]), bg)
+        text_contrast = _contrast(_rgb(styles["text"]), bg)
+        assert border_contrast >= text_contrast - 0.05, (
+            f"{theme}: the nodata pill's border is {border_contrast:.2f}:1 against its own fill while "
+            f"its label is {text_contrast:.2f}:1 - a border nobody can see is not a distinction")
+
+
+class TestTheExecutiveLegendCountsWhatIsActuallyThere:
+    """post-build-review #1, Keith's option (b), 2026-09-24.
+
+    The green figure was computed as `total - red - amber`, so an
+    agency whose status is `nodata` or `exhausted` landed in the green
+    bucket by arithmetic. The single most prominent number on the
+    landing page could state that both agencies were healthy directly
+    above a notice saying six datasets could not be processed.
+
+    Option (b) was to give the quiet states their own counters rather
+    than drop them from the totals, so the legend also stops naming
+    three statuses when the vocabulary has five.
+    """
+
+    ALL_QUIET = "2028-01-01"   # past the quarterly calendar's last period
+    NOTHING_YET = "2022-01-01"  # before any real history exists
+    NORMAL = None
+
+    def _legend(self, page):
+        return page.locator("#view .legend-key").first.inner_text()
+
+    def test_no_agency_is_counted_green_when_none_is_green(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ALL_QUIET)
+        statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
+        assert "green" not in statuses, "precondition - no agency should be green at this as-of"
+        assert re.search(r"Green[^(]*\(0\b", self._legend(clean_page)), (
+            f"legend claims green agencies that do not exist: {self._legend(clean_page)}")
+
+    def test_the_quiet_states_are_named_and_counted(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, in_place_on=self.ALL_QUIET)
+        legend = self._legend(clean_page)
+        statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
+        for label, status in (("No data", "nodata"), ("Schedule ended", "exhausted")):
+            if status in statuses:
+                assert label in legend, f"{status!r} is on the page and absent from the legend"
+
+    def test_every_counter_sums_to_the_number_of_agencies(self, clean_page, built_dashboard_html):
+        """The arithmetic bug was a subtraction that could not be
+        checked. Whatever the legend shows must add up."""
+        for in_place_on in (self.NORMAL, self.ALL_QUIET, self.NOTHING_YET):
+            _goto(clean_page, built_dashboard_html, in_place_on=in_place_on)
+            total = clean_page.evaluate("() => DATA.agencies.length")
+            counted = sum(int(n) for n in re.findall(r"\((\d+)\)", self._legend(clean_page)))
+            assert counted == total, (
+                f"in_place_on={in_place_on}: legend counts {counted} of {total} agencies: "
+                f"{self._legend(clean_page)}")
+
+    def test_a_normal_in_place_on_still_reads_the_way_it_always_did(self, clean_page, built_dashboard_html):
+        """The quiet counters must not become permanent furniture on a
+        page where nothing is quiet."""
+        _goto(clean_page, built_dashboard_html, in_place_on=self.NORMAL)
+        legend = self._legend(clean_page)
+        statuses = clean_page.evaluate("() => DATA.agencies.map(a => a.status)")
+        if "nodata" not in statuses:
+            assert "No data" not in legend
+        if "exhausted" not in statuses:
+            assert "Schedule ended" not in legend
+
+
+def _open_a_drawer(page):
+    """Open the Past snapshots panel, by its label."""
+    page.get_by_text("Past snapshots", exact=False).first.click()
+    page.wait_for_timeout(300)
+
+
+class TestTheKeyboardCanReachTheData:
+    """The accessibility cluster: post-build-review #8, #9, #10 and #55,
+    signed off together 2026-09-25.
+
+    Four findings that are really one job. A reader who does not use a
+    mouse could reach Tier 1 and Tier 3 but not Tier 2 - so keyboard
+    navigation dead-ended exactly one level above the data this
+    dashboard exists to show - while focus could disappear into
+    off-screen drawers, seven of eleven interactive element types had no
+    visible focus ring, and nothing announced a route change at all.
+    """
+
+    # Registry Services rather than Child Protection, deliberately:
+    # three of the six CP datasets still throw on drill-down
+    # (post-build-review #5, not yet signed off), and that throw aborts
+    # navigate() before history.pushState - so a row click there does
+    # not change the URL at all. These tests are about keyboard
+    # equivalence, not about that bug, and must not be green or red
+    # because of it.
+    AGENCY = {"tier": "agency", "agencyId": "registry-services"}
+
+    def test_every_dataset_row_is_in_the_tab_order(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        tabindexes = clean_page.evaluate(
+            "() => [...document.querySelectorAll('tr[data-nav]')].map(t => t.tabIndex)")
+        assert tabindexes, "precondition - the agency page must render dataset rows"
+        assert all(t >= 0 for t in tabindexes), (
+            f"dataset rows are unreachable by keyboard: tabIndex values {tabindexes}")
+
+    def test_a_dataset_row_navigates_on_enter(self, clean_page, built_dashboard_html):
+        """The property that matters is operability, not the attribute."""
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        clean_page.locator("tr[data-nav]").first.focus()
+        clean_page.keyboard.press("Enter")
+        clean_page.wait_for_timeout(300)
+        assert "/dataset/" in clean_page.url, (
+            f"Enter on a focused dataset row did not drill in: {clean_page.url}")
+
+    def test_nothing_inside_a_closed_drawer_can_take_focus(self, clean_page, built_dashboard_html):
+        """Focusable content inside `aria-hidden` is a WCAG 4.1.2
+        violation, and to a keyboard user it simply reads as "Tab
+        stopped working" - the focus ring vanishes off-screen."""
+        _goto(clean_page, built_dashboard_html)
+        stuck = clean_page.evaluate("""() => {
+            const out = [];
+            document.querySelectorAll('.drawer:not(.open)').forEach(drawer => {
+                drawer.querySelectorAll('a,button,input,select,textarea,[tabindex]')
+                      .forEach(el => {
+                          el.focus();
+                          if(document.activeElement === el) out.push(drawer.id);
+                      });
+            });
+            return [...new Set(out)];
+        }""")
+        assert not stuck, f"closed drawers still hold focusable controls: {stuck}"
+
+    def test_an_open_drawer_can_still_be_used(self, clean_page, built_dashboard_html):
+        """Whatever hides the closed ones must not hide the open one."""
+        _goto(clean_page, built_dashboard_html)
+        # By its text, not by `.snapshots-btn` - that class is on every
+        # masthead chip, and `.first` is "Dark mode", which opens no
+        # drawer at all. An earlier draft of this test did exactly that
+        # and passed without ever opening one.
+        _open_a_drawer(clean_page)
+        assert clean_page.locator(".drawer.open").count() == 1, "precondition - a drawer must be open"
+        reachable = clean_page.evaluate("""() => {
+            const open = document.querySelector('.drawer.open');
+            const el = open.querySelector('button, a, input');
+            el.focus();
+            return document.activeElement === el;
+        }""")
+        assert reachable, "an OPEN drawer's own controls cannot take focus"
+
+    @pytest.mark.parametrize("selector", [
+        ".crumb", ".col-tile", ".snapshots-btn", ".drawer-close",
+    ])
+    def test_interactive_things_have_a_designed_focus_ring(
+            self, clean_page, built_dashboard_html, selector):
+        """Seven of eleven element types fell back to Chrome's own
+        1px ring. The bar is that focus is styled deliberately, not that
+        it is styled identically - the four that already had rings carry
+        their own offsets on purpose."""
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": "registry-services",
+            "collectionId": "civil-registration", "datasetId": "birth-registrations"})
+        # A closed drawer is inert now, so its own close button cannot
+        # take focus until the drawer is open - which is the point of
+        # the change above, not a gap in this one.
+        if selector == ".drawer-close":
+            _open_a_drawer(clean_page)
+        # Chrome decides :focus-visible from how the LAST interaction
+        # arrived, so a programmatic .focus() after a mouse click gets
+        # no ring however the CSS is written. One Tab puts the browser
+        # back in keyboard mode, which is the mode this test is about.
+        clean_page.keyboard.press("Tab")
+        found = clean_page.evaluate("""(sel) => {
+            const el = document.querySelector(sel + ":not([inert] *)");
+            if(!el) return null;
+            el.focus();
+            const s = getComputedStyle(el);
+            return {style: s.outlineStyle, width: s.outlineWidth, color: s.outlineColor};
+        }""", selector)
+        assert found, f"no {selector} on the page to focus"
+        assert found["style"] == "solid" and found["width"] != "0px", (
+            f"{selector} falls back to the browser's default focus ring: {found}")
+
+    def test_the_page_title_says_which_view_you_are_on(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        exec_title = clean_page.title()
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        agency_title = clean_page.title()
+        assert agency_title != exec_title, (
+            f"the title never changes - both views are titled {exec_title!r}")
+        assert "Registry Services" in agency_title
+
+    def test_a_route_change_is_announced_and_moves_focus(self, clean_page, built_dashboard_html):
+        """Without either, a screen-reader user who activates a row is
+        told nothing and left where they were."""
+        _goto(clean_page, built_dashboard_html, state=self.AGENCY)
+        clean_page.locator("tr[data-nav]").first.click()
+        clean_page.wait_for_timeout(400)
+        focused = clean_page.evaluate("() => document.activeElement.tagName")
+        assert focused != "BODY", "focus was not moved to the new view"
+        announced = clean_page.evaluate(
+            "() => (document.querySelector('[aria-live]') || {}).textContent || ''")
+        assert announced.strip(), "nothing was announced for the route change"
+
+
+class TestEveryDatasetPageSurvivesItsOwnDrillDown:
+    """post-build-review #5, signed off 2026-09-25.
+
+    A column with no real rule gets a synthesised placeholder check, and
+    that placeholder had no `key`. The scope-section renderer writes
+    `data-check="${ck.key}"`, so the attribute became the literal string
+    "undefined"; the re-lookup compared `undefined === "undefined"`,
+    matched nothing, and dereferenced it.
+
+    Three of seven datasets throw - precisely the three carrying a
+    TABLE-scope placeholder, which is the only scope that loop runs
+    over. The consequence is worse than a missing panel: navigate()
+    calls render() BEFORE history.pushState, so the throw aborts the
+    navigation itself and the URL never changes.
+    """
+
+    DATASETS = ["cp-clients", "cp-carers", "cp-case-workers",
+                "cp-notifications", "cp-investigations", "cp-placements"]
+
+    def _state(self, dataset_id):
+        return {"tier": "dataset", "agencyId": "child-protection-family-support",
+                "collectionId": "child-protection", "datasetId": dataset_id}
+
+    @pytest.mark.parametrize("dataset_id", DATASETS)
+    def test_it_renders_without_throwing(self, clean_page, built_dashboard_html, dataset_id):
+        """clean_page's teardown asserts no console error and no
+        uncaught exception, which is the whole assertion here."""
+        _goto(clean_page, built_dashboard_html, state=self._state(dataset_id))
+        assert clean_page.locator("#view h2").count() == 1
+
+    @pytest.mark.parametrize("dataset_id", ["cp-clients", "cp-carers", "cp-case-workers"])
+    def test_everything_after_the_scope_sections_still_renders(
+            self, clean_page, built_dashboard_html, dataset_id):
+        """The throw aborted renderDataset() partway, and Supply History
+        is what lived after it."""
+        _goto(clean_page, built_dashboard_html, state=self._state(dataset_id))
+        assert clean_page.locator("#supply-history-toggle, .supply-history").count() > 0, (
+            "the supply-history section is missing - renderDataset() stopped early")
+
+    @pytest.mark.parametrize("dataset_id", ["cp-clients", "cp-carers", "cp-case-workers"])
+    def test_clicking_the_row_actually_changes_the_url(
+            self, clean_page, built_dashboard_html, dataset_id):
+        """The half nobody reported: a throw inside render() means
+        history.pushState never runs, so the address bar keeps saying
+        the agency while the screen shows a dataset."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        row = clean_page.locator(f'tr[data-nav*="{dataset_id}"]').first
+        row.click()
+        clean_page.wait_for_timeout(400)
+        assert f"/dataset/{dataset_id}" in clean_page.url, (
+            f"navigating to {dataset_id} left the URL at {clean_page.url}")
+
+    def test_the_placeholder_check_is_deep_linkable(self, clean_page, built_dashboard_html):
+        """#12, the same root cause: with no key the check panel opened
+        with no URL change, so it was neither shareable nor closable
+        with Back."""
+        _goto(clean_page, built_dashboard_html, state=self._state("cp-clients"))
+        missing = clean_page.evaluate("""() => {
+            const out = [];
+            (DATA && DATA.agencies || []).forEach(ag => ag.collections.forEach(col =>
+                col.datasets.forEach(ds => (ds.columns || []).forEach(c =>
+                    (c.checks || []).forEach(ck => { if(!ck.key) out.push(`${ds.id}.${c.name}`); })))));
+            return out;
+        }""")
+        assert not missing, f"checks with no key, so no deep link and no Back: {missing}"
+
+
+class TestAStaleDeepLinkSaysSo:
+    """post-build-review #11, and the half tests-js cannot cover.
+
+    `renderNotFound()` was built for a bookmark pointing at an agency,
+    collection or dataset that no longer exists, and never extended to
+    a COLUMN or a CHECK. A stale column link landed on the dataset page
+    with no message, `STATE.columnName` still set to the value that
+    resolved to nothing, and the dead segment still in the URL - so
+    re-sharing propagated it. At thirty datasets with evolving schemas
+    that is the common case, not the edge.
+
+    The jsdom suite covers the not-found behaviour and cannot cover
+    this: its harness carries only a hierarchy, so every dataset has
+    zero columns and every column name is stale in it. Proving that a
+    REAL column still opens needs real check data, which is here.
+    """
+
+    STATE = {"tier": "dataset", "agencyId": "registry-services",
+             "collectionId": "civil-registration", "datasetId": "birth-registrations"}
+
+    def _first_column_key(self, page):
+        return page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="registry-services")
+                .collections.find(c=>c.id==="civil-registration")
+                .datasets.find(d=>d.id==="birth-registrations");
+            return columnKey(ds.columns[0]);
+        }""")
+
+    def test_a_real_column_link_still_opens_its_drawer(self, clean_page, built_dashboard_html):
+        """The must-not-change half. Repairing a broken deep link is
+        worth nothing if it broke the working ones."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        key = self._first_column_key(clean_page)
+        _goto(clean_page, built_dashboard_html, state={**self.STATE, "columnName": key})
+        clean_page.wait_for_timeout(400)
+        assert clean_page.locator("#drawer.open").count() == 1, (
+            "a column that exists no longer opens its drawer")
+        assert key in clean_page.url
+
+    def test_a_dropped_column_is_named_rather_than_ignored(self, clean_page,
+                                                            built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={**self.STATE, "columnName": "a_column_that_was_dropped"})
+        clean_page.wait_for_timeout(400)
+        notice = clean_page.locator(".stale-link-notice")
+        assert notice.count() == 1, "no notice - the stale link failed silently"
+        assert "a_column_that_was_dropped" in notice.inner_text()
+
+    def test_the_dead_segment_is_taken_out_of_the_url(self, clean_page,
+                                                       built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={**self.STATE, "columnName": "a_column_that_was_dropped"})
+        clean_page.wait_for_timeout(400)
+        assert "a_column_that_was_dropped" not in clean_page.url
+
+    def test_the_rest_of_the_dataset_page_still_renders(self, clean_page,
+                                                         built_dashboard_html):
+        """Deliberately NOT a full-page not-found: everything the reader
+        asked for except the column resolved, and is worth showing."""
+        _goto(clean_page, built_dashboard_html,
+              state={**self.STATE, "columnName": "a_column_that_was_dropped"})
+        clean_page.wait_for_timeout(400)
+        assert clean_page.locator("#view h2").count() == 1
+        assert clean_page.locator(".column-tile, .col-tile").count() > 0
+
+
+class TestTheLowRunwayWarningIsOnThePage:
+    """post-build-review #2 - REQ-PIPE-053's own criterion says the
+    warning appears "both in the dashboard and as a non-fatal warning in
+    the repository's gates", and only the gate half was built.
+
+    Live against the real committed config at the time of writing: the
+    quarterly calendar has 2 future slots against a threshold of 4, so a
+    warning is due right now, which is what makes this assertable
+    against the real built page rather than a fixture.
+    """
+
+    def test_it_is_visible_on_the_landing_view(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        notice = clean_page.locator(".notice-runway")
+        assert notice.count() == 1, (
+            "the low-runway warning is computed and still not rendered anywhere")
+        assert notice.first.is_visible()
+
+    def test_it_names_the_calendar_and_the_dataset_that_runs_out_first(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        text = clean_page.locator(".notice-runway").first.inner_text()
+        assert "quarterly" in text
+        assert "cp-case-workers" in text, (
+            "the number is a minimum across datasets and the notice does not say whose")
+
+    def test_it_says_in_words_that_nothing_has_failed(self, clean_page,
+                                                       built_dashboard_html):
+        """Criterion: distinguish a warning from a failure in text as
+        well as colour. A reader who cannot tell them apart treats both
+        as noise."""
+        text = None
+        _goto(clean_page, built_dashboard_html)
+        text = clean_page.locator(".notice-runway").first.inner_text().lower()
+        assert "nothing has failed" in text or "not failing" in text
+
+
+class TestAnUncheckedColumnSaysSoAtEveryLevel:
+    """post-build-review #4, signed off 2026-09-25 with Keith's own
+    direction: "a grey, as in a disabled kind of grey colour - kind of
+    speaks to it's inactive".
+
+    A column with no rule defined got a synthesised placeholder check
+    whose recorded status was GREEN, with the honest explanation in a
+    `note` that renders in exactly one place - the check panel, four
+    clicks deep. So at every level a reader actually looks, an unchecked
+    column read as a healthy one, and a table-scope placeholder rolled a
+    whole "Table-level checks" section to green on its own.
+
+    Eleven of these exist across the seven real datasets. At thirty
+    datasets the critic called it the most likely thing in the whole
+    review to become a real false-green incident.
+    """
+
+    STATE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+             "collectionId": "child-protection", "datasetId": "cp-clients"}
+
+    def test_no_placeholder_still_claims_to_be_green(self, clean_page,
+                                                      built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        wrong = clean_page.evaluate("""() => {
+            const out = [];
+            (DATA.agencies||[]).forEach(ag => ag.collections.forEach(col =>
+              col.datasets.forEach(ds => (ds.columns||[]).forEach(c =>
+                (c.checks||[]).forEach(ck => {
+                  if(ck.key === "no_rule_defined" && ck.current_status !== "inactive")
+                    out.push(`${ds.id}.${c.name}=${ck.current_status}`);
+                })))));
+            return out;
+        }""")
+        assert wrong == [], wrong
+
+    def test_the_column_tile_reads_inactive_rather_than_green(self, clean_page,
+                                                               built_dashboard_html):
+        """The level the reader actually looks at."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        status = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="child-protection-family-support")
+              .collections.find(c=>c.id==="child-protection")
+              .datasets.find(d=>d.id==="cp-clients");
+            const col = ds.columns.find(c=>c.name==="extract_timestamp");
+            return rollupStatuses((col.checks||[]).map(checkStatus));
+        }""")
+        assert status == "inactive", (
+            f"a column with no rule defined rolls up as {status!r}")
+
+    def test_a_table_scope_section_of_placeholders_is_not_green(self, clean_page,
+                                                                 built_dashboard_html):
+        """The critic's specific observation: a table-scope placeholder
+        rolling a whole section to green on its own."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        status = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="child-protection-family-support")
+              .collections.find(c=>c.id==="child-protection")
+              .datasets.find(d=>d.id==="cp-clients");
+            const col = ds.columns.find(c=>/table/i.test(c.name));
+            return col ? rollupStatuses((col.checks||[]).map(checkStatus)) : "no-such-column";
+        }""")
+        assert status == "inactive", status
+
+    def test_an_inactive_column_does_not_drag_its_dataset_down(self, clean_page,
+                                                                built_dashboard_html):
+        """The constraint the finding stated: it must not win a worstOf
+        against a real verdict, in either direction."""
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        same = clean_page.evaluate("""() => {
+            const ds = DATA.agencies.find(a=>a.id==="child-protection-family-support")
+              .collections.find(c=>c.id==="child-protection")
+              .datasets.find(d=>d.id==="cp-clients");
+            const all = ds.columns.map(c=> rollupStatuses((c.checks||[]).map(checkStatus)));
+            const real = all.filter(s=> s !== "inactive");
+            return rollupStatuses(all) === rollupStatuses(real);
+        }""")
+        assert same, "the inactive columns changed the dataset's own status"
+
+    def test_the_pill_is_labelled_in_words_not_only_by_colour(self, clean_page,
+                                                              built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.STATE)
+        assert clean_page.evaluate("() => STATUS_LABEL.inactive") == "No rule defined"
+
+
+class TestNavigationUsesRealLinks:
+    """post-build-review #10, Keith's own principle: "there should be
+    links everywhere. Everything should be an actual link. Nothing
+    should be a magic JavaScript link or magic JavaScript button."
+
+    There were 2 real anchors in the whole rendered page. The jsdom
+    suite covers the markup and the modifier guards; this covers what
+    only a real browser can show - that the href genuinely resolves, and
+    that an ordinary click still routes rather than reloading the page.
+    """
+
+    def test_the_landing_view_is_full_of_real_links_now(self, clean_page,
+                                                         built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        anchors = clean_page.locator("#agency-grid a.card")
+        assert anchors.count() > 0
+        href = anchors.first.get_attribute("href")
+        assert href.startswith("#/agency/"), href
+
+    def test_an_ordinary_click_routes_without_reloading(self, clean_page,
+                                                         built_dashboard_html):
+        """The interception still has to work - a real href that always
+        navigated the hard way would lose the SPA."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("window.__stillHere = true")
+        clean_page.locator("#agency-grid a.card").first.click()
+        clean_page.wait_for_timeout(400)
+        assert clean_page.evaluate("window.__stillHere") is True, (
+            "the page reloaded - the click was not intercepted")
+        assert "/agency/" in clean_page.url
+
+    def test_a_dataset_name_is_a_link_that_resolves(self, clean_page,
+                                                     built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        link = clean_page.locator("tbody tr a.dataset-link").first
+        href = link.get_attribute("href")
+        assert "/dataset/" in href, href
+        link.click()
+        clean_page.wait_for_timeout(400)
+        assert "/dataset/" in clean_page.url
+
+    def test_the_breadcrumbs_are_links(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "registry-services"})
+        crumbs = clean_page.locator("#rail a.crumb")
+        assert crumbs.count() > 1
+        assert crumbs.first.get_attribute("href") == "#/"
+
+    def test_a_control_that_acts_rather_than_navigates_is_still_a_button(
+            self, clean_page, built_dashboard_html):
+        """The other half of the rule - a panel toggle is an action."""
+        _goto(clean_page, built_dashboard_html)
+        for control_id in ["theme-btn", "activity-btn", "in-place-on-btn"]:
+            tag = clean_page.evaluate(
+                f"() => (document.getElementById({control_id!r})||{{}}).tagName")
+            assert tag in (None, "BUTTON"), f"{control_id} is a {tag}"
+
+
+class TestAnExhaustedDatasetStillShowsItsHistory:
+    """post-build-review #13, decided 2026-09-25: "keep the message
+    prominent, and show the last known results below it".
+
+    The exhausted branch replaced the ENTIRE dataset page - columns,
+    checks, arrival history, trends - with its message and returned.
+    cp-case-workers has 18 real committed runs and 7 columns behind
+    that message, with no affordance to reach any of it.
+
+    The reasoning to build against: "nothing is expected" and "nothing
+    ever happened" are different statements, and replacing the whole
+    page conflates them. This is not a demotion of the message - it
+    stays first and stays loud - it is putting the history back
+    underneath it.
+    """
+
+    # An as-of date past the quarterly calendar's last authored period,
+    # so the dataset is genuinely exhausted rather than merely quiet.
+    IN_PLACE_ON = "2028-06-01"
+    STATE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+             "collectionId": "child-protection", "datasetId": "cp-case-workers"}
+
+    def _open(self, page, html):
+        _goto(page, html, state=self.STATE, in_place_on=self.IN_PLACE_ON)
+        page.wait_for_timeout(400)
+
+    def test_the_message_is_still_there_and_still_first(self, clean_page,
+                                                         dashboard_html_without_blockers):
+        self._open(clean_page, dashboard_html_without_blockers)
+        text = clean_page.locator("#view").inner_text()
+        assert "delivery schedule has ended" in text.lower()
+
+    def test_the_columns_are_reachable_rather_than_replaced(self, clean_page,
+                                                             dashboard_html_without_blockers):
+        self._open(clean_page, dashboard_html_without_blockers)
+        assert clean_page.locator(".column-tile, .col-tile").count() > 0, (
+            "the whole page is still the message - 7 columns of real history are hidden")
+
+    def test_the_supply_history_is_reachable_too(self, clean_page,
+                                                  dashboard_html_without_blockers):
+        self._open(clean_page, dashboard_html_without_blockers)
+        assert clean_page.locator("#supply-history-toggle, .supply-history").count() > 0
+
+    def test_the_head_still_says_the_schedule_ended(self, clean_page,
+                                                     dashboard_html_without_blockers):
+        """Showing history under the message must not make the page look
+        ordinary at a glance - but the pill belongs where every other
+        dataset's status pill is, which is the right-hand cluster.
+        Putting a second one in the <h2> was the shape #53 complains
+        about (a reader who has learned "status is top-right" finding it
+        top-left), and the first draft of #13 did exactly that."""
+        self._open(clean_page, dashboard_html_without_blockers)
+        assert clean_page.locator("#view h2 .pill.exhausted").count() == 0
+        assert clean_page.locator(".view-head .pill.exhausted").count() == 1
+
+    def test_it_renders_without_throwing(self, clean_page, dashboard_html_without_blockers):
+        """clean_page's teardown asserts no console error - the whole
+        point, since this path never ran the normal renderer before."""
+        self._open(clean_page, dashboard_html_without_blockers)
+        assert clean_page.locator("#view h2").count() == 1
+
+
+class TestTheQuietPillsSurviveBeingLookedAt:
+    """post-build-review #48 and #50 - two visual defects that only a
+    real browser can show, which is why both sat unnoticed.
+
+    #48: `.dataset-table tbody tr:hover` and `.pill.nodata` resolve to
+    the SAME token, so hovering a row made the pill's fill vanish into
+    it - measured at 1.00:1. What was left under the cursor was a 1px
+    dashed border. At any past or future as-of, where "No data" is the
+    most common row state, the status token disappeared exactly when a
+    reader pointed at it.
+
+    #50: `border:1.5px` floors to 1px at DPR 1, which is most government
+    desktops - so the exhausted pill's "deliberately unlike the others"
+    heavier border was the same weight as the quiet one's, and rendered
+    differently between machines. Exactly the case where reading the
+    source gives the wrong answer.
+    """
+
+    def test_a_hovered_row_does_not_swallow_a_quiet_status_pill(
+            self, clean_page, built_dashboard_html):
+        """MEASURED AGAINST THE RULES, not against whichever pill a row
+        happens to be showing.
+
+        The first draft of this hovered a real row and compared its
+        background with its own pill's - and passed, because at the
+        as-of it chose that pill was GREEN. It was measuring a state
+        that was never in question. The defect is that two CSS rules
+        resolve to the same token, so that is what this measures: hover
+        a row to get the real hovered colour, then compare it with what
+        `.pill.nodata` and `.pill.inactive` actually paint.
+        """
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        clean_page.locator("tbody tr").first.hover()
+        clean_page.wait_for_timeout(200)
+        result = clean_page.evaluate("""() => {
+            const tr = document.querySelector("tbody tr");
+            const rowBg = getComputedStyle(tr).backgroundColor;
+            const probe = (cls) => {
+                const el = document.createElement("span");
+                el.className = "pill " + cls;
+                tr.querySelector("td").appendChild(el);
+                const bg = getComputedStyle(el).backgroundColor;
+                el.remove();
+                return bg;
+            };
+            return {rowBg, nodata: probe("nodata"), inactive: probe("inactive")};
+        }""")
+        assert result["rowBg"] != result["nodata"], (
+            f"a hovered row and the No data pill are both {result['rowBg']} - the "
+            "status token vanishes under the cursor")
+        assert result["rowBg"] != result["inactive"], (
+            f"a hovered row and the No rule defined pill are both {result['rowBg']}")
+
+    def test_the_heavier_border_is_actually_heavier(self, clean_page,
+                                                     built_dashboard_html):
+        """Measured, not read: 1.5px is not a width a 1x display has."""
+        _goto(clean_page, built_dashboard_html)
+        widths = clean_page.evaluate("""() => {
+            const probe = (cls) => {
+                const el = document.createElement("span");
+                el.className = "pill " + cls;
+                document.body.appendChild(el);
+                const w = getComputedStyle(el).borderTopWidth;
+                el.remove();
+                return w;
+            };
+            return {nodata: probe("nodata"), exhausted: probe("exhausted")};
+        }""")
+        assert widths["exhausted"] != widths["nodata"], (
+            f"both borders render at {widths['exhausted']} - the intended weight "
+            "difference does not exist on this display")
+
+
+class TestABuiltRequirementShowsItsOwnHoles:
+    """post-build-review #33, Keith: "I'm open to that. Give me a
+    proposal" then "ship it".
+
+    REQ-PIPE-053 was marked `built` while six of its criteria were not
+    built at all (five, since REQ-PIPE-061 closed one), and the only
+    record of that was a `decisions:` note -
+    accurate, and in a field nobody has to read. The register's binary
+    built/not_started model had no way to say "built except for these",
+    so `built` overclaimed and nothing in CI could tell.
+
+    The proposal built here is an optional `unmet_criteria:` list
+    rather than a third STATUS: status is what the register is indexed
+    and filtered by, and the honest answer for this requirement is that
+    it IS built and has a hole in it.
+    """
+
+    def test_the_panel_names_them_rather_than_burying_them_in_decisions(
+            self, clean_page, built_dashboard_html):
+        """Compared against what requirements.yaml actually says, not
+        against a literal.
+
+        This asserted `== 6` and went red the day one of the six was
+        closed - a test that fails when the work SUCCEEDS, and whose
+        only remedy is to edit the number, which is how a number stops
+        meaning anything. The claim worth testing is that the panel
+        renders what the register holds; how many holes are left is the
+        register's business and changes as the batch lands.
+        """
+        import yaml
+
+        register = yaml.safe_load(Path("requirements.yaml").read_text())
+        expected = {r["id"]: len(r.get("unmet_criteria") or [])
+                    for r in register["requirements"] if r.get("unmet_criteria")}
+        assert expected, "no requirement declares an unmet criterion - this test is vacuous"
+
+        _goto(clean_page, built_dashboard_html)
+        rendered = clean_page.evaluate("""() => {
+            const out = {};
+            (REQUIREMENTS||[]).forEach(r => {
+                const n = (r.unmet_criteria||[]).length;
+                if(n) out[r.id] = n;
+            });
+            return out;
+        }""")
+        assert rendered == expected, (
+            f"the page and the register disagree about which requirements have holes: "
+            f"page {rendered}, register {expected}")
+
+    def test_every_unmet_criterion_says_which_why_and_who_next(
+            self, clean_page, built_dashboard_html):
+        """A record that cannot answer those three is the same sentence
+        the prose already carried, in a different place."""
+        _goto(clean_page, built_dashboard_html)
+        bad = clean_page.evaluate("""() => {
+            const out = [];
+            (REQUIREMENTS||[]).forEach(r => (r.unmet_criteria||[]).forEach(u => {
+                if(!u.criterion || !u.why || !u.owner) out.push(r.id);
+            }));
+            return out;
+        }""")
+        assert bad == [], bad
+
+
+class TestTheDependencyViewInThePlansTab:
+    """REQ-DOCS-073 criterion 6, against the real built dashboard.
+
+    The page must not re-derive this: qa_tools/common/sprint_state.py
+    computes it and `mothman plans dependencies` renders the same
+    structure. So what is worth asserting here is that the page shows
+    what that function produced, not that the page's own arithmetic
+    agrees with itself - this project has already shipped a shared
+    rule implemented twice and had one copy render a check with
+    fourteen real violations green.
+    """
+
+    def test_it_matches_what_the_python_computed(self, clean_page, built_dashboard_html):
+        from qa_tools.common.sprint_state import dependency_data
+
+        expected = dependency_data()
+        assert expected["sprints"], "no sprint is waiting on anything - this test is vacuous"
+
+        _goto(clean_page, built_dashboard_html)
+        embedded = clean_page.evaluate("() => SPRINT_DEPENDENCIES")
+        assert embedded == expected
+
+    def test_the_tab_renders_a_row_per_sprint_in_the_graph(
+            self, clean_page, built_dashboard_html):
+        from qa_tools.common.sprint_state import dependency_data
+
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        clean_page.wait_for_selector("details.plans-deps")
+        rows = clean_page.locator("details.plans-deps tbody tr")
+        assert rows.count() == len(dependency_data()["sprints"])
+
+    def test_it_is_collapsed_until_asked_for(self, clean_page, built_dashboard_html):
+        """The Plans tab's job is the hundred-odd entries below it. A
+        ten-row table expanded by default pushes the thing people came
+        for off the screen."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        clean_page.wait_for_selector("details.plans-deps")
+        assert not clean_page.locator("details.plans-deps").evaluate("d => d.open")
+
+    def test_the_summary_names_the_worst_blocker_without_opening(
+            self, clean_page, built_dashboard_html):
+        """The single fact the whole view exists to surface, readable
+        without interacting - promotion holds up more than anything
+        else, which the sprint list alone could never show."""
+        from qa_tools.common.sprint_state import dependency_data
+
+        worst = max(dependency_data()["sprints"], key=lambda s: s["holds_up"])
+        _goto(clean_page, built_dashboard_html)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        text = clean_page.locator("details.plans-deps summary").inner_text()
+        assert f"sprint {worst['sprint']}" in text and str(worst["holds_up"]) in text
+
+    def test_a_shared_requirement_does_not_double_count(
+            self, clean_page, built_dashboard_html):
+        """REQ-PIPE-035 is owned by two sprints. Counting per owner
+        rather than per criterion made promotion read as holding up
+        twenty when it holds up seventeen."""
+        from qa_tools.common.sprint_state import all_deferrals
+
+        _goto(clean_page, built_dashboard_html)
+        embedded = clean_page.evaluate("() => SPRINT_DEPENDENCIES")
+        most = max(s["holds_up"] for s in embedded["sprints"])
+        assert most <= len(all_deferrals())
+
+    def test_it_renders_without_console_errors(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        errors = []
+        clean_page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        clean_page.evaluate("() => navigate({tier:'plans'})")
+        clean_page.wait_for_selector("details.plans-deps")
+        clean_page.locator("details.plans-deps summary").click()
+        clean_page.wait_for_timeout(200)
+        assert errors == []
+
+
+class TestTheDisplayStandardHoldsInARealBrowser:
+    """REQ-DASH-071, built 2026-09-25.
+
+    The unit suites (tests/test_display_time.py and its browser twin
+    tests-js/display-time.test.js) hold the two FORMATTERS to one
+    committed case table. This holds the PAGE to the formatters, which
+    is a different claim and the one that actually failed before: every
+    formatter on this page was already correct about its own arguments,
+    and the bug was that three render sites did not call them - one
+    character-sliced a wall clock out of the stored string and appended
+    " UTC", one emitted the stored string raw, microseconds and offset
+    included, and one counted seconds up from a hardcoded 4.
+
+    Same reasoning as CLAUDE.md's own shape-change rule: assert at the
+    layer a human sees, not at the layer that computes.
+    """
+
+    ALL_DATASETS = [
+        ("registry-services", "civil-registration", "birth-registrations"),
+        ("child-protection-family-support", "child-protection", "cp-clients"),
+        ("child-protection-family-support", "child-protection", "cp-carers"),
+        ("child-protection-family-support", "child-protection", "cp-case-workers"),
+        ("child-protection-family-support", "child-protection", "cp-notifications"),
+        ("child-protection-family-support", "child-protection", "cp-investigations"),
+        ("child-protection-family-support", "child-protection", "cp-placements"),
+    ]
+
+    # An ISO-8601 instant, an ISO date, or a bare wall clock. Criterion 7
+    # rules out all three wherever a person can read one.
+    RAW = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|\b\d{4}-\d{2}-\d{2}\b|\b\d{2}:\d{2}:\d{2}\b")
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", ALL_DATASETS)
+    def test_no_dataset_page_shows_a_raw_timestamp(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": agency,
+            "collectionId": collection, "datasetId": dataset_id})
+        text = clean_page.locator("#view").inner_text()
+        assert not self.RAW.search(text), (
+            f"{dataset_id} renders a raw timestamp: "
+            f"{self.RAW.search(text).group(0)!r} in {text[:400]!r}")
+
+    def test_the_supply_history_timing_column_reads_as_a_sentence(
+            self, clean_page, built_dashboard_html):
+        """43 raw "2026-09-16T05:17:30.280161+00:00" strings were landing
+        in this one column when the requirement was written."""
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": "registry-services",
+            "collectionId": "civil-registration", "datasetId": "birth-registrations"})
+        cells = clean_page.locator("#view table tr td").all_inner_texts()
+        timings = [c for c in cells if re.search(r"\d{1,2}:\d{2}(am|pm)", c)]
+        assert timings, "no formatted timing rendered in the supply history at all"
+        for cell in timings:
+            assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}", cell), cell
+
+    def test_the_masthead_says_when_the_page_was_built(
+            self, clean_page, built_dashboard_html):
+        """Criterion 13 / post-build-review #60. It used to say "Live ·
+        updated 4s ago" and count up, so the number a reader saw was the
+        age of their own browser tab.
+
+        THE INSTANT IS NO LONGER THE END OF THE LINE (REQ-PIPE-092
+        criteria 7 and 17), which is why the date pattern is no longer
+        anchored to it. The build stamp now also says WHICH environment
+        built the page and from which commit, because the build happens
+        wherever the database is reachable and a production build and a
+        developer's build are otherwise two identical-looking artifacts.
+        """
+        _goto(clean_page, built_dashboard_html)
+        first = clean_page.locator("#clock-text").inner_text()
+        assert first.startswith("Built "), first
+        assert re.search(r"\d{1,2}:\d{2}(am|pm) \w+day, \d{1,2} \w+ \d{4}", first), first
+
+    def test_the_masthead_says_which_environment_and_commit_built_the_page(
+            self, clean_page, built_dashboard_html):
+        """REQ-PIPE-092 criteria 7 and 17, asserted AT THE RENDER LAYER
+        rather than on the embedded const - which is CLAUDE.md's own
+        standing lesson, that a correct data layer says nothing about a
+        template with its own transform.
+
+        A SHORT SHA IN THE LINE, THE FULL ONE IN THE TITLE: a reader
+        recognises seven characters and does not read forty.
+        """
+        _goto(clean_page, built_dashboard_html)
+        stamp = clean_page.locator("#clock-text")
+        text = stamp.inner_text()
+        assert " · " in text, f"the build stamp names no environment: {text}"
+
+        title = stamp.get_attribute("title") or ""
+        assert "Built in:" in title, title
+        assert "Commit:" in title, title
+        # The full sha is in the title and a short one in the line, so the
+        # line must NOT carry the whole forty characters.
+        commit = title.split("Commit:")[1].strip()
+        assert len(commit) >= 7, title
+        assert commit not in text, "the full sha is in the line rather than the title"
+        assert commit[:7] in text, f"the short sha is not in the line: {text}"
+
+    def test_the_masthead_does_not_count_up_while_the_page_sits_there(
+            self, clean_page, built_dashboard_html):
+        """The other half of criterion 13: no elapsed time measured from
+        when the reader opened it. The old clock ticked every 7 seconds;
+        this waits long enough to have caught it twice."""
+        _goto(clean_page, built_dashboard_html)
+        first = clean_page.locator("#clock-text").inner_text()
+        clean_page.wait_for_timeout(15_000)
+        assert clean_page.locator("#clock-text").inner_text() == first
+
+    def test_the_page_and_the_python_twin_agree_on_a_real_instant(
+            self, clean_page, built_dashboard_html):
+        """The cross-runtime check the shared case table cannot make:
+        both implementations pass the table independently, and this
+        asserts the PAGE's own function against the CLI's own function
+        on the same value."""
+        from qa_tools.common import display_time
+
+        _goto(clean_page, built_dashboard_html)
+        for value in ("2026-09-16T05:17:30.280161+00:00",
+                      "2026-01-01T16:00:00+00:00",
+                      "2026-09-29T14:15:00+08:00"):
+            in_browser = clean_page.evaluate(f"fmtInstant({value!r})")
+            assert in_browser == display_time.format_instant(value), value
+
+
+class TestOutstandingDecisions:
+    """REQ-DASH-070, asserted where a person actually looks.
+
+    The standing lesson this follows is CLAUDE.md's own: a green data
+    layer says nothing about a render layer with its own transform.
+    Everything below drives the REAL built page in a REAL browser and
+    reads what the page decided, not what the build wrote.
+    """
+
+    def test_every_tier_says_nothing_is_waiting_rather_than_showing_nothing(
+            self, clean_page, built_dashboard_html):
+        """Criterion 13, at all three tiers.
+
+        An empty element and a missing one look identical to a reader,
+        and both look identical to a panel that crashed - so the panel
+        is ALWAYS present and always says which it is.
+
+        IT USED TO ASSERT THE QUIET WORDING EVERYWHERE, because the
+        generated history had nothing outstanding anywhere. REQ-GEN-044
+        injected TS-38, whose renamed resupplies are a real unattributed
+        artefact, and one tier now correctly reports it. That is the
+        scenario working rather than a regression, so what this holds is
+        the property that survives both states: the panel exists, and it
+        either names what is waiting or says nothing is - never neither.
+        """
+        quiet = "Nothing is waiting for a person"
+        waiting = "waiting for a person"
+
+        _goto(clean_page, built_dashboard_html)
+        assert clean_page.locator(".notice-queue").count() == 1
+        top = clean_page.locator(".notice-queue").inner_text()
+        assert quiet in top or waiting in top, top
+
+        agency = clean_page.locator("#agency-grid .card").first
+        agency.click()
+        clean_page.wait_for_timeout(400)
+        assert clean_page.locator(".notice-queue").count() >= 1
+        tier2 = clean_page.locator(".notice-queue").first.inner_text()
+        assert quiet in tier2 or waiting in tier2, tier2
+
+    def test_the_quiet_state_is_not_dressed_as_a_data_verdict(
+            self, clean_page, built_dashboard_html):
+        """Criterion 5, and the reason this element exists at all: an
+        event in our own processing is not a claim about anybody's
+        data, so it may not borrow the status vocabulary to say so."""
+        _goto(clean_page, built_dashboard_html)
+        classes = clean_page.locator(".notice-queue").get_attribute("class")
+        for verdict in ("green", "amber", "red"):
+            assert verdict not in classes
+
+    def test_no_arrival_anywhere_on_the_page_renders_an_unknown_state_as_on_time(
+            self, clean_page, built_dashboard_html):
+        """Criterion 10, at the last transform before the user.
+
+        arrivalPill() used to map anything that was not early or late
+        to a green 'On time', so REQ-PIPE-066's 'unfiled' - which means
+        there is no slot to be punctual against - would have rendered
+        as a confident verdict. This asks the PAGE's own function,
+        because the page is where that decision is actually made.
+        """
+        _goto(clean_page, built_dashboard_html)
+        for status in ("unfiled", "something-nobody-taught-it", ""):
+            label = clean_page.evaluate(f"arrivalStatusLabel({status!r})")
+            pill = clean_page.evaluate(f"arrivalPill({status!r})")
+            assert label != "On time", status
+            assert "pill green" not in pill, status
+
+    def test_an_arrival_verdict_says_it_follows_the_supplys_current_filing(
+            self, clean_page, built_dashboard_html):
+        """Criterion 11. A punctuality verdict is measured against the
+        slot a supply is currently filed to, so it is not a fixed
+        historical fact - and a reader who does not know that reads a
+        changed figure as the page being wrong.
+
+        THE AS-OF DATE COMES FROM THE PAGE'S OWN DATA, not from today.
+        The first version of this test drove the default as-of, which
+        is today on the asset clock, and went red the moment the Perth
+        date rolled past the newest generated run: Birth Registrations
+        is DAILY, so a day later its newest supply falls outside its own
+        current cycle and the row correctly renders the quiet state,
+        which has no arrival cell to carry a qualifier. Nothing about
+        the page was wrong. That is post-build-review #59's shape
+        exactly - an assertion resting on an ambient date - and it
+        would have gone red in CI on the next run for the same reason.
+        """
+        _goto(clean_page, built_dashboard_html)
+        newest = clean_page.evaluate(
+            "REAL_BIRTH_REG_DATA.runs[REAL_BIRTH_REG_DATA.runs.length-1].run_date")
+        _goto(clean_page, built_dashboard_html, in_place_on=newest)
+        clean_page.locator("#agency-grid .card").first.click()
+        clean_page.wait_for_timeout(400)
+        titles = clean_page.locator("td span[title*='currently filed to']")
+        assert titles.count() > 0, (
+            f"no arrival verdict on Tier 2 carries the qualifier as of {newest}")
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factory) -> Path:
+    """A second built HTML whose Child Protection datasets arrive on
+    their OWN schedules (REQ-DASH-041).
+
+    The real committed history cannot exercise this requirement at all:
+    all six CP datasets arrive together, eighteen runs each on the same
+    dates, because the generator emits one six-table delivery per
+    period. So the divergence is constructed here - two datasets cut
+    short by a quarter, one cut to a single late arrival - rather than
+    waited for.
+
+    The CUT IS ON `runs` AND EVERYTHING KEYED BY RUN, not on `runs`
+    alone: leaving a check's history pointing at a run the dataset no
+    longer has is a shape the real data can never produce, and a test
+    built on one proves nothing about the real page.
+    """
+    from dashboard import embed_dashboard_data as edd
+
+    tmp_path = tmp_path_factory.mktemp("divergent")
+    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
+    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
+
+    source = Path(edd.ROOT) / "reports" / "child_protection_dashboard.json"
+    data = json.loads(source.read_text())
+
+    # How many of each dataset's own runs to keep. One is left whole,
+    # so the collection genuinely does not line up.
+    KEEP = {"cp-carers": 9, "cp-case-workers": 1, "cp-investigations": 14}
+    for dataset in data["datasets"]:
+        keep = KEEP.get(dataset["id"])
+        if keep is None:
+            continue
+        dataset["runs"] = dataset["runs"][:keep]
+        kept = {r["run_id"] for r in dataset["runs"]}
+        dataset["arrivalHistory"] = [a for a in dataset.get("arrivalHistory") or []
+                                      if a["run_id"] in kept]
+        dataset["arrivalByRun"] = {k: v for k, v in (dataset.get("arrivalByRun") or {}).items()
+                                    if k in kept}
+        dataset["lastArrival"] = {
+            **(dataset.get("lastArrival") or {}),
+            "run_date": dataset["runs"][-1]["run_date"]}
+        for column in dataset.get("columns") or []:
+            for check in column.get("checks") or []:
+                check["history"] = [h for h in check.get("history") or []
+                                     if h["run_id"] in kept]
+            stats = column.get("stats") or {}
+            stats["byRun"] = {k: v for k, v in (stats.get("byRun") or {}).items() if k in kept}
+
+    doctored = tmp_path / "child_protection_dashboard.json"
+    doctored.write_text(json.dumps(data))
+
+    out_html = tmp_path / "dashboard_divergent.html"
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(edd, "TARGETS", [
+            ("REAL_BIRTH_REG_DATA", str(Path(edd.ROOT) / "reports" / "birth_registrations_dashboard.json")),
+            ("REAL_CP_DATA", str(doctored)),
+        ])
+        mp.setattr(edd, "DASHBOARD_HTML", out_html)
+        edd.embed()
+    return out_html
+
+
+class TestPerDatasetArrivals:
+    """REQ-DASH-041, at the render layer in a real browser.
+
+    The requirement exists BECAUSE the data layer was already checked:
+    buildSupplyHistory was driven against a doctored dataset and held
+    up, and a correct builder says nothing about a template with its
+    own transform. So every assertion here is on the rendered page.
+    """
+
+    def _open_cp(self, page, html):
+        _goto(page, html)
+        page.locator("#agency-grid .card").nth(1).click()
+        page.wait_for_timeout(500)
+
+    def test_a_collection_arriving_on_six_schedules_renders_without_console_errors(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 5, and the NFR's "should not look like a bug"."""
+        self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
+        rows = clean_page.locator(".dataset-table tbody tr")
+        assert rows.count() >= 6, "the Child Protection table lost datasets"
+
+    def test_each_dataset_resolves_on_its_OWN_history_not_the_collections(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 1, and the assertion is about DIVERGENCE rather
+        than about dates.
+
+        Three datasets are cut short, and at the default as-of date
+        their newest arrival falls outside their own current cycle - so
+        the page correctly renders them in the quiet state while the
+        three whole ones render a real arrival. A collection-wide
+        as-of would put all six in the same state, whichever it chose,
+        which is exactly what this is here to rule out.
+        """
+        self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
+        rows = clean_page.locator(".dataset-table tbody tr")
+        quiet = [i for i in range(rows.count())
+                  if "no qa run within tolerance" in rows.nth(i).inner_text().lower()]
+        assert len(quiet) == 3, (
+            f"expected the three cut-short datasets to resolve quietly, got {quiet}")
+        assert rows.count() - len(quiet) == 3, "the untouched datasets stopped rendering"
+
+    def test_a_dataset_with_no_arrival_by_the_in_place_on_date_shows_the_existing_quiet_state(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 4. cp-case-workers is cut to its single earliest
+        arrival, so an as-of date before that has nothing to show - and
+        the page must say so in the state it already has rather than
+        rendering an empty panel."""
+        _goto(clean_page, dashboard_html_with_divergent_arrivals, in_place_on="2023-01-01")
+        clean_page.locator("#agency-grid .card").nth(1).click()
+        clean_page.wait_for_timeout(500)
+        text = clean_page.locator("#view").inner_text().lower()
+        assert "no qa run within tolerance" in text or "no data" in text, text[:400]
+
+    def test_the_in_place_on_picker_moves_each_dataset_on_its_own_history(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criteria 2 and 3. Stepping the as-of date back must change
+        what SOME datasets show without emptying the page - the case a
+        collection-wide as-of would get wrong."""
+        self._open_cp(clean_page, dashboard_html_with_divergent_arrivals)
+        before = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
+
+        _goto(clean_page, dashboard_html_with_divergent_arrivals, in_place_on="2024-06-01")
+        clean_page.locator("#agency-grid .card").nth(1).click()
+        clean_page.wait_for_timeout(500)
+        after = clean_page.locator(".dataset-table tbody tr td:nth-child(5)").all_inner_texts()
+
+        assert before != after, "the as-of date changed nothing on any dataset"
+        assert clean_page.locator(".dataset-table tbody tr").count() >= 6, (
+            "moving the as-of date emptied the collection")
+
+    def test_a_short_datasets_own_supply_history_still_renders_at_tier_3(
+            self, clean_page, dashboard_html_with_divergent_arrivals):
+        """Criterion 1 at the dataset page - the surface the original
+        data-layer check never reached."""
+        _goto(clean_page, dashboard_html_with_divergent_arrivals,
+              state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                      "collectionId": "child-protection", "datasetId": "cp-carers"})
+        text = clean_page.locator("#view").inner_text()
+        assert text.strip(), "the cut-short dataset's own page rendered nothing"
+
+
+class TestScenariosTab:
+    """REQ-DASH-046's behaviours, kept, on REQ-DASH-139's top-level tab - in a
+    real browser against the real built page.
+
+    The dashboard deliberately carries NO label on a deliberately
+    broken supply - "this is still just a proof of concept", and the
+    red is the point - so this panel is the one place that says which
+    red was on purpose.
+    """
+
+    def test_it_opens_and_renders_the_committed_map(self, clean_page, built_dashboard_html):
+        """Criteria 1 and 6 - the console-error collector this suite
+        runs under covers the second."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+
+        assert "/scenarios" in clean_page.url
+        body = clean_page.locator("#scenarios-panel-body").inner_text()
+        assert "which red was on purpose" in body.lower()
+        assert "TS-1" in body, body[:300]
+
+    def test_an_entry_with_no_coordinates_is_plain_text_not_a_link(
+            self, clean_page, built_dashboard_html):
+        """Criterion 4.
+
+        IT USED TO BE EVERY ENTRY, because nothing was injected and a
+        panel full of dead links was the whole failure this ruled out.
+        REQ-GEN-044 changed that: three scenarios have real coordinates
+        now, so the assertion is no longer "no links anywhere" but the
+        thing it always meant - an entry with nothing behind it does not
+        pretend to lead somewhere. Counting controls against the number
+        of PLACED scenarios keeps it honest as more are injected, where
+        a fixed count would have to be edited every time and would
+        eventually be edited to whatever the page happened to render.
+        """
+        from qa_tools.common import scenario_map
+
+        placed = {sid for sid, p in scenario_map.read_placements().items()
+                  if p.is_complete}
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+
+        panel = clean_page.locator("#scenarios-panel-body")
+        controls = panel.locator("a").count() + panel.locator("button[data-scenario]").count()
+        assert controls <= len(placed), (
+            f"the panel offers {controls} control(s) for {len(placed)} placed "
+            f"scenario(s) - one of them leads nowhere")
+        assert "no data behind it" in panel.inner_text(), (
+            "no entry says it has nothing behind it, and most still have nothing")
+
+    def test_a_coordinate_lands_on_the_right_page_and_date(
+            self, clean_page, built_dashboard_html):
+        """REQ-DASH-139 NFR 2 (sprint 11 critic: it was only done by hand).
+        TS-47 is planted, so its entry leads somewhere: the Birth
+        Registrations page, at the in-place-on date its placement records."""
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-47")
+        if placement is None or not placement.is_complete:
+            pytest.skip("TS-47 is not placed in this history")
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
+        assert index >= 0, "TS-47 is not in the embedded map"
+        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(600)
+        assert f"in-place-on={placement.in_place_on}" in clean_page.url
+        assert "/dataset/birth-registrations" in clean_page.url
+
+    def test_a_jump_says_so_and_back_undoes_it(self, clean_page, built_dashboard_html):
+        """Keith, 2026-10-06 (post-build-review #123 B4): a scenario jump
+        silently moved the whole dashboard to a past date, and Back did not
+        put it back. It now shows a bar naming the scenario and the date,
+        with a way back to today, and Back restores the date it left."""
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get("TS-47")
+        if placement is None or not placement.is_complete:
+            pytest.skip("TS-47 is not placed in this history")
+        _goto(clean_page, built_dashboard_html)
+        before = clean_page.evaluate("CURRENT_IN_PLACE_ON")
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
+        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(600)
+        bar = clean_page.locator("[data-testid=scenario-jump-bar]")
+        assert bar.count() == 1
+        assert "TS-47" in bar.inner_text()
+        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == placement.in_place_on
+
+        clean_page.go_back()
+        clean_page.wait_for_timeout(600)
+        assert "/scenarios" in clean_page.url
+        assert clean_page.evaluate("CURRENT_IN_PLACE_ON") == before
+        assert f"in-place-on={placement.in_place_on}" not in clean_page.url
+
+    def test_the_committed_map_carries_no_url_for_the_page_to_follow(
+            self, clean_page, built_dashboard_html):
+        """Criterion 3. The page constructs the link; a URL written into
+        the map would break silently the next time a route changed."""
+        _goto(clean_page, built_dashboard_html)
+        embedded = clean_page.evaluate("JSON.stringify(SCENARIO_MAP)")
+        assert embedded and embedded != "[]", "no scenario map was embedded"
+        assert "http" not in embedded
+        assert "#/" not in embedded
+
+    def test_it_is_a_real_history_entry_that_the_back_button_leaves(
+            self, clean_page, built_dashboard_html):
+        """A tab is navigation like Plans and Demo (REQ-DASH-139 criterion 1):
+        it has its own URL, and back returns to where the reader was."""
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        assert "/scenarios" in clean_page.url
+
+        clean_page.go_back()
+        clean_page.wait_for_timeout(400)
+        assert "/scenarios" not in clean_page.url
+
+
+class TestCrossTableChecks:
+    """REQ-QAC-037 criteria 6 and 7, in a real browser.
+
+    The requirement's own NFR asks for exactly this: it changes the
+    shape of a stored result, so assert at the last transform before
+    the user rather than at the first one after the source.
+    """
+
+    COLLECTION = ("#/agency/child-protection-family-support"
+                   "/collection/child-protection")
+
+    def test_the_collection_gathers_them_into_one_section(
+            self, clean_page, built_dashboard_html):
+        """Criterion 6's collection half, and deduped - every
+        participating dataset carries the same record, so an
+        un-deduped section would list one problem several times."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "agency", "agencyId": "child-protection-family-support"})
+        section = clean_page.locator('.scope-section[data-scope="cross-table"]')
+        assert section.count() == 1, f"expected one section, got {section.count()}"
+        rows = section.first.locator("button.scope-check")
+        assert rows.count() > 0
+        # DEDUPED BY check_id, which is the actual claim. Display
+        # LABELS legitimately repeat - "Client reference" is the name
+        # of the dbt, Soda and datacontract-cli versions of the same
+        # relationship, on each of three tables - so asserting unique
+        # labels would assert something untrue about the corpus.
+        ids = clean_page.evaluate("""() => {
+            const cp = DATA.agencies.flatMap(a=>a.collections)
+                .find(c=>c.id === "child-protection");
+            return collectionCrossTableChecks(cp).map(e=>e.check.check_id);
+        }""")
+        assert ids, "the collection gathered no cross-table checks"
+        assert len(ids) == len(set(ids)), "a check_id appears twice in the section"
+        assert rows.count() == len(ids)
+
+    def test_a_dataset_that_only_reads_a_check_still_shows_it(
+            self, clean_page, built_dashboard_html):
+        """Criterion 6's dataset half. cp-carers declares none of these
+        checks - it is only read BY them - so before this requirement
+        its page showed nothing about them at all."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                      "collectionId": "child-protection", "datasetId": "cp-carers"})
+        section = clean_page.locator('.scope-section[data-scope="cross-table"]')
+        assert section.count() == 1, "cp-carers shows no cross-table section"
+        assert section.first.locator("button.scope-check").count() > 0
+
+    def test_a_cross_table_failure_turns_a_participating_dataset_red(
+            self, clean_page, built_dashboard_html):
+        """Criterion 7, and the cost Keith took knowingly on 2026-09-26,
+        superseding Thread I's "healthy neighbour green": cp-carers goes
+        red for a disagreement with a neighbour, on a day nothing about
+        cp-carers itself changed.
+
+        Asserted through the PAGE's own status function rather than off
+        the rendered pill, so it cannot pass because some other check
+        happens to be red on the same dataset.
+        """
+        _goto(clean_page, built_dashboard_html)
+        # ASSERTED PER RUN, not over the whole history, and the first
+        # version of this test got that wrong. cp-carers has its own
+        # failing Duplicate rate check in five runs, so "is it ever
+        # red" was true with or without folding and proved nothing.
+        # The real claim is narrower: there is at least one run where
+        # this dataset is green on its own checks and red once the
+        # cross-table section is counted.
+        found = clean_page.evaluate("""() => {
+            const cp = DATA.agencies.flatMap(a=>a.collections)
+                .find(c=>c.id === "child-protection");
+            const ds = cp.datasets.find(d=>d.id === "cp-carers");
+            const scoped = ds.columns.filter(c=>c.scope === "cross-table");
+            // A GAP RED IS READ AT ITS MEASURED VERDICT (REQ-QAC-108): it is
+            // the gap rule's red, not cp-carers' own data, and this test
+            // is about folding cross-table checks in.
+            const measured = c => ({...c, checks: (c.checks||[]).map(ck => ({...ck,
+                history: (ck.history||[]).map(h => h.reference && h.reference.measuredStatus
+                    ? {...h, status: h.reference.measuredStatus} : h)}))});
+            const without = {columns: ds.columns.filter(c=>c.scope !== "cross-table").map(measured)};
+            const withAll = datasetStatusByRun({...ds, columns: ds.columns.map(measured)});
+            const ownOnly = datasetStatusByRun(without);
+            const turned = [];
+            for(const [runId, status] of withAll){
+                if(status === "red" && ownOnly.get(runId) !== "red") turned.push(runId);
+            }
+            return {nCross: scoped.flatMap(c=>c.checks||[]).length, turned};
+        }""")
+        assert found["nCross"] > 0, "cp-carers carries no cross-table checks"
+        assert found["turned"], (
+            "no run exists where cp-carers is red only because of a cross-table "
+            "check - folding is not reaching this dataset's status")
+
+    def test_a_cross_table_check_is_not_among_the_real_columns(
+            self, clean_page, built_dashboard_html):
+        """A referential check declared on cp_notifications reads
+        cp_client_id, which is not a column of cp_carers. Rendering it
+        as one would invent a column."""
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": "child-protection-family-support",
+                      "collectionId": "child-protection", "datasetId": "cp-carers"})
+        invented = clean_page.evaluate("""() => {
+            const cp = DATA.agencies.flatMap(a=>a.collections)
+                .find(c=>c.id === "child-protection");
+            const ds = cp.datasets.find(d=>d.id === "cp-carers");
+            return realColumns(ds).map(c=>c.name);
+        }""")
+        assert "cp_client_id" not in invented, invented
+
+
+class TestArrivedVersusPromoted:
+    """REQ-DASH-056, in a real browser against the real built page.
+
+    Driven here rather than only in tests-js because the thing being
+    checked is a chain: a decision in the log, through the build, into
+    the embedded data, into a rendered panel. Each link is tested on its
+    own; only this asserts at the layer a person actually sees, which is
+    the lesson plans/qa-pipeline.md item 74 paid for - a green data
+    layer says nothing about a render layer with its own transform.
+    """
+
+    DATASETS = (
+        ("registry-services", "civil-registration", "birth-registrations"),
+        ("child-protection-family-support", "child-protection", "cp-carers"),
+    )
+
+    def _open(self, page, html, agency, collection, dataset_id):
+        _goto(page, html, state={"tier": "dataset", "agencyId": agency,
+                                  "collectionId": collection, "datasetId": dataset_id})
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_the_panel_agrees_with_the_data_about_whether_to_show_at_all(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        """Criteria 1 and 3 together, and asserting them as ONE claim is
+        deliberate: "show both" and "stay quiet" are the same rule read
+        from its two sides, and a test for either alone passes on a page
+        that always does that one thing."""
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        differs = clean_page.evaluate(
+            """(id) => {
+                 const ds = DATA.agencies.flatMap(a=>a.collections)
+                   .flatMap(c=>c.datasets).find(d=>d.id === id);
+                 return Boolean(ds && ds.promotionState && ds.promotionState.differs);
+               }""", dataset_id)
+        shown = clean_page.locator('[data-testid="promotion-split"]').count()
+        assert shown == (1 if differs else 0), (
+            f"{dataset_id}: promotionState.differs is {differs} and the panel "
+            f"rendered {shown} time(s)")
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_where_it_shows_it_names_both_supplies_and_says_why(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        panel = clean_page.locator('[data-testid="promotion-split"]')
+        if panel.count() == 0:
+            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
+        text = panel.inner_text()
+        state = clean_page.evaluate(
+            """(id) => DATA.agencies.flatMap(a=>a.collections)
+                 .flatMap(c=>c.datasets).find(d=>d.id === id).promotionState""",
+            dataset_id)
+        assert state["arrived"]["supply"] in text
+        if state["promoted"]:
+            assert state["promoted"]["supply"] in text
+        # CASE-INSENSITIVELY, because the labels are uppercased by CSS
+        # and inner_text() reports what is rendered. The claim is that
+        # the two are LABELLED rather than left to the reader's guess at
+        # the order (criterion 2) - which letter-case they are in is the
+        # stylesheet's business.
+        lower = text.lower()
+        assert "promoted" in lower and "latest arrival" in lower
+        assert state["explanation"] and state["explanation"] in text
+
+    @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
+    def test_it_shows_no_raw_period_code(
+            self, clean_page, built_dashboard_html, agency, collection, dataset_id):
+        """A DAILY calendar names its periods by the day, so the period
+        name is a bare ISO date - the one thing REQ-DASH-071 says a
+        reader never sees. The panel is the newest place one could leak
+        in."""
+        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        panel = clean_page.locator('[data-testid="promotion-split"]')
+        if panel.count() == 0:
+            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
+        # The supply IDENTIFIER legitimately carries digits, so the line
+        # holding it is excluded rather than the whole panel: an
+        # identifier is what somebody quotes in a ticket, not a date
+        # being shown to them.
+        prose = [ln for ln in panel.inner_text().splitlines() if "@" not in ln]
+        raw = [ln for ln in prose if re.search(r"\b\d{4}-\d{2}-\d{2}\b", ln)]
+        assert not raw, f"{dataset_id} shows a raw period code: {raw}"
+
+
+class TestAPeriodStandingInOnAnEarlierOne:
+    """REQ-DASH-085 and REQ-DASH-100, in a real browser.
+
+    NO DATASET IN THIS DEPLOYMENT IS SUBSTITUTED OR INHERITED, and that
+    is stated rather than worked around: a substitution needs a person's
+    decision and no operator route exists yet, and inheritance needs a
+    dataset the schedule says is not due, which no configuration
+    declares. Writing either into the real decision log to make a test
+    pass would be fabricating an operator decision in an append-only
+    record.
+
+    So these set the state ON THE PAGE and re-render. What that proves
+    is the render layer - that the qualifier reaches the status line,
+    that the detail panel says what it must, and that a real browser
+    reports no errors doing it. What it cannot prove is the chain from a
+    real decision, which waits on REQ-GEN-044 giving inheritance a real
+    instance and on the operator routes giving substitution one.
+    """
+
+    SUBSTITUTED = {
+        "kind": "substituted", "level": "warning", "period": "2026-Q3",
+        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "decidedBy": "Keith", "byAPerson": True,
+        "reason": "the supplier confirmed no extract will be sent this quarter",
+    }
+    INHERITED = {
+        "kind": "inherited", "level": "information", "period": "2026-Q3",
+        "standsOn": "2026-Q1", "supply": "cp-carers@202602010100000000",
+        "decidedBy": None, "byAPerson": False,
+        "reason": "carers are supplied annually, so no quarterly file is due",
+    }
+
+    def _with_state(self, page, html, standing_in):
+        _goto(page, html, state={"tier": "dataset",
+                                  "agencyId": "child-protection-family-support",
+                                  "collectionId": "child-protection",
+                                  "datasetId": "cp-carers"})
+        page.evaluate(
+            """(st) => {
+                 const ds = DATA.agencies.flatMap(a=>a.collections)
+                   .flatMap(c=>c.datasets).find(d=>d.id === "cp-carers");
+                 ds.promotionState = Object.assign({}, ds.promotionState,
+                                                    {standingIn: st});
+                 render();
+               }""", standing_in)
+
+    @pytest.mark.parametrize("kind,word", [("SUBSTITUTED", "Substituted"),
+                                            ("INHERITED", "Inherited")])
+    def test_the_qualifier_appears_beside_the_status(
+            self, clean_page, built_dashboard_html, kind, word):
+        self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
+        marker = clean_page.locator('[data-testid="standing-in"]')
+        assert marker.count() >= 1
+        assert word in marker.first.inner_text()
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_it_names_the_period_the_data_came_from_in_the_label(
+            self, clean_page, built_dashboard_html, kind):
+        state = getattr(self, kind)
+        self._with_state(clean_page, built_dashboard_html, state)
+        text = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        assert state["standsOn"] in text
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_the_drill_down_shows_the_reason_as_written(
+            self, clean_page, built_dashboard_html, kind):
+        state = getattr(self, kind)
+        self._with_state(clean_page, built_dashboard_html, state)
+        detail = clean_page.locator('[data-testid="standing-in-detail"]')
+        assert detail.count() == 1
+        assert state["reason"] in detail.inner_text()
+
+    def test_a_substitution_names_who_decided_it(self, clean_page,
+                                                  built_dashboard_html):
+        self._with_state(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        assert "Keith" in clean_page.locator(
+            '[data-testid="standing-in-detail"]').inner_text()
+
+    def test_an_inheritance_names_nobody(self, clean_page, built_dashboard_html):
+        """Naming the rule as though it were a person would put a
+        decision on somebody who never made one."""
+        self._with_state(clean_page, built_dashboard_html, self.INHERITED)
+        text = clean_page.locator('[data-testid="standing-in-detail"]').inner_text()
+        assert "no person decided it" in text
+        assert "Decided by" not in text
+
+    def test_the_two_are_told_apart_by_more_than_colour(
+            self, clean_page, built_dashboard_html):
+        self._with_state(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        one = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        self._with_state(clean_page, built_dashboard_html, self.INHERITED)
+        two = clean_page.locator('[data-testid="standing-in"]').first.inner_text()
+        assert one != two, "the label carries the whole meaning, never the colour"
+
+    @pytest.mark.parametrize("kind", ["SUBSTITUTED", "INHERITED"])
+    def test_it_renders_with_zero_console_errors(
+            self, clean_page, built_dashboard_html, kind):
+        errors = []
+        clean_page.on("console",
+                       lambda m: errors.append(m.text) if m.type == "error" else None)
+        self._with_state(clean_page, built_dashboard_html, getattr(self, kind))
+        assert clean_page.locator('[data-testid="standing-in"]').count() >= 1
+        assert errors == []
+
+
+class TestDrillingThroughToThePeriodThatEarnedTheResults:
+    """REQ-DASH-085 criteria 9-11 and REQ-DASH-100 criteria 8-10.
+
+    THE STATE IS SET ON THE EMBEDDED SOURCE, not on the built DATA tree,
+    and the difference is the whole reason this class exists separately
+    from the one above. Drilling REBUILDS DATA for the new as-of date,
+    so a standing-in record patched onto DATA disappears on the first
+    click - which would make every assertion after it about a page in a
+    state the test never set up. Patching REAL_CP_DATA, which buildData()
+    reads, survives the rebuild exactly as a real record would.
+
+    Still not a real decision, for the reason the class above states:
+    writing one into an append-only log to make a test pass would be
+    fabricating an operator's decision.
+    """
+
+    SUBSTITUTED = {
+        "kind": "substituted", "level": "warning", "period": "2026-Q3",
+        "standsOn": "2026-Q2", "supply": "cp-carers@202605010100000000",
+        "decidedBy": "Keith", "byAPerson": True,
+        "reason": "the supplier confirmed no extract will be sent this quarter",
+    }
+    # The two dates the real quarterly calendar gives those period names.
+    # Written out rather than computed, so a change to the calendar shows
+    # up here as a failing assertion rather than as a test that quietly
+    # agrees with whatever it now says.
+    PERIOD_DATE = "2026-08-01"
+    STANDS_ON_DATE = "2026-05-01"
+    WHERE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+              "collectionId": "child-protection", "datasetId": "cp-carers"}
+
+    def _open(self, page, html, standing_in=None):
+        _goto(page, html, state=self.WHERE)
+        if standing_in is not None:
+            page.evaluate(
+                """(st) => {
+                     const d = REAL_CP_DATA.datasets.find(x => x.id === "cp-carers");
+                     d.promotionState = Object.assign({}, d.promotionState,
+                                                       {standingIn: st});
+                     DATA = buildData(CURRENT_IN_PLACE_ON);
+                     renderFromState();
+                   }""", standing_in)
+
+    def _params(self, page):
+        return dict(urllib.parse.parse_qsl(
+            urllib.parse.urlparse(page.url).query))
+
+    def test_the_page_says_whose_results_these_are_before_offering_the_drill(
+            self, clean_page, built_dashboard_html):
+        """Criterion 9's first half. A reader who never clicks still
+        reads the checks below as this period's, which is the whole
+        false green - so the sentence is not optional decoration around
+        the link."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        text = " ".join(clean_page.locator(
+            '[data-testid="standing-in-detail"]').inner_text().split())
+        assert "ran against 2026-Q2's supply" in text
+        assert "not 2026-Q3's own results" in text
+
+    def test_drilling_moves_the_in_place_on_date_and_records_where_from(
+            self, clean_page, built_dashboard_html):
+        """Criterion 9's second half, and criterion 11's first: the
+        framing is in the URL, so a refresh or a shared link says the
+        same thing."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        params = self._params(clean_page)
+        assert params.get("in-place-on") == self.STANDS_ON_DATE
+        assert params.get("from") == "2026-Q3"
+
+    def test_the_reader_is_told_they_have_left_the_period_they_were_on(
+            self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        notice = clean_page.locator('[data-testid="arrival-notice"]')
+        assert notice.count() == 1
+        assert "You have left 2026-Q3" in notice.inner_text()
+
+    def test_the_way_back_returns_and_takes_the_framing_with_it(
+            self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        params = self._params(clean_page)
+        assert params.get("in-place-on") == self.PERIOD_DATE
+        assert "from" not in params
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_a_reader_who_came_here_directly_is_told_nothing(
+            self, clean_page, built_dashboard_html):
+        """The 'only' in criterion 10 is half of it: telling somebody
+        they have left a period they were never on is a false alarm."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_the_framing_does_not_travel_onto_the_next_page(
+            self, clean_page, built_dashboard_html):
+        """Criterion 11's second half. A banner saying 'you have left
+        2026-Q3' is true of the one page it was followed to and a lie
+        everywhere else - and pushState() with a bare hash keeps the
+        query string, so this does not happen by itself."""
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        assert self._params(clean_page).get("from") == "2026-Q3"
+        clean_page.locator("#rail .crumb").first.click()
+        clean_page.wait_for_function(
+            "() => !new URLSearchParams(location.search).get('from')")
+        params = self._params(clean_page)
+        assert "from" not in params
+        # The orthogonal query state a navigation has always kept stays.
+        assert params.get("in-place-on") == self.STANDS_ON_DATE
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+
+    def test_the_whole_drill_reports_no_console_errors(
+            self, clean_page, built_dashboard_html):
+        errors = []
+        clean_page.on("console",
+                       lambda m: errors.append(m.text) if m.type == "error" else None)
+        self._open(clean_page, built_dashboard_html, self.SUBSTITUTED)
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        assert errors == []
+
+
+def _rewrite_const(html: str, name: str, change) -> str:
+    start = html.index(f"const {name} = ") + len(f"const {name} = ")
+    end = html.index(";\n", start)
+    record = json.loads(html[start:end])
+    change(record)
+    return html[:start] + json.dumps(record, separators=(",", ":")) + html[end:]
+
+
+def _with_blockers(built: Path, out: Path, blockers: list,
+                   closed_slots: dict | None = None) -> Path:
+    """The built page with its OUTSTANDING record's blockers replaced -
+    only that one const rewritten, every other byte the real build.
+
+    `closed_slots`, when given, replaces every real dataset's closed,
+    unfilled periods (REQ-DASH-133) - the dataset ids it names get those
+    slots, every other dataset none."""
+    root = Path(__file__).resolve().parent.parent / "dashboard"
+    for name in ("fonts", "vendor"):
+        if not (out.parent / name).exists():
+            (out.parent / name).symlink_to((root / name).resolve())
+    html = _rewrite_const(built.read_text(), "OUTSTANDING",
+                          lambda record: record.__setitem__("blockers", blockers))
+    if closed_slots is not None:
+        def _slots(record):
+            for d in record.get("datasets") or [record]:
+                d["closedSlots"] = closed_slots.get(d.get("id", "birth-registrations"), [])
+        html = _rewrite_const(html, "REAL_CP_DATA", _slots)
+        html = _rewrite_const(html, "REAL_BIRTH_REG_DATA", _slots)
+    out.write_text(html)
+    return out
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_without_blockers(built_dashboard_html, tmp_path_factory) -> Path:
+    """The built page with no held supply or contested pair in it.
+
+    WHY THE ENDED-SCHEDULE TESTS NEED IT (REQ-PIPE-115, 2026-10-05). The
+    real corpus files cp-case-workers' May and November supplies to no
+    period - it takes only February and August, so REQ-PIPE-131 holds
+    them - and nobody resolves a hold in a bootstrap. An open hold makes
+    the dataset RED, and red OUTRANKS an ended schedule (PROVISIONAL): a
+    file is here waiting on a person, so "no supply expected" would be
+    untrue. Those tests are about the ended schedule alone, so they read
+    a page where nothing is held; TestHeldOutranksAnEndedSchedule covers
+    the two together.
+
+    NOR A PERIOD THAT CLOSED WITH NO SUPPLY (REQ-DASH-133, 2026-10-05):
+    an unmarked gap is red too and outranks an ended schedule for the
+    same reason, so this page carries none - TestClosedWithNoSupply
+    covers gaps on a page that has them.
+    """
+    tmp = tmp_path_factory.mktemp("noblockers")
+    return _with_blockers(built_dashboard_html, tmp / "dashboard_no_blockers.html", [],
+                          closed_slots={})
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_with_blockers(built_dashboard_html, tmp_path_factory) -> Path:
+    """Exactly two blockers - one held supply, one contested pair - in
+    place of whatever the deployment held, so REQ-PIPE-115 criterion 13
+    is asserted against a known case rather than a corpus that may have
+    none of either."""
+    opened = TestAHeldOrContestedDatasetReadsRed.OPENED
+    tmp = tmp_path_factory.mktemp("blockers")
+    return _with_blockers(built_dashboard_html, tmp / "dashboard_with_blockers.html", [
+        {"kind": "held", "datasetId": "cp-carers", "supply": "cp-carers@k1",
+         "openedAt": opened, "resolvedAt": None,
+         "reason": "cp-carers@k1 could not be placed - no slot was open.",
+         "files": [], "loadFailures": [], "delivery": "d1"},
+        {"kind": "contested", "datasetId": "cp-clients", "supply": "cp-clients@k2#1",
+         "openedAt": opened, "resolvedAt": None,
+         "reason": "Two files claim this dataset's table: a.csv and b.csv.",
+         "files": ["a.csv", "b.csv"], "loadFailures": [], "delivery": "d2"}])
+
+
+class TestAHeldOrContestedDatasetReadsRed:
+    """REQ-PIPE-115 criterion 13: one dataset held, another contested;
+    each reads red with its reason, the red rolls up to its collection
+    and agency, and none of its own checks reads as passing."""
+
+    OPENED = "2026-09-01T02:00:00+00:00"
+    IN_PLACE_ON = "2026-09-23"
+    BEFORE = "2026-08-20"
+    CP = "child-protection-family-support"
+
+    def _ds(self, dataset_id):
+        return {"tier": "dataset", "agencyId": self.CP, "collectionId": "child-protection",
+                "datasetId": dataset_id}
+
+    def test_each_reads_red_with_its_reason_at_the_agency_tier(self, page,
+                                                               dashboard_html_with_blockers):
+        _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
+              in_place_on=self.IN_PLACE_ON)
+        contested = page.locator("tr[data-blocked=contested]")
+        assert contested.count() == 1
+        assert "Two files, choose one" in contested.inner_text()
+        assert contested.locator(".pill.red").count() == 1
+        # One reason row: no row count, run date or sparkline beside it.
+        assert contested.locator("svg").count() == 0
+        # A HELD SUPPLY HAS NO PERIOD, so it no longer replaces the row
+        # (criterion 11 as amended 2026-10-05, Keith): the row keeps the
+        # latest checked supply's columns, red, with the hold beneath.
+        held = page.locator("tr", has=page.locator("[data-waiting-blocker=held]"))
+        assert held.count() == 1
+        assert "Carer Register" in held.inner_text() and "Held" in held.inner_text()
+        assert held.locator(".pill.red").count() == 1
+
+    def test_the_red_rolls_up_to_the_collection_and_the_agency(self, page,
+                                                               dashboard_html_with_blockers):
+        _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
+              in_place_on=self.IN_PLACE_ON)
+        statuses = page.evaluate(f"""() => {{
+            const ag = DATA.agencies.find(a => a.id === "{self.CP}");
+            return {{agency: ag.status, collection: ag.collections[0].status}};
+        }}""")
+        assert statuses == {"agency": "red", "collection": "red"}
+
+    @pytest.mark.parametrize("dataset_id", ["cp-clients"])
+    def test_none_of_its_own_checks_reads_as_passing(self, page, dashboard_html_with_blockers,
+                                                     dataset_id):
+        _goto(page, dashboard_html_with_blockers, state=self._ds(dataset_id), in_place_on=self.IN_PLACE_ON)
+        got = page.evaluate(f"""() => {{
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "{dataset_id}");
+            return {{status: ds.status,
+                     checks: [...new Set(ds.columns.flatMap(c => c.checks).map(checkStatus))],
+                     columns: [...new Set(ds.columns.map(c => c.status))]}};
+        }}""")
+        assert got["status"] == "red"
+        assert got["checks"] in ([], ["nodata"]) and got["columns"] in ([], ["nodata"])
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "nothing is checked for this dataset until a person resolves it" in text
+        assert page.locator("#col-grid .pill.green").count() == 0
+
+    def test_a_held_supply_keeps_the_latest_checked_results(self, page,
+                                                            dashboard_html_with_blockers):
+        """Criterion 11 as amended 2026-10-05 (Keith): an open hold no
+        longer blanks later periods - red with its reason, the latest
+        checked supply's results shown."""
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), in_place_on=self.IN_PLACE_ON)
+        got = page.evaluate("""() => {
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                           .find(d => d.id === "cp-carers");
+            return {status: ds.status,
+                    checks: [...new Set(ds.columns.flatMap(c => c.checks).map(checkStatus))]};
+        }""")
+        assert got["status"] == "red"
+        assert got["checks"] and got["checks"] != ["nodata"]
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "The dataset stays red until a person resolves it" in text
+
+    def test_its_check_panel_does_not_show_an_earlier_run_as_current(
+            self, page, dashboard_html_with_blockers):
+        """Criteria 11 and 26 in the check panel (delivery-critic, sprint 6):
+        the pill read No data while the panel still showed the last run's
+        value and row counts as "current"."""
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-clients"), in_place_on=self.IN_PLACE_ON)
+        page.evaluate("""() => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, col.checks[0]);
+        }""")
+        # innerText carries the CSS text-transform, so the heading reads
+        # upper case here - compared case-insensitively for that reason.
+        text = " ".join(page.locator("body").inner_text().split()).lower()
+        assert "not run for this period" in text
+        assert "rows checked, current run" not in text
+
+    def test_its_supply_history_lists_it(self, page, dashboard_html_with_blockers):
+        _goto(page, dashboard_html_with_blockers, state=self._ds("cp-carers"), in_place_on=self.IN_PLACE_ON)
+        assert page.locator("tr[data-blocker=held]").count() == 1
+
+    def test_before_its_receipt_nothing_is_red_for_it(self, page, dashboard_html_with_blockers):
+        """Criterion 12: open from the supply's own receipt, so the as-of
+        view of an earlier date shows what a reader saw then."""
+        _goto(page, dashboard_html_with_blockers, state={"tier": "agency", "agencyId": self.CP},
+              in_place_on=self.BEFORE)
+        assert page.locator("tr[data-blocked]").count() == 0
+
+
+class TestHeldOutranksAnEndedSchedule:
+    """The two together (PROVISIONAL, 2026-10-05): a held supply on a
+    dataset whose schedule has ended reads RED with the hold's reason,
+    not as the quiet ended-schedule row - a file arrived and waits on a
+    person, so "no supply expected" would be untrue."""
+
+    def test_the_row_says_held(self, page, built_dashboard_html, tmp_path):
+        out = _with_blockers(built_dashboard_html, tmp_path / "both.html", [
+            {"kind": "held", "datasetId": "cp-case-workers", "supply": "cp-case-workers@k",
+             "openedAt": "2027-08-20T02:00:00+00:00", "resolvedAt": None,
+             "reason": "could not be placed", "files": [], "loadFailures": []}])
+        _goto(page, out, state={"tier": "agency", "agencyId": "child-protection-family-support"},
+              in_place_on="2027-09-15")
+        # A held supply keeps the row (REQ-PIPE-115 criterion 11 as amended
+        # 2026-10-05), red, with the hold beneath its pill.
+        row = page.locator("tr", has=page.locator("[data-waiting-blocker=held]"))
+        assert row.count() == 1 and "Case Workers" in row.inner_text()
+        assert row.locator(".pill.red").count() == 1
+
+
+class TestASupplyThatCouldNotBeLoaded:
+    """REQ-DASH-148 criterion 9 and REQ-PIPE-153 criterion 15: one Child
+    Protection table could not be loaded while the other five loaded. Its
+    dataset reads red with the reason and rolls up; none of its own checks
+    reads as passing; the other five are checked as usual. Once a person
+    rejects it, it is no longer red on that account - and still is as at
+    an instant between the failure and the rejection."""
+
+    CP = "child-protection-family-support"
+    FAILED = "2026-09-01T02:00:00+00:00"
+    REJECTED = "2026-09-10T02:00:00+00:00"
+
+    def _page(self, built, tmp_path, *, rejected: bool):
+        return _with_blockers(built, tmp_path / f"refused{int(rejected)}.html", [
+            {"kind": "refused", "datasetId": "cp-placements", "supply": "cp-placements@k",
+             "openedAt": self.FAILED,
+             "resolvedAt": self.REJECTED if rejected else None,
+             "reason": "The supply could not be loaded: malformed row: line 3 has 4 fields "
+                       "where 2 were expected. Nothing can read the table, so nothing is checked.",
+             "files": [], "loadFailures": [], "delivery": "d",
+             "rejected": ({"actor": "Keith Moss", "at": self.REJECTED,
+                           "reason": "supplier is resending"} if rejected else None)}])
+
+    def _status(self, page, dataset_id):
+        return page.evaluate(f"""() => DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).find(d => d.id === "{dataset_id}").status""")
+
+    def test_it_reads_red_with_the_reason_and_the_rest_are_checked(self, page, tmp_path,
+                                                                   built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path, rejected=False)
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-23")
+        row = page.locator("tr[data-blocked=refused]")
+        assert row.count() == 1 and "Could not be loaded" in row.inner_text()
+        assert self._status(page, "cp-placements") == "red"
+        assert page.evaluate(f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
+        others = page.evaluate("""() => DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).filter(d => d.id.startsWith("cp-") && d.id !== "cp-placements")
+            .map(d => !!d.blocked)""")
+        assert others and not any(others)
+
+    def test_its_own_checks_do_not_read_as_passing(self, page, tmp_path, built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path, rejected=False)
+        _goto(page, out, state={"tier": "dataset", "agencyId": self.CP,
+                                "collectionId": "child-protection", "datasetId": "cp-placements"},
+              in_place_on="2026-09-23")
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "line 3 has 4 fields" in text
+        assert page.locator("#col-grid .pill.green").count() == 0
+
+    def test_a_rejection_settles_it_and_the_in_place_on_view_still_shows_it(self, page, tmp_path,
+                                                                     built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path, rejected=True)
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-23")
+        assert page.locator("tr[data-blocked=refused]").count() == 0
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-05")
+        assert page.locator("tr[data-blocked=refused]").count() == 1
+        _goto(page, out, state={"tier": "dataset", "agencyId": self.CP,
+                                "collectionId": "child-protection", "datasetId": "cp-placements"},
+              in_place_on="2026-09-23")
+        row = page.locator("tr[data-blocker=refused]")
+        assert row.count() == 1
+        assert "rejected by Keith Moss" in row.inner_text()
+        assert "supplier is resending" in row.inner_text()
+
+
+class TestClosedWithNoSupply:
+    """REQ-DASH-133: a period that closed with nothing in it reads RED and
+    says 'no supply' at agency and dataset level, consecutive periods as
+    one item; a period a person accepted reads quietly with its reason and
+    stays out of the red; both are judged as at the date on show and both
+    stay in the supply history. Injected rather than taken from the corpus,
+    so the assertions do not depend on which gaps a bootstrap happened to
+    leave."""
+
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-clients"}
+    MARKED = "2026-09-10T02:00:00+00:00"
+
+    def _slot(self, period, index, closes, **extra):
+        return {"period": period, "index": index, "closesAt": closes, "changes": [],
+                "filedAt": None, "marks": [], "rejected": None, **extra}
+
+    def _page(self, built, tmp_path):
+        slots = [self._slot("2025-Q2", 5, "2025-08-15T16:00:00+00:00"),
+                 self._slot("2025-Q3", 6, "2025-11-15T16:00:00+00:00"),
+                 self._slot("2024-Q4", 2, "2025-02-15T16:00:00+00:00",
+                            marks=[{"at": self.MARKED, "actor": "Keith Moss",
+                                    "reason": "supplier had a system outage"}])]
+        return _with_blockers(built, tmp_path / "gaps.html", [],
+                              closed_slots={"cp-clients": slots})
+
+    def _ds(self, page, dataset_id="cp-clients"):
+        return page.evaluate(f"""() => {{ const d = DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).find(d => d.id === "{dataset_id}");
+            return {{status: d.status, noSupply: d.noSupply, accepted: d.acceptedGaps}}; }}""")
+
+    def test_an_unmarked_gap_is_red_and_rolls_up_in_words(self, page, tmp_path,
+                                                         built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, in_place_on="2026-09-23")
+        assert self._ds(page)["status"] == "red"
+        assert page.evaluate(f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
+        card = page.locator(f'a.card[href*="{self.CP}"]')
+        text = " ".join(card.inner_text().split())
+        assert "1 no supply" in text, text
+        assert "1 dataset with a period accepted as not supplied" in text, text
+
+    def test_consecutive_periods_are_one_item_on_the_agency_page(self, page, tmp_path,
+                                                                built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, state={"tier": "agency", "agencyId": self.CP}, in_place_on="2026-09-23")
+        note = page.locator("[data-no-supply]")
+        assert note.count() == 1
+        assert "2 periods with no supply, 2025-Q2 to 2025-Q3" in note.inner_text()
+
+    def test_the_dataset_page_says_no_supply_and_names_the_accepted_reason(
+            self, page, tmp_path, built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, state=self.DS, in_place_on="2026-09-23")
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "No supply — 2 periods with no supply, 2025-Q2 to 2025-Q3" in text
+        assert "Not supplied (accepted)" in text and "supplier had a system outage" in text
+        # Chase the supplier first, then the filing wizard, which offers all
+        # three decisions (Keith, 2026-10-05; post-build-review #104).
+        assert "Chase the supplier first" in text
+        assert "Filing decisions" in text, "and names where to decide it"
+
+    def test_the_supply_history_lists_every_closed_period(self, page, tmp_path,
+                                                        built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, state=self.DS, in_place_on="2026-09-23")
+        assert page.locator("tr[data-gap=open]").count() == 1
+        assert page.locator("tr[data-gap=accepted]").count() == 1
+
+    def test_in_place_on_before_the_mark_the_accepted_period_was_still_red(
+            self, page, tmp_path, built_dashboard_html):
+        out = self._page(built_dashboard_html, tmp_path)
+        _goto(page, out, in_place_on="2025-06-01")
+        got = self._ds(page)
+        assert got["accepted"] is None, "not marked yet on this date"
+        assert [g["periods"] for g in got["noSupply"]] == [["2024-Q4"]], \
+            "and Q2/Q3 had not closed yet"
+
+    def test_a_daily_feed_awaiting_todays_file_keeps_its_row(self, page, tmp_path,
+                                                            built_dashboard_html):
+        """UX critic, 2026-10-05: the reason row is for a dataset with
+        nothing current at all. A daily feed whose file for the day on
+        show has not arrived (23 September has no Birth Registrations
+        run in the seeded corpus) keeps its arrival columns, with the old
+        gap beneath its pill - the period actually late and still open
+        must not be hidden behind it."""
+        slot = self._slot("2026-09-09", 250, "2026-09-09T16:00:00+00:00")
+        out = _with_blockers(built_dashboard_html, tmp_path / "daily.html", [],
+                             closed_slots={"birth-registrations": [slot]})
+        _goto(page, out, state={"tier": "agency", "agencyId": "registry-services"},
+              in_place_on="2026-09-23")
+        assert page.locator("tr[data-no-supply]").count() == 0
+        note = page.locator(".no-supply-note")
+        assert note.count() == 1 and "9 September 2026" in note.inner_text()
+
+
+class TestFileChecksOnThePage:
+    """REQ-DASH-097 criterion 12, against the bootstrapped history rather
+    than a fixture (Keith's choice, 2026-10-04): TS-12 plants a Child
+    Protection delivery whose cp_clients goes ragged partway, refused by
+    the fields-per-row file check; TS-56 plants cp_carers with its columns
+    reordered, which only warns. Zero console errors comes from the page
+    fixture this suite runs under."""
+
+    CP = "child-protection-family-support"
+
+    def _placement(self, scenario):
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get(scenario)
+        if placement is None or not placement.is_complete:
+            pytest.skip(f"{scenario} is not placed in this history")
+        return placement
+
+    def _dataset(self, page, dataset_id):
+        return page.evaluate(f"""() => DATA.agencies.flatMap(a => a.collections)
+            .flatMap(c => c.datasets).find(d => d.id === "{dataset_id}")""")
+
+    def test_a_refused_file_reads_red_naming_the_check(self, clean_page, built_dashboard_html):
+        placement = self._placement("TS-12")
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": self.CP, "collectionId": "child-protection",
+                     "datasetId": "cp-clients"}, in_place_on=placement.in_place_on)
+        section = clean_page.locator(".file-section")
+        assert section.get_attribute("data-file-outcome") == "refused"
+        assert "fields per row" in section.inner_text().lower()
+        assert "file check" in section.inner_text().lower()
+        ds = self._dataset(clean_page, "cp-clients")
+        assert ds["status"] == "red"
+        # By the check's NAME, in one sentence (post-build-review #118 D-G).
+        assert ds["blocked"] and "Fields per row" in ds["blocked"]["reason"]
+        assert ".." not in ds["blocked"]["reason"]
+        # Its waiting item shows on the scenario's own date too (#118 D-B).
+        assert "Nothing is waiting for a person here" not in clean_page.inner_text("body")
+        assert clean_page.evaluate(
+            f"""() => DATA.agencies.find(a => a.id === "{self.CP}").status""") == "red"
+
+    def test_a_warned_file_leaves_the_status_alone(self, clean_page, built_dashboard_html):
+        placement = self._placement("TS-56")
+        _goto(clean_page, built_dashboard_html,
+              state={"tier": "dataset", "agencyId": self.CP, "collectionId": "child-protection",
+                     "datasetId": "cp-carers"}, in_place_on=placement.in_place_on)
+        section = clean_page.locator(".file-section")
+        assert section.get_attribute("data-file-outcome") == "warned"
+        assert "column order" in section.inner_text().lower()
+        ds = self._dataset(clean_page, "cp-carers")
+        assert not ds.get("blocked")
+        # Unchanged: the dataset's status is exactly its data checks' roll-up.
+        own = clean_page.evaluate("""() => {
+            const d = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+              .find(d => d.id === "cp-carers");
+            return rollupStatuses((d.columns||[]).map(c => c.status));
+        }""")
+        assert ds["status"] == own
+
+
+class TestSampleFinePrint:
+    """post-build-review #129 (Keith 2026-10-07): the example failing rows
+    say which rows they are, in the real panel."""
+
+    def test_a_soda_check_past_its_limit_says_soda_chose_them(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        text = clean_page.evaluate("""() => {
+          const ctx = resolveContext(STATE);
+          const col = ctx.ds.columns.find(c => c.checks && c.checks.length);
+          const ck = col.checks[0];
+          ck.tool_ref = "soda:missing_count";
+          for (const h of ck.history) {
+            h.failing_sample_keys = ["A1", "A2", "A3", "A4", "A5"];
+            h.row_count_invalid = 250;
+          }
+          openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+          openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, ck);
+          const fp = document.querySelector('#check-panel-body .sample-fine-print');
+          return fp ? fp.textContent : null;
+        }""")
+        assert text and "Soda returns up to 100 of the failing rows" in text

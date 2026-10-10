@@ -30,20 +30,24 @@ include_failed_samples at all, a real gap noted rather than hidden.
 from __future__ import annotations
 import os
 
+from . import bdm_common
+from qa_tools.common import supply_db
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_local_server, failing_sample_keys, check_id_from_quality_definition,
+    run_against_warehouse, failing_sample_keys, check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
+)
+from qa_tools.common.check_lifecycle import (
+    name_by_check_id, parse_contract_check_metadata,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
-RAW_DIR = os.path.join(ROOT, "data", "raw")
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 # the real quality-rule-driven check types this project's contract produces
 # (see contract yaml's metric: nullValues/invalidValues/duplicateValues/
@@ -55,28 +59,45 @@ _QUALITY_CHECK_TYPES = {
     "field_quality_sql", "row_count",
 }
 
-# The 2 custom_sql rules below get an explicit shared label: each is the
-# same real-world check as a dbt (and, for the sibling check, Soda)
-# counterpart under a different name - the label is what makes that
-# overlap visible on the dashboard, same rationale as run_dbt_bdm.py's
-# and run_soda_bdm.py's own versions of this dict. Matched by the
-# rule's own description prefix (this contract's own text, not a guess).
-_CUSTOM_SQL_LABEL = {
-    "Multiple-birth sibling match:": "Sibling record match",
-    "Extract timestamp ordering:": "Timestamp ordering",
-    "Freshness / relative-date check:": "Freshness",
+# Three custom_sql rules share a label with a dbt (and, for the sibling
+# check, Soda) counterpart - each is the same real-world check under a
+# different name, and the label is what makes that overlap visible on
+# the dashboard, same rationale as run_dbt_bdm.py's and run_soda_bdm.py's
+# own versions of this dict.
+#
+# REQ-QAC-023, 2026-09-20: keyed on the check_id's own tail, which is
+# structure. It used to be keyed on the rule's `description:` prefix, so
+# reformatting an explanation would silently drop the label and split one
+# real-world check into two unrelated-looking ones on the dashboard.
+_LABEL_BY_CHECK_TAIL = {
+    "sibling_match_datacontract": "Sibling record match",
+    "timestamp_ordering_datacontract": "Timestamp ordering",
+    "freshness_datacontract": "Freshness",
 }
 
+# Authored display names, read once at import from the contract itself -
+# the same already-authoritative parse used elsewhere, not a second copy
+# maintained here. Before this, all five Birth Registrations SQL checks
+# rendered under the identical name "datacontract:custom_sql", because
+# the runner had no per-rule name to give them and the label dict only
+# covered three.
+CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH))
 
-def _custom_sql_label(description: str) -> str | None:
-    for prefix, label in _CUSTOM_SQL_LABEL.items():
-        if description.startswith(prefix):
-            return label
-    return None
 
 
-def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str) -> list[dict]:
-    run = run_against_local_server(CONTRACT_PATH, os.path.join(RAW_DIR, csv_filename))
+
+def evaluate_datacontract_bdm(run_id: str, run_timestamp: str) -> list[dict]:
+    # THE WAREHOUSE, NOT THE FILE (REQ-QAC-088). This tool used to read
+    # the supplier's CSV directly, which made it the one tool answering a
+    # different question from the other three - they checked what had
+    # been loaded, it checked what had been sent.
+    #
+    # `csv_filename` WAS KEPT IN THIS SIGNATURE and is now gone
+    # (REQ-PIPE-102): the comment here claimed "other parts of this
+    # module still use it for reporting", and nothing did - it was
+    # accepted and ignored, which is exactly the shape of the dead
+    # parameter that cost a test eighty seconds a run elsewhere.
+    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
 
     results = []
     for c in run.checks:
@@ -89,12 +110,24 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
         row_count_total = diag.get("row_count")
         row_count_invalid = None if metric == "row_count" else diag.get("value")
 
-        label = _custom_sql_label(c.name) if metric == "custom_sql" else LABEL_BY_METRIC.get(metric)
-
         check_id = check_id_from_quality_definition(c.qualityDefinition)
         if check_id is None:
             raise ValueError(f"no check_id found in qualityDefinition for datacontract check {c.name!r} "
                               f"(type={c.type!r}) - the contract is missing customProperties.check_id for this rule")
+
+        if metric == "custom_sql":
+            authored = CHECK_NAME_BY_ID.get(check_id)
+            if not authored:
+                raise ValueError(
+                    f"datacontract SQL rule {check_id!r} has no authored "
+                    f"customProperties `name` - add one rather than letting its "
+                    f"display name come from its description")
+            check_name = f"datacontract:sql: {authored}"
+            label = next((lbl for tail, lbl in _LABEL_BY_CHECK_TAIL.items()
+                          if check_id.endswith(tail)), None)
+        else:
+            check_name = f"datacontract:{metric}"
+            label = LABEL_BY_METRIC.get(metric)
 
         results.append({
             "agency_id": AGENCY_ID,
@@ -102,7 +135,7 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
             "dataset_id": DATASET_ID,
             "check_id": check_id,
             "column_name": c.field or "(table)",
-            "check_name": f"datacontract:{metric}",
+            "check_name": check_name,
             "dimension": c.dimension or DIMENSION_BY_METRIC.get(metric, ""),
             "label": label,
             "run_id": run_id,
@@ -124,19 +157,20 @@ def evaluate_datacontract_bdm(run_id: str, csv_filename: str, run_timestamp: str
     # `verified` for uniformity with the other 3 tools, so the reader
     # never has to special-case which tools happen to need it (see
     # qa_results_writer.py's own docstring).
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "datacontract", run.model_dump(), verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "datacontract", run.model_dump(), verified=results)
     return results
 
 
 if __name__ == "__main__":
-    import json
     from datetime import datetime, timezone
 
-    with open(os.path.join(RAW_DIR, "manifest.json")) as f:
-        manifest = json.load(f)
-    for entry in manifest[:1] + [e for e in manifest if e["dirty_severity"]]:
-        res = evaluate_datacontract_bdm(entry["run_id"], entry["file"], datetime.now(timezone.utc).isoformat())
-        print(f"--- {entry['run_id']} ({entry['dirty_severity']}) ---")
+    from qa_tools.common import arrivals
+    manifest = [a.as_entry() | {"csv_path": str(a.path_for("birth-registrations"))}
+                for a in arrivals.arrivals_for("civil-registration", "run_")
+                if "birth-registrations" not in a.contested]
+    for entry in manifest:
+        res = evaluate_datacontract_bdm(entry["run_id"], datetime.now(timezone.utc).isoformat())
+        print(f"--- {entry['run_id']} ({entry['delivery']}) ---")
         for r in res:
             if r["status"] != "pass":
                 print(" ", r["column_name"], r["check_name"], r["status"], r["metric_value"], r["unit"])

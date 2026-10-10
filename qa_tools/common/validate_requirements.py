@@ -43,50 +43,39 @@ comparison here).
 from __future__ import annotations
 
 import ast
-import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
-from dashboard.requirements_yaml import parse_requirements
+import yaml
+from pydantic import ValidationError
+
+from qa_tools.common.schemas import Requirement, format_error
+from qa_tools.common.sprint_state import SPRINTS_FILE, parse_sprints
+from qa_tools.common.vocab import COMPONENT_CODES
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 REQUIREMENTS_YAML = ROOT / "requirements.yaml"
 
-# Single source of truth for the id's own middle component code - the
-# same 7-part taxonomy plans/*.md items and CHANGELOG.md entries tag
-# things with (dashboard/qa-reporting-dashboard.template.html's own
-# `COMPONENT_ICON`/`PLANS_ALL_COMPONENTS` consts), just condensed to
-# 3-4 letters for the id. Edit this dict when the taxonomy itself
-# changes and nothing else - tests/test_component_taxonomy_consistency.py
-# (2026-09-19, Keith's own question: "how do we keep components.md in
-# sync with the UI") fails CI if this dict, those 2 template consts, and
-# docs/components.md's own section headers ever disagree, so drift here
-# is a real, structural CI failure, not something that has to be
-# remembered by hand any more. docs/components.md has the
-# full write-up of what each one actually covers (real scope, real
-# file/directory ownership, in/out-of-scope boundary against its
-# neighbours) - this dict is deliberately just the bare code mapping.
-_COMPONENT_CODES = {
-    "GEN": "Data generation",
-    "QAC": "QA checks & contract",
-    "PIPE": "Pipeline & publishing",
-    "DASH": "Dashboard UI",
-    "GHUB": "GitHub workflow & people",
-    "TEST": "Testing & dev tooling",
-    "DOCS": "Docs & process",
-}
-# "REQ-<CODE>-NNN" only - the old bare "REQ-NNN" shape is no longer
-# valid, see this module's own docstring for the same-day migration.
-_ID_RE = re.compile(r"^REQ-(?:" + "|".join(_COMPONENT_CODES) + r")-\d{3}$")
-_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_VALID_MOSCOW = {"must", "should", "could", "wont"}
-_VALID_STATUS = {"not_started", "in_progress", "built"}
+# The taxonomy itself moved to qa_tools/common/vocab.py (2026-09-20)
+# so the declared schema and this validator can both use it without
+# importing each other in a circle. Re-exported under its old private
+# name because tests/test_component_taxonomy_consistency.py and
+# validate_changelog.py both import it from here - that test is what
+# fails CI if this, the dashboard's own two consts and
+# docs/components.md ever disagree.
+_COMPONENT_CODES = COMPONENT_CODES
 
 
-def _python_test_exists(rel_path: str, qualname: list[str]) -> bool:
+def _python_symbol_exists(rel_path: str, qualname: list[str]) -> bool:
     """qualname is ["function"] or ["Class", "method"] - real AST parse
     of the referenced file (never a regex/string match, which could be
-    fooled by a comment or a docstring mentioning the same name)."""
+    fooled by a comment or a docstring mentioning the same name).
+
+    Used by BOTH `linked_tests` and `implemented_by` (2026-09-20). It was
+    named `_python_test_exists` while tests were its only caller; the
+    mechanism was never test-specific, and pointing it at production
+    code is exactly what makes `implemented_by` worth more than a path."""
     full_path = ROOT / rel_path
     if not full_path.exists():
         return False
@@ -101,10 +90,23 @@ def _python_test_exists(rel_path: str, qualname: list[str]) -> bool:
         # in this class") - both are real, legitimate single-segment
         # references.
         name = qualname[0]
-        return any(
-            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name
-            for node in tree.body
-        )
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if node.name == name:
+                    return True
+            # A module-level CONSTANT is a symbol too, and worth pinning
+            # for the same reason a function is - delete it and the
+            # requirement claiming it should break. Added 2026-09-20,
+            # found by the gate itself: qa_tools/common/vocab.py is
+            # purely constants, so a bare path was rejected (rightly)
+            # and no symbol was acceptable (wrongly).
+            elif isinstance(node, ast.Assign):
+                if any(isinstance(tgt, ast.Name) and tgt.id == name for tgt in node.targets):
+                    return True
+            elif isinstance(node, ast.AnnAssign):
+                if isinstance(node.target, ast.Name) and node.target.id == name:
+                    return True
+        return False
     if len(qualname) == 2:
         class_name, method_name = qualname
         for node in ast.walk(tree):
@@ -128,119 +130,203 @@ def _linked_test_exists(entry: str) -> bool:
         file_part, *qualname = entry.split("::")
         if not file_part.endswith(".py"):
             return False
-        return _python_test_exists(file_part, qualname)
+        return _python_symbol_exists(file_part, qualname)
     full_path = ROOT / entry
     return full_path.exists()
 
 
-def _valid_string_list(value, field_name: str, where: str) -> list[str]:
-    """Real validation shared by all 4 optional list-of-strings fields
-    (non_functional_requirements/dependencies/open_questions/evidence):
-    absent/empty is fine (all 4 are optional), but if present, must be
-    a real list of non-empty strings - a stray `null` entry or a bare
-    string instead of a list is a real authoring mistake, not silently
-    accepted."""
-    if value is None:
+# Files whose symbols this toolchain can actually verify, and files
+# where a bare path is the honest limit of what it can claim.
+#
+# Keith's call, 2026-09-20: Python MUST name a symbol; front-end code may
+# be a bare path "for now - for the HTML we'll probably end up with a
+# separate TypeScript or JavaScript file, and maybe we can take it up
+# later". A `::` on a `.html` file IS allowed and IS verified, just not
+# here - tests-js/implemented_by.test.js loads the real template into jsdom
+# and checks the symbol actually resolves, which is stronger than an AST
+# parse because it is real execution rather than a reading of the source.
+_FRONT_END_SUFFIXES = (".html", ".js", ".ts")
+
+
+def _implemented_by_errors(entry: str, where: str) -> list[str]:
+    """One `implemented_by` entry: a path, or `path::Symbol` /
+    `path::Class::method`.
+
+    The asymmetry between Python and everything else is deliberate and
+    is the whole point of the field. `Path.exists()` stays green while a
+    module is gutted, stubbed, or renamed-and-recreated - which is
+    precisely how `touches:` lines in plans/*.md rotted while continuing
+    to look authoritative. An AST-verified symbol cannot: delete
+    `parse_contract_check_metadata` and CI names the requirement that
+    claimed it."""
+    file_part, *qualname = entry.split("::")
+    if not (ROOT / file_part).exists():
+        return [f"{where}: implemented_by entry {entry!r} names a file that does not exist"]
+    if file_part.endswith(".py"):
+        if not qualname:
+            return [f"{where}: implemented_by entry {entry!r} is a bare Python path - "
+                    f"name a symbol (file.py::function or file.py::Class::method), "
+                    f"since a path alone stays valid while the code inside it goes away"]
+        if not _python_symbol_exists(file_part, qualname):
+            return [f"{where}: implemented_by entry {entry!r} names no real "
+                    f"function/class/method in that file"]
         return []
-    errors = []
-    if not isinstance(value, list):
-        errors.append(f"{where}: {field_name} must be a list, got {type(value).__name__}")
-        return errors
-    for entry in value:
-        if not isinstance(entry, str) or not entry.strip():
-            errors.append(f"{where}: {field_name} entries must be non-empty strings, got {entry!r}")
+    if qualname and not file_part.endswith(_FRONT_END_SUFFIXES):
+        return [f"{where}: implemented_by entry {entry!r} qualifies a {Path(file_part).suffix or 'n extensionless'} "
+                f"file with '::' - nothing verifies that, and an unchecked claim in a "
+                f"checked field is worse than a plain path"]
+    return []
+
+
+def _schema_errors(raw: list[dict]) -> tuple[list[str], list[Requirement]]:
+    """Validates each entry against the declared schema, returning error
+    strings and the entries that parsed.
+
+    Every entry is tried even after one fails, so an author fixing a
+    batch sees the whole list rather than one problem per run - which is
+    why this catches ValidationError per entry rather than validating
+    the document in one go."""
+    errors: list[str] = []
+    ok: list[Requirement] = []
+    for i, entry in enumerate(raw):
+        where = entry.get("id") or f"entry #{i + 1} (no id)"
+        try:
+            ok.append(Requirement(**entry))
+        except ValidationError as e:
+            errors.extend(format_error(err, where) for err in e.errors())
+    return errors, ok
+
+
+@lru_cache(maxsize=1)
+def _sprint_numbers() -> frozenset[int]:
+    """Every sprint number the delivery plan actually has.
+
+    Read once per process: the plan does not change under a running
+    validator, and the alternative is re-parsing a 1,800-line markdown
+    file for each of the register's deferrals.
+    """
+    return frozenset(number for number, _tag, _owns in parse_sprints())
+
+
+def _cross_reference_errors(requirements: list[Requirement]) -> list[str]:
+    """The half no schema library can express - claims checked against
+    the real codebase and against the rest of the document.
+
+    A schema can say `linked_tests` is a list of strings. Only this can
+    say that `tests/test_x.py::TestY::test_z` names a method that really
+    exists, which is the difference between a decorative reference and
+    an enforced one."""
+    errors: list[str] = []
+    all_ids = {r.id for r in requirements}
+    retired_ids = {r.id for r in requirements if r.status == "retired"}
+
+    seen: dict[str, int] = {}
+    for r in requirements:
+        seen[r.id] = seen.get(r.id, 0) + 1
+    for rid, count in seen.items():
+        if count > 1:
+            errors.append(f"id {rid!r} is used {count} times - ids must be globally unique")
+
+    for r in requirements:
+        for field in r.missing_when_built():
+            errors.append(f"{r.id}: status is 'built' but {field} is empty")
+        if r.needs_sign_off():
+            errors.append(f"{r.id}: status is {r.status!r} but nobody has signed it off. "
+                           f"Requirements are presented to Keith and agreed before building "
+                           f"starts - add `signed_off: {{by: <name>, date: YYYY-MM-DD}}`")
+        for field in r.present_but_not_built():
+            errors.append(f"{r.id}: has {field} but status is {r.status!r} - a requirement "
+                           f"cannot carry that before the work exists. Set status to 'built', "
+                           f"or remove it")
+
+        # A RETIRED requirement's links are HISTORY (REQ-DOCS-143: it
+        # "keeps whatever it carried"), and retiring one usually means its
+        # code was removed - so they are not required to resolve any more.
+        live = r.status != "retired"
+        for entry in r.linked_tests if live else ():
+            if not _linked_test_exists(entry):
+                errors.append(f"{r.id}: linked_tests entry {entry!r} does not resolve to a real "
+                               f"file/test")
+        for entry in r.implemented_by if live else ():
+            errors.extend(_implemented_by_errors(entry, r.id))
+        for dep in r.dependencies:
+            if dep not in all_ids:
+                errors.append(f"{r.id}: dependencies entry {dep!r} does not match any real "
+                               f"requirement id in this file")
+            elif dep in retired_ids and r.status != "retired":
+                # REQ-DOCS-143 criterion 6: depend on what replaced it.
+                errors.append(f"{r.id}: depends on {dep}, which is retired - depend on what "
+                               f"replaced it instead")
+        for problem in r.retirement_problems():
+            errors.append(f"{r.id}: {problem}")
+        for where, retirement in ([("retired", r.retired)] if r.retired else []) + [
+                (f"retired_criteria (criterion {c.criterion})", c) for c in r.retired_criteria]:
+            for successor in retirement.replaced_by:
+                if successor not in all_ids:
+                    errors.append(f"{r.id}: {where} says it was replaced by {successor!r}, "
+                                   f"which is not a requirement id in this file")
+        # REQ-DOCS-073 criterion 7. A blocker nothing can resolve is
+        # worse than free text, because free text at least does not
+        # claim to be checkable - and a typo'd id silently drops the
+        # deferral out of every dependency view that looks it up.
+        for i, u in enumerate(r.unmet_criteria):
+            where = f"{r.id}: unmet_criteria[{i}].blocked_by"
+            for dep in u.blocked_by.requirements:
+                if dep not in all_ids:
+                    errors.append(f"{where} names {dep!r}, which is not a requirement id "
+                                   f"in this file")
+            for number in u.blocked_by.sprints:
+                if number not in _sprint_numbers():
+                    errors.append(f"{where} names sprint {number}, which is not a sprint in "
+                                   f"{SPRINTS_FILE.name}")
     return errors
 
 
 def validate(requirements: list[dict]) -> list[str]:
-    """Pure function, no file I/O of its own (except each linked_tests
-    entry's own real existence check) - testable directly against
-    fixture data, same pattern as qa_tools.common.check_lifecycle."""
-    errors: list[str] = []
-    seen_ids: dict[str, int] = {}
+    """Schema first, then cross-references against the real codebase.
 
-    for i, r in enumerate(requirements):
-        where = r.get("id") or f"entry #{i + 1} (no id)"
-
-        rid = r.get("id", "")
-        if not _ID_RE.match(rid):
-            errors.append(
-                f"{where}: id {rid!r} doesn't match ^REQ-({'|'.join(_COMPONENT_CODES)})-\\d{{3}}$"
-            )
-        else:
-            seen_ids[rid] = seen_ids.get(rid, 0) + 1
-
-        if not (r.get("title") or "").strip():
-            errors.append(f"{where}: missing/empty title")
-        if not (r.get("story") or "").strip():
-            errors.append(f"{where}: missing/empty story")
-
-        moscow = r.get("moscow")
-        if moscow not in _VALID_MOSCOW:
-            errors.append(f"{where}: moscow {moscow!r} not one of {sorted(_VALID_MOSCOW)}")
-
-        status = r.get("status")
-        if status not in _VALID_STATUS:
-            errors.append(f"{where}: status {status!r} not one of {sorted(_VALID_STATUS)}")
-
-        acceptance = r.get("acceptance_criteria") or []
-        if not acceptance or not all((c or "").strip() for c in acceptance):
-            errors.append(f"{where}: acceptance_criteria must have at least 1 non-empty entry")
-
-        linked = r.get("linked_tests") or []
-        if status == "built" and not linked:
-            errors.append(f"{where}: status is 'built' but linked_tests is empty - "
-                           f"a built requirement needs at least one real test verifying it")
-        for entry in linked:
-            if not _linked_test_exists(entry):
-                errors.append(f"{where}: linked_tests entry {entry!r} does not resolve to a real "
-                               f"file/test")
-
-        # dashboard/requirements_yaml.py's own parser defaults an unset
-        # `source` to `""` (falsy), not `None` - `main()` below always
-        # runs against parser output, so this must treat a real, unset
-        # default the same as genuinely absent, only flagging an
-        # actually-present-but-invalid value (whitespace-only, or a
-        # non-string).
-        source = r.get("source")
-        if source and (not isinstance(source, str) or not source.strip()):
-            errors.append(f"{where}: source, if present, must be a non-empty string")
-
-        # Same "permissive if absent, strict if present" treatment as
-        # `source` - dashboard/requirements_yaml.py's own parser also
-        # defaults an unset `date_written` to `""`.
-        date_written = r.get("date_written")
-        if date_written and (not isinstance(date_written, str) or not _DATE_RE.match(date_written)):
-            errors.append(f"{where}: date_written {date_written!r}, if present, must be a real "
-                           f"\"YYYY-MM-DD\" date")
-
-        for field_name in ("non_functional_requirements", "open_questions", "evidence"):
-            errors.extend(_valid_string_list(r.get(field_name), field_name, where))
-
-        # dependencies gets the same "is it a real list of strings" check
-        # as the other 3, PLUS its own extra rule below (each entry must
-        # actually exist as a real REQ-id in this same file) - same
-        # "dangling reference is a real error" treatment linked_tests
-        # already gets, checked once every id is known (after this loop).
-        errors.extend(_valid_string_list(r.get("dependencies"), "dependencies", where))
-
-    for rid, count in seen_ids.items():
-        if count > 1:
-            errors.append(f"id {rid!r} is used {count} times - ids must be globally unique")
-
-    all_ids = set(seen_ids)
-    for i, r in enumerate(requirements):
-        where = r.get("id") or f"entry #{i + 1} (no id)"
-        for dep in r.get("dependencies") or []:
-            if isinstance(dep, str) and dep not in all_ids:
-                errors.append(f"{where}: dependencies entry {dep!r} does not match any real "
-                               f"requirement id in this file")
-
-    return errors
+    Restructured 2026-09-20 (REQ-DOCS-029). What used to be ~90 lines of
+    hand-written field checks is now a declaration in
+    `qa_tools/common/schemas.py`; what remains here is everything a
+    schema genuinely cannot do."""
+    errors, parsed = _schema_errors(requirements)
+    return errors + _cross_reference_errors(parsed)
 
 
-def main() -> int:
-    requirements = parse_requirements(REQUIREMENTS_YAML)
+def main(path: str | None = None) -> int:
+    """Reads the raw YAML rather than going through
+    `dashboard/requirements_yaml.py`.
+
+    That parser validates against the same schema and RAISES on the
+    first problem it meets (2026-09-20) - fine for a build, wrong for a
+    gate. An author fixing a batch of entries should see the whole list
+    in one run, not one error per run, so this keeps its own read and
+    catches per entry.
+
+    `path` lets a DRAFT be checked before it is applied - added
+    2026-09-22, Keith's own call, after a scoper pass handed back 16
+    list items that could not parse as YAML at all (plain scalars
+    containing a colon-space, which YAML reads as a mapping key). The
+    root cause was not carelessness: `delivery-scoper` is granted
+    Read/Grep/Glob and no Bash, so it had no way to run a parser over
+    its own output. Keith's framing - "let the agents validate the
+    YAML, or give them the tools to write better YAML" - is the fix,
+    and a style rule telling them to quote everything would only have
+    been the fix until somebody forgot.
+
+    A draft file holds a bare LIST of requirements rather than the
+    `requirements:` mapping the real file uses, so both shapes are
+    accepted. Cross-reference checks still run, and a draft that
+    references a requirement it does not itself contain will report
+    that - correctly, since the draft is not the whole register."""
+    target = Path(path) if path else REQUIREMENTS_YAML
+    if not target.exists():
+        print(f"requirements YAML not found at {target}", file=sys.stderr)
+        return 1
+    with open(target) as f:
+        doc = yaml.safe_load(f) or {}
+    raw = doc.get("requirements") if isinstance(doc, dict) else doc
+    requirements = [r or {} for r in (raw or [])]
     errors = validate(requirements)
 
     if errors:
@@ -254,4 +340,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))

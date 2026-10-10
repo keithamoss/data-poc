@@ -72,8 +72,10 @@ import os
 import subprocess
 from dataclasses import dataclass
 
+from qa_tools.common import hierarchy
 from qa_tools.common.dataset_status import dataset_status
 from qa_tools.common.people import PEOPLE_YAML, github_usernames_for, parse_people_config
+from qa_tools.common.ticket_check_summary import build_check_summary
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 BDM_DASHBOARD_JSON = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
@@ -86,25 +88,20 @@ CP_DASHBOARD_JSON = os.path.join(ROOT, "reports", "child_protection_dashboard.js
 # any other issue a human might open on this repo for unrelated reasons.
 TICKET_LABEL = "qa-ticket"
 
-# Real, currently-static dataset -> agency mapping (running-thoughts.md
-# #2, 2026-09-18) - needed here so open_ticket() can resolve real ticket
-# assignees (qa_tools/common/people.py's own dataset-then-agency
-# fallback). A plain dict, not derived from anything dynamic, same "just
-# add the new entry" convention already used twice elsewhere for this
-# exact same real mapping (qa_tools/common/github_links.py's
-# AGENCY_QA_FOLDER/DATASET_QA_FOLDER, qa_tools/common/acceptance_sync.py's
-# QA_RESULTS_SCOPE_FOR_DATASET) - not consolidated into one shared
-# module in this pass (a real, deliberate scope call, not an oversight -
-# worth doing if a 4th copy is ever needed).
-DATASET_AGENCY = {
-    "birth-registrations": "registry-services",
-    "cp-clients": "child-protection-family-support",
-    "cp-notifications": "child-protection-family-support",
-    "cp-investigations": "child-protection-family-support",
-    "cp-placements": "child-protection-family-support",
-    "cp-carers": "child-protection-family-support",
-    "cp-case-workers": "child-protection-family-support",
-}
+# dataset -> (agency, collection), needed here so open_ticket() can
+# resolve real ticket assignees (qa_tools/common/people.py's own
+# dataset-then-agency fallback) and so a ticket body can carry a real
+# dashboard deep link, which names all three.
+#
+# This used to be a plain dict, and its own comment recorded that it was
+# the FOURTH copy of the same mapping - alongside github_links.py's
+# AGENCY_QA_FOLDER/DATASET_QA_FOLDER and acceptance_sync.py's
+# QA_RESULTS_SCOPE_FOR_DATASET - and that four was the trigger for
+# consolidating them. REQ-QAC-039 is that consolidation: all four now
+# resolve through the one hierarchy in contract/data-asset.yaml.
+DATASET_SCOPE = {d.dataset_id: (d.agency_id, d.collection_id) for d in hierarchy.all_datasets()}
+
+DATASET_AGENCY = {dataset: agency for dataset, (agency, _collection) in DATASET_SCOPE.items()}
 
 
 @dataclass
@@ -112,6 +109,7 @@ class DatasetScope:
     id: str
     name: str
     agency_id: str
+    collection_id: str
 
 
 def _load_scopes() -> list[tuple[DatasetScope, dict]]:
@@ -122,13 +120,19 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
     scopes: list[tuple[DatasetScope, dict]] = []
     with open(BDM_DASHBOARD_JSON) as f:
         bdm = json.load(f)
-    scopes.append((DatasetScope(id=bdm["id"], name=bdm["name"], agency_id=DATASET_AGENCY[bdm["id"]]), bdm))
+    scopes.append((_scope_for(bdm), bdm))
 
     with open(CP_DASHBOARD_JSON) as f:
         cp = json.load(f)
     for ds in cp["datasets"]:
-        scopes.append((DatasetScope(id=ds["id"], name=ds["name"], agency_id=DATASET_AGENCY[ds["id"]]), ds))
+        scopes.append((_scope_for(ds), ds))
     return scopes
+
+
+def _scope_for(dataset: dict) -> DatasetScope:
+    agency_id, collection_id = DATASET_SCOPE[dataset["id"]]
+    return DatasetScope(id=dataset["id"], name=dataset["name"],
+                        agency_id=agency_id, collection_id=collection_id)
 
 
 def _dataset_label(dataset_id: str) -> str:
@@ -175,7 +179,8 @@ def _ensure_label(owner: str, repo: str, name: str, description: str) -> None:
 _EMPTY_PEOPLE_CONFIG = {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
 
 
-def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_config: dict | None = None) -> int:
+def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str,
+                people_config: dict | None = None, dataset: dict | None = None) -> int:
     _ensure_label(owner, repo, TICKET_LABEL, "Opened automatically by this project's real QA pipeline")
     _ensure_label(owner, repo, _dataset_label(scope.id), f"Real QA tickets for {scope.name}")
 
@@ -199,14 +204,15 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_
         f"This ticket will get a real comment on every future QA run while "
         f"it stays open - closing it is always a human decision, never "
         f"automatic."
-        + (
-            "\n\nA real supply, even amber, can be accepted for now by "
-            "commenting `/accept` on this issue - it's matched to whichever "
-            "run was current at the time (running-thoughts.md #6). The "
-            "supply itself stays amber on the dashboard; a real "
-            "acknowledgment badge shows next to it."
-            if status == "amber" else ""
-        )
+        # The `/accept` paragraph that followed went with REQ-QAC-017
+        # (retired by REQ-PIPE-122, 2026-10-05): an amber supply is
+        # acknowledged as a filing decision on its SLOT's ticket now.
+        # REQ-GHUB-027. The paragraph above still points at the dashboard,
+        # and deliberately so - this section answers "what is wrong" where
+        # the dashboard answers "and what has it been doing for a month".
+        # Appended rather than replacing anything: a ticket that names its
+        # failing checks is still a ticket about a dataset's status.
+        + _check_section(scope, status, dataset)
     )
     args = [
         "issue", "create", "--repo", f"{owner}/{repo}",
@@ -222,6 +228,21 @@ def open_ticket(owner: str, repo: str, scope: DatasetScope, status: str, people_
     return int(out.strip().rsplit("/", 1)[-1])
 
 
+
+def _check_section(scope: DatasetScope, status: str, dataset: dict | None) -> str:
+    """The REQ-GHUB-027 block, ready to append to a body or a comment.
+
+    Returns "" for a green dataset, which has nothing not-green to list,
+    and for a caller that did not pass the dataset at all - open_ticket()
+    is public and was callable without it before this.
+    """
+    if not dataset:
+        return ""
+    summary = build_check_summary(
+        dataset, status, scope.agency_id, scope.collection_id, scope.id)
+    return f"\n\n---\n\n{summary}" if summary else ""
+
+
 def comment(owner: str, repo: str, issue_number: int, body: str) -> None:
     _run_gh(["issue", "comment", str(issue_number), "--repo", f"{owner}/{repo}", "--body", body])
 
@@ -233,22 +254,71 @@ def sync_dataset(owner: str, repo: str, scope: DatasetScope, dataset: dict, peop
     status = dataset_status(dataset)
     existing = find_open_ticket(owner, repo, scope.id)
 
+
     if existing is None:
         if status in ("red", "amber"):
-            issue_number = open_ticket(owner, repo, scope, status, people_config)
+            issue_number = open_ticket(owner, repo, scope, status, people_config, dataset)
             return f"{scope.id}: opened #{issue_number} ({status})"
         return f"{scope.id}: {status}, no open ticket - nothing to do"
 
+    # THE POST-EVERY-RUN RULE IS RETIRED (REQ-GHUB-109 criterion 2).
+    # REQ-GHUB-027 criterion 7 used to post a comment even when it was
+    # word-for-word what the last one said - Keith's own call at the
+    # time, with the repetition stated, so the thread was a record of
+    # the failure set shrinking and a reader never had to scroll up.
+    #
+    # WHAT CHANGED THE ANSWER is that the SAME THREAD now also carries
+    # the per-slot reconciler's comments, which post only on a change.
+    # Two rules on one thread means a reader cannot tell a repeat from a
+    # new fact, which is worse than either rule alone. So this one
+    # follows the other: say something, or say nothing.
     if status == "red":
-        comment(owner, repo, existing,
-                f"Still **red** as of this run - {scope.name} continues to fail its own checks.")
-        return f"{scope.id}: #{existing} still red, commented"
+        body = (f"Still **red** as of this run - {scope.name} continues to fail "
+                f"its own checks." + _check_section(scope, status, dataset))
+    else:
+        body = (f"Resolved to **{status}** as of this run. This ticket does NOT "
+                f"auto-close - close it once you've confirmed the fix, or leave "
+                f"it open if follow-up is still needed."
+                + _check_section(scope, status, dataset))
 
-    comment(owner, repo, existing,
-            f"Resolved to **{status}** as of this run. This ticket does NOT "
-            f"auto-close - close it once you've confirmed the fix, or leave "
-            f"it open if follow-up is still needed.")
+    if _already_said(owner, repo, existing, body):
+        # CRITERION 4's reasoning, and the reason this asks the THREAD
+        # rather than remembering: a process that lost its memory,
+        # restarted, or ran from a second place would otherwise post a
+        # duplicate, and there are now two callers of this module.
+        return f"{scope.id}: #{existing} unchanged ({status}), nothing posted"
+
+    comment(owner, repo, existing, body)
+    if status == "red":
+        return f"{scope.id}: #{existing} still red, commented"
     return f"{scope.id}: #{existing} resolved to {status}, commented (not closed)"
+
+
+def _already_said(owner: str, repo: str, issue_number: int, body: str) -> bool:
+    """Whether this exact comment is already the last thing on the thread.
+
+    THE LAST ONE, not any of them. A state that went red, then green,
+    then red again has genuinely changed twice and the thread should say
+    so both times - comparing against the whole history would swallow
+    the second one.
+
+    FAILS OPEN, deliberately. If the thread cannot be read, the old
+    behaviour returns: post. A missed comment is invisible; a repeated
+    one is merely noise, and this is not the failure to optimise for.
+    """
+    try:
+        out = _run_gh(["issue", "view", str(issue_number), "--repo",
+                       f"{owner}/{repo}", "--json", "comments"])
+        comments = (json.loads(out or "{}").get("comments") or [])
+    except (subprocess.CalledProcessError, FileNotFoundError,
+            json.JSONDecodeError, TypeError, AttributeError):
+        # NARROW ON PURPOSE. A bare `except Exception` here swallowed an
+        # AssertionError from a test's own fake - which meant every test
+        # silently took the fail-open path and proved nothing about the
+        # new rule. Same shape as promotion.status_of()'s own note: a
+        # broad except around a lookup turns a bug into a wrong answer.
+        return False
+    return bool(comments) and (comments[-1].get("body") or "").strip() == body.strip()
 
 
 def sync_all(owner: str, repo: str, people_config: dict | None = None) -> list[str]:
@@ -256,7 +326,14 @@ def sync_all(owner: str, repo: str, people_config: dict | None = None) -> list[s
 
 
 def main() -> None:
-    owner, repo = os.environ["GITHUB_REPOSITORY"].split("/", 1)
+    # THE ASSET'S TICKET REPOSITORY, never GITHUB_REPOSITORY (REQ-PIPE-093
+    # criterion 12): that names whichever repository a workflow runs in.
+    from qa_tools.common import environments
+
+    slug = environments.ticket_repository()
+    if not slug or "/" not in slug:
+        raise SystemExit("contract/data-asset.yaml names no ticket_repository (owner/repo)")
+    owner, repo = slug.split("/", 1)
     people_config = parse_people_config(PEOPLE_YAML)
     for line in sync_all(owner, repo, people_config):
         print(line)

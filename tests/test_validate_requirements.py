@@ -8,7 +8,14 @@ the whole point of this gate is confirming a REAL file/test exists, not
 just that some string matches some other string."""
 from __future__ import annotations
 
-from qa_tools.common.validate_requirements import _linked_test_exists, _python_test_exists, validate
+import re
+from pathlib import Path
+
+import pytest
+
+from qa_tools.common.validate_requirements import _linked_test_exists, _python_symbol_exists, validate
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _valid_entry(**overrides):
@@ -18,8 +25,21 @@ def _valid_entry(**overrides):
         "story": "As a user, I want X, so that Y.",
         "moscow": "must",
         "status": "built",
+        # Required since 2026-09-20 - the one field nobody can
+        # reconstruct after the fact, so the fixture has to carry it.
+        "source": "Keith, voice-dictated batch, 2026-09-19",
         "acceptance_criteria": ["It does the thing."],
         "linked_tests": ["tests/test_resupply.py::test_add_business_days_skips_weekends"],
+        # Both required once `status` is "built" (2026-09-20) - so the
+        # base fixture, which IS built, has to carry them to stay valid.
+        "implemented_by": ["qa_tools/common/validate_requirements.py::validate"],
+        "evidence": ["2026-09-20: 27 requirements validate with zero errors."],
+        "decisions": ["Kept the register as YAML rather than a database, so it "
+                      "diffs and reviews like the code it describes."],
+        # Required from the moment status leaves "not_started"
+        # (2026-09-20), so the base fixture carries it for the same
+        # reason it carries the four above.
+        "signed_off": {"by": "Keith", "date": "2026-09-20"},
     }
     entry.update(overrides)
     return entry
@@ -94,7 +114,11 @@ def test_validate_rejects_a_built_requirement_with_no_linked_tests():
 
 
 def test_validate_allows_not_started_with_no_linked_tests():
-    errors = validate([_valid_entry(status="not_started", linked_tests=[])])
+    # Also clears implemented_by and evidence: since 2026-09-20 a
+    # not_started requirement may not carry those either, so a fixture
+    # keeping them would be asserting something the schema now forbids
+    # rather than the optionality this test is about.
+    errors = validate([_valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])])
     assert errors == []
 
 
@@ -108,7 +132,7 @@ def test_validate_rejects_a_linked_test_naming_a_real_file_but_fake_function():
     assert any("does not resolve" in e for e in errors)
 
 
-# ---- _linked_test_exists() / _python_test_exists() - against REAL repo files --
+# ---- _linked_test_exists() / _python_symbol_exists() - against REAL repo files --
 
 def test_real_module_level_test_function_resolves():
     assert _linked_test_exists("tests/test_resupply.py::test_add_business_days_skips_weekends") is True
@@ -140,32 +164,50 @@ def test_method_name_that_does_not_exist_in_a_real_class_does_not_resolve():
     assert _linked_test_exists("tests/test_dashboard_e2e.py::TestDarkModeToggle::test_nonexistent") is False
 
 
-def test_python_test_exists_returns_false_for_a_missing_file():
-    assert _python_test_exists("tests/does_not_exist.py", ["test_x"]) is False
+def test_python_symbol_exists_returns_false_for_a_missing_file():
+    assert _python_symbol_exists("tests/does_not_exist.py", ["test_x"]) is False
 
 
 # ---- 5 new optional fields (2026-09-19, plans/wider.md #10) ---------
 
-def test_source_is_optional_and_absent_is_fine():
-    assert validate([_valid_entry()]) == []
+def test_source_is_required():
+    """Keith, 2026-09-20: "I'm happy to make the source field a required
+    field. As in, it must be there and it must not be white space only
+    or empty."
+
+    It was optional until then because backfilling real provenance for
+    the 22 pre-2026-09-19 entries after the fact would have meant
+    guessing. That was answered by going and finding it instead - 21
+    trace to a real plans/*.md item or a quoted ask, and the 22nd says
+    plainly that its origin was not recorded, which is itself real
+    provenance."""
+    entry = _valid_entry()
+    del entry["source"]
+    errors = validate([entry])
+    assert any("source" in e and "required" in e.lower() for e in errors), errors
 
 
-def test_source_defaulted_to_empty_string_by_the_real_parser_is_fine():
-    """Real bug found live, 2026-09-19: dashboard/requirements_yaml.py's
-    parse_requirements() defaults an unset `source` to `""` (falsy),
-    not `None` - and main() below always runs against parser output,
-    never a raw dict. An earlier version of this check used `is not
-    None`, which treated that real default as "present but invalid",
-    failing all 22 real requirements.yaml entries at once. Confirmed
-    failing against the pre-fix code by actually running `python3 -m
-    qa_tools.common.validate_requirements` against the real committed
-    file before this fix."""
-    assert validate([_valid_entry(source="")]) == []
+def test_source_written_as_an_empty_string_is_rejected():
+    """Keith's call, 2026-09-20: "I'm not sure about accepting that."
+
+    A blank `source` is someone who started filling it in and stopped.
+    That is a different thing from omitting the key, and the file should
+    be able to tell you so - accepting it is the same silent shape as
+    the duplicate mapping key that prompted this work.
+
+    There is real history behind why it was ever accepted, worth keeping
+    so it isn't re-introduced by the same route: until 2026-09-20 this
+    gate ran against `parse_requirements()` OUTPUT, which filled every
+    unset optional field with `""`, so rejecting `""` here failed all 22
+    real entries at once. `main()` now reads the raw YAML itself, so an
+    absent key never reaches the schema at all and blank means blank."""
+    errors = validate([_valid_entry(source="")])
+    assert any("source" in e and "blank" in e for e in errors), errors
 
 
-def test_source_if_present_must_be_a_non_empty_string():
+def test_source_written_as_whitespace_only_is_rejected():
     errors = validate([_valid_entry(source="   ")])
-    assert any("source" in e for e in errors)
+    assert any("source" in e and "blank" in e for e in errors), errors
 
 
 def test_source_can_be_real_free_text():
@@ -176,11 +218,11 @@ def test_date_written_is_optional_and_absent_is_fine():
     assert validate([_valid_entry()]) == []
 
 
-def test_date_written_defaulted_to_empty_string_by_the_real_parser_is_fine():
-    """Same real-parser-default treatment as `source` above -
-    dashboard/requirements_yaml.py's parse_requirements() also defaults
-    an unset `date_written` to `""`, not `None`."""
-    assert validate([_valid_entry(date_written="")]) == []
+def test_date_written_written_as_an_empty_string_is_rejected():
+    """Same treatment as `source` above - the rule is about any field
+    written with nothing in it, not about one field in particular."""
+    errors = validate([_valid_entry(date_written="")])
+    assert any("date_written" in e and "blank" in e for e in errors), errors
 
 
 def test_date_written_accepts_a_real_iso_date():
@@ -198,12 +240,12 @@ def test_non_functional_requirements_absent_is_fine():
 
 def test_non_functional_requirements_must_be_a_list_not_a_bare_string():
     errors = validate([_valid_entry(non_functional_requirements="CI must never touch live data")])
-    assert any("non_functional_requirements must be a list" in e for e in errors)
+    assert any("non_functional_requirements" in e and "valid list" in e for e in errors), errors
 
 
 def test_non_functional_requirements_rejects_empty_entries():
     errors = validate([_valid_entry(non_functional_requirements=["", "  "])])
-    assert any("non_functional_requirements entries must be non-empty strings" in e for e in errors)
+    assert any("non_functional_requirements" in e and "non-empty strings" in e for e in errors), errors
 
 
 def test_non_functional_requirements_accepts_real_entries():
@@ -226,7 +268,7 @@ def test_dependencies_absent_is_fine():
 
 def test_dependencies_must_be_a_list():
     errors = validate([_valid_entry(dependencies="REQ-QAC-002")])
-    assert any("dependencies must be a list" in e for e in errors)
+    assert any("dependencies" in e and "valid list" in e for e in errors), errors
 
 
 def test_dependencies_referencing_a_real_id_in_the_same_file_is_fine():
@@ -238,3 +280,501 @@ def test_dependencies_referencing_a_real_id_in_the_same_file_is_fine():
 def test_dependencies_referencing_a_nonexistent_id_is_an_error():
     errors = validate([_valid_entry(id="REQ-QAC-001", dependencies=["REQ-QAC-999"])])
     assert any("dependencies entry 'REQ-QAC-999' does not match any real requirement id" in e for e in errors)
+
+
+# ---- implemented_by ------------------------------------------------------
+#
+# Keith's call, 2026-09-20 (plans/tooling.md #18). The register already
+# says which TESTS verify a requirement; it never said where the thing
+# lives. The lesson driving the shape is the `evidence` field sitting at
+# zero use a day after it shipped, despite a well-written spec: it was
+# assigned to an agent that is read-only and so cannot write it, and no
+# instruction anywhere tells anyone to populate it. A field with no
+# forcing function stays empty, so this one is required once a
+# requirement is `built` and CI refuses to pass without it.
+
+def test_a_built_requirement_must_say_where_it_is_implemented():
+    errors = validate([_valid_entry(implemented_by=[])])
+    assert any("implemented_by" in e for e in errors), errors
+
+
+def test_implemented_by_is_optional_until_a_requirement_is_built():
+    assert validate([_valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])]) == []
+
+
+def test_a_python_entry_must_name_a_symbol_not_just_a_file():
+    """Keith's explicit call: "Python code must have a symbol."
+
+    A bare path is verified only by `Path.exists()`, which stays green
+    while the file is gutted, stubbed, or emptied - the same weak
+    guarantee that let plans/*.md `touches:` lines rot while looking
+    authoritative. A symbol is AST-verified, so a rename breaks the
+    build and names the requirement that claimed it."""
+    errors = validate([_valid_entry(implemented_by=["qa_tools/common/validate_requirements.py"])])
+    assert any("symbol" in e.lower() for e in errors), errors
+
+
+def test_a_python_symbol_that_does_not_exist_is_an_error():
+    errors = validate([_valid_entry(implemented_by=[
+        "qa_tools/common/validate_requirements.py::no_such_function"])])
+    assert any("no_such_function" in e for e in errors), errors
+
+
+def test_a_real_python_symbol_resolves():
+    assert validate([_valid_entry(implemented_by=[
+        "qa_tools/common/check_lifecycle.py::parse_contract_check_metadata",
+        "qa_tools/common/check_lifecycle.py::CheckMetadata"])]) == []
+
+
+def test_a_front_end_path_may_be_bare():
+    """No AST parser for the template's inline JS on the Python side, so
+    a bare path is allowed there rather than pretending to a rigour this
+    toolchain does not have. The JS symbol form is checked by the Node
+    toolchain instead - tests-js/implemented_by.test.js."""
+    assert validate([_valid_entry(implemented_by=[
+        "dashboard/qa-reporting-dashboard.template.html"])]) == []
+
+
+def test_a_symbol_on_a_file_neither_python_nor_front_end_is_rejected():
+    """Nothing verifies a `::` on a YAML or SQL file, so accepting one
+    would record an unchecked claim in a field whose whole point is that
+    it is checked."""
+    errors = validate([_valid_entry(implemented_by=[
+        "contract/data-asset.yaml::data_asset_id"])])
+    assert any("contract/data-asset.yaml" in e for e in errors), errors
+
+
+def test_an_implemented_by_path_that_does_not_exist_is_an_error():
+    errors = validate([_valid_entry(implemented_by=["qa_tools/common/nope.py::thing"])])
+    assert any("nope.py" in e for e in errors), errors
+
+
+def test_a_built_requirement_must_carry_a_measured_result():
+    """Keith's call, 2026-09-20: mandate it, no exceptions.
+
+    The field went unused on all 27 requirements for the day and a half
+    it was optional, and nothing noticed. The same forcing function
+    `implemented_by` gets - CI refusing to go green - is what keeps it
+    from drifting back.
+
+    Asked whether a requirement with no obvious measurement (dark mode)
+    should be allowed an explicit opt-out, he said no exceptions. That
+    turned out to be the right call: demanding a real number produced
+    one - all 21 colour tokens redefined under the dark theme, zero
+    falling through to their light value - and produced it by measuring
+    the real page rather than asserting a toggle flips."""
+    errors = validate([_valid_entry(evidence=[])])
+    assert any("evidence" in e for e in errors), errors
+
+
+def test_evidence_is_optional_until_a_requirement_is_built():
+    assert validate([_valid_entry(status="not_started", linked_tests=[],
+                                   implemented_by=[], evidence=[])]) == []
+
+
+# ---- decisions -------------------------------------------------------
+#
+# Keith's idea, 2026-09-20, and the thing that makes deleting plans prose
+# safe rather than merely reversible. Git preserves a deleted write-up,
+# but finding one needs `git log -S"<phrase>"` with a phrase you must
+# already suspect. This field moves the reasoning INTO the requirement -
+# "decisions taken, other pathways rejected... our collective memory of
+# the thinking that went into that requirement" - so it does not have to
+# be recovered from history or kept in a massive plans file.
+#
+# It sits opposite `open_questions`: that field holds the forks NOT
+# resolved, this one holds the forks that were.
+
+def test_a_built_requirement_must_record_its_decisions():
+    errors = validate([_valid_entry(decisions=[])])
+    assert any("decisions" in e for e in errors), errors
+
+
+def test_decisions_is_optional_until_a_requirement_is_built():
+    assert validate([_valid_entry(status="not_started", linked_tests=[],
+                                   implemented_by=[], evidence=[], decisions=[])]) == []
+
+
+def test_decisions_must_be_a_list_of_non_empty_strings():
+    errors = validate([_valid_entry(decisions=["   "])])
+    assert any("decisions" in e for e in errors), errors
+
+
+def test_a_module_level_constant_counts_as_a_symbol():
+    """Found by the gate itself, 2026-09-20: a module that is purely
+    constants - qa_tools/common/vocab.py - could not satisfy
+    implemented_by at all, because the AST check only looked for
+    functions and classes. A path alone was rejected (rightly), and no
+    symbol was acceptable (wrongly).
+
+    A constant is a symbol worth pinning for exactly the same reason a
+    function is: delete COMPONENT_CODES and the requirement claiming it
+    should break, rather than a bare path staying green over an empty
+    file."""
+    assert _python_symbol_exists("qa_tools/common/vocab.py", ["COMPONENT_CODES"]) is True
+    assert _python_symbol_exists("qa_tools/common/vocab.py", ["NOT_A_REAL_CONST"]) is False
+
+
+# ---------------------------------------------------------------------
+# The inverse rule: a requirement carrying built-only evidence while
+# claiming not to have started.
+#
+# Found for real on 2026-09-20. REQ-QAC-024 was finished - 257 of 257
+# checks authored, the CI gate live - and its status field still read
+# `not_started`, because the edit meant to flip it matched nothing and
+# failed silently. Nothing caught it: implemented_by, linked_tests,
+# evidence and decisions are only DEMANDED once status is "built", so a
+# requirement could carry every one of them and still report that no
+# work had begun. It was caught by Keith asking whether the work was
+# finished, which is not a control.
+# ---------------------------------------------------------------------
+
+def test_a_not_started_requirement_cannot_claim_where_it_is_implemented():
+    errors = validate([_valid_entry(status="not_started")])
+    assert any("implemented_by" in e and "but status is" in e for e in errors), errors
+
+
+def test_a_not_started_requirement_cannot_carry_tests_or_evidence():
+    errors = validate([_valid_entry(status="not_started")])
+    assert any("linked_tests" in e and "but status is" in e for e in errors), errors
+    assert any("evidence" in e and "but status is" in e for e in errors), errors
+
+
+def test_in_progress_is_caught_too_not_just_not_started():
+    """The rule is about what the fields claim, not about one status
+    value - a requirement half-built cannot have a measured result
+    either."""
+    errors = validate([_valid_entry(status="in_progress")])
+    assert any("but status is 'in_progress'" in e for e in errors), errors
+
+
+def test_decisions_may_precede_the_work_and_are_not_flagged():
+    """Deliberately excluded from the rule above (Keith, 2026-09-20).
+
+    `decisions` is scoping material and legitimately grows before any
+    code does: REQ-QAC-024 accumulated fourteen of them over a day of
+    forks settled one at a time, while correctly reading `not_started`.
+    A rule covering it would have failed CI on every one of those
+    pushes, which is the opposite of recording a decision the moment it
+    is settled."""
+    entry = _valid_entry(status="not_started", linked_tests=[], implemented_by=[], evidence=[])
+    assert validate([entry]) == []
+
+
+# ---------------------------------------------------------------------
+# Sign-off. Keith's standing instruction, 2026-09-20: a requirement is
+# presented to him and agreed BEFORE building starts. The written
+# convention landed the same day and is not the control - REQ-DASH-026
+# sat in the register with ten acceptance criteria while work went ahead
+# against one of them backwards, because nothing required anyone to open
+# it. These are the control.
+# ---------------------------------------------------------------------
+
+def test_a_built_requirement_must_be_signed_off():
+    entry = _valid_entry()
+    del entry["signed_off"]
+    errors = validate([entry])
+    assert any("signed it off" in e for e in errors), errors
+
+
+def test_an_in_progress_requirement_must_be_signed_off():
+    """The rule is about building having STARTED, not having finished -
+    so in_progress is exactly as covered as built."""
+    entry = _valid_entry(status="in_progress", linked_tests=[],
+                         implemented_by=[], evidence=[], decisions=[])
+    del entry["signed_off"]
+    errors = validate([entry])
+    assert any("signed it off" in e for e in errors), errors
+
+
+def test_sign_off_is_optional_while_a_requirement_is_not_started():
+    """Deliberately allowed, and not an oversight: signed-off-then-built
+    is the whole shape of the rule, so a requirement that has been
+    agreed but not begun is the normal resting state between the two."""
+    entry = _valid_entry(status="not_started", linked_tests=[],
+                         implemented_by=[], evidence=[], decisions=[])
+    del entry["signed_off"]
+    assert validate([entry]) == []
+
+
+def test_a_not_started_requirement_may_still_carry_a_sign_off():
+    assert validate([_valid_entry(status="not_started", linked_tests=[],
+                                   implemented_by=[], evidence=[],
+                                   decisions=[])]) == []
+
+
+def test_sign_off_must_carry_both_a_name_and_a_date():
+    assert any("date" in e for e in validate([_valid_entry(signed_off={"by": "Keith"})]))
+    assert any("by" in e for e in validate([_valid_entry(signed_off={"date": "2026-09-20"})]))
+
+
+def test_sign_off_rejects_a_date_that_is_not_a_real_iso_date():
+    errors = validate([_valid_entry(signed_off={"by": "Keith", "date": "yesterday"})])
+    assert any("date" in e for e in errors), errors
+
+
+def test_sign_off_rejects_a_blank_name():
+    errors = validate([_valid_entry(signed_off={"by": "   ", "date": "2026-09-20"})])
+    assert any("by" in e for e in errors), errors
+
+
+def test_sign_off_rejects_an_undeclared_field():
+    """`extra="forbid"` reaches the nested model too - a typo'd
+    `signed_off: {name: ...}` would otherwise sit there looking signed
+    while carrying no name at all."""
+    errors = validate([_valid_entry(signed_off={"by": "Keith", "date": "2026-09-20",
+                                                "note": "looks good"})])
+    assert any("note" in e for e in errors), errors
+
+
+# ---- unmet_criteria (post-build-review #33) --------------------------
+#
+# REQ-PIPE-053 is marked `built` and one of its dashboard criteria is
+# not built (#2) - a criterion on a sprint whose dashboard work WAS in
+# scope, which delivery-dashboard-ux had already rescued once from
+# being lost in scoping. The register's binary built/not_started model
+# had no way to say "built except for these", so `built` overclaimed
+# and nothing in CI could tell.
+#
+# Keith, 2026-09-25: "I'm open to that. Give me a proposal", then
+# "ship it". The proposal, and what is built here: an optional
+# `unmet_criteria:` list rather than a third STATUS. A status is what
+# the register is indexed and filtered by; adding a third value would
+# make every consumer of `status` decide what it means, and the honest
+# answer for REQ-PIPE-053 is that it IS built and has a hole in it.
+
+def test_a_built_requirement_may_declare_unmet_criteria():
+    entry = _valid_entry(unmet_criteria=[
+        {"criterion": "surface the low-runway warning in the dashboard",
+         "why": "the gate half shipped; the dashboard half was never built",
+         "owner": "post-build-review #2",
+         "blocked_by": {"unowned": True}},
+    ])
+    assert validate([entry]) == []
+
+
+def test_an_unmet_criterion_must_say_which_one_and_why():
+    """A bare list of strings would let "some criteria are unmet" pass
+    as a record, which is what the prose already did."""
+    for bad in ([{"criterion": "x"}], [{"why": "y"}], ["just a string"]):
+        assert validate([_valid_entry(unmet_criteria=bad)]), (
+            f"{bad!r} was accepted as an unmet-criteria record")
+
+
+def test_an_unmet_criterion_must_name_who_owns_it_next():
+    """The field exists so a gap has somewhere to go, not so it has
+    somewhere to sit."""
+    assert validate([_valid_entry(unmet_criteria=[
+        {"criterion": "x", "why": "y"}])])
+
+
+def test_a_requirement_that_is_not_started_cannot_have_unmet_criteria():
+    """Nothing is built, so nothing is unmet - and allowing it would
+    make the field mean two different things."""
+    entry = _valid_entry(status="not_started", linked_tests=[], implemented_by=[],
+                         evidence=[], decisions=[], signed_off=None,
+                         unmet_criteria=[{"criterion": "x", "why": "y", "owner": "z",
+                                           "blocked_by": {"unowned": True}}])
+    assert validate([entry])
+
+
+# ---- blocked_by (REQ-DOCS-073) --------------------------------------
+#
+# `owner` was already a dependency edge - "the promotion sprint (batch
+# 4)" - and nothing could resolve it, so seven deferrals sat pointing
+# at work that had shipped and the register understated its own
+# progress. These cover the resolvable half.
+
+def _deferral(**blocked_by):
+    return _valid_entry(unmet_criteria=[
+        {"criterion": "x", "why": "y", "owner": "z", "blocked_by": blocked_by}])
+
+
+def test_a_deferral_must_say_what_it_waits_on():
+    """Omitting it is refused rather than defaulted: a deferral with no
+    blocker is a real state (`unowned`) and must be said out loud, not
+    arrived at by leaving a field off."""
+    assert validate([_valid_entry(unmet_criteria=[
+        {"criterion": "x", "why": "y", "owner": "z"}])])
+
+
+def test_a_sprint_that_does_not_exist_is_refused():
+    """Criterion 7. Silent in the worst direction otherwise - a typo'd
+    number drops the deferral out of every view that resolves it."""
+    problems = validate([_deferral(sprints=[999])])
+    assert problems and "999" in problems[0]
+
+
+def test_a_requirement_that_does_not_exist_is_refused():
+    problems = validate([_deferral(requirements=["REQ-NOPE-999"])])
+    assert problems and "REQ-NOPE-999" in problems[0]
+
+
+def test_a_real_sprint_is_accepted():
+    """Guards the guard: if every sprint number were rejected, the test
+    above would pass while proving nothing."""
+    assert validate([_deferral(sprints=[11])]) == []
+
+
+def test_it_may_name_both_a_sprint_and_a_requirement():
+    """Keith, 2026-09-26 - and/or, not either/or. Seventeen deferrals
+    wait on a sprint that owns no requirement, so ids alone cannot
+    express them; naming a requirement is more precise where one
+    exists."""
+    entry = _deferral(sprints=[11])
+    entry["unmet_criteria"][0]["blocked_by"]["requirements"] = [entry["id"]]
+    assert validate([entry]) == []
+
+
+def test_empty_is_refused_rather_than_read_as_unowned():
+    """`unowned` says nobody has it; two empty lists say somebody
+    forgot to fill this in. Keeping them distinct is the point."""
+    assert validate([_deferral()])
+
+
+def test_unowned_cannot_also_name_a_blocker():
+    assert validate([_deferral(unowned=True, sprints=[11])])
+
+
+def test_omitting_it_entirely_is_still_valid():
+    """The overwhelming majority of requirements have no hole, and must
+    not have to say so."""
+    assert validate([_valid_entry()]) == []
+
+
+class TestNoHyphenWrapArtifacts:
+    """A line break taken AT a hyphen silently inserts a space.
+
+    Both of these files are folded YAML - every scalar uses `>` and
+    neither has a single literal `|` block - so a line break inside a
+    scalar becomes a SPACE when the file is read. Break a line at an
+    existing hyphen and `read-committed-history` is stored as
+    `read- committed-history`, which is not what anybody wrote and not
+    what any reader wants to see.
+
+    Found 2026-09-27: fifty of them across the register, left behind by
+    ad hoc `textwrap.fill()` calls in session scripts, whose default
+    `break_on_hyphens=True` does exactly this. Four were introduced the
+    same night by my own. There is no committed writer to fix, which is
+    why this is a gate rather than a change to a tool.
+
+    NO ALLOWLIST IS NEEDED, and that is the point of checking the RAW
+    text rather than the parsed strings. English really does use a
+    suspended hyphen - "meta-, ctrl- and shift-click" is correct and
+    appears in this register - but that is a hyphen followed by a real
+    space on one line, which this pattern cannot match. A hyphen at the
+    END of a line followed by a word has no legitimate form here.
+    """
+
+    FILES = ("requirements.yaml", "CHANGELOG.yaml")
+    #: A word character, a hyphen, a line break, indentation, a word
+    #: character. `.`, `)` and `]` are included before the hyphen so a
+    #: path or a parenthetical is caught too.
+    PATTERN = re.compile(r"([A-Za-z0-9_.)\]])-\n(\s+)([A-Za-z0-9_])")
+
+    @pytest.mark.parametrize("name", FILES)
+    def test_no_scalar_is_wrapped_at_a_hyphen(self, name):
+        raw = (ROOT / name).read_text()
+        found = []
+        for m in self.PATTERN.finditer(raw):
+            line = raw[: m.start()].count("\n") + 1
+            found.append(f"{name}:{line} ...{m.group(1)}- / {m.group(3)}...")
+        assert not found, (
+            "a line is wrapped at a hyphen, so the folded text will carry a "
+            "space that nobody wrote - join the token onto one line:\n  "
+            + "\n  ".join(found))
+
+    @pytest.mark.parametrize("name", FILES)
+    def test_the_file_really_is_folded_throughout(self, name):
+        """Guards the guard. The test above is only sound while every
+        scalar is folded - in a literal `|` block a line break is
+        PRESERVED, so joining those lines would change the content
+        rather than repair it. If a literal block is ever added, this
+        fails and the rule above needs narrowing to exclude it."""
+        raw = (ROOT / name).read_text()
+        literal = [i + 1 for i, line in enumerate(raw.split("\n"))
+                   if re.search(r":\s*\|[-+]?\s*$", line)]
+        assert not literal, (
+            f"{name} now has a literal block at line(s) {literal} - "
+            f"test_no_scalar_is_wrapped_at_a_hyphen assumes folded scalars "
+            f"throughout and must be narrowed to skip it")
+
+
+class TestARetiredRequirement:
+    """REQ-DOCS-143: a requirement a later one replaced stays in the
+    register as history, saying when, who decided and what replaced it."""
+
+    _RETIRED = {"date": "2026-10-04", "by": "Keith", "replaced_by": ["REQ-QAC-002"]}
+
+    def _pair(self, **overrides):
+        return [_valid_entry(**overrides), _valid_entry(id="REQ-QAC-002")]
+
+    def test_a_retired_requirement_with_its_three_facts_is_valid(self):
+        assert validate(self._pair(status="retired", retired=dict(self._RETIRED))) == []
+
+    def test_retired_without_saying_when_who_and_what_replaced_it_is_refused(self):
+        errors = validate(self._pair(status="retired"))
+        assert any("no `retired:` block" in e for e in errors), errors
+
+    @pytest.mark.parametrize("missing", ["date", "by", "replaced_by"])
+    def test_each_of_the_three_facts_is_required(self, missing):
+        retired = {k: v for k, v in self._RETIRED.items() if k != missing}
+        assert validate(self._pair(status="retired", retired=retired)), missing
+
+    def test_a_retired_block_on_a_live_requirement_is_refused(self):
+        errors = validate(self._pair(retired=dict(self._RETIRED)))
+        assert any("has a `retired:` block but status is 'built'" in e for e in errors), errors
+
+    def test_its_record_of_code_since_removed_is_kept_as_history(self):
+        """Found retiring REQ-PIPE-063 and REQ-PIPE-077 (2026-10-04): the
+        whole point of a retirement is usually that its code was REMOVED,
+        and a retired requirement "keeps whatever it carried as history"
+        (REQ-DOCS-143's own decision) - so demanding its implemented_by and
+        linked_tests still resolve would force the history to be deleted."""
+        reqs = self._pair(status="retired", retired=dict(self._RETIRED),
+                          implemented_by=["qa_tools/common/assignment.py::gone_long_ago"],
+                          linked_tests=["tests/test_never_existed.py"])
+        assert validate(reqs) == []
+
+    def test_a_live_requirement_still_needs_its_code_to_exist(self):
+        """The control: only a RETIRED record is history."""
+        reqs = self._pair(implemented_by=["qa_tools/common/assignment.py::gone_long_ago"])
+        assert any("gone_long_ago" in e for e in validate(reqs))
+
+    def test_the_successor_must_exist(self):
+        errors = validate([_valid_entry(status="retired",
+                                         retired={**self._RETIRED, "replaced_by": ["REQ-QAC-099"]})])
+        assert any("REQ-QAC-099" in e for e in errors), errors
+
+    def test_depending_on_a_retired_requirement_is_refused(self):
+        reqs = self._pair(status="retired", retired=dict(self._RETIRED))
+        reqs[1]["dependencies"] = ["REQ-QAC-001"]
+        errors = validate(reqs)
+        assert any("depends on REQ-QAC-001, which is retired" in e for e in errors), errors
+
+    def test_it_keeps_its_history_without_being_refused_for_it(self):
+        """Criterion 5: a retired requirement that was once built still
+        names its tests and code; that is history, not a contradiction."""
+        assert validate(self._pair(status="retired", retired=dict(self._RETIRED))) == []
+
+    def test_a_never_signed_draft_can_be_retired(self):
+        assert validate(self._pair(status="retired", retired=dict(self._RETIRED),
+                                   signed_off=None, linked_tests=[], implemented_by=[],
+                                   evidence=[])) == []
+
+
+class TestARetiredCriterion:
+    """REQ-DOCS-143 criterion 3: one criterion retires, the rest stands."""
+
+    def test_a_retired_criterion_is_valid_by_position(self):
+        reqs = [_valid_entry(acceptance_criteria=["One.", "Two."],
+                             retired_criteria=[{"criterion": 2, "date": "2026-10-04",
+                                                "by": "Keith", "replaced_by": ["REQ-QAC-002"]}]),
+                _valid_entry(id="REQ-QAC-002")]
+        assert validate(reqs) == []
+
+    def test_a_position_past_the_last_criterion_is_refused(self):
+        reqs = [_valid_entry(retired_criteria=[{"criterion": 5, "date": "2026-10-04",
+                                                "by": "Keith", "replaced_by": ["REQ-QAC-002"]}]),
+                _valid_entry(id="REQ-QAC-002")]
+        assert any("only 1" in e for e in validate(reqs))

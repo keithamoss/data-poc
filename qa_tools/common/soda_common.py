@@ -7,8 +7,57 @@ plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 
+import os
+import re
+
 from soda.sampler.sampler import Sampler
 from soda.sampler.sample_ref import SampleRef
+from qa_tools.common import config_yaml
+
+def _defuse_sodas_dotenv_reload() -> None:
+    """Build Soda's EnvHelper now, and put the environment back.
+
+    WHY THIS RUNS AT IMPORT. Soda constructs a singleton `EnvHelper` the
+    first time a scan needs it, and that constructor calls
+    `dotenv.load_dotenv(override=True)` - it walks up from its own file,
+    finds this repo's `.env`, and writes every name in it over whatever
+    the process already had. `MOTHMAN_SUPPLY_DSN` is one of those names,
+    so the first scan of a run silently moved the warehouse to whatever
+    the file said: it discarded an operator's explicit
+    `MOTHMAN_SUPPLY_DSN=... mothman pipeline run`, and in the test suite
+    it sent every test after a Soda test on the same xdist worker at the
+    developer's real database instead of its own isolated one. That is
+    how ~14 pytest fixture tables came to be sitting in `supply`.
+
+    IT HAPPENS DURING SCAN CONSTRUCTION, not during `execute()`, which
+    is why containing `execute()` alone was not enough - and why this is
+    here rather than in `execute_scan()` below. Getting the singleton
+    built once, on our terms, means no scan anywhere can do it later: a
+    rule that needs no discipline at any future call site.
+
+    PUBLIC NAMES ONLY (`EnvHelper`, `Logs`), and both are singletons
+    Soda itself reuses across scans, so this is indistinguishable from
+    having run one scan already. It never raises: a Soda release that
+    renames or drops this leaves a process that behaves exactly as it
+    does today, and
+    tests/test_soda_leaves_the_environment_alone.py is what says whether
+    the invariant still holds.
+    """
+    before = dict(os.environ)
+    try:
+        from soda.common.env_helper import EnvHelper
+        from soda.common.logs import Logs
+
+        EnvHelper(Logs())
+    except Exception:  # noqa: BLE001 - see the docstring: never fatal
+        pass
+    finally:
+        if os.environ != before:
+            os.environ.clear()
+            os.environ.update(before)
+
+
+_defuse_sodas_dotenv_reload()
 
 ENGINE_TAG = "Soda Core 3.5"
 
@@ -16,6 +65,17 @@ ENGINE_TAG = "Soda Core 3.5"
 # datacontract_common.py) - one consistent cap across every tool's
 # failing-row samples, not a per-tool guess. See plans/qa-pipeline.md #15.
 FAILING_SAMPLE_LIMIT = 5
+
+#: How many failing rows each Soda check asks Soda for (`samples limit:` in
+#: the checks YAML) - more than FAILING_SAMPLE_LIMIT on purpose, so the five
+#: recorded are the lowest keys rather than whichever five Soda returned
+#: first (post-build-review #129). 100 is Soda's own default. Past this many
+#: failing rows the five are the lowest of the rows Soda returned.
+SODA_SAMPLES_LIMIT = 100
+
+#: The live checks files, whose every `samples limit:` is SODA_SAMPLES_LIMIT.
+SODA_CHECK_FILES = ("contract/bdm-birth-registrations-soda-checks.yml",
+                    "contract/child-protection-soda-checks.yml")
 
 
 class CaptureSampler(Sampler):
@@ -39,7 +99,11 @@ class CaptureSampler(Sampler):
     def store_sample(self, sample_context) -> SampleRef:
         columns = [c.name for c in sample_context.sample.get_schema().columns]
         rows = sample_context.sample.get_rows()
-        self.captured[sample_context.check_name] = [dict(zip(columns, row)) for row in rows[:FAILING_SAMPLE_LIMIT]]
+        # EVERYTHING SODA RETURNED, not its first few: failing_sample_keys
+        # sorts before it keeps FAILING_SAMPLE_LIMIT, so the same data records
+        # the same sample (post-build-review #129). Bounded by Soda's own
+        # sample limit, and only the key column ever leaves this module.
+        self.captured[sample_context.check_name] = [dict(zip(columns, row)) for row in rows]
         return SampleRef(
             name=sample_context.sample_name,
             schema=sample_context.sample.get_schema(),
@@ -58,7 +122,8 @@ def failing_sample_keys(captured: dict[str, list[dict]], check_name: str, pk_col
     column its own fail query selected. Either way, only pk_column's
     value ever leaves this function - never other row content."""
     rows = captured.get(check_name, [])
-    return [str(row[pk_column]) for row in rows if row.get(pk_column) is not None]
+    keys = sorted(str(row[pk_column]) for row in rows if row.get(pk_column) is not None)
+    return keys[:FAILING_SAMPLE_LIMIT]
 
 
 def check_id_from_resource_attributes(check: dict) -> str | None:
@@ -86,3 +151,263 @@ def threshold(spec: dict | None) -> float | None:
     # side) - "upper bound wins for a single scalar" convention, same one
     # the now-removed equivalent engine's _numeric_threshold() used.
     return next(iter(spec.values()), None)
+
+
+def execute_scan(scan):
+    """Run a Soda scan and return its results, leaving nothing behind.
+
+    TWO THINGS SODA DOES NOT CLEAN UP, both found on 2026-09-27 and both
+    fixed here rather than at each call site, because a scan that raises
+    leaks in exactly the same way and that is the case nobody is
+    watching.
+
+    THE CONNECTION - see close_scan_connections() below for the full
+    account. Soda's own teardown iterates an empty dict, so every scan
+    otherwise leaves a PostgreSQL backend sitting `idle in transaction`.
+
+    THE ENVIRONMENT, which is the worse of the two. Soda builds a
+    singleton `EnvHelper` on the first scan in a process, and its
+    constructor calls `dotenv.load_dotenv(override=True)`: it walks up
+    from its own file, finds this repo's `.env`, and writes every name
+    in it over whatever the process already had. `MOTHMAN_SUPPLY_DSN` is
+    one of those names, so the first scan of a run silently moved the
+    warehouse to whatever the file said - discarding an operator's
+    explicit `MOTHMAN_SUPPLY_DSN=... mothman pipeline run`, and, in the
+    test suite, sending every test after a Soda test on the same worker
+    at the developer's real database instead of its own.
+
+    RESTORING THE WHOLE ENVIRONMENT rather than the one name we know
+    about. The defect is not "Soda overwrites the DSN", it is "a library
+    reloads a file over our process configuration"; `MOTHMAN_ENVIRONMENT`
+    decides where a build publishes and is in the same file. Naming the
+    variables here would mean remembering to add the next one.
+
+    NOT A WORKAROUND FOR SOMETHING WE COULD ASK SODA TO STOP DOING -
+    there is no configuration for it, and the alternative was
+    pre-seeding a name-mangled private singleton so its constructor
+    never ran. Containing the effect is both smaller and honest about
+    what it is. The guard against Soda changing is
+    tests/test_soda_leaves_the_environment_alone.py, which asserts the
+    outcome rather than the mechanism.
+    """
+    before = dict(os.environ)
+    try:
+        scan.execute()
+        return scan.get_scan_results()
+    finally:
+        close_scan_connections(scan)
+        if os.environ != before:
+            os.environ.clear()
+            os.environ.update(before)
+
+
+def close_scan_connections(scan) -> int:
+    """Close the database connections a finished Soda scan leaves open.
+    Returns how many were closed, so a caller or a test can assert on it.
+
+    SODA'S OWN TEARDOWN MISSES THEM, and this is a real leak rather than
+    tidiness (2026-09-27). `Scan.execute()` ends with `self._close()`,
+    which calls `DataSourceManager.close_all_connections()`, which
+    iterates `manager.connections` - and on this code path that dict is
+    EMPTY. The live connection is held on the data source itself,
+    `manager.data_sources[name].connection`, so the loop closes nothing
+    and every scan leaves one PostgreSQL backend open. Verified directly:
+    a single scan against a real server takes the count of unlabelled
+    backends from 0 to 1, and it survives `del scan` and `gc.collect()`.
+
+    WHAT THAT LEAK ACTUALLY BROKE, because "a spare connection" sounds
+    harmless. Soda's connection is not autocommit, so the leaked backend
+    sits `idle in transaction` holding ACCESS SHARE on every table the
+    scan read. `DROP SCHEMA ... CASCADE` needs ACCESS EXCLUSIVE, so the
+    orchestrator's own tidy-up of a run's view schema queued behind it -
+    for thirty seconds, and then failed with a lock timeout. A pipeline
+    run over ~40 arrivals accumulated ~40 such backends. Under the
+    retired DuckDB engine none of this was visible: the tools shared one
+    in-process file and the per-run database was discarded whole.
+
+    WHY REACHING INTO `_data_source_manager` IS THE RIGHT FIX HERE
+    rather than a workaround. The connection exists because we asked
+    Soda to open it, so closing it is ours to do; the public API for
+    that is `_close()` and it demonstrably does not work. The guard
+    against Soda changing its internals is not defensive code here - it
+    is tests/test_soda_leaves_no_connection.py, which asserts the
+    OUTCOME (a completed scan leaves no open backend) rather than the
+    mechanism. If a future Soda release fixes this or moves it, that
+    test still says whether the invariant holds.
+    """
+    manager = getattr(scan, "_data_source_manager", None)
+    closed = 0
+    for data_source in getattr(manager, "data_sources", {}).values():
+        connection = getattr(data_source, "connection", None)
+        if connection is None or getattr(connection, "closed", False):
+            continue
+        try:
+            connection.close()
+            closed += 1
+        except Exception:
+            # A connection we cannot close is not worth failing a scan
+            # whose results are already in hand - the backend will go
+            # when the process does, and the test above is what notices
+            # if this starts happening.
+            pass
+    return closed
+
+
+def readable_checks_yaml(path: str, unreadable) -> str:
+    """The SodaCL file at `path`, less every check this run cannot read.
+
+    THE SODA HALF OF dbt_common.exclude_unreadable(), and the same
+    latent defect one tool over (found 2026-10-02). A run's view schema
+    can lack a table - held, contested with nothing promoted, or filed
+    to another period, which REQ-PIPE-105 makes ordinary: one file is
+    one arrival, and Case Workers' April file is not its siblings'
+    period's to read. Handed checks over a relation that does not exist,
+    Soda errors them, and the scan's caller fails the whole run - every
+    readable table losing its QA for one that was never there.
+
+    TWO THINGS GO: a `checks for <table>` section whose table is
+    unreadable, and any check elsewhere whose `check_id` DECLARES that
+    it reads one (a reference check, a cross-table failed-rows query).
+    The declaration is the same one the promotion gate and the results
+    writer use, so the three cannot disagree about what a check reads.
+    Nothing is recorded for a check left out: it was not run, which is
+    different from failing.
+    """
+    import yaml
+
+    from qa_tools.common.qa_results_writer import _declared_reads_tables
+
+    gone = set(unreadable)
+    with open(path) as f:
+        text = f.read()
+    if not gone:
+        # VERBATIM in the ordinary case, so a run that can read every
+        # table is handed exactly the authored file and no round-trip.
+        return text
+    out, _ = _split(config_yaml.parse(text), gone, _declared_reads_tables())
+    return yaml.safe_dump(out, sort_keys=False)
+
+
+def left_out_checks(path: str, unreadable) -> list[str]:
+    """The check ids readable_checks_yaml() leaves out, so the run can
+    reconcile them against what it recorded as not evaluated
+    (REQ-PIPE-115 criterion 17)."""
+
+    from qa_tools.common.qa_results_writer import _declared_reads_tables
+
+    gone = set(unreadable)
+    if not gone:
+        return []
+    with open(path) as f:
+        doc = config_yaml.parse(f)
+    _, removed = _split(doc, gone, _declared_reads_tables())
+    return removed
+
+
+def _check_id_of(item) -> str | None:
+    if isinstance(item, dict) and len(item) == 1:
+        body = next(iter(item.values()))
+        if isinstance(body, dict):
+            return (body.get("attributes") or {}).get("check_id")
+    return None
+
+
+def _split(doc: dict, gone: set, declared: dict) -> tuple[dict, list[str]]:
+    """(the document less every unreadable check, the ids taken out)."""
+    out, removed = {}, []
+    for key, checks in doc.items():
+        if key.startswith("checks for ") and key[len("checks for "):].strip() in gone:
+            if isinstance(checks, list):
+                removed.extend(c for c in map(_check_id_of, checks) if c)
+            continue
+        if isinstance(checks, list):
+            kept = []
+            for item in checks:
+                check_id = _check_id_of(item)
+                if check_id and gone & set(declared.get(check_id, ())):
+                    removed.append(check_id)
+                    continue
+                kept.append(item)
+            checks = kept
+        out[key] = checks
+    return out, removed
+
+
+def unreported_checks(yaml_text: str, scan_results: dict, scan) -> list[dict]:
+    """Every check the SodaCL handed to the scan declared, that the scan did
+    not report - each as {check_id, table, check_name, column, reason}.
+
+    A CHECK SODA CANNOT EVALUATE DISAPPEARS (Keith, 2026-10-06, the
+    road-testing sweep's #7, a defect): Soda Core logs an error, marks the
+    check not evaluated and leaves it OUT of get_scan_results()["checks"],
+    so a declared check that never reports read as nothing at all - a false
+    green. A change-over-time check, which needs Soda Cloud, is the worked
+    case. The runners record each of these red, "could not be evaluated",
+    and the rest of the scan's results stand.
+
+    Compared by check_id - the one identity every check here declares - so
+    a check Soda renamed or reshaped still matches. The reason is Soda's own
+    error, shortened; never a value from the data, which Soda's evaluation
+    errors do not carry.
+    """
+
+    reported = {check_id_from_resource_attributes(c) for c in scan_results.get("checks") or ()}
+    doc = config_yaml.parse(yaml_text) or {}
+    errors = []
+    try:
+        errors = [str(getattr(log, "message", log)) for log in scan.get_error_logs()]
+    except Exception:  # noqa: BLE001 - the reason is a courtesy; the record is not
+        pass
+    missing = []
+    for key, checks in doc.items():
+        if not (isinstance(key, str) and key.startswith("checks for ")):
+            continue
+        # THE TABLE WITHOUT ITS PARTITION: `checks for t [recent]` is Soda's
+        # partition syntax, and read raw the table was "t [recent]", which a
+        # runner's table filter then dropped (post-build-review #131 D6).
+        table = key[len("checks for "):].split("[", 1)[0].strip()
+        for item in checks or ():
+            check_id = _check_id_of(item)
+            if not check_id or check_id in reported:
+                continue
+            line = next(iter(item)) if isinstance(item, dict) else str(item)
+            body = next(iter(item.values())) if isinstance(item, dict) else {}
+            name = (body or {}).get("name") if isinstance(body, dict) else None
+            mine = [e for e in errors if line in e or (name and name in e)]
+            reason = (mine or errors or ["Soda reported no result for it"])[0]
+            reason = " ".join(reason.split())[:300]
+            # THE FIRST ARGUMENT, wherever the call sits: `missing_count(c) = 0`
+            # carries a threshold after it, which an ends-with test missed.
+            call = re.search(r"\(([^()]*)\)", line)
+            column = (call.group(1).split(",")[0].strip() or None) if call else None
+            missing.append({"check_id": check_id, "table": table,
+                            "check_name": name or line, "column": column or "(table)",
+                            "reason": reason})
+    return missing
+
+
+def not_evaluated_record(missing: dict, **fields) -> dict:
+    """The recorded shape of one check Soda could not evaluate: red, with
+    no measurement, saying why. `fields` carries the runner's own identity
+    columns (agency, collection, dataset, run, engine, row count)."""
+    return {
+        **fields,
+        "check_id": missing["check_id"],
+        "column_name": missing["column"],
+        "check_name": missing["check_name"],
+        "dimension": "",
+        "label": None,
+        "metric_value": None,
+        "unit": None,
+        "warn_threshold": None,
+        "fail_threshold": None,
+        "status": "error",
+        "on_fail_action": "flag",
+        "row_count_invalid": None,
+        "failing_sample_keys": [],
+        "finding": f"could not be evaluated - {missing['reason']}",
+        # Read by both dashboard builders, which show it as the run's "not
+        # evaluated" line - the same place a drift check with no reference
+        # says why.
+        "not_evaluated_reason": f"Soda could not evaluate it - {missing['reason']}",
+    }

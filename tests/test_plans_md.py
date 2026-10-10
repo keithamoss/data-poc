@@ -4,7 +4,7 @@ test), not the real committed plans/*.md files - those change over time
 and aren't what this module's own correctness depends on."""
 from __future__ import annotations
 
-from dashboard.plans_md import _parse_numbered_items, _parse_notes, _parse_threads, parse_plans
+from dashboard.plans_md import _parse_numbered_items, _parse_threads, parse_plans
 
 
 def test_parses_a_single_numbered_item_with_one_component(tmp_path):
@@ -110,7 +110,7 @@ def test_an_item_in_the_old_untagged_format_is_silently_skipped(tmp_path):
     """Real content: qa-pipeline.md's own "Held over from the original
     (equivalent-only) build" section restarts its own numbering in the
     OLD, pre-retrofit tag format - this parser doesn't retrofit-match it,
-    same "skip what doesn't match" philosophy as changelog_md.py's own
+    same "skip what doesn't match" philosophy the changelog parser has always had
     optional fields."""
     text = "7. **[open]** An old-format item with no date/component tags.\n"
     assert _parse_numbered_items(text, "qa-pipeline") == []
@@ -169,48 +169,6 @@ Second body.
     assert [t["heading"] for t in threads] == ["Thread B - first", "Thread A - second"]
 
 
-def test_parses_a_numbered_note_with_title_and_body(tmp_path):
-    text = """### 4. GitHub Issues -> Microsoft Teams integration (research first)
-
-Some raw prose, no status/component tags at all - running-thoughts.md
-keeps its own simpler shape by design.
-
-Second paragraph.
-"""
-    notes = _parse_notes(text)
-    assert len(notes) == 1
-    assert notes[0]["number"] == 4
-    assert notes[0]["title"] == "GitHub Issues -> Microsoft Teams integration (research first)"
-    assert notes[0]["body"] == (
-        "Some raw prose, no status/component tags at all - running-thoughts.md\n"
-        "keeps its own simpler shape by design.\n\nSecond paragraph."
-    )
-
-
-def test_a_note_heading_with_no_leading_number_still_parses(tmp_path):
-    text = "### Untitled idea with no number\n\nBody.\n"
-    notes = _parse_notes(text)
-    assert notes[0]["number"] is None
-    assert notes[0]["title"] == "Untitled idea with no number"
-
-
-def test_note_body_stops_at_the_next_two_hash_batch_heading(tmp_path):
-    text = """### 1. First idea
-
-Body of the first idea.
-
-## Also flagged, queued separately
-
-### 2. Second idea
-
-Body of the second idea.
-"""
-    notes = _parse_notes(text)
-    assert len(notes) == 2
-    assert notes[0]["body"] == "Body of the first idea."
-    assert notes[1]["body"] == "Body of the second idea."
-
-
 def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     plans_dir = tmp_path
     (plans_dir / "wider.md").write_text("1. **[done, 2026-09-18]** **[Dashboard UI]** A wider item.\n")
@@ -224,12 +182,108 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
     (plans_dir / "conceptual-design.md").write_text(
         "## Thread A - a thread\n\n**Status:** parked (2026-09-17) · **Category:** QA checks & contract\n\nBody.\n"
     )
-    (plans_dir / "running-thoughts.md").write_text("### 1. A raw idea\n\nBody.\n")
+    # publishing-and-history legitimately carries BOTH numbered items and
+    # threads; performance.md was never listed when this was an
+    # allowlist. Both are picked up by the directory walk now.
+    (plans_dir / "performance.md").write_text(
+        "1. **[done, 2026-09-18]** **[Testing & dev tooling]** A perf item.\n"
+    )
 
     result = parse_plans(plans_dir)
-    assert len(result["items"]) == 5
-    assert {i["file"] for i in result["items"]} == {"wider", "qa-pipeline", "dashboard", "data-generation", "tooling"}
+    assert len(result["items"]) == 6
+    assert {i["file"] for i in result["items"]} == {
+        "wider", "qa-pipeline", "dashboard", "data-generation", "tooling", "performance"}
     assert len(result["threads"]) == 2
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
-    assert len(result["notes"]) == 1
-    assert result["notes"][0]["title"] == "A raw idea"
+
+
+def test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space():
+    """Real bug, found 2026-09-20 while checking whether a generated index
+    line would be legible: plans_md.py joins wrapped lines with " ".join,
+    so a hyphenated word split across two source lines ("requirements-\n
+    analysis") comes back as "requirements- analysis". It renders that way
+    in the live dashboard's Plans tab. 195 occurrences across 74 of 137
+    items when this test was written."""
+    import re
+    items = parse_plans("plans")["items"]
+    bad = [(i["file"], i["number"], m.group(0))
+           for i in items for m in re.finditer(r"\w+- \w+", i["text"])]
+    assert not bad, f"{len(bad)} hyphen-wrap artifacts, e.g. {bad[:5]}"
+
+
+def test_a_real_dash_between_words_keeps_its_spaces():
+    """The other half of the same fix, and the reason it can't just strip
+    every trailing hyphen: this project uses ' - ' as a dash constantly
+    ("a real bug - not a design gap"). A line ending in a standalone
+    hyphen is punctuation, not a wrapped word, and must keep its space."""
+    from dashboard.markdown_text import join_wrapped
+    assert join_wrapped(["a real bug -", "not a design gap"]) == "a real bug - not a design gap"
+    assert join_wrapped(["requirements-", "analysis subagent"]) == "requirements-analysis subagent"
+    assert join_wrapped(["plain", "words"]) == "plain words"
+
+
+def test_every_numbered_item_in_every_plans_file_is_parsed():
+    """Real bug, found 2026-09-20 while building the plans index
+    (plans/tooling.md #17): NUMBERED_FILES was an allowlist of five
+    files, and two others had since grown numbered items -
+    publishing-and-history.md (8) and performance.md (5). All 13 were
+    invisible to the dashboard's Plans tab, which presents itself as the
+    browsable view of this project's memory and was silently showing 138
+    of 151. Among the missing was publishing-and-history #6, the
+    HIGH-priority per-dataset architecture item.
+
+    Asserted generically against the real files rather than against a
+    count, so that a NEW plans file growing items cannot be forgotten
+    the same way - which is exactly how this happened.
+
+    Writing it caught a second, separate thing: 10 items across three
+    files still carried the pre-2026-09-18 shape (`**[open, low]**`,
+    `**[done]**` - a status and a PRIORITY, no date), left behind by that
+    convention's own retrofit and silently unparsed for the same reason.
+    Those were retrofitted 2026-09-20, so this assertion is deliberately
+    UNSCOPED - anything shaped like a numbered item must parse, whatever
+    format it is in. An item written in some third shape should fail here
+    rather than vanish."""
+    import re
+    from pathlib import Path
+    seen = {(i["file"], i["number"]) for i in parse_plans("plans")["items"]}
+    missing = []
+    for path in sorted(Path("plans").glob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        for m in re.finditer(r"^(\d+)\.\s+\*\*\[", path.read_text(), re.M):
+            if (path.stem, int(m.group(1))) not in seen:
+                missing.append(f"{path.name}#{m.group(1)}")
+    assert not missing, f"{len(missing)} numbered items never parsed: {missing}"
+
+
+def test_a_brand_new_plans_file_is_picked_up_with_no_code_change(tmp_path):
+    """Keith's own call, 2026-09-20, on being shown that two files had
+    grown numbered items nobody had added to an allowlist: "I'm happy for
+    it just to walk all of the markdown files in a given directory -
+    that's probably safer because we will probably add more files as we
+    go."
+
+    The failure mode the allowlist had is the dangerous kind: a file it
+    didn't know about was skipped SILENTLY, so the dashboard's Plans tab
+    under-reported without anything looking wrong."""
+    (tmp_path / "a-brand-new-topic.md").write_text(
+        "1. **[todo, 2026-09-20]** **[Dashboard UI]** An item in a file nobody listed.\n"
+    )
+    result = parse_plans(tmp_path)
+    assert [(i["file"], i["number"]) for i in result["items"]] == [("a-brand-new-topic", 1)]
+
+
+def test_the_generated_index_is_not_parsed_as_planning_content(tmp_path):
+    """plans/INDEX.md lives in the same directory and is generated FROM
+    these files - walking the directory must not read it back in, or the
+    index becomes self-referential."""
+    (tmp_path / "real.md").write_text(
+        "1. **[todo, 2026-09-20]** **[Dashboard UI]** A real item.\n"
+    )
+    (tmp_path / "INDEX.md").write_text(
+        "## plans/real.md\n\n- **#1** `todo` 2026-09-20 - A real item.\n"
+    )
+    result = parse_plans(tmp_path)
+    assert {i["file"] for i in result["items"]} == {"real"}
+    assert not [t for t in result["threads"] if t["file"] == "INDEX"]

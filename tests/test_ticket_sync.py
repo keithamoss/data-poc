@@ -10,6 +10,7 @@ must never actually do."""
 from __future__ import annotations
 
 import json
+import subprocess
 
 import pytest
 
@@ -23,10 +24,16 @@ class FakeGh:
     boundary (_run_gh), not a deeper mock, so the test still exercises
     this module's own real argument-building/parsing logic."""
 
-    def __init__(self, list_response: list[dict] | None = None, create_url: str | None = None):
+    def __init__(self, list_response: list[dict] | None = None,
+                 create_url: str | None = None,
+                 comments: list[str] | None = None):
         self.calls: list[list[str]] = []
         self.list_response = list_response if list_response is not None else []
         self.create_url = create_url or "https://github.com/o/r/issues/42"
+        #: What the thread already says (REQ-GHUB-109). Empty means a
+        #: ticket nobody has commented on, which is what every test
+        #: written before that requirement assumed.
+        self.comments = list(comments or [])
 
     def __call__(self, args: list[str]) -> str:
         self.calls.append(args)
@@ -38,6 +45,8 @@ class FakeGh:
             return ""
         if args[:2] == ["label", "create"]:
             return ""
+        if args[:2] == ["issue", "view"]:
+            return json.dumps({"comments": [{"body": b} for b in self.comments]})
         raise AssertionError(f"unexpected gh invocation: {args}")
 
 
@@ -55,7 +64,8 @@ def _amber_dataset():
 
 @pytest.fixture
 def scope():
-    return DatasetScope(id="birth-registrations", name="Birth Registrations", agency_id="registry-services")
+    return DatasetScope(id="birth-registrations", name="Birth Registrations",
+                        agency_id="registry-services", collection_id="civil-registration")
 
 
 def test_no_open_ticket_and_red_opens_a_new_one(monkeypatch, scope):
@@ -87,7 +97,10 @@ def test_no_open_ticket_and_amber_opens_a_new_one(monkeypatch, scope):
     title = create_call[create_call.index("--title") + 1]
     assert title == "Birth Registrations is amber"
     body = create_call[create_call.index("--body") + 1]
-    assert "/accept" in body
+    # NO LONGER INVITES /accept: REQ-QAC-017 was retired by REQ-PIPE-122
+    # (2026-10-05), and a ticket telling people to use a retired command
+    # would be telling them something untrue.
+    assert "/accept" not in body
 
 
 def test_opening_a_ticket_with_a_real_assignee_passes_gh_assignee(monkeypatch, scope):
@@ -199,3 +212,189 @@ def test_open_ticket_parses_the_issue_number_from_gh_own_url_output(monkeypatch,
     fake = FakeGh(create_url="https://github.com/o/r/issues/123")
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
     assert ticket_sync.open_ticket("o", "r", scope, "red") == 123
+
+
+# ---------------------------------------------------------------------
+# REQ-GHUB-027 - the plain-English check list now reaching the ticket
+# itself. The rendering is covered in full by
+# tests/test_ticket_check_summary.py; these assert the wiring, which is
+# the part that decides whether anyone ever sees it.
+# ---------------------------------------------------------------------
+
+def _authored_dataset(status_value: float):
+    """One real, named, described check, so the section has something to
+    render. The fixtures above deliberately carry none of that - they
+    predate this and test status arithmetic only."""
+    return {"columns": [{"name": "sex", "checks": [{
+        "key": "not_null_dbt", "tool_ref": "dbt:not_null",
+        "name": "Null rate", "description": "This value must never be empty.",
+        "current": status_value, "warn": 1, "fail": 2, "retired_as_of": None,
+    }]}]}
+
+
+def _body_of(calls, kind):
+    call = next(c for c in calls if c[:2] == ["issue", kind])
+    return call[call.index("--body") + 1]
+
+
+def test_a_new_tickets_body_names_what_is_actually_failing(monkeypatch, scope):
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+
+    body = _body_of(fake.calls, "create")
+    assert "## Failing checks" in body
+    assert "This value must never be empty." in body
+    assert "/check/not_null_dbt)" in body
+    # the original paragraph still points at the dashboard - this adds
+    # to the ticket rather than replacing what was there
+    assert "live dashboard" in body
+
+
+def test_every_still_red_comment_carries_the_current_list(monkeypatch, scope):
+    fake = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+
+    body = _body_of(fake.calls, "comment")
+    assert "Still **red**" in body
+    assert "This value must never be empty." in body
+
+
+def test_the_list_is_posted_again_even_when_it_has_not_changed(monkeypatch, scope):
+    """Keith's own call, 2026-09-20, with the repetition stated: the
+    thread is then a real record of the failure set shrinking run by
+    run, and the most recent list is always the last thing in it."""
+    fake = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+    sync_dataset("o", "r", scope, _authored_dataset(5))
+
+    comments = [c[c.index("--body") + 1] for c in fake.calls if c[:2] == ["issue", "comment"]]
+    assert len(comments) == 2
+    assert comments[0] == comments[1]
+
+
+def test_a_dataset_resolved_to_green_gets_no_list(monkeypatch, scope):
+    fake = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, _authored_dataset(0))
+
+    body = _body_of(fake.calls, "comment")
+    assert "Resolved to **green**" in body
+    assert "## Failing checks" not in body
+    assert "must never be empty" not in body
+
+
+def test_an_amber_check_is_listed_under_a_red_ticket(monkeypatch, scope):
+    """Keith's amendment: a red ticket still lists the amber checks,
+    under their own heading."""
+    dataset = {"columns": [{"name": "sex", "checks": [
+        {"key": "unique_dbt", "tool_ref": "dbt:unique", "name": "Duplicate rate",
+         "description": "This value must be unique.",
+         "current": 5, "warn": 1, "fail": 2, "retired_as_of": None},
+        {"key": "duplicate_count_soda", "tool_ref": "soda:duplicate_count",
+         "name": "Duplicate rate", "description": "A few duplicates are tolerated.",
+         "current": 1.5, "warn": 1, "fail": 2, "retired_as_of": None},
+    ]}]}
+    fake = FakeGh(list_response=[])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    sync_dataset("o", "r", scope, dataset)
+
+    body = _body_of(fake.calls, "create")
+    assert "## Failing checks" in body
+    assert "## Checks in warning" in body
+    assert "A few duplicates are tolerated." in body
+
+
+# ---------------------------------------------------------------------
+# REQ-GHUB-109: the post-every-run rule is retired.
+#
+# REQ-GHUB-027 criterion 7 posted a comment even when it was word-for-
+# word what the last one said - Keith's own call at the time, with the
+# repetition stated. What changed the answer is that the SAME THREAD now
+# also carries the per-slot reconciler's comments, which post only on a
+# change. Two rules on one thread means a reader cannot tell a repeat
+# from a new fact, which is worse than either rule alone.
+# ---------------------------------------------------------------------
+
+def _last_comment_body(fake):
+    call = next(c for c in fake.calls if c[:2] == ["issue", "comment"])
+    return call[call.index("--body") + 1]
+
+
+def test_an_unchanged_red_ticket_gets_no_second_identical_comment(monkeypatch, scope):
+    """The rule being retired, stated as the test that would have failed
+    under it."""
+    first = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", first)
+    sync_dataset("o", "r", scope, _red_dataset())
+    said = _last_comment_body(first)
+
+    again = FakeGh(list_response=[{"number": 7}], comments=[said])
+    monkeypatch.setattr(ticket_sync, "_run_gh", again)
+    result = sync_dataset("o", "r", scope, _red_dataset())
+
+    assert result == "birth-registrations: #7 unchanged (red), nothing posted"
+    assert not any(c[:2] == ["issue", "comment"] for c in again.calls)
+
+
+def test_a_CHANGED_state_still_posts(monkeypatch, scope):
+    """The other half, and the one that keeps this honest: retiring the
+    repeat must not retire the comment."""
+    fake = FakeGh(list_response=[{"number": 7}],
+                  comments=["Still **red** as of an earlier run - something else."])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    result = sync_dataset("o", "r", scope, _green_dataset())
+
+    assert "resolved to green, commented" in result
+    assert "resolved" in _last_comment_body(fake).lower()
+
+
+def test_it_compares_against_the_LAST_comment_only(monkeypatch, scope):
+    """A state that went red, then green, then red again has genuinely
+    changed twice, and the thread should say so both times - comparing
+    against the whole history would swallow the second one."""
+    first = FakeGh(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", first)
+    sync_dataset("o", "r", scope, _red_dataset())
+    red_said = _last_comment_body(first)
+
+    again = FakeGh(list_response=[{"number": 7}],
+                   comments=[red_said, "Resolved to **green** as of this run."])
+    monkeypatch.setattr(ticket_sync, "_run_gh", again)
+    result = sync_dataset("o", "r", scope, _red_dataset())
+
+    assert "still red, commented" in result
+
+
+def test_an_unreadable_thread_posts_rather_than_staying_silent(monkeypatch, scope):
+    """Fails OPEN, deliberately: a missed comment is invisible, a
+    repeated one is merely noise, and that is not the failure to
+    optimise for."""
+    class Unreadable(FakeGh):
+        def __call__(self, args):
+            if args[:2] == ["issue", "view"]:
+                raise subprocess.CalledProcessError(1, "gh")
+            return super().__call__(args)
+
+    fake = Unreadable(list_response=[{"number": 7}])
+    monkeypatch.setattr(ticket_sync, "_run_gh", fake)
+
+    assert "still red, commented" in sync_dataset("o", "r", scope, _red_dataset())
+
+
+def test_no_code_or_comment_still_asserts_the_retired_rule(monkeypatch, scope):
+    """Criterion 2's second half - "SHALL leave no code or test
+    asserting it" - held against the module's own source."""
+    import inspect
+    source = inspect.getsource(ticket_sync)
+    assert "posts it even when it is word-for-word" not in source, \
+        "the retired rule is still described as current"
+    assert "RETIRED" in source, "the retirement is not recorded where it happened"

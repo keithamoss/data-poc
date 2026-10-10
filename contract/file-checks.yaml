@@ -1,0 +1,118 @@
+# File checks (REQ-QAC-096): the questions only the file as delivered can
+# answer, asked of its bytes before a row of it is loaded.
+#
+# WRITTEN ONCE, IDS DERIVED PER DATASET (criterion 4). Each entry here is
+# one check for EVERY dataset; its check_id for a dataset is
+# `<asset>.<agency>.<collection>.<dataset>.<check>_file`, the existing
+# grammar with a fifth tool suffix. Six checks on thirty datasets would be
+# 180 near-identical entries to keep in step by hand, which is why this is
+# the one place a check id is derived rather than written.
+#
+# LIMITED TO WHAT LOADING ANSWERS OR DESTROYS (criterion 2). A question about
+# the DATA - is this value allowed, is this column present - is a data check
+# and belongs to one of the other four tools. Nothing here may become one.
+#
+# `severity` decides what a failure does (criterion 18): `failure` refuses
+# the whole file, so no data check runs over it and nothing of it reaches
+# promotion; `warning` is recorded and the file loads as usual.
+#
+# `formats` names the delivery formats a check applies to (NFR
+# FORMAT-SPECIFIC). Only CSV is accepted today; a second format ADDS its own
+# checks here rather than editing these.
+#
+# The prose is held to docs/check-authoring-rules.md like every other
+# check's, and lifecycle metadata (introduced_date, changelog,
+# retired_as_of) is gated by the same check-lifecycle gate (criteria 5, 6):
+# changing `severity` or `formats` is a change to what a check does and
+# needs a changelog entry, exactly as it would for a dbt test.
+checks:
+  - check: encoding
+    name: Text encoding
+    severity: failure
+    formats: [csv]
+    category: conformity
+    introduced_date: "2026-10-05"
+    description: >
+      Every line of the file must be readable as UTF-8 text.
+    failure_indicates: >
+      The file was written out in a different text encoding, so any
+      character beyond plain English letters - an accented name, for
+      instance - would have arrived as something else.
+    changelog: []
+
+  - check: delimiter
+    name: Field separator
+    severity: failure
+    formats: [csv]
+    category: conformity
+    introduced_date: "2026-10-05"
+    description: >
+      The first line must split on commas into the file's columns.
+    failure_indicates: >
+      The file was written with a different separator, such as tabs or
+      semicolons, so every row would have loaded as a single column.
+    changelog: []
+
+  - check: header_row
+    name: Header row
+    severity: failure
+    formats: [csv]
+    category: completeness
+    introduced_date: "2026-10-05"
+    description: >
+      The first line must be a header naming the columns, not a row of
+      data.
+    failure_indicates: >
+      The file was written without its header, or arrived empty. Loaded as
+      it stands, the first record would have been taken for the column
+      names and lost.
+    changelog: []
+
+  - check: header_names_unique
+    name: Distinct column names
+    severity: failure
+    formats: [csv]
+    category: uniqueness
+    introduced_date: "2026-10-05"
+    description: >
+      No column name may appear more than once in the header.
+    failure_indicates: >
+      The file was assembled with a column repeated. Loading renames the
+      copy silently, leaving two columns with no way to tell which one is
+      right.
+    changelog: []
+
+  - check: fields_per_row
+    name: Fields per row
+    severity: failure
+    formats: [csv]
+    category: conformity
+    introduced_date: "2026-10-05"
+    description: >
+      Every row must have exactly as many fields as the header - no more
+      and no fewer.
+    failure_indicates: >
+      Rows were cut short or ran on, most often because a value carried an
+      unquoted comma or line break. Loaded as it stands, a short row reads
+      as genuinely empty values and a long one shifts values into the
+      wrong columns.
+    technical_note: >
+      Asked of the bytes before loading because the loader pads a short
+      row with empty values, which no later check can tell from real ones,
+      and a file whose every row carries one extra field loads without
+      error with every column shifted one place.
+    changelog: []
+
+  - check: column_order
+    name: Column order
+    severity: warning
+    formats: [csv]
+    category: conformity
+    introduced_date: "2026-10-05"
+    description: >
+      The columns must appear in the order the contract lists them. A
+      different order only warns.
+    failure_indicates: >
+      The supplying system has changed the layout it writes. Columns are
+      matched by name when loaded, so nothing is lost.
+    changelog: []

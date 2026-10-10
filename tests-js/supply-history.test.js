@@ -6,7 +6,8 @@
 // and each arrival's own real aggregate red/amber/green status (the worst
 // status among every check's own history[] value vs its warn/fail
 // thresholds) - never from the generator's synthetic is_resupply/
-// delivery_id/delivery_date/supersedes_run_id bookkeeping, which a real
+// supersedes_run_id/attempt_number bookkeeping, which REQ-GEN-042 has
+// since retired from the generator outright, and which a real
 // production dashboard would never have. A RED arrival starts/continues a
 // chain; the chain closes on the first AMBER or GREEN after a RED (Keith's
 // own "keep it simple" rule).
@@ -35,9 +36,19 @@ function datasetWithStatuses(entries, cadence = { type: "daily", expected_time: 
     run_id, run_date, value: VALUE_FOR_STATUS[status],
   }));
   return {
+    // AN ID, because period arithmetic is a lookup keyed by dataset since
+    // REQ-DASH-054 - the page asks which calendar THIS dataset follows
+    // before it can say which period a date falls in. It used to compute
+    // from `sla.cadence` alone, which is why these fixtures never needed
+    // one. `cadence` stays: it is still what the cadence LABEL renders.
+    id: "birth-registrations",
     sla: { cadence },
     runs: entries.map(([run_id, run_date]) => ({ run_id, run_date })),
-    arrivalByRun,
+    // ONE FILED PERIOD unless a test says otherwise (#123 B1): a chain
+    // never crosses a period, so these chain-logic fixtures file every run
+    // to the same one, as a daily dataset's resupplies of one day would be.
+    arrivalByRun: Object.fromEntries(entries.map(([run_id]) =>
+      [run_id, { slot: "2026-01-01", ...(arrivalByRun[run_id] || {}) }])),
     columns: [{ checks: [{ warn: 1, fail: 2, history }] }],
   };
 }
@@ -69,7 +80,11 @@ describe("buildSupplyHistory", () => {
       ["r1", "2026-01-01", "green"],
       ["r2", "2026-01-02", "green"],
       ["r3", "2026-01-03", "green"],
-    ]);
+    ], undefined, {
+      // Each fresh daily arrival filed to its own day, as the rule files
+      // it - the heading is the FILED slot's (post-build-review #142).
+      r1: { slot: "2026-01-01" }, r2: { slot: "2026-01-02" }, r3: { slot: "2026-01-03" },
+    });
 
     const history = w.buildSupplyHistory(d);
 
@@ -91,6 +106,30 @@ describe("buildSupplyHistory", () => {
     expect(history[0].cycleStart).toBe("2026-01-01");
     expect(history[0].entries.map((e) => e.run_id)).toEqual(["r2", "r1"]); // newest first
     expect(history[0].entries.map((e) => e.isResupply)).toEqual([true, false]);
+  });
+
+  it("never chains across a period - Keith, 2026-10-06 (#123 B1): a red supply filed to one period is not resupplied by one filed to the next", () => {
+    const w = load();
+    const d = datasetWithStatuses([
+      ["r1", "2026-01-01", "red"],
+      ["r2", "2026-01-02", "red"],
+      ["r3", "2026-01-02", "green"],
+    ], undefined, {r1: {slot: "2026-01-01"}, r2: {slot: "2026-01-02"}, r3: {slot: "2026-01-02"}});
+
+    const history = w.buildSupplyHistory(d);
+
+    expect(history.map((c) => c.entries.map((e) => e.run_id))).toEqual([["r3", "r2"], ["r1"]]);
+    expect(history[1].entries[0].isResupply).toBe(false);
+  });
+
+  it("follows the period a supply is FILED to, not the day it arrived", () => {
+    const w = load();
+    // A late file for 1 January arriving on the 3rd still resupplies it.
+    const d = datasetWithStatuses([
+      ["r1", "2026-01-01", "red"],
+      ["r2", "2026-01-03", "green"],
+    ], undefined, {r1: {slot: "2026-01-01"}, r2: {slot: "2026-01-01"}});
+    expect(w.buildSupplyHistory(d)).toHaveLength(1);
   });
 
   it("a RED arrival stays open through further REDs and closes on the first GREEN", () => {
@@ -115,7 +154,7 @@ describe("buildSupplyHistory", () => {
       ["r1", "2026-01-01", "red"],
       ["r2", "2026-01-02", "amber"], // closes the chain
       ["r3", "2026-01-03", "green"], // a fresh, unrelated arrival
-    ]);
+    ], undefined, { r3: { slot: "2026-01-03" } });
 
     const history = w.buildSupplyHistory(d);
 
@@ -133,7 +172,7 @@ describe("buildSupplyHistory", () => {
       ["r2", "2026-01-02", "green"], // closes chain 1
       ["r3", "2026-01-05", "red"], // starts chain 2
       ["r4", "2026-01-06", "green"], // closes chain 2
-    ]);
+    ], undefined, { r3: { slot: "2026-01-05" }, r4: { slot: "2026-01-05" } });
 
     const history = w.buildSupplyHistory(d);
 
@@ -170,7 +209,7 @@ describe("buildSupplyHistory", () => {
     ]);
   });
 
-  it("a resupply (any entry after the first in its chain) carries NO real arrivalStatus (item 69's reasoning, now keyed off real chain position instead of a synthetic flag) but DOES carry rowCount", () => {
+  it("EVERY entry in a chain carries its own arrival verdict, including a resupply (REQ-PIPE-080 criterion 3 - this test used to assert the opposite)", () => {
     const w = load();
     const d = datasetWithStatuses(
       [
@@ -185,9 +224,23 @@ describe("buildSupplyHistory", () => {
     const [{ entries }] = w.buildSupplyHistory(d);
     const byId = Object.fromEntries(entries.map((e) => [e.run_id, e]));
 
-    expect(byId.r1.arrivalStatus).toBe("onTime"); // chain-first entry keeps its real arrival status
-    expect(byId.r2.arrivalStatus).toBeUndefined(); // resupply - category error, dropped
-    expect(byId.r2.arrivedAt).toBeUndefined();
+    // REWRITTEN RATHER THAN DELETED, and the half that changed is
+    // named so the history is readable. It used to assert
+    // `byId.r2.arrivalStatus` was undefined, on item 69's reasoning:
+    // a resupply reuses its predecessor's rows, so comparing its
+    // stale extract_timestamp against whatever cycle it landed in was
+    // a category error rather than a fact about lateness. That was
+    // sound ABOUT THE DERIVATION IT WAS WRITTEN FOR, which
+    // REQ-PIPE-080 has since deleted. The verdict now comes from OUR
+    // RECEIPT INSTANT against the slot the supply is filed to, which
+    // every attempt has its own of - so blanking it would hide a real
+    // answer rather than suppress a meaningless one.
+    //
+    // The rowCount half is untouched and still asserted: it was never
+    // part of what changed.
+    expect(byId.r1.arrivalStatus).toBe("onTime");
+    expect(byId.r2.arrivalStatus).toBe("early");
+    expect(byId.r2.arrivedAt).toBe("16:30 AWST");
     expect(byId.r2.rowCount).toBe(4321);
   });
 
@@ -249,6 +302,59 @@ describe("buildSupplyHistory", () => {
   });
 });
 
+describe("a dataset with no agreed supply calendar", () => {
+  // REQ-PIPE-106's subject, reaching the supply history. It arrived as a
+  // REAL DEFECT rather than as a design question: REQ-DASH-054 made the
+  // period a lookup, a lookup answers null for a dataset it has no
+  // calendar for, and the chain sort went straight into
+  // `null.localeCompare` and took the whole panel out with a TypeError.
+  //
+  // The old code could not fail this way and was not better for it -
+  // cycleStartDate() computed a cycle from a cadence rule for any input,
+  // so a dataset with no agreed schedule got a confidently invented
+  // period instead of an error.
+  function unscheduled(dates) {
+    const d = datasetWithStatuses(dates.map((day, i) => [`r${i + 1}`, day, "green"]));
+    return { ...d, id: "a-sample-nobody-has-agreed-a-calendar-for" };
+  }
+
+  it("still builds its real arrival history", () => {
+    const w = load();
+    const chains = w.buildSupplyHistory(unscheduled(["2026-02-01", "2026-05-01"]));
+    expect(chains.flatMap((c) => c.entries)).toHaveLength(2);
+  });
+
+  it("says it has no period rather than inventing one", () => {
+    const w = load();
+    const [chain] = w.buildSupplyHistory(unscheduled(["2026-02-01"]));
+    expect(chain.cycleStart).toBeNull();
+    expect(w.cycleLabel({ type: "daily" }, chain.cycleStart)).toBe("No agreed supply period");
+  });
+
+  it("orders its chains newest-first on their own arrivals", () => {
+    const w = load();
+    // Three chains, because each green arrival closes the one before it.
+    const chains = w.buildSupplyHistory(unscheduled(["2026-02-01", "2026-05-01", "2026-08-01"]));
+    expect(chains).toHaveLength(3);
+    expect(chains.map((c) => c.entries[0].run_date))
+      .toEqual(["2026-08-01", "2026-05-01", "2026-02-01"]);
+  });
+
+  it("badges none of its chains the current one", () => {
+    const w = load();
+    // Both sides of the comparison are null for a dataset with no
+    // calendar, so `null===null` would badge every chain in its whole
+    // history "Current cycle" - a confident wrong answer, and the one
+    // this requirement exists to stop.
+    const ds = { ...unscheduled(["2026-02-01", "2026-05-01"]),
+      name: "A sample", sla: { cadence: { type: "daily", expected_time: "14:00" } } };
+    const cycles = w.buildSupplyHistory(ds);
+    const html = w.renderSupplyHistorySection(ds, cycles, w.periodStartDate(ds.id, "2026-09-01"));
+    expect(html).toContain("No agreed supply period");
+    expect(html).not.toContain("Current cycle");
+  });
+});
+
 describe("rowCountAtRun", () => {
   it("returns the row count from the first column whose byRun covers this run", () => {
     const w = load();
@@ -260,5 +366,26 @@ describe("rowCountAtRun", () => {
     const w = load();
     const d = { columns: [{ stats: { byRun: {} } }] };
     expect(w.rowCountAtRun(d, "r1")).toBeNull();
+  });
+});
+
+describe("the cycle tables line up (#121 D3)", () => {
+  // Keith, 2026-10-06: Outcome's left edge swung 499px between cycles,
+  // because each table sized its own columns to its own content.
+  it("every cycle table shares one fixed set of column widths", () => {
+    const w = load();
+    const ds = { id: "birth-registrations", sla: { cadence: { type: "daily" } } };
+    const cycles = [
+      { cycleStart: "2026-01-02", entries: [{ run_id: "a", run_date: "2026-01-02", status: "green" }] },
+      { cycleStart: "2026-01-01", entries: [{ run_id: "b", run_date: "2026-01-01", status: "red" }] },
+    ];
+    const root = w.document.createElement("div");
+    root.innerHTML = w.renderSupplyHistorySection(ds, cycles, "2026-01-02");
+    const tables = [...root.querySelectorAll("table")];
+    expect(tables.length).toBe(2);
+    const widths = tables.map((t) => [...t.querySelectorAll("colgroup col")].map((c) => c.getAttribute("style")));
+    expect(widths[0].length).toBe(6);
+    expect(widths[1]).toEqual(widths[0]);
+    expect(tables.every((t) => t.classList.contains("supply-cycle-table"))).toBe(true);
   });
 });

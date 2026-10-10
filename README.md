@@ -46,7 +46,7 @@ dashboard rebuild/embed/validate/snapshot chain, Tier 2), `github`
 (GitHub Issues ticket/acceptance/leaderboard sync, Tier 2), `debug`
 (per-tool debug runners against a run already on disk - `run-dbt`/
 `run-soda`/`run-datacontract`/`run-evidently`/`build-warehouses`/
-`load-warehouse`/`changelog`, Tier 3), `pipeline` (the full real-tool
+`changelog`, Tier 3), `pipeline` (the full real-tool
 batch run this section just ran, Tier 2), and `population` (a
 population-scale, cross-agency-identity-linked synthetic dataset via
 the separate `synthetic_data_generator/` package - Tier 4, explicitly
@@ -79,12 +79,21 @@ instead.** The template is the real, hand-authored UI source (HTML/CSS/
 JS), committed and edited directly; `dashboard/embed_dashboard_data.py`
 reads it and writes the real, viewable `.html` file, which is gitignored
 and never committed (2026-09-16, `plans/publishing-and-history.md` Phase
-3). CI (`.github/workflows/deploy-pages.yml`) rebuilds it fresh from
-committed `qa_results/` history on every relevant push, gates the
-result, and deploys — it doesn't commit anything back to git either.
-Running the pipeline locally still builds the file for your own
-viewing; there's just nothing to accidentally commit any more, since
-git never tracks that path.
+3). It is rebuilt fresh from the recorded QA results on every publish,
+gated, and deployed — nothing is committed back to git either.
+
+**CI no longer builds it** (REQ-PIPE-089/092). It used to:
+`.github/workflows/deploy-pages.yml` rebuilt the whole dashboard from the
+committed `qa_results/` tree on every relevant push and was the only path
+to the published site. The results are rows in a PostgreSQL database now,
+which a GitHub runner has no route to, so the build moved to the
+environment that can read them and that workflow is replaced by
+`.github/workflows/validate-config.yml` — every gate that reads only
+committed configuration, and nothing that needs the results.
+
+Running the pipeline locally still builds the file for your own viewing;
+there's just nothing to accidentally commit, since git never tracks that
+path.
 
 Pass `--snapshot` (`./mothman pipeline run --snapshot`, same effect as
 `SNAPSHOT_DASHBOARD=1`) to also archive the freshly re-embedded
@@ -105,8 +114,8 @@ regenerated automatically — every `mothman pipeline run` run backfills them
 regardless of the `--snapshot` flag above, so the picker works
 even when opening the dashboard straight off disk via `file://`. On the
 published GitHub Pages site the same decompression happens at deploy time
-instead (`.github/workflows/deploy-pages.yml`) — either way, only the
-`.gz` files are ever actually committed to git.
+instead, in whichever step publishes — either way, only the `.gz` files
+are ever actually committed to git.
 
 ## What's actually running
 
@@ -203,7 +212,7 @@ pipeline/                    a real package (pipeline/__init__.py) - invoked via
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
-                               chart, run against it; qa_tools/ builds its own separate per-run warehouses)
+                               chart, run against it; qa_tools/ stages supplies into data/supply.duckdb)
   orchestrate.py                generate -> load the combined warehouse (qa_tools/bdm/orchestrate_bdm.py
                                is the next step, run separately - see `mothman pipeline run`)
   build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
@@ -216,8 +225,9 @@ dashboard/
                                collection wired to real data
   embed_dashboard_data.py       builds qa-reporting-dashboard.html from the template above, embedding
                                both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA)
-data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
-                               cp_raw/, cp_duckdb_runs/ (not checked in)
+data/                          generated - raw run CSVs, manifest.json, cp_raw/, and supply.duckdb:
+                               ONE database holding every staged supply, which each QA run reads
+                               through a schema of views of its own (REQ-PIPE-068). Not checked in.
 reports/                       generated - results_bdm.json, results_cp.json,
                                birth_registrations_dashboard.json, child_protection_dashboard.json
                                (not checked in)
@@ -232,11 +242,34 @@ tests/                         pytest smoke tests - generator and dashboard-buil
 
 ## Development
 
+This project needs a **PostgreSQL 16** to talk to (REQ-PIPE-087), and that
+is a real change to what it costs to evaluate the PoC rather than a detail:
+there is no longer a database file in the repository to open, so `uv sync
+--dev` is no longer the whole of setup.
+
+**A password is not optional, even locally.** datacontract-cli requires
+`DATACONTRACT_POSTGRES_PASSWORD` and treats an empty value as missing, so
+it refuses to run at all against a trust-authenticated database. The
+pipeline checks for this and says so rather than letting the tool fail
+obscurely.
+
 ```bash
 uv sync --dev              # installs everything, including dev tooling
 uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
                             # one-time: installs dbt_utils (see the top of this
                             # README for why a real-tool dbt build needs it)
+
+# Where the pipeline's own warehouse lives. NO DEFAULT, on purpose: there is
+# no local file to fall back to, so a default would have to name somebody's
+# database - and the one thing worse than failing to connect is connecting
+# to the wrong environment.
+export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
+
+# Where the TEST SUITE connects. It creates a database per test worker and
+# never starts a server itself - a suite that starts its own server tests a
+# server nobody deploys. Point it at a maintenance database.
+export MOTHMAN_TEST_DSN="postgresql://user:password@localhost:5432/postgres"
+
 uv run pytest              # smoke tests - generator layer (real, seeded runs) +
                             # dashboard-builder layer (fixture-based, no slow real-tool run needed)
 uv run ruff check .        # lint - a lean rule set (real bugs: unused imports/vars,
@@ -256,9 +289,19 @@ a system-installed Python or any package installed outside `.venv`
 (Playwright's browser binary included, via `uv run playwright install
 chromium` above). This matters more than usual for this repo specifically:
 it's meant to be checked out and run by other people evaluating the PoC,
-on their own machines, not just the one it was built on — `uv sync --dev`
-plus the one-time `playwright install` should be the entire setup, with no
-implicit "also have X on your PATH already" assumptions anywhere.
+on their own machines, not just the one it was built on.
+
+**That claim used to be stronger and is now honestly weaker** (REQ-PIPE-087,
+2026-09-27). It used to read "`uv sync --dev` plus the one-time `playwright
+install` should be the entire setup, with no implicit 'also have X on your
+PATH already' assumptions anywhere". A PostgreSQL is exactly such an
+assumption, and the trade was made deliberately: a warehouse that only
+works because it is a file in the repository is not the warehouse
+production runs, so every property this design leans on was being read from
+documentation rather than exercised. What remains true is the narrower
+claim — nothing depends on a system Python, an activated `.venv`, or any
+package installed outside it; the one external dependency is a database,
+and it is named in the Development section above rather than discovered.
 
 ## On-demand checks against a file you already have
 
@@ -290,10 +333,15 @@ reachable interactively — bare `./mothman`, then Quality Assurance → pick a
 dataset → "Local files" — browsed via real filesystem tab-completion
 instead of typed paths.
 
-**Defaults to a throwaway, local-only check** — nothing gets written into
-this repo's real, committed `qa_results/` history unless you pass
-`--commit` (Keith's own explicit call: an ad hoc sanity check on your own
-pull usually isn't meant to become part of the permanent QA record).
+**Asks whether to keep it, and defaults to a TRIAL** (REQ-PIPE-103).
+Keeping files the supply as a real delivery received now — so the
+delivery log and the dashboard describe everything we actually
+received, not only what arrived automatically — and the run takes its
+id from recognition exactly as an automatic arrival would. Declining
+gives a trial: the same four tools against the same rows, filed
+nowhere and recorded nowhere, with every schema it touched dropped
+when the command ends. `--commit` and `--trial` state the answer for a
+script; with neither, and no terminal to ask, it runs as a trial.
 
 `mothman`'s **S3 QA source mode** (`plans/tooling.md` #1 Phase 3) covers the
 same real use case one step earlier — before you've pulled the file down
@@ -454,12 +502,12 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-./mothman pipeline run --dataset cp
+./mothman pipeline run --collection cp
 ```
 
 (Generates data/cp_raw/'s 15 quarterly snapshots, runs the real tools ->
 reports/results_cp.json, reshapes -> reports/child_protection_dashboard.json,
-then re-embeds BOTH real datasets into the dashboard HTML. `--dataset all`,
+then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
 the default, does the same for Birth Registrations too in one call.)
 
 A few things specific to this collection, each found by actually running

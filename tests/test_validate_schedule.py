@@ -1,0 +1,844 @@
+"""Tests for the schedule/asset configuration gate (REQ-PIPE-050).
+
+Every test here breaks the configuration in ONE specific way and
+requires the gate to say so. That shape is deliberate: a validator is
+only worth the build it interrupts if it actually catches the thing it
+claims to, and a gate tested only against valid input is a gate that
+has never been shown to do anything.
+
+The real committed configuration is the baseline every case starts
+from, copied and then broken, rather than a hand-written minimal one.
+A fixture config drifts from the real file's shape, and then the gate
+gets tested against a shape nobody uses.
+"""
+from __future__ import annotations
+
+import copy
+from datetime import date
+import shutil
+from pathlib import Path
+
+import pytest
+import yaml
+
+from qa_tools.common import validate_schedule
+import agreement_split
+from qa_tools.common.validate_schedule import Source, validate
+
+REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
+
+
+@pytest.fixture
+def config(tmp_path):
+    """A writable copy of the real contract directory, and a helper that
+    rewrites the asset file after mutating it."""
+    contract_dir = tmp_path / "contract"
+    shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+    asset_path = contract_dir / "data-asset.yaml"
+    src = Source(asset_path, contract_dir)
+
+    def apply(mutate):
+        # Mutated in the one-file shape and written out as the two files
+        # REQ-PIPE-110 split it into - see tests/agreement_split.py.
+        doc = agreement_split.merged_view(contract_dir)
+        mutate(doc)
+        agreement_split.write(contract_dir, doc)
+        return validate(src)
+
+    apply.src = src
+    apply.asset_path = asset_path
+    apply.contract_dir = contract_dir
+    return apply
+
+
+def _messages(errors):
+    return "\n".join(f"{e.scope or ''} {e.problem} {e.fix}" for e in errors)
+
+
+def _datasets(doc):
+    for agency in doc["hierarchy"]["agencies"]:
+        for collection in agency["collections"]:
+            yield from collection["datasets"]
+
+
+def _dataset(doc, dataset_id):
+    return next(d for d in _datasets(doc) if d["id"] == dataset_id)
+
+
+def _calendar(doc, name):
+    return next(c for c in doc["calendars"] if c["name"] == name)
+
+
+class TestTheRealConfigurationPasses:
+    def test_the_committed_configuration_is_valid(self):
+        """The baseline. If this ever fails, the gate is reporting on
+        the repo's own config, not on a test fixture."""
+        assert validate() == []
+
+    def test_an_untouched_copy_is_valid_too(self, config):
+        """Proves the fixture itself introduces nothing - otherwise
+        every test below could be passing for the wrong reason."""
+        assert config(lambda doc: None) == []
+
+
+class TestATypoCanNeverLeaveADatasetExpectingNothing:
+    """The one sentence the whole gate exists for."""
+
+    def test_a_misspelt_month_is_rejected(self):
+        def mutate(doc):
+            _dataset(doc, "cp-case-workers")["delivery_months"] = ["Febuary", "August"]
+        errors = _run(mutate)
+        assert any("Febuary" in e.problem for e in errors), _messages(errors)
+        assert any("February" in e.fix for e in errors), "the fix must name a real month"
+
+    def test_a_month_the_calendar_has_no_date_in_is_rejected(self):
+        def mutate(doc):
+            _dataset(doc, "cp-case-workers")["delivery_months"] = ["March", "August"]
+        errors = _run(mutate)
+        assert any("March" in e.problem and "no\n" not in e.problem for e in errors), _messages(errors)
+        assert any("expects nothing in March" in e.fix for e in errors), _messages(errors)
+
+    def test_a_calendar_the_asset_does_not_define_is_rejected(self):
+        def mutate(doc):
+            _dataset(doc, "cp-clients")["calendar"] = "quarterly-v2"
+        errors = _run(mutate)
+        assert any("quarterly-v2" in e.problem for e in errors), _messages(errors)
+        assert any("expects nothing" in e.fix for e in errors), _messages(errors)
+
+    def test_an_empty_delivery_months_list_is_rejected(self):
+        def mutate(doc):
+            _dataset(doc, "cp-case-workers")["delivery_months"] = []
+        errors = _run(mutate)
+        assert any("nothing in it" in e.problem for e in errors), _messages(errors)
+
+    def test_not_expected_covering_every_period_is_rejected(self):
+        """The combination no single rule catches: every month is real,
+        every month is on the calendar, and every resulting period is
+        then excluded."""
+        def mutate(doc):
+            dataset = _dataset(doc, "cp-case-workers")
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            months = {2: "February", 8: "August"}
+            dataset["not_expected"] = [
+                {"period": e["period"], "reason": "test"} for e in dates
+                if int(e["date"].split("-")[1]) in months]
+        errors = _run(mutate)
+        assert any("expects no supply in any period" in e.problem for e in errors), _messages(errors)
+
+    def test_a_dataset_expecting_nothing_is_reported_once_not_twice(self):
+        """A dataset naming a calendar that does not exist already has a
+        better error than "expects nothing" - saying both is two errors
+        for one mistake."""
+        def mutate(doc):
+            _dataset(doc, "cp-clients")["calendar"] = "nope"
+        errors = [e for e in _run(mutate) if e.scope == "dataset 'cp-clients'"]
+        assert len(errors) == 1, _messages(errors)
+
+    def test_a_version_with_neither_dates_nor_a_rule_is_rejected(self):
+        def mutate(doc):
+            version = _calendar(doc, "quarterly")["versions"][0]
+            del version["dates"]
+        errors = _run(mutate)
+        assert any("neither" in e.problem for e in errors), _messages(errors)
+
+
+class TestAMistypedKeyFailsToo:
+    """Not just a mistyped VALUE. A silently-dropped delivery_months key
+    gives a dataset every quarterly date when its author meant two, and
+    nothing about the result looks wrong."""
+
+    def test_an_unknown_dataset_key_is_rejected(self):
+        def mutate(doc):
+            dataset = _dataset(doc, "cp-case-workers")
+            dataset["delivery_month"] = dataset.pop("delivery_months")
+        errors = _run(mutate)
+        assert any("delivery_month" in e.problem for e in errors), _messages(errors)
+        assert any("not a key" in e.problem for e in errors), _messages(errors)
+
+    def test_an_unknown_top_level_key_is_rejected(self):
+        errors = _run(lambda doc: doc.update({"timzone": "Australia/Perth"}))
+        assert any("timzone" in e.problem for e in errors), _messages(errors)
+
+    def test_a_missing_required_value_is_rejected(self):
+        def mutate(doc):
+            del _dataset(doc, "cp-clients")["table"]
+        errors = _run(mutate)
+        assert any("required" in e.problem for e in errors), _messages(errors)
+
+
+class TestCalendarIntegrity:
+    def test_duplicate_calendar_names_are_rejected(self):
+        def mutate(doc):
+            doc["calendars"].append(copy.deepcopy(_calendar(doc, "daily")))
+        errors = _run(mutate)
+        assert any("defined 2 times" in e.problem for e in errors), _messages(errors)
+
+    def test_a_duplicate_period_name_is_rejected(self):
+        def mutate(doc):
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            dates.append({"period": dates[0]["period"], "date": "2028-02-01"})
+        errors = _run(mutate)
+        assert any("2 times" in e.problem and "period" in e.problem for e in errors), _messages(errors)
+
+    def test_a_duplicate_date_is_rejected(self):
+        def mutate(doc):
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            dates.append({"period": "2028-Q9", "date": dates[0]["date"]})
+        errors = _run(mutate)
+        assert any("carries the date" in e.problem for e in errors), _messages(errors)
+
+    def test_out_of_order_versions_are_rejected(self):
+        def mutate(doc):
+            cal = _calendar(doc, "quarterly")
+            later = copy.deepcopy(cal["versions"][0])
+            later["effective_from"] = "2020-01-01"
+            cal["versions"].append(later)
+        errors = _run(mutate)
+        assert any("not after" in e.problem for e in errors), _messages(errors)
+
+    def test_versions_sharing_an_effective_date_are_rejected(self):
+        def mutate(doc):
+            cal = _calendar(doc, "quarterly")
+            cal["versions"].append(copy.deepcopy(cal["versions"][0]))
+        errors = _run(mutate)
+        assert any("not after" in e.problem for e in errors), _messages(errors)
+
+    def test_an_unparseable_date_is_rejected(self):
+        def mutate(doc):
+            _calendar(doc, "quarterly")["versions"][0]["dates"][0]["date"] = "1 Feb 2023"
+        errors = _run(mutate)
+        assert any("not a date" in e.problem for e in errors), _messages(errors)
+
+    def test_two_period_names_that_would_share_one_schema_are_rejected(self):
+        """THE CHECK THAT LET THE HEX ENCODING GO (2026-09-27). A period's
+        schema is its name normalised, so "2026-Q3" and "2026_Q3" both
+        become period_2026_q3 - and two periods in one schema means
+        promoted data merged with nothing downstream able to notice.
+
+        This has to be caught HERE, in the calendar somebody just edited,
+        because the alternative - encoding the name so the collision is
+        impossible - cost every real schema name its legibility. It is
+        distinct from the duplicate-period check above: these are two
+        DIFFERENT authored names, so that check sees nothing wrong."""
+        def mutate(doc):
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            first = dates[0]["period"]
+            dates.append({"period": first.replace("-", "_"), "date": "2028-02-01"})
+        errors = _run(mutate)
+        assert any("would share one schema" in e.problem for e in errors), _messages(errors)
+
+    def test_a_name_differing_by_case_alone_is_rejected_too(self):
+        """The case half matters as much as the punctuation half, and is
+        easier to miss reading a diff."""
+        def mutate(doc):
+            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            dates.append({"period": dates[0]["period"].lower(), "date": "2028-02-01"})
+        errors = _run(mutate)
+        assert any("would share one schema" in e.problem for e in errors), _messages(errors)
+
+
+class TestDurationsAreNeverCoerced:
+    @pytest.mark.parametrize("value", ["14", "14 days", "P14D", "fortnight"])
+    def test_a_claim_window_without_a_recognised_unit_is_rejected(self, value):
+        def mutate(doc):
+            _calendar(doc, "quarterly")["versions"][0]["claim_window"] = value
+        errors = _run(mutate)
+        assert any("not a duration" in e.problem for e in errors), f"{value!r}: {_messages(errors)}"
+
+    def test_a_negative_claim_window_is_rejected(self):
+        def mutate(doc):
+            _calendar(doc, "quarterly")["versions"][0]["claim_window"] = "-14d"
+        errors = _run(mutate)
+        assert any("negative" in e.problem or "not a duration" in e.problem
+                    for e in errors), _messages(errors)
+
+
+class TestSubsettingAndOverridingAreDifferentActs:
+    def test_a_dataset_cannot_do_both(self):
+        def mutate(doc):
+            _dataset(doc, "cp-case-workers")["dates"] = [
+                {"period": "2026-Q1", "date": "2026-02-01"}]
+        errors = _run(mutate)
+        assert any("BOTH" in e.problem for e in errors), _messages(errors)
+
+    def test_delivery_months_against_a_cadence_rule_calendar_is_rejected(self):
+        def mutate(doc):
+            _dataset(doc, "birth-registrations")["delivery_months"] = ["February"]
+        errors = _run(mutate)
+        assert any("cadence RULE" in e.problem for e in errors), _messages(errors)
+        assert any("cannot honour" in e.fix for e in errors), _messages(errors)
+
+
+class TestTheContractsOnTheOtherSide:
+    def test_a_collection_naming_a_contract_that_does_not_exist_is_rejected(self):
+        def mutate(doc):
+            doc["hierarchy"]["agencies"][0]["collections"][0]["contract"] = "nope.yaml"
+        errors = _run(mutate)
+        assert any("does not exist" in e.problem for e in errors), _messages(errors)
+
+    def test_a_contract_no_collection_names_is_rejected(self, config):
+        def mutate(doc):
+            pass
+        shutil.copy(config.contract_dir / "child-protection-contract.yaml",
+                     config.contract_dir / "orphan-contract.yaml")
+        errors = config(mutate)
+        assert any(e.file == "orphan-contract.yaml" for e in errors), _messages(errors)
+        assert any("checked by nothing" in e.fix for e in errors), _messages(errors)
+
+    def test_a_negative_grace_allowance_is_rejected(self, config):
+        """Grace moved from the contract's slaProperties to the dataset's
+        participation in contract/calendar.yaml (REQ-PIPE-110); the rule
+        did not change."""
+        errors = config(lambda d: None)
+        assert errors == []
+        path = config.contract_dir / "calendar.yaml"
+        doc = yaml.safe_load(path.read_text())
+        entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+        entry["participation"]["versions"][0]["grace"] = "-30m"
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        errors = validate(config.src)
+        # A duration has no sign, so a negative one is refused as not a
+        # duration at all - still refused, still naming the dataset.
+        assert any("-30m" in e.problem and "grace" in e.problem
+                   and "cp-clients" in (e.scope or "") for e in errors), _messages(errors)
+
+
+class TestHowItReports:
+    def test_every_offending_item_is_reported_individually(self):
+        """Keith's own call, 2026-09-23, against a recommendation to
+        suppress errors caused by an earlier one: nothing is hidden and
+        the count in the header is the true count."""
+        def mutate(doc):
+            for dataset in _datasets(doc):
+                dataset["calendar"] = "no-such-calendar"
+        errors = _run(mutate)
+        named = {e.scope for e in errors if e.scope}
+        assert len(named) == 7, f"expected one error per dataset, got {len(named)}: {named}"
+
+    def test_it_does_not_stop_at_the_first_error(self):
+        def mutate(doc):
+            _dataset(doc, "cp-case-workers")["delivery_months"] = ["Febuary"]
+            _calendar(doc, "quarterly")["versions"][0]["claim_window"] = "14"
+        errors = _run(mutate)
+        assert len(errors) >= 2, _messages(errors)
+        assert any("Febuary" in e.problem for e in errors)
+        assert any("not a duration" in e.problem for e in errors)
+
+    def test_every_error_names_a_correction_not_only_the_rule(self):
+        def mutate(doc):
+            _dataset(doc, "cp-case-workers")["delivery_months"] = ["Febuary"]
+            _dataset(doc, "cp-clients")["calendar"] = "nope"
+            _calendar(doc, "daily")["versions"][0]["claim_window"] = "4"
+        errors = _run(mutate)
+        assert errors
+        for error in errors:
+            assert error.fix.strip(), f"no correction offered for: {error.problem}"
+
+    def test_errors_carry_the_file_and_the_thing_to_open(self):
+        def mutate(doc):
+            _dataset(doc, "cp-clients")["calendar"] = "nope"
+        errors = _run(mutate)
+        assert all(e.file for e in errors)
+        assert any(e.scope == "dataset 'cp-clients'" for e in errors), _messages(errors)
+
+
+class TestAFileThatDoesNotParse:
+    def test_it_names_the_location_and_reports_nothing_else(self, config):
+        """A file that did not parse has no values to be missing, and
+        reporting every one of them as absent buries the one thing that
+        is actually wrong."""
+        config.asset_path.write_text("calendars:\n  - name: quarterly\n   bad_indent: true\n")
+        errors = validate(config.src)
+        assert len(errors) == 1, _messages(errors)
+        assert "could not be parsed" in errors[0].problem
+        assert "line" in errors[0].problem
+        assert errors[0].file == "data-asset.yaml"
+
+    def test_a_missing_file_says_so_once(self, config):
+        config.asset_path.unlink()
+        errors = validate(config.src)
+        assert len(errors) == 1
+        assert "does not exist" in errors[0].problem
+
+
+class TestItTouchesNoData:
+    def test_validating_opens_nothing_under_data(self, monkeypatch):
+        """The standing CI rule, asserted rather than assumed - this
+        gate runs on every push, and a config validator that reached
+        into data/ would be exactly the accident the rule exists for."""
+        opened = []
+        real_open = Path.open
+
+        def watching(self, *args, **kwargs):
+            opened.append(str(self))
+            return real_open(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", watching)
+        validate()
+        assert not [p for p in opened if "/data/" in p or p.endswith("duckdb")], opened
+
+
+def _run(mutate):
+    """Apply one mutation to a throwaway copy of the real configuration
+    and validate it. Module-level so the class-based tests above read as
+    one line each."""
+    import tempfile
+
+    tmp = Path(tempfile.mkdtemp())
+    contract_dir = tmp / "contract"
+    shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+    asset_path = contract_dir / "data-asset.yaml"
+    doc = agreement_split.merged_view(contract_dir)
+    mutate(doc)
+    agreement_split.write(contract_dir, doc)
+    try:
+        return validate(Source(asset_path, contract_dir))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_the_module_reports_through_a_real_mothman_command():
+    """Criterion: invoked as a mothman subcommand, in a group that is
+    not documented as non-human-facing."""
+    from cli.schedule import schedule_group
+
+    assert "validate" in schedule_group.commands
+    assert validate_schedule.main() == 0
+
+
+class TestTheSuccessLineDoesNotContradictTheWarningBelowIt:
+    """post-build-review #17, Keith's option (b), 2026-09-24.
+
+    The gate's OK line used to end "every one of them expecting
+    something". `_expects_nothing_errors` asks whether a dataset derives
+    zero periods EVER; that clause generalises it into a claim about
+    NOW, and the two part company the moment a calendar runs out - at
+    which point the first line of the gate's output asserts the opposite
+    of the warning three lines below it.
+
+    Keith's call was to keep the headline as a statement about
+    configuration validity, which is what the gate actually checks, and
+    drop the clause - rather than make the headline runway-aware, which
+    would merge two concerns the code deliberately separates.
+    """
+
+    def _run_past_the_last_authored_date(self, monkeypatch, capsys):
+        from qa_tools.common import asset_time
+
+        # Past the quarterly calendar's last authored period, so the
+        # real exhausted warning fires against the REAL committed
+        # config - the state the contradiction actually appears in.
+        monkeypatch.setattr(
+            asset_time, "now",
+            lambda: asset_time.wall_clock(date(2028, 6, 1), "09:00"))
+        code = validate_schedule.main()
+        captured = capsys.readouterr()
+        return code, captured.out, captured.err
+
+    def test_the_gate_still_passes_and_the_warning_still_fires(self, monkeypatch, capsys):
+        """Precondition for the test below: without the warning there is
+        nothing for the headline to contradict."""
+        code, _out, err = self._run_past_the_last_authored_date(monkeypatch, capsys)
+        assert code == 0
+        assert "cannot be processed" in err
+
+    def test_the_headline_makes_no_claim_about_what_datasets_expect_now(
+            self, monkeypatch, capsys):
+        _code, out, err = self._run_past_the_last_authored_date(monkeypatch, capsys)
+        assert "cannot be processed" in err, "precondition - the exhausted warning must fire"
+        assert "expecting something" not in out, (
+            f"the gate's success line claims every dataset is expecting something while the "
+            f"warning below it says some cannot be processed at all:\n  {out.strip()}")
+
+    def test_the_headline_still_says_what_it_checked(self, monkeypatch, capsys):
+        """Dropping the clause must not leave a bare "OK" - the counts
+        are what tell a reader the gate looked at the whole file rather
+        than falling out early."""
+        _code, out, _err = self._run_past_the_last_authored_date(monkeypatch, capsys)
+        assert "calendar(s)" in out and "dataset(s)" in out
+
+
+class TestOneTypoReadsAsOneTypo:
+    """post-build-review #19, Keith's option (c), 2026-09-25.
+
+    Rename a calendar by one character and every dataset on it reports
+    "names calendar 'quarterly', which this asset does not define. Use
+    one of: daily, quarterley, or add that calendar."
+
+    Two things were wrong with that, and neither is the individual
+    reporting Keith settled on 2026-09-23 - nothing here hides an error
+    or changes the header count.
+
+    The true fix is one character in the calendar, and the output
+    described N broken datasets instead. And the options offered
+    included the typo itself, so a reader who followed the text
+    literally pointed every dataset at the misspelling and turned the
+    gate GREEN with it committed.
+    """
+
+    @pytest.fixture
+    def renamed_calendar(self, tmp_path):
+        """The real config with `quarterly` renamed by one character -
+        the exact mistake, not an approximation of it."""
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        doc = agreement_split.merged_view(contract_dir)
+        for calendar in doc["calendars"]:
+            if calendar["name"] == "quarterly":
+                calendar["name"] = "quarterley"
+        agreement_split.write(contract_dir, doc)
+        return Source(path, contract_dir)
+
+    def _errors(self, src):
+        return validate(src)
+
+    def test_no_fix_line_offers_the_name_nothing_uses(self, renamed_calendar):
+        """`quarterley` is defined and no dataset names it. A calendar
+        nothing references is either brand new or a typo, and steering
+        a broken dataset at it is not a safe thing to suggest."""
+        unknown = [e for e in self._errors(renamed_calendar)
+                   if "does not define" in e.problem]
+        assert unknown, "precondition - the rename must produce unknown-calendar errors"
+        for error in unknown:
+            assert "quarterley" not in error.fix, (
+                f"the fix line offers the typo as a valid option:\n  {error.fix}")
+
+    def test_the_shared_cause_is_named_once_above_the_detail(self, renamed_calendar, capsys):
+        validate_schedule.main(renamed_calendar)
+        err = capsys.readouterr().err
+        assert "quarterly" in err
+        cause_lines = [ln for ln in err.splitlines() if "datasets name" in ln]
+        assert len(cause_lines) == 1, (
+            f"expected exactly one line naming the shared cause, got {cause_lines}")
+        assert "quarterley" in cause_lines[0], (
+            "the one calendar nothing references is the likely typo and should be named")
+
+    def test_every_offending_dataset_is_still_reported_individually(self, renamed_calendar, capsys):
+        """Keith's 2026-09-23 rule. The cause line is printed ABOVE the
+        detail; it suppresses nothing and changes no count."""
+        errors = self._errors(renamed_calendar)
+        unknown = [e for e in errors if "does not define" in e.problem]
+        assert len(unknown) == 6, f"expected all six CP datasets reported, got {len(unknown)}"
+        validate_schedule.main(renamed_calendar)
+        err = capsys.readouterr().err
+        assert f"{len(errors)} error(s)" in err
+
+    def test_a_calendar_that_was_simply_never_written_gets_no_typo_guess(self, tmp_path, capsys):
+        """The guess is only safe when exactly one defined calendar is
+        unreferenced. Point a dataset at a name nobody has ever defined,
+        leave every real calendar in use, and there is nothing to
+        suggest as the typo."""
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        doc = agreement_split.merged_view(contract_dir)
+        for _dataset, _collection in validate_schedule._walk_datasets(doc):
+            if _dataset.get("id") == "cp-carers":
+                _dataset["calendar"] = "fortnightly"
+        agreement_split.write(contract_dir, doc)
+
+        validate_schedule.main(Source(path, contract_dir))
+        err = capsys.readouterr().err
+        assert "fortnightly" in err
+        assert "if that is the typo" not in err, (
+            f"guessed a typo with no unreferenced calendar to guess at:\n{err}")
+        assert "datasets name" not in err, (
+            "one dataset is not a shared cause - there is nothing to aggregate")
+
+
+class TestTheGateActuallyFailsTheBuild:
+    """REQ-PIPE-050 criterion 1 - "SHALL exit non-zero on any error".
+
+    Added 2026-09-25 as part of post-build-review #43. Not a defect:
+    `main()` has always returned 1 on errors. It had simply never been
+    asserted - every other test in this module checks that `validate()`
+    returns a non-empty list, which is a different claim from the gate
+    actually failing, and the one gate-level assertion in the suite was
+    the happy path (`main() == 0`).
+
+    A validator whose exit code nobody checks is a validator CI can stop
+    honouring without any test noticing.
+    """
+
+    def test_a_broken_configuration_exits_non_zero(self, tmp_path):
+        import shutil
+
+        contract_dir = tmp_path / "contract"
+        shutil.copytree(REAL_CONTRACT_DIR, contract_dir)
+        path = contract_dir / "data-asset.yaml"
+        doc = agreement_split.merged_view(contract_dir)
+        for calendar in doc["calendars"]:
+            if calendar["name"] == "quarterly":
+                calendar["name"] = "quarterley"
+        agreement_split.write(contract_dir, doc)
+
+        assert validate_schedule.main(Source(path, contract_dir)) == 1
+
+    def test_the_real_committed_configuration_exits_zero(self):
+        """The other half: a gate that always failed would also satisfy
+        the assertion above."""
+        assert validate_schedule.main() == 0
+
+
+class TestOneMistakeIsOneError:
+    """post-build-review #20. `claim_window: 14` produced TWO errors on
+    the same value, two lines apart, in two idioms:
+
+        calendars -> 0 -> versions -> 0 -> claim_window: Input should
+        be a valid string. Correct the value.
+        version 1's claim_window is 14, which is not a duration with a
+        unit. Write a duration with its unit, like 14d or 4h.
+
+    The same version, 0-indexed and 1-indexed. The build decision "so
+    one mistake is one error" was applied inside
+    `_expects_nothing_errors` and never across this seam - which also
+    inflated the header count #18 is about.
+
+    The SEMANTIC message survives, not the schema one: it names the
+    unit, gives two examples and says why it is never guessed at. The
+    schema layer's "Correct the value." names nothing.
+    """
+
+    def _doc(self, **version):
+        doc = agreement_split.merged_view(REAL_CONTRACT_DIR)
+        doc["calendars"][0]["versions"][0].update(version)
+        return doc
+
+    def _errors(self, doc, tmp_path):
+        from qa_tools.common import validate_schedule as mod
+        path = tmp_path / "data-asset.yaml"
+        agreement_split.write(tmp_path, doc)
+        return mod.validate(Source(path, REAL_CONTRACT_DIR))
+
+    def test_a_bare_number_claim_window_produces_one_error_not_two(self, tmp_path):
+        errors = [e for e in self._errors(self._doc(claim_window=14), tmp_path)
+                  if "claim_window" in e.problem]
+        assert len(errors) == 1, [str(e) for e in errors]
+
+    def test_the_one_that_survives_is_the_one_that_names_the_unit(self, tmp_path):
+        errors = [e for e in self._errors(self._doc(claim_window=14), tmp_path)
+                  if "claim_window" in e.problem]
+        assert "14d" in errors[0].fix
+        assert errors[0].fix != "Correct the value."
+
+    def test_a_missing_key_says_what_to_add_rather_than_add_it(self, tmp_path):
+        """The generated fix lines named no shape, no example and
+        nowhere to look - against an NFR reading "every error here must
+        be one a human can act on immediately"."""
+        doc = self._doc()
+        doc["calendars"][0]["versions"][0].pop("effective_from")
+        errors = [e for e in self._errors(doc, tmp_path) if "effective_from" in e.problem]
+        assert errors
+        assert errors[0].fix != "Add it."
+        assert "YYYY-MM-DD" in errors[0].fix or "2027-01-01" in errors[0].fix
+
+    def test_a_wrong_typed_value_says_what_shape_is_wanted(self, tmp_path):
+        errors = [e for e in self._errors(self._doc(changelog="not a list"), tmp_path)
+                  if "changelog" in e.problem]
+        assert errors
+        assert errors[0].fix != "Correct the value."
+
+
+class TestTheHeaderCountIsTheNumberOfDatasetsActuallyAffected:
+    """post-build-review #18. The header count came from
+    `{e.scope for e in errors if e.scope.startswith("dataset ")}`, so a
+    CALENDAR-scoped error contributed zero no matter how many datasets
+    named that calendar. The critic reproduced a run reporting
+    "affecting 1 dataset(s)" where seven of seven were affected.
+
+    Criterion 22 is met in form. The number is what a reader uses to
+    judge urgency, and it was wrong in the safe-looking direction.
+
+    WHAT "AFFECTED" MEANS, settled here because the fix needs it: a
+    dataset is affected when an error names it, or when an error names
+    a calendar it uses. An error about the asset's own top-level
+    configuration is NOT fanned out to every dataset - that case
+    already has its own wording and turning it into "7 datasets" would
+    trade one imprecise number for another.
+    """
+
+    def _doc(self):
+        return agreement_split.merged_view(REAL_CONTRACT_DIR)
+
+    def _report(self, errors, capsys):
+        from qa_tools.common import validate_schedule as mod
+        mod._report(errors)
+        return capsys.readouterr().err
+
+    def test_a_calendar_error_counts_the_datasets_on_that_calendar(self, capsys):
+        from qa_tools.common import validate_schedule as mod
+
+        errors = [mod.ConfigError("data-asset.yaml", "calendar 'quarterly'",
+                                   "is broken.", "Fix it.",
+                                   affects=("cp-clients", "cp-carers", "cp-case-workers"))]
+        assert "3 dataset(s)" in self._report(errors, capsys)
+
+    def test_one_dataset_counted_once_however_many_errors_name_it(self, capsys):
+        from qa_tools.common import validate_schedule as mod
+
+        errors = [
+            mod.ConfigError("data-asset.yaml", "dataset 'cp-clients'", "a.", "Fix.",
+                             affects=("cp-clients",)),
+            mod.ConfigError("data-asset.yaml", "calendar 'quarterly'", "b.", "Fix.",
+                             affects=("cp-clients",)),
+        ]
+        out = self._report(errors, capsys)
+        assert "2 error(s) affecting 1 dataset(s)" in out
+
+    def test_an_asset_level_error_still_says_so_rather_than_naming_every_dataset(self, capsys):
+        from qa_tools.common import validate_schedule as mod
+
+        errors = [mod.ConfigError("data-asset.yaml", None,
+                                   "has no data_asset_id.", "Add one.")]
+        assert "the asset's own configuration" in self._report(errors, capsys)
+
+    def test_the_real_gate_fans_a_calendar_error_out_to_its_datasets(self, tmp_path,
+                                                                      monkeypatch):
+        """End to end against the real config, which is where the
+        critic found it: rename the calendar the six CP datasets name
+        and the count must be six, not zero."""
+        from qa_tools.common import validate_schedule as mod
+
+        doc = self._doc()
+        for calendar in doc["calendars"]:
+            if calendar["name"] == "quarterly":
+                calendar["name"] = "quarterley"
+        path = tmp_path / "data-asset.yaml"
+        agreement_split.write(tmp_path, doc)
+        src = Source(path, REAL_CONTRACT_DIR)
+        errors = mod.validate(src)
+        affected = set()
+        for error in errors:
+            affected.update(error.affects)
+        assert len(affected) >= 6, (
+            f"a renamed calendar left {len(affected)} datasets counted as affected")
+
+
+class TestTheGateAndTheRuntimeReadAMonthTheSameWay:
+    """post-build-review #34. `schedule.parse_month_name` lowercases;
+    the gate's own `_month_number` did `_MONTHS.index()` against title
+    case. So `delivery_months: [february]` - which the runtime honours
+    perfectly - was refused at the gate with "which is not a month",
+    and the refusal cascaded into a second, untrue error saying the
+    dataset expects no supply at all.
+
+    A false RED rather than a false green, but the same
+    two-implementations-of-one-rule shape `REQ-QAC-047` exists to stamp
+    out, one requirement earlier in the same batch.
+
+    Held to EACH OTHER rather than each to its own expectation, which
+    is what the finding asked for: a parity test keeps them together
+    when either one changes.
+    """
+
+    CASES = ["February", "february", "FEBRUARY", "  February  ", "fEbRuArY",
+              "January", "december",
+              "Febuary", "Feb", "2", "", "Smarch"]
+
+    def test_every_spelling_reads_the_same_in_both(self):
+        from qa_tools.common import schedule
+        from qa_tools.common import validate_schedule as mod
+
+        for value in self.CASES:
+            try:
+                runtime = schedule.parse_month_name(value, "test")
+            except schedule.ScheduleConfigError:
+                runtime = None
+            assert mod._month_number(value) == runtime, (
+                f"{value!r}: the gate says {mod._month_number(value)!r} and the runtime "
+                f"says {runtime!r} - config one accepts, the other refuses")
+
+    def test_a_lowercase_month_is_not_reported_as_not_a_month(self):
+        """The end-to-end consequence, at the layer a maintainer sees."""
+        from qa_tools.common import validate_schedule as mod
+
+        assert mod._month_number("february") == 2
+
+    def test_a_real_typo_is_still_refused(self):
+        """The must-not-change half - case-insensitive is not lenient."""
+        from qa_tools.common import validate_schedule as mod
+
+        assert mod._month_number("Febuary") is None
+        assert mod._month_number("Feb") is None
+
+
+class TestTheDiffBase:
+    """Which commit both gates compare against (#44).
+
+    Both `validate_schedule`'s past-date guard and
+    `validate_check_lifecycle` compared against `HEAD~1` at
+    `fetch-depth: 2`, so a push of two or more commits was only ever
+    checked on its last one. Move a past date in commit A, land commit B
+    on top, and neither gate sees it.
+    """
+
+    def test_it_falls_back_when_nothing_is_configured(self, monkeypatch):
+        from qa_tools.common import diff_base
+
+        monkeypatch.delenv("MOTHMAN_DIFF_BASE", raising=False)
+        assert diff_base.diff_base() == "HEAD~1"
+
+    def test_it_uses_a_configured_ref_that_resolves(self, monkeypatch):
+        # HEAD rather than an ancestor: `actions/checkout@v4` defaults
+        # to fetch-depth 1, so an ancestor ref resolves on a full local
+        # clone and NOT on the runner - a test that passes here and
+        # fails there, which is the one shape CLAUDE.md names outright.
+        # Reproduced against a real `git clone --depth 1` before
+        # changing it. HEAD resolves at any depth and proves the same
+        # thing: a configured ref is used rather than the fallback.
+        from qa_tools.common import diff_base
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
+        assert diff_base.diff_base() == "HEAD"
+
+    def test_it_falls_back_when_the_configured_ref_does_not_resolve(self, monkeypatch):
+        """A first push sets the before-SHA to all zeros, and a shallow
+        checkout cannot reach an older one. Neither is a finding, and
+        neither should crash the gate."""
+        from qa_tools.common import diff_base
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "0" * 40)
+        assert diff_base.diff_base() == "HEAD~1"
+
+    # The function existing is not the fix. The defect was that both
+    # gates named their own ref - one as a parameter default, one as a
+    # hardcoded string - so these two assert the WIRING, which is the
+    # part that was actually broken.
+
+    def test_the_schedule_guard_reads_the_ref_it_is_given(self, monkeypatch):
+        from qa_tools.common import validate_schedule as mod
+
+        seen = []
+
+        def spy(rel_path, ref):
+            seen.append(ref)
+            return None  # no previous content - the guard returns [] and stops
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
+        monkeypatch.setattr(mod, "_content_at", spy)
+        src = Source(mod.ROOT / "contract" / "data-asset.yaml", REAL_CONTRACT_DIR)
+        mod._freeze_errors({}, {}, src)
+        assert seen and set(seen) == {"HEAD"}, (
+            f"the past-date guard compared against {seen} - a push of several "
+            "commits is only checked on its last one")
+
+    def test_the_check_gate_reads_the_ref_it_is_given(self, monkeypatch):
+        """The same hole, for every hand-authored check."""
+        from qa_tools.common import validate_check_lifecycle as mod
+
+        seen = []
+
+        def spy(ref):
+            seen.append(ref)
+            return []
+
+        monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
+        monkeypatch.setattr(mod, "collect_checks", spy)
+        mod.main()
+        assert seen[0] == "HEAD", (
+            f"the check-lifecycle gate compared against {seen[0]!r}")

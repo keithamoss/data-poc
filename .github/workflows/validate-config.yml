@@ -1,0 +1,109 @@
+name: Validate committed configuration
+
+# WHAT THIS USED TO BE, because the change is the interesting part.
+# This file was `deploy-pages.yml`, and it was the ONLY path from a
+# committed QA run to the published site: it rebuilt the whole dashboard
+# from the committed `qa_results/` tree, gated the result, and deployed
+# it to GitHub Pages. Keith's own call at the time - "gone entirely - CI
+# is the only path", no manual local-publish path in any form.
+#
+# REQ-PIPE-089 ENDED THAT, and not by choice. QA results are rows in a
+# PostgreSQL database now rather than files in the repository, and GitHub
+# Actions cannot reach that database - a runner has no route into the
+# environment where the warehouse lives, and giving it one would be
+# exactly the wrong thing to build. So the build moved to the
+# environment that CAN read the results (REQ-PIPE-092), and what is left
+# here is everything that never needed the results at all.
+#
+# WHAT IS LEFT IS THE CONFIGURATION GATES, and they are worth keeping in
+# CI rather than folding into the local `mothman check`: they read only
+# committed files - contracts, calendars, the hierarchy, the check
+# definitions, the register, the changelog, the plans index - so a runner
+# can check every one of them, and they catch the class of mistake that
+# is invisible to a test suite because it lives in YAML rather than in
+# Python.
+#
+# WHAT WENT WITH THE BUILD, so nobody looks for it here: the real-browser
+# render check needs a built dashboard, so it belongs where the build
+# now happens; and the three `gh` reads that fetched open tickets,
+# /accept comments and ticket resolution history were feeding the embed
+# step, which is likewise no longer here. plans/running-thoughts.md #53
+# is the follow-up that matters for those - something inside the secure
+# environment has to poll GitHub for QA-ticket comments now, because a
+# workflow can no longer hand them to a build.
+#
+# THE TWO HISTORY-COMPARING GATES still need real history. They ask "did
+# something that should be immutable change?" by reading a file at an
+# earlier commit, so this checks out the full history and passes the
+# push's own base commit rather than HEAD~1 - comparing against HEAD~1
+# only ever checks a push's LAST commit, so anything edited in the one
+# underneath it went unread (plans/post-build-review.md #44).
+
+on:
+  push:
+    # A glob, not a single named branch - this was pinned to one
+    # session's branch name once and silently stopped firing for every
+    # later session (plans/publishing-and-history.md #7).
+    branches: ["claude/**"]
+    paths:
+      - "contract/**"
+      - "dbt_project/models/staging/schema.yml"
+      - "qa_tools/**"
+      - "CHANGELOG.yaml"
+      - "requirements.yaml"
+      - "plans/**"
+      - ".github/workflows/validate-config.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      # Empty on workflow_dispatch, where qa_tools/common/diff_base.py
+      # falls back to HEAD~1.
+      MOTHMAN_DIFF_BASE: ${{ github.event.before }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history, not 2: the gates compare against the push's
+          # base, which can be any number of commits back.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Gate - hierarchy validation (REQ-QAC-039)
+        run: uv run mothman dashboard validate-hierarchy
+
+      - name: Gate - schedule and asset config validation (REQ-PIPE-050)
+        run: uv run mothman schedule validate
+      # REQ-GEN-135 criterion 13: the scripted decisions, against
+      # configuration alone.
+      - name: Scripted decisions
+        run: uv run mothman scenarios validate
+
+      - name: Gate - check-lifecycle validation (Thread D)
+        run: uv run mothman dashboard validate-check-lifecycle --require-explanations
+
+      - name: Every Soda check can run here
+        run: uv run mothman dashboard validate-soda
+
+      - name: Gate - requirements validation (item 75)
+        run: uv run mothman dashboard validate-requirements
+
+      - name: Validate CHANGELOG.yaml (schema + component tags)
+        run: uv run mothman dashboard validate-changelog
+
+      # plans/INDEX.md is generated from plans/*.md but committed, so it
+      # can drift the moment anyone edits a plans file without
+      # regenerating. A committed generated artifact nobody checks is
+      # worse than none - a session reads it INSTEAD of the files.
+      - name: Check the plans index is current
+        run: uv run mothman dashboard plans-index --check

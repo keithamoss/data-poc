@@ -14,11 +14,10 @@ datacontract-cli/Evidently chain via orchestrate_bdm.run_single(), just
 reached from a browsable questionary.path() prompt or --file/
 --reference-file flags instead of a positional CSV argument."""
 from __future__ import annotations
-import json
+import dataclasses
 import os
 import sys
 import tempfile
-from datetime import datetime, timezone
 
 import rich_click as click
 from rich.console import Console
@@ -27,14 +26,14 @@ from rich.table import Table
 from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
-from qa_tools.common.lambda_results_dir import BDM_MODULES, patch_write_qa_result_for_lambda
-from qa_tools.common.local_check import copy_into, run_id_from_path as local_run_id_from_path
-from qa_tools.common.qa_results_reader import list_run_ids
+from qa_tools.common import trial as trial_mod
+from qa_tools.common import hand_filing
 
-from . import common
+from . import common, filing_tui
+from qa_tools.common import asset_time
 
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
-DATASET_ID = orchestrate_bdm.DATASET_ID
+COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
 CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-contract.yaml")
 
 console = Console()
@@ -48,165 +47,263 @@ def s3_config() -> dict:
     return s3_source.dataset_s3_config(CONTRACT_PATH)
 
 
-def raw_dir() -> str:
-    """Read dynamically, at call time, off build_per_run_warehouses'
-    own module attribute - never bound to a module-level constant here.
-    A real bug class this project has hit more than once (see
-    orchestrate_bdm.run_single()'s own comment on the same pitfall): a
-    module-level constant captured at import time would silently ignore
-    a test (or any other caller) monkeypatching build_per_run_warehouses.
-    RAW_DIR afterwards."""
-    return build_per_run_warehouses.RAW_DIR
+def generated_output_dir() -> str:
+    """Where `generate-synthetic-data` leaves its output.
 
+    THE DELIVERY TREE, since REQ-PIPE-102 - the generator writes one
+    copy of a supply and that is it. This used to return data/raw/,
+    which held a second flat copy of every generated run.
+    """
+    from generator import generate_runs
 
-def manifest_path() -> str:
-    return os.path.join(raw_dir(), "manifest.json")
+    return str(generate_runs.DELIVERIES_DIR)
+
 
 
 def generate_synthetic_data() -> None:
-    """Wraps pipeline.orchestrate.prepare_warehouse(regenerate=True) -
-    already fuses "generate the synthetic runs" and "build the combined
-    warehouse" into one deterministic, idempotent call (confirmed by
-    reading that module directly, not assumed - plans/tooling.md #1),
-    including the real resupply-chain/dirty-severity simulation
-    unmodified."""
-    from pipeline import orchestrate
-    orchestrate.prepare_warehouse(regenerate=True)
+    """Runs the real generator directly - the same shape as cli/cp.py's
+    own generate_synthetic_data(), which is new.
+
+    IT USED TO BUILD A DUCKDB WAREHOUSE TOO. This wrapped
+    pipeline.orchestrate.prepare_warehouse(), which generated the runs
+    and then loaded every one of them into one combined DuckDB file at
+    data/warehouse.duckdb. That file had exactly one reader - the
+    dashboard build's own direct chart queries - and it lost that reader
+    in Phase 3 of plans/publishing-and-history.md, when the build became
+    a pure function of committed results. It kept being written for
+    another year of project time with nothing reading it, which is the
+    quiet kind of legacy: no error, no failing test, just a generator
+    step paying for a warehouse nobody opens.
+
+    REQ-PIPE-087 criterion 1 is what finally removed it - all supply data
+    lives in the one PostgreSQL database and none of it in a DuckDB file -
+    and staging now happens where it belongs, per arrival, as QA runs
+    (REQ-PIPE-068). Generating synthetic data is generating synthetic
+    data again."""
+    from generator import generate_runs
+    generate_runs.main()
+    # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
+    # A map regenerated separately is a map that disagrees with the
+    # history the first time somebody regenerates one and not the
+    # other - and it disagrees silently, because both files look
+    # fine on their own.
+    from qa_tools.common import scenario_map
+    scenario_map.write_map()
 
 
 def load_manifest() -> list[dict]:
-    with open(manifest_path()) as f:
-        return json.load(f)
+    """Every arrival, RECOGNISED FROM DISK (REQ-GEN-043).
+
+    Named `load_manifest` still because every caller here treats it as
+    "the list of runs", but it no longer opens the generator's
+    manifest.json - that is bookkeeping, and reading it would file
+    supplies from a declaration rather than from what arrived.
+    """
+    from qa_tools.common import arrivals
+    # A CONTESTED arrival - two files for the dataset - is not pickable:
+    # nothing may choose between its files, so there is no one csv_path
+    # to offer (REQ-PIPE-105 criterion 6; it was REQ-PIPE-059's hold).
+    return [a.as_entry()
+                | {"csv_path": str(a.path_for("birth-registrations"))}
+            for a in arrivals.arrivals_for("civil-registration", "run_")
+            if "birth-registrations" not in a.contested]
 
 
 def manifest_exists() -> bool:
-    return os.path.exists(manifest_path())
+    """Is there anything to pick from? A real question now: with no
+    deliveries on disk there are no arrivals, which is what the picker
+    needs to know."""
+    return bool(load_manifest())
 
 
-def default_reference(manifest: list[dict]) -> tuple[str, str]:
-    """The last Promoted run for this dataset (plans/tooling.md #1's own
-    design: Evidently's reference/baseline defaults to the last run
-    that's actually in the real, permanent qa_results/ history), falling
-    back to the manifest's own first (always-clean-by-construction) entry
-    - the same reference run_pipeline() itself already uses - if nothing
-    has been Promoted yet, or if a previously-Promoted run's own CSV no
-    longer exists locally (RUN_PLAN's size has changed across versions of
-    this repo before; regeneration is deterministic only for run_ids the
-    CURRENT RUN_PLAN still produces)."""
-    promoted = list_run_ids(AGENCY_ID, DATASET_ID)
-    if promoted:
-        candidate = promoted[-1]
-        if os.path.exists(os.path.join(raw_dir(), f"{candidate}.csv")):
-            return candidate, f"{candidate}.csv"
-    first = manifest[0]
-    return first["run_id"], first["file"]
+def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
+              on_step=None, *, keep: bool = True) -> tuple[list[dict], str]:
+    """Runs the real check chain for one existing Synthetic manifest entry.
+    Returns (results, recorded_run_id) - the second is `run_id` itself for
+    a kept run, and a throwaway trial identity when `keep` is False.
 
+    IT USED TO WRITE INTO A THROWAWAY DIRECTORY and hand the caller a
+    path to promote into the committed qa_results/ tree. REQ-PIPE-089
+    removed the tree, and with it the idea that a run can be held
+    somewhere provisional until somebody accepts it: results are recorded
+    as the run completes, so the keep-or-not decision moved to before the
+    chain rather than after the report. See the body for the whole
+    reasoning.
 
-def run_check(run_id: str, run_by: str, reference_run_id: str | None = None) -> tuple[list[dict], str]:
-    """Runs the real check chain for one existing Synthetic manifest entry
-    into a fresh throwaway location - never the real, permanent
-    qa_results/ history directly. Returns (results, tmp_results_dir); the
-    caller decides whether to common.promote() it, matching the same
-    tmp-dir-first pattern qa_tools/bdm/check_file.py's own --commit
-    handling already uses (qa_tools.common.lambda_results_dir).
+    This used to do two extra things, both of which REQ-GEN-043 removed
+    the NEED for rather than the code for, which is worth saying so the
+    absence does not read as an oversight. It backed up and restored
+    raw_dir()'s manifest.json around the call, because run_single()
+    overwrote it with its own synthetic one (a real bug, found live: a
+    manual smoke test corrupted the real data/raw/manifest.json from 176
+    entries down to 1). And it passed the immediately-preceding manifest
+    entry down as previous_run_id/previous_csv, so the row-count-growth
+    check had a previous run to compare against.
 
-    Real bug found live while building this (a manual smoke test actually
-    corrupted the real data/raw/manifest.json from 176 entries down to 1):
-    orchestrate_bdm.run_single() unconditionally OVERWRITES RAW_DIR/
-    manifest.json with its own synthetic 1-or-2-entry manifest - correct
-    and intentional for its real Lambda use case (no pre-existing manifest
-    there at all - see that function's own docstring), but a real
-    collision here, since this CLI's own run picker reads that same path
-    as the real, full generate_runs.py batch manifest. Backs the real
-    manifest up and restores it around the call rather than changing
-    run_single()'s own already-tested Lambda-path contract. Also passes
-    the REAL immediately-preceding manifest entry as previous_run_id/
-    previous_csv while we're already reading the real manifest anyway -
-    real row-count-growth check coverage instead of the silent skip the
-    Lambda MVP path settles for when nothing supplies those."""
+    Neither exists now. run_single() writes no manifest, and the
+    row-count-growth check finds the preceding arrival from the
+    deliveries RECOGNISED on disk - which is the same answer this used
+    to hand it, arrived at without anyone declaring it."""
     manifest = load_manifest()
     idx = next((i for i, e in enumerate(manifest) if e["run_id"] == run_id), None)
     if idx is None:
         raise click.ClickException(
             f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
     entry = manifest[idx]
-    previous_entry = manifest[idx - 1] if idx > 0 else None
 
-    if reference_run_id is None:
-        reference_run_id, reference_csv = default_reference(manifest)
-    else:
-        reference_csv = f"{reference_run_id}.csv"
-    if not os.path.exists(os.path.join(raw_dir(), f"{reference_run_id}.csv")):
+    # NO DEFAULT REFERENCE ANY MORE (REQ-QAC-108 criterion 4,
+    # 2026-09-29). `None` is passed straight through, and the
+    # orchestrator resolves the reference from what was RECORDED - the
+    # last period a supply was really promoted into. default_reference()
+    # picked the last run whose results existed, falling back to the
+    # manifest's first entry, which is the anchor receding into the past
+    # that criterion 4 forbids. An operator naming one explicitly is a
+    # different thing and still honoured.
+    if reference_run_id is not None and not any(
+            e["run_id"] == reference_run_id for e in manifest):
         raise click.ClickException(
-            f"Reference run {reference_run_id!r}'s CSV isn't in {raw_dir()} - "
+            f"Reference run {reference_run_id!r} isn't among the arrivals recognised on disk - "
             f"run generate-synthetic-data first?")
 
-    csv_path = os.path.join(raw_dir(), entry["file"])
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
+    if keep:
+        # A KEPT, UNRECORDED ARRIVAL GOES THROUGH THE PIPELINE'S OWN LIFECYCLE
+        # (REQ-PIPE-086 criterion 9) - staged, filed, overlaid on its period,
+        # checked and gated - never a bare check outside it. A recorded one
+        # never reaches here (common.decide_record refuses it).
+        common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
+        arrival = common.kept_arrival("civil-registration", "run_", run_id)
+        common.record_delivery_of(arrival)
+        build_per_run_warehouses.stage_arrival(arrival)
+        return orchestrate_bdm.run_arrivals([arrival], run_by, on_step=on_step), run_id
+
+    csv_path = entry["csv_path"]
+
+    # KEEP OR TRIAL IS DECIDED BEFORE THE CHAIN RUNS, and it used to be
+    # decided afterwards (REQ-PIPE-089 criterion 8). The old shape wrote
+    # every run's results to a throwaway directory and then asked
+    # "promote?" - so declining meant deleting files nobody had read. A
+    # recorded result is visible the moment its run completes, so there
+    # is no afterwards to ask in: a run the operator does not want kept
+    # runs under a TRIAL identity instead, which records nothing that
+    # survives it (REQ-PIPE-103). Same choice, moved to the only place it
+    # can still be made.
+    # A kept arrival returned above, so this is always a trial - and
+    # run_single refuses anything else (REQ-PIPE-086 criterion 10).
+    recorded_run_id = trial_mod.trial_run_id()
 
     results = _run_single_preserving_manifest(
-        run_id, csv_path, entry["run_date"], entry["dirty_severity"],
-        reference_run_id, reference_csv, run_by=run_by,
-        previous_run_id=previous_entry["run_id"] if previous_entry else None,
-        previous_csv=previous_entry["file"] if previous_entry else None,
+        recorded_run_id, csv_path, asset_time.local_date(entry["received_at"]).isoformat(),
+        reference_run_id, run_by=run_by,
+        on_step=on_step,
     )
-    return results, tmp_dir
+    return results, recorded_run_id
 
 
 def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
-    """Calls orchestrate_bdm.run_single(*args, **kwargs), backing up and
-    restoring raw_dir()'s real manifest.json around the call - see
-    run_check()'s own docstring for the real bug this guards against
-    (run_single() unconditionally overwrites it with its own synthetic
-    1-or-2-entry manifest, correct for its real Lambda use case but a
-    real collision against the full generate_runs.py batch manifest this
-    CLI's own run picker reads from). Local files mode (Phase 2) hits
-    this exact same collision - a real CSV a human downloaded has
-    nothing to do with the batch manifest, but run_single() would still
-    clobber it - so this helper is shared, not just run_check()'s own."""
-    real_manifest_path = manifest_path()
-    real_manifest_backup = None
-    if os.path.exists(real_manifest_path):
-        with open(real_manifest_path) as f:
-            real_manifest_backup = f.read()
-    try:
-        return orchestrate_bdm.run_single(*args, **kwargs)
-    finally:
-        if real_manifest_backup is not None:
-            with open(real_manifest_path, "w") as f:
-                f.write(real_manifest_backup)
+    """Calls orchestrate_bdm.run_single(*args, **kwargs).
+
+    THIS USED TO BACK UP AND RESTORE raw_dir()'s manifest.json around
+    the call, because run_single() overwrote it with its own synthetic
+    one - correct for its Lambda use case, a real collision against the
+    batch manifest this CLI's run picker read from.
+
+    REQ-GEN-043 removed the cause rather than the symptom: run_single()
+    writes no manifest at all now, and the picker recognises arrivals
+    from disk instead of reading one. The wrapper is kept as a single
+    named seam for the two callers that share it, and because deleting
+    it would spread orchestrate_bdm.run_single() across two more call
+    sites for no gain.
+    """
+    return orchestrate_bdm.run_single(*args, **kwargs)
 
 
 def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
-                          run_id: str | None = None, run_date: str | None = None) -> tuple[list[dict], str]:
+                          run_id: str | None = None, run_date: str | None = None,
+                          on_step=None, keep: bool | None = None,
+                          originally: str | None = None, route: str = "file",
+                          storage_times: dict | None = None
+                          ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The Local files QA source mode's real check-running body (plans/
     tooling.md #1 Phase 2) - folds in qa_tools/bdm/check_file.py's own
-    retired logic: copies the reference CSV into raw_dir() under a real
-    run_id (there's no synthetic manifest[0] to fall back on for a real,
+    retired logic: stages the reference CSV under a real run_id
+    (there's no synthetic manifest[0] to fall back on for a real,
     manually-downloaded file - a real reference is required, not
     defaulted), then reuses orchestrate_bdm.run_single(), same entry
     point both the Synthetic flow above and Thread B's Lambda handler
-    call. Returns (results, tmp_results_dir) - same tmp-dir-first Promote
-    pattern as run_check()."""
-    run_date = run_date or datetime.now(timezone.utc).date().isoformat()
-    run_id = run_id or local_run_id_from_path(csv_path)
-    reference_run_id = local_run_id_from_path(reference_csv, prefix="ref")
-    reference_csv_filename = f"{reference_run_id}.csv"
-    copy_into(reference_csv, raw_dir(), reference_csv_filename)
+    call.
 
-    tmp_dir = common.new_tmp_results_dir()
-    patch_write_qa_result_for_lambda(BDM_MODULES, tmp_dir)
+    THE DECISION COMES FIRST (REQ-PIPE-103). Keeping this supply files
+    it as a real delivery received now and gives the run an id from
+    recognition, before any check runs; declining gives a TRIAL, whose
+    id comes from the clock and which leaves nothing behind. Returns
+    `(results, tmp_results_dir, filed)` - the third is what the caller
+    needs to say which of the two it did.
 
-    results = _run_single_preserving_manifest(
-        run_id, csv_path, run_date, None,
-        reference_run_id=reference_run_id, reference_csv=reference_csv_filename, run_by=run_by,
-    )
-    return results, tmp_dir
+    THE REFERENCE IS ALWAYS A TRIAL, whichever way the supply went: it
+    is a known-good file the operator already had, and filing it would
+    record an arrival that never happened.
+    """
+    run_date = run_date or asset_time.now().date().isoformat()
+    # KEEP OR TRIAL FIRST, AND A REFERENCE ONLY FOR A TRIAL (REQ-PIPE-086
+    # criterion 14): a kept supply is measured against the last promoted one.
+    keep = common.decide_keep([csv_path], keep=keep)
+    common.refuse_reference_for_kept(keep, reference_csv, "--reference-file")
+    if not keep:
+        common.require_reference_for_trial(reference_csv, "--reference-file")
+    filed = common.file_or_trial([csv_path], "civil-registration", "run_", keep=keep,
+                                 route=route, originally=originally,
+                                 storage_times=storage_times)
+    if run_id is not None and not filed.delivery_name:
+        filed = dataclasses.replace(filed, run_id=run_id)
+    if filed.delivery_name:
+        # KEPT: AN ARRIVAL LIKE ANY OTHER, processed as the batch would -
+        # staged, filed, overlaid on its period, checked, promoted - with
+        # its drift reference from the recorded history (REQ-PIPE-105;
+        # Keith, 2026-10-02). --reference-file applies to a trial only.
+        found = hand_filing.arrivals_of(filed, "civil-registration", "run_")
+        for arrival in found:
+            for ordinal, name in enumerate(sorted(arrival.files_by_dataset[
+                    build_per_run_warehouses.DATASET_ID]), start=1):
+                build_per_run_warehouses.build_one(
+                    arrival.run_id, str(arrival.path / name),
+                    asset_time.local_date(arrival.received_at).isoformat(),
+                    ordinal=ordinal if len(arrival.files_by_dataset[
+                        build_per_run_warehouses.DATASET_ID]) > 1 else 0,
+                    received_at=arrival.received_at,
+                    delivery_name=arrival.delivery_name)
+        return orchestrate_bdm.run_arrivals(found, run_by, on_step=on_step), filed
+    run_id = filed.run_id
+    csv_path = filed.paths[0]
+    # A KEPT FILE THAT FELL BACK TO A TRIAL (filing refused it) still needs
+    # the trial's reference, which nobody was asked for - so it is asked
+    # for now (#120 D5).
+    reference_csv = common.reference_for_fallback_trial(reference_csv, "--reference-file",
+                                                        "file")
+    reference_run_id = common.reference_run_id()
+
+    # THE REFERENCE IS STAGED TOO (REQ-PIPE-102, 2026-09-27), which is
+    # what lets data/raw/ go. It used to be copied into that directory
+    # so Evidently could find it by name, leaving it the one supply in
+    # this flow that was checked against a file rather than the
+    # warehouse. Child Protection's own local-folder mode already
+    # staged both sides; this is BDM catching up.
+    build_per_run_warehouses.build_one(reference_run_id, reference_csv, run_date)
+
+    try:
+        results = _run_single_preserving_manifest(
+            run_id, csv_path, run_date,
+            reference_run_id=reference_run_id, run_by=run_by,
+            on_step=on_step, received_at=filed.received_at,
+        )
+    finally:
+        common.discard_reference(reference_run_id)
+    return results, filed
 
 
 def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
-                  run_id: str | None = None, run_date: str | None = None, s3_client=None) -> tuple[list[dict], str]:
+                  run_id: str | None = None, run_date: str | None = None, s3_client=None,
+                  on_step=None, keep: bool | None = None, originally: str | None = None
+                  ) -> tuple[list[dict], str, "hand_filing.Filed"]:
     """The S3 QA source mode's real check-running body (plans/tooling.md
     #1 Phase 3) - downloads key/reference_key (real boto3, via
     qa_tools.common.s3_source) into a fresh local staging dir, then
@@ -215,10 +312,22 @@ def run_check_s3(bucket: str, key: str, reference_key: str, run_by: str,
     third parallel check-running code path. Returns (results,
     tmp_results_dir) - same tmp-dir-first Promote pattern as
     run_check_local_file()."""
+    # DECIDED HERE, BEFORE ANY DOWNLOAD, so a missing or unwanted reference is
+    # named by the S3 flag the person typed (REQ-PIPE-086 criterion 14).
+    keep = common.decide_keep([key], keep=keep)
+    common.refuse_reference_for_kept(keep, reference_key, "--s3-reference-key")
+    if not keep:
+        common.require_reference_for_trial(reference_key, "--s3-reference-key")
     staging_dir = tempfile.mkdtemp(prefix="mothman-s3-")
     local_path = s3_source.download_key(bucket, key, staging_dir, s3_client=s3_client)
-    local_reference_path = s3_source.download_key(bucket, reference_key, staging_dir, s3_client=s3_client)
-    return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date)
+    # ONLY A TRIAL'S REFERENCE IS FETCHED (REQ-PIPE-086 criterion 14).
+    local_reference_path = (s3_source.download_key(bucket, reference_key, staging_dir,
+                                                   s3_client=s3_client)
+                            if reference_key is not None else None)
+    return run_check_local_file(local_path, local_reference_path, run_by, run_id=run_id, run_date=run_date,
+                                 on_step=on_step, keep=keep, originally=originally, route="s3",
+                                 storage_times=s3_source.last_modified(bucket, [key],
+                                                                       s3_client=s3_client))
 
 
 _STATUS_STYLE = {"pass": "green", "warn": "yellow", "fail": "red", "error": "bold red"}
@@ -232,8 +341,9 @@ def report_table(results: list[dict], run_id: str) -> Table:
     for r in results:
         style = _STATUS_STYLE.get(r.get("status"), "")
         status = r.get("status", "?")
-        table.add_row(r.get("engine", "?"), r.get("check_id") or r.get("name", "?"),
-                      f"[{style}]{status}[/{style}]" if style else status)
+        cell = f"[{style}]{status}[/{style}]" if style else status
+        table.add_row(r.get("engine", "?"), common.check_label(r),
+                      cell + common.reference_suffix(r))
     n_fail = sum(1 for r in results if r.get("status") in ("fail", "error"))
     n_warn = sum(1 for r in results if r.get("status") == "warn")
     n_pass = sum(1 for r in results if r.get("status") == "pass")
@@ -246,7 +356,15 @@ def has_failures(results: list[dict]) -> bool:
 
 
 def picker_choices(manifest: list[dict]) -> list[str]:
-    return [f'{e["run_id"]}  ({e["run_date"]}, {e["dirty_severity"] or "clean"})' for e in manifest]
+    # The delivery it came from, not an injected severity - the picker
+    # shows what arrived, and severity is generator bookkeeping the CLI
+    # has no business reading (REQ-GEN-043).
+    # MARKED 'recorded' WHERE ITS QA ALREADY IS (REQ-PIPE-086 criterion 6):
+    # picking one runs a trial, said before it starts.
+    recorded = common.recorded_runs(e["run_id"] for e in manifest)
+    return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
+            + ("  - recorded" if e["run_id"] in recorded else "")
+            for e in manifest]
 
 
 def run_id_from_choice(choice: str) -> str:
@@ -258,17 +376,73 @@ _SOURCE_LOCAL_FILE = "Local files - a CSV you've already downloaded"
 _SOURCE_S3 = "S3 - browse the real raw-data bucket"
 
 
-def _offer_promote(results: list[dict], run_id: str, tmp_dir: str, commit_default: bool) -> None:
-    console.print(report_table(results, run_id))
-    if common.confirm("Promote this run into the real, permanent qa_results/ history?",
-                       yes=False, default=commit_default):
-        dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-        console.print(
-            "This only wrote to qa_results/ - commit and push it yourself to publish "
-            "(that's what triggers the real CI rebuild).", style="dim")
+def _report_synthetic(results: list[dict], recorded_run_id: str, keep: bool,
+                       *, interactive: bool) -> None:
+    """Report a Synthetic-mode check, and say what became of it.
+
+    IT USED TO ASK "Promote this run into the real, permanent qa_results/
+    history?" here, with the report already on screen. That question is
+    gone rather than reworded (REQ-PIPE-089 criterion 8): the results were
+    recorded as the run completed, so by the time anything could be asked
+    the answer is already true. The same decision is now taken before the
+    chain runs, which is the only place it can still change anything.
+
+    NOTHING SAYS "commit and push to publish" ANY MORE either, and that
+    absence is the point rather than an omission - publishing was a git
+    push, and it is now REQ-PIPE-092's own step.
+    """
+    console.print(report_table(results, recorded_run_id))
+    if not keep:
+        console.print(f"TRIAL {recorded_run_id} - the real tools ran against the same rows and "
+                       "nothing was recorded.", style="dim")
+    elif interactive:
+        common.report_recorded(recorded_run_id, len(results))
+        common.report_kept_arrival(COLLECTION_ID, "run_", recorded_run_id)
+        # AND IF THIS RUN LEFT ITS SUPPLY WAITING ON A PERSON, OFFER THE
+        # DECISION HERE (REQ-GHUB-082 criterion 17), through the same
+        # implementation the standing queue uses. Before the publish
+        # offer, because promoting a supply changes what a publish would
+        # publish - asking the other way round would republish the state
+        # the operator was about to change.
+        filing_tui.offer_after_run(COLLECTION_ID, recorded_run_id)
+        # AND THEN, ONLY THEN, THE OFFER (REQ-PIPE-092 criterion 14).
+        # After the panel rather than before it: the operator has just
+        # been told what was recorded, which is what they need in order
+        # to answer this.
+        common.offer_to_publish()
     else:
-        console.print("Not promoted - nothing written to the real qa_results/ history.", style="dim")
+        # The scriptable form keeps its one line, for the same reason the
+        # panel it replaces kept its own: a panel is noise in a pipeline
+        # and a blocking keypress would be a hang.
+        console.print(f"Recorded {len(results)} results for {recorded_run_id}", style="green")
+        common.report_kept_arrival(COLLECTION_ID, "run_", recorded_run_id)
+
+
+def _finish_supply(results: list[dict], filed, all_checks: bool = False) -> None:
+    """Report a hand-supplied check, and say what the operator already
+    decided (REQ-PIPE-103 criterion 8).
+
+    NO SECOND QUESTION. The decision was taken before anything ran,
+    because a supply has to be filed BEFORE it can take its identity
+    from recognition - so asking "promote?" afterwards would be
+    offering a choice that was already made, with only half of it
+    still available.
+
+    THAT REASONING NOW GOVERNS EVERY MODE, which is what REQ-PIPE-089
+    criterion 8 changed. This path already asked before the run; the
+    Synthetic path asked after, and could only do so because results
+    were parked in a temp directory until somebody accepted them. With
+    the results recorded as the run completes, this is the only shape
+    left - so the copy-then-commit step this used to end with is gone.
+    """
+    common.finish_kept(results, filed, collection_id="civil-registration", run_id_prefix="run_",
+                       table=report_table, all_checks=all_checks)
+    # A KEPT run that left its supply waiting offers the decision here
+    # (REQ-GHUB-082 criterion 17), as the synthetic route always did -
+    # post-build-review #82 found the hand-filed routes never asking. A
+    # trial filed nothing, so there is nothing of its own to decide.
+    if filed.delivery_name:
+        filing_tui.offer_after_run(COLLECTION_ID, filed.run_id)
 
 
 def run_qa_interactive(commit_default: bool = False) -> None:
@@ -312,10 +486,18 @@ def run_qa_interactive(commit_default: bool = False) -> None:
         return
     run_id = run_id_from_choice(choice)
 
+    # ASKED BEFORE THE CHAIN, not after the report (REQ-PIPE-089
+    # criterion 8) - and before the "Running..." line too, so the
+    # question never appears to interrupt a run already under way.
+    keep = common.decide_record(run_id, keep=True if commit_default else None)
+
+    # plans/tooling.md #13 - this used to print the line below and then
+    # go completely silent for ~13.5s while the real chain ran.
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
                   style="dim")
-    results, tmp_dir = run_check(run_id, run_by)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(run_id) as on_step:
+        results, recorded_run_id = run_check(run_id, run_by, on_step=on_step, keep=keep)
+    _report_synthetic(results, recorded_run_id, keep, interactive=True)
 
 
 def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
@@ -325,20 +507,25 @@ def _run_qa_interactive_local_file(run_by: str, commit_default: bool) -> None:
     run_check_local_file() the flag-invocable --file/--reference-file
     form below also calls."""
     csv_path = common.path_prompt("Path to the CSV you've already downloaded:",
-                                   flag_hint="mothman bdm qa --file <csv> --reference-file <csv>")
+                                   flag_hint="mothman bdm qa --file <csv> [--trial --reference-file <csv>]")
     if csv_path is None:
         return
-    reference_csv = common.path_prompt(
-        "Path to a known-good reference CSV (for distribution-drift comparison):",
-        flag_hint="mothman bdm qa --file <csv> --reference-file <csv>")
-    if reference_csv is None:
-        return
-
-    run_id = local_run_id_from_path(csv_path)
+    # KEEP OR TRIAL FIRST, AND A REFERENCE ONLY FOR A TRIAL (REQ-PIPE-086
+    # criterion 14): a kept supply is measured against the last promoted one.
+    keep = common.decide_keep([csv_path], keep=True if commit_default else None)
+    reference_csv = None
+    if not keep:
+        reference_csv = common.path_prompt(
+            "Path to a known-good reference CSV to compare against:",
+            flag_hint="mothman bdm qa --file <csv> --trial --reference-file <csv>")
+        if reference_csv is None:
+            return
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {csv_path}...",
                   style="dim")
-    results, tmp_dir = run_check_local_file(csv_path, reference_csv, run_by, run_id=run_id)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(os.path.basename(csv_path)) as on_step:
+        results, filed = run_check_local_file(csv_path, reference_csv, run_by,
+                                                        on_step=on_step, keep=keep)
+    _finish_supply(results, filed)
 
 
 def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
@@ -360,15 +547,23 @@ def _run_qa_interactive_s3(run_by: str, commit_default: bool) -> None:
     key = common.select("Pick an object to check:", keys, flag_hint=flag_hint)
     if key is None:
         return
-    reference_key = common.select("Pick a known-good reference object:", keys, flag_hint=flag_hint)
-    if reference_key is None:
-        return
+    # KEEP OR TRIAL FIRST, AND A REFERENCE ONLY FOR A TRIAL (REQ-PIPE-086
+    # criterion 14).
+    keep = common.decide_keep([key], keep=True if commit_default else None)
+    reference_key = None
+    if not keep:
+        reference_key = common.select("Pick a known-good reference object:", keys,
+                                      flag_hint=flag_hint)
+        if reference_key is None:
+            return
 
-    run_id = local_run_id_from_path(key, prefix="s3")
+
     console.print(f"Downloading + running the real dbt-core/Soda Core/datacontract-cli/Evidently chain "
                   f"for s3://{bucket}/{key}...", style="dim")
-    results, tmp_dir = run_check_s3(bucket, key, reference_key, run_by, run_id=run_id)
-    _offer_promote(results, run_id, tmp_dir, commit_default)
+    with common.chain_progress(os.path.basename(key)) as on_step:
+        results, filed = run_check_s3(bucket, key, reference_key, run_by,
+                                                on_step=on_step, keep=keep)
+    _finish_supply(results, filed)
 
 
 @click.group("bdm")
@@ -386,40 +581,45 @@ def generate_synthetic_data_command(yes: bool) -> None:
         console.print("Not regenerated.", style="yellow")
         return
     generate_synthetic_data()
-    console.print(f"Generated -> {raw_dir()}", style="green")
-
-
-def _finish_flag_mode(results: list[dict], run_id: str, tmp_dir: str, commit: bool) -> None:
-    console.print(report_table(results, run_id))
-    if commit:
-        dst = common.promote(tmp_dir, AGENCY_ID, DATASET_ID, run_id)
-        console.print(f"Promoted -> {dst}", style="green")
-    else:
-        console.print("(local-only check - not written to qa_results/ history; re-run with --commit to keep it)",
-                       style="dim")
-    sys.exit(1 if has_failures(results) else 0)
+    console.print(f"Generated -> {generated_output_dir()}", style="green")
 
 
 @bdm_group.command("qa")
 @click.option("--run-id", default=None, help="Synthetic mode: an existing manifest run_id "
                                               "(e.g. run_005_2026-...). Omit to pick interactively.")
 @click.option("--reference-run-id", default=None,
-              help="Synthetic mode: defaults to the last Promoted run, or the manifest's own first (clean) entry.")
+              help="Synthetic mode, a trial's only: a run to compare distribution drift against. "
+                   "There is no default; a kept run is measured against the last promoted supply.")
 @click.option("--file", "file_path", default=None, type=click.Path(exists=True, dir_okay=False),
               help="Local files mode: an already-downloaded CSV to check (instead of --run-id).")
 @click.option("--reference-file", default=None, type=click.Path(exists=True, dir_okay=False),
               help="Local files mode: a known-good CSV to compare distribution drift against. "
-                   "Required together with --file.")
+                   "A trial's only: a kept supply is measured against the last promoted one.")
 @click.option("--s3-key", default=None,
               help="S3 mode: an object key under the dataset's s3Source prefix to check "
                    "(instead of --run-id/--file).")
 @click.option("--s3-reference-key", default=None,
               help="S3 mode: a known-good reference object key to compare distribution drift against. "
-                   "Required together with --s3-key.")
-@click.option("--commit", is_flag=True, help="Write this run into the real, permanent qa_results/ history.")
+                   "A trial's only: a kept supply is measured against the last promoted one.")
+@click.option("--all-checks", is_flag=True,
+              help="List every check in full. By default a kept delivery that became "
+                   "several arrivals shows failing and warning checks in full and passing "
+                   "ones as a count per dataset.")
+@click.option("--commit", is_flag=True,
+              help="Keep it: file the supply as a real delivery received now, and record "
+                   "this run in the dataset's QA history.")
+@click.option("--originally-received", "originally_received", default=None,
+              help="Keeping a supply: when it was ORIGINALLY received - the email's arrival, "
+                   "say - as a time (read on the asset's own clock unless it carries an "
+                   "offset), `not-known`, or `storage` for each S3 object's own time. "
+                   "Recorded beside our receipt; never used to file or judge the supply.")
+@click.option("--trial", is_flag=True,
+              help="Run it as a TRIAL: the same four tools against the same rows, filed "
+                   "nowhere and recorded nowhere. The opposite of --commit, stated so a "
+                   "script never relies on a default it cannot see.")
 def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str | None,
                reference_file: str | None, s3_key: str | None, s3_reference_key: str | None,
-               commit: bool) -> None:
+               commit: bool, originally_received: str | None, trial: bool, all_checks: bool) -> None:
     """Run the real QA check chain against a Birth Registrations run - Synthetic (--run-id),
     Local files (--file/--reference-file), or S3 (--s3-key/--s3-reference-key) source mode."""
     if s3_key is not None:
@@ -427,26 +627,29 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
             raise click.ClickException(
                 "Pass exactly one of --run-id (Synthetic mode), --file (Local files mode), "
                 "or --s3-key (S3 mode).")
-        if s3_reference_key is None:
-            raise click.ClickException(
-                "--s3-key requires --s3-reference-key (a known-good object key to compare against).")
+        common.refuse_reference_for_kept(common.keep_from_flags(commit, trial),
+                                         s3_reference_key, "--s3-reference-key")
         bucket = common.raw_bucket_name()
-        run_by = get_run_by() if commit else "local-check:not-persisted"
-        local_run_id = local_run_id_from_path(s3_key, prefix="s3")
-        results, tmp_dir = run_check_s3(bucket, s3_key, s3_reference_key, run_by, run_id=local_run_id)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        with common.chain_progress(os.path.basename(s3_key)) as on_step:
+            results, filed = run_check_s3(bucket, s3_key, s3_reference_key, run_by,
+                                                    on_step=on_step,
+                                                    keep=common.keep_from_flags(commit, trial),
+                                                    originally=originally_received)
+        _finish_supply(results, filed, all_checks)
+        sys.exit(1 if has_failures(results) else 0)
 
     if file_path is not None:
         if run_id is not None:
             raise click.ClickException("Pass either --run-id (Synthetic mode) or --file (Local files mode), not both.")
-        if reference_file is None:
-            raise click.ClickException("--file requires --reference-file (a known-good CSV to compare against).")
-        run_by = get_run_by() if commit else "local-check:not-persisted"
-        local_run_id = local_run_id_from_path(file_path)
-        results, tmp_dir = run_check_local_file(file_path, reference_file, run_by, run_id=local_run_id)
-        _finish_flag_mode(results, local_run_id, tmp_dir, commit)
-        return
+        run_by = get_run_by() if commit else "trial:not-recorded"
+        with common.chain_progress(os.path.basename(file_path)) as on_step:
+            results, filed = run_check_local_file(file_path, reference_file, run_by,
+                                                            on_step=on_step,
+                                                            keep=common.keep_from_flags(commit, trial),
+                                                            originally=originally_received)
+        _finish_supply(results, filed, all_checks)
+        sys.exit(1 if has_failures(results) else 0)
 
     if run_id is None:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -454,6 +657,10 @@ def qa_command(run_id: str | None, reference_run_id: str | None, file_path: str 
         run_qa_interactive(commit_default=commit)
         return
 
-    run_by = get_run_by() if commit else "local-check:not-persisted"
-    results, tmp_dir = run_check(run_id, run_by, reference_run_id=reference_run_id)
-    _finish_flag_mode(results, run_id, tmp_dir, commit)
+    keep = common.decide_record(run_id, keep=common.keep_from_flags(commit, trial))
+    run_by = get_run_by() if keep else "trial:not-recorded"
+    with common.chain_progress(run_id) as on_step:
+        results, recorded_run_id = run_check(run_id, run_by, reference_run_id=reference_run_id,
+                                              on_step=on_step, keep=keep)
+    _report_synthetic(results, recorded_run_id, keep, interactive=False)
+    sys.exit(1 if has_failures(results) else 0)

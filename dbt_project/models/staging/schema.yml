@@ -87,22 +87,36 @@ version: 2
 # anywhere and was silently invisible to check_lifecycle.validate() -
 # not failing the gate, just never seen by it at all. See
 # plans/qa-pipeline.md's own entry for the full account.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
 tests:
   - name: multiple_birth_sibling
     config:
       meta:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.multiple_birth_sibling_dbt
+        check_id: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.multiple_birth_sibling_dbt
+        name: Multiple-birth sibling match
         category: consistency
         introduced_date: "2026-01-15"
-        description: "Every is_multiple_birth record must have a matching sibling row from the same birth event."
+        description: >
+          Every record flagged as a multiple birth must have a matching sibling in the same supply.
+        failure_indicates: >
+          self-evident
         changelog: []
   - name: recency
     config:
       meta:
-        check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.recency_dbt
+        check_id: data-asset-1.registry-services.civil-registration.birth-registrations.recency_dbt
+        name: Recent births present
         category: timeliness
         introduced_date: "2026-09-15"
-        description: "At least one birth registration should have a date_of_birth within 7 days of this run's own date_registered - a freshness check."
+        description: >
+          Each supply must contain recent records rather than only old ones.
+        failure_indicates: >
+          self-evident
         changelog:
           - date: "2026-09-17T00:00:00Z"
             description: "Rebuilt as a singular test (tests/recency.sql) anchored to this run's own date_registered instead of real wall-clock CURRENT_DATE - the dbt_utils.recency macro had no way to parametrize its 'now', which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch."
@@ -111,33 +125,51 @@ tests:
   - name: escalation_completeness
     config:
       meta:
-        check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.escalation_completeness_dbt
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_dbt
+        reads_tables: [cp_investigations]
+        name: Escalation completeness
         category: completeness
         introduced_date: "2023-01-15"
-        description: "Every escalated notification must have an investigation opened for it."
+        description: >
+          Every notification escalated to an investigation must have that investigation recorded.
+        failure_indicates: >
+          self-evident
         changelog: []
   - name: closed_case_investigation_hygiene
     config:
       meta:
-        check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.closed_case_investigation_hygiene_dbt
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_investigation_hygiene_dbt
+        reads_tables: [cp_clients]
+        name: Closed-case hygiene
         category: consistency
         introduced_date: "2023-01-15"
-        description: "A closed case's investigations must all have an end date - none should still be open."
+        description: >
+          An investigation must not still be open once its client's case has been closed.
+        failure_indicates: >
+          self-evident
         changelog: []
   - name: placement_carer_approval
     config:
       meta:
-        check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.placement_carer_approval_dbt
+        check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.placement_carer_approval_dbt
+        reads_tables: [cp_carers]
+        name: Carer approval compliance
         category: consistency
         introduced_date: "2023-01-15"
-        description: "A placement's carer must be Approved-status at the time of assignment."
+        description: >
+          A placement's carer must hold an approved status.
+        failure_indicates: >
+          self-evident
         changelog: []
 
 models:
   - name: stg_birth_registrations
     description: >
       One row per birth registration, across all loaded runs
-      (run_id/run_date/dirty_severity identify which run a row came from).
+      (run_id/run_date identify which run a row came from). dirty_severity
+      was dropped by REQ-GEN-043: it is generator bookkeeping, and a
+      pipeline reading it is filing from a declaration rather than from
+      what arrived.
     # Model-level tests (2026-09-15, dbt_utils switch - see plans/qa-
     # pipeline.md) - dbt_utils.expression_is_true/recency both operate
     # across the model as a whole (a cross-field comparison; a max()
@@ -146,10 +178,14 @@ models:
     tests:
       - dbt_utils.expression_is_true:
           meta:
-            check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.expression_is_true_dbt
+            check_id: data-asset-1.registry-services.civil-registration.birth-registrations.expression_is_true_dbt
+            name: Registered on or after birth
             category: consistency
             introduced_date: "2026-09-15"
-            description: "A registration date earlier than the birth date indicates a corrupt or misjoined record."
+            description: >
+              A registration must not be dated earlier than the birth it records.
+            failure_indicates: >
+              The record is corrupt, or two different registrations have been joined together into one.
             changelog: []
           expression: "date_registered >= date_of_birth"
           # Replaces tests/date_registered_after_birth.sql. Same rule as
@@ -172,25 +208,34 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.unique_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.unique_dbt
                 category: uniqueness
                 introduced_date: "2026-01-15"
-                description: "BDM's unique registration identifier must not be duplicated."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Every birth registration must carry a registration number."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - matches_regex:
               pattern: '^BDM-[0-9]{9}$'
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registration_number.matches_regex_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.matches_regex_dbt
                 category: conformity
                 introduced_date: "2026-01-15"
-                description: "Catches upstream ID-format changes before they reach consumers as silent garbage."
+                description: >
+                  This value must be in the expected format.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: child_given_names
@@ -202,36 +247,48 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.child_given_names.not_null_dbt
                 category: completeness
                 introduced_date: "2026-09-15"
-                description: "A child's given names must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - matches_regex:
               pattern: '^[A-Za-z][A-Za-z. -]*$'
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_given_names.matches_regex_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.child_given_names.matches_regex_dbt
                 category: conformity
                 introduced_date: "2026-09-15"
-                description: "Given names should look like a name, not garbage/mis-parsed data."
+                description: >
+                  This value must be in the expected format.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: child_family_name
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.child_family_name.not_null_dbt
                 category: completeness
                 introduced_date: "2026-09-15"
-                description: "A child's family name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - matches_regex:
               pattern: '^[A-Za-z][A-Za-z. -]*$'
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.child_family_name.matches_regex_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.child_family_name.matches_regex_dbt
                 category: conformity
                 introduced_date: "2026-09-15"
-                description: "Family names should look like a name, not garbage/mis-parsed data."
+                description: >
+                  This value must be in the expected format.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: sex
@@ -240,10 +297,14 @@ models:
           - accepted_values:
               values: ['M', 'F', 'X']
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.sex.accepted_values_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.sex.accepted_values_dbt
                 category: conformity
                 introduced_date: "2026-01-15"
-                description: "Sex must be one of the closed value set M, F, or X."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the
+                  contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 # accepted_values' own main_sql (see dbt-core's
@@ -277,19 +338,26 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "A birth registration must carry a date of birth."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - dbt_utils.accepted_range:
               min_value: "DATE '1900-01-01'"
               max_value: "CURRENT_DATE"
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_of_birth.accepted_range_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.accepted_range_dbt
+                name: Date of birth in a plausible range
                 category: conformity
                 introduced_date: "2026-09-15"
-                description: "Date of birth must be a plausible real date, not in the future or absurdly old."
+                description: >
+                  This value must be a plausible real date, neither in the future nor absurdly old.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               # Replaces tests/bdm_date_of_birth_range.sql (item 28's
               # decision, plans/qa-pipeline.md). Same rule as the ODCS
@@ -304,18 +372,24 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_suburb.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Suburb of birth must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - accepted_values:
               values: ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington", "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton", "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance", "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook", "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill", "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine", "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_suburb.accepted_values_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_suburb.accepted_values_dbt
                 category: conformity
                 introduced_date: "2026-01-15"
-                description: "Suburb of birth must be one of the real WA suburbs in the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 # Same two-tier fail_calc override as the sex test above -
@@ -331,10 +405,13 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.date_registered.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "A birth registration must carry the date it was registered."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: registering_parent_1_name
@@ -353,10 +430,13 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_1_name.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Parent 1's name is expected on most registrations, tolerated null up to ~5%."
+                description: >
+                  This value is often empty for good reason; the check only fails if that becomes much more common.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               config:
                 warn_if: ">90"
@@ -364,10 +444,13 @@ models:
           - matches_regex:
               pattern: '^[A-Za-z][A-Za-z. -]*$'
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_1_name.matches_regex_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_1_name.matches_regex_dbt
                 category: conformity
                 introduced_date: "2026-01-15"
-                description: "Parent 1's name should look like a name, not garbage/mis-parsed data."
+                description: >
+                  This value must be in the expected format.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: registering_parent_2_name
@@ -380,10 +463,13 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_2_name.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Parent 2's name is optional - single-parent registrations are common - tolerated null up to ~30%."
+                description: >
+                  This value is often empty for good reason; the check only fails if that becomes much more common.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               config:
                 warn_if: ">550"
@@ -391,20 +477,26 @@ models:
           - matches_regex:
               pattern: '^[A-Za-z][A-Za-z. -]*$'
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.registering_parent_2_name.matches_regex_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_2_name.matches_regex_dbt
                 category: conformity
                 introduced_date: "2026-01-15"
-                description: "Parent 2's name should look like a name, not garbage/mis-parsed data."
+                description: >
+                  This value must be in the expected format.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: is_multiple_birth
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.is_multiple_birth.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Whether a birth was part of a multiple birth must always be recorded, never left unset."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: place_of_birth_facility
@@ -412,10 +504,13 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.place_of_birth_facility.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_facility.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Facility should usually be captured - home births are the expected exception."
+                description: >
+                  This value is often empty for good reason; the check only fails if that becomes much more common.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               config:
                 warn_if: ">300"
@@ -433,17 +528,23 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.unique_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.source_system_record_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2026-01-15"
-                description: "BDM's internal record ID must not be duplicated."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.source_system_record_id.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.source_system_record_id.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Every record must carry BDM's internal record ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           # matches_regex on this column retired 2026-09-17 - see
           # dbt_project/schema-retired.yml's own copy of this test for the
@@ -458,10 +559,13 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.registry-services.birth-registrations.stg_birth_registrations.extract_timestamp.not_null_dbt
+                check_id: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.not_null_dbt
                 category: completeness
                 introduced_date: "2026-01-15"
-                description: "Every record must carry the timestamp it was extracted at."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
   - name: stg_cp_clients
@@ -471,17 +575,23 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.unique_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each client must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.cp_client_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every client record must carry a client ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: given_name
@@ -492,20 +602,26 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.given_name.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.given_name.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A client's given name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: family_name
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.family_name.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.family_name.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A client's family name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: date_of_birth
@@ -521,18 +637,25 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A client record must carry a date of birth."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - dbt_utils.accepted_range:
               min_value: "DATE '1900-01-01'"
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.date_of_birth.accepted_range_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.accepted_range_dbt
+                name: Date of birth in a plausible range
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Date of birth must not be implausibly old (no upper bound - see this property's own description)."
+                description: >
+                  This value must be a plausible real date, neither in the future nor absurdly old.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               config:
                 # Carries forward tests/cp_client_date_of_birth_range.
@@ -554,10 +677,14 @@ models:
           - accepted_values:
               values: ['M', 'F', 'X']
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.sex.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.sex.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Sex must be one of the closed value set M, F, or X."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the
+                  contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -568,20 +695,26 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.suburb.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.suburb.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A client's suburb must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: case_opened_date
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.case_opened_date.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_opened_date.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A client record must carry the date its case was opened."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
       - name: postcode
@@ -592,18 +725,24 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A client's postcode must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - accepted_values:
               values: ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056", "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148", "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225", "6230", "6258", "6280", "6285", "6312", "6330", "6401", "6430", "6450", "6530", "6714", "6721", "6725"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-clients.stg_cp_clients.postcode.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Postcode must be one of the closed value set paired with the suburb reference pool."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -617,10 +756,13 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.unique_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Notification IDs must not be duplicated - apply_cp_notifications_presets' near-duplicate injection is the only thing that ever makes this fail."
+                description: >
+                  A few duplicates are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  self-evident
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -652,47 +794,64 @@ models:
               # once you know the cause).
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every notification must carry a notification ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: cp_client_id
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every notification must reference a client."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_clients')
               field: cp_client_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.cp_client_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_dbt
+                reads_tables: [cp_clients]
+                name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "A notification's client_id must reference a real, existing client record."
+                description: >
+                  Every value must match an existing client.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: notification_date
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.notification_date.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_date.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every notification must carry the date it was made."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: source_type
         tests:
           - accepted_values:
               values: ["School", "Police", "Health service", "Family member", "Neighbour", "Anonymous", "Self-report"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.source_type.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.source_type.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Notification source must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -708,10 +867,14 @@ models:
           - accepted_values:
               values: ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse", "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.concern_type.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Concern type must be one of the closed value set - this collection's own traffic-light demo column."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the
+                  contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -722,10 +885,13 @@ models:
           - accepted_values:
               values: ["Low", "Medium", "High", "Critical"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.risk_rating.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.risk_rating.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Risk rating must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -735,29 +901,40 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every notification must be assigned to a case worker."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_case_workers')
               field: worker_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.assigned_worker_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_dbt
+                reads_tables: [cp_case_workers]
+                name: Assigned worker reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "The assigned worker_id must reference a real, existing case worker record."
+                description: >
+                  Every value must match an existing case worker.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: outcome
         tests:
           - accepted_values:
               values: ["No further action", "Referred to family support", "Investigation opened"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-notifications.stg_cp_notifications.outcome.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.outcome.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Notification outcome must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -771,72 +948,100 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.unique_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each investigation must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.investigation_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every investigation record must carry an investigation ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: notification_id
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every investigation must reference the notification that escalated into it."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_notifications')
               field: notification_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.notification_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_dbt
+                reads_tables: [cp_notifications]
+                name: Notification reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "An investigation's notification_id must reference a real, existing notification record."
+                description: >
+                  Every value must match an existing notification.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: cp_client_id
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every investigation must reference a client."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_clients')
               field: cp_client_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.cp_client_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_dbt
+                reads_tables: [cp_clients]
+                name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "An investigation's client_id must reference a real, existing client record."
+                description: >
+                  Every value must match an existing client.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: start_date
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.start_date.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.start_date.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every investigation must carry the date it started."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: substantiated
         tests:
           - accepted_values:
               values: ["Substantiated", "Not substantiated", "Inconclusive"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.substantiated.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.substantiated.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Investigation outcome must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -846,19 +1051,27 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every investigation must have a lead case worker assigned."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_case_workers')
               field: worker_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-investigations.stg_cp_investigations.lead_worker_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_dbt
+                reads_tables: [cp_case_workers]
+                name: Lead worker reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "The lead_worker_id must reference a real, existing case worker record."
+                description: >
+                  Every value must match an existing case worker.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
   - name: stg_cp_placements
@@ -868,45 +1081,62 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.unique_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each placement must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every placement record must carry a placement ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: cp_client_id
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every placement must reference a client."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_clients')
               field: cp_client_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.cp_client_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_dbt
+                reads_tables: [cp_clients]
+                name: Client reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "A placement's client_id must reference a real, existing client record."
+                description: >
+                  Every value must match an existing client.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: placement_type
         tests:
           - accepted_values:
               values: ["Kinship care", "Foster care", "Residential care", "Family group home"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_type.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_type.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Placement type must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -916,37 +1146,51 @@ models:
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every placement must have a carer assigned."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - relationships:
               to: ref('stg_cp_carers')
               field: carer_id
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.carer_id.relationships_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_dbt
+                reads_tables: [cp_carers]
+                name: Carer reference
                 category: consistency
                 introduced_date: "2023-01-15"
-                description: "The carer_id must reference a real, existing carer record."
+                description: >
+                  Every value must match an existing carer.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: placement_start
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_start.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_start.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every placement must carry the date it started."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: placement_suburb
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-placements.stg_cp_placements.placement_suburb.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_suburb.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every placement must carry the suburb it's located in."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
 
   - name: stg_cp_carers
@@ -956,45 +1200,60 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.unique_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each carer must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every carer record must carry a carer ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: given_name
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.given_name.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.given_name.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A carer's given name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: family_name
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.family_name.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.family_name.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A carer's family name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: carer_type
         tests:
           - accepted_values:
               values: ["Kinship", "Foster", "Residential-staff"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.carer_type.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_type.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Carer type must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -1005,10 +1264,13 @@ models:
           - accepted_values:
               values: ["Approved", "Provisional", "Under review"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-carers.stg_cp_carers.approval_status.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-carers.approval_status.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Approval status must be one of the closed value set."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"
@@ -1022,45 +1284,60 @@ models:
         tests:
           - unique:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.unique_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.unique_dbt
                 category: uniqueness
                 introduced_date: "2023-01-15"
-                description: "Each case worker must be uniquely identified."
+                description: >
+                  This value must be unique.
+                failure_indicates: >
+                  self-evident
                 changelog: []
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.worker_id.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "Every case worker record must carry a worker ID."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: given_name
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.given_name.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.given_name.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A case worker's given name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: family_name
         tests:
           - not_null:
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.family_name.not_null_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.family_name.not_null_dbt
                 category: completeness
                 introduced_date: "2023-01-15"
-                description: "A case worker's family name must be recorded."
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
                 changelog: []
       - name: team_region
         tests:
           - accepted_values:
               values: ["Metro North", "Metro South", "Metro East", "South West", "Great Southern", "Goldfields", "Kimberley", "Pilbara", "Wheatbelt", "Midwest-Gascoyne"]
               meta:
-                check_id: data-asset-1.child-protection-family-support.cp-case-workers.stg_cp_case_workers.team_region.accepted_values_dbt
+                check_id: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.team_region.accepted_values_dbt
                 category: conformity
                 introduced_date: "2023-01-15"
-                description: "Team region must be one of the closed value set of WA regions."
+                description: >
+                  A few unrecognised values are tolerated; a sustained rise fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
                 changelog: []
               config:
                 fail_calc: "coalesce(sum(n_records), 0)"

@@ -24,6 +24,5 @@ select
     source_system_record_id,
     extract_timestamp,
     run_id,
-    run_date,
-    dirty_severity
+    run_date
 from source

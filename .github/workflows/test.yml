@@ -72,16 +72,449 @@ name: Run test suite
 # subprocess.run(..., check=False, capture_output=True) and nothing
 # surfaces a failed dbt invocation's own stderr.
 
+# 2026-09-29 (plans/tooling.md #27, Keith's own ask - "go and fix CI"):
+# THIS WAS ONE JOB AND IS NOW THREE, because half of a nineteen-minute run
+# was a bootstrap that almost none of the tests read. Measured on run
+# 36503758018: setup 1m04s, `mothman pipeline bootstrap` 8m55s, the
+# dashboard build 8s, the suite 9m18s.
+#
+# Only 269 of 2,894 tests need what that bootstrap produces - the
+# DEPLOYMENT's own recorded QA history, and the `reports/*.json` built
+# from it. The other 2,625 use a database per xdist worker and never look
+# at either, so they were waiting nine minutes for something they do not
+# read. They now run in `test` while `test-deployment` bootstraps beside
+# them, so the wall clock is the longer of the two rather than the sum.
+#
+# THE SPLIT IS DERIVED, NOT LISTED HERE. A path list in YAML goes stale
+# the moment somebody adds a module, and going stale means a test running
+# in the job that cannot satisfy it - which is the skip-rather-than-fail
+# failure the bootstrap step's own comment below records having hit
+# before. `tests/conftest.py` marks anything requesting the
+# `deployment_history` fixture, five modules that read `reports/` carry
+# the mark themselves, and tests/test_publish.py asserts that no module
+# reading those files is missing it.
+#
+# COVERAGE HAS TO BE COMBINED, which is the cost of splitting and the
+# reason for the third job: each half measures only the lines its own
+# tests reach, so neither could meet `fail_under` alone. `coverage`
+# downloads both, combines them and enforces the threshold - seconds of
+# work, and it keeps the gate measuring exactly what it measured before.
+
+# A glob, not a single named branch (plans/publishing-and-history.md #7,
+# fixed 2026-09-19). This used to read `branches:
+# [claude/new-session-en9qen]` - the working branch of whichever session
+# last edited this file. Every session since got a different branch name,
+# so this workflow fired for NONE of them and CI silently did nothing:
+# `list_workflow_runs` filtered to a later session's branch returned zero
+# runs while the repo as a whole had 335. Nothing was ever red - the
+# failure mode was CI looking fine because it wasn't running at all,
+# exactly the thing CLAUDE.md's own "a passing local pytest is NOT
+# evidence CI is green" rule exists to catch.
+#
+# `claude/**` rather than a PR trigger, deliberately: this project has no
+# trunk at all (there is no `main` - every branch in the repo is a
+# `claude/*` session branch, each continuing from the last), and its own
+# convention is to push straight to a session branch and never open a PR
+# unless asked. A pull_request trigger would have nothing to target.
 on:
   push:
-    branches: [claude/new-session-en9qen]
+    branches: ["claude/**"]
   workflow_dispatch:
+
+# A superseded run tells you nothing - this branch pushes several times a
+# session, and only the newest commit's result matters. Cancels in
+# progress per-branch, so two concurrent sessions never cancel each other.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   test:
+    runs-on: ubuntu-latest
+    # A REAL PostgreSQL, because the suite needs one and deliberately does
+    # not start its own (REQ-TEST-095 criterion 1): a suite that starts its
+    # own server tests a server nobody deploys.
+    #
+    # A SERVICE CONTAINER RATHER THAN THE RUNNER'S PREINSTALLED PostgreSQL,
+    # which also exists on ubuntu-latest and is the wrong choice: its
+    # version is GitHub's to change, so the day they bump the image the
+    # suite would quietly start testing a different engine than the dev
+    # container and production run. Pinning it here is what makes all
+    # three agree.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Real, and deliberately not a secret: it authenticates a
+          # throwaway container that exists for the length of one job and
+          # is reachable only from it. Written inline rather than pulled
+          # from GitHub secrets because a reader who finds a secrets
+          # reference reasonably assumes it guards something.
+          #
+          # It cannot be EMPTY: datacontract-cli treats an empty password
+          # as missing and refuses to run at all - see
+          # qa_tools/common/datacontract_common.py's run_against_warehouse.
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        # The health check is load-bearing, not boilerplate: the container
+        # is reported started before PostgreSQL accepts connections, so
+        # without it the first test races the server and fails
+        # intermittently - which is worse than failing outright, because it
+        # reads as a flake.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # TWO DSNs, AND THEY POINT AT DIFFERENT DATABASES ON PURPOSE - the
+      # same shape CLAUDE.md documents for a dev container.
+      #
+      # MOTHMAN_TEST_DSN is the ADMIN connection the suite uses to create
+      # and drop a database per xdist worker, so it has to name a database
+      # that is never one of those - `postgres`.
+      #
+      # MOTHMAN_SUPPLY_DSN is the warehouse anything outside the suite
+      # uses, which here is the bootstrap and dashboard-build steps below.
+      # Added 2026-09-28 after those steps had been failing on every push
+      # since REQ-PIPE-089 phase 6 introduced them: only the test DSN was
+      # set, so `mothman pipeline bootstrap` died on "MOTHMAN_SUPPLY_DSN is
+      # not set" before a single test ran. Green locally the whole time,
+      # because a developer's shell has both - which is the exact shape
+      # CLAUDE.md's own "local passing is necessary, never sufficient"
+      # rule is about.
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      # WHICH PLACE THIS BUILD CAME FROM (REQ-PIPE-093). There is no
+      # default and deliberately so - a build that guesses is a build that
+      # can be labelled as somewhere it is not. `ci` was added to
+      # contract/environments.yaml on 2026-09-28 rather than reusing
+      # `sandbox`, which describes an agent session's container and is not
+      # what this is. It publishes nothing.
+      MOTHMAN_ENVIRONMENT: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      # The service container creates `postgres` and nothing else, so the
+      # warehouse the DSN above names has to be made. A step rather than a
+      # second POSTGRES_DB, because the image takes only one.
+      # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
+      # log after every step, and the API returns only a job's last 5000
+      # lines - the QA tools' own sessions log tens of thousands of
+      # warnings ("there is no transaction in progress") and expected
+      # errors, which pushed pytest's summary out of reach (2026-10-05).
+      # The tests report their own failures; the server need not.
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
+
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+
+      # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
+      # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
+      # the environment id as anyone marking a database does.
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
+
+      - name: Install Playwright's Chromium
+        run: uv run playwright install --with-deps chromium
+
+      # THE DASHBOARD'S JS, FOR THE ONE PYTHON TEST THAT RUNS IT: the
+      # Python and dashboard status rollups are compared on the same inputs
+      # (tests/test_no_calendar.py, the assertion that would have caught
+      # item 74). Without node_modules it skipped - on every CI run, found
+      # 2026-10-06 once this half named its skips. This half skips nothing.
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install the dashboard's JS dependencies
+        run: npm ci
+
+      # Before the suite, because it is fast and because the class of
+      # bug it catches is invisible to everything after it: PyYAML
+      # silently keeps only the last of a duplicate mapping key, so the
+      # content under the first is gone before any test or schema check
+      # can see it. Runs here as well as in pre-commit, since hooks only
+      # fire for people who ran `pre-commit install`.
+      - name: Lint YAML (duplicate keys)
+        run: uv run yamllint --strict .
+
+      - name: Run the tests that need no deployment
+        # THE FAST HALF - 2,625 of 2,894 tests, each using a database of
+        # its own per xdist worker. No bootstrap, so this starts the
+        # moment setup finishes and reports the common failure in about
+        # three and a half minutes rather than nineteen.
+        #
+        # `-rs` NAMES EVERY SKIP: this half should skip none, and a skip only
+        # the runner produced (3659 passed, 1 skipped, 2026-10-06, none under
+        # the same conditions locally) could not be identified without it.
+        # `--cov` writes a PARTIAL measurement on purpose; the `coverage`
+        # job below combines it with the other half's before anything is
+        # enforced. Enforcing here would fail on every line only the
+        # deployment tests reach.
+        run: |
+          uv run pytest -m "not needs_deployment" -rs \
+            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+            --cov-report= --cov-fail-under=0
+
+      - name: Keep this half's coverage for the combine
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-fast
+          path: .coverage
+          include-hidden-files: true
+          retention-days: 1
+
+  # THE TESTS MARKED on_demand, ON EVERY PUSH (post-build-review #128, Keith
+  # 2026-10-06). They are deselected from a plain `uv run pytest` because
+  # they are slow, which keeps a person's local run quick - and the
+  # bootstrap-equivalence one then failed on every run for two days with
+  # nothing running it. A test nobody runs is not a check. They build their
+  # own small corpus, so this needs PostgreSQL and dbt_utils but not the
+  # deployment bootstrap, and runs beside the longer jobs rather than after.
+  on-demand:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      MOTHMAN_ENVIRONMENT: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
+
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
+
+      - name: Run the tests marked on_demand
+        run: uv run pytest --run-on-demand -m on_demand
+
+  test-deployment:
+    # THE SLOW HALF, and the only job that pays for a bootstrap. It runs
+    # beside `test` rather than after it, so nineteen minutes of serial
+    # work becomes the longer of two parallel halves.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-not-a-secret
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MOTHMAN_TEST_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/postgres
+      MOTHMAN_SUPPLY_DSN: postgresql://postgres:ci-not-a-secret@localhost:5432/supply
+      MOTHMAN_ENVIRONMENT: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      - name: Sync dependencies
+        run: uv sync --dev
+
+      # THE BOOTSTRAP IS CACHED, KEYED ON EVERY INPUT THAT SHAPES IT
+      # (REQ-TEST-117). The list is qa_tools/common/replay_inputs.py's -
+      # the same one a checkpoint replay compares (REQ-TEST-160), so it is
+      # held once rather than copied here. It hashes what git considers
+      # part of the checkout (ignored files excluded), so dbt deps and
+      # .venv cannot move it. cli/pipeline.py and no other cli/ file: the
+      # bootstrap enters through it, and a terminal change must not cost
+      # a full bootstrap. EXACT KEY ONLY - no restore-keys, so a dump made
+      # from different inputs is never used (criterion 3): a new check
+      # can turn a supply red and change every filing after it.
+      - name: Key the bootstrap cache
+        id: key
+        run: echo "key=$(uv run mothman pipeline cache-key)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the bootstrapped database, if these inputs made one
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ steps.key.outputs.key }}
+          path: |
+            ci-cache
+            data/deliveries
+            data/receipts
+            data/generator_bookkeeping.json
+            data/scenario_placements.json
+
+      # AND QUIETENS THE SERVER'S OWN LOG. GitHub prints the container's
+      # log after every step, and the API returns only a job's last 5000
+      # lines - the QA tools' own sessions log tens of thousands of
+      # warnings ("there is no transaction in progress") and expected
+      # errors, which pushed pytest's summary out of reach (2026-10-05).
+      # The tests report their own failures; the server need not.
+      - name: Create the warehouse database
+        run: |
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c 'CREATE DATABASE supply'
+          PGPASSWORD=ci-not-a-secret psql -h localhost -U postgres \
+            -c "ALTER SYSTEM SET log_min_messages = 'fatal'" \
+            -c "ALTER SYSTEM SET log_min_error_statement = 'panic'" \
+            -c 'SELECT pg_reload_conf()'
+
+      # A HIT RESTORES THE DUMP, identity row and all (it is a qa.identity
+      # row since qa schema 31), so the marking below is a no-op after it.
+      - name: Restore the cached database
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          PGPASSWORD=ci-not-a-secret pg_restore -h localhost -U postgres \
+            --dbname supply --no-owner --exit-on-error ci-cache/supply.dump
+
+      # CRITERION 4: plainly, and with the key, whichever it was.
+      - name: Say whether the database was restored or rebuilt
+        run: |
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+            echo "Bootstrap RESTORED from cache key ${{ steps.key.outputs.key }}"
+          else
+            echo "Bootstrap REBUILT - no cache for key ${{ steps.key.outputs.key }}"
+          fi
+
+      - name: Install dbt_utils
+        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+
+      # EVERY CONNECTION CHECKS THE DATABASE'S RECORDED IDENTITY and refuses
+      # one with none (REQ-PIPE-107), so CI marks its own as `ci`, typing
+      # the environment id as anyone marking a database does.
+      - name: Mark the warehouse database as CI's
+        run: uv run mothman env mark --confirm ci
+
+      - name: Install Playwright's Chromium
+        run: uv run playwright install --with-deps chromium
+
+      # reports/*.json is gitignored, so a freshly-cloned runner has
+      # none - and ten tests across three files guard on it and call
+      # pytest.skip when it is absent. They were therefore SILENTLY
+      # SKIPPING here, including the whole data-layer coverage for
+      # REQ-QAC-037's cross-table checks, while passing locally where
+      # a developer had built. Worse than absent coverage: it reports
+      # green and nobody knows what it proved. Verified by reproducing
+      # the runner's condition locally - move reports/ aside, run those
+      # files, watch ten tests skip.
+      #
+      # THE SUITE NEEDS QA HISTORY, AND SINCE REQ-PIPE-089 THAT MEANS A
+      # BOOTSTRAP. The results used to be a committed tree, so this step
+      # could rebuild the dashboard from whatever the checkout carried.
+      # They are a table now, and a runner's database starts empty - so
+      # something has to generate the synthetic supplies and run the
+      # real checks over them before anything can be built from them.
+      #
+      # THIS IS A TEST STEP, WHICH IS WHY IT MAY TOUCH data/. The rule
+      # it looks like it breaks - a BUILD may read recorded QA results,
+      # never actual data - is about the publisher, and the publisher no
+      # longer runs here at all (REQ-PIPE-092). A test suite has always
+      # been allowed to generate its own synthetic supplies; that is
+      # what the fixtures do.
+      - name: Generate the QA history the suite reads
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: uv run mothman pipeline bootstrap
+
+      # ON A MISS, KEEP WHAT WAS JUST MADE for the next run with the same
+      # inputs - in GitHub's cache, never the repository (criterion 5).
+      - name: Dump the bootstrapped database
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ci-cache
+          PGPASSWORD=ci-not-a-secret pg_dump -h localhost -U postgres \
+            --format custom --no-owner --file ci-cache/supply.dump supply
+
+      - name: Save the bootstrapped database
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.key.outputs.key }}
+          path: |
+            ci-cache
+            data/deliveries
+            data/receipts
+            data/generator_bookkeeping.json
+            data/scenario_placements.json
+
+      - name: Build the dashboard data the suite reads
+        run: |
+          uv run mothman dashboard rebuild-results
+          uv run mothman dashboard build-data
+
+      - name: Run the tests that need a deployment
+        run: |
+          uv run pytest -m needs_deployment -rs \
+            --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard \
+            --cov-report= --cov-fail-under=0
+
+      - name: Keep this half's coverage for the combine
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-deployment
+          path: .coverage
+          include-hidden-files: true
+          retention-days: 1
+
+  coverage:
+    # THE GATE THE SPLIT WOULD OTHERWISE HAVE BROKEN. Each half measures
+    # only the lines its own tests reach, so `fail_under` has to be
+    # enforced on the two combined - anywhere else and it would either
+    # fail on every push or stop meaning anything.
+    needs: [test, test-deployment]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -93,14 +526,23 @@ jobs:
       - name: Sync dependencies
         run: uv sync --dev
 
-      - name: Install dbt_utils
-        run: uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
+      - name: Collect both halves
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage-parts
 
-      - name: Install Playwright's Chromium
-        run: uv run playwright install --with-deps chromium
-
-      - name: Run test suite
-        run: uv run pytest --cov=qa_tools --cov=pipeline --cov=generator --cov=dashboard --cov-report=term-missing
+      - name: Combine and enforce the threshold
+        # `coverage combine` consumes the files it is given, so they are
+        # named apart first - two files both called `.coverage` in one
+        # directory is one file.
+        run: |
+          find coverage-parts -name .coverage -print0 \
+            | while IFS= read -r -d "" f; do
+                mv "$f" ".coverage.$(basename "$(dirname "$f")")"
+              done
+          uv run coverage combine
+          uv run coverage report --show-missing
 
   js-tests:
     runs-on: ubuntu-latest

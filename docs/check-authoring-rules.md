@@ -1,0 +1,515 @@
+# Check authoring rules
+
+How to write the hand-authored prose every QA check carries: the three
+fields a reader meets - `description`, `failure_indicates` and the
+heading, `name` - plus `technical_note`, which is for contributors and
+is never published. These
+are the fields a data engineer actually reads in the dashboard's check
+drawer, so they are the only part of a check definition written for
+someone who does not know dbt, Soda, datacontract-cli or Evidently.
+
+**This file is the standing standard.** It applies to every check
+authored from here on, across all four tools and every dataset - not
+just to the checks `REQ-QAC-024` rewrote. Read it before adding a check
+or editing any of the three fields.
+
+> **These rules are not changed without Keith's explicit approval.**
+> Standing instruction, 2026-09-20, and it covers the wording, not just
+> the substance: propose the exact replacement text, get a yes, then
+> edit. A rule agreed in conversation is not yet a rule in this file.
+> Adding, removing, renumbering or reinterpreting one is the same act.
+
+---
+
+## The rules
+
+Hold a draft against this list. Each rule is expanded further down,
+under the same grouping, carrying the draft it replaced and why that
+draft was rejected - this list is WHAT to do, those sections are why.
+The numbers are stable, so a review can say "rule 9" rather than
+quoting it.
+
+**`description` - what the check verifies**
+
+1. State what the check verifies, and nothing else. If a clause explains
+   what a failure MEANS, that clause belongs in `failure_indicates`.
+   The one exception is a check whose type already says what it
+   verifies - see rule 4.
+2. Name no agency. "Every registration identifier must be unique", not
+   "BDM's unique registration identifier".
+3. Write no numbers at all - not values, not bands, not thresholds.
+   "one of the values the contract allows", never "M, F, or X";
+   "inside the expected band for this table", never "[300, 900]";
+   "a sustained rise fails", never "a rise past 3% fails". All three
+   already exist structurally in the check.
+4. Where the check's TYPE already states the rule - an allowed-values
+   check, a not-null check - never say the purpose AND the tolerance.
+   Say whichever tells a reader more. Where the check tolerates some,
+   that is always the tolerance, because the tolerance is what differs
+   between the siblings beside it: "A few empty values are tolerated;
+   a sustained rise fails". Where it tolerates none, the two are the
+   same fact stated twice, so pick the plainer sentence - and that is
+   not the same answer every time. "This value must never be empty"
+   beats "A single empty value fails"; "A single unrecognised value
+   fails" beats restating what an allowed-values check is.
+
+**`failure_indicates` - what a failure means upstream**
+
+5. Author one only where the upstream cause is genuinely known.
+   Otherwise write exactly `self-evident`. Expect roughly half of all
+   checks to land there - it is the common case, not a cop-out.
+6. Say what a failure indicates, never the description rephrased. If
+   what you have written is a rephrasing, the answer is `self-evident`.
+7. Say nothing about what to DO about it. Remediation belongs to the
+   ticket.
+
+**`technical_note` - contributor-facing, never published**
+
+8. Use it only for cross-references between checks, and for why a check
+   behaves as it does by construction.
+9. Never for generator or synthetic-data facts; never for a note that
+   really describes a GAP (fix the gap); never for dated definition
+   changes (those are `changelog`).
+
+**All three fields**
+
+10. Name no tool, macro or statistical method. No `accepted_values`, no
+    `invalid_percent`, no "two-sample K-S test".
+11. Cross-reference nothing a reader cannot follow - no file paths, no
+    check ids, no "see the rowCount rule".
+12. Never name the column the check is on, in any of the three fields.
+    The drawer's breadcrumb ends in that column name directly above
+    what you are writing, so repeating it spends words on something
+    already on screen. Naming a DIFFERENT column or table is allowed
+    and is sometimes the only way to state the rule - "on or after
+    `date_of_birth`" on a check that sits on `date_registered` - and
+    that is the case this rule permits.
+13. Assume no run, no cadence and no delivery shape. "the previous
+    supply", never "this run" or "a day's registrations". Say **supply**,
+    never "extract" or "file" - standardised 2026-09-20. The one
+    exception is the real column `extract_timestamp`, where "extract" is
+    its name rather than a word for a delivery (rule 12). The other
+    exception is a file check, whose subject is the file as delivered;
+    there "file" is the accurate word.
+14. Drop measured results; keep the rule they justify. "tolerated null
+    up to ~5%" stays, "(real observed range 0.9-3.3%)" goes.
+15. Identical wording across tools is allowed, never required. Check
+    what the sibling actually does before copying its text - the same
+    rule is often three different questions.
+
+**Mechanics**
+
+16. Use `>` block scalars. Plain English carries apostrophes, colons and
+    hashes that break a plain YAML scalar.
+17. Spell the sentinel exactly `self-evident`. Near-misses are rejected
+    by the lifecycle gate, because any other value renders verbatim on
+    the published page.
+18. Editing any of the three changes nothing else: no config-hash
+    change, no changelog entry, no audit trail.
+
+**`name` - the heading, where the default is not good enough**
+
+19. A check's `name` is its heading, and the same real-world check must
+    read identically across tools. Keep it to a few words, no verb
+    needed: "Carer reference", "Registered on or after birth". Rules 2,
+    3, 10, 11 and 13 apply to it exactly as they do to the other three
+    fields - no agency, no figures, no tool or macro, no delivery
+    mechanics. Where a check already has a sibling with a `name`, reuse
+    that sibling's wording rather than writing a second one.
+
+---
+
+**Where the rules came from.** They were settled with Keith on
+2026-09-20 over 25 real checks, reviewed three at a time. Every rule
+below came from him rejecting a specific draft, which is why each one
+carries the draft it replaced - the rejected wording is usually the
+clearest statement of what the rule is actually for. Nothing here was
+drafted up front.
+
+**What is the source of truth for what, so this file and the code
+cannot quietly disagree:**
+
+- `qa_tools/common/check_lifecycle.py`'s `CheckMetadata` defines the
+  fields themselves - names, types, which are optional, and which sit
+  outside the config hash. If this file and that dataclass ever
+  disagree about the mechanics, the dataclass wins.
+- This file carries the authoring standard, which no code can express:
+  what good prose looks like, and what has already been rejected.
+- `requirements.yaml`'s `REQ-QAC-024` carries the decisions about that
+  one migration pass - its measured counts, its dependency on
+  `REQ-QAC-023`, the shape of the work. It does not restate the rules
+  below, deliberately, so there is only ever one copy of each.
+
+**Nothing below is CI-enforced, and that is a known weakness.** The
+lifecycle gate checks that `failure_indicates` is present (a real value
+or the `self-evident` sentinel) and nothing more. It cannot tell whether
+a description names an agency or lists allowed values. The bar is
+"sounds right to a non-technical colleague", the check's own maintainer
+authors it, and there is no review step - Keith's explicit call, with
+no reading-age target, no length cap and no external style guideline.
+
+**These fields are published on a public site.** Also Keith's explicit,
+informed decision, made with that consequence named. There is no limit
+on what a failure's consequence may say. If this is ever pointed at real
+production data rather than synthetic, that is a decision to revisit
+deliberately, not an unexamined default.
+
+---
+
+## The three fields
+
+| Field | Who reads it | Required |
+|---|---|---|
+| `description` | Anyone looking at the check in the dashboard | Yes |
+| `failure_indicates` | Same reader, when the check has failed | Yes - a real value, or the literal `self-evident` |
+| `technical_note` | A contributor reading the check definition. **Never published.** | No, and expect it to stay near-empty |
+
+`description` answers **what does this check verify**.
+`failure_indicates` answers **what has most likely gone wrong upstream
+if it failed**. They are separate questions and a good description
+answers only the first.
+
+`technical_note` is contributor-facing and is deliberately not embedded
+into the built page. There are tests asserting it never reaches the
+dashboard. Do not publish it.
+
+---
+
+## Rules for `description`
+
+### State what the check verifies, and only that
+
+Many descriptions written before this standard welded the failure
+meaning on and never said what the check does at all. The worked
+example: *"A registration date earlier than the birth date indicates a
+corrupt or misjoined record"* never says the dates have to be in order.
+Split it - the ordering rule is the description, the corrupt-record
+reading is `failure_indicates`.
+
+### No agency names
+
+*"BDM's unique registration identifier"* became *"Every registration
+identifier must be unique"*. The reader already knows whose data they
+are looking at from where they are standing in the dashboard, and a
+hard-coded agency name goes stale the moment a check is reused.
+
+### No enumerated value lists
+
+*"Sex must be one of the closed value set M, F, or X"* became *"one of
+the values the contract allows"*. The values already exist structurally
+in the check definition, and often on the column too, so prose is a
+third copy - and the only one of the three that cannot be filtered,
+counted or validated.
+
+This is the rule that prompted `plans/running-thoughts.md` #16: a
+histogram of real arrived value counts answers "which values" far
+better than a sentence restating the contract, because it shows a value
+that is technically allowed but has collapsed to almost nothing.
+
+**A numeric band is a value list too** (Keith, 2026-09-20, asked
+directly). Each table's row-count rule carries a real pair -
+`[300, 900]`, `[600, 1600]`, `[80, 350]` - and the same reasoning
+applies: the band is already structural in the check, so prose would be
+a third copy that cannot be filtered or counted. Write "inside the
+expected band for this table".
+
+The argument the other way was put and lost: unlike a value list, a
+band is not visible to a reader anywhere else on the page today. That
+is a gap in what the dashboard shows, not a reason to write the number
+into prose - the same answer rule 3 already gives for values, where
+`plans/running-thoughts.md` #16 is the real fix.
+
+### For an invalid-values check, state the tolerance, not the purpose
+
+*"Must be one of the allowed values"* is what that check type **is** -
+saying so tells a reader nothing that distinguishes this instance from
+any other. What actually differs between instances is the tolerance: one
+tolerates none, another tolerates a few and only fails on a sustained
+rise, a third scopes itself to the most recent supplies only.
+
+**Instead of, not as well as** (Keith, 2026-09-20). The first draft of
+this rule was read as "purpose, then tolerance", which produced *"Every
+concern type must be one of the values the contract allows. None are
+tolerated."* - rejected on both halves. The opening clause is the
+restatement this rule exists to prevent, and *"None are tolerated"*
+never says none of WHAT, so it reads as plausibly being about nulls.
+The tolerance is the whole description:
+
+> A single unrecognised concern type fails.
+> A few unrecognised concern types are tolerated; a sustained rise fails.
+
+**Where the check tolerates none, pick the plainer sentence** (Keith,
+2026-09-20). At zero tolerance *"this must never happen"* and *"a single
+one fails"* are the same fact, so there is no purpose-versus-tolerance
+tension to resolve - only a readability choice, and it does not go the
+same way for every check type. An allowed-values check's heading already
+reads "Invalid values", so restating the purpose adds nothing and the
+tolerance form wins. A not-null check's heading reads "Null rate", which
+is jargon a data engineer may not parse at all, so *"This value must
+never be empty"* tells them something the tolerance form leaves out:
+empty OF WHAT.
+
+That second half has a shelf life worth knowing about -
+`plans/running-thoughts.md` #19 records that the drawer heading is
+jargon and is due to be fixed. If it stops saying "Null rate", revisit
+this.
+
+**Qualitatively, with no figure** (same call). *"a sustained rise past
+3% fails"* becomes *"a sustained rise fails"*, for the reason rule 3
+already gives for values and bands: the threshold is structural in the
+check's own `warn:`/`fail:`, so prose is a third copy. What survives is
+the distinction that actually matters to a reader - whether the check
+tolerates none or some - which no number was carrying anyway.
+
+Where two instances tolerate some and differ only in how much, the
+honest differentiator is usually not the figure but the SCOPE: one runs
+against everything, the other against the most recent supplies only.
+Say that.
+
+That is also why shared wording is dangerous here specifically - see
+"Shared wording is permission, not obligation" below.
+
+---
+
+## Rules for `failure_indicates`
+
+### "Most likely" is not a licence to guess
+
+Author a real value only where the upstream cause is genuinely known.
+Where the honest answer is a plausible-sounding story you constructed to
+fill the field, the value is the literal sentinel:
+
+```yaml
+failure_indicates: self-evident
+```
+
+Two of the first three drafts reviewed were rejected on exactly this,
+and both became `self-evident`. Roughly half of the 25 checks reviewed
+did. **Expect the sentinel to be the common case, not the exception** -
+reaching for it is the correct instinct, not a failure to try hard
+enough.
+
+**What the sentinel does to the page:** nothing shows. The drawer omits
+the "What a failure means" heading entirely, exactly as it does for a
+check that has no value at all, so that heading only ever appears with
+something real underneath it. The authored string does travel through
+to the built page data - it is resolved in the template rather than at
+the builders (Keith, 2026-09-20) - so it is visible in page source, and
+that is fine: it is an authoring marker, not contributor prose. Unlike
+`technical_note`, it is not something a viewer must not see.
+
+Write it as a plain scalar. A `>` block scalar folds a trailing newline
+onto it, which the template trims for exactly this reason, but a plain
+scalar is what the rest of the tooling expects.
+
+**Spell it exactly.** `self evident`, `Self_Evident` and `selfevident`
+are all rejected by the lifecycle gate rather than quietly accepted.
+They have to be: any non-empty value satisfies the "say something" rule,
+so a near-miss would pass the gate and then render verbatim under a
+heading on the public page - which is the one thing the sentinel exists
+to prevent.
+
+### Say what a failure indicates, not what the check verifies in other words
+
+If the sentence you have written is the description rephrased, the
+answer is `self-evident`.
+
+### Say nothing about what to do about it
+
+Remediation belongs to the ticket, not to the check definition. A ticket
+is a live thing with an owner and a state; a check definition is a
+standing fact. The two rot at different rates, and a check definition
+that carries a remediation step is wrong the first time the process
+changes.
+
+---
+
+## Rules for `technical_note`
+
+`technical_note` is kept, narrowed, and may go entirely unused in a
+given pass. It holds standing facts a contributor needs and a viewer
+must not see: cross-references between checks, and notes explaining why
+a check behaves as it does by construction.
+
+**It must not hold synthetic-data or generator facts.** Those are
+meaningless the moment this is pointed at real data.
+
+**It must not hold a note that really describes a GAP.** Fix the gap
+instead. The worked example: a Soda completeness check on
+`date_of_birth` carried a clause explaining that a silently renamed
+column would surface here as 100% missing rather than as a schema
+failure. That is not a standing fact about the check - it is a symptom
+of nothing checking the column set at all. The clause was dropped and
+the gap became `plans/running-thoughts.md` #17 instead.
+
+**It must not hold dated definition changes.** Those belong in the
+check's own `changelog`. The boundary is load-bearing and was tested
+against the real text before the field was kept: a changelog entry
+carries a date, an author and a breaking flag; a standing fact has none
+of those. Forcing one into the changelog means inventing a date and an
+author for something that never happened, which corrupts the one field
+whose whole job is who changed what, when.
+
+When an existing description contains dated definition history, move it
+into the changelog - not into `technical_note`.
+
+---
+
+## Rules that apply to all three fields
+
+### Name no tool, macro or statistical method
+
+No `accepted_values`, no `dbt_utils.expression_is_true`, no
+`invalid_percent`, no "two-sample K-S test". The reader does not know
+which tool ran the check and should not need to.
+
+### Cross-reference nothing a reader cannot follow
+
+No "see the rowCount rule", no file paths, no check ids. A cross-
+reference between checks is the one thing `technical_note` is legitimately
+for, because that field is never published.
+
+### Never name the column the check is on
+
+Keith's call, 2026-09-20: "we're already looking at the column name".
+Verified against the real template rather than assumed - the drawer's
+eyebrow renders `${ag.name} / ${col.name} / ${ds.name} / ${column.name}`
+directly above the title and prose, so a reader of a check on `sex`
+has "Registry Services / Births / Birth Registrations / sex" on screen
+while they read it. *"A single unrecognised concern type fails"* becomes
+*"A single unrecognised value fails"*.
+
+**Naming a different column or table is the case this rule permits.**
+Where the rule genuinely involves another column, there is no way to
+state it without the name: *"on or after `date_of_birth`"* on a check
+that sits on `date_registered`. That is real - the `extract_timestamp`
+ordering checks cannot be written without referring to
+`date_registered` - and it is why this rule is about the check's OWN
+column rather than about column names generally.
+
+A real column name is otherwise clearer to a data engineer than a
+paraphrase, because it is the name they see on the data itself.
+
+### Never leak run, cadence or delivery mechanics
+
+*"within 7 days of this run's own `date_registered`"* assumes a run
+concept that will not exist in production. Neither will *"a day's
+registrations"* - that assumes a cadence this data asset does not
+guarantee. Compare against **"the previous supply"** instead, which is
+true regardless of how often data arrives or what triggered the check.
+
+**The word is "supply".** Standardised 2026-09-20 on Keith's own call -
+"standardised on supply now rather than using extract anywhere". Before
+that, check prose used "extract", "file" and "supply" interchangeably
+for the same thing, which is three names for one concept in a body of
+text whose whole job is to be read by someone learning the system.
+"Supply" is also what the rest of the dashboard already says.
+
+The one real exception is `extract_timestamp`, a genuine column on
+Birth Registrations. Five checks sit on it, and there "extract" is the
+column's name, not a word for a delivery - rule 12 governs, and the
+name stays as it is. The distinction is worth making rather than
+find-replacing: of the eleven checks whose prose said "extract", five
+were naming that column and six were naming a delivery.
+
+### Drop measured results; keep the rule they justify
+
+A description states the rule. It does not carry the measurement that
+was used to set the rule. *"tolerated null up to ~5%"* stays;
+*"(real observed range: 0.9-3.3%)"* goes.
+
+Keith's call, 2026-09-20, taken against three real alternatives that
+would each have kept the number somewhere - `evidence:` on the
+requirement that owns the check battery, `technical_note`, and a new
+requirement invented to hold it. The reasoning that beat all three:
+observed ranges are recomputable from committed
+`dataset_stats.json` whenever anyone actually wants them, so writing
+them into prose buys nothing that cannot be got back, while costing a
+sentence that goes stale silently the moment the data moves.
+
+The same applies to a note saying how a check behaves on this project's
+own synthetic runs - *"Passes 0/0 on every clean run"* - which is both
+a measured result and generator prose, and fails this rule twice over.
+
+### Shared wording is permission, not obligation
+
+Where two tools genuinely check the same thing, their wording may be
+identical - there is no requirement to manufacture a difference. But
+per-engine wording exists precisely because the checks sometimes differ,
+and identical text can paper over a real difference.
+
+The worked case, and it is worth reading closely because the first
+version of it was wrong: the real split across the `sex` family is zero
+tolerance (datacontract's `mustBe: 0`), some tolerance (dbt **and**
+Soda, which legitimately share a sentence), and some tolerance scoped to
+the most recent supplies only. dbt's `accepted_values` looks pass/fail
+and is not - every one in this repo carries a real `error_if` row
+threshold. Check the config before deciding which case a check is in.
+
+So splitting wording **apart** is as much part of authoring as reusing
+it. Check what the check actually does before copying its sibling's
+text.
+
+---
+
+## Naming a check
+
+Most checks need no `name` at all - the heading falls back to the label
+each tool's own runner writes (`Invalid values`, `Null rate`), which is
+already plain. Author one only where that fallback would show something
+that only makes sense to someone who knows the tool that produced it: a
+raw macro (`dbt:escalation_completeness`), or a tool's own generated
+sentence (*"values in (carer_id) must exist in cp_carers (carer_id)"*).
+
+**The heading is not the identity.** It was once, which is why headings
+used to carry the tool and macro - they had to stay unique within a
+column. The URL keys on the `check_id`'s final segment now, so a heading
+can be reworded freely and a bookmark still resolves.
+
+**Say it the same way across tools.** The same real-world check is
+usually implemented three times, and three headings for one rule reads
+as three rules. The 13 names authored on 2026-09-20 each reused the
+wording their datacontract sibling already carried, for that reason.
+
+---
+
+## Mechanics
+
+### Use block scalars
+
+Plain English carries apostrophes, colons and hashes that terse
+technical text does not, and most of these fields are hand-edited into
+YAML. Two real breakages happened in a single morning just writing
+`REQ-QAC-024` itself: a continuation line beginning with a `#` parsed as
+a comment, and a `: ` inside a plain scalar split the key.
+
+```yaml
+attributes:
+  description: >
+    Every registration identifier must be unique.
+  failure_indicates: >
+    The same registration has been supplied twice, or two registrations
+    were assigned the same identifier at source.
+```
+
+The `check-yaml` pre-commit hook catches YAML that no longer parses. It
+does **not** catch a mangled-but-still-valid string, which is the more
+dangerous outcome and has bitten this project before.
+
+### Editing wording never changes a check
+
+None of the three fields is part of a check's `config_hash`. Editing any
+of them with no change to the check's actual config does not report the
+check as changed and does not require a changelog entry - the same
+treatment `name` and `description` already had.
+
+There is deliberately **no audit trail** when wording changes, however
+material: out of the config hash, out of the changelog. Keith's explicit
+call. The committed `dashboard/snapshots/*.html.gz` files become the de
+facto record of what wording was live when.
+
+One real trap, worth knowing before adding any field of this kind:
+Evidently's parser excludes config-hash fields by an explicit name list
+rather than by excluding the whole metadata block the way dbt's and
+Soda's do. A new field that is not added to that list changes every
+Evidently check's hash.

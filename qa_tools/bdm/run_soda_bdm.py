@@ -1,7 +1,7 @@
 """
-Runs REAL Soda Core (soda-core-duckdb) against this project's actual
+Runs REAL Soda Core (soda-core-postgres) against this project's actual
 contract/bdm-birth-registrations-soda-checks.yml, via Soda's own Python
-Scan API (add_duckdb_connection + add_sodacl_yaml_file) - not a
+Scan API (add_configuration_yaml_str + add_sodacl_yaml_file) - not a
 reimplementation, this hands the real SodaCL file to the real soda-core
 engine and reads back its own scan results.
 
@@ -34,20 +34,23 @@ rows.
 from __future__ import annotations
 import os
 
-import duckdb
 
+from . import bdm_common
+from qa_tools.common import supply_db
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
+    execute_scan,
+    not_evaluated_record,
+    unreported_checks,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
-DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 
 # "failed rows" checks (extract_timestamp ordering, the multiple-birth
@@ -109,107 +112,137 @@ _CUSTOM_CHECK_DIMENSION = {
 def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
-    db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
-    conn = duckdb.connect(db_path, read_only=True)
-    # dbt's source config puts the loaded table in a schema literally named
-    # "raw" (see build_per_run_warehouses.py) - Soda's checks file refers to
-    # the bare table name, so it needs "raw" on the search path to resolve.
-    conn.execute("SET search_path = 'raw'")
-    n_total = conn.execute("SELECT COUNT(*) FROM birth_registrations").fetchone()[0]
+    # READ-ONLY, and it now means what it says rather than protecting
+    # other workers: the retired engine let one writer lock out every
+    # reader, so this flag was load-bearing for the fan-out. PostgreSQL
+    # has no such contention, so it is simply a reader that cannot write
+    # what it is measuring (REQ-PIPE-087).
+    conn = supply_db.connect(read_only=True)
+    # CLOSED IN A `finally` (2026-09-27). It used to close on the
+    # last line of the happy path, which leaks the connection on
+    # every exception - and a Soda scan raising is exactly the case nobody is watching.
+    try:
+        # The run's own view schema on the search path - one arrival's rows,
+        # resolved only where exactly one staged table claims the name. `TO`
+        # with a quoted identifier rather than `= '...'`, which was the
+        # retired engine's spelling.
+        conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+        n_total = conn.execute("SELECT COUNT(*) FROM birth_registrations").fetchone()[0]
 
-    scan = Scan()
-    scan.set_data_source_name("birth_registrations")
-    scan.add_duckdb_connection(conn, data_source_name="birth_registrations")
-    scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
-    sampler = CaptureSampler()
-    scan.sampler = sampler
-    scan.disable_telemetry()
-    scan.execute()
-    scan_results = scan.get_scan_results()
-    metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
+        scan = Scan()
+        scan.set_data_source_name("birth_registrations")
+        # CONFIGURED RATHER THAN HANDED A CONNECTION (REQ-PIPE-087).
+        # soda-core-duckdb took the live connection object this code already
+        # had open; soda-core-postgres has no equivalent, so the run's view
+        # schema reaches Soda as its data source's own `schema` - which is
+        # what the SET search_path above was doing for the shared connection.
+        scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
+            "birth_registrations", supply_db.run_schema(run_id)))
+        scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+        sampler = CaptureSampler()
+        scan.sampler = sampler
+        scan.disable_telemetry()
+        # RUN IT THROUGH THE HELPER, never `scan.execute()` directly -
+        # see execute_scan()'s own docstring for the two things a bare
+        # scan leaves behind (a backend idle in transaction, and this
+        # process's environment reloaded from `.env`).
+        scan_results = execute_scan(scan)
+        metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
-    results = []
-    for c in scan_results["checks"]:
-        scope = c["filter"] or "all"
-        diagnostics = c["diagnostics"]
-        value = diagnostics.get("value")
-        outcome = c["outcome"]  # "pass" | "warn" | "fail"
+        results = []
+        for c in scan_results["checks"]:
+            scope = c["filter"] or "all"
+            diagnostics = c["diagnostics"]
+            value = diagnostics.get("value")
+            outcome = c["outcome"]  # "pass" | "warn" | "fail"
 
-        # the real check type (row_count/missing_count/invalid_percent/
-        # missing_percent/duplicate_count) comes from the metric this check
-        # reads, not from parsing c["name"] - custom-named checks (a
-        # scoped filter check, or a "failed rows" check with no metric at
-        # all) have a custom `name:` in the YAML that doesn't follow the
-        # generic pattern. c["metrics"] is empty for a "failed rows" check
-        # (no underlying metric object), hence the guard.
-        base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
-        # Soda's auto-generated check name is the whole check line ("...
-        # warn when > 0 fail when > 5") - a real custom `name:` reads as a
-        # short label with no "when".
-        is_custom_name = "when" not in c["name"]
-        check_name = c["name"] if is_custom_name else f"{base_check}[{scope}]"
-        is_pct = base_check.endswith("percent")
+            # the real check type (row_count/missing_count/invalid_percent/
+            # missing_percent/duplicate_count) comes from the metric this check
+            # reads, not from parsing c["name"] - custom-named checks (a
+            # scoped filter check, or a "failed rows" check with no metric at
+            # all) have a custom `name:` in the YAML that doesn't follow the
+            # generic pattern. c["metrics"] is empty for a "failed rows" check
+            # (no underlying metric object), hence the guard.
+            base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
+            # Soda's auto-generated check name is the whole check line ("...
+            # warn when > 0 fail when > 5") - a real custom `name:` reads as a
+            # short label with no "when".
+            is_custom_name = "when" not in c["name"]
+            check_name = c["name"] if is_custom_name else f"{base_check}[{scope}]"
+            is_pct = base_check.endswith("percent")
 
-        column = c["column"] or (_CUSTOM_CHECK_COLUMN.get(c["name"]) if is_custom_name else None) or "(table)"
+            column = c["column"] or (_CUSTOM_CHECK_COLUMN.get(c["name"]) if is_custom_name else None) or "(table)"
 
-        check_id = check_id_from_resource_attributes(c)
-        if check_id is None:
-            raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
-                              f"the checks YAML is missing attributes.check_id for this check")
+            check_id = check_id_from_resource_attributes(c)
+            if check_id is None:
+                raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
+                                  f"the checks YAML is missing attributes.check_id for this check")
 
-        row_count_invalid = None
-        if diagnostics.get("blocks"):
-            row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
-        elif base_check == "missing_count":
-            row_count_invalid = int(value) if value is not None else None
-        elif base_check == "row_count":
-            row_count_invalid = 0
-        elif is_custom_name and c["name"] in _CUSTOM_CHECK_COLUMN:
-            # a "failed rows" check's own value IS the failing-row count.
-            row_count_invalid = int(value) if value is not None else None
+            row_count_invalid = None
+            if diagnostics.get("blocks"):
+                row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
+            elif base_check == "missing_count":
+                row_count_invalid = int(value) if value is not None else None
+            elif base_check == "row_count":
+                row_count_invalid = 0
+            elif is_custom_name and c["name"] in _CUSTOM_CHECK_COLUMN:
+                # a "failed rows" check's own value IS the failing-row count.
+                row_count_invalid = int(value) if value is not None else None
 
-        # A short, human-readable phrase for what this check actually
-        # measures - written here, where the check result is constructed,
-        # not guessed later from check_name by the dashboard-building
-        # code. None for a custom-named check with no dashboard-visible
-        # counterpart (only "sex validity, last 24h only" today): its own
-        # name is already plain. The 2 "failed rows" checks DO get an
-        # explicit shared label - see _CUSTOM_CHECK_LABEL's own comment.
-        label = _CUSTOM_CHECK_LABEL.get(c["name"]) if is_custom_name else {
-            "missing_count": "Null rate", "missing_percent": "Null rate",
-            "invalid_percent": "Invalid values", "row_count": "Row count",
-            "duplicate_count": "Duplicate rate",
-        }.get(base_check)
+            # A short, human-readable phrase for what this check actually
+            # measures - written here, where the check result is constructed,
+            # not guessed later from check_name by the dashboard-building
+            # code. None for a custom-named check with no dashboard-visible
+            # counterpart (only "sex validity, last 24h only" today): its own
+            # name is already plain. The 2 "failed rows" checks DO get an
+            # explicit shared label - see _CUSTOM_CHECK_LABEL's own comment.
+            label = _CUSTOM_CHECK_LABEL.get(c["name"]) if is_custom_name else {
+                "missing_count": "Null rate", "missing_percent": "Null rate",
+                "invalid_percent": "Invalid values", "row_count": "Row count",
+                "duplicate_count": "Duplicate rate",
+            }.get(base_check)
 
-        results.append({
-            "agency_id": AGENCY_ID,
-            "collection_id": COLLECTION_ID,
-            "dataset_id": DATASET_ID,
-            "check_id": check_id,
-            "column_name": column,
-            "check_name": check_name,
-            "dimension": _CUSTOM_CHECK_DIMENSION.get(c["name"]) if is_custom_name
-                         else _DIMENSION_BY_BASE_CHECK.get(base_check, ""),
-            "label": label,
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": value,
-            "unit": "%" if is_pct else "count",
-            "warn_threshold": threshold(diagnostics.get("warn")),
-            "fail_threshold": threshold(diagnostics.get("fail")),
-            "status": outcome,
-            "on_fail_action": "flag",
-            "row_count_total": n_total,
-            "row_count_invalid": row_count_invalid,
-            "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], "registration_number"),
-            "engine": ENGINE_TAG,
-        })
+            results.append({
+                "agency_id": AGENCY_ID,
+                "collection_id": COLLECTION_ID,
+                "dataset_id": DATASET_ID,
+                "check_id": check_id,
+                "column_name": column,
+                "check_name": check_name,
+                "dimension": _CUSTOM_CHECK_DIMENSION.get(c["name"]) if is_custom_name
+                             else _DIMENSION_BY_BASE_CHECK.get(base_check, ""),
+                "label": label,
+                "run_id": run_id,
+                "run_timestamp": run_timestamp,
+                "metric_value": value,
+                "unit": "%" if is_pct else "count",
+                "warn_threshold": threshold(diagnostics.get("warn")),
+                "fail_threshold": threshold(diagnostics.get("fail")),
+                "status": outcome,
+                "on_fail_action": "flag",
+                "row_count_total": n_total,
+                "row_count_invalid": row_count_invalid,
+                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], "registration_number"),
+                "engine": ENGINE_TAG,
+            })
 
-    conn.close()
+        # EVERY DECLARED CHECK SODA DID NOT REPORT IS RED, never absent
+        # (the road-testing sweep's #7, Keith 2026-10-06): Soda leaves a
+        # check it cannot evaluate out of its results entirely.
+        with open(SODA_CHECKS_PATH) as f:
+            handed = f.read()
+        for missing in unreported_checks(handed, scan_results, scan):
+            results.append(not_evaluated_record(
+                missing, agency_id=AGENCY_ID, collection_id=COLLECTION_ID,
+                dataset_id=DATASET_ID, run_id=run_id, run_timestamp=run_timestamp,
+                row_count_total=n_total, engine=ENGINE_TAG))
+
+    finally:
+        conn.close()
     # Committed only now, after row_count_total's own live query above -
     # scan_results alone never carries it (see qa_results_writer.py's
     # own docstring for why `verified` exists).
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "soda", scan_results, verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "soda", scan_results, verified=results)
     return results
 
 

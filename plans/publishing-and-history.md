@@ -45,75 +45,36 @@ cadence, some quarterly. Two real problems surfaced:
    ago" beyond the opt-in, coarse "time travel" snapshots (whole-page
    freezes, not queryable data).
 
-## Thread B - committed per-run tool-output files (build first)
+## Thread B - per-run tool output (superseded)
 
-**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-09-27) · **Category:** Pipeline & publishing
 
-**Decision:** each QA run's raw tool output - one file per tool per
-dataset per run (a real dbt run-results file, a real Soda scan result, a
-real Evidently report, etc.) - gets committed to the repo, as-is in each
-tool's own native format, not reshaped into a common schema first. This
-becomes the actual source of truth for QA history, potentially spanning
-years, independent of whatever the dashboard currently renders.
+**Replaced by REQ-PIPE-089, which is built.** Thread B's design was that
+each QA run's raw tool output gets COMMITTED to the repository, one file
+per tool per dataset per run, in each tool's own native format - the
+source of truth for QA history, potentially spanning years. That tree
+existed for a year of this project's life and is gone: 924 files, 28MB,
+removed once the same records were rows in the `qa` metadata schema.
 
-A separate "dashboard pipeline" step reads the full committed history
-and merges/reshapes it into the reporting layer - deliberate separation
-of concerns between the checks layer and the reporting layer, since
-either might get swapped independently (tools narrowed down post-PoC;
-the dashboard itself rebuilt or replaced).
+**What replaced it and why**, so nobody reads this as a design still
+waiting to be built: Keith's own standing rule of 2026-09-27 is that the
+repository holds CONFIGURATION, not STATE, and QA results are state -
+they accumulate, nobody reviews them, and a second person running the
+pipeline legitimately produces different bytes.
 
-**Confirmed explicitly with Keith:**
-- Scope is tool RESULTS only (what `reports/*.json` already holds today)
-  - NOT the underlying raw synthetic data records (`data/raw/`), which
-    stays exactly as it is: gitignored, regenerated, ephemeral.
-- This reverses CLAUDE.md's current documented rule that `reports/*.json`
-  etc. are gitignored/regenerated - needs an explicit doc update as part
-  of this work, not a silent contradiction (see "Doc updates needed"
-  below).
-- Retention: keep everything forever, same policy as the dashboard
-  snapshots (item 26) - no thinning, revisit only if storage genuinely
-  becomes a problem.
-- Format: native/raw tool output, unmodified - the dashboard pipeline
-  does all reshaping when reading history back, not at commit time.
+**Its live decisions were carried into REQ-PIPE-089's own `decisions:`
+before this prose went** - scope is tool results only and never the data
+records, retention is forever with no thinning, and nesting stays at
+dataset level rather than table level for both check definitions and
+results. That last one has the most reasoning behind it and REQ-PIPE-089
+records the whole of it, including what changed Keith's own first
+instinct.
 
-**Not yet pinned down** (implementation detail, propose a default when
-building, not a real fork worth a round of questions): exact path/
-naming layout for these files. Something like `qa_results/<agency>/
-<dataset>/<run_timestamp>/<tool>.<ext>` is the obvious shape, consistent
-with how `data/raw/`/`data/cp_raw/` already lay out by dataset - confirm
-against the real per-tool output formats when this gets built (dbt's
-`run_results.json`, Soda's scan result, Evidently's report format may
-each want slightly different handling).
-
-**Scoped and decided, 2026-09-16 (Keith): per-table nesting stays
-dataset-level everywhere, not table-level** - both for check DEFINITION
-files and for `qa_results/` output. Keith's own initial instinct was
-table-level (Child Protection has 6 tables, and he was explicitly fine
-with the real-tool run time cost of invoking each tool once per table
-instead of once per dataset), but once the ODCS/datacontract-cli
-constraint was laid out concretely - one contract document IS one data
-product, carrying document-level identity/version/team/support/as-of
-config plus 10 real cross-table FK/business-rule checks that don't have
-a single owning table to live under - Keith's final call was to keep
-every tool (dbt/Soda/ODCS/Evidently) uniformly at dataset level, not
-carve out ODCS as the one exception while the other three fragment.
-Nothing about `qa_results/`'s existing `<agency>/<dataset>/<run_id>/
-<tool>.json` layout needed to change to honor this - it was already
-dataset-level for 3 of 4 CP tools.
-
-**A real bug found while confirming that, not a design gap**: tracing
-CP's actual on-disk `qa_results/` layout to answer this turned up that
-`run_evidently_cp.py` was the one genuine outlier - it wrote under its
-own table-scoped dataset id (`cp_common.TABLE_DATASET_ID
-["cp_notifications"]`) instead of the collection id every other CP tool
-uses, landing each run's `evidently.json` in a stray sibling directory
-instead of alongside that run's other 4 files. Fixed (write path only -
-each result's own per-table `dataset_id` field is untouched, still
-needed for dashboard grouping), verified via a real full `orchestrate_
-cp.py` run diffed against the previously-committed history (only
-`run_timestamp` changed, same 2832-result pass/warn/fail distribution),
-stale directory removed. Full account, including the regression tests,
-in `plans/qa-pipeline.md` item 50 - not re-derived here.
+**What went with the prose, because each is spent:** the path/naming
+layout it left unpinned (there are no paths), its note that committing
+results reverses CLAUDE.md's gitignored-and-regenerated rule (this
+reverses it back), and a real `run_evidently_cp.py` bug it recorded and
+that was fixed in 2026-09-16 - see `plans/qa-pipeline.md` item 50.
 
 ## Thread D - check lifecycle: retirement + definition changes (build together with B)
 
@@ -376,7 +337,37 @@ CHECK_LIFECYCLE = {
 
 ## Thread A - publishing (build after B/D's data format exists)
 
-**Status:** done (2026-09-16) · **Category:** Pipeline & publishing
+**Status:** superseded (2026-09-28) · **Category:** Pipeline & publishing
+
+> **SUPERSEDED BY `REQ-PIPE-092`, AND THE WHOLE MECHANISM BELOW IS
+> HISTORY** (REQ-DOCS-101 criterion 6). Everything in this thread rests
+> on two premises that are no longer true: that a QA run's results are
+> COMMITTED FILES, and that CI is therefore the only thing able to see
+> all of them and so the only thing that may publish. `REQ-PIPE-089`
+> moved the results into the warehouse database on 2026-09-27, and a
+> GitHub Actions runner has no route to that database - so the publisher
+> moved to the environment that does.
+>
+> **WHAT SURVIVES, because it is the part that mattered.** Keith's own
+> call - "gone entirely" - was about there being NO ad-hoc publish path,
+> and that is intact: there is exactly one publisher, `mothman dashboard
+> publish`, it gates before it deploys, and publishing is opt-in on
+> every other command so a debugging run cannot put its reproduction on
+> the public site. The gate itself survives whole: structural checks, a
+> real browser render check, and the check-lifecycle validation, still
+> one gate rather than three. What changed is WHERE it runs, never
+> whether it runs.
+>
+> **WHAT DOES NOT SURVIVE:** the path-filter design in the last two
+> paragraphs, which exists only to decide when CI should rebuild;
+> committing raw per-run files as the way results are shared; and
+> `deploy-pages.yml`, which is deleted - `validate-config.yml` gates the
+> committed CONFIGURATION and deploys nothing.
+>
+> Left in place rather than deleted because CLAUDE.md's rule is that a
+> thread goes whole once its last dependent batch is built, and because
+> the reasoning below is why the design was right for the system it was
+> designed for.
 
 **Decision: no manual "publish from local" path, in any form** - not a
 routine mechanism, and not even as a break-glass fallback for CI being
@@ -2579,7 +2570,9 @@ convention. Numbered independently from this file's own Thread/Phase
 structure above - these are discrete open questions, not part of any
 one Thread's narrative.
 
-1. **[todo, medium]** **[Pipeline & publishing]** No CI. Nothing re-runs
+1. **[todo, 2026-09-14]** **[Pipeline & publishing]** Medium priority (the
+   original tag's own word, preserved through the 2026-09-20 retrofit).
+   No CI. Nothing re-runs
    `qa_tools/bdm/orchestrate_bdm.py` against upstream tool releases, so a
    `dbt-core`/`soda-core-duckdb`/`datacontract-cli`/`evidently` update
    could silently break this and we wouldn't know. A scheduled job (even
@@ -2675,7 +2668,7 @@ one Thread's narrative.
    dates, same row counts), confirming the split is behaviour-preserving,
    not just a plausible-looking rewrite.
 
-3. **[done]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
+3. **[done, 2026-09-14]** **[Pipeline & publishing]** `generator/`, `pipeline/`, and
    `synthetic_data_generator/` got the same treatment `plans/qa-
    pipeline.md` #84 gave `real_tools/` -> `qa_tools/`: real Python
    packages (an `__init__.py` each, `-m` invocation, real absolute
@@ -2761,7 +2754,7 @@ one Thread's narrative.
    run by other people evaluating the PoC, on their own machines, not
    just the one it was built on.
 
-4. **[superseded]** **[Pipeline & publishing]** Versioning the checks
+4. **[superseded, 2026-09-16]** **[Pipeline & publishing]** Versioning the checks
    themselves, with that version flowing through to the results/data
    each check run captures - Keith's own framing, raised right after
    `plans/dashboard.md` #5's time-travel build: "a useful thing to have
@@ -2833,13 +2826,54 @@ one Thread's narrative.
    "log the specific mistake" (done, `plans/dashboard.md` #5's addendum)
    with "fix the pattern" (this item).
 
-6. **[parked]** **[Pipeline & publishing]** Revisit the per-dataset file
-   architecture across `qa_tools/`/`pipeline/` - flagged by Keith right
-   after Phase 2 landed, near-future not now: "I don't really want a
-   separate file for each individual dataset/agency, but I am open to it
-   if needs be." Explicitly a discussion/brainstorm to have later, not a
-   decision made here - this entry just records the concern and its
-   context, no proposed solution.
+6. **[todo, 2026-09-19]** **[Pipeline & publishing]**
+   **Priority: HIGH - to FIX, and no longer a "discuss it later"
+   (2026-09-19, Keith's own explicit words, quoting `plans/qa-pipeline.md`
+   #84's own closing cost back at it): "every new data set currently
+   means copy pasting a whole file and manually picking apart which
+   parts to keep - that is not tolerable in the short term as we add
+   more data sets, so that will need to be addressed as a priority."**
+
+   **Everything this item grew on 2026-09-21 - the supply lifecycle
+   model, and the delivery sprints for it - now lives in
+   `plans/supply-model.md`.** Moved there the same night (Keith's own
+   ask) rather than left here, because it had become a different
+   subject: this item is about CODE ARCHITECTURE (how many near-
+   identical modules this repo needs per dataset), whereas that is a
+   DOMAIN MODEL (what a supply is, what a slot is, who decides what).
+   The eight requirements this item spawned
+   (`REQ-PIPE-034`..`REQ-DASH-041`) are specified against that model, so
+   read it before building any of them - and note `REQ-PIPE-035` is
+   already known to need rewriting, since it specifies a composition
+   that file drops.
+
+   Two of this item's own older open questions are carried on that
+   file's own open-items list too, because the new model bears on both -
+   "current version" vs "good version", and what a "run" means for
+   supply history (sub-items 1 and 3 below). The detail stays HERE;
+   `supply-model.md` only points at it, so there is one copy rather than
+   two that can disagree.
+
+
+   That is a real change of position on this item, and worth recording
+   as one rather than quietly rewriting the entry: this was parked from
+   Phase 2 until now on Keith's own earlier, softer framing - "near-
+   future not now", "I don't really want a separate file for each
+   individual dataset/agency, but I am open to it if needs be" - and
+   logged explicitly as "a discussion/brainstorm to have later, not a
+   decision made here." Both the urgency and the appetite have moved:
+   the copy-paste cost is now named as NOT tolerable, on a short-term
+   horizon, tied to datasets actually being added rather than to the
+   ~30 target as an abstraction. What has NOT changed is the caveat
+   three paragraphs down - #84's finding that the per-dataset LOGIC is
+   genuinely different still stands, and "fix" here does not mean
+   forcing it into one shared abstraction to reduce file count.
+
+   Revisit the per-dataset file
+   architecture across `qa_tools/`/`pipeline/` - originally flagged by
+   Keith right after Phase 2 landed. This entry originally recorded only
+   the concern and its context, with no proposed solution; the sections
+   below are still that, now with a real mandate attached.
 
    Related to, but a reopening of, `plans/qa-pipeline.md` #84 rather
    than the same question: `plans/qa-pipeline.md` #84 confirmed the same
@@ -2870,5 +2904,504 @@ one Thread's narrative.
    better, or whether the current shape is still fine and it's
    specifically the Phase 1/2 additions (which are more mechanical/
    generic than the original 4 tool-runners) that should collapse first.
-   Not scoped - the point of this entry is to not lose the concern
-   before that conversation happens.
+
+   **Relationship to `plans/tooling.md` #12, since both are now HIGH
+   priority and they overlap** - worth being precise so a session
+   doesn't do half of each twice. #12 is the broad duplication sweep
+   across the whole codebase (`_run_gh` copied three times, the JS<->
+   Python mirrors, dead code); THIS item is the narrower, sharper one
+   Keith's words above are actually about: making "add a dataset" stop
+   meaning "copy-paste a file." #12's own rubric already says to resolve
+   this one first or alongside it, and that ordering now looks right
+   rather than incidental - this is the item with a concrete, felt cost
+   attached to it, and #12 is the sweep that would otherwise keep
+   rediscovering symptoms of it. `plans/qa-pipeline.md` #84 supplies the
+   method for both (diff the real pairs in full, sort into
+   genuinely-shared vs genuinely-dataset-specific, extract only what's
+   confirmed) - and note #84 measured 2 datasets, whereas Phase 1/2 have
+   since added more per-dataset pairs on top, so its numbers need
+   re-measuring rather than reusing.
+
+   Still genuinely unscoped: WHICH of the shapes above is right
+   (data-driven off each dataset's own config, a per-tool plugin/
+   registry, or collapsing only the mechanical Phase 1/2 additions).
+   That's the conversation this entry was always waiting for - it just
+   now has a decided outcome to aim at rather than an open question
+   about whether to bother.
+
+   **FIRST piece of work under this item (Keith's own call, 2026-09-20):
+   settle the agency/collection/dataset/table hierarchy before touching
+   anything else here.** It surfaced from a plain factual question of his
+   - "what is it that actually groups Child Protection data together as a
+   collection?" - and the answer turned out to be four different things.
+
+   The hierarchy IS modelled, three levels, and the dashboard's own data
+   tree uses it consistently (`registry-services` -> `civil-registration`
+   -> `birth-registrations`; `child-protection-family-support` ->
+   `child-protection` -> 6 datasets; the illustrative agencies the same).
+   What is inconsistent is everything underneath it:
+
+   1. **The CP collection has four names.** `cp_common.py` says
+      `COLLECTION_ID = "child-protection"`; the contract's `id` is
+      `child-protection-casework`, its `name` is "Child Protection
+      Casework Collection", and its `domain` is `child-and-family-safety`.
+      The telling detail - Birth Registrations' contract `domain` is
+      `civil-registration`, which EXACTLY matches the dashboard's
+      collection id for it. So `domain` looks like it is meant to BE the
+      collection, and for CP it simply does not match.
+   2. **Birth Registrations has no collection in code at all.**
+      `cp_common.py` carries `AGENCY_ID` + `COLLECTION_ID` + a
+      `TABLE_DATASET_ID` map; the BDM side carries only `AGENCY_ID` +
+      `DATASET_ID`. One models the middle level, the other skips it.
+   3. **`check_id` has no collection segment.** The grammar is
+      `data-asset.agency.dataset.table.column.check`, but a dashboard URL
+      is `/agency/X/collection/Y/dataset/Z`. The URL carries a level the
+      identifier does not, so a check's collection cannot be derived from
+      its own id. Found while scoping `plans/qa-pipeline.md` item 25's
+      REQ-QAC-023, which writes that grammar down - it was taken from the
+      module docstring without noticing it skips a level.
+   4. **The storage layer picks the OTHER model.** `qa_results/` keys CP
+      by `<agency>/<collection>/<run_id>/` with ONE set of 5 tool files
+      per run covering all 6 tables, and BDM by
+      `<agency>/<dataset>/<run_id>/` with the same 5 files. So on disk,
+      CP's collection is stored exactly the way BDM's dataset is - one
+      unit, one run, one set of files - and the 6 tables are split out
+      afterwards by `TABLE_DATASET_ID`.
+
+   **Keith's own framing of the choice**, recorded in his words rather
+   than paraphrased: it could be "a collection containing multiple data
+   sets where each data set has one table", or "drop collection and just
+   have one data set, for example child protection, having multiple
+   tables". **He leans toward keeping collection** because it groups
+   things well, "even if it means inventing some collection names for
+   smaller agencies".
+
+   **His stress test - "if we didn't have a collection and we had one
+   dataset with multiple tables, is that something we'd also support?" -
+   already has an answer in the code, and it is the most useful finding
+   here.** Yes, and not hypothetically: that IS how CP is stored today
+   (finding 4). The system currently implements BOTH models at once - one
+   dataset holding multiple tables at the storage layer, a collection of
+   single-table datasets at the presentation layer - and bridges them
+   with a hand-maintained table-to-dataset map. That is not a choice
+   between two designs so much as a decision about which of the two the
+   system should stop pretending not to have.
+
+   **DECIDED 2026-09-20, and the framing changed on the way there.**
+   The question started as "which layer gives way" - split `qa_results/`
+   per dataset, or accept that a dataset holds several tables. Keith's
+   first answer was storage follows presentation ("I'm not keen on
+   splitting things out via the hand maintained table dataset ID map").
+   Then he asked a better question that reframed the whole item, and it
+   is the one to carry forward: **what does a partial resupply
+   require?**
+
+   His scenario - some CP tables come back clean, two of the six get
+   resupplied. Can the tools run against just those two, keep the
+   original good four, and still evaluate the referential-integrity
+   checks between them?
+
+   **Checked against the real code: no, on every path, and by design.**
+   - A local run's warehouse is a self-contained snapshot of one
+     delivery - `data/cp_duckdb_runs/<run_id>.duckdb`, "each containing
+     that run's 6 tables". Nothing composes a warehouse from two new
+     tables plus four from an earlier run.
+   - CP's resupply simulation treats a delivery as whole - "CP's own
+     payload is a whole delivery's worth of tables at once" - so a
+     resupply re-sends all six.
+   - The AWS event-driven path enforces the same rule explicitly, via
+     `qa_tools/cp/completion_tracker.py`. Worth being precise, since an
+     earlier draft of this entry overstated it - that module is imported
+     ONLY by `aws/lambda_handlers/cp_ingest_handler.py` and the CDK
+     stack. It constrains nothing you can run locally. It is a third
+     expression of the same intent, not a third live constraint.
+
+   And the referential-integrity half specifically: running against only
+   the two resupplied tables would evaluate `placements.carer_id ->
+   carers` against a warehouse where `carers` is absent. Not a check
+   that quietly passes - an error or a false red on every row. Which is
+   exactly the "incomplete/wrong cross-table-check result" the
+   completion signal was built to prevent.
+
+   **Keith's decision, in his own words: "we're going to have to move to
+   a model where the shape is per dataset runs against a shared
+   warehouse composed of the current good version of every table,
+   because that's just the reality of how it works."**
+
+   That is a stronger basis for this work than tidiness. Partial
+   resupply is ordinary in the real world - one agency resends one file
+   - and it is *impossible* while results are stored per collection,
+   because a single `run_id` would have to mean different things for
+   different tables.
+
+   **What the model requires:**
+   - Per-table lineage - each table has its own arrival history and its
+     own current version, rather than sharing one delivery's `run_id`.
+   - A composed warehouse - assembled from the current version of every
+     table, not a snapshot of one delivery.
+   - Per-dataset QA runs, each triggered by its own table's arrival.
+   - Cross-table checks running against that composed warehouse, so they
+     see real current data on both sides.
+   - `qa_results/` keyed per dataset, which is where this item started.
+   - `TABLE_DATASET_ID` retires.
+
+   **What falls out for free:** the `raw_output` problem disappears. It
+   is 75% of each run's bytes and cannot be split per dataset without
+   either duplicating it six times or filtering a document whose
+   `metadata`/`elapsed_time`/`args` describe one whole invocation -
+   which would break the "genuinely unmodified tool output" guarantee
+   that makes it worth keeping. If the tools run per dataset, its output
+   is per dataset already. Nothing to duplicate, nothing to filter.
+   Birth Registrations is unaffected throughout (one table), which is a
+   good sign - the model generalises rather than special-casing CP.
+
+   **ALL THREE ANSWERED 2026-09-20 evening (Keith), and the four
+   hierarchy findings above re-verified against the real code first
+   rather than trusted from this prose.** Verification: CP's collection
+   really does carry four names (`COLLECTION_ID = "child-protection"`,
+   contract `id: child-protection-casework`, `name: Child Protection
+   Casework Collection`, `domain: child-and-family-safety`), while Birth
+   Registrations' contract `domain: civil-registration` exactly matches
+   its dashboard collection id; the BDM side really carries only
+   `AGENCY_ID` + `DATASET_ID`; `_SEGMENTS` really is
+   data_asset/agency/dataset/table/column with no collection; and
+   `qa_results/` really does key CP at collection level (18 run dirs)
+   against BDM at dataset level (352). All six CP datasets share the
+   same 18 run_ids today - one collection-level timeline.
+
+   1. **"Good" is the wrong word - it is the CURRENT version, always.**
+      The composed warehouse holds what the agency actually sent, and
+      status is reported rather than acted on. A red table is still the
+      table. Rejected holding the last green version: the warehouse and
+      the real delivery would silently disagree, and every downstream
+      number would inherit that - a green dashboard built on last week's
+      data is the worst failure this system could have. This no longer
+      waits on `plans/conceptual-design.md` Thread A; Thread A decides
+      what a human may DO about an amber supply, which is a different
+      question from what the warehouse contains.
+   2. **A cross-table check result belongs to its own cross-table
+      scope, not to any one dataset.** Rejected recording it against the
+      triggering dataset (a viewer of `carers` would never see a check
+      concerning `carers` change) and rejected duplicating it against
+      every table it touches (two records to keep in step, and a check
+      appearing in a dataset's history without that dataset changing).
+      This matches what these checks already are on the page:
+      REQ-DASH-033 gave them their own section for exactly this reason,
+      so the lineage follows the presentation rather than fighting it.
+   3. **Supply history survives per-table lineage - VERIFIED, not
+      assumed.** `buildSupplyHistory(d)` reads only the dataset object
+      it is handed (`d.runs`, plus `statusByRun`/`arrivalByRun` keyed by
+      run_id), so six timelines are six calls. Driven in a real browser
+      against the built page: `cp-placements` doctored down to 9 of its
+      18 runs, as a table resupplied on its own schedule would be,
+      produced 7 well-formed chains carrying all 9 entries, zero console
+      errors. Thread A's "dataset-agnostic by construction" claim is
+      real. Scope of that check, stated so it is not over-read: it
+      covers the chain-building logic. Whether the as-of picker and the
+      rendered supply-history UI also hold up is untested and worth
+      checking when this is built.
+
+   **Two scope answers, 2026-09-20 evening (Keith), settled because
+   `delivery-scoper` cannot resolve either from the files and cannot
+   follow a thread adaptively mid-run:**
+
+   - **The committed `qa_results/` history may be REBUILT for both
+     datasets. An explicit, approved exception to a hard rule**, in his
+     words: "given we're making big structural changes, I'm happy to
+     make an exception and approve rebuilding what's there for child
+     protection and obviously for BDM as well." `CLAUDE.md` otherwise
+     states that `qa_results/` is the permanent source of truth and that
+     nothing in it should ever be deleted or regenerated away, so this
+     is a one-off for this restructure, granted for it, and does not
+     generalise to any other work.
+
+     What it actually costs, measured rather than assumed before
+     acting: all 370 `dataset_stats.json` files carry a single
+     `run_by`, and their `run_timestamp` values span 2026-09-18T04:01
+     to 2026-09-19T06:16 - about 26 hours, two days before the
+     decision. So this is machine-generated history from one identity,
+     not a long-accumulated multi-person QA record, and what a rebuild
+     rewrites is the dashboard's own activity feed
+     (`qa_tools/common/changelog.py` derives "who QA'd what, when" from
+     exactly those two fields plus git history). Nothing irreplaceable.
+     Note also that a rebuild is necessarily LOCAL - it re-runs the real
+     tools against regenerated data, which CI must never do.
+
+   - **The synthetic generator is IN SCOPE.**
+     `generator/generate_cp_runs.py` currently emits "a whole delivery's
+     worth of tables at once", so per-table arrival cannot even be
+     exercised without changing it. Keith: "yes, that should be part of
+     this work." It is not a separate follow-up.
+
+   **NOT needed before scoping, deliberately**: which of the three
+   shapes is right (data-driven off each dataset's own config, a
+   per-tool plugin/registry, or collapsing only the mechanical Phase 1/2
+   additions). That is an architecture question and belongs to
+   `delivery-architect` AFTER scoping - `delivery-scoper` needs to know
+   what is in scope, not how it is built.
+
+   **CORRECTION to finding 2 above, verified 2026-09-20 night.** It says
+   "Birth Registrations has no collection in code at all". Not quite:
+   there is no `bdm_common.py`, and all four `qa_tools/bdm/run_*_bdm.py`
+   modules DO each declare `COLLECTION_ID = "civil-registration"` -
+   copy-pasted four times - while `orchestrate_bdm.py` and
+   `build_results_from_history.py` declare only `AGENCY_ID` +
+   `DATASET_ID`. So BDM names its collection and then never passes it to
+   `write_qa_result()`, which is why it vanishes at the storage layer.
+   Raised by `delivery-scoper` and confirmed by reading the four files.
+   The inconsistency is real; it is a duplication problem as much as an
+   omission, which makes it a better fit for the "stated once" treatment
+   than the original wording suggested.
+
+   **SCOPED 2026-09-20 night by `delivery-scoper`, awaiting Keith's
+   sign-off. Nothing applied to `requirements.yaml` yet, deliberately -
+   several criteria are provisional on the questions below.** Eight
+   small requirements proposed, ids to be re-checked at apply time
+   (highest live id was `REQ-DASH-033`):
+
+   - per-dataset arrival lineage
+   - the composed warehouse
+   - per-dataset QA runs
+   - cross-table checks get their own scope and lineage
+   - `qa_results/` keyed per dataset, plus the approved one-off rebuild
+   - one hierarchy stated once, including in a check's own identity
+   - the generator delivering one table at a time
+   - supply history and the as-of picker under per-dataset arrivals
+     (the stated limit of this item's own verification)
+
+   **Eight questions for Keith, recorded here so they survive the
+   session that produced them:**
+
+   Set 1 - the model's own forks.
+   1. **Check_ids and a collection segment.** Rename all 258 ids to carry
+      `collection` (and absorb `plans/running-thoughts.md` #22's
+      `table`/data-asset changes at the same time, one rename instead of
+      two), rename for `collection` only, or do not touch check_ids and
+      resolve a check's collection through the single hierarchy
+      definition instead. The first two need an explicit exception to the
+      permanence rule below.
+   2. **Does "these six arrived together" stay a recorded fact?**
+      Per-dataset arrival ids only, or per-dataset ids plus a delivery id.
+   3. **How is a historical arrival re-evaluated** once the warehouse is
+      composed rather than snapshotted? Point-in-time composition,
+      current composition only, or split by check type.
+   4. **When does a cross-table check re-run?** On any arrival it depends
+      on, on any arrival in the collection, or on its own cadence.
+
+   Set 2 - the non-functional ones it could not settle from the files.
+   5. **Timestamps on rebuilt history.** Preserve the originals, stamp
+      the rebuild, or carry both.
+   6. **A check whose other side has never arrived.** Report not
+      evaluable, fail loudly and stop, or defer silently until both
+      sides exist.
+   7. **Are superseded table versions kept?** Every version, current
+      only, or a bounded window. This one decides whether question 3's
+      point-in-time option is even available.
+   8. **How far may the composed warehouse span?** Per collection, per
+      agency, or the whole data asset. Real privacy question in a real
+      deployment, since composition puts several agencies' tables in one
+      place.
+
+   **The collision question 1 turns on is real, confirmed by reading
+   it**: this file's own line 991 states a check_id "once introduced, is
+   PERMANENTLY unique - it must never be changed or deleted". 1,850
+   committed history files, 129MB, carry today's ids. Any rename needs
+   its own recorded exception on the same terms as the `qa_results`
+   rebuild, not one inherited from it by implication.
+
+   **One scoper claim NOT confirmed**, flagged so it is not carried
+   forward: it suggested `validate_tail_uniqueness()`'s own docstring
+   calls its collision "structurally impossible". No such wording exists
+   in `qa_tools/common/check_id.py`. Whether that gate still guards
+   something real under the new model is still worth settling while the
+   grammar is open - but not on that basis.
+
+   **Still to do**: get Keith's answers to the eight above, then apply
+   the requirements for sign-off. Nothing here is built.
+
+   **Three real questions this opens, flagged not resolved:**
+   1. **What does "good" mean in "current good version"?** If
+      `cp-placements` arrives red, does the warehouse use it - it is
+      what the agency actually sent - or hold the last green one? A QA
+      tool that quietly substitutes older data for bad data is not
+      reporting reality. The likely answer is "current version" full
+      stop, with status reported rather than acted on, which makes
+      "good" the wrong word. This is adjacent to
+      `plans/conceptual-design.md` Thread A's amber accept/reject
+      governance and should be settled with it, not separately.
+   2. **A check result stops being a pure function of one run.** If
+      `placements` is resupplied and `carers` is not, the FK check
+      re-runs and may change answer later when `carers` is resupplied -
+      without `placements` changing at all. So a cross-table check's
+      result depends on two tables' versions. Which dataset's history
+      records it, and what a viewer is told when it changes without its
+      own dataset changing, both need deciding.
+   3. **What a "run" means, and what that does to supply history.**
+      Today `run_id` is one delivery across six tables; Phase 7's
+      resupply-chain redesign derives chain membership from per-run
+      aggregate status. Per-table arrivals change what a chain is - six
+      independent timelines rather than one. Worth checking whether the
+      existing supply-history UI genuinely survives that, given Thread A
+      claims it is "dataset-agnostic by construction".
+
+
+7. **[done, 2026-09-19]** **[Pipeline & publishing]** Both GitHub Actions
+   workflows are pinned to a single, hardcoded session branch name -
+   `on: push: branches: [claude/new-session-en9qen]` in
+   `.github/workflows/test.yml`, and the equivalent in
+   `deploy-pages.yml`. That branch was the working branch of the session
+   that last edited them; every session since gets a different one, so
+   **neither workflow fires at all for the current branch** and CI
+   silently does nothing.
+
+   Found 2026-09-19 while following `CLAUDE.md`'s own standing "a
+   passing local pytest is NOT evidence CI is green - actually check the
+   real run" rule after pushing item 74's fix: there was no run to
+   check. `list_workflow_runs` filtered to this session's own branch
+   returned `total_count: 0`, while the unfiltered list showed 335 runs,
+   every recent one on `claude/new-session-en9qen`.
+
+   Worth noting precisely what this does and doesn't break, because it's
+   easy to over- or under-read: nothing is broken on the branch the pin
+   names, and the last run there (`b0585da`) was genuinely green. The
+   failure mode is subtler and matches the exact incident that rule was
+   written for - CI appearing fine because it isn't running, rather than
+   failing loudly. `workflow_dispatch` is a real workaround (used for
+   item 74's own push, against this branch's ref, and it works), but it
+   depends on someone remembering, which is the same class of thing the
+   rule already says not to rely on.
+
+   **Fixed 2026-09-19** (Keith's call: "open to moving to PR triggers if
+   that's cleaner, but also a Claude glob if simpler"). Chose the
+   `claude/**` glob, and the deciding fact was one nobody had checked:
+   **this repo has no trunk at all.** `list_branches` returns three
+   branches, every one a `claude/*` session branch, each continuing from
+   the last - there is no `main`. So a `pull_request` trigger has
+   nothing to target, and the PR option isn't "cleaner" here, it's
+   inapplicable without first inventing a trunk. Worth recording since
+   the option sounded reasonable in the abstract.
+
+   **A third workflow had the identical pin, found only by grepping
+   after fixing the first two**: `.github/workflows/ticket-sync.yml`.
+   That one matters more than the other two, because it holds
+   `issues: write` and opens real GitHub issues on a public repo - and
+   its own trigger `paths` include itself, so the very commit fixing its
+   pin would fire it. Its own comment records that Keith had explicitly
+   enabled its push trigger at the time; the dead pin meant it had
+   nonetheless never once fired. Flagged to him with the real number
+   before touching it - 3 datasets currently read red
+   (birth-registrations, cp-carers, cp-placements), down from all 7
+   before `plans/qa-pipeline.md` item 74's fix, so the first real run
+   opens 3 tickets rather than the noise storm that item's own write-up
+   had been holding this back to avoid - and his call was to fix the pin
+   and let it fire.
+
+   `test.yml` also gained a real `concurrency` group
+   (`test-${{ github.ref }}`, `cancel-in-progress: true`): this branch
+   pushes several times a session and only the newest commit's result
+   means anything. Keyed on the ref, so two concurrent sessions can't
+   cancel each other. `deploy-pages.yml` already had its own
+   `concurrency: pages` group, so deploys serialise rather than
+   interleave.
+
+   **A real second half to this, found immediately after pushing the
+   fix and NOT solvable from code**: `deploy-pages.yml` now fires, and
+   then fails in ~2 seconds with no steps run and no logs (a 404 on the
+   log download). That is the signature of GitHub's own **environment
+   protection rules** rejecting the branch: the job declares
+   `environment: github-pages`, and that environment is configured in
+   repo Settings to allow deployments only from specific branches -
+   almost certainly still just `claude/new-session-en9qen`, the same
+   dead branch this whole item is about. So the pin exists in TWO
+   places, and fixing the workflow file only fixed one of them.
+   Diagnosis is high-confidence but not directly confirmed: this
+   session's proxy blocks the `/repos/{owner}/{repo}/environments/...`
+   API path, so the rule couldn't be read back. Supporting evidence:
+   the same workflow succeeded on the old branch (run 163), a
+   job-level `if:` evaluating false would report "skipped" not
+   "failure", and the `concurrency: pages` group would report
+   "cancelled".
+
+   **Keith's to fix, not a session's** - repo Settings -> Environments
+   -> `github-pages` -> "Deployment branches and tags" -> allow
+   `claude/**` (or whatever pattern matches the glob above). Deliberately
+   NOT reverted to a pinned branch to hide it in the meantime: a visible
+   failure is strictly better than the silent non-run this item started
+   as.
+
+   **Done by Keith, 2026-09-19 evening - and the diagnosis is now
+   CONFIRMED, not just high-confidence.** He added the `claude/**`
+   wildcard to the environment's allowed branches, and the very next
+   push flipped the workflow's behaviour completely: instead of failing
+   in ~2 seconds with zero steps and a 404 on logs, it ran properly and
+   finished `success`. That's the first time all three workflows have
+   run and passed on a session branch since the pin broke - `Run test
+   suite`, `Sync QA status to GitHub Issues`, and `Build, validate, and
+   publish the dashboard`, all green on the same commit. The earlier
+   inference (environment protection rejecting the branch, unreadable
+   from here because the proxy blocks the environments API) held up
+   exactly.
+
+   Real, user-visible consequence worth naming: the live published
+   dashboard had not been rebuilt since before the pin broke, so this
+   is also the deploy that finally carries `plans/qa-pipeline.md` item
+   74's corrected statuses to the public site - the end of the "all 7
+   datasets read red on every run" era for anyone actually looking at
+   it.
+
+   **Now verified against the real live site, not just inferred from the
+   workflow's own conclusion** - Keith allow-listed
+   `keithamoss.github.io` minutes later (see `CLAUDE.md`'s own audited
+   blocked-domain list), which made the check that this item originally
+   had to skip actually possible. Driving the real published URL in a
+   real browser and using the page's OWN
+   `buildRealDataset()`/`checkStatus()`/`historyStatus()`: **30,561
+   rendered statuses compared against each tool's own recorded verdict,
+   zero disagreements, and zero results missing a verdict** (locally it
+   had been 198 before the placeholder fix, so that shipped too). The
+   live page's embedded `GITHUB_LINKS` commit confirms it was built from
+   `24b2560`, the commit carrying all of item 74's work. This is the
+   first time this project has verified its own published output at the
+   render layer against the real source of truth, rather than trusting a
+   green workflow.
+
+   **One residual risk, named rather than silently accepted**: with a
+   glob, any `claude/*` branch can publish to the live public site. That
+   matches how this project actually works (sessions are sequential, so
+   "newest push publishes" is correct) and the pages concurrency group
+   stops two interleaving - but if two sessions genuinely overlap, an
+   older branch pushing last would publish older content. The honest fix
+   for that is a real trunk branch to publish from, which is a bigger
+   change to how this project works and is deliberately NOT bundled in
+   here.
+
+8. **[done, 2026-09-19]** **[Pipeline & publishing]** The Plans tab was
+   silently never republishing. `dashboard/embed_dashboard_data.py`
+   embeds every `plans/*.md` file's own content into `const PLANS` at
+   build time (via `dashboard/plans_md.py`'s `parse_plans()`,
+   `PLANS_DIR`), exactly like `CHANGELOG.md` feeds Release Notes and
+   `requirements.yaml` feeds the Requirements panel - but **`plans/**`
+   was never added to `.github/workflows/deploy-pages.yml`'s own trigger
+   `paths`**, so a plans-only commit didn't rebuild the site and the
+   live Plans tab quietly drifted behind the repo.
+
+   Missed when that tab was built (2026-09-18, `plans/running-
+   thoughts.md` #10). The other two embedded files each carry an inline
+   comment in that path list saying why they're there ("embeds this
+   file's own content at build time") - `plans/**` just never got added
+   alongside them.
+
+   Found 2026-09-19 evening, and only because `keithamoss.github.io`
+   had just been allow-listed (`CLAUDE.md`'s own audited domain list):
+   fetching the REAL published page and grepping it showed none of that
+   day's plans work present, with the live build's own embedded
+   `GITHUB_LINKS` commit still reading `24b2560` after five subsequent
+   plans-only commits. Not findable any other way from here - the
+   workflow wasn't failing, it simply wasn't running, the same
+   silent-non-run failure mode as item #7 above and caught by the same
+   habit of checking the real artifact rather than the green tick.
+
+   Fixed by adding `plans/**` to that `paths` list, with a comment
+   matching the convention the neighbouring two already use. The fix
+   verifies itself: the commit carrying it is a `plans/**` change, so
+   it triggers the very rebuild it enables.

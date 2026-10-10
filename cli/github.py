@@ -22,13 +22,6 @@ def sync_tickets_command() -> None:
     sync_main()
 
 
-@github_group.command("sync-acceptances")
-def sync_acceptances_command() -> None:
-    """Fetch every real qa-ticket issue's own comments (for /accept matching) - prints JSON to stdout."""
-    from qa_tools.common.acceptance_sync import main as sync_main
-    sync_main()
-
-
 @github_group.command("sync-leaderboard")
 def sync_leaderboard_command() -> None:
     """Fetch every real qa-ticket issue's own closed/reopened history (for the leaderboard) - prints JSON to stdout."""

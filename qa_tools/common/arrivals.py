@@ -1,0 +1,406 @@
+"""Deliveries on disk, recognised as arrivals the pipeline can act on
+(REQ-GEN-043).
+
+THIS IS WHERE THE FORMAT STOPS BEING A FILE LAYOUT and starts being
+something the pipeline uses. Everything it knows, it works out from
+what physically happened:
+
+- WHICH DATASET a file belongs to, from the filename alone, through
+  that dataset's own configured `arrivalPattern` (criterion 3).
+- WHICH COLLECTION a delivery is for, from the datasets its files
+  matched. A delivery is not labelled; it is recognised.
+- WHEN it arrived, from OUR receipt record, never from anything inside
+  the delivery (criterion 5).
+- WHAT ORDER arrivals happened in, from those receipt instants - never
+  from a delivery's name, which is arbitrary and means nothing.
+
+WHAT IT DELIBERATELY DOES NOT DO is read the generator's bookkeeping.
+`data/generator_bookkeeping.json` knows which slot each delivery was
+built to fill, which scenario it came from and what severity was
+injected - and a pipeline reading any of that would be making filing
+decisions from a declaration rather than from arrival plus slot state,
+which is the supplier-declared manifest Thread B rejected, wearing our
+own badge (criterion 7). Tests may read it. Nothing here may.
+
+RUN IDS COME FROM RECEIPT ORDER, which is a real observable rather than
+a declaration: the first Birth Registrations delivery we received is
+run_001. That keeps them dateless and deterministic (REQ-GEN-042) while
+deriving them from arrival rather than from anything a supplier said.
+"""
+from __future__ import annotations
+
+import warnings
+import dataclasses
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+
+from qa_tools.common import asset_time, delivery, hierarchy, holds, slots
+
+
+@dataclass(frozen=True)
+class Arrival:
+    """One recognised delivery, ready for the pipeline.
+
+    `files_by_dataset` maps a dataset id to the file NAMES that matched
+    it - a list, because a supplier splitting a large extract across
+    two files is ordinary (criterion 8). `unmatched` holds files no
+    pattern claimed, which is not an error: a covering note or a PDF is
+    a real thing suppliers send, reported rather than swallowed
+    (criterion 9).
+    """
+
+    run_id: str
+    run_index: int
+    collection_id: str
+    delivery_name: str
+    path: Path
+    received_at: datetime
+    #: The receipt's own sequence, carried through from the Delivery
+    #: (REQ-PIPE-061 criterion 3). Without it an Arrival cannot be
+    #: placed in the processing order at all - and the first version of
+    #: this left it off, which nothing noticed because the reader
+    #: defaulted a missing one to zero.
+    sequence: int
+    files_by_dataset: dict[str, tuple[str, ...]]
+    unmatched: tuple[str, ...]
+    anomalies: tuple[str, ...]
+    #: WHERE EACH OF ITS FILES IS (REQ-PIPE-152): (filename, storage URI)
+    #: pairs, from qa.delivery_file. Empty for an arrival recognised straight
+    #: off the deliveries tree, whose files are under `path`; an S3 object is
+    #: fetched to a local `path` by s3_arrival.materialise() before staging.
+    sources: tuple[tuple[str, str], ...] = ()
+
+    def as_entry(self) -> dict:
+        """This arrival as the plain dict the orchestrators pass around.
+
+        Carries ONLY what the pipeline legitimately knows from what
+        arrived: which run it is, when we received it, and where its
+        files are. No injected severity, no slot, no period - those are
+        the generator's bookkeeping, and a pipeline reading them is
+        filing from a declaration (criterion 7).
+        """
+        return {"run_id": self.run_id, "run_index": self.run_index,
+                "received_at": self.received_at.isoformat(),
+                "delivery": self.delivery_name, "path": str(self.path)}
+
+    @property
+    def contested(self) -> frozenset[str]:
+        """Datasets in this arrival that several files claim, so nothing
+        may choose which is the supply - CONTESTED (REQ-PIPE-105
+        criterion 6). It was `held`, REQ-PIPE-059's word, until that hold
+        was retired on 2026-10-02 (renamed by Keith's call).
+
+        A CALLER MUST CHECK THIS BEFORE path_for(), which still refuses
+        rather than guessing.
+        """
+        return frozenset(ds for ds, names in self.files_by_dataset.items()
+                          if len(names) > 1)
+
+    def path_for(self, dataset_id: str) -> Path:
+        """The single file for one dataset, or an error naming why not.
+
+        Deliberately refuses when a dataset matched several files: the
+        loaders below handle one file per dataset today, and quietly
+        taking the first would drop a supplier's second file without
+        anybody noticing. Criterion 8 requires the format to CARRY that
+        case; making the loader guess is a different thing.
+        """
+        names = self.files_by_dataset.get(dataset_id) or ()
+        if len(names) != 1:
+            raise delivery.DeliveryFormatError(
+                f"delivery {self.delivery_name!r}: dataset {dataset_id!r} matched {len(names)} "
+                f"files ({', '.join(names) or 'none'}). This loader handles exactly one; taking "
+                f"the first would silently drop the rest.")
+        return self.path / names[0]
+
+
+@dataclass(frozen=True)
+class Recognition:
+    """What one delivery turned out to hold.
+
+    A DELIVERY MAY SPAN COLLECTIONS (criteria 8 and 14, Keith
+    2026-09-24), which this used to refuse: it raised, and a raise here
+    took the whole run down for one odd drop. The argument for holding
+    was that a mixed delivery means the transport BOUNDARY is wrong
+    rather than the data, so every arrival fact derived from it is
+    suspect - and it does not survive the observation that spanning is
+    legitimate, because a hold would stop healthy supply on a boundary
+    that is working. Each file is attributed on its own dataset's
+    terms; nothing is held for the delivery's shape.
+
+    What survives from that thread is the blast-radius rule, which
+    applies to every odd delivery: whatever recognition decides about
+    one, it must not take the rest of the run down - the same shape as
+    failing 29 healthy datasets for one exhausted schedule.
+    """
+
+    delivery_name: str
+    by_dataset: dict[str, tuple[str, ...]]
+    unmatched: tuple[str, ...]
+    contested: dict[str, tuple[str, ...]]
+    #: Datasets whose files DID match, for a dataset nothing is owed
+    #: from. An UNEXPECTED TABLE, which is a different event from an
+    #: unrecognised artefact and gets a different level (criterion 11).
+    unexpected: tuple[str, ...] = ()
+
+    @property
+    def collections(self) -> tuple[str, ...]:
+        """Derived from the datasets the FILES were attributed to, never
+        from the delivery's name (criterion 9)."""
+        return tuple(sorted({hierarchy.dataset(ds).collection_id for ds in self.by_dataset}))
+
+    @property
+    def is_unplaceable(self) -> bool:
+        """Nothing in it matched any dataset. A real operational event
+        - reported, never a failed run (criterion 13)."""
+        return not self.by_dataset
+
+
+def recognise(d: delivery.Delivery) -> Recognition:
+    """Sort one delivery's files by the dataset each belongs to.
+
+    THE PATTERNS NO LONGER COME FROM THE CONTRACT (REQ-PIPE-058). Each
+    dataset declares its own regular expression in
+    contract/data-asset.yaml and qa_tools/common/arrival_patterns.py
+    owns the match.
+    """
+    found = delivery.files_by_dataset(d)
+    # A FILE TWO DATASETS BOTH CLAIM is a configuration error, and it is
+    # reported at warning level and attributed to nobody rather than
+    # failing the delivery (REQ-PIPE-058 criterion 9). Failing would
+    # mean one bad pattern stopping every other supply in the same drop.
+    for name, claimants in sorted(found.contested.items()):
+        warnings.warn(
+            f"delivery {d.name!r}: {name!r} matches the arrival pattern of more than "
+            f"one dataset ({', '.join(claimants)}), so it has been attributed to none "
+            f"of them and is held for a human. Two datasets claiming one filename is a "
+            f"configuration error - see contract/data-asset.yaml.",
+            stacklevel=2)
+    # AN UNRECOGNISED ARTEFACT IS A WARNING, not informational (Keith,
+    # 2026-09-24). His own case is the dangerous one: a catch-up
+    # delivery whose current files match their patterns while an older
+    # one, named differently, does not - so the delivery looks healthy
+    # and a real supply is silently on the floor. Its NAME is reported
+    # and its CONTENTS are never read: a filename in a Birth
+    # Registrations or Child Protection context is itself potentially
+    # identifying, which is why the line is stated rather than assumed.
+    if found.unmatched:
+        warnings.warn(
+            f"delivery {d.name!r}: {len(found.unmatched)} file(s) matched no dataset's "
+            f"arrival pattern and were not processed - {', '.join(sorted(found.unmatched))}. "
+            f"A covering note is ordinary; a renamed extract is a supply on the floor.",
+            stacklevel=2)
+    # AN UNEXPECTED TABLE IS INFORMATIONAL, and an unrecognised
+    # artefact is a warning. The two sit adjacent and are easy to
+    # collapse into one another, so the distinction is worth keeping:
+    # a file matching NO pattern may be a renamed extract, which is a
+    # real supply on the floor; a file matching a pattern for a dataset
+    # nothing is owed from is a supplier sending something extra, which
+    # is odd rather than lossy. Nothing is dropped either way - the
+    # table is still attributed and still staged.
+    #
+    # NARROWER THAN THE CRITERION, deliberately. It says "no slot in
+    # that period", and which period a supply fills is REQ-PIPE-062's
+    # answer, which does not exist yet. What is checkable now is a
+    # dataset with no slots AT ALL, which is the same event at a
+    # coarser grain.
+    unexpected = tuple(sorted(
+        ds for ds in found.by_dataset if not slots.is_owed_supplies(ds)))
+    if unexpected:
+        print(f"note: delivery {d.name!r} carries {', '.join(unexpected)}, which "
+               f"nothing is currently owed from - processed as usual.")
+    # A SUPPLY NOBODY MAY CHOOSE FOR YOU (REQ-PIPE-059). Reported as
+    # needing action rather than informationally: an unexpected table
+    # is a supplier sending something extra, and this is a supply that
+    # will not be checked until somebody resolves it.
+    found_holds = holds.holds_in(Recognition(
+        delivery_name=d.name,
+        by_dataset={ds: tuple(names) for ds, names in found.by_dataset.items()},
+        unmatched=(), contested={}))
+    for hold in found_holds:
+        warnings.warn(hold.describe(), stacklevel=2)
+
+    return Recognition(
+        delivery_name=d.name,
+        unexpected=unexpected,
+        by_dataset={ds: tuple(names) for ds, names in found.by_dataset.items()},
+        unmatched=tuple(found.unmatched),
+        contested={k: tuple(v) for k, v in found.contested.items()})
+
+
+def arrivals_for(collection_id: str, run_id_prefix: str,
+                  deliveries_dir: Path | None = None,
+                  receipts_dir: Path | None = None) -> list[Arrival]:
+    """Every recognised arrival for one collection, OLDEST FIRST.
+
+    AN UNKNOWN COLLECTION RAISES rather than answering `[]`, which is
+    what it used to do. Empty means "nothing has arrived yet", an
+    ordinary state; a collection the tree does not define is a
+    different thing entirely, and returning the same answer for both
+    made a renamed collection look like a quiet day - a pipeline
+    processing nothing and reporting nothing wrong
+    (post-build-review #41).
+
+    ONE ARRIVAL IS ONE FILE (REQ-PIPE-105 criterion 1). It was one
+    delivery FOLDER until 2026-10-02, so Child Protection's six files
+    were recognised as one thing and checked as one run - which is
+    what made "is the delivery complete?" a question anything had to
+    ask. Now each file is its own arrival and is processed without
+    waiting for any other.
+
+    THE SHAPE IS KEPT AND ONLY THE CONTENTS NARROW. `files_by_dataset`
+    is still a mapping, carrying exactly one dataset, so every caller
+    that iterates it still works. Collapsing it to a scalar would have
+    made this a rewrite of every consumer rather than a change of
+    unit, for no gain.
+
+    RUN IDS ARE NO LONGER POSITIONAL, and the two changes had to land
+    together. `cp_run_007` meant "the seventh delivery recognised",
+    which REQ-PIPE-057 criterion 18 forbids - an id must not come from
+    a position recognition can reorder or shorten - and which had
+    already bitten once, leaving run_022 to run_027 each carrying a
+    neighbour's instant when two days were suppressed. Splitting one
+    delivery into six would have made that six times worse.
+
+    THE NEW ID ALREADY EXISTED. One arrival is one file, so one
+    dataset, so one supply - run identity and supply identity
+    converge. It takes the staged PHYSICAL TABLE's spelling,
+    `cp_clients__202305010100000000`, rather than the supply id's
+    `cp-clients@...`, because `run_schema()` uses a run id UNCHANGED
+    as a PostgreSQL schema name and `_ident()` refuses `-` and `@`.
+    That refusal is deliberate (Keith, 2026-09-27): hex-encoding was
+    dropped because `qa_run_run_5f_001` is what a person then reads in
+    psql, in a log and in every error message.
+
+    `run_id_prefix` IS NOW UNUSED FOR THE ID and is kept in the
+    signature on purpose, rather than removed in the same change: it
+    still says which collection a caller means, every call site passes
+    it, and retiring a parameter is a separate, mechanical change that
+    does not belong in one that moves the unit of work.
+    """
+    hierarchy.datasets_in_collection(collection_id)  # raises if unknown
+    out: list[Arrival] = []
+    for d in delivery.list_deliveries(deliveries_dir, receipts_dir):
+        found = recognise(d)
+        by_dataset = {ds: names for ds, names in found.by_dataset.items()
+                      if hierarchy.dataset(ds).collection_id == collection_id}
+        # ONE DELIVERY, POSSIBLY TWO COLLECTIONS. A delivery spanning
+        # collections contributes to each: the DELIVERY is the
+        # transport unit and the RUN is the QA unit, and they were only
+        # ever the same thing by coincidence of this PoC's data.
+        if not by_dataset:
+            continue
+        for dataset_id in sorted(by_dataset):
+            names = by_dataset[dataset_id]
+            table = hierarchy.dataset(dataset_id).table
+            # THIS FILE'S OWN RECEIPT, not the delivery's (REQ-GEN-044
+            # criterion 12). Six files can land over ten minutes, and the
+            # instant is what names the run and orders the pipeline. Two
+            # files for one dataset - the contested case - take the
+            # earlier of the two, which is when that supply began to land.
+            received_at, sequence = min(
+                (d.received_at_of(n), d.sequence_of(n)) for n in names)
+            key = asset_time.arrival_key(received_at)
+            out.append(Arrival(
+                run_id=f"{table}__{key}",
+                # POSITION IS STILL REPORTED, and is no longer
+                # IDENTITY. Something has to order the processing -
+                # filing depends on what the arrival before it
+                # promoted - and a sequence number is the honest way
+                # to say "fourth of this batch" without anything
+                # keying on it.
+                run_index=len(out) + 1,
+                collection_id=collection_id, delivery_name=d.name, path=d.path,
+                received_at=received_at, sequence=sequence,
+                # SEVERAL FILES FOR ONE DATASET STAY TOGETHER in one
+                # arrival, which is the contested case rather than two
+                # arrivals: nobody has said which file is the supply,
+                # so splitting them would be choosing between them.
+                files_by_dataset={dataset_id: names},
+                unmatched=found.unmatched, anomalies=d.anomalies))
+    # IN THE ORDER STORAGE TOOK THEM, across every delivery: receipt
+    # instant, then the order receipts were written (REQ-PIPE-061). Once
+    # files carry their own instants a delivery's files no longer arrive
+    # in dataset-name order, and processing them that way would file
+    # each against a decision log one step out of date. `run_index` is
+    # renumbered to match - it reports position and is not identity.
+    out.sort(key=lambda a: (a.received_at, a.sequence, a.run_id))
+    return [dataclasses.replace(a, run_index=i) for i, a in enumerate(out, start=1)]
+
+
+def arrivals_from_records(collection_id: str, deliveries_dir: Path | None = None,
+                          conn=None) -> list[Arrival]:
+    """Every arrival for one collection, built from the DELIVERY RECORDS
+    rather than the tree, OLDEST FIRST (REQ-PIPE-152 criterion 6; Keith,
+    2026-10-06: the pass builds every arrival from the database).
+
+    THE SAME ARRIVALS arrivals_for() recognises from disk, by construction:
+    one per dataset per delivery, its receipt the earliest of that dataset's
+    files, the run id the staged table's spelling, the same order, the same
+    renumbering - pinned against arrivals_for() over the whole deployment by
+    tests/test_arrivals_from_records.py. What it adds is that an object a
+    handler recorded straight from S3, with no directory anywhere, is an
+    arrival like any other.
+
+    A LOCAL DELIVERY WHOSE DIRECTORY IS GONE IS NOT AN ARRIVAL. Its files are
+    named relative to the deliveries tree, so a record the tree no longer
+    holds - a test's, or one deleted by hand - would be an arrival whose
+    files cannot be read. That is the orphan the tree once left in qa.run
+    (CLAUDE.md, 2026-09-28); here it is simply not offered. An S3 delivery
+    has no directory and is always offered.
+    """
+    from datetime import datetime as _dt
+
+    from qa_tools.common import delivery_log, qa_store, s3_arrival
+
+    hierarchy.datasets_in_collection(collection_id)  # raises if unknown
+    root = Path(deliveries_dir or delivery.DELIVERIES_DIR)
+    with delivery_log._db(conn) as db:
+        rows = db.execute(
+            f'SELECT d.name, d.anomalies, f.filename, f.dataset_id, f.contested_by, '
+            f'f.received_at, f.receipt_sequence, f.storage_uri '
+            f'FROM "{qa_store.SCHEMA}".delivery d '
+            f'JOIN "{qa_store.SCHEMA}".delivery_file f ON f.delivery = d.name '
+            f"ORDER BY d.name, f.filename").fetchall()
+    by_delivery: dict[str, list] = {}
+    anomalies: dict[str, tuple[str, ...]] = {}
+    for name, anomaly, *rest in rows:
+        by_delivery.setdefault(name, []).append(rest)
+        anomalies[name] = tuple(anomaly or ())
+    out: list[Arrival] = []
+    for name, files in by_delivery.items():
+        uris = {filename: uri for filename, _, _, _, _, uri in files}
+        remote = any((uri or "").startswith(s3_arrival.S3_SCHEME) for uri in uris.values())
+        if not remote and not (root / name).is_dir():
+            continue
+        unmatched = tuple(sorted(f for f, ds, contested, *_ in files
+                                 if ds is None and not contested))
+        datasets: dict[str, list] = {}
+        for filename, dataset_id, _, received_at, sequence, _ in files:
+            if dataset_id and hierarchy.dataset(dataset_id).collection_id == collection_id:
+                datasets.setdefault(dataset_id, []).append(
+                    (filename, _dt.fromisoformat(received_at), int(sequence)))
+        for dataset_id in sorted(datasets):
+            entries = datasets[dataset_id]
+            names = tuple(sorted(f for f, _, _ in entries))
+            received_at, sequence = min((at, seq) for _, at, seq in entries)
+            table = hierarchy.dataset(dataset_id).table
+            out.append(Arrival(
+                run_id=f"{table}__{asset_time.arrival_key(received_at)}",
+                run_index=len(out) + 1, collection_id=collection_id,
+                delivery_name=name, path=root / name,
+                received_at=received_at, sequence=sequence,
+                files_by_dataset={dataset_id: names}, unmatched=unmatched,
+                anomalies=anomalies[name],
+                sources=tuple((f, uris[f]) for f in names if remote)))
+    out.sort(key=lambda a: (a.received_at, a.sequence, a.run_id))
+    return [dataclasses.replace(a, run_index=i) for i, a in enumerate(out, start=1)]
+
+
+def unplaceable(deliveries_dir: Path | None = None,
+                 receipts_dir: Path | None = None) -> list[delivery.Delivery]:
+    """Deliveries nothing could place - reported, never guessed at."""
+    return [d for d in delivery.list_deliveries(deliveries_dir, receipts_dir)
+            if recognise(d).is_unplaceable]

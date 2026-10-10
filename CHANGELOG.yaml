@@ -1,0 +1,2676 @@
+# What's New - this project's own development history, written for the
+# people who use it rather than the people who build it.
+#
+# Replaced the hand-written Keep-a-Changelog CHANGELOG.md on 2026-09-20.
+# That file had become an engineering log: entries ran fifteen lines,
+# carried config hashes and file paths and measured percentages, and were
+# addressed to whoever would maintain the code next. Useful, but not to a
+# director, a manager, or someone in client services trying to stay across
+# a refresh cycle - and that is who reads this.
+#
+# THE STANDARD BELOW IS NOT CHANGED WITHOUT KEITH'S EXPLICIT APPROVAL.
+# Standing instruction, 2026-09-20, covering the wording and not just
+# the substance: propose the exact replacement text, get a yes, then
+# edit. This applies to the rules in this header, never to the entries
+# themselves - writing a new entry is ordinary work.
+#
+# The model is Keith's own `keithamoss/mapa`, whose in-app "What's New"
+# page this deliberately imitates:
+#
+#   - Every item is a HEADLINE plus one or two sentences. Not a paragraph.
+#   - Write what someone can now DO, in second person. "You can now see
+#     which column a check belongs to" - never "moved 10 sql rules to
+#     property level".
+#   - No file paths, function names, measurements or internal references.
+#     If a sentence only makes sense to someone who has read the code, it
+#     belongs in requirements.yaml, not here.
+#   - Name a tool only where the name IS the information - something a
+#     reader types, or a check they would recognise in their own output.
+#     Refined 2026-09-20 on Keith's own ask, against an entry that said a
+#     command "runs every check it has" and left the reader none the
+#     wiser: "be good if you explained a little bit more about what
+#     actually, what it's checking". The test is who the name helps, not
+#     whether it sounds technical - the tools someone runs are part of
+#     their day; the function that calls them is not.
+#   - Headlines can have some life in them. Mapa's are the bar:
+#     "Begone, weird highlighting bug", "No menu for you".
+#
+# LENGTH. Measured against Mapa's own live feed on 2026-09-20 (the
+# production branch - main was four versions stale, and reading it gave
+# numbers that were wrong by a third), 7 releases and 44 items:
+#
+#                     min   median   mean   p90   max
+#   item description   13      27     30.1    49    79
+#   headline            1       2      3.0     5    16
+#
+# So the targets here, and they are targets rather than limits - Mapa
+# has a 79-word item and it earns it:
+#
+#   - `description`: around 25-35 words. Up to 35 is comfortable; past
+#     that, ask what the extra words are doing. This file's own first
+#     ten items averaged 49 and ran to 85, which is what prompted
+#     measuring: "way too long... maybe 30% of the size" (Keith).
+#   - `headline`: 2-5 words. Mapa's median is 2. Ours were averaging
+#     6.5 - "Four things the register said we hadn't built" says in
+#     eight what "Four things we'd already built" says in four.
+#   - `summary`: REQUIRED here. Around 20 words, and 40 at the outside
+#     - Keith, 2026-09-20, setting the ceiling and the condition on it
+#     in the same breath: 40 "would need to be like a lot of changes in
+#     one day". So the length is the day's, not the writer's. A quiet
+#     day that takes 40 words to summarise has been padded; a genuinely
+#     busy one has earned them.
+#
+#     Mapa leaves the summary out on six of its seven releases, so
+#     requiring it is a deliberate divergence, not an imitation: it
+#     groups by named version, we group by day, and a day needs a line
+#     telling a reader whether it is worth their time at all.
+#
+# None of this is gated. Word count IS machine-checkable, unlike voice,
+# so it could be - it is not, because a hard cap would push an author
+# into dropping the word that carried the meaning rather than into
+# writing a better sentence, and because the one real outlier in
+# Mapa's own feed is a good entry. Review is what holds it.
+#
+# Where the engineering detail went, and why this is safe: every built
+# requirement in requirements.yaml now carries `evidence:` (what was
+# measured, with the number) and `decisions:` (what was decided, and what
+# was rejected). Both are CI-enforced. So the detail that used to justify
+# a long changelog entry has a better home, and this file does not need
+# to carry it.
+#
+# Structure notes:
+#   - Grouped by DAY, newest first. No release names or version numbers.
+#     Add to a day's existing `date:` block rather than starting a
+#     second one - the validator rejects two blocks for one day, and
+#     the reason is the reader, not the schema: they would see the
+#     date twice with no way to tell which is authoritative.
+#   - `category` is one of: New, Improved, Fixed.
+#   - `components` are the project's own 7-part taxonomy, by full name,
+#     CI-checked against docs/components.md and the dashboard's own
+#     consts. They render as tags; the per-component emoji was dropped
+#     from this feed on 2026-09-20 (the Plans tab keeps its own).
+#   - `summary` is one sentence for the whole day. A reader should be
+#     able to stop there.
+#   - `time` is optional per item and usually omitted - day-grouping is
+#     the point, and a to-the-minute timestamp is detail this audience
+#     does not need.
+#
+# YAML rather than Mapa's JSON, deliberately: this repo already
+# hand-authors prose in YAML with `>` block scalars, which handle
+# multi-sentence text far better than JSON's escaped strings; the
+# check-yaml pre-commit hook already validates every staged .yaml; and
+# comments like this one are possible at all. Mapa used JSON because its
+# reader is TypeScript. Ours is Python, which reads YAML natively.
+
+intro: >
+  What's changed in the data quality tool, newest first. Everything here
+  is written for the people who use it - if you want the reasoning, the
+  measurements or the code behind a change, the Requirements panel has
+  all three.
+
+releases:
+  - date: "2026-10-11"
+    summary: >
+      A collection with nothing counted no longer reads green, one re-check
+      never runs twice, the asset's clock can change without rewriting the
+      past, and every delivery agreement lives in one file.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Nothing counted, never green
+            components: ["Dashboard UI"]
+            description: >
+              A collection whose every dataset is left out of its status - none
+              has an agreed schedule yet - used to show green. It now reads Not
+              counted, with a line saying why.
+          - headline: One re-check, one run
+            components: ["Pipeline & publishing"]
+            description: >
+              The terminal and the processing pass could both start the same
+              re-check at once. Now whichever starts second says it is already
+              being run elsewhere and leaves it to finish there.
+      - category: Improved
+        items:
+          - headline: A clock that can move
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              The asset's timezone now has dated versions, so if it ever
+              changes, every past due time keeps the clock it was judged
+              against. A due time daylight saving would skip or repeat is
+              refused.
+          - headline: One file for the delivery agreement
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Calendars, which datasets are on them, and when each is due now
+              live together in contract/calendar.yaml, in dated versions. The
+              data contracts no longer carry delivery timing, and the old
+              delivery_months key is refused with the name of its replacement.
+          - headline: A due time that can change going forward
+            components: ["Pipeline & publishing"]
+            description: >
+              Each slot now takes its due time, grace and claim window from
+              the agreement in force on its own date, so changing a due time
+              never re-judges a slot that was already due. A supply can be due
+              a whole number of days before its period - the evening before,
+              for instance.
+          - headline: The agreement's past changes only on the record
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Once a date, a due time or a timezone has governed a supply, the
+              configuration gate refuses any change to it that is not a declared
+              correction - with a change reference, an approver and the old and
+              new values - and prints the correction ready to paste. Adding next
+              year's dates still needs nothing.
+          - headline: The asset has a named manager
+            components: ["Pipeline & publishing"]
+            description: >
+              The people file now lists the roles a person can hold and names
+              the manager of the whole data asset, and the configuration check
+              fails if there is none. A decision can be limited to that person.
+          - headline: Due ahead of its period
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A dataset whose supply arrives weeks before the period it is for
+              can now say so in its schedule, and the supply history heads that
+              cycle with the day it is actually due.
+          - headline: A verdict remembers what judged it
+            components: ["Pipeline & publishing"]
+            description: >
+              Each early, on-time or late verdict is now kept with the due
+              time, grace and claim window it was measured against. If an
+              approved correction changes that, the new verdict is added
+              alongside the old one, naming the correction.
+          - headline: Corrections need a code owner
+            components: ["GitHub workflow & people", "Pipeline & publishing"]
+            description: >
+              The delivery agreement's files now have named code owners, and a
+              correction is refused unless its approver is one of them. Making
+              GitHub require their review is a repository setting; the new
+              docs/code-owner-review.md says how to turn it on.
+          - headline: Excuse a late supply
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              When a supplier was late for a reason you accept, you can now
+              excuse that supply with a reason, one at a time or across a range
+              of periods. It still counts as late, and the dashboard shows it as
+              Late (excused) with who excused it and why. An excuse can be
+              withdrawn.
+  - date: "2026-10-07"
+    summary: >
+      A promoted supply's colour now matches the page, held supplies say how
+      to unblock them, and example failing rows are stable.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Promoted pill matches the page
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply could read green in its history while the page
+              above said red. Its colour now follows the page, and changes only
+              when something after its arrival changes it - saying what.
+          - headline: Odd file names from S3
+            components: ["Pipeline & publishing"]
+            description: >
+              A file whose name has a space or bracket is now read correctly when
+              it arrives through S3, and one unreadable file no longer stops the
+              others in the same upload being recorded.
+          - headline: Same data, same example rows
+            components: ["QA checks & contract"]
+            description: >
+              A check's example failing rows were whichever rows a tool
+              happened to return first. They are now the lowest keys, in key
+              order, so two runs of the same data show the same rows.
+      - category: Improved
+        items:
+          - headline: Held until dates exist
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A supply held because its dataset's delivery dates ran out now
+              says so by name, and that adding the next dates files it
+              automatically - not that someone has to file or reject it.
+          - headline: Checkpoints explain themselves
+            components: ["Testing & dev tooling"]
+            description: >
+              Checkpoint and resume refuse a bad request in a sentence before
+              touching anything, list the arrival numbers you can choose, and
+              end a resume with one line you can paste.
+          - headline: Fine print on example rows
+            components: ["Dashboard UI"]
+            description: >
+              Under a check's example failing rows, a line says which rows
+              they are - and, past the number Soda or datacontract-cli
+              returns, that the tool chose them.
+  - date: "2026-10-06"
+    summary: >
+      One command now processes whatever has arrived and finishes what is
+      owed, and every route by which you keep a supply from the terminal goes
+      through the same steps the pipeline does.
+    changes:
+      - category: New
+        items:
+          - headline: Replay a collection from a checkpoint
+            components: ["Testing & dev tooling"]
+            description: >
+              mothman pipeline bootstrap --collection cp --checkpoint-before N
+              keeps a copy of the database part-way through, and mothman
+              pipeline resume replays from there into a database of its own.
+              It works out for itself whether your change could affect an
+              earlier arrival, and refuses if it could.
+          - headline: One command processes what has arrived
+            components: ["Pipeline & publishing"]
+            description: >
+              mothman pipeline process checks and gates every arrival not yet
+              processed, in the order they were received, then runs what is
+              owed and reconciles tickets. It asks nothing, so a scheduler can
+              run it, and it never generates data.
+          - headline: The gate records why it did not promote
+            components: ["Pipeline & publishing"]
+            description: >
+              When the promotion rule leaves a supply for a person, the
+              decision log now says so and why - red, a filled slot, no open
+              period, could not be loaded. It changes nothing about what a
+              period holds.
+          - headline: A kept supply reports what happened to it
+            components: ["Testing & dev tooling"]
+            description: >
+              After you keep a supply from the terminal you see which dataset
+              each file became, the period and slot it was filed to, whether
+              it was early or late, and what the rule decided. A trial says
+              what recognition would make of each file.
+      - category: Improved
+        items:
+          - headline: Rebuilding the history is much faster
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Configuration files are now read once per run rather than
+              thousands of times, using the faster C parser. A test replay of
+              twelve Child Protection arrivals dropped from about three minutes
+              to under two, and database connections are now reused rather than
+              opened about sixty times per arrival. dbt now runs in a process of
+              its own that keeps its parsed project between runs, so a full
+              bootstrap from empty takes about eight and a half minutes rather
+              than fifteen.
+          - headline: A supply after its schedule ends says what to fix
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply that arrives after its dataset's last scheduled date is
+              held as schedule-ended, naming the last period, the file to edit
+              and the command that proposes dates. Once you add them, the next
+              processing pass files it for you.
+          - headline: The schedule-ended notice counts what is waiting
+            components: ["Dashboard UI"]
+            description: >
+              The notice now says how many supplies are held because a
+              schedule ended and when the earliest arrived, and appears from
+              the day the last slot closes rather than a period early.
+          - headline: A rebuilt synthetic history keeps its own dates
+            components: ["Pipeline & publishing", "Data generation"]
+            description: >
+              Rebuilding the synthetic history now stamps every decision,
+              filing, run and load with when it happened in that history, not
+              with the day you rebuilt it. Anything you decide afterwards still
+              carries the real time.
+          - headline: A past date says what has changed it since
+            components: ["Dashboard UI"]
+            description: >
+              Viewing what was in place on a past date, the page now lists the
+              decisions made after that date that changed what it shows, naming
+              the dataset, the supply and when each was made.
+          - headline: A promoted supply's pill shows how it stands now
+            components: ["Dashboard UI"]
+            description: >
+              In a supply history, a promoted supply's status pill is its
+              newest result on the date on show, with the verdict it arrived
+              with beside it when the two differ - so a Green pill no longer
+              sits beside "Red promoted".
+          - headline: Keeping a supply from the terminal follows the pipeline's own steps
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              A single table, part of a delivery or a run picked from the
+              synthetic data is now filed, checked against its period and
+              gated exactly as the pipeline would. A drift reference is asked
+              for only when you run a trial.
+          - headline: A file from the other collection is refused straight away
+            components: ["Testing & dev tooling"]
+            description: >
+              Keeping a Birth Registrations file through the Child Protection
+              command, or the reverse, is refused before anything is written,
+              naming the collection it belongs to.
+      - category: Fixed
+        items:
+          - headline: Relabelling a database needs a person
+            components: ["Pipeline & publishing"]
+            description: >
+              Replacing the environment a database is marked as - production
+              included - could be done with flags alone. It now needs someone
+              at a terminal typing out what is being replaced.
+          - headline: The version gate reads every image
+            components: ["Testing & dev tooling"]
+            description: >
+              An untagged, pinned or differently named PostgreSQL image, or
+              one set as a job's container, no longer slips past the check
+              that CI and the dev container run the declared version.
+          - headline: Keeping a supply and a processing pass no longer collide
+            components: ["Pipeline & publishing"]
+            description: >
+              If a processing pass is already working on an arrival you keep
+              from the terminal, your keep is refused and you are told why.
+              Before, both ran and both failed.
+          - headline: A failed step makes processing exit 2
+            components: ["Pipeline & publishing"]
+            description: >
+              A failure anywhere in a pass - recording deliveries, owed work,
+              tickets - now reads as a failure to a scheduler, not as red
+              results. A file that cannot be staged now holds back only its
+              own collection.
+          - headline: A trial really leaves nothing behind
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              A trial's own check results and run are now removed along with
+              everything else it used. Before, they stayed in the database,
+              even though the terminal told you nothing was recorded.
+          - headline: A kept folder tells you what it left behind
+            components: ["Testing & dev tooling"]
+            description: >
+              Keeping a folder now lists any file no dataset recognises, so a
+              renamed extract doesn't quietly go unchecked.
+          - headline: Production asks for its name before deleting anything
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              Tidying left-over schemas or discarding sample data in production
+              now needs you to type the environment's name, and --yes no longer
+              skips it. Keeping a file by hand in production is one step now:
+              typing the name is the decision to keep it.
+          - headline: A file without a header is caught even when it looks like one
+            components: ["QA checks & contract"]
+            description: >
+              A first line holding a date, a number or true/false is now
+              treated as data rather than as column names, so a file missing
+              its header no longer slips through by accident.
+          - headline: Which database you're on is now recorded inside it
+            components: ["Pipeline & publishing"]
+            description: >
+              A database's environment is now kept as a row in its own QA
+              history, so it travels with copies of the database. A database
+              marked the old way needs marking once more with mothman env mark.
+          - headline: A Soda check that can't run now shows red
+            components: ["QA checks & contract"]
+            description: >
+              If Soda can't evaluate one of its checks, that check now reads
+              red with the reason, instead of quietly missing from the
+              results. CI also refuses a check Soda can't parse or one that
+              would need Soda Cloud.
+          - headline: Production asks for its name once per keep
+            components: ["Testing & dev tooling"]
+            description: >
+              Keeping a supply in production asked you to type its name
+              twice. It now asks once, and a typo gets one more try before
+              the check runs as a trial instead.
+          - headline: A file refused at load is not checked and replaces nothing
+            components: ["Pipeline & publishing"]
+            description: >
+              A file that fails a file check now records those results and
+              nothing else. Before, the tools ran against last period's table
+              under its name, and it set aside a real supply that was still
+              waiting.
+          - headline: Past dates on the dashboard no longer show today
+            components: ["Dashboard UI"]
+            description: >
+              On an earlier date, held supplies stay in the waiting list,
+              waits count to that date, and a file check's history stops at
+              it. A superseded supply names its replacement by the time it
+              arrived, and the "results below" line no longer sits above an
+              empty page.
+          - headline: An unknown collection name gets a plain answer
+            components: ["Testing & dev tooling"]
+            description: >
+              The supply commands now name the known collections when you
+              mistype one, and take bdm and cp as pipeline run does.
+          - headline: Red promoted is easier to see
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply that has since turned red now shows a short
+              red pill in the dataset's header, with the reason beneath, and
+              the agency and collection cards list those datasets.
+          - headline: Supplies waiting for a decision are on the dashboard
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              "Waiting for a person" now includes the supplies the terminal's
+              queue lists as awaiting a decision, one line per dataset, and the
+              cards count the same things the list does.
+          - headline: Supply history keeps each period's story to itself
+            components: ["Dashboard UI"]
+            description: >
+              A red supply is no longer shown as resupplied by the next
+              period's supply, and the history tables' columns line up from
+              one period to the next.
+          - headline: Jumping to a scenario says so, and Back undoes it
+            components: ["Dashboard UI"]
+            description: >
+              Following a scenario's link shows a bar naming the scenario and
+              the date you are viewing, with a way back to today, and the
+              browser's Back button returns you to the date you left.
+          - headline: Cross-table checks say which tables and tool
+            components: ["Dashboard UI"]
+            description: >
+              On a collection page, each cross-table check now names the table
+              it is declared on, its column and the tool that runs it.
+          - headline: Red and green read clearly in dark mode
+            components: ["Dashboard UI"]
+            description: >
+              The red and green status colours are lighter in dark mode, so
+              both meet the usual contrast standard against their pills.
+          - headline: A promotion past a reference gap says so
+            components: ["Pipeline & publishing"]
+            description: >
+              When the rule promotes a supply whose only reds come from a gap
+              in its reference, the recorded reason now names those checks
+              instead of saying every check passed or warned.
+          - headline: The terminal report shows which check, not the shared prefix
+            components: ["Testing & dev tooling"]
+            description: >
+              The Check column now shows the column and check name, since the
+              tool already has its own column.
+          - headline: Files arriving in S3 go through the same steps as everything else
+            components: ["Pipeline & publishing"]
+            description: >
+              The S3 handlers now record each arriving object as a delivery,
+              with its receipt taken from storage, and then run the same
+              processing pass the terminal does - filed, checked and gated in
+              receipt order. Nothing is copied, and a retried event records
+              nothing twice.
+          - headline: A fixed file that loads is checked again
+            components: ["Pipeline & publishing"]
+            description: >
+              When a supply that could not be loaded is reprocessed and loads,
+              its checks are now owed again, and the next processing pass runs
+              them as a run of their own, recording the reload as the reason.
+          - headline: CI reuses the bootstrapped database
+            components: ["Testing & dev tooling"]
+            description: >
+              When nothing that shapes the generated QA history has changed,
+              CI restores the database from its cache instead of spending
+              over twenty minutes rebuilding it, and its log says which it did.
+          - headline: A refusal in the menu no longer ends the session
+            components: ["Testing & dev tooling"]
+            description: >
+              If something inside a menu flow is refused, you see why and
+              return to the menu, instead of being dropped out of mothman.
+          - headline: Clearer messages from the terminal
+            components: ["Testing & dev tooling"]
+            description: >
+              The progress bar counts each arrival separately, production
+              explains that a change needs a terminal, and the messages no
+              longer name a flag that does not exist or print quoted errors.
+          - headline: Waiting items link to their dataset
+            components: ["Dashboard UI"]
+            description: >
+              Each item in "waiting for a person" that names a dataset now
+              links straight to it, and rows that lead nowhere no longer
+              look clickable.
+          - headline: Resetting a synthetic database keeps its identity in place
+            components: ["Pipeline & publishing"]
+            description: >
+              A reset now empties everything except the database's identity
+              record, so nothing reading it at the same moment is told the
+              database is unmarked, and the date it was marked stays.
+
+  - date: "2026-10-05"
+    summary: >
+      A dataset that cannot be checked - its supply held, claimed by two
+      files, or impossible to load - now reads plainly red and says why,
+      instead of showing last time's green.
+    changes:
+      - category: New
+        items:
+          - headline: A period holds exactly one version of each table
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting a supply into a period that already holds one now sets
+              the old one aside as superseded, in the same step, so anything
+              reading the period sees one table rather than several. If a
+              later period stands on the old one, you are told which and how
+              to clear it.
+          - headline: A decision that does more than its own period shows you first
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              Before you confirm, the terminal lists what else the decision
+              changes and how to undo each. A script passes the warning's key
+              with --acknowledge; on a ticket you reply a second time with
+              acknowledge and the key. If anything changed in between, you are
+              shown the new warning instead.
+          - headline: Re-file a supply to the period it belongs to
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              From the terminal or a ticket you can now move a supply to a
+              different period. It is checked again there and the normal rules
+              decide whether it is promoted. The earlier filing stays on
+              record, and you are shown first anything the move takes out or
+              sets aside.
+          - headline: The scenario map is a tab of its own
+            components: ["Dashboard UI"]
+            description: >
+              The list of deliberately awkward supplies moved from a side
+              drawer to a Scenarios tab beside Plans and Demo, with its own
+              address. Each entry names the requirements it demonstrates and
+              says when there is no data behind it yet.
+          - headline: The sample history now plays back a person's decisions too
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The synthetic history can now include a person's decisions,
+              scripted in configuration and raised through the same decision
+              path you use, such as acknowledging an amber supply or marking a
+              day not supplied. They run only on a synthetic asset, as a
+              dedicated actor no route but the replay can use.
+          - headline: Each file is checked before any of it is loaded
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              Six checks now look at a file as it arrived - readable text, the
+              right separator, a header row, no repeated column names, every
+              row the same width, columns in the contract's order. A file that
+              fails one is refused and its dataset reads red naming the check;
+              columns out of order only warn. They are about the file, never
+              its data, so they do not change any data check's status.
+          - headline: More awkward supplies in the sample data
+            components: ["Testing & dev tooling"]
+            description: >
+              The sample history now shows a daily file arriving a day late
+              that fills the next day, while its own day is marked not
+              supplied by a person. It also has a Child Protection file that
+              goes ragged partway and is refused, and one whose columns arrive
+              in a different order and only warns.
+          - headline: Fresh re-checks now win over older results in replays
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A supply's results are now ordered by when each run's cause took
+              effect on the asset's own timeline, never by when the batch
+              happened to run. In a replay, older results had been outranking
+              newer ones, which could show a false "red promoted".
+          - headline: Every period says what each of its tables is
+            components: ["Pipeline & publishing"]
+            description: >
+              Each period schema now has a _manifest view: one row per table,
+              saying whether it was promoted, inherited or substituted, which
+              supply it is, when it was received and decided, and the status it
+              went in on. An analyst or tool with access to the period alone can
+              read it.
+          - headline: Choose whether a resend may replace accepted data
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              A new replacement setting decides whether a resupply may replace a
+              promoted supply automatically: never (as shipped), when green, or
+              when green or amber. The replaced supply is superseded, not lost,
+              and the gate refuses green-or-amber wherever amber is held.
+          - headline: Moving a table re-checks what reads it
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Promoting, rejecting, demoting or re-filing a supply now re-checks
+              the cross-table checks in that period that read its table, and the
+              gate looks again at every supply waiting there. One that still
+              fails is listed in one prominent decision-log entry; anything left
+              undone shows as owed in the queue.
+          - headline: Red promoted, and every supply's outcome
+            components: ["Dashboard UI"]
+            description: >
+              A promoted supply whose newest cross-table results are red now
+              says so beside its status, with when and after what it turned and
+              the status it went in on. Each supply in a dataset's history shows
+              its outcome: promoted, rejected, superseded (by which, by whom), or
+              waiting.
+          - headline: The date control says "In place on"
+            components: ["Dashboard UI"]
+            description: >
+              The date picker is now labelled "In place on", and the page says
+              plainly that it uses everything known today; the snapshot archive
+              is what shows what the page said on a past date. Old links using
+              ?asof= still work and are rewritten to ?in-place-on=.
+          - headline: A decision can check a supply again, as a run of its own
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Bringing back a superseded supply, or re-filing one, now runs its
+              checks again while you wait, under a run of its own. The new
+              verdict becomes the supply's verdict and the earlier run stays in
+              its history. If the check cannot finish, it is left owed and you
+              are told.
+          - headline: Tables in a period carry their plain name
+            components: ["Pipeline & publishing"]
+            description: >
+              A promoted table is now called cp_clients in its period, not
+              cp_clients__ followed by an arrival key, so you query a period
+              like any ordinary schema. The database itself refuses to move a
+              table out from under a period's view, and a decision waiting on
+              a running check tells you to retry rather than hanging.
+          - headline: The dashboard tells you when the warehouse and the log disagree
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              After every check run and every decision that moves a table, the
+              decision log is compared with what each period actually holds.
+              A missing or stray table shows as a red notice on that dataset's
+              page, naming the period and the table, and the build warns.
+          - headline: A newer file waiting in a promoted period is in the queue
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              The terminal's queue and period view now list a newer version
+              waiting in a period that already has one promoted, and offer to
+              promote it - showing you first that the current one will be set
+              aside, and both commands it takes to put it back.
+          - headline: A held, contested or unloadable supply turns its dataset red
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              While a supply waits for you to place it, choose between two
+              files, or deal with a file that could not be loaded, its
+              dataset reads red with the reason in words - once, not on every
+              check - and the red rolls up to the collection and agency. The
+              date picker shows it from the day the file arrived.
+          - headline: Drift checks say when they compared across a gap
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              If an earlier period you were owed has no accepted supply, the
+              drift and volume checks go red and tell you which period they
+              compared with instead - while still showing what the
+              measurement itself found, so a gap is never mistaken for drift.
+          - headline: You can accept that a closed period was not supplied
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              A period that closed with nothing in it now says so, and you can
+              record - with a reason - that you accept it was not supplied.
+              It leaves your to-do list but stays in the record. Runs of
+              missed days or quarters show as one item, not one per period.
+          - headline: The dashboard shows a period with no supply in red
+            components: ["Dashboard UI"]
+            description: >
+              A dataset with a closed period that nothing arrived for reads
+              red and says "no supply", naming the periods. Each agency card
+              counts what is waiting for you in one line, by kind. Periods
+              you accepted show quietly with your reason.
+          - headline: A newer file replaces the older one waiting for the same period
+            components: ["Pipeline & publishing"]
+            description: >
+              When a supplier resends a table, the earlier version nobody had
+              accepted is set aside for that period - kept, not deleted - and
+              only the newest waits for you or is checked against its siblings.
+          - headline: You can set a supply aside, or bring a set-aside one back
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              Supersede a waiting supply to set it aside without rejecting it,
+              or un-supersede one to bring it back. `mothman supply superseded`
+              lists the set-aside versions and what replaced each.
+          - headline: You choose what happens to an amber supply
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              One setting - hold, promote-and-acknowledge or promote - for the
+              whole asset, a collection or a dataset. Under hold an amber supply
+              waits for you; under promote-and-acknowledge it is promoted and you
+              are asked to acknowledge it, with a reason, from the queue.
+          - headline: You can reject a supply that could not be loaded
+            components: ["Pipeline & publishing"]
+            description: >
+              A file that failed to load now appears in the terminal's queue
+              of supplies waiting on you. Rejecting it settles it everywhere;
+              promoting it is refused, since there is nothing to promote.
+          - headline: The tool refuses a database that belongs somewhere else
+            components: ["Pipeline & publishing"]
+            description: >
+              Every database now records which data asset and environment it
+              belongs to, and every command checks that against yours before it
+              does anything. A new database is marked once with mothman env
+              mark, where you type the environment's name.
+          - headline: The terminal always says which environment you are in
+            components: ["Testing & dev tooling"]
+            description: >
+              The menu and every question show the environment along the
+              bottom, a confirmation names it, and a command prints it on its
+              first line, marked "not production" unless it is.
+          - headline: One declared PostgreSQL version, checked on every connection
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              The data asset now says which PostgreSQL major it runs on. A
+              server on a different one is refused, and the configuration gate
+              fails if the dev container or CI would test against another.
+      - category: Improved
+        items:
+          - headline: A gap in earlier periods no longer holds a supply back
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              A drift or volume check compared across a period with nothing
+              accepted still reads red and says so, but it no longer stops
+              the supply being promoted - only a real drift does. One supply
+              left waiting no longer makes every later one wait too.
+          - headline: A dataset page shows the newest supply in place or waiting
+            components: ["Dashboard UI"]
+            description: >
+              On any date you pick, a dataset's results are the newest supply
+              that is in place or still waiting for a decision, and a line
+              under the heading says which. A supply that was rejected,
+              demoted or set aside no longer stands in as the answer.
+          - headline: An old held supply no longer hides later results
+            components: ["Dashboard UI"]
+            description: >
+              A dataset with a supply still waiting to be placed stays red
+              with the reason, but its later periods now show their own
+              checked results rather than "No data".
+          - headline: See which amber setting applies, and where it was set
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Each dataset page, `mothman supply slots` and the new `mothman
+              supply amber-setting` say what happens to an amber supply - for
+              example "promote (set for the whole data asset, since 1 Jan
+              2023)" - so a setting nobody remembers choosing can be found.
+          - headline: A late file that is still expected is named
+            components: ["Dashboard UI"]
+            description: >
+              A dataset's row now says when a file is late but its period is
+              still open, beside any older period that closed with nothing in
+              it, and the no-supply notice asks you to chase the supplier
+              before deciding anything.
+      - category: Fixed
+        items:
+          - headline: A period can no longer end up holding two versions of a table
+            components: ["Pipeline & publishing"]
+            description: >
+              Two people promoting into the same period at once, rejecting a
+              promoted supply, or promoting a supply with no tables could each
+              leave a period with two versions or none. Each is now refused or
+              handled in one step, and a pipeline rule never overrides a
+              person's promotion.
+          - headline: The terminal refuses before asking, and its undo steps work
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              A promotion that cannot happen is refused before you are asked to
+              confirm it. The warning's undo now lists every step it takes, and
+              each command prints on its own line so you can copy it whole.
+          - headline: Child Protection pages say correctly what is in place
+            components: ["Dashboard UI"]
+            description: >
+              The line saying whether a dataset's results are in place or
+              waiting read "nothing is in place" for five of the six Child
+              Protection datasets. Each supply is now matched to its own run.
+          - headline: A past date shows each check as it was that day
+            components: ["Dashboard UI"]
+            description: >
+              Picking an earlier date coloured each check by its newest result,
+              so a check that was red that day could read green. It now shows
+              the result of the run on show.
+          - headline: A trial with a file that will not load no longer crashes
+            components: ["Pipeline & publishing"]
+            description: >
+              A trial now records the checks it could not run because a file
+              was missing or unreadable, and finishes, rather than stopping
+              with an error.
+          - headline: A slip in the asset configuration no longer crashes every command
+            components: ["Testing & dev tooling"]
+            description: >
+              If contract/data-asset.yaml cannot be read, every mothman
+              command now stops with one line naming the file, the line and
+              the problem, instead of a page of Python error.
+          - headline: A file after the calendar runs out is held, not filed years back
+            components: ["Pipeline & publishing"]
+            description: >
+              The last period of a written-out calendar now closes, so a file
+              arriving after it waits for you to place it rather than being
+              filed into a period years earlier.
+          - headline: A demote that would leave two waiting versions is refused
+            components: ["Pipeline & publishing"]
+            description: >
+              Demoting a supply into a period where a newer version is
+              already waiting now says to reject or set aside the newer one
+              first, so one table never has two versions waiting.
+          - headline: Bootstrapping both collections at once no longer fails at random
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The two collections could both create the same shared table at
+              the same moment, and one would crash. Shared tables and schemas
+              are now created one at a time.
+          - headline: Setting a supply aside yourself now takes effect everywhere
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A supply you superseded by hand was not recognised as superseded,
+              so it could still be promoted and could not be brought back. It
+              is now listed, refused promotion and can be un-superseded, and a
+              superseded supply no longer shows on the dashboard as still waiting.
+          - headline: A period emptied after it closed reads as having no supply again
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A closed period that was filled and later emptied - say by
+              undoing a substitution - stayed green on the dashboard. It now
+              reads red again from the moment it was emptied.
+          - headline: The dashboard's to-do panel follows the date you are viewing
+            components: ["Dashboard UI"]
+            description: >
+              Looking at a past date no longer lists periods that had not
+              closed yet. A resupply waiting for your decision is no longer
+              counted as a period with no supply.
+          - headline: A supply nobody could place is no longer checked anyway
+            components: ["Pipeline & publishing"]
+            description: >
+              Held supplies were still having every check run against them and
+              recorded. Now nothing runs until you decide which period they
+              belong to.
+          - headline: One held supply no longer stops a dataset's later supplies being checked
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply waiting for a person used to stop every later supply of
+              the same dataset from being checked, and those showed as green.
+              Each supply is now checked on its own terms.
+          - headline: No check silently drops out of a run
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Each run now confirms that every check a tool left out is
+              recorded as not evaluated. The first full run of this found two
+              checks that had been vanishing, which are now checked again.
+          - headline: Why a file could not be loaded is said in our own words
+            components: ["Pipeline & publishing"]
+            description: >
+              The recorded reason no longer copies the loading library's
+              message, which could quote a row of the file; it names the
+              line and the problem instead.
+          - headline: Hand-filing questions are no longer hidden under the progress bar
+            components: ["Testing & dev tooling"]
+            description: >
+              When you file a supply by hand, the questions and what you type
+              now show properly, a bare date is refused rather than recorded as
+              midnight, and receipts that disagree about who filed a delivery
+              are refused.
+          - headline: A file refused on its own date shows its waiting item
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              On the date a supply could not be loaded, the dataset said it was
+              waiting for a person and then that nothing was. The item now
+              counts from when the file arrived, as the red does.
+          - headline: The date page shows the file that really arrived last
+            components: ["Dashboard UI"]
+            description: >
+              Two files received the same day could be shown in the wrong
+              order, because their times were compared as text. They are now
+              compared as times, and dated in the data asset's own timezone.
+          - headline: Smaller fixes to the file checks
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              A very long legitimate field no longer refuses a file, a repeated
+              name the contract does not list is counted rather than quoted, a
+              refusal names the check as the page does, and a screen reader
+              now hears each check's status and finding.
+  - date: "2026-10-04"
+    summary: >
+      A check that could not run now shows on the dashboard as red and
+      says why, instead of quietly disappearing.
+    changes:
+      - category: Fixed
+        items:
+          - headline: A dataset's arrival history shows when its own file landed
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              In a delivery whose files arrived a few minutes apart, `mothman
+              supply history` showed every file at the time the first one
+              landed, with a supply id that matched no filing. Each arrival
+              now shows its own file's receipt and the id its filing carries.
+          - headline: A late file is no longer filed into an older, empty period
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Each period now closes the moment the next period starts
+              accepting files, and a file goes to whichever period was open
+              when we received it - never backward into an older one left
+              empty. A file that arrives when none of its dataset's periods
+              is open is held for you to place. The "Uncertain filing"
+              marker and the separate review of off-cycle arrivals are gone,
+              since neither case can happen any more.
+          - headline: A check that could not run no longer vanishes
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              The 2 October release recorded why a check could not run, but
+              the dashboard never showed it - the check simply dropped out
+              of the run. It now appears on the check's own card in red,
+              marked "not evaluated", with the reason in its detail panel,
+              and its trend chart leaves a gap rather than drawing a zero
+              that looked like nothing was wrong.
+          - headline: Automatic promotions name the rule that made them
+            components: ["Pipeline & publishing"]
+            description: >
+              The decision log said an automatic promotion was made by
+              whoever ran the pipeline. It now names the promotion rule, so
+              you can tell at a glance which decisions a person made.
+          - headline: Keeping a file from the terminal offers the next decision
+            components: ["Testing & dev tooling"]
+            description: >
+              When you keep a local file, folder or S3 supply and it is left
+              waiting on a decision, the terminal now offers that decision
+              straight away, as the synthetic route already did.
+          - headline: Rejecting a replacement file no longer empties its quarter
+            components: ["Pipeline & publishing"]
+            description: >
+              If a quarter was already filled and you rejected a second file
+              sent for it, the quarter read as empty and the queue asked for
+              a resupply. It now keeps showing the supply that fills it. The
+              same applied when an off-cycle resupply was held back.
+          - headline: Two checks with the same name are no longer drawn as one
+            components: ["Dashboard UI"]
+            description: >
+              On a table other datasets check against, two of their checks
+              that shared a name were merged into a single card, so one
+              dataset's results were shown under the other's check. Each
+              now has its own card and its own link.
+          - headline: Database passwords stay out of error messages
+            components: ["Pipeline & publishing"]
+            description: >
+              A connection error only hid the password when the connection
+              string was written as a web-style address. It now hides it
+              however the string is written, and shows nothing of one it
+              cannot read.
+      - category: Improved
+        items:
+          - headline: A supply filed by hand says who filed it and when it really arrived
+            components: ["Pipeline & publishing", "Dashboard UI", "Testing & dev tooling"]
+            description: >
+              Keeping a supply you received by hand now asks when it was
+              originally received - the email's arrival, or each S3 object's
+              own time, offered for you to confirm - and records your answer
+              beside our receipt without ever using it to file or judge the
+              supply. Every delivery also records whether a person filed it,
+              how and who, shown in `mothman supply deliveries` and on the
+              dashboard. Scripts pass `--originally-received`.
+          - headline: Starting the synthetic history from empty is one deliberate command
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              `mothman env reset-synthetic` deletes the whole synthetic QA
+              history after you type a phrase naming what goes, and refuses
+              for any asset not declared synthetic. `pipeline run` and
+              `bootstrap --force` now refuse to run over existing history
+              instead of quietly adding to it, delivery records are kept for
+              good, and `pipeline regenerate-history` is gone.
+          - headline: Overlapping delivery periods are caught before anything arrives
+            components: ["Pipeline & publishing"]
+            description: >
+              The configuration check now fails if any dataset's claim window
+              for one period would open before the previous period stops
+              being on time, so a file can never belong to two periods at once.
+          - headline: Requirements can be retired, and filtered by status
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              A requirement a later one replaces now stays in the
+              Requirements panel marked "Retired", saying when, who decided
+              and what replaced it - a single criterion can be retired the
+              same way. The panel also gains a filter, so you can show only
+              what is built, in progress, not started or retired.
+
+  - date: "2026-10-02"
+    summary: >
+      Every file is now checked the moment it lands, only the supply that
+      turned up unexpectedly waits for you, and a file sent early is
+      credited to the right quarter.
+    changes:
+      - category: Fixed
+        items:
+          - headline: A missing table is not a failure
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              When a check needs a table that is not available, it no longer
+              fails - or takes every other check in the run down with it. It
+              now says which table it was waiting for and why: not due yet
+              (no data, not red), overdue, or sent but awaiting your
+              decision. The last two stay red, because each needs someone to
+              act, and each says plainly that the data itself did not fail.
+          - headline: An early file counts for the quarter it was sent for
+            components: ["Pipeline & publishing"]
+            description: >
+              Suppliers may send a quarterly file up to a fortnight before
+              it is due. Until now one that arrived in that fortnight was
+              counted against the PREVIOUS quarter and recorded as about
+              three months late. It is now credited to the quarter it was
+              sent for, and reads as early. No existing supply changes -
+              none has ever arrived that far ahead.
+      - category: Improved
+        items:
+          - headline: Each file is checked as it lands
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Nothing waits for a delivery to be complete any more. Each file
+              is checked on arrival against the rest of its quarter - whatever
+              else has arrived, or what you have already accepted - and its
+              results are recorded once, against its own table.
+          - headline: Files arrive on their own time
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              Each file now carries the moment it reached us, not one
+              time for its whole delivery. Most synthetic deliveries still
+              land at once, as if unzipped together; some trickle in over a
+              few minutes, in a different order each time.
+          - headline: An early table no longer holds up the rest
+            components: ["Pipeline & publishing"]
+            description: >
+              A dataset that only delivers twice a year sometimes arrives in
+              a quarter it is not due in. That supply is still checked and
+              still comes to you for a decision, but the five tables that
+              arrived alongside it are promoted normally. Across the whole
+              synthetic history that is 45 supplies you no longer have to
+              wave through.
+          - headline: The reason says what actually happened
+            components: ["Pipeline & publishing"]
+            description: >
+              The queue used to tell you a delivery's tables were "filed to
+              more than one period", which left you working out which one
+              was odd. It now names the dataset, the quarter it arrived in
+              and the quarter it was filed to.
+          - headline: Late means late, measured from when we received it
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Whether a supply was early, on time or late was worked out
+              from a timestamp inside the supplier's own file - so in
+              effect the supplier decided whether they were late. It is now
+              measured from when the file reached us, against the quarter
+              it was filed to. Twenty-five Child Protection supplies that
+              read as on time are now correctly late; one of them arrived
+              eleven days after its deadline.
+          - headline: Every resupply shows its own verdict
+            components: ["Dashboard UI"]
+            description: >
+              Only the first attempt in a chain used to show early, on time
+              or late - the rest were left blank, because the old
+              calculation could not say anything meaningful about them. Each
+              attempt now carries its own.
+          - headline: Decisions are dated when they were taken
+            components: ["Pipeline & publishing"]
+            description: >
+              Every promotion in the synthetic history was stamped with the
+              moment the history was generated, so all four years of
+              decisions appeared to happen at once. They now carry the date
+              they would really have been taken, which is what makes asking
+              "what did we hold back in June" possible at all.
+          - headline: See how long a supply has been waiting on you
+            components: ["Dashboard UI"]
+            description: >
+              The dataset page and the supply-history panel now show the
+              time between a supply reaching us and somebody promoting it.
+              Where nobody has yet, it reads as still waiting rather than
+              as nothing at all.
+  - date: "2026-09-30"
+    summary: >
+      A supply nothing could place now waits for you until you deal with
+      it, instead of disappearing when the run that found it ended.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Held supplies stop vanishing
+            components: ["Pipeline & publishing"]
+            description: >
+              When nothing can work out which period a supply belongs to,
+              it now stays on your list until you decide about it. It used
+              to be mentioned once in a run's output and then forgotten.
+          - headline: Both kinds of hold, one list
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply held because two files claim the same dataset and one
+              held because no period fits now appear together, each saying
+              what you can do about it. The second kind was invisible before.
+      - category: New
+        items:
+          - headline: Catch-up drops wait for you
+            components: ["Pipeline & publishing"]
+            description: >
+              When one delivery's tables belong to two different quarters,
+              everything in it is still checked but nothing is promoted
+              automatically - it comes to you with its results in hand
+              instead of being filed and found later.
+      - category: Improved
+        items:
+          - headline: A hold knows how it ended
+            components: ["Pipeline & publishing"]
+            description: >
+              Once you promote, reject or re-file a held supply, its entry
+              closes and keeps a pointer to the decision that closed it - so
+              you can see later why it stopped asking for your attention.
+  - date: "2026-09-29"
+    summary: >
+      You can now decide what goes into a period from the terminal, and
+      see what every period already resolves to.
+    changes:
+      - category: New
+        items:
+          - headline: Decide a period from the terminal
+            components: ["Testing & dev tooling"]
+            description: >
+              A new Filing decisions menu shows the supplies waiting on
+              somebody, and lets you promote or reject one, or say a
+              period stands on an earlier one. Every choice is recorded
+              with your name and your reason.
+          - headline: Your queue, without running anything first
+            components: ["Testing & dev tooling"]
+            description: >
+              Run mothman supply queue to see what is waiting, and
+              mothman supply slots to see where every period stands.
+              Both read the same live record the tickets do, so the
+              terminal and a ticket can no longer disagree.
+          - headline: The run you just did offers its own next step
+            components: ["Testing & dev tooling"]
+            description: >
+              Finish a check and, if that supply is now waiting on a
+              decision, you are offered it there rather than having to
+              go and find it.
+      - category: Improved
+        items:
+          - headline: Only people we know can file
+            components: ["Testing & dev tooling"]
+            description: >
+              A filing decision is accepted only from somebody named in
+              the project's own people list, and refused with a reason
+              from anybody else. Every decision needs a reason and an
+              explicit yes before it is written.
+          - headline: A fresher demo
+            components: ["Dashboard UI"]
+            description: >
+              The Demo tab's recording was showing a question the tool
+              stopped asking. It has been re-recorded against the real
+              wizard as it is today.
+
+  - date: "2026-09-28"
+    summary: >
+      Supplies that pass their checks now file themselves into the period
+      they were sent for, and looking at an earlier date follows the
+      delivery dates you actually agreed.
+    changes:
+      - category: Improved
+        items:
+          - headline: A dashboard now tells you when it is not the real one
+            components: ["Dashboard UI"]
+            description: >
+              A dashboard built anywhere other than the published
+              environment now says so on the page, in words rather than
+              just a colour, so a screenshot of development results can
+              never be mistaken for production's. One that does not know
+              where it was built says that too, instead of staying quiet.
+          - headline: As-of viewing now follows your real delivery dates
+            components: ["Dashboard UI"]
+            description: >
+              Pick a past date and the dashboard works out which delivery
+              period it falls in from the calendar you agreed, not from a
+              guess about how quarters usually run. It gets the February,
+              May, August and November cycle right.
+          - headline: The as-of panel tells you which period you are looking at
+            components: ["Dashboard UI"]
+            description: >
+              Choose a date and the panel names the period it lands in on
+              each of your calendars. The same day is its own day on a daily
+              feed and the middle of a quarter on a quarterly one.
+          - headline: You can no longer pick a date the dashboard cannot answer for
+            components: ["Dashboard UI"]
+            description: >
+              The date box now stops at the earliest and latest periods it
+              has. If an old link carries a date outside them, the page says
+              so, names the range it covers and offers one click back.
+      - category: Fixed
+        items:
+          - headline: A repaired link no longer breaks itself
+            components: ["Dashboard UI"]
+            description: >
+              Opening an old link to a column that no longer exists tidies the
+              address so you can share it again. With a date set, that tidy-up
+              used to leave a link nobody could open. It does not now.
+          - headline: Daily periods are named in words again
+            components: ["Dashboard UI"]
+            description: >
+              Items about a daily feed's missing days named the day as a bare
+              code. They now name it in words, the way every other date on the
+              page is written.
+      - category: New
+        items:
+          - headline: A ticket says something new or says nothing
+            components: ["Pipeline & publishing"]
+            description: >
+              Tickets no longer repeat themselves run after run. Each one's
+              description is kept up to date with where its supply has got to,
+              so a thread quiet for a month still tells you, and comments mark
+              only what actually changed.
+          - headline: Each expected supply can have its own ticket
+            components: ["Pipeline & publishing"]
+            description: >
+              A ticket per expected supply, kept up to date with where that
+              supply has got to, and silent when nothing has changed. By
+              default only supplies that want somebody get one; set
+              ticket_policy to all for every one.
+          - headline: Decide it on the ticket, in your own words
+            components: ["Pipeline & publishing"]
+            description: >
+              A line starting with a slash on a supply's ticket now records the
+              decision, with everything you wrote around it as the reason. A
+              comment with no such line is left alone, and a decision that
+              cannot be taken is answered on the thread.
+          - headline: One set of filing decisions, whoever makes them
+            components: ["Pipeline & publishing"]
+            description: >
+              Promote, reject, demote, substitute and the rest now go through
+              one place, so the terminal and a ticket cannot end up offering
+              different things or disagreeing about what is allowed. Repeating
+              a decision already made says so instead of failing.
+          - headline: Only real people can file a decision
+            components: ["Pipeline & publishing"]
+            description: >
+              Filing decisions are now checked against the people list, so a
+              stand-in entry can be shown on a page without being able to act,
+              and a real colleague added without a GitHub username fails the
+              build instead of finding out later.
+          - headline: You can take an inherited quarter back out
+            components: ["Pipeline & publishing"]
+            description: >
+              A quarter standing on an earlier supply can now be stood up or
+              taken back down one dataset at a time, with your reason on the
+              record - which is what frees a withdrawal those quarters were
+              holding up.
+          - headline: A blocked withdrawal now tells you how to unblock it
+            components: ["Pipeline & publishing"]
+            description: >
+              Refusing to move a supply, the system names each quarter standing
+              on it AND which action clears that one - de-substitute where a
+              person chose it, un-inherit where the schedule did.
+          - headline: Every Child Protection table watches its own size
+            components: ["QA checks & contract"]
+            description: >
+              Each of the six tables now has a check on how much it grew or
+              shrank against the last supply you promoted, with a warn level
+              and a fail level. A table that has doubled over three years is no
+              longer judged against a fixed floor.
+          - headline: Drift is measured against what you actually promoted
+            components: ["QA checks & contract"]
+            description: >
+              Distribution and row-count checks now compare each supply with
+              the last one you promoted, however many periods back that was -
+              never with the start of history, and never with a file somebody
+              rejected.
+          - headline: A check with nothing to compare says so
+            components: ["QA checks & contract"]
+            description: >
+              A dataset's first supply has nothing behind it, so its drift and
+              volume checks now read as having no reference instead of quietly
+              passing. Nothing is promoted on the strength of a comparison that
+              never happened.
+          - headline: Whose results are these, and a way back
+            components: ["Dashboard UI"]
+            description: >
+              A period showing an earlier one's data now says the checks on
+              the page belong to that earlier period, and offers one click
+              through to it. You are told you have left, and given a way
+              back, on a link that survives being shared.
+          - headline: A period standing in on an earlier one says so
+            components: ["Dashboard UI"]
+            description: >
+              Where a period shows data from an earlier one, its status now
+              carries a label naming where the data came from - and saying
+              whether a person decided it or the schedule did, with their
+              reason as written.
+          - headline: You can see what is live, not just what arrived
+            components: ["Dashboard UI"]
+            description: >
+              Where a dataset's newest file is not the one in the warehouse, its
+              page now shows both and says why the new one is not live yet. When
+              they are the same, nothing extra appears.
+          - headline: A dataset that is not due stops reading as missing
+            components: ["Pipeline & publishing"]
+            description: >
+              An annual dataset now fills each quarter it is not due in with
+              the supply that is still current, so a query for this quarter
+              answers instead of finding nothing. Where there is nothing
+              earlier to stand on, the queue says so.
+          - headline: A period nobody supplied can stand on an earlier one
+            components: ["Pipeline & publishing"]
+            description: >
+              When a supplier confirms a quarter's extract is not coming, you
+              can point that period at an earlier one you choose, with your
+              reason on the record. Queries answer instead of returning an
+              empty table.
+          - headline: Good supplies now file themselves away
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply whose checks all pass or warn now moves itself into the
+              period it was sent for. A red one, or one arriving where a supply
+              already sits, waits for you and says which it is.
+          - headline: Deliveries are handled oldest first
+            components: ["Pipeline & publishing"]
+            description: >
+              Each delivery is now checked before the next one starts, so it
+              sees the periods the earlier ones filled. Five years of quarterly
+              extracts land in five years of quarters instead of piling into
+              the first.
+          - headline: There is now one record of who decided what happened to a supply
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting, rejecting, demoting or re-filing a supply is written
+              down as it happens, with who decided it and why. Nothing can
+              change or remove an entry afterwards - a change of mind is a new
+              one. See it with mothman supply decisions.
+          - headline: A decision and what it does to the data are now one step
+            components: ["Pipeline & publishing"]
+            description: >
+              The record and the change land together or not at all, so the log
+              can never say a supply was promoted when the promotion failed.
+              Two people cannot both be told yes for the same delivery period.
+          - headline: Rejecting a supply or using a bad one now asks you why
+            components: ["Pipeline & publishing"]
+            description: >
+              A rejection, using a supply whose checks came back red, or
+              replacing one already in use all need a reason. A routine
+              promotion does not - reasons you are made to give for everything
+              stop meaning anything.
+      - category: New
+        items:
+          - headline: Three of the awkward supply shapes are now in the real data
+            components: ["Data generation"]
+            description: >
+              The forward cascade, the supplier outage and the renamed resupply
+              are generated rather than living only in a test. You can watch a
+              third file land after a day is already filled, two days with no
+              supply at all, and a catch-up drop whose renamed files are left
+              on the floor.
+          - headline: You can now run checks before a schedule is agreed
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Sample data for a dataset nobody has agreed a schedule for is held
+              apart from your real supplies, and the checks run over it normally.
+              You see whether each one passes, which is the whole point of
+              developing it.
+          - headline: Check development stays out of your quality history
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Results from a dataset with no agreed schedule are recorded as
+              in-development. They show on that dataset's own page with their real
+              verdicts, and count towards nothing above it.
+          - headline: A new dataset can be checked against an established one
+            components: ["QA checks & contract"]
+            description: >
+              A check that compares two tables works even when only one of them has
+              an agreed schedule. Its verdict belongs to the new dataset, so a
+              dataset still in development can never turn a live one red.
+          - headline: Sample data goes when you say it goes
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              Run mothman supply discard-sample to remove the data you were
+              developing checks against. Nothing removes it for you - not agreeing a
+              schedule, not any later run - and the record of that work stays.
+      - category: Improved
+        items:
+          - headline: A dataset with no schedule cannot colour the others
+            components: ["Dashboard UI"]
+            description: >
+              A dataset you have not agreed a schedule for keeps its own real red,
+              amber or green, and every summary above it leaves it out. One
+              collection's unfinished work no longer changes the asset's headline.
+          - headline: The tile says which kind of no-schedule it is
+            components: ["Dashboard UI"]
+            description: >
+              "No delivery schedule agreed yet" is somebody's outstanding job. A
+              one-off extraction says so instead, because presenting a finished
+              decision as an open one puts a permanent item on your list.
+          - headline: A supply no longer waits for the rest of its delivery
+            components: ["Pipeline & publishing"]
+            description: >
+              Every file that arrives is checked on its own, against the newest
+              version of the other tables it needs. Nothing has to work out when
+              a multi-file delivery has finished, so nothing can sit waiting for
+              a file that never comes.
+          - headline: Every arrival now records which clock timed it
+            components: ["Pipeline & publishing"]
+            description: >
+              An arrival is timed by when our own storage took the file, or by
+              our clock where storage does not say - and the record tells you
+              which. It is never taken from the file itself, which a supplier
+              controls.
+          - headline: A check run by automation now says which automation
+            components: ["Pipeline & publishing"]
+            description: >
+              A run from a scheduled workflow is credited to that workflow by
+              name rather than needing a person's details, so the activity feed
+              stops implying somebody was at a keyboard.
+      - category: Fixed
+        items:
+          - headline: Which period each supply counts for is recorded in the warehouse
+            components: ["Pipeline & publishing"]
+            description: >
+              That record was going to be written into the repository the day
+              this gets switched on. It now goes where everything else does, so
+              nothing starts filling the repository with day-to-day state.
+          - headline: The requirements register agrees with itself again
+            components: ["Docs & process", "Pipeline & publishing"]
+            description: >
+              Around twenty requirements still described quality results as
+              files in the repository and the dashboard as something GitHub
+              builds. Each now says what the system actually does, and says
+              what it used to say, so nothing reads as two conflicting rules.
+          - headline: A dataset can exist before its delivery schedule is agreed
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              You can add a dataset, say plainly that no schedule has been
+              agreed for it yet, and it will not be reported as owing anything.
+              A one-off extraction for a project says so differently, because it
+              is never going to gain one.
+          - headline: Saying nothing about a schedule is still an error
+            components: ["Pipeline & publishing"]
+            description: >
+              Declaring that a dataset has no calendar is now allowed; leaving
+              the calendar out by accident, or mistyping its name, still fails
+              the configuration check. A dataset that silently expects nothing
+              never reports a missing delivery.
+          - headline: A retired design cannot quietly come back
+            components: ["Testing & dev tooling", "Docs & process"]
+            description: >
+              A new check fails the build if anything starts describing quality
+              results as files again. A tidy-up only stays tidy if something
+              watches it, and this is what watches.
+          - headline: The test suite stopped leaving deliveries behind
+            components: ["Testing & dev tooling"]
+            description: >
+              One test was filing a real delivery every time it ran, and twenty-six
+              had built up. They were being counted as arrivals, which made one
+              measurement of what actually arrived wrong. Nothing can do it again.
+          - headline: The dashboard's read-only account really is read-only now
+            components: ["Pipeline & publishing"]
+            description: >
+              It could still reach one part of the warehouse it was never meant
+              to, because of how database-wide permissions work. It is now
+              limited to the quality records and nothing else.
+  - date: "2026-09-27"
+    summary: >
+      The warehouse is now PostgreSQL, and every QA tool checks what was
+      loaded into it rather than the file that arrived.
+    changes:
+      - category: Improved
+        items:
+          - headline: Your QA history lives in the warehouse now, not in the repository
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Every check result, every tool's own raw output and every run's
+              own record are stored alongside the data they describe. You no
+              longer commit anything to keep a run, and the history is the
+              same history whoever is looking at it.
+          - headline: Keeping a run, or not, is now something you decide before it runs
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              The wizard asks whether to record a check before it starts
+              rather than offering to promote the results afterwards. Say no
+              and it runs as a trial, which leaves nothing behind.
+          - headline: The dashboard is no longer built by GitHub
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              Building it needs the QA history, and that is somewhere GitHub
+              cannot reach. The checks that only read configuration still run
+              there on every push, so a bad contract or a stale index is
+              still caught before anything else happens.
+      - category: New
+        items:
+          - headline: A file you were emailed can now become a real arrival
+            components: ["Pipeline & publishing"]
+            description: >
+              Check a supply you downloaded or were sent, and you are asked
+              whether to keep it. Keeping files it as a delivery received
+              now, so the arrival history and the dashboard show it the same
+              way they show anything that arrived on its own.
+          - headline: Or run a trial, which leaves nothing behind
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Say no and you get a trial: the same four tools against the
+              same rows, with the same verdicts, and not a trace of it
+              anywhere afterwards. Experimenting with a file costs nothing.
+              Pass --commit or --trial to answer without being asked.
+      - category: Improved
+        items:
+          - headline: A run now cleans up after itself on disk
+            components: ["Pipeline & publishing"]
+            description: >
+              Each run already gave back the database schemas it borrowed;
+              it now gives back dbt's working directory too. That had been
+              quietly accumulating - nearly two gigabytes of it in this
+              checkout - because nothing ever removed it.
+          - headline: Open the project in a container and it just works
+            components: ["Testing & dev tooling"]
+            description: >
+              A development container now brings up a PostgreSQL on the
+              same version the build server uses, waits for it, and
+              installs everything the tests need. Evaluating the project
+              no longer starts with a list of commands to run by hand.
+          - headline: Run names you can actually read
+            components: ["Pipeline & publishing"]
+            description: >
+              A kept supply is numbered like every other arrival, and a
+              trial is named for the moment you ran it. The long names built
+              out of your own filename, which repeated the dataset name and
+              the date back at you, are gone.
+          - headline: One database, and it is the one production runs
+            components: ["Pipeline & publishing"]
+            description: >
+              Staging, rejected supplies, each period and each run's views
+              now live in PostgreSQL instead of a DuckDB file. Every
+              property this design leans on is exercised by the engine a
+              real deployment would use, rather than read from
+              documentation and hoped for.
+          - headline: DuckDB now reads what arrives, and nothing else
+            components: ["Pipeline & publishing"]
+            description: >
+              It still reads the CSV or Parquet a supplier sends and works
+              out what is in it, which is the job it is best at. The rows
+              then stream into PostgreSQL. It is never a warehouse.
+          - headline: Drift is measured against the warehouse too
+            components: ["QA checks & contract"]
+            description: >
+              The last check still reading the supplier's file now reads
+              what was loaded, like the other three. It compares against
+              the distribution recorded when the reference supply was
+              checked, so it keeps working however old that supply gets.
+          - headline: datacontract-cli checks the warehouse, not the file
+            components: ["QA checks & contract"]
+            description: >
+              It used to read the supplier's CSV directly, which made it
+              the one tool answering a different question from the other
+              three - they checked what had been loaded, it checked what
+              had been sent. Two tools could disagree about a dataset and
+              both be right. They now look at the same thing.
+      - category: Fixed
+        items:
+          - headline: A failed check no longer leaves a connection behind either
+            components: ["QA checks & contract"]
+            description: >
+              Four places closed their database connection only when
+              everything went right, so a check that errored leaked one
+              and could block the next run's tidy-up. They now close
+              whatever happens.
+          - headline: Nothing to export before you run anything
+            components: ["Testing & dev tooling"]
+            description: >
+              Put your database details in a `.env` file once and every
+              command and the tests pick them up. Anything already set
+              in your shell still wins. `.env.example` lists what goes
+              in it.
+          - headline: Soda no longer leaves a connection behind after every scan
+            components: ["QA checks & contract"]
+            description: >
+              Each scan quietly left one database connection open, still
+              inside a transaction, holding the tables it had just read.
+              After forty of them a run could no longer tidy up after
+              itself and gave up waiting. Scans now close what they
+              opened.
+          - headline: A load can no longer wait forever for a lock
+            components: ["Pipeline & publishing"]
+            description: >
+              If something does hold a table open, a load now gives up
+              after thirty seconds and tells you what it was waiting for,
+              rather than hanging with nothing in the log to say why.
+          - headline: A scan can no longer move your database
+            components: ["QA checks & contract"]
+            description: >
+              Running Soda quietly reloaded your `.env` over everything
+              you had already set, so a run told to use one database
+              carried on against another. Whatever you set when you
+              started a command now stays set.
+          - headline: The test suite stays in its own database
+            components: ["Testing & dev tooling"]
+            description: >
+              A side effect of the above had tests drifting onto the real
+              warehouse partway through a run, so they failed differently
+              every time and left tables behind. Each one now stays where
+              it was put.
+          - headline: A dbt build that failed no longer looks like one that worked
+            components: ["QA checks & contract"]
+            description: >
+              If dbt could not run, the previous run's results were still
+              on disk and got reported as this run's - a pass you could
+              not tell from a real one. A build that did not happen now
+              stops the run and tells you what dbt said.
+          - headline: Each run cleans up after itself
+            components: ["Pipeline & publishing"]
+            description: >
+              A run's temporary schemas used to be swept up at the very
+              end, all at once, which could pull the floor out from
+              under a check you started separately. Each run now
+              discards its own the moment it finishes.
+          - headline: One copy of a supply, not three
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply used to be written to disk two or three times -
+              as a delivery, as a flat copy beside it, and for Child
+              Protection again by staging. It now exists where it
+              arrived and in the database, and nowhere else.
+          - headline: A file you hand it is checked where it is
+            components: ["Pipeline & publishing"]
+            description: >
+              Checking a single file used to copy it into a working
+              directory first, along with the reference you compared
+              it against. Both are now read from wherever you point
+              at, and the reference is loaded like any other supply.
+          - headline: Shorter names for an ad-hoc check
+            components: ["Pipeline & publishing"]
+            description: >
+              Checking a file you point at built a name from the whole
+              filename plus the time, which for an ordinary delivery
+              repeated the dataset name and carried two dates. It now
+              keeps the recognisable start and the time.
+          - headline: Drift will not answer from a stale file
+            components: ["QA checks & contract"]
+            description: >
+              If the warehouse cannot give the drift check the rows it
+              needs, it now says so. It used to quietly read a copy off
+              disk instead and hand you a number that looked fine.
+          - headline: Two checks of the same files no longer collide
+            components: ["Pipeline & publishing"]
+            description: >
+              Checking two folders in one go could have the second
+              quietly demolish what the first had loaded, because the
+              two runs were treated as the same arrival. They are two
+              arrivals now.
+      - category: New
+        items:
+          - headline: mothman supply tidy
+            components: ["Testing & dev tooling"]
+            description: >
+              Clears temporary schemas an interrupted run left behind.
+              It shows you what it found and asks before dropping
+              anything, because it cannot tell a leftover from a run
+              somebody else has going right now.
+      - category: New
+        items:
+          - headline: You need a PostgreSQL to run this
+            components: ["Testing & dev tooling"]
+            description: >
+              There is no database file in the repository to open any
+              more, so setting this up means pointing it at a real
+              server. The README says how, including one trap worth
+              knowing: the database needs a password even locally.
+      - category: New
+        items:
+          - headline: The dashboard will say which environment built it
+            components: ["Pipeline & publishing"]
+            description: >
+              Environments are now declared in one place, and a checkout
+              says which one it is. Groundwork for building the
+              dashboard where the data lives, so a development build can
+              never be mistaken for the published one. `mothman env
+              list` shows them.
+          - headline: One command to set up a fresh checkout
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman pipeline bootstrap` generates the synthetic data
+              and runs every check over it, so a new clone has something
+              to look at. Run it as often as you like - if there is
+              already data there it says so and stops. It is on the
+              mothman menu too.
+          - headline: A new session sets itself up
+            components: ["Testing & dev tooling"]
+            description: >
+              Starting a session now starts the database, creates its
+              login if missing, installs what the tests need, and tells
+              you whether the warehouse has anything in it. Previously
+              you found all of that out from failing tests.
+      - category: Improved
+        items:
+          - headline: The browser tests stopped waiting around
+            components: ["Testing & dev tooling"]
+            description: >
+              They used to pause half a second after every page load on
+              the off chance it had finished rendering. They now wait
+              for the page to say it has, which takes a quarter off the
+              time the checks need and removes a source of flakiness.
+          - headline: Schema names you can actually read
+            components: ["Pipeline & publishing"]
+            description: >
+              A quarter's schema is now `period_2026_q3` rather than
+              `period_2026_2d_51_33`, and a run's is `qa_run_run_001`.
+              What you see in the database is what you would have
+              guessed.
+          - headline: Two periods can no longer share one schema by accident
+            components: ["QA checks & contract"]
+            description: >
+              A calendar naming both "2026-Q3" and "2026_Q3" is now
+              refused, naming both, when you validate the schedule.
+              Previously they were two periods whose promoted data would
+              have quietly ended up together.
+  - date: "2026-09-26"
+    summary: >
+      Birth Registrations no longer looks like it missed three and a half
+      years of deliveries, and a late supply is filed to the day it was
+      actually for.
+    changes:
+      - category: Fixed
+        items:
+          - headline: 1,333 deliveries that were never owed
+            components: ["Pipeline & publishing"]
+            description: >
+              The daily delivery calendar was set to start in January 2023,
+              years before Birth Registrations first supplied anything, so
+              every day in between counted as a delivery that never arrived.
+              It now starts when the feed does.
+          - headline: Both tables now count
+            components: ["QA checks & contract"]
+            description: >
+              A check comparing two tables used to count against whichever
+              one it happened to be written under, so the other could read
+              green while a check about it was failing. It now appears on
+              both, and counts against both.
+          - headline: Late supplies land right
+            components: ["Pipeline & publishing"]
+            description: >
+              Because those empty days counted as still waiting to be filled,
+              a supply arriving late was filed against the oldest of them
+              rather than the day it was for - in one case three and a half
+              years earlier.
+          - headline: Two checks wearing one name
+            components: ["Dashboard UI"]
+            description: >
+              Where two checks of the same tool sat side by side, the second
+              borrowed the first's name and opened the first's details. Both
+              now show their own, so a row about carers no longer reads as a
+              row about clients.
+          - headline: Sprints count themselves
+            components: ["Docs & process"]
+            description: >
+              The delivery plan works out each sprint's status from how many of
+              its requirements are actually finished, instead of someone typing
+              it in. Eleven of twenty-five had drifted out of date.
+          - headline: No rule is not a pass
+            components: ["Dashboard UI"]
+            description: >
+              A section with no quality rule defined showed a green tick, which
+              read as "checked and fine" rather than "nothing checked". It now
+              says so plainly instead.
+      - category: Improved
+        items:
+          - headline: What is waiting on what
+            components: ["Docs & process"]
+            description: >
+              The Plans tab now shows which delivery sprints are held up by
+              which, and by how many unfinished criteria. One sprint turns
+              out to be holding up seventeen across seven others.
+          - headline: One folder per table
+            components: ["Pipeline & publishing"]
+            description: >
+              Every QA result is now filed under the table it describes, so
+              finding one table's history is opening a folder rather than
+              sifting a shared file. The whole history was rebuilt this way.
+          - headline: Cross-table checks have a home
+            components: ["Dashboard UI"]
+            description: >
+              Checks about the relationship between two tables now have a
+              section of their own on the collection page, and appear on
+              every table they read rather than only the one they were
+              written under.
+  - date: "2026-09-25"
+    summary: >
+      Every date and time now reads the same way, supplies are kept in
+      one warehouse rather than thrown away, and everything waiting for a
+      person is gathered into one list with a count.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Three Child Protection datasets open properly again
+            components: ["Dashboard UI"]
+            description: >
+              Opening Client Register, Carer Register or Case Workers
+              left out the supply history and did not update the address
+              bar, so the link you copied went back to the agency. Both
+              are fixed, and the checks that caused it can now be linked
+              to like any other.
+          - headline: The overview counts what is actually there
+            components: ["Dashboard UI"]
+            description: >
+              The green figure on the front page was worked out by
+              subtracting the red and amber ones from the total, so an
+              agency with no data, or whose schedule had ended, was
+              counted as healthy. Every figure is now counted in its own
+              right, and the two quiet states appear in the key with
+              their own totals whenever they are real.
+          - headline: A trend line no longer ends in red when there is no current reading
+            components: ["Dashboard UI"]
+            description: >
+              Looking at a date where a dataset has history but nothing
+              recent, the card drew its full trend ending in a red dot —
+              often the only red on screen — directly under a pill
+              saying there is no data. The history still shows; the dot
+              marking "where it stands now" goes grey, because at that
+              date nobody can say. A related fix means a status the
+              dashboard does not recognise is drawn grey rather than
+              green.
+          - headline: Adding a collection no longer means remembering a second file
+            components: ["QA checks & contract"]
+            description: >
+              The check that keeps data contracts and the agency tree in
+              step worked from a hand-written list of contract files, so
+              adding a collection meant editing two places — and
+              forgetting the second one meant the new contract was never
+              checked at all, silently. The list is now worked out from
+              the tree itself, and a contract file nothing points at is
+              reported rather than ignored.
+          - headline: A finished requirement can now admit what it did not finish
+            components: ["Docs & process"]
+            description: >
+              The requirements register could only say "built" or "not
+              started", so one marked built while six of its criteria
+              were not built at all read as complete, with the gap
+              recorded in a notes field nobody had to open. A
+              requirement can now list the criteria it does not meet,
+              each saying why and who picks it up next, and the
+              Requirements panel shows them above everything else.
+          - headline: Quiet status pills no longer disappear under the cursor
+            components: ["Dashboard UI"]
+            description: >
+              Pointing at a dataset row made its own "No data" or
+              "Schedule ended" pill vanish — the row highlight and the
+              pill were painted in exactly the same colour. The pill now
+              keeps its shape under the cursor, and reads slightly more
+              clearly there than it does at rest.
+          - headline: Priority and status stopped sharing a colour
+            components: ["Dashboard UI"]
+            description: >
+              A requirement marked "Must" was drawn in the same red as a
+              failing dataset, so one screen could show red verdicts on
+              one side and red priorities on the other. Priorities now
+              have their own scale.
+          - headline: Small fixes for narrow screens and long lines
+            components: ["Dashboard UI"]
+            description: >
+              Header buttons and breadcrumbs are now big enough to press
+              on a phone, a command shown in a notice no longer splits
+              into what looks like two commands, "Tier 2" stops wrapping
+              onto two lines, and the footer and the front-page notice
+              no longer run the full width of a wide monitor.
+          - headline: Everything you can navigate to is a real link
+            components: ["Dashboard UI"]
+            description: >
+              Breadcrumbs, agency cards and dataset names were buttons
+              pretending to be links, so middle-click, Ctrl-click,
+              open-in-new-tab and copy-link-address all did nothing on
+              them. They are real links now, and the page gets out of
+              the way when you ask the browser to handle one. Buttons
+              that perform an action rather than going somewhere — the
+              date picker, dark mode, the side panels — stay buttons.
+          - headline: A dataset whose schedule has ended still shows its history
+            components: ["Dashboard UI"]
+            description: >
+              Opening one replaced the whole page with a notice saying no
+              more supplies are expected, hiding eighteen runs of real
+              results behind it. The notice stays at the top, and
+              everything you came for is underneath it, labelled as the
+              last known state rather than a current reading.
+          - headline: A column with no quality rule now says so instead of showing green
+            components: ["Dashboard UI", "QA checks & contract"]
+            description: >
+              Eleven columns across the Child Protection datasets have no
+              automated rule defined. Each showed a green tick, with the
+              explanation buried four clicks away in the check panel — so
+              a column nobody checks looked exactly like one that had
+              passed, and in three cases turned a whole table-level
+              section green on its own. They now read "No rule defined"
+              in a disabled grey at every level. It is not a verdict: it
+              neither drags a dataset down nor lifts it up.
+          - headline: The dashboard warns you before a delivery calendar runs out
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              The warning that a calendar is nearly out of dates was
+              computed and only ever shown in the build log, so the one
+              place people actually look never carried it. It now
+              appears on the front page, names the dataset that runs out
+              first, and says plainly that nothing has failed. It steps
+              aside once a calendar has actually run out, where the
+              existing notice takes over.
+          - headline: A link to a column that no longer exists says so
+            components: ["Dashboard UI"]
+            description: >
+              Opening an old bookmark for a column that had since been
+              renamed or dropped left you on the dataset page with no
+              explanation and the dead link still in the address bar, so
+              sharing it passed the problem on. You now get a short note
+              saying what is missing, the address bar is tidied up, and
+              the rest of the page still shows what you came for.
+          - headline: A sentence in the page footer reads properly again
+            components: ["Dashboard UI"]
+            description: >
+              Removing the illustrative datasets left two sentences run
+              together with no full stop between them, on every page.
+          - headline: "`schedule show` answers \"what's next?\" without a date dump"
+            components: ["Testing & dev tooling"]
+            description: >
+              Asking for a daily dataset's schedule either crashed, or
+              printed over a thousand rows once you worked out that it
+              wanted an end date. It now shows the last few periods and
+              the next few, marks the next supply owed, and says how
+              many it left out. Use --all for the full list.
+          - headline: Wrong input to a schedule command reads like an error, not a crash
+            components: ["Testing & dev tooling"]
+            description: >
+              A mistyped dataset name, or a malformed date, ended in
+              thirty lines of Python traceback - while the command next
+              to it answered the same mistake in a tidy box. Both now
+              do. The dataset and calendar options also list their real
+              values in --help, so there is less to guess at.
+          - headline: The runway warning names the dataset its number belongs to
+            components: ["Pipeline & publishing"]
+            description: >
+              It said a calendar had two supplies left and gave the
+              calendar's last date, which belonged to a different
+              dataset - so counting the dates in the file gave you a
+              different answer with no way to reconcile them. It now
+              names the dataset that runs out first and that dataset's
+              own last period.
+          - headline: "`mothman check` can say \"passed, with a warning\""
+            components: ["Testing & dev tooling"]
+            description: >
+              A gate could only pass or fail, so the low-runway warning
+              printed eight gates above a summary that said "Every gate
+              passed". There is now a fourth outcome that reports the
+              warning without failing anything.
+          - headline: Suggesting next year's delivery dates cannot leave a gap
+            components: ["Testing & dev tooling"]
+            description: >
+              The command the runway warning points you at would
+              propose a year already in the file, a year in the past, or
+              a year with unauthored ones before it - which is the empty
+              schedule the build check exists to prevent. It now
+              proposes only the year next in line, and --yaml gives you
+              the block to paste.
+          - headline: Configuration errors are easier to act on
+            components: ["Testing & dev tooling"]
+            description: >
+              One mistyped duration produced two errors saying different
+              things about the same value, and the generated advice was
+              "Add it." or "Correct the value." Each mistake is now
+              reported once, with the shape and an example of what
+              belongs there, and the count of affected datasets includes
+              those broken by a calendar rather than only those named
+              directly.
+          - headline: Changing a delivery calendar no longer moves old claim windows
+            components: ["Pipeline & publishing"]
+            description: >
+              How early a supply may be filed against a slot was read
+              from whichever version of the calendar is current, and
+              applied to every slot including ones years old. Shortening
+              the window today would have quietly moved when past
+              supplies became claimable. Each slot now uses the window
+              that was in force on its own date. A window set on an
+              individual dataset is unaffected - it has no versions to
+              move between.
+          - headline: An unrecognised collection is now an error, not an empty day
+            components: ["Pipeline & publishing"]
+            description: >
+              Asking for the arrivals of a collection that does not
+              exist returned nothing at all, which looks exactly like a
+              collection that has had no deliveries. Renaming one would
+              have given you a pipeline that processed nothing and said
+              nothing was wrong. It now stops and tells you which
+              collections there are.
+          - headline: Lower-case month names are accepted where they always worked
+            components: ["Pipeline & publishing"]
+            description: >
+              Writing "february" instead of "February" in a delivery
+              calendar was refused by the build check with "which is not
+              a month", even though the pipeline itself read it
+              perfectly. The check now asks the pipeline how it reads a
+              month rather than keeping its own second opinion.
+          - headline: Every commit in a push is now checked for quiet edits
+            components: ["Pipeline & publishing"]
+            description: >
+              Two guards exist to stop a past delivery date, or a
+              check's definition, being changed after the fact - and
+              both only ever looked at the last commit of a push. A
+              change made one commit earlier went unseen. They now read
+              the whole push. Two related holes closed with it: editing
+              an existing calendar note no longer licenses moving a
+              past date (only a new note does), and "in the past" is
+              now decided on the asset's own clock rather than the
+              build machine's, which sits on a different calendar day
+              for about a third of every day.
+          - headline: An empty delivery calendar no longer calls itself "low"
+            components: ["Pipeline & publishing"]
+            description: >
+              A calendar with no future dates left was described in the
+              same words as one merely running short. It now says it is
+              exhausted, and says plainly that nothing is failing the
+              build yet.
+      - category: Improved
+        items:
+          - headline: Nobody picks between two files for you
+            components: ["Pipeline & publishing"]
+            description: >
+              If one delivery carries two files that are both the same
+              table, that table is held for you rather than the pipeline
+              picking one. Both are kept, everything else in the
+              delivery carries on, and you decide.
+          - headline: A permanent record of what arrived
+            components: ["Pipeline & publishing"]
+            description: >
+              Every delivery now leaves a record of what was in it and
+              what each file was taken to be, written once and kept.
+              Including the files nothing recognised, so a supplier
+              quietly renaming an extract shows up rather than passing.
+          - headline: One slow upload no longer stops everything
+            components: ["Pipeline & publishing"]
+            description: >
+              A delivery still being uploaded used to halt the whole
+              run. It is now left alone and picked up once complete, and
+              you can see what is still arriving and which files have
+              landed so far.
+          - headline: Adding a dataset stops being a code change
+            components: ["Pipeline & publishing"]
+            description: >
+              Each dataset now says for itself how its files are named,
+              in one line of configuration. If two datasets ever claim
+              the same file, it is held for you rather than filed
+              against a guess.
+          - headline: One warehouse instead of hundreds
+            components: ["Pipeline & publishing"]
+            description: >
+              Every supply used to be loaded into its own database file,
+              thrown away once the checks had run. They now go into one
+              warehouse that keeps them, and each run records which
+              version of each table it read.
+          - headline: A tied count no longer shuffles
+            components: ["Dashboard UI"]
+            description: >
+              Where several values were invalid the same number of
+              times, the list could come back in a different order each
+              rebuild, and one could drop off the bottom. Now it is
+              always the same list.
+          - headline: Dates read like dates
+            components: ["Dashboard UI", "Testing & dev tooling"]
+            description: >
+              Every date and time, on the dashboard and in the command
+              line, now reads one way - "2:15pm Friday, 29 September
+              2026" - on Perth time. No raw timestamps left, and no UTC
+              to convert.
+          - headline: When this page was built
+            components: ["Dashboard UI"]
+            description: >
+              The "Live - updated 4s ago" counter beside the title was
+              measuring how long your browser tab had been open, not how
+              fresh the data was. It now says when the page was built.
+          - headline: The top tier is called Agencies
+            components: ["Dashboard UI"]
+            description: >
+              The landing view was labelled "Executive", which said who
+              it was for rather than what was on it. It is now
+              "Agencies" - the plural matters, because the tier below it
+              is one agency. Nothing you have bookmarked changes.
+          - headline: You can reach the whole dashboard from the keyboard
+            components: ["Dashboard UI"]
+            description: >
+              The dataset list on an agency page could not be reached
+              without a mouse, so keyboard navigation stopped one level
+              above the data. Those rows now take focus and open on
+              Enter, every control has a visible focus outline, and
+              focus no longer disappears into panels that are closed.
+          - headline: The page says which view you are on
+            components: ["Dashboard UI"]
+            description: >
+              Every view used to share one browser-tab title, so history
+              and bookmarks could not tell them apart. The title now
+              names the view, and moving between views announces itself
+              and moves the cursor there.
+          - headline: One calendar typo now reads as one calendar typo
+            components: ["Pipeline & publishing"]
+            description: >
+              Mistyping a calendar's name used to produce an identical
+              error for every dataset on it, each suggesting you edit
+              that dataset - and offering the misspelling itself as a
+              valid choice. The check now says once, above the detail,
+              how many datasets name the missing calendar and which
+              defined calendar nobody is using, and it only suggests
+              calendars something already uses.
+          - headline: A calendar mistake is caught before you push
+            components: ["Testing & dev tooling"]
+            description: >
+              Editing the delivery calendars now runs the schedule check
+              as you commit, rather than waiting for the build. It takes
+              about a second and reads no data.
+          - headline: "--collection, because that is what it takes"
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman pipeline run` and the `debug` runners took
+              `--dataset bdm` or `--dataset cp`, which name collections
+              rather than datasets - and `--dataset` means a real
+              dataset elsewhere in the same tool. They now take
+              `--collection`. Commands that genuinely take a dataset are
+              unchanged.
+          - headline: A file is loaded or it is not
+            components: ["Pipeline & publishing"]
+            description: >
+              Every supply now carries a record saying it finished
+              loading, and a check can only read one that has it. If a
+              load is cut short, nothing is left behind for a check to
+              mistake for a short delivery.
+          - headline: Stage what arrived, ask questions later
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman supply load` puts every delivery into the
+              warehouse on the strength of having arrived - no period,
+              no slot, nothing it cannot know yet. Each supply is kept
+              under its own arrival time, so a resupply never writes
+              over the one before it.
+          - headline: The ones that would not load
+            components: ["Pipeline & publishing"]
+            description: >
+              A file that cannot be read no longer stops the rest of its
+              delivery. `mothman supply failures` lists what failed and
+              why, and waits for you - reject the supply, or fix the
+              cause and load it again.
+          - headline: Arrival order, not whatever the folder said
+            components: ["Pipeline & publishing"]
+            description: >
+              Two files that landed in the same batch are now processed
+              in the order they actually arrived. Where two share an
+              arrival time, the order they were received in settles it -
+              previously the supplier's own file naming did, which meant
+              the same two files could be filed differently.
+          - headline: An interrupted run picks up where it stopped
+            components: ["Pipeline & publishing"]
+            description: >
+              A run that stops partway now leaves everything it did not
+              finish for the next one, in the same order, rather than
+              only looking at whatever arrived most recently.
+          - headline: Every table gets its own timeline
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman supply history --dataset <name>` shows when that
+              one table arrived, on its own. A file resent for it no
+              longer disappears into a delivery of five other tables
+              that did not change, and those five gain nothing from
+              sharing the drop.
+          - headline: A file that would not load still counts as arriving
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply that could not be read is still the latest thing
+              that arrived for that table, so a supplier sending
+              something broken shows up rather than leaving yesterday
+              on screen as though nothing happened.
+          - headline: A punctual supplier stops reading as a late one
+            components: ["Pipeline & publishing"]
+            description: >
+              Working out which period a supply is for now treats
+              arriving on time as evidence of which period it belongs
+              to. Without that, a supplier whose system went down for
+              two days had every later delivery recorded two days late,
+              for good.
+          - headline: A delivery that never came stays missing
+            components: ["Pipeline & publishing"]
+            description: >
+              A period nobody delivered for can no longer be quietly
+              filled by a later day's resupply. It stays on the record
+              as an obligation that was not met, so a service failure
+              cannot turn into a met one.
+          - headline: Saying it does not know
+            components: ["Pipeline & publishing"]
+            description: >
+              Where the pipeline genuinely cannot tell which period a
+              supply is for, it now says so and waits for you, naming
+              every period it considered and why each was ruled out -
+              rather than putting the file somewhere plausible.
+          - headline: Everything waiting, in one list
+            components: ["Dashboard UI"]
+            description: >
+              Held supplies, failed loads, files nothing could place and
+              uncertain filings now appear together with one count, on
+              the overview and on every agency and dataset they affect.
+              On a quiet day it says nothing is waiting.
+          - headline: Warnings are not verdicts
+            components: ["Dashboard UI"]
+            description: >
+              Anything waiting for a person is marked as needing action,
+              a warning or information, in its own wording and never in
+              the red, amber and green a failing check uses - so an odd
+              filename cannot read as a dataset in trouble.
+          - headline: One period at a time
+            components: ["Pipeline & publishing"]
+            description: >
+              Checks will read a single period's data with the delivery
+              under test laid over it, so a comparison between two tables
+              is always within one period. A delivery covering two periods
+              is checked once for each.
+          - headline: Checks that cannot run
+            components: ["Pipeline & publishing"]
+            description: >
+              Where a table a check needs never arrived, the check now
+              reads red and names it, instead of quietly reading nothing.
+              A brand-new dataset with no earlier period to compare
+              against still reads as having no data, not as a failure.
+          - headline: Checks name what they read
+            components: ["QA checks & contract"]
+            description: >
+              A check that compares two tables now records which version
+              of the other table it read, so a failing referential check
+              tells you what it was failing against rather than leaving
+              you to work it out.
+          - headline: No half-finished runs
+            components: ["Pipeline & publishing"]
+            description: >
+              If a tool fails partway through a run, the error now names
+              the collection, the tool and the run, and the run is no
+              longer counted as a completed one just because some of its
+              results were written.
+          - headline: Tables on their own schedules
+            components: ["Dashboard UI"]
+            description: >
+              Where the tables in one collection arrive at different
+              times, each now shows its own history, and picking a date
+              shows each one as at its own most recent arrival rather
+              than the collection's.
+          - headline: A map of the breakages
+            components: ["Testing & dev tooling"]
+            description: >
+              A committed list now says which awkward supplies in the
+              sample data are there on purpose, what each is meant to
+              show and where to look at it - so a red supply reads as a
+              demonstration rather than as something nobody fixed.
+          - headline: Scenarios, on the page
+            components: ["Dashboard UI"]
+            description: >
+              A new Scenarios panel lists the deliberate breakages and
+              what each is meant to show. Once one is in the data, picking
+              it will set the date and open the page it happened on.
+
+  - date: "2026-09-24"
+    summary: >
+      Child Protection investigations are now checked for dates that run
+      backwards, and two quiet states on the dashboard are easier to read.
+    changes:
+      - category: Fixed
+        items:
+          - headline: A guess now looks like a guess
+            components: ["Pipeline & publishing"]
+            description: >
+              Where the pipeline had to choose between a late delivery
+              and an early one, it now says the filing was a guess
+              instead of presenting it as settled, and flags it for
+              someone to check while it is still cheap to correct.
+          - headline: Late for which period, exactly
+            components: ["Pipeline & publishing"]
+            description: >
+              Early, on time and late are now worked out against the
+              period a supply was actually filed to. A quarterly file
+              arriving a week ahead used to read as about twelve weeks
+              late for a quarter that closed months earlier.
+          - headline: Fix the filing, fix the verdict
+            components: ["Pipeline & publishing"]
+            description: >
+              A supply that only looked late because it was filed to
+              the wrong period stops looking late once somebody moves
+              it to the right one. When it arrived does not change -
+              only which period it counts towards.
+          - headline: Agency cards line up again
+            components: ["Dashboard UI"]
+            description: >
+              The summary row at the foot of each agency card now sits at
+              the same height on every card, whatever the length of the
+              agency's name. A card with a short name used to leave a gap
+              below its figures that read as though something was missing.
+          - headline: Older activity now says how long ago, not just when
+            components: ["Dashboard UI"]
+            description: >
+              Recent activity gave up after a month and showed a bare
+              date instead. It now keeps counting in weeks, months and
+              years, so you can tell at a glance how long ago something
+              was QA'd without working it out.
+          - headline: The schedule check no longer contradicts its own warning
+            components: ["Pipeline & publishing"]
+            description: >
+              When a delivery calendar had run out of dates, the check
+              said every dataset was expecting a supply immediately above
+              a warning that six of them could not be processed. It now
+              reports what it actually checked - that the configuration
+              itself is sound - and leaves the warning to speak for
+              itself.
+          - headline: One ended schedule is no longer announced twice
+            components: ["Dashboard UI"]
+            description: >
+              An agency or collection with a single ended schedule used
+              to show "Schedule ended" and "1 schedule ended" side by
+              side. The count now appears only when it is adding
+              something - and it still appears for a single one whenever
+              the status beside it says anything else, so nothing gets
+              hidden.
+          - headline: The "No data" tag has an outline you can actually see
+            components: ["Dashboard UI"]
+            description: >
+              The dashed outline that tells "No data" apart from "Schedule
+              ended" was too faint to make out, so at a glance the two
+              looked alike. It is now as clear as the label inside it, and
+              it no longer disappears when you hover the row.
+      - category: New
+        items:
+          - headline: An investigation cannot end before it began
+            components: ["QA checks & contract"]
+            description: >
+              Child Protection investigations are now checked for a
+              closing date earlier than the date they opened. An
+              investigation still open is left alone, and one opened and
+              closed on the same day passes.
+
+  - date: "2026-09-23"
+    summary: >
+      Supplies are now recognised from what actually arrived, delivery
+      calendars are written down and warn you before they run out, and
+      the names behind everything come from one place.
+    changes:
+      - category: Improved
+        items:
+          - headline: Checks name their collection
+            components: ["QA checks & contract"]
+            description: >
+              A check's identifier now carries its collection, so you can
+              see where a check sits from its name alone. It no longer
+              carries a database table name that only ever made sense to
+              one of the four tools.
+          - headline: One place for agencies and collections
+            components: ["QA checks & contract", "Pipeline & publishing"]
+            description: >
+              Agency, collection and dataset names were written down in
+              twelve places that could quietly disagree, and several
+              had. Change one now and the whole tool follows, including
+              the dashboard.
+          - headline: Delivery dates are written down
+            components: ["Pipeline & publishing"]
+            description: >
+              The dates a supplier agreed to deliver on are now recorded
+              as dates, not worked out from a rule each time. A dataset
+              says which calendar it is on and which months it takes
+              part in, and can say a period has no supply coming, with a
+              reason.
+          - headline: Every dataset on the page is real
+            components: ["Dashboard UI"]
+            description: >
+              The invented agencies and datasets that filled out the
+              overview are gone. Everything you see is now backed by a
+              real pipeline run, and more real datasets are coming to
+              take their place.
+          - headline: A supply knows its period
+            components: ["Data generation"]
+            description: >
+              Every supply now records which period it is for and when
+              it actually turned up, as two separate things. A late
+              resupply belongs to the quarter it was meant for, not the
+              one it arrived in.
+          - headline: Next year's dates, suggested
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman schedule candidate-dates` proposes next year's
+              delivery dates for you to check, edit and commit, and
+              flags any that land on a weekend rather than quietly
+              moving them. Nothing is judged against its suggestions.
+          - headline: Supplies arrive, rather than announce themselves
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              The tool used to be handed a list of what had been sent.
+              It now works out what arrived by looking at what actually
+              landed - which files, in which drop, and when we received
+              them - so nothing a supplier could write decides how a
+              supply is filed.
+          - headline: Ready for an awkward drop
+            components: ["Data generation"]
+            description: >
+              The tool can now take in the drops that cause real
+              trouble - a covering note nobody asked for, an extract
+              split across two files, a resupply of only the tables
+              that were wrong. They are not in the demo data yet; the
+              handling that reads them is.
+          - headline: Typos fail the build
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              A mistake in a delivery calendar - a misspelt month, a
+              calendar that does not exist, a month with no date - now
+              stops the build and tells you what to change. It used to
+              leave that dataset quietly expecting nothing, which looks
+              exactly like a dataset with nothing wrong.
+          - headline: Each table has its own deadline
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection's tables each get their own expected supply,
+              with their own due time and their own allowance for being
+              late. One table arriving late now shows as one late
+              table, instead of dragging its punctual siblings down
+              with it.
+          - headline: See when a supply is due
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman schedule show --dataset <name>` now lists, for
+              every period, when that dataset's supply is due and the
+              moment it can first be filed against - so you can check a
+              calendar edit did what you meant before committing it.
+          - headline: Last year's dates stay put
+            components: ["Pipeline & publishing"]
+            description: >
+              Changing a delivery date that has already passed would
+              silently rewrite whether past supplies were on time. You
+              can still correct one, but you now have to say what you
+              changed and why.
+          - headline: Told before dates run out
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A calendar with only a few delivery dates left now says
+              so, on the dashboard and every time you run the checks.
+              It counts deliveries rather than months, because three
+              months of a quarterly calendar is one delivery.
+          - headline: A calendar that ended says so
+            components: ["Dashboard UI"]
+            description: >
+              When a dataset's dates run out it now reads as its own
+              thing, not as red and not as quiet - naming the last
+              period it covered and the file to edit. It says so at
+              every level, so one ended calendar among thirty healthy
+              datasets cannot go unnoticed.
+          - headline: One answer, two places
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              The status you see on the page and the status behind your
+              tickets are now held to one shared list of agreed cases,
+              so the two cannot quietly disagree about the same check.
+      - category: Fixed
+        items:
+          - headline: An unknown result is no longer green
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              A result neither side recognised used to read as healthy,
+              in both the dashboard and the ticketing. It now stops
+              things and says what it found, because not knowing what a
+              result means is not the same as it being fine.
+          - headline: A retired check that was not
+            components: ["Dashboard UI"]
+            description: >
+              A check whose retirement date was left blank was dropped
+              from the dashboard's totals while still counting
+              everywhere else, so a live check could vanish from the
+              status you were reading.
+          - headline: Old links no longer break the page
+            components: ["Dashboard UI"]
+            description: >
+              A bookmark pointing at a dataset that has since been
+              renamed or removed used to open a blank page with no
+              explanation. It now tells you what the link is looking
+              for and offers a way back.
+          - headline: Regenerating no longer doubles the history
+            components: ["Data generation"]
+            description: >
+              Rebuilding the demo data on a different day used to leave
+              two complete copies of the history side by side rather
+              than replacing it. It now overwrites itself, and rebuilds
+              identically whatever day you run it.
+          - headline: Six datasets, one deadline
+            components: ["Pipeline & publishing"]
+            description: >
+              Child Protection's six datasets all shared whichever
+              delivery time the first one declared, because the
+              per-dataset setting was being read and thrown away. Each
+              can now have its own.
+          - headline: Yesterday's date, all morning
+            components: ["Dashboard UI"]
+            description: >
+              Open the dashboard before 8am in Perth and it defaulted to
+              yesterday, because it worked out the date in UTC. It now
+              uses the asset's own timezone, so everyone sees the same
+              day wherever they are.
+          - headline: Timestamps say their timezone
+            components: ["Pipeline & publishing"]
+            description: >
+              Arrival times were stored with no timezone on them, so a
+              supply that landed at 10pm could be read as the next
+              afternoon. Every stored time now carries its offset, and
+              anything missing one is rejected rather than guessed at.
+          - headline: Contracts said the wrong thing
+            components: ["QA checks & contract"]
+            description: >
+              Both data contracts named an agency or collection that no
+              longer existed anywhere else. They are corrected, and a
+              new check stops them drifting again.
+          - headline: Birth Registrations found its collection
+            components: ["Pipeline & publishing"]
+            description: >
+              Birth Registrations results were filed without a
+              collection while Child Protection's had one. They now
+              match, so the two read the same way everywhere.
+          - headline: Two drops, one folder
+            components: ["Data generation"]
+            description: >
+              Two unrelated deliveries that happened to pick the same
+              name were quietly merged into one folder, losing the
+              contents of the first. A drop now refuses to write over
+              one that is already there.
+
+  - date: "2026-09-20"
+    summary: >
+      Checks now sit against the column they actually check, and the
+      tool's own records became something you can verify.
+    changes:
+      - category: Improved
+        items:
+          - headline: Checks know where they belong
+            components: ["QA checks & contract"]
+            description: >
+              Every check now sits against the column it actually
+              checks, so a rule about a carer's identifier appears under
+              that identifier rather than off to one side under the
+              table. Three cross-table rules moved too.
+          - headline: Five checks, one name
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              Five Birth Registrations checks all displayed under one
+              name, impossible to tell apart. They now read as what they
+              are - "Registered on or after birth", "Multiple-birth
+              sibling match", and so on.
+          - headline: Safe to reword
+            components: ["QA checks & contract"]
+            description: >
+              A check's name and column used to be read out of the
+              explanation beneath it, so improving the wording could
+              quietly move the check. No longer.
+          - headline: One command to check everything
+            components: ["Testing & dev tooling"]
+            description: >
+              One command now runs ruff, yamllint, the dashboard's
+              JavaScript tests and the Python suite, so there's no
+              working out which checks a given change needs. Anything
+              that couldn't run says so rather than passing quietly.
+          - headline: The explanations have rules now
+            components: ["QA checks & contract", "Docs & process"]
+            description: >
+              The plain-English explanations on checks are now written
+              to one agreed standard rather than to whoever happened to
+              write them, so they read consistently across every check
+              and dataset as new ones arrive.
+          - headline: No check ships unexplained
+            components: ["QA checks & contract"]
+            description: >
+              A check that arrives without a plain-English explanation
+              now fails the build rather than quietly appearing with
+              nothing to read. Retired checks are held to it too.
+          - headline: Checks say what they are
+            components: ["Dashboard UI"]
+            description: >
+              Check headings read "Invalid values" and "Registered on or
+              after birth" now, instead of "Invalid values —
+              dbt:accepted_values (dbt-core)". Which tool ran it is
+              still there, in the line underneath.
+          - headline: The missing thirteen
+            components: ["Dashboard UI"]
+            description: >
+              Thirteen checks were running but had nowhere to appear, so
+              you never saw them. Row-count and freshness checks now sit
+              under the supply they check, alongside the columns.
+          - headline: Two checks wearing one name
+            components: ["Dashboard UI", "QA checks & contract"]
+            description: >
+              Two different checks on the date of birth were sharing one
+              tile, so the numbers you saw under one of them sometimes
+              belonged to the other. They are now separate.
+          - headline: Every check explains itself
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              All 257 checks now say in plain English what they look
+              for, and the ones with a known cause say what a failure
+              usually means. No jargon, no tool names, no thresholds
+              you have to decode.
+      - category: Fixed
+        items:
+          - headline: Five decisions that quietly disappeared
+            components: ["Docs & process"]
+            description: >
+              Part of the record explaining why things were built the
+              way they were had been silently dropped. It is back, and
+              cannot be lost that way again.
+          - headline: Filed under the wrong heading
+            components: ["QA checks & contract", "Dashboard UI"]
+            description: >
+              The date-of-birth plausibility check was grouped with the
+              ones that verify records point at each other correctly. It
+              now sits where it belongs.
+      - category: New
+        items:
+          - headline: Paperwork, properly checked
+            components: ["Docs & process", "Testing & dev tooling"]
+            description: >
+              The rules about what a requirement or a release note must
+              contain are now written down as a specification rather
+              than scattered through code. A misspelt field name is an
+              error, not something quietly ignored.
+          - headline: What's New, written for you
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              This page used to be a build log - fifteen lines an entry,
+              full of file names and percentages. It is now a short
+              account of what changed and what you can do with it.
+          - headline: Four things we'd already built
+            components: ["Docs & process", "Dashboard UI"]
+            description: >
+              Readable web addresses, the Plans tab, the leaderboard and
+              the accept-or-reject decision on an amber supply were all
+              listed as not started, months after they shipped. They now
+              read as built.
+          - headline: Every requirement shows its working
+            components: ["Docs & process"]
+            description: >
+              For everything the tool promises, the Requirements panel
+              now shows where it lives in the code, what proves it
+              works, the measured result, and what was decided. Nothing
+              is marked finished without all four.
+          - headline: Checks read like sentences
+            components: ["Dashboard UI"]
+            description: >
+              A check now leads with what it checks in plain English,
+              with the explanation right underneath and a short tool
+              reference below that. You no longer have to open a check
+              to find out what it looks for.
+          - headline: Check cards are real links
+            components: ["Dashboard UI"]
+            description: >
+              Middle-click a check to open it in a new tab, or copy its
+              link address, the way you would anywhere else. Every check
+              has had its own web address for a while; now you can
+              actually get at it.
+          - headline: Supply checks get their own place
+            components: ["Dashboard UI"]
+            description: >
+              Whether the right amount of recent data turned up now has
+              its own section at the top of a dataset, instead of
+              hiding at the end of the column list. Its checks read
+              without a click.
+          - headline: Tickets say what is wrong
+            components: ["GitHub workflow & people", "QA checks & contract"]
+            description: >
+              A QA ticket now lists what is actually failing, in plain
+              English, with a link to each check. You can act on it
+              without opening the dashboard first, and every run adds
+              the current list.
+          - headline: Nothing gets built unagreed
+            components: ["Docs & process"]
+            description: >
+              Every requirement now carries who agreed it and when, next
+              to its status in the Requirements panel. Work cannot move
+              past "not started" without one, so nothing gets built on
+              an assumption.

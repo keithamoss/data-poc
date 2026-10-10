@@ -16,19 +16,292 @@ retired_as_of}, ...]}, ...]`, or - for Child Protection - one entry from
 that shape's `datasets` list) - never a live warehouse/DuckDB
 connection, matching CLAUDE.md's own hard rule that no "read committed
 history" code path may touch live data.
+
+REQ-QAC-047. This module and its browser twin are held to ONE committed
+table of cases - status-cases.json at the repo root - read by tests/
+test_status_parity.py and tests-js/status-parity.test.js. Neither suite
+owns the table, which is the point: a suite that writes its own expected
+answers blesses whatever its own side already does. That is not
+hypothetical here. A test written for REQ-PIPE-053 asserted that a
+rollup handed an unorderable status returns green, reasoning correctly
+about the implementation and wrongly about the rule, and it passed for a
+day.
+
+The behaviour change this brought is from silently-wrong to
+noisily-broken. An unrecognised recorded status used to fall through to
+threshold arithmetic here and return green; in the dashboard it passed
+straight out to a rollup that could not order it, where the reduce kept
+its green seed. Two routes, one false green. Both now raise.
 """
 from __future__ import annotations
 
-STATUS_ORDER = {"green": 0, "amber": 1, "red": 2}
+class UnknownStatusError(ValueError):
+    """A recorded status neither implementation recognises.
+
+    Raised rather than fallen back on, and that is the whole point of
+    REQ-QAC-047. The previous behaviour converted "I do not know what
+    this is" into "this is fine" - an unrecognised verdict fell through
+    to threshold arithmetic here, and passed straight out to a rollup
+    that could not order it in the dashboard, where the reduce kept its
+    green seed. Two different routes to the same false green.
+
+    This changes the failure mode from silently-wrong to noisily-broken.
+    That is deliberate: a malformed committed result now stops a
+    dashboard build that would previously have rendered a green tile."""
 
 
-def status_for_value(value: float, warn: float, fail: float) -> str:
-    """Mirrors the dashboard's own statusForValue() exactly."""
-    if value > fail:
+# The agreed vocabulary. Held to status-cases.json by tests/
+# test_status_parity.py and tests-js/status-parity.test.js, which is what
+# stops this module and the dashboard's own STATUS_ORDER drifting apart
+# the way they did in plans/qa-pipeline.md item 74.
+#
+# The numbers ARE the rule: worst-of is a reduce seeded at green, so
+# nodata sits below green where it can only ever lose. "Nothing to show
+# yet" must not outrank a real green, and must not look like the worst
+# outcome either.
+ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
+
+# Recognised, but deliberately OUTSIDE the ordering so no rollup can
+# absorb them - a caller that needs one surfaces it ALONGSIDE the rolled
+# up status, never through it. Asked to order one, worst_of() fails,
+# because the only two honest answers are "throw" and "green", and green
+# is how item 74 happened.
+# `inactive` joins `exhausted` here for the same reason rather than by
+# analogy: a column with no rule defined has not passed anything, so
+# ranking it against verdicts invents a position nobody agreed. Low, and
+# it loses every rollup and vanishes; high, and an unasked question
+# outranks a real failure (post-build-review #4). rollup_statuses()
+# below is where a caller handles it explicitly instead.
+# `notcounted` is a GROUP's status: every dataset in it is left out of its
+# rollup (post-build-review #135). It replaced a false green.
+UNORDERED_STATUSES = {"exhausted", "inactive", "notcounted"}
+
+RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
+
+# Recognition is scoped to WHERE a status was read from, which the first
+# draft of this got wrong and the shared table's own cases caught.
+# `exhausted` is a property of a dataset's SCHEDULE; a check result
+# carrying it means something upstream wrote a dataset-level status onto
+# a check. A flat vocabulary would render that bug instead of reporting
+# it.
+# A check MAY carry `inactive` - unlike `exhausted`, it is a property of
+# the check itself (no rule is defined for it) rather than of the
+# dataset's schedule, so a check result carrying one is correct rather
+# than a symptom of something upstream writing at the wrong level.
+CHECK_STATUSES = set(ORDERED_STATUSES) | {"inactive"}
+DATASET_STATUSES = RECOGNISED_STATUSES
+
+# Retained under its original name because callers outside this module
+# index it directly. Same mapping, now including nodata - whose absence
+# was the defect.
+STATUS_ORDER = ORDERED_STATUSES
+
+
+def is_retired(check: dict) -> bool:
+    """Whether a check is retired, by the one rule both implementations
+    apply: `retired_as_of` carries a real, hand-authored date. Never
+    inferred from absence.
+
+    A function rather than an inline truth test because the two sides
+    had expressed the same rule differently and disagreed on one input:
+    the dashboard tested `retired_as_of != null`, so an EMPTY STRING
+    read as retired, while this module tested truthiness and read the
+    same check as active. The dashboard's reading is the dangerous one -
+    it drops a live check out of the rollup entirely. Empty means nobody
+    wrote a date, so the check is active."""
+    return bool(check.get("retired_as_of"))
+
+
+def recognised_status(value: str, read_from: str, allowed=None) -> str:
+    """Returns a recorded status if it is one both implementations know
+    AT THIS LEVEL, and raises naming it and where it came from otherwise.
+
+    `read_from` is not decoration. Turning a silent wrong answer into a
+    loud one is only worth doing if the noise says enough to act on, and
+    a bare "unknown status" in a dashboard build tells nobody which of
+    four tools wrote it or onto which field."""
+    allowed = CHECK_STATUSES if allowed is None else allowed
+    if value in allowed:
+        return value
+    note = ""
+    if value in RECOGNISED_STATUSES:
+        note = (f" {value!r} is a real status, but not one a {read_from!r} "
+                "may carry - something wrote a dataset-level status onto a "
+                "check result.")
+    raise UnknownStatusError(
+        f"unrecognised status {value!r} read from {read_from!r}; "
+        f"valid here are {sorted(allowed)}.{note} An unrecognised "
+        "status is not evidence of health, so it is refused rather than "
+        "read as green - see status-cases.json."
+    )
+
+
+def worst_of(statuses) -> str:
+    """Worst-of across an orderable set, seeded green - the Python mirror
+    of the dashboard's own worstOf().
+
+    Fails on anything it cannot order, including a RECOGNISED but
+    deliberately unordered status like `exhausted`. Dropping it silently
+    returns green; ranking it invents an ordering nobody agreed."""
+    worst = "green"
+    for s in statuses:
+        if s not in ORDERED_STATUSES:
+            raise UnknownStatusError(
+                f"cannot order status {s!r} in a rollup; orderable statuses "
+                f"are {sorted(ORDERED_STATUSES)}"
+                + (f". {s!r} is recognised but deliberately unorderable - it "
+                   "is surfaced alongside a rolled-up status, never through "
+                   "one." if s in UNORDERED_STATUSES else "")
+            )
+        if ORDERED_STATUSES[s] > ORDERED_STATUSES[worst]:
+            worst = s
+    return worst
+
+# Each real check result carries its own tool's verdict - a real `status`
+# written by every qa_tools/*/run_*.py module from what dbt-core/Soda
+# Core/datacontract-cli/Evidently actually decided. That verdict is the
+# authority everywhere; threshold math is only ever a fallback, because a
+# warn/fail pair cannot express every real rule (the ODCS `rowCount` rule
+# is a two-sided `mustBeBetween`, so neither bound exists as a single
+# number). plans/qa-pipeline.md item 74.
+#
+# `nodata` IS A REAL TOOL VERDICT, added 2026-09-29 for REQ-QAC-108
+# criterion 5. A drift check whose reference period does not exist -
+# the first supply a dataset ever had - has measured nothing, and the
+# criterion forbids reporting that as a pass in as many words. It maps
+# onto itself because the dashboard's quiet vocabulary already has the
+# word; what it must NOT map onto is green.
+_DASHBOARD_STATUS_BY_TOOL_STATUS = {
+    "pass": "green",
+    "warn": "amber",
+    "fail": "red",
+    "error": "red",
+    "nodata": "nodata",
+}
+
+
+#: Quiet states in order of what a reader can do about them. An ended
+#: schedule is why nothing is happening at all, so it stays the
+#: headline; "nobody defined a rule" is a standing fact somebody can act
+#: on; "no run within tolerance as of this date" is temporal and may
+#: resolve itself tomorrow.
+_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notcounted")
+
+
+def rollup_statuses(statuses) -> str:
+    """Roll a column or dataset up, quiet states included.
+
+    THE DIFFERENCE FROM `worst_of` IS THE WHOLE REASON THIS EXISTS.
+    `worst_of` orders, and refuses anything it cannot order. This first
+    decides what to do with the statuses that carry no verdict at all:
+    a status carrying no verdict never competes with one that does, and
+    never disappears either.
+
+    The dashboard has had this as `rollupStatuses()` since the quiet
+    states were introduced; THIS SIDE DID NOT, and `dataset_status()`
+    called `worst_of()` directly - so the first check carrying
+    `inactive` would have raised inside the GitHub Issues automation
+    (post-build-review #4). Held to the same committed table as its
+    twin, `status-cases.json`'s `dataset_rollup_cases`.
+    """
+    statuses = list(statuses)
+    live = [s for s in statuses if s not in _QUIET_PRECEDENCE]
+    if live:
+        return worst_of(live)
+    for quiet in _QUIET_PRECEDENCE:
+        if quiet in statuses:
+            return quiet
+    return "green"
+
+
+def in_no_rollup(dataset: dict) -> bool:
+    """Whether this dataset is excluded from every rollup above it
+    (REQ-PIPE-106 criterion 9).
+
+    EXCLUDED ENTIRELY, with no fallback, and that is the difference from
+    every other exclusion here. `nodata` and `exhausted` both come BACK
+    if they are all there is, because "every dataset in this collection
+    has ended" is a real answer about the collection. This one has none,
+    because a collection whose only member is a dataset somebody is still
+    developing checks against has nothing to say about the asset's quality
+    - and what it prevents is a dataset nobody agreed turning an agreed
+    one's status.
+
+    SEPARATE FROM THE DATASET'S OWN STATUS, which criterion 7 requires to
+    be the REAL verdict its checks found: developing a check means seeing
+    whether it passes. The tile stays red or amber or green; only the
+    rollup skips it.
+
+    The Python mirror of the dashboard's own `inNoRollup()` - held to the
+    same committed table as everything else here, for the reason this
+    module exists at all.
+    """
+    return bool(dataset.get("scheduleNotAgreed"))
+
+
+def rollup_datasets(datasets) -> str:
+    """Roll a collection or an agency up from its datasets, leaving out the
+    ones no rollup counts.
+
+    THE FILTER IS FIRST, deliberately. Rolling up and then trying to
+    subtract an unagreed dataset's contribution is not possible - worst-of
+    loses which input won - so anything excluded has to be excluded before
+    the reduce, which is also what makes "by construction" true of the
+    ordering rather than only of the storage.
+    """
+    datasets = list(datasets)
+    counted = [d for d in datasets if not in_no_rollup(d)]
+    live = [d for d in counted
+            if not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted")]
+    if not live:
+        if any(d.get("scheduleExhausted") for d in counted):
+            return "exhausted"
+        if counted:
+            return "nodata"
+        # EVERY DATASET HERE IS LEFT OUT (post-build-review #135): this
+        # returned "green", the false green. Only an empty group stays green.
+        return "notcounted" if datasets else "green"
+    return rollup_statuses([rollup_statuses(
+        [c.get("status") for c in (d.get("columns") or [])]) for d in live])
+
+
+def dashboard_status(tool_status: str | None) -> str | None:
+    """Maps a real tool verdict onto the dashboard's own green/amber/red
+    vocabulary. None for anything unrecognised (or absent), so callers
+    fall back rather than silently reading an unknown verdict as green -
+    an unknown verdict is not evidence of health."""
+    if not tool_status:
+        return None
+    return _DASHBOARD_STATUS_BY_TOOL_STATUS.get(tool_status)
+
+
+def status_for_value(value: float, warn: float | None, fail: float | None) -> str:
+    """Mirrors the dashboard's own statusForValue() exactly - including
+    (plans/qa-pipeline.md item 74) that a None bound means "this check
+    has no threshold of that kind", never zero, so it can never be
+    crossed. The real case: the ODCS `rowCount` rule is a two-sided
+    `mustBeBetween`, so neither bound exists as a single-sided number.
+
+    Only a FALLBACK now: where a real tool verdict was recorded, that
+    wins - see dashboard_status_of() below and its two callers."""
+    if fail is not None and value > fail:
         return "red"
-    if value > warn:
+    if warn is not None and value > warn:
         return "amber"
     return "green"
+
+
+def dashboard_status_of(record: dict, value_key: str, status_key: str,
+                        warn: float | None, fail: float | None) -> str:
+    """The real tool verdict where one was recorded, threshold math
+    otherwise - the Python mirror of the dashboard's own
+    checkStatus()/historyStatus() (item 74). Kept as one helper so the
+    two callers below can't drift apart the way this module drifted from
+    its own JS counterpart."""
+    recorded = record.get(status_key)
+    if recorded:
+        return recognised_status(recorded, status_key)
+    return status_for_value(record.get(value_key) or 0, warn, fail)
 
 
 def status_by_run(dataset: dict) -> dict[str, str]:
@@ -54,9 +327,9 @@ def status_by_run(dataset: dict) -> dict[str, str]:
     for col in dataset.get("columns", []):
         for ck in col.get("checks", []):
             for h in ck.get("history", []):
-                s = status_for_value(h["value"], ck["warn"], ck["fail"])
+                s = dashboard_status_of(h, "value", "status", ck["warn"], ck["fail"])
                 prev = by_run.get(h["run_id"], "green")
-                if STATUS_ORDER[s] > STATUS_ORDER[prev]:
+                if worst_of([s, prev]) != prev:
                     by_run[h["run_id"]] = s
     return by_run
 
@@ -69,12 +342,12 @@ def dataset_status(dataset: dict) -> str:
     "retired" the same way the dashboard treats it: `retired_as_of` is
     set (a real, hand-authored declaration, never inferred from
     absence)."""
-    worst = "green"
-    for col in dataset.get("columns", []):
-        for ck in col.get("checks", []):
-            if ck.get("retired_as_of"):
-                continue
-            s = status_for_value(ck["current"], ck["warn"], ck["fail"])
-            if STATUS_ORDER[s] > STATUS_ORDER[worst]:
-                worst = s
-    return worst
+    # rollup_statuses rather than worst_of: a check may now carry a
+    # status with no verdict (`inactive`), which worst_of refuses to
+    # rank - correctly. See that function's own docstring.
+    return rollup_statuses(
+        dashboard_status_of(ck, "current", "current_status", ck["warn"], ck["fail"])
+        for col in dataset.get("columns", [])
+        for ck in col.get("checks", [])
+        if not is_retired(ck)
+    )

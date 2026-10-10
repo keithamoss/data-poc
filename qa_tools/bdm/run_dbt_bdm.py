@@ -63,11 +63,13 @@ from __future__ import annotations
 import json
 import os
 
-import duckdb
 
+from . import bdm_common
+from qa_tools.common import supply_db
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
-    ENGINE_TAG, parse_threshold, run_dbt, test_nodes,
+    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, parse_threshold, run_dbt,
+    test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -75,7 +77,6 @@ from qa_tools.common.qa_results_writer import write_qa_result
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
-DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "duckdb_runs")
 SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml")
 
 # Built once from schema.yml itself, not the compiled manifest - see
@@ -85,9 +86,9 @@ SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml
 # see that file's header comment) never produces one.
 _CHECK_ID_LOOKUP = dbt_check_id_lookup(SCHEMA_YML_PATH)
 
-AGENCY_ID = "registry-services"
-COLLECTION_ID = "civil-registration"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 # Test shapes whose --store-failures audit table can replace
 # run_results.json's own (sometimes wrong) `failures` field - see
@@ -246,8 +247,21 @@ def _status_for(count: int, warn_t: float | None, fail_t: float | None) -> str:
     return "pass"
 
 
+def _unreadable_in(run_id: str) -> frozenset[str]:
+    """The logical tables this run has no view for - see
+    run_dbt_cp.py's identical helper."""
+    conn = supply_db.connect(read_only=True, label="mothman:dbt-readable")
+    try:
+        return frozenset(supply_db.resolution_for(conn, run_id).unreadable)
+    finally:
+        conn.close()
+
+
 def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
-    db_path = os.path.join(DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
+    # No scratch database any more (REQ-PIPE-087): dbt writes its
+    # staging models and its --store-failures audit tables into its own
+    # SCHEMA in the one PostgreSQL database, and the connection opened
+    # further down reads them from there through a search_path.
     # A single `dbt build` (build the model, then run its tests) instead of
     # separate `dbt run` + `dbt test` subprocess calls - dbt-core's fixed
     # per-invocation startup cost (~2.4s just for `dbt --version`, before
@@ -258,20 +272,39 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # then also contains the model-build step's own result, which the
     # parsing below already silently skips (nodes.get() returns None for
     # anything that isn't a test node), so nothing further changes.
-    # Lives beside db_path (DUCKDB_RUNS_DIR/<run_id>.duckdb), not under
-    # DBT_PROJECT_DIR/target/ - that's a fixed, repo-relative path shared
-    # by every invocation regardless of DUCKDB_RUNS_DIR, so two tests
-    # reusing the same run_id (tests/test_run_dbt_bdm.py's own two tests,
-    # by design, matching conftest.py's fixture-built data) would collide
-    # if ever scheduled onto different parallel workers - a real risk,
-    # not hypothetical (plans/running-thoughts.md #12, confirmed by
-    # reproducing it). DUCKDB_RUNS_DIR is already genuinely unique per
-    # real production run (untouched) and, in tests, already monkeypatched
-    # to a per-worker tmp dir - so basing target_path on it inherits that
-    # same uniqueness for free, no test-file changes needed.
-    target_path = os.path.join(DUCKDB_RUNS_DIR, "dbt_target", run_id)
-    run_dbt(db_path, "build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
-            PROFILES_DIR, DBT_PROJECT_DIR, ROOT)
+    # Never DBT_PROJECT_DIR/target/ - a fixed, repo-relative path shared
+    # by every invocation, so two tests reusing the same run_id
+    # (tests/test_run_dbt_bdm.py's own two, by design, matching
+    # conftest.py's fixture-built data) would collide if ever scheduled
+    # onto different parallel workers - a real risk, not hypothetical
+    # (plans/running-thoughts.md #12, confirmed by reproducing it).
+    # supply_db.dbt_target_path() hangs off the supply database's own
+    # directory, so a worker with its own database inherits that
+    # uniqueness for free - the same property the retired
+    # data/duckdb_runs/ layout used to give it.
+    target_path = str(supply_db.dbt_target_path(run_id))
+
+    # ONLY WHAT THIS RUN CAN ACTUALLY READ (REQ-PIPE-078 criterion 9) -
+    # see run_dbt_cp.py's identical block and dbt_common's
+    # exclude_unreadable for the defect this closes.
+    #
+    # BIRTH REGISTRATIONS IS ITS COLLECTION'S ONLY MODEL, so a hold
+    # here leaves nothing to build at all rather than five other
+    # datasets to get on with. That is the case NothingLeftToBuild
+    # exists for: an empty --select would build the whole project,
+    # which would run Child Protection's models against this run's
+    # schema.
+    try:
+        exclude = exclude_unreadable(models=["stg_birth_registrations"],
+                                      unreadable=_unreadable_in(run_id))
+    except NothingLeftToBuild as exc:
+        print(f"note: {run_id}: {exc}")
+        return []
+
+    run_dbt("build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
+            PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
+            run_schema=supply_db.run_schema(run_id), run_id=run_id,
+            exclude=exclude)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
@@ -279,98 +312,114 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         run_results = json.load(f)
 
     nodes = test_nodes(manifest)
-    conn = duckdb.connect(db_path, read_only=True)
-    n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
+    # Unqualified names resolve to dbt's own schema - see connect_dbt().
+    conn = supply_db.connect_dbt(run_id)
+    # CLOSED IN A `finally` (2026-09-27). It used to close on the
+    # last line of the happy path, which leaks the connection on
+    # every exception - and an audit-table query raising is exactly the case nobody is watching.
+    try:
+        n_total = conn.execute("SELECT COUNT(*) FROM stg_birth_registrations").fetchone()[0]
 
-    results = []
-    for r in run_results["results"]:
-        node = nodes.get(r["unique_id"])
-        if node is None:
-            continue
-        meta = node.get("test_metadata")
-        test_name = meta["name"] if meta else node["name"]
-        # Three cases: a real column-level generic test (column_name set);
-        # a model-level generic test (test_metadata present, but
-        # column_name is None - dbt_utils.expression_is_true, declared
-        # under the model itself in schema.yml, not a column); a
-        # singular test (no test_metadata at all - multiple_birth_
-        # sibling, recency).
-        if meta and node["column_name"]:
-            column = node["column_name"]
-        elif meta:
-            column = _MODEL_LEVEL_TEST_COLUMN.get(test_name, "(table)")
-        else:
-            column = _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
-        config = node.get("config", {})
-        status = r["status"]
-        failures = r.get("failures") or 0
-        warn_t = parse_threshold(config.get("warn_if"))
-        fail_t = parse_threshold(config.get("error_if"))
-
-        relation_name = node.get("relation_name")
-        if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
-            sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
-            verified_count = conn.execute(sql).fetchone()[0]
-            failures = verified_count
-            if warn_t is not None or fail_t is not None:
-                status = _status_for(verified_count, warn_t, fail_t)
+        results = []
+        for r in run_results["results"]:
+            node = nodes.get(r["unique_id"])
+            if node is None:
+                continue
+            meta = node.get("test_metadata")
+            test_name = meta["name"] if meta else node["name"]
+            # Three cases: a real column-level generic test (column_name set);
+            # a model-level generic test (test_metadata present, but
+            # column_name is None - dbt_utils.expression_is_true, declared
+            # under the model itself in schema.yml, not a column); a
+            # singular test (no test_metadata at all - multiple_birth_
+            # sibling, recency).
+            if meta and node["column_name"]:
+                column = node["column_name"]
+            elif meta:
+                column = _MODEL_LEVEL_TEST_COLUMN.get(test_name, "(table)")
             else:
-                # a hard pass/fail test (no warn_if/error_if config, so no
-                # threshold to compare against) - _status_for would
-                # silently read as "always pass" with both thresholds
-                # None; any nonzero verified count means the test
-                # genuinely failed instead.
-                status = "fail" if verified_count > 0 else "pass"
+                column = _SINGULAR_TEST_COLUMN.get(node["name"], "(table)")
+            config = node.get("config", {})
+            status = r["status"]
+            failures = r.get("failures") or 0
+            warn_t = parse_threshold(config.get("warn_if"))
+            fail_t = parse_threshold(config.get("error_if"))
 
-        failing_sample_keys = _failing_sample_keys(conn, test_name, column, node, status)
+            relation_name = node.get("relation_name")
+            if test_name in _AUDIT_AGGREGATE_SQL and relation_name and status != "error":
+                sql = _AUDIT_AGGREGATE_SQL[test_name].format(relation=relation_name)
+                # int(), and this is load-bearing rather than defensive.
+                # PostgreSQL's SUM() over a bigint returns NUMERIC, which
+                # psycopg faithfully gives back as a decimal.Decimal - where
+                # the retired engine returned a plain integer. A Decimal
+                # reaching metric_value is not a cosmetic difference: it is
+                # what qa_results/ serialises, and json.dumps REFUSES a
+                # Decimal outright, so every run writing an accepted_values
+                # or unique result would have failed at the write. COUNT()
+                # is unaffected; SUM() is the one that changes shape
+                # (REQ-PIPE-087).
+                verified_count = int(conn.execute(sql).fetchone()[0] or 0)
+                failures = verified_count
+                if warn_t is not None or fail_t is not None:
+                    status = _status_for(verified_count, warn_t, fail_t)
+                else:
+                    # a hard pass/fail test (no warn_if/error_if config, so no
+                    # threshold to compare against) - _status_for would
+                    # silently read as "always pass" with both thresholds
+                    # None; any nonzero verified count means the test
+                    # genuinely failed instead.
+                    status = "fail" if verified_count > 0 else "pass"
 
-        # The lookup key's column segment is None for a model-level or
-        # singular test even though `column` above may hold a display-
-        # only column (_MODEL_LEVEL_TEST_COLUMN/_SINGULAR_TEST_COLUMN) -
-        # matches dbt_check_id_lookup()'s own keying exactly. Model is
-        # None for a singular test (schema.yml's own tests: block has no
-        # model association - see that function's own docstring on why
-        # that's fine); every generic test here is on this dataset's one
-        # model.
-        check_id_model = "stg_birth_registrations" if meta else None
-        check_id_column = node["column_name"] if (meta and node["column_name"]) else None
-        check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
-        if check_id is None:
-            raise ValueError(f"no check_id found for dbt test {test_name!r} "
-                              f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
-                              f"is missing meta.check_id or this test isn't declared there")
+            failing_sample_keys = _failing_sample_keys(conn, test_name, column, node, status)
 
-        results.append({
-            "agency_id": AGENCY_ID,
-            "collection_id": COLLECTION_ID,
-            "dataset_id": DATASET_ID,
-            "check_id": check_id,
-            "column_name": column,
-            "check_name": f"dbt:{test_name}",
-            "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
-            "label": _LABEL_BY_TEST.get(test_name),
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": failures,
-            "unit": "count",
-            "warn_threshold": warn_t,
-            "fail_threshold": fail_t,
-            "status": status,
-            "on_fail_action": "flag",
-            "row_count_total": n_total,
-            "row_count_invalid": failures,
-            "failing_sample_keys": failing_sample_keys,
-            "engine": ENGINE_TAG,
-        })
+            # The lookup key's column segment is None for a model-level or
+            # singular test even though `column` above may hold a display-
+            # only column (_MODEL_LEVEL_TEST_COLUMN/_SINGULAR_TEST_COLUMN) -
+            # matches dbt_check_id_lookup()'s own keying exactly. Model is
+            # None for a singular test (schema.yml's own tests: block has no
+            # model association - see that function's own docstring on why
+            # that's fine); every generic test here is on this dataset's one
+            # model.
+            check_id_model = "stg_birth_registrations" if meta else None
+            check_id_column = node["column_name"] if (meta and node["column_name"]) else None
+            check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
+            if check_id is None:
+                raise ValueError(f"no check_id found for dbt test {test_name!r} "
+                                  f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "
+                                  f"is missing meta.check_id or this test isn't declared there")
 
-    conn.close()
+            results.append({
+                "agency_id": AGENCY_ID,
+                "collection_id": COLLECTION_ID,
+                "dataset_id": DATASET_ID,
+                "check_id": check_id,
+                "column_name": column,
+                "check_name": f"dbt:{test_name}",
+                "dimension": _DIMENSION_BY_TEST.get(test_name, ""),
+                "label": _LABEL_BY_TEST.get(test_name),
+                "run_id": run_id,
+                "run_timestamp": run_timestamp,
+                "metric_value": failures,
+                "unit": "count",
+                "warn_threshold": warn_t,
+                "fail_threshold": fail_t,
+                "status": status,
+                "on_fail_action": "flag",
+                "row_count_total": n_total,
+                "row_count_invalid": failures,
+                "failing_sample_keys": failing_sample_keys,
+                "engine": ENGINE_TAG,
+            })
+
+    finally:
+        conn.close()
     # Committed only now, after the audit-table correction above (not
     # right after run_results.json is read) - raw_output stays dbt's own
     # unmodified output (bug included), but `verified` (=`results`, the
     # already-corrected records) is what a later, no-live-DB read of
     # this file actually needs - see qa_results_writer.py's own
     # docstring for why.
-    write_qa_result(AGENCY_ID, DATASET_ID, run_id, run_timestamp, "dbt", run_results, verified=results)
+    write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "dbt", run_results, verified=results)
     return results
 
 

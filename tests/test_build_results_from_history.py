@@ -11,14 +11,14 @@ import qa_tools.bdm.build_results_from_history as bdm_history
 import qa_tools.cp.build_results_from_history as cp_history
 
 
-def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
+def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "results_bdm.json"
     monkeypatch.setattr(bdm_history, "RESULTS_PATH", str(results_path))
 
     output = bdm_history.build_results_from_history()
 
     assert results_path.exists(), "should write reports/results_bdm.json (redirected to tmp here)"
-    assert output["runs"], "the real committed qa_results/registry-services/birth-registrations/ history is empty"
+    assert output["runs"], "the real committed qa_results/registry-services/civil-registration/ history is empty"
     assert output["results"], "no real check results found across committed history"
     # run_index, not run_date - a resupply's own run_date sorts away from its parent delivery (see module docstring)
     run_indexes = [r["run_index"] for r in output["runs"]]
@@ -26,7 +26,16 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
 
     summary = output["summary"]
     assert summary["total_checks"] == len(output["results"])
-    assert summary["pass"] + summary["warn"] + summary["fail"] + summary["error"] == summary["total_checks"]
+    # EVERY VERDICT IS COUNTED, and this line is the one that found the
+    # gap. REQ-QAC-108 added a fifth - `nodata`, a drift or volume check
+    # with no reference period - and the summary went on counting four,
+    # so the parts stopped adding up to the whole. Nothing else noticed:
+    # the dashboard reads `results`, not `summary`.
+    counted = sum(summary[k] for k in ("pass", "warn", "fail", "error", "nodata"))
+    assert counted == summary["total_checks"], (
+        f"{summary['total_checks'] - counted} result(s) carry a verdict the "
+        f"summary does not count: "
+        f"{sorted({r['status'] for r in output['results']})}")
     assert summary["engines"] == sorted(summary["engines"])
     assert summary["engines"], "no real engine names found in committed history"
 
@@ -34,7 +43,7 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
     assert set(output["dataset_stats"]) == {r["run_id"] for r in output["runs"]}
 
 
-def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
+def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
     results_path = tmp_path / "results_cp.json"
     monkeypatch.setattr(cp_history, "RESULTS_PATH", str(results_path))
 
@@ -48,7 +57,16 @@ def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch):
 
     summary = output["summary"]
     assert summary["total_checks"] == len(output["results"])
-    assert summary["pass"] + summary["warn"] + summary["fail"] + summary["error"] == summary["total_checks"]
+    # EVERY VERDICT IS COUNTED, and this line is the one that found the
+    # gap. REQ-QAC-108 added a fifth - `nodata`, a drift or volume check
+    # with no reference period - and the summary went on counting four,
+    # so the parts stopped adding up to the whole. Nothing else noticed:
+    # the dashboard reads `results`, not `summary`.
+    counted = sum(summary[k] for k in ("pass", "warn", "fail", "error", "nodata"))
+    assert counted == summary["total_checks"], (
+        f"{summary['total_checks'] - counted} result(s) carry a verdict the "
+        f"summary does not count: "
+        f"{sorted({r['status'] for r in output['results']})}")
 
     # results span more than one of the 6 real CP tables - not silently
     # collapsed onto just one dataset_id by the interleaved-per-run read

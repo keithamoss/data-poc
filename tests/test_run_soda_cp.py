@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import qa_tools.cp.run_soda_cp as run_soda_cp
 
-_REF_RUN_ID = "pytest_cp_ref"
-_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
 
 def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp):
-    monkeypatch.setattr(run_soda_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_soda_cp, "write_qa_result", lambda *a, **k: None)
     return run_soda_cp.evaluate_soda_cp(run_id, run_timestamp)
 
@@ -32,3 +32,61 @@ def test_dirty_run_produces_a_real_failure(monkeypatch, cp_duckdb_dir):
     assert all(r["check_id"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "a real red-severity dirty CP run produced no Soda failures at all"
+
+
+class TestAnUnreadableTableDoesNotTakeTheScanDown:
+    """The Soda counterpart of test_run_dbt_cp.py's identically named
+    class, and the same latent defect one tool over - found 2026-10-02
+    when REQ-PIPE-105 made an absent table ORDINARY rather than
+    hypothetical.
+
+    One file is one arrival, so a run reads its siblings from its
+    period, and a sibling filed to a DIFFERENT period - Case Workers,
+    delivered only in February and August - is legitimately absent. The
+    scan counted every table's rows up front and handed Soda checks for
+    all six, so one absent table raised UndefinedTable and the run lost
+    its QA for all five readable ones.
+    """
+
+    def test_the_other_tables_are_still_checked(self, monkeypatch, cp_duckdb_dir):
+        import uuid
+
+        from conftest import clone_run_views
+        from qa_tools.common import supply_db
+
+        mine = f"cp_held_{uuid.uuid4().hex[:8]}"
+        with supply_db.connect(label="test-held-soda") as conn:
+            clone_run_views(conn, _REF_RUN_ID, mine, held={"cp_clients"})
+        try:
+            results = _run(monkeypatch, cp_duckdb_dir, mine, "2026-01-01T09:00:00Z")
+            seen = {r["dataset_id"] for r in results}
+            assert len(seen) > 1, f"expected several tables still checked, got {seen}"
+            assert "cp-clients" not in seen, \
+                "nothing may be recorded against the table that could not be read"
+            assert not [r for r in results if r["status"] == "error"], \
+                "a check reading the absent table must be left out, not errored"
+        finally:
+            with supply_db.connect(label="test-held-soda") as conn:
+                conn.execute(
+                    f'DROP SCHEMA IF EXISTS "{supply_db.run_schema(mine)}" CASCADE')
+
+
+class TestAPartitionedCheckIsNotDropped:
+    """post-build-review #131 D6: `checks for t [recent]` is Soda's partition
+    syntax (BDM uses it today). Its table is `t`; read raw it was
+    "t [recent]", which the CP runner's table filter then dropped - a check
+    that could not run vanishing, the false green 15edf01 exists to stop."""
+
+    def test_its_table_is_the_bare_name(self):
+        from types import SimpleNamespace
+
+        from qa_tools.common import soda_common
+
+        yaml_text = ("checks for cp_clients [recent]:\n"
+                     "  - missing_count(given_name) = 0:\n"
+                     "      attributes:\n"
+                     "        check_id: x.cp-clients.given_name.missing_count_soda\n")
+        [missing] = soda_common.unreported_checks(
+            yaml_text, {"checks": []}, SimpleNamespace(get_error_logs=lambda: []))
+        assert missing["table"] == "cp_clients"
+        assert missing["column"] == "given_name"

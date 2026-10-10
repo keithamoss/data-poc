@@ -34,13 +34,38 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
+
+# REQ-QAC-024. The literal value `failure_indicates` carries when a
+# human looked and decided the cause of a failure adds nothing to what
+# the check already verifies - an authored decision, not an unfilled
+# field, which is the whole reason it exists rather than just leaving
+# the field blank. Roughly half of all checks are expected to carry it.
+#
+# Spelled once here so the CI gate and the dashboard template agree.
+# They cannot literally share a constant across Python and JS, so the
+# template holds its own copy beside `failureMeansBlock` - if this value
+# ever changes, that is the other place to change.
+SELF_EVIDENT = "self-evident"
+
+
+def is_self_evident(value: str | None) -> bool:
+    """True when `value` is the sentinel rather than authored prose.
+
+    Trimmed and lowercased on purpose: docs/check-authoring-rules.md
+    tells authors to use `>` block scalars for these fields, and a
+    folded scalar clips to a trailing newline, so the most likely real
+    spelling of the sentinel is not `==` the sentinel. The template
+    normalises identically, for the same reason.
+    """
+    return (value or "").strip().lower() == SELF_EVIDENT
 
 
 class MissingCheckIdError(ValueError):
@@ -116,6 +141,56 @@ class CheckMetadata:
     retired_reason: str | None = None
     description: str | None = None
     changelog: list[dict] = field(default_factory=list)
+    # A hand-authored short display name (REQ-QAC-023). Only SQL-type
+    # contract rules carry one today - every other check kind already
+    # has a name its own tool gives it. Deliberately outside the config
+    # hash, same as `description`: renaming a check for readability is
+    # not a change to what it does.
+    name: str | None = None
+
+    # The two prose fields REQ-QAC-024 adds, alongside `description` -
+    # which that requirement repurposes as, by definition, the
+    # plain-English statement of WHAT a check verifies.
+    #
+    #   failure_indicates - what a failure most likely means happened
+    #     upstream. Reader-facing, and deliberately not "what to do
+    #     about it": remediation belongs to the ticket, not to the
+    #     check definition.
+    #   technical_note - contributor-facing standing facts a viewer
+    #     must not see (cross-references between checks, why a check
+    #     behaves as it does by construction). Sparse by design and
+    #     never required. NOT for dated definition changes - those are
+    #     what `changelog` is for, and forcing one in here would mean
+    #     inventing a date and an author for something that never
+    #     happened.
+    #
+    # Both are outside the config hash for the same reason `description`
+    # and `name` are.
+    #
+    # How to WRITE all three (and `description`) is a standing authoring
+    # standard, not a mechanical rule this dataclass can express:
+    # docs/check-authoring-rules.md. This comment defines the fields;
+    # that file defines what good prose in them looks like and what has
+    # already been rejected.
+    failure_indicates: str | None = None
+    technical_note: str | None = None
+
+    # EVERY TABLE THIS CHECK READS BESIDES THE ONE IT IS FILED AGAINST
+    # (REQ-PIPE-036 criterion 10), as LOGICAL names. Declared rather
+    # than derived, because deriving it means four tool-specific
+    # parsers - a dbt `to: ref()`, a SodaCL "must exist in" sentence, a
+    # contract SQL query, an Evidently dict - and a parser that quietly
+    # returns nothing for a shape it did not expect produces a check
+    # result that looks complete and names none of what it read. A
+    # missed DECLARATION is caught by a gate that scans the check's own
+    # config for other known table names; a missed derivation is caught
+    # by nobody.
+    #
+    # Empty for the great majority of checks, which read only their own
+    # table, and criterion 10 asks for nothing from those. Outside the
+    # config hash for the same reason every field above it is: naming
+    # what a check already read is not a change to what it does.
+    reads_tables: list[str] = field(default_factory=list)
 
 
 def _config_hash(config: dict) -> str:
@@ -137,14 +212,76 @@ def _require_category(meta: dict, error_prefix: str) -> str:
     return category
 
 
+def _authored(meta: dict, key: str) -> str | None:
+    """One hand-authored text field, with surrounding whitespace removed.
+
+    REQ-GHUB-027. These are written as YAML block scalars, and a `>` or
+    `|` block keeps the trailing newline - so `failure_indicates` for 210
+    of the 213 self-evident checks really arrives as "self-evident\n".
+    Nothing had noticed because the one consumer that compares it
+    against the sentinel, the dashboard template, happens to
+    `.trim().toLowerCase()` first. The next consumer would not have: a
+    ticket builder comparing exactly would have printed the literal word
+    "self-evident" into 210 GitHub issues.
+
+    Fixed here rather than at each consumer because this function is the
+    single place every parser reads these fields from, and because
+    `_NON_CONFIG_FIELDS` is derived from its own keys - so these values
+    are excluded from `config_hash` by construction, and normalising
+    them cannot report a check as changed. Verified, not assumed: all
+    258 hashes are byte-identical across this change.
+
+    A field that is genuinely absent stays None rather than becoming "",
+    since absent and blank mean different things everywhere else in this
+    project."""
+    value = meta.get(key)
+    return value.strip() if isinstance(value, str) else value
+
+
+def _table_list(meta: dict, key: str) -> list[str]:
+    """A declared list of logical table names, normalised and sorted.
+
+    A BARE STRING IS ACCEPTED AND WRAPPED, because the single-table case
+    is the common one and `reads_tables: cp_clients` is what somebody
+    will write. Refusing it would be correct and would also mean a
+    silently undeclared cross-table check the first time an author took
+    the obvious shortcut.
+    """
+    value = meta.get(key)
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    return sorted({str(name).strip() for name in value if str(name).strip()})
+
+
 def _lifecycle_fields(meta: dict) -> dict:
     return {
         "introduced_date": meta.get("introduced_date"),
         "retired_as_of": meta.get("retired_as_of"),
-        "retired_reason": meta.get("retired_reason"),
-        "description": meta.get("description"),
+        "retired_reason": _authored(meta, "retired_reason"),
+        "description": _authored(meta, "description"),
         "changelog": list(meta.get("changelog") or []),
+        "name": _authored(meta, "name"),
+        "failure_indicates": _authored(meta, "failure_indicates"),
+        "technical_note": _authored(meta, "technical_note"),
+        "reads_tables": _table_list(meta, "reads_tables"),
     }
+
+
+# Everything `_lifecycle_fields` reads, plus `category` - i.e. every key
+# that describes a check rather than defining what it does.
+#
+# Derived rather than restated, and that is the whole point (REQ-QAC-024,
+# 2026-09-20). Only the Evidently parser needs this: dbt and Soda exclude
+# their WHOLE metadata block from the config hash, so a field added there
+# is cosmetic automatically, while Evidently hashes everything EXCEPT a
+# named list - the opposite default, and one that silently hashes any new
+# authored field. That list was hand-maintained and had already fallen
+# behind once: `name` shipped with REQ-QAC-023 and never reached it, a
+# bug that stayed latent only because no Evidently check happens to carry
+# a display name yet. Deriving it means the next field cannot repeat that.
+_NON_CONFIG_FIELDS = frozenset(_lifecycle_fields({})) | {"category"}
 
 
 # ---- dbt schema.yml -------------------------------------------------
@@ -193,7 +330,7 @@ def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
 
 def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]:
     with open(schema_yml_path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(schema_yml_path)
@@ -255,7 +392,7 @@ def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, s
     - used to tag each real check result with its own check_id at write
     time, not reconstructed from the check_id naming convention."""
     with open(schema_yml_path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
     lookup: dict[tuple[str | None, str | None, str], str] = {}
 
     def _record(test: Any, model: str, column: str | None) -> None:
@@ -311,6 +448,10 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
         raise MissingCheckIdError(f"{source}: {location}: soda check {check_expr!r} has no attributes.check_id")
     category = _require_category(attributes, f"{source}: {location}: soda check {check_expr!r} (check_id={check_id!r})")
     check_config.pop("name", None)  # cosmetic label, not part of what the check does
+    # HOW MANY EXAMPLE ROWS SODA RETURNS is not what the check checks either:
+    # the verdict and the count are the same at any limit. Raised on 71
+    # checks at once for post-build-review #129, none of them changed.
+    check_config.pop("samples limit", None)
     return [CheckMetadata(
         check_id=check_id, category=category, tool="soda", config_hash=_config_hash(check_config),
         source_file=source, **_lifecycle_fields(attributes),
@@ -319,7 +460,7 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
 
 def parse_soda_check_metadata(soda_yml_path: Path | str) -> list[CheckMetadata]:
     with open(soda_yml_path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(soda_yml_path)
@@ -359,28 +500,72 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     category = _require_category({"category": rule.get("dimension")},
                                   f"{source}: {location}: quality rule (check_id={check_id!r})")
     native_description = rule.pop("description", None)
+    rule_meta = {"description": native_description}
     changelog = meta.get("changelog")
     if isinstance(changelog, str):
         changelog = json.loads(changelog)  # ODCS customProperties values are scalar - a list gets stored as a JSON string
+    # Spread `_lifecycle_fields()` and override the two keys this tool
+    # genuinely handles differently, rather than listing every field by
+    # hand. That listing was a real bug (REQ-QAC-024, 2026-09-20): it
+    # predated `failure_indicates`/`technical_note` and silently dropped
+    # both, so 89 of 257 active checks would have had prose authored
+    # into their YAML that never reached anything, with no error. Every
+    # other parser already spreads this helper; this one is why the
+    # helper's whole point is that a new field arrives by default rather
+    # than needing four call sites updated.
+    fields = _lifecycle_fields(meta)
+    # ODCS quality rules already commonly carry their own native
+    # `description:` field (a real ODCS property, unlike dbt's/
+    # Soda's tool-specific config) - reuse it rather than requiring
+    # every rule to duplicate the same text into customProperties
+    # too. customProperties' own `description` wins if both exist
+    # (an explicit override for this metadata specifically).
+    # Normalised the same way _authored() does for everything it reads.
+    # This is the one authored string that does not come through that
+    # helper, and it was missed on the first pass of REQ-GHUB-027's
+    # whitespace fix - 40 real descriptions still reached the dashboard
+    # JSON with a trailing newline afterwards. Found by re-measuring the
+    # built output rather than by re-reading the change, which is the
+    # only reason it is not still there.
+    fields["description"] = fields["description"] or _authored(rule_meta, "description")
+    # customProperties values are scalar, so a changelog list arrives as
+    # a JSON string and has already been decoded above.
+    fields["changelog"] = changelog or []
     return [CheckMetadata(
         check_id=check_id, category=category, tool="datacontract", config_hash=_config_hash(rule),
-        source_file=source,
-        introduced_date=meta.get("introduced_date"), retired_as_of=meta.get("retired_as_of"),
-        retired_reason=meta.get("retired_reason"),
-        # ODCS quality rules already commonly carry their own native
-        # `description:` field (a real ODCS property, unlike dbt's/
-        # Soda's tool-specific config) - reuse it rather than requiring
-        # every rule to duplicate the same text into customProperties
-        # too. customProperties' own `description` wins if both exist
-        # (an explicit override for this metadata specifically).
-        description=meta.get("description") or native_description,
-        changelog=changelog or [],
+        source_file=source, **fields,
     )]
+
+
+def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str, str | None]]:
+    """`[(check_id, column_or_None)]` - the column each quality rule is
+    ACTUALLY attached to in the contract's schema.
+
+    REQ-QAC-023. This is the structural fact the runners now read a
+    check's column from, instead of regex-matching the rule's own
+    description prose. Exposed separately so the CI gate can assert that
+    a check_id's column segment agrees with where its rule really sits -
+    the two were free to disagree before, and nothing would have said
+    so."""
+    with open(contract_yaml_path) as f:
+        doc = config_yaml.parse(f) or {}
+    out: list[tuple[str, str | None]] = []
+    for table in doc.get("schema", []) or []:
+        for rule in table.get("quality", []) or []:
+            meta = _custom_properties_to_dict(rule.get("customProperties") or [])
+            if meta.get("check_id"):
+                out.append((meta["check_id"], None))
+        for prop in table.get("properties", []) or []:
+            for rule in prop.get("quality", []) or []:
+                meta = _custom_properties_to_dict(rule.get("customProperties") or [])
+                if meta.get("check_id"):
+                    out.append((meta["check_id"], prop.get("name")))
+    return out
 
 
 def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckMetadata]:
     with open(contract_yaml_path) as f:
-        doc = yaml.safe_load(f) or {}
+        doc = config_yaml.parse(f) or {}
     out: list[CheckMetadata] = []
     errors: list[str] = []
     source = str(contract_yaml_path)
@@ -402,6 +587,44 @@ def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckM
     return out
 
 
+# ---- File checks (REQ-QAC-096) ---------------------------------------
+
+def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMetadata]:
+    """One CheckMetadata per file check PER DATASET, from the one committed
+    definition of each (criterion 4) - so the lifecycle gate holds a file
+    check to exactly the rules every other check is held to (criterion 5):
+    an id that is unique and grammatical, a category, `failure_indicates`,
+    and a changelog entry for any change to what it does.
+
+    WHAT IT DOES is `severity` and `formats` - everything but the authored
+    and lifecycle fields - hashed per definition, so changing a definition
+    changes every dataset's copy at once and the gate asks for the entry
+    once per id, which is what a reader of any one dataset's history needs.
+
+    The datasets come from the CURRENT hierarchy even when this parses an
+    older ref's file: an id derived for a dataset that has since been
+    removed is a disappearance the hierarchy gate already reports.
+    """
+    from qa_tools.common import file_checks, hierarchy
+
+    with open(file_checks_yaml_path) as f:
+        doc = config_yaml.parse(f) or {}
+    source = str(file_checks_yaml_path)
+    out: list[CheckMetadata] = []
+    for meta in doc.get("checks") or []:
+        name = meta.get("check")
+        if not name:
+            raise MissingCheckIdError(f"{source}: a file check has no `check` name")
+        category = _require_category(meta, f"{source}: file check {name!r}")
+        config = {k: v for k, v in meta.items() if k not in _NON_CONFIG_FIELDS}
+        for dataset in hierarchy.all_datasets():
+            out.append(CheckMetadata(
+                check_id=file_checks.check_id_for(dataset, name), category=category,
+                tool=file_checks.TOOL, config_hash=_config_hash(config),
+                source_file=source, **_lifecycle_fields(meta)))
+    return out
+
+
 # ---- Evidently (plain Python dicts, no YAML) --------------------------
 
 def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[CheckMetadata]:
@@ -412,9 +635,7 @@ def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[C
     out = []
     for check_id, meta in check_lifecycle.items():
         category = _require_category(meta, f"{source}: evidently check (check_id={check_id!r})")
-        config = {k: v for k, v in meta.items()
-                  if k not in ("introduced_date", "retired_as_of", "retired_reason", "description", "changelog",
-                                "category")}
+        config = {k: v for k, v in meta.items() if k not in _NON_CONFIG_FIELDS}
         out.append(CheckMetadata(
             check_id=check_id, category=category, tool="evidently", config_hash=_config_hash(config),
             source_file=source, **_lifecycle_fields(meta),
@@ -439,6 +660,24 @@ def category_by_check_id(checks: list[CheckMetadata]) -> dict[str, str]:
     return {c.check_id: c.category for c in checks}
 
 
+def name_by_check_id(checks: list[CheckMetadata]) -> dict[str, str]:
+    """`{check_id: name}` for checks that carry a hand-authored name.
+
+    REQ-QAC-023. Before this, a SQL-type contract rule's display name was
+    recovered from its own `description:` prose - the first sentence for
+    Child Protection, a prefix match for Birth Registrations - so
+    rewording an explanation renamed the check and changed its URL. Two
+    real defects that shipped as a result: all five Birth Registrations
+    SQL checks rendered as the identical name `datacontract:custom_sql`,
+    and one Child Protection name had already been mangled into a
+    trailing bare full stop by the sentence split.
+
+    Absent for every other check kind, which already has a real name its
+    own tool gives it - so callers fall back rather than requiring one
+    everywhere."""
+    return {c.check_id: c.name for c in checks if c.name}
+
+
 # ---- Validation --------------------------------------------------------
 
 def find_duplicate_check_ids(checks: list[CheckMetadata]) -> list[str]:
@@ -449,6 +688,59 @@ def find_duplicate_check_ids(checks: list[CheckMetadata]) -> list[str]:
     for c in checks:
         seen[c.check_id] = seen.get(c.check_id, 0) + 1
     return sorted(check_id for check_id, count in seen.items() if count > 1)
+
+
+# ---- REQ-QAC-039's one-time grammar migration ------------------------
+
+# The 2026-09-16 rule is that a check_id, once introduced, is
+# PERMANENTLY unique and must never be changed - which is what
+# `find_disappeared_check_ids()` below enforces, since a rename reads as
+# the old id vanishing and a new one appearing.
+#
+# REQ-QAC-039 is that rule's one approved exception (Keith, 2026-09-22),
+# and this is where it is spent. The grammar gained a `collection`
+# segment and lost the `table` one, so all 258 ids changed in one
+# commit - see qa_tools/common/check_id.py's own header for what changed
+# and why, and REQ-QAC-039's `decisions:` for the exception itself.
+#
+# It is deliberately a TRANSFORM, not a hand-listed dict of 258 pairs:
+# a list could be wrong in a way nobody would check, while this states
+# the same rule the rename script applied, so an old id that does not
+# map onto a real new one still fails. And it is narrow in the way that
+# matters - it only ever rewrites an id that matches the OLD grammar,
+# which nothing authored after this commit can do.
+#
+# It is also SELF-EXPIRING rather than a standing loophole: from the
+# commit after the migration, no old-grammar id exists in git history to
+# migrate, so this is dead code that changes nothing. It is kept rather
+# than deleted so that the exception is visible where the rule is
+# enforced, instead of only in a requirement nobody reads at the moment
+# they hit the error.
+_PRE_039_ID = re.compile(
+    r"^(?P<asset>[A-Za-z0-9_-]+)\.(?P<agency>[A-Za-z0-9_-]+)\.(?P<dataset>[A-Za-z0-9_-]+)"
+    r"\.(?P<table>stg_[A-Za-z0-9_-]+)(?P<rest>(?:\.[A-Za-z0-9_-]+)?\.[A-Za-z0-9_-]+)$")
+
+
+def migrate_pre_039_check_id(check_id: str) -> str:
+    """One old-grammar check_id in the post-REQ-QAC-039 grammar, or the
+    id unchanged if it is not an old-grammar one.
+
+    Returns the input untouched when the dataset it names is not in the
+    hierarchy, rather than guessing - an id that cannot be placed is
+    exactly the case the permanence rule should still catch."""
+    from qa_tools.common import hierarchy
+
+    m = _PRE_039_ID.match(check_id)
+    if not m:
+        return check_id
+    try:
+        entry = hierarchy.dataset(m.group("dataset"))
+    except hierarchy.UnknownDatasetError:
+        return check_id
+    if entry.agency_id != m.group("agency"):
+        return check_id
+    return (f"{m.group('asset')}.{m.group('agency')}.{entry.collection_id}"
+            f".{m.group('dataset')}{m.group('rest')}")
 
 
 def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:
@@ -465,9 +757,15 @@ def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list
     `_YAML_SOURCES`/`_EVIDENTLY_SOURCES`), just now sourced from the
     retired file instead of the active one. Only a genuine deletion, or
     an attempted rename (editing the check_id string itself, which reads
-    as the old id vanishing and a "new" one appearing), shows up here."""
+    as the old id vanishing and a "new" one appearing), shows up here.
+
+    The one exception is REQ-QAC-039's grammar migration - see
+    `migrate_pre_039_check_id()` above for what it covers and why it is
+    spent rather than standing."""
     new_ids = {c.check_id for c in new_checks}
-    return sorted(c.check_id for c in old_checks if c.check_id not in new_ids)
+    return sorted(c.check_id for c in old_checks
+                  if c.check_id not in new_ids
+                  and migrate_pre_039_check_id(c.check_id) not in new_ids)
 
 
 def find_undocumented_changes(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -> list[str]:

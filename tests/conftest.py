@@ -19,13 +19,26 @@ since genuinely testing "does this correctly parse the real tool's
 real output" requires actually running the real tool."""
 from __future__ import annotations
 
-import json
 import os
 from datetime import date
 
 import pytest
 
+# A DEVELOPER'S OWN .env, so `uv run pytest` needs no exports.
+# At import time rather than in a fixture: the supply_dsn fixture
+# below is autouse and reads the environment, and several test
+# modules read it at import. Never overrides something already
+# set, which is what keeps CI's own MOTHMAN_TEST_DSN authoritative
+# - a .env that clobbered it would point the run at a database
+# that does not exist there, and the failure would read as a code
+# fault.
+from qa_tools.common.local_env import load_local_env  # noqa: E402
+
+load_local_env()
+
+import fixture_ids
 from generator.daily_batch import generate_daily_batch
+from qa_tools.common import asset_time, delivery
 from generator.dirty import apply_birth_registrations_presets
 
 
@@ -76,31 +89,573 @@ def bdm_raw_dir(tmp_path_factory):
     dirty_df = apply_birth_registrations_presets(dirty_df, severity="red", seed=90003, previous_row_count=600)
     dirty_df.to_csv(raw_dir / f"{_DIRTY_RUN_ID}.csv", index=False)
 
-    manifest = [
-        {"run_id": _REF_RUN_ID, "file": f"{_REF_RUN_ID}.csv", "run_date": "2026-01-01", "dirty_severity": None},
-        {"run_id": _DIRTY_RUN_ID, "file": f"{_DIRTY_RUN_ID}.csv", "run_date": "2026-01-02", "dirty_severity": "red"},
-    ]
-    with open(raw_dir / "manifest.json", "w") as f:
-        json.dump(manifest, f)
+    # AND AS REAL DELIVERIES (REQ-GEN-043) - the shape the pipeline
+    # actually reads now. Two arrivals, arbitrary supplier-shaped names,
+    # filenames matching the real arrivalPattern, receipts OUTSIDE the
+    # deliveries. The flat CSVs above stay because several tests want
+    # a plain file to hand `mothman bdm qa --file`, which is what an
+    # operator really has; nothing reads a manifest from them.
+    deliveries = raw_dir / "deliveries"
+    receipts = raw_dir / "receipts"
+    for run_id, name, when, df in (
+            (_REF_RUN_ID, "REF_20260101", "2026-01-01T06:00:00+00:00", ref_df),
+            (_DIRTY_RUN_ID, "drop-9002", "2026-01-02T06:00:00+00:00", dirty_df)):
+        delivery.write_delivery(
+            name, {f"birth_registrations_{when[:10]}.csv": df.to_csv(index=False)},
+            received_at=asset_time.parse_instant(when, run_id),
+            deliveries_dir=deliveries, receipts_dir=receipts)
 
     return str(raw_dir)
 
 
 @pytest.fixture(scope="session")
-def bdm_duckdb_dir(tmp_path_factory, bdm_raw_dir):
-    """Per-run DuckDB warehouses for bdm_raw_dir's same two runs, built
-    via the real qa_tools.bdm.build_per_run_warehouses.build_all() -
-    the exact loading code path the real pipeline uses, not a
-    hand-rolled copy of it."""
+def bdm_delivery_dirs(bdm_raw_dir):
+    """(deliveries_dir, receipts_dir) for the fixture above."""
+    from pathlib import Path
+    return Path(bdm_raw_dir) / "deliveries", Path(bdm_raw_dir) / "receipts"
+
+
+#: The PostgreSQL the SUITE connects to. Points at a server somebody else
+#: is running - a dev container, a CI service container, or a local
+#: install - never one this suite starts (REQ-TEST-095 criterion 1). A
+#: suite that starts its own server tests a server nobody deploys.
+TEST_DSN_ENV = "MOTHMAN_TEST_DSN"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def stated_test_environment():
+    """THE SUITE IS THE `test` ENVIRONMENT, stated here and nowhere else
+    (REQ-PIPE-093 criterion 16): a test worker's scratch database is not
+    the CI runner or the sandbox it happens to run in, and since criterion
+    1 every connection needs a stated environment. A test that wants
+    another one states it with monkeypatch, which puts this back after."""
+    import os
+
+    from qa_tools.common import environments
+
+    before = os.environ.get(environments.ENVIRONMENT_ENV)
+    # THE DEPLOYMENT'S OWN ENVIRONMENT, remembered alongside its DSN: a test
+    # that reads the deployment's history must say it is acting as the
+    # environment that database is marked for (REQ-PIPE-107), or it is
+    # refused like any other mismatch.
+    globals()["DEPLOYMENT_ENVIRONMENT"] = before
+    os.environ[environments.ENVIRONMENT_ENV] = "test"
+    yield
+    if before is None:
+        os.environ.pop(environments.ENVIRONMENT_ENV, None)
+    else:
+        os.environ[environments.ENVIRONMENT_ENV] = before
+
+
+def drop_qa_schema(conn) -> None:
+    """Drop the qa schema the way a test wanting it rebuilt from nothing
+    does - and put the database's identity back, which lives in it since
+    2026-10-06 (REQ-PIPE-107). Without that every later connection to this
+    worker's database refuses, which is the guard working, not the test."""
+    from qa_tools.common import db_identity, qa_store
+
+    _, identity = db_identity.read(conn)
+    conn.execute(f'DROP SCHEMA IF EXISTS "{qa_store.SCHEMA}" CASCADE')
+    if identity is not None:
+        db_identity.mark(conn, identity)
+
+
+def mark_test_database(admin_conn, name: str) -> None:
+    """Record a scratch database's identity as this asset's `test`
+    environment (REQ-PIPE-107 criterion 12), from a connection to another
+    database - the one that just created it."""
+    # A row has to be written from INSIDE the database, so this opens a
+    # connection to it with the admin connection's credentials. Lived in
+    # db_identity as mark_by_admin until 2026-10-06, when the test review
+    # (plans/running-thoughts.md #67) found nothing but this fixture called
+    # it - test infrastructure belongs with the tests.
+    import psycopg
+
+    from qa_tools.common import db_identity, hierarchy
+
+    info = psycopg.conninfo.conninfo_to_dict(admin_conn.info.dsn)
+    info["dbname"] = name
+    if admin_conn.info.password:
+        info["password"] = admin_conn.info.password
+    with psycopg.connect(psycopg.conninfo.make_conninfo(**info), autocommit=True) as conn:
+        db_identity.mark(conn, db_identity.Identity(hierarchy.data_asset_id(), "test"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def supply_dsn(worker_id, stated_test_environment):
+    """ONE SUPPLY DATABASE PER TEST WORKER, in a real PostgreSQL.
+
+    WHY A WHOLE DATABASE rather than a schema set per worker: the code
+    under test creates and drops SCHEMAS as its ordinary business -
+    staging, rejected, one per period, one per run - so a worker confined
+    to a schema would have to have every one of those names rewritten,
+    and the thing being tested would no longer be the thing that runs.
+    A database is the boundary that needs no cooperation from the code.
+
+    IT FAILS RATHER THAN SKIPS when there is nowhere to connect
+    (criterion 2). A skip is how a suite quietly stops testing: the run
+    goes green, the count drops, and nobody reads the count. This is the
+    same reasoning as the never-silently-skip rule the arrival pin in
+    tests/test_asset_time_semantics.py carries.
+
+    Dropped and recreated at session start rather than cleaned up at the
+    end, which is deliberate: a crashed run leaves its database behind to
+    look at, and the next run does not care what it finds.
+    """
+    import os
+
+    import psycopg
+
+    admin = os.environ.get(TEST_DSN_ENV)
+    if not admin:
+        raise pytest.UsageError(
+            f"{TEST_DSN_ENV} is not set. This suite needs a real PostgreSQL to "
+            f"connect to and deliberately does not start one - see README's "
+            f"Development section. A dev container and CI each supply it; "
+            f"locally, point it at your own server, e.g. "
+            f"{TEST_DSN_ENV}=postgresql://user:pass@localhost:5432/postgres")
+
+    # A SESSION TAG, so two test sessions on one server cannot drop each
+    # other's databases: the name was the worker id alone, dropped WITH
+    # (FORCE) at the start of every session, and on 2026-10-05 a critic's
+    # run and the builder's gate killed each other's databases mid-run
+    # ("database mothman_test_gw2 does not exist"). Unset is the old name.
+    tag = "".join(c for c in os.environ.get("MOTHMAN_TEST_DB_TAG", "") if c.isalnum())[:12]
+    name = f"mothman_test_{tag + '_' if tag else ''}{worker_id}"
+    with psycopg.connect(admin, autocommit=True) as conn:
+        # FORCE, because a leftover connection from a crashed run would
+        # otherwise block the drop and fail the whole session with an
+        # error about something the person did not do.
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{name}"')
+        # REAP CONNECTIONS A QA TOOL LEAVES IDLE IN A TRANSACTION, which
+        # is a real thing that happens rather than a precaution. Found
+        # 2026-09-27: a datacontract-cli SQL rule left its connection
+        # open after `test()` returned, holding a read lock on a staged
+        # table, and the next load's DROP TABLE blocked behind it until
+        # the whole run was killed. supply_db sets a lock_timeout so that
+        # now fails loudly instead of hanging - this removes the cause as
+        # well as the symptom, so the suite does not spend its time
+        # proving the timeout works.
+        #
+        # ON THE DATABASE, not on our own connections: the leaking
+        # connection is the TOOL'S, opened by its own driver, so nothing
+        # we set on a connection we opened would reach it. A production
+        # deployment wants this too, set by whoever administers the
+        # database rather than by the application.
+        conn.execute(
+            f'ALTER DATABASE "{name}" SET idle_in_transaction_session_timeout = \'15s\'')
+        # MARKED AS THE `test` ENVIRONMENT (REQ-PIPE-107 criterion 12): every
+        # connection checks the database's recorded identity, a test
+        # worker's included - the suite is where a misdirected DSN has
+        # already done real damage, so it is not exempt.
+        mark_test_database(conn, name)
+
+    info = psycopg.conninfo.conninfo_to_dict(admin)
+    info["dbname"] = name
+    dsn = psycopg.conninfo.make_conninfo(**info)
+
+    # BEFORE ANY SODA SCAN CAN RUN, and this import is the whole point
+    # of the line rather than a stylistic one. Soda builds a singleton
+    # EnvHelper whose constructor reloads this repo's `.env` OVER the
+    # process environment, which would undo the redirection below and
+    # send every test after a Soda test on this worker at the
+    # developer's real database. Importing soda_common defuses that
+    # once - see its own _defuse_sodas_dotenv_reload(). Doing it here
+    # makes the isolation guaranteed rather than dependent on which
+    # module a worker happens to import first.
+    from qa_tools.common import soda_common, supply_db  # noqa: F401
+
+    before = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    # THE DEPLOYMENT'S OWN DATABASE, remembered before this fixture
+    # points everything at the worker's. One fixture genuinely needs
+    # it: tests/test_dashboard_e2e.py builds the real dashboard, whose
+    # input is recorded QA history - a shared, read-only corpus that
+    # used to arrive with the checkout as committed files and is a
+    # populated database since REQ-PIPE-089. A worker's database is
+    # empty by design, so building from it produces an empty dashboard.
+    globals()["DEPLOYMENT_SUPPLY_DSN"] = before
+    os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    yield dsn
+    if before is None:
+        os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
+    else:
+        os.environ[supply_db.SUPPLY_DSN_ENV] = before
+
+
+@pytest.fixture
+def private_supply_dsn(supply_dsn, request):
+    """A database NO OTHER TEST MODULE can write into.
+
+    `supply_dsn` gives a database per WORKER, which isolates a module
+    from the deployment and from other workers - but not from the other
+    modules pytest-xdist put on the same worker. That is enough for a
+    test asserting on rows it wrote itself, and not enough for one
+    asserting on a GLOBAL total: "the queue is empty" is a claim about
+    everything in the database, so any module sharing the worker can
+    falsify it.
+
+    FOUND THE HARD WAY, 2026-09-29. tests/test_outstanding.py asserts on
+    the whole outstanding queue, and passed for as long as it happened to
+    share a worker with modules that wrote no filings. Splitting CI into
+    two halves moved 270 tests out of the run, `--dist loadfile`
+    redistributed what was left, and nine of its tests began reporting
+    28 items where they expected none. Its own docstring had already
+    recorded the previous version of this - the deployment's 84
+    promotions arriving mid-test - and the fix then was this fixture's
+    weaker cousin.
+
+    PER TEST, not per module, because the decision log is append-only by
+    a database trigger: a TRUNCATE is refused, so a module cannot clean
+    up after itself between its own tests either.
+    """
+    import os
+
+    import psycopg
+
+    from qa_tools.common import supply_db
+
+    admin = os.environ[TEST_DSN_ENV]
+    safe = "".join(c if c.isalnum() else "_" for c in request.node.name)[:40]
+    name = f"mothman_solo_{os.getpid()}_{abs(hash(safe)) % 10**8}"
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        conn.execute(f'CREATE DATABASE "{name}"')
+        mark_test_database(conn, name)
+
+    info = psycopg.conninfo.conninfo_to_dict(admin)
+    info["dbname"] = name
+    dsn = psycopg.conninfo.make_conninfo(**info)
+
+    before = os.environ.get(supply_db.SUPPLY_DSN_ENV)
+    os.environ[supply_db.SUPPLY_DSN_ENV] = dsn
+    yield dsn
+    if before is None:
+        os.environ.pop(supply_db.SUPPLY_DSN_ENV, None)
+    else:
+        os.environ[supply_db.SUPPLY_DSN_ENV] = before
+    # DROPPED, unlike supply_dsn's, because there is one of these per
+    # test rather than one per worker - left behind they would
+    # accumulate a database per test run, which is the leak this
+    # project's own `drop_orphan_run_schemas` docstring warns about.
+    with psycopg.connect(admin, autocommit=True) as conn:
+        conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _no_test_files_a_real_delivery():
+    """No test writes a delivery into this repo's own delivery tree.
+
+    NOT PRECAUTIONARY - it is a cleanup. `mothman bdm qa`/`mothman cp qa`
+    with `--commit` FILE the supply (REQ-PIPE-103), by design, into
+    data/deliveries/ with a receipt beside it. One CLI test invoked that
+    without redirecting the directories, so every run of the suite filed a
+    real `handfiled-*` delivery. Twenty-three had accumulated when CI found
+    it, on 2026-09-28.
+
+    THE DAMAGE WAS NOT THE CLUTTER, and this is why a guard rather than a
+    one-line fix in that test. Those directories are read by everything that
+    recognises arrivals from disk, so they became two extra Child Protection
+    runs: they pushed a bootstrap from 151 staged tables to 275, and they got
+    themselves PINNED into tests/fixtures/arrival_semantics_golden.json as
+    cp_run_019 and cp_run_020 - a characterization pin that then disagreed
+    with every clean checkout, which is exactly what CI reported. A test
+    artefact had become part of the corpus this project measures itself
+    against.
+
+    REFUSES RATHER THAN REDIRECTS, which is the opposite of
+    _committed_history_is_off_limits below, and deliberately so. That one
+    guards trees written several frames below whatever a test called, where
+    a test cannot reliably opt in. This is the other shape: every write here
+    comes from a test that asked for `--commit`, so it KNOWS it is filing
+    something and can say where. Silently redirecting would leave the test
+    passing while asserting about a directory it never named.
+    """
+    import functools
+    import inspect
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+
+    real = delivery.write_delivery
+    # THE REAL PATH IS CAPTURED HERE, once, BEFORE any test has run - and
+    # that is the whole correctness of this guard rather than a detail.
+    # The first version compared the target against the LIVE
+    # `delivery.DELIVERIES_DIR`, which several tests legitimately
+    # monkeypatch to a tmp_path: those two are then equal and the guard
+    # fired on thirteen tests that were already doing the right thing.
+    # Caught by the gate, which is where a guard this broad should be
+    # caught.
+    real_tree = Path(delivery.DELIVERIES_DIR).resolve()
+
+    # BOUND THROUGH THE REAL SIGNATURE rather than picking `deliveries_dir`
+    # out of **kwargs, which is the second thing this guard got wrong:
+    # several tests pass the directories POSITIONALLY, so a keyword-only
+    # read saw None and the guard fired on a call that had named a
+    # tmp_path perfectly well. `bind` gets the same answer whichever way
+    # the caller wrote it, and keeps getting it if the signature changes.
+    signature = inspect.signature(real)
+
+    @functools.wraps(real)
+    def guarded(*args, **kwargs):
+        bound = signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        named = bound.arguments.get("deliveries_dir")
+        target = Path(named or delivery.DELIVERIES_DIR).resolve()
+        if target == real_tree:
+            raise AssertionError(
+                f"a test tried to file delivery "
+                f"{bound.arguments.get('name')!r} into this repo's real "
+                f"{real_tree} - point deliveries_dir and receipts_dir "
+                f"at tmp_path, or monkeypatch delivery.DELIVERIES_DIR "
+                f"(see tests/conftest.py's _no_test_files_a_real_delivery)")
+        return real(*args, **kwargs)
+
+    delivery.write_delivery = guarded
+    try:
+        yield
+    finally:
+        delivery.write_delivery = real
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _committed_history_is_off_limits(tmp_path_factory):
+    """No test writes into this repo's committed history trees.
+
+    AUTOUSE AND SESSION-SCOPED ON PURPOSE. The trees here - the
+    processing log, the delivery log, the in-flight observations - are
+    written several frames below whatever a test actually called, by
+    real production code paths that take a directory argument nobody
+    at the test's level passes. So a test cannot opt in reliably; it
+    has to be opted in for.
+
+    THIS IS NOT PRECAUTIONARY. Both halves of it have already happened
+    in this repo. `mothman pipeline run` once cleared the whole
+    delivery log at its top, and the suite - which invokes that command
+    with the real work stubbed - deleted sixty committed records on the
+    next gate run. And the processing log, one day old, had 109
+    test-run records in it out of 259, each one a table name that only
+    ever existed inside a temporary directory.
+
+    The prune half is the worse of the two and is still live without
+    this: six tests invoke `pipeline run` without redirecting the
+    delivery log, and the prune removes every record for a delivery
+    not on disk. On this machine `data/deliveries/` exists so nothing
+    is pruned; on a freshly-cloned CI runner there is no `data/` at
+    all, so the correct answer to "which deliveries are present" is
+    NONE and all sixty records go. Exactly the shape CLAUDE.md records
+    for gitignored trees, in the opposite direction.
+
+    Patches the module constants rather than the environment, so a test
+    that redirects one of these itself still overrides this and still
+    restores to a temporary directory rather than to the real tree.
+    """
+    from qa_tools.common import in_flight_log
+
+    root = tmp_path_factory.mktemp("committed_history")
+    # NEITHER load_log NOR delivery_log NOR filing is here any more:
+    # REQ-PIPE-089 moved the first two into the database and
+    # REQ-PIPE-104 the third, so there is no committed tree of any of
+    # them left to guard. Isolation comes from each worker having its own
+    # database, which is stronger than a redirected directory - a test
+    # cannot reach the real one at all, rather than being pointed away
+    # from it.
+    guarded = [(in_flight_log, "OBSERVATIONS_DIR", "observations")]
+    before = [(module, name, getattr(module, name)) for module, name, _ in guarded]
+    for module, name, folder in guarded:
+        setattr(module, name, root / folder)
+    yield root
+    for module, name, value in before:
+        setattr(module, name, value)
+
+
+@pytest.fixture
+def real_committed_history(_committed_history_is_off_limits):
+    """Opt one test back on to the REAL committed trees, for READING.
+
+    The guard above is about writes and deletes, and redirecting
+    everything also hides the trees from the handful of tests whose
+    whole point is the real corpus - REQ-PIPE-058's collision gate, for
+    one, which reads the committed delivery log precisely so it can run
+    in CI without touching data/.
+
+    Deliberately not autouse and deliberately named: a test that wants
+    the real tree has to say so, which is the difference between an
+    exception and a hole.
+    """
+    from qa_tools.common import delivery_log, in_flight_log
+
+    root = delivery_log.ROOT
+    restore = [(in_flight_log, "OBSERVATIONS_DIR", in_flight_log.OBSERVATIONS_DIR)]
+    in_flight_log.OBSERVATIONS_DIR = root / "observations" / "in_flight"
+    yield root
+    for module, name, value in restore:
+        setattr(module, name, value)
+
+
+@pytest.fixture
+def deployment_history(supply_dsn, monkeypatch):
+    """Read the DEPLOYMENT'S recorded QA history, not this worker's.
+
+    A handful of tests exist to check this repo's own real corpus -
+    "a real run has a recorded sex distribution", "BDM's run windows
+    are sorted and open-ended". That corpus used to arrive with the
+    checkout as committed `qa_results/` files, so every worker saw it
+    for free; REQ-PIPE-089 made it a database and a worker's is empty
+    by design.
+
+    READ-ONLY BY CONVENTION AND BY WHAT THESE TESTS DO - they assert on
+    a corpus, they do not build one. A test that WRITES must use its own
+    worker database, which is what every other test here gets.
+
+    It needs that database populated, which is
+    `mothman pipeline bootstrap` - see CLAUDE.md's setup section.
+    """
+    dsn = globals().get("DEPLOYMENT_SUPPLY_DSN")
+    if not dsn:
+        pytest.skip("no deployment database configured (MOTHMAN_SUPPLY_DSN)")
+    monkeypatch.setenv(supply_db_module().SUPPLY_DSN_ENV, dsn)
+    use_deployment_environment(monkeypatch)
+    return dsn
+
+
+def use_deployment_environment(monkeypatch) -> None:
+    """Act as the environment the deployment's database is marked for."""
+    env = globals().get("DEPLOYMENT_ENVIRONMENT")
+    if env:
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", env)
+
+
+def supply_db_module():
+    from qa_tools.common import supply_db
+    return supply_db
+
+
+@pytest.fixture
+def clean_qa_history(supply_dsn):
+    """An empty QA history for one test (REQ-PIPE-089).
+
+    Per-test isolation used to come free from `tmp_path`, because each
+    test wrote its own little `qa_results/` tree. The history is a
+    schema now and a worker's database outlives any one test, so a
+    test reusing a run id - `run_1` is popular - sees whatever an
+    earlier test recorded under it.
+
+    Yields the connection, so a test that needs to mark a run complete
+    or look at a row directly has one to hand.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-qa-history") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".run CASCADE')
+        yield conn
+
+
+@pytest.fixture
+def finish_runs():
+    """Attribute runs and mark them finished, so their results are
+    observable (criterion 13).
+
+    A helper rather than something automatic: a run becoming observable
+    is a real event with a real precondition - it has to say who ran
+    it - and a fixture that quietly completed every run would remove
+    the thing several tests are about.
+    """
+    from qa_tools.common.qa_results_writer import finish_run, open_run
+
+    def _finish(*run_ids, agency="a", collection="b",
+                when="2026-01-01T00:00:00+00:00", run_by="tests@example.gov.au"):
+        for run_id in run_ids:
+            open_run(agency, collection, run_id, when, run_by)
+            finish_run(run_id)
+
+    return _finish
+
+
+@pytest.fixture
+def clean_delivery_log(supply_dsn):
+    """An empty delivery log for one test (REQ-PIPE-089 criterion 16).
+
+    Same reasoning as `clean_load_log` below, and the same deliberate
+    non-autouse: a test asserting on the WHOLE log has to empty it
+    first, and the staging fixtures legitimately leave records behind.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-delivery-log") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".delivery CASCADE')
+        yield conn
+
+
+@pytest.fixture
+def clean_load_log(supply_dsn):
+    """An empty load log for one test (REQ-PIPE-089).
+
+    Until the load record moved into the database each test got this
+    free, from its own temporary directory. A worker's database is
+    shared across the tests that run on it, so a test asserting on the
+    WHOLE log - "these are the only records" - has to empty it first or
+    it is asserting about whatever ran before it. Exactly the leakage
+    that made three assertions in tests/test_qa_store.py fail on rows
+    an earlier test left behind.
+
+    DELIBERATELY NOT AUTOUSE, for a reason rather than restraint: the
+    module-scoped staging fixtures below write load records, and those
+    records are the gate that makes their staged tables readable. A
+    blanket truncate between tests would leave the tables staged and
+    invisible, which is a far more confusing failure than the one it
+    would prevent.
+    """
+    from qa_tools.common import qa_store, supply_db
+
+    with supply_db.connect(label="test-clean-load-log") as conn:
+        qa_store.ensure_schema(conn)
+        conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".load_outcome')
+        yield conn
+
+
+@pytest.fixture(scope="module")
+def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
+    """bdm_raw_dir's same two runs, staged into this worker's supply
+    database via the real build_all() - the exact loading code path the
+    real pipeline uses, not a hand-rolled copy of it.
+
+    PER MODULE, NOT PER SESSION, since 2026-09-27. What this fixture
+    guarantees is not just "the rows are staged" but "this run has a
+    view schema to read them through", and a QA run now DISCARDS its
+    own view schema when it finishes (REQ-PIPE-068 criterion 1, which
+    always said "once the run completes" - the sweep-at-the-end it
+    replaced never actually met it). So one module calling run_single()
+    used to leave the next module on the same xdist worker with staged
+    tables and no views. Re-staging is cheap here - two arrivals, 620
+    rows - and buys back an invariant every reader of this fixture
+    assumes.
+
+    Named for the directory it used to return, and returning the
+    database path instead. The name is left alone on purpose: every
+    test that depends on it depends on the DATA being staged, not on
+    the path, and renaming it across a dozen files would be churn that
+    hid the one real change in the diff.
+    """
+    from pathlib import Path
+
     from qa_tools.bdm.build_per_run_warehouses import build_all
 
-    out_dir = tmp_path_factory.mktemp("bdm_duckdb_runs")
-    build_all(raw_dir=bdm_raw_dir, out_dir=str(out_dir))
-    return str(out_dir)
+    build_all(deliveries_dir=Path(bdm_raw_dir) / "deliveries",
+               receipts_dir=Path(bdm_raw_dir) / "receipts")
+    return supply_dsn
 
 
-_CP_REF_RUN_ID = "pytest_cp_ref"
-_CP_DIRTY_RUN_ID = "pytest_cp_dirty"
+# The run_ids recognition will assign these two deliveries - see
+# tests/fixture_ids.py. The flat data/cp_raw/<run_id>/ copy below has to
+# be named for them because qa_tools/cp/run_datacontract_cp.py and
+# run_evidently_cp.py still read their CSVs from that path, exactly as
+# the real generator writes it. That coupling is real and outlives this
+# fixture; it is logged as a follow-up rather than papered over here.
+_CP_REF_RUN_ID = fixture_ids.CP_REF_RUN_ID
+_CP_DIRTY_RUN_ID = fixture_ids.CP_DIRTY_RUN_ID
 
 
 @pytest.fixture(scope="session")
@@ -131,19 +686,25 @@ def cp_raw_dir(tmp_path_factory):
     pop = generate_population(45000, seed=91001)
     base_tables = generate_child_protection_collection(pop, seed=91002, n_case_workers=15)
 
-    def _write_run(run_id: str, run_date: str, tables: dict, dirty_severity: str | None):
+    def _write_run(run_id: str, run_date: str, tables: dict, delivery_name: str):
+        """One arrival: the six CP tables landing together as ONE
+        delivery (REQ-GEN-043), plus a flat per-run folder several
+        tests hand to `mothman cp qa --folder`, which is the shape an
+        operator really has."""
         run_dir = raw_dir / run_id
         run_dir.mkdir()
-        row_counts = {}
+        files = {}
         for name in tables_list:
             df = _add_extract_timestamp(tables[name], date.fromisoformat(run_date), None, seed=91003)
             cols = [c for c in df.columns if not c.startswith("_")]
             df[cols].to_csv(run_dir / f"{name}.csv", index=False)
-            row_counts[name] = int(len(df))
-        return {"run_id": run_id, "run_index": 1, "run_date": run_date,
-                "dirty_severity": dirty_severity, "seed": 91000, "row_counts": row_counts}
+            files[f"{name}.csv"] = df[cols].to_csv(index=False)
+        delivery.write_delivery(
+            delivery_name, files,
+            received_at=asset_time.parse_instant(f"{run_date}T06:00:00+00:00", run_id),
+            deliveries_dir=raw_dir / "deliveries", receipts_dir=raw_dir / "receipts")
 
-    ref_entry = _write_run(_CP_REF_RUN_ID, "2026-01-01", base_tables, None)
+    _write_run(_CP_REF_RUN_ID, "2026-01-01", base_tables, "CP_20260101")
 
     dirty_tables = {name: base_tables[name].copy() for name in tables_list}
     dirty_tables["cp_notifications"] = dirty_mod.apply_cp_notifications_presets(
@@ -158,21 +719,233 @@ def cp_raw_dir(tmp_path_factory):
     dirty_tables["cp_clients"] = dirty_mod.apply_cp_clients_presets(dirty_tables["cp_clients"], "red", seed=91104)
     dirty_tables["cp_carers"] = dirty_mod.apply_cp_carers_presets(dirty_tables["cp_carers"], "red", seed=91105)
     dirty_tables["cp_case_workers"] = dirty_mod.apply_cp_case_workers_presets(dirty_tables["cp_case_workers"], "red", seed=91106)
-    dirty_entry = _write_run(_CP_DIRTY_RUN_ID, "2026-04-01", dirty_tables, "red")
-
-    with open(raw_dir / "manifest.json", "w") as f:
-        json.dump([ref_entry, dirty_entry], f)
+    _write_run(_CP_DIRTY_RUN_ID, "2026-04-01", dirty_tables, "cp-drop-9104")
 
     return str(raw_dir)
 
 
 @pytest.fixture(scope="session")
-def cp_duckdb_dir(tmp_path_factory, cp_raw_dir):
-    """Per-run DuckDB warehouses for cp_raw_dir's same two runs, built
-    via the real qa_tools.cp.build_cp_warehouses.build_all() - the
-    exact loading code path the real pipeline uses."""
+def cp_delivery_dirs(cp_raw_dir):
+    """(deliveries_dir, receipts_dir) for the fixture above."""
+    from pathlib import Path
+    return Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts"
+
+
+@pytest.fixture(scope="module")
+def cp_duckdb_dir(supply_dsn, cp_raw_dir):
+    """cp_raw_dir's same two runs, staged into this worker's supply
+    database via the real build_all(). Shares one database with the BDM
+    fixture above, which is the point rather than a compromise - the
+    whole asset has one, and the two collections' tables have always
+    been distinct.
+
+    PER MODULE for the same reason as the BDM fixture - see its own
+    note on run_single() discarding the view schema it read through.
+    The expensive half (generating a 45,000-person population) stays
+    session-scoped in cp_raw_dir; only the staging repeats.
+
+    See the BDM fixture for why the name still says `dir`.
+    """
+    from pathlib import Path
+
     from qa_tools.cp.build_cp_warehouses import build_all
 
-    out_dir = tmp_path_factory.mktemp("cp_duckdb_runs")
-    build_all(raw_dir=cp_raw_dir, out_dir=str(out_dir))
-    return str(out_dir)
+    # deliveries_dir/receipts_dir passed EXPLICITLY. Without them
+    # build_all() recognises arrivals from the real data/deliveries/
+    # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
+    # run, building 18 real CP warehouses into a pytest tmp dir while
+    # the fixture's own two sat unread.
+    build_all(
+               deliveries_dir=Path(cp_raw_dir) / "deliveries",
+               receipts_dir=Path(cp_raw_dir) / "receipts")
+    _file_and_overlay_cp(Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts")
+    return supply_dsn
+
+
+def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
+    """What the batch does between staging and checking, for the two
+    fixture deliveries (REQ-PIPE-105 criterion 5).
+
+    ONE FILE IS ONE ARRIVAL, so staging alone gives each run a view of
+    ONE table. A run sees its siblings only once filing has given it a
+    period, so each arrival is filed and its overlay rebuilt in receipt
+    order - the last file of a delivery then reads all six, which is
+    what fixture_ids.CP_REF_RUN_ID names.
+
+    FILED TO FIXED PERIODS, NOT THROUGH THE ASSIGNMENT RULE - and that is
+    a hermeticity fix found the hard way, 2026-10-02. The rule files as
+    a fill or a resupply by what has been PROMOTED, and the decision log it
+    reads is append-only and shared by every module on this worker - so
+    any module that promoted cp-clients somewhere moved where the
+    reference delivery filed, and two of its six tables silently left
+    its period. It passed alone and failed in the full suite. The rule
+    has its own tests; this fixture's job is a known period per
+    delivery: 2026-Q1 for the reference, 2026-Q2 for the dirty one.
+
+    THE REFERENCE DELIVERY IS ACCEPTED before the dirty one is overlaid,
+    directly rather than through the gate, because no QA has run yet -
+    the dirty runs then read their period, and the reference run keeps
+    reading its own.
+    """
+
+    from qa_tools.common import arrivals, decision_log, filing, period_overlay, promotion
+    from qa_tools.common import asset_time, qa_store, supply_db
+    from qa_tools.cp.build_cp_warehouses import TABLES
+
+    from qa_tools.common import delivery as delivery_mod
+    from qa_tools.common import delivery_log
+
+    found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)
+    first = min(a.received_at for a in found)
+    # A FILING LINKS TO ITS DELIVERY RECORD (REQ-PIPE-144 criterion 10),
+    # so the deliveries are recorded first, as the batch does.
+    for d in delivery_mod.list_deliveries(deliveries_dir, receipts_dir):
+        delivery_log.record(d, arrivals.recognise(d))
+
+    def file_to(arrival, period: str) -> None:
+        (dataset_id,) = tuple(arrival.files_by_dataset)
+        supply_id = f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
+        with supply_db.connect(label="pytest:file-fixture") as conn:
+            qa_store.ensure_schema(conn)
+            import filing_support
+
+            filing_support.place(conn, dataset_id, supply_id, period, arrival.delivery_name,
+                                 branch="pytest-fixture")
+
+    for arrival in [a for a in found if a.received_at == first]:
+        file_to(arrival, "2026-Q1")
+        period_overlay.rebuild_for_arrival(arrival, tables=TABLES)
+    with supply_db.connect(label="pytest:accept-reference") as conn:
+        for arrival in [a for a in found if a.received_at == first]:
+            (supply,) = filing.supplies_of(conn, arrival)
+            promotion.promote(
+                conn, agency_id="child-protection-family-support",
+                collection_id="child-protection", dataset_id=supply["dataset_id"],
+                supply=supply["supply"], period=supply["period"],
+                physical_tables=supply["physical_tables"], actor="pytest-fixture",
+                actor_kind=decision_log.RULE, effective_at=first.isoformat())
+    for arrival in [a for a in found if a.received_at != first]:
+        file_to(arrival, "2026-Q2")
+        period_overlay.rebuild_for_arrival(arrival, tables=TABLES)
+
+
+# ---------------------------------------------------------------------------
+# WHICH TESTS NEED A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27).
+#
+# CI used to be one job: set up, spend nine minutes on `mothman pipeline
+# bootstrap`, then run all 2,890 tests. Only a handful of them need what
+# that bootstrap produces - the deployment's own recorded QA history, and
+# the `reports/*.json` built from it - and the rest were waiting nine
+# minutes for something they never read.
+#
+# So the suite is split, and the split is DERIVED rather than listed in
+# the workflow. A path list in YAML goes stale the moment somebody adds a
+# module, and going stale here means a test silently running in the job
+# that cannot satisfy it - which is the SKIP-rather-than-fail failure
+# `.github/workflows/test.yml`'s own bootstrap comment records having hit
+# before: ten tests quietly skipping in CI while passing locally.
+# ---------------------------------------------------------------------------
+
+#: The fixture that hands a test the DEPLOYMENT'S database rather than its
+#: own worker's. Anything requesting it needs the bootstrap by definition,
+#: so the marker is applied from the fixture rather than by hand.
+DEPLOYMENT_FIXTURE = "deployment_history"
+
+#: The marker both halves of CI select on.
+NEEDS_DEPLOYMENT = "needs_deployment"
+
+
+#: Tests too slow for every run, kept in the repository and run when their
+#: subject changes (Keith, 2026-10-04: the bootstrap equivalence test).
+ON_DEMAND = "on_demand"
+
+
+def pytest_addoption(parser):
+    parser.addoption("--run-on-demand", action="store_true", default=False,
+                     help="also run tests marked on_demand (slow; deselected otherwise)")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Mark every test that needs a bootstrapped deployment, and DESELECT
+    the on-demand ones unless asked for.
+
+    DESELECTED, NOT SKIPPED: the fast half of CI watches its skip count,
+    which should be zero, because a skip there is a test in the wrong
+    half. An on-demand test is not in any half by design, so it must not
+    show up as one.
+    """
+    if not config.getoption("--run-on-demand"):
+        kept = [i for i in items if i.get_closest_marker(ON_DEMAND) is None]
+        dropped = [i for i in items if i.get_closest_marker(ON_DEMAND) is not None]
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+            items[:] = kept
+    _mark_deployment(items)
+
+
+def _mark_deployment(items):
+    """Mark every test that needs a bootstrapped deployment.
+
+    TWO WAYS TO NEED ONE, and only the first can be detected: a test that
+    requests `deployment_history` says so in its signature, and a test
+    that reads a built `reports/*.json` says so nowhere at all. The second
+    kind carries a module-level `pytestmark` instead, and
+    tests/test_publish.py asserts that every module reading those files
+    has one - which is what stops the two drifting apart.
+    """
+    for item in items:
+        if DEPLOYMENT_FIXTURE in getattr(item, "fixturenames", ()):
+            item.add_marker(getattr(pytest.mark, NEEDS_DEPLOYMENT))
+
+
+def clone_run_views(conn, source_run: str, new_run: str, *, held=(), contested=(),
+                    absent=()):
+    """A run of a test's own that reads exactly what `source_run` reads,
+    with the `held` tables withheld - recorded as a real resolution.
+
+    `contested` tables are recorded as two candidates with no view, the
+    way the overlay records a run whose arrival carried two files for
+    one table; `absent` tables are simply missing (REQ-PIPE-115).
+
+    Over the source run's VIEWS rather than its staged tables, because
+    since REQ-PIPE-105 a run's tables come from wherever its period
+    overlay found them - staging, or a period schema once promoted - and
+    a test that re-derived them from staging would find nothing for a
+    promoted delivery.
+    """
+    from qa_tools.common import supply_db
+
+    src, dst = supply_db.run_schema(source_run), supply_db.run_schema(new_run)
+    conn.execute(f'DROP SCHEMA IF EXISTS "{dst}" CASCADE')
+    conn.execute(f'CREATE SCHEMA "{dst}"')
+    source = supply_db.resolution_for(conn, source_run)
+    res = supply_db.Resolution(run_id=new_run, schema=dst)
+    for logical, physical in sorted(source.resolved.items()):
+        if logical in held:
+            res.held[logical] = physical
+            continue
+        if logical in contested:
+            res.ambiguous[logical] = [physical, f"{physical}_2"]
+            continue
+        if logical in absent:
+            res.absent.append(logical)
+            continue
+        conn.execute(f'CREATE VIEW "{dst}"."{logical}" AS SELECT * FROM "{src}"."{logical}"')
+        res.resolved[logical] = physical
+    supply_db.record_resolution(conn, res)
+    return res
+
+
+@pytest.fixture(autouse=True)
+def _minted_periods_are_on_the_calendar(monkeypatch):
+    """A re-file is refused into a period its dataset's calendar does not
+    have (post-build-review #115, D1). Tests mint their own periods -
+    `2099-<something>` - so nothing one test files answers another's
+    question; those count as on the calendar, and every real name is still
+    judged by the real calendar."""
+    from qa_tools.common import refiling
+
+    real = refiling._on_calendar
+    monkeypatch.setattr(refiling, "_on_calendar",
+                        lambda dataset_id, period: period.startswith("2099-")
+                        or real(dataset_id, period))

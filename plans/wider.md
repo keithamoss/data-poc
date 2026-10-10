@@ -76,11 +76,21 @@ check_lifecycle.py`'s own `check_id` convention.
 
 ## Action items
 
-1. **[todo, 2026-09-18]** **[Pipeline & publishing]** Try Postgres as the
-   warehouse instead of DuckDB (the original HANDOFF suggested it as an
+1. **[superseded, 2026-09-26]** **[Pipeline & publishing]** Try Postgres as
+   the warehouse instead of DuckDB (the original HANDOFF suggested it as an
    alternative). Would tell us whether the dbt-duckdb reliability bug is
    DuckDB-specific or a more general dbt-core issue — useful signal for
    `plans/qa-pipeline.md` #1 even if Postgres itself isn't adopted.
+
+   **Answered and overtaken.** PostgreSQL is now the one warehouse engine,
+   scoped as delivery sprint 26 (`REQ-PIPE-087` and the eight requirements
+   beside it) and switched over on 2026-09-26/27; DuckDB keeps only the job
+   of reading arriving files. The real measurements and the dbt/Soda/
+   datacontract-cli/Evidently verification are in
+   `plans/running-thoughts.md` #45. The dbt-duckdb signal this item was
+   originally after is now a by-product rather than the reason — the switch
+   happened because the storage and decision-log design rests on properties
+   a single-writer file cannot provide, not to diagnose one bug.
 
 2. **[investigate, 2026-09-18]** **[Pipeline & publishing]** Data pipeline
    observability — flagged as a tangent, not yet scoped. Distinct from
@@ -537,13 +547,13 @@ check_lifecycle.py`'s own `check_id` convention.
       role labels - real motivations and perspectives per role. Added:
       what Keith himself is actually doing when he looks at this (judging
       the approach generally, and using it as something to show other
-      people); the data steward's real frustration point (noise, too many
-      clicks before reaching what matters, checking this quickly
+      people); the data engineer's real frustration point (noise, too
+      many clicks before reaching what matters, checking this quickly
       alongside other work); the accountable data owner's real concern
       (trend over time, defensibility); the pipeline maintainer's
-      opposite need (wants the raw tool-level detail the steward
-      doesn't) - a real, concrete tension the same dashboard has to serve
-      both sides of.
+      opposite need (wants the raw tool-level detail the data engineer
+      doesn't) - a real, concrete tension the same dashboard has to
+      serve both sides of.
     - **The "banked for later" post-build UX pass pulled forward into
       `delivery-critic` now**, not deferred - Keith explicitly liked
       the idea flagged during the UX-agent scoping research (a real-
@@ -552,7 +562,7 @@ check_lifecycle.py`'s own `check_id` convention.
       asked for it built into the current reviewer rather than parked.
       `delivery-critic` now does a real, separate visual-QA pass
       for dashboard-facing requirements only, adopting a busy/moderately-
-      attentive data-steward persona, taking real screenshots as
+      attentive data-engineer persona, taking real screenshots as
       evidence (spacing, interaction states, dark mode, whether a
       confused click-path is possible), checked against the same
       Apple-level bar - and, since `delivery-dashboard-ux`'s own pre-build note
@@ -595,9 +605,9 @@ check_lifecycle.py`'s own `check_id` convention.
       assessed" section rather than inflating the finding count -
       directly validates `delivery-critic`'s own "never mark a
       criterion as met unless you've explicitly verified it" rule and
-      its explicit busy/moderately-attentive-steward persona (though
-      punchlist itself deliberately avoids a "frustrated user" archetype
-      in favour of a neutral state+device description - a real
+      its explicit busy/moderately-attentive-data-engineer persona
+      (though punchlist itself deliberately avoids a "frustrated user"
+      archetype in favour of a neutral state+device description - a real
       alternative framing worth knowing about, not adopted here).
     - `agapi-koutsi/UX-Design-Critique` - a different real pattern: MULTIPLE
       named personas (Product Manager, Engineer, Skeptical User) critique
@@ -1422,16 +1432,81 @@ check_lifecycle.py`'s own `check_id` convention.
     through the new subagent) rather than the full agent-level
     invocation - real, live end-to-end verification of `tui_drive.py`
     itself happened either way, just not routed through the new agent's
-    own instructions text. **Still open**: a real, live spawn of
+    own instructions text. ~~**Still open**: a real, live spawn of
     `delivery-cli-ux`/`delivery-cli-ux-critic` needs a fresh
     session (or the other already-open one) to confirm the agent files
     themselves - not just the underlying mechanism - actually work as
-    written.
+    written.~~
+
+    **Resolved, 2026-09-19 evening, by the fresh `claude/delivery-
+    subagents-plans-717lrx` session this anticipated** - and it closes
+    the post-rename question too (commit `0e9b634` renamed all 8
+    `requirements-*` agents to `delivery-*`; nothing had confirmed the
+    renamed files were actually spawnable, only that they existed on
+    disk). Verified three independent ways, in a session that cloned
+    the repo with the renamed files already present:
+    - **All 8 appear in this session's own `Agent` tool roster** under
+      their new `delivery-*` names, with their real descriptions - the
+      session-start-only read that caused the original gap above now
+      picks them up correctly.
+    - **3 were genuinely spawned**, not just listed - deliberately
+      chosen to span all 3 tool profiles rather than 3 of a kind:
+      `delivery-architect` (`Read/Grep/Glob/AskUserQuestion`,
+      `permissionMode: plan`), `delivery-cli-ux` (same profile), and
+      `delivery-cli-ux-critic` (adds `Bash`). Each was asked to recite
+      its own role from the instructions it was LOADED with (not from
+      re-reading its own file), and each came back with a real,
+      correct, agent-specific answer - so the renamed files are being
+      parsed and injected as system prompts, not merely resolving as
+      names. `delivery-architect` also confirmed its own frontmatter
+      reads `name: delivery-architect` / `model: opus`.
+    - **Their own internal cross-references survive the rename.**
+      `delivery-cli-ux-critic` grepped `.claude/agents/` for lingering
+      `requirements-` strings: only 2 hits, both in
+      `delivery-critic.md`, both the ordinary English phrase
+      "requirements-check" rather than a stale agent name - no agent
+      file still points at a `requirements-*` sibling that no longer
+      exists. `delivery-cli-ux` separately confirmed both reference
+      docs its instructions name (`docs/project-context-for-agents.md`,
+      `docs/hci-ux-psychology.md`) resolve on disk, and
+      `delivery-cli-ux-critic` confirmed `scripts/dev/tui_drive.py`
+      does too.
+
+    One real, deliberate non-finding worth recording rather than
+    leaving implicit: the 5 agents not spawned here
+    (`delivery-scoper`/`delivery-dashboard-ux`/`delivery-critic`/
+    `delivery-dashboard-ux-critic`/`delivery-dashboard-visual-critic`)
+    are covered by the roster check only, not by a live spawn - the 3
+    chosen cover every distinct `tools:` profile in the set, so a 4th
+    of an already-proven profile would add little, but that's a
+    reasoned sample, not full coverage. The 3 Playwright-MCP-driving
+    agents specifically were verified live in the earlier
+    `claude/playwright-mcp-verify-b2t4nb` session (see this item's own
+    account above), so the only genuinely unexercised files are
+    `delivery-scoper`/`delivery-dashboard-ux`.
+
+    Also still open, unchanged and NOT tested here: whether
+    `permissionMode: plan` would break the 3 `Bash`-using critics'
+    own `mothman dashboard rebuild` step - and note the caveat already
+    recorded above, that in an auto-mode session (this one included)
+    `permissionMode:` is ignored entirely, so this session couldn't
+    have observed it either way.
+
+    **A separate, small finding from the same sweep - checked, then
+    found already settled**: a repo-wide grep for stale
+    `requirements-<agentname>` references outside `.claude/agents/`
+    found 25 hits, all in `CHANGELOG.md`. Briefly flagged here as
+    something needing Keith's call, then withdrawn on reading the
+    rename's own CHANGELOG entry, which already states it outright:
+    those entries were "deliberately left alone, since they're an
+    accurate record of what these agents were actually called at the
+    time." No open question - recorded only so the next session that
+    runs the same grep doesn't re-raise it a third time.
 
     **Keith's own offer, same evening, not yet acted on**: he offered to
     explain more about who the real users actually are, to sharpen both
     this taxonomy/weighting (currently grounded in the generic personas
-    `docs/project-context-for-agents.md` already had - data steward,
+    `docs/project-context-for-agents.md` already had - data engineer,
     agency data owner, pipeline maintainer) and `plans/running-
     thoughts.md` #2's own real roles (QA, peer review, manager - today
     just labels driving ticket assignment, no real description of what
@@ -1439,3 +1514,46 @@ check_lifecycle.py`'s own `check_id` convention.
     file's own item #2) so it survives compaction either way - ask him
     for this directly next time revisiting either the HCI guide or the
     roles/ticketing work, don't let it quietly drop.
+
+11. **[in-progress, 2026-10-06]** **[Docs & process]** **The work queue Keith
+    set on 2026-10-06 morning, in order.** **Priority: work through in this
+    order (Keith, 2026-10-06: "let's work through them" / "sounds good",
+    across that morning's conversation).** Kept here because it spans every
+    component; each item's own detail lives where named.
+    1. Soda's silent pass on a configuration error - a defect, the 2026-10-06
+       staleness sweep (plans/road-testing.md #7). DONE, 15edf01. Then the
+       critic fix sprint on #121-#124, DONE in three chunks (0c9b4d8,
+       5c5a616, 18203af).
+    2. REQ-TEST-117 - CI reuses a bootstrapped database. BUILT in 33a1bf6;
+       flipped to built once CI shows a real miss and then a real hit.
+    3. REQ-PIPE-152 - the S3 Lambda handlers (criteria 12-13 added that day;
+       every arrival built from the database). BUILT 2026-10-06 at qa schema
+       33 (32 went to the critic sprint's current-run tie-break).
+    4. REQ-PIPE-078 - finish it for all four tools. BUILT 2026-10-06: the
+       other three were fixed by REQ-PIPE-079/115; what was missing was an
+       end-to-end test through all four, which now exists.
+    5. REQ-DASH-148 criterion 12 - a reload owes a re-check. BUILT 2026-10-06.
+    6. REQ-QAC-039 - a dataset's hierarchy identifiers in one place (survey
+       first). SURVEYED 2026-10-06 and HELD at Keith's "talk it through
+       first" - the survey, his answers so far and the open fork are in
+       plans/post-build-review.md #36.
+    7. REQ-PIPE-086 criterion 11 (and criterion 10, unblocked by
+       REQ-PIPE-152) - BUILT 2026-10-06. REQ-PIPE-140 criterion 5's terminal half
+       (AMENDED AWAY, Keith), REQ-DASH-126 criterion 3 (BUILT) and REQ-PIPE-081
+       criterion 6 (BUILT, with a simulated clock for synthetic replays) - all
+       done 2026-10-06. Was:       then REQ-PIPE-081 criterion 6 with REQ-DASH-126 criterion 3.
+    8. Bootstrap speed and the test review together
+       (plans/running-thoughts.md #65 and #67).
+    9. The calendar group (REQ-PIPE-110 to 113, with road-testing #3) -
+       AND, with it, the talk Keith asked for on REQ-QAC-039 and "no custom
+       code per dataset" (plans/running-thoughts.md #68).
+    10. A walk through plans/running-thoughts.md.
+    11. Sprints planned around everything left in plans/road-testing.md.
+    ALONGSIDE: delivery-scoper drafts for REQ-PIPE-053's five criteria,
+    REQ-PIPE-057 criterion 18 and REQ-PIPE-068 criterion 2, then the sweep's
+    four new requirements (overview labels with a failing-columns count,
+    contract-declared date outliers, cardinality drift, one histogram); the
+    four critics on a17d6e8 (plans/post-build-review.md); and clearing
+    road-testing #16's design log once its decisions are confirmed on
+    REQ-PIPE-118 to 127.
+

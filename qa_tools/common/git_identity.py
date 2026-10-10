@@ -30,6 +30,22 @@ truthful attribution ("this ran automatically, via this specific Lambda
 function"), not a placeholder standing in for a missing human - the
 same distinction Keith's own "never fall back to unknown" rule is
 protecting.
+
+GitHub Actions is the same case and got the same answer (2026-09-28,
+found by CI going red). An Actions runner has a real `.git` checkout and
+no `git config user.email` at all, so the local path failed there for a
+reason that has nothing to do with a person forgetting to configure git -
+there is no person. `GITHUB_ACTIONS` is set by the runner itself and by
+nothing else, so a run there attributes to
+`github-actions:<owner/repo>@<workflow>`, which says exactly what it was:
+this workflow, in this repository, ran it.
+
+WHY NOT SET `git config user.email` IN THE WORKFLOW, which was the
+obvious one-line fix. It works and it lies a little: whatever address it
+carried would read in the activity feed like a person who ran the
+pipeline. It also has to be remembered in every workflow that ever runs a
+real tool, and the one that forgets fails far from here. A truthful
+service identity needs no setup step and cannot be forgotten.
 """
 from __future__ import annotations
 
@@ -45,22 +61,40 @@ class MissingGitIdentityError(Exception):
 
 
 def get_run_by() -> str:
-    """Real attribution for this invocation, for stamping into
-    qa_results/ as `run_by`. Two real sources, checked in order:
+    """Real attribution for this invocation, stamped into the recorded run
+    as `run_by`. Three real sources, checked in order:
 
     1. A real AWS Lambda runtime (AWS_LAMBDA_FUNCTION_NAME is set by the
        Lambda service itself, never by a human) - returns
        "aws-lambda:<function-name>", a real service identity, not a
        placeholder.
-    2. Otherwise, the local git identity's email (`git config
+    2. A real GitHub Actions runner (GITHUB_ACTIONS likewise) - returns
+       "github-actions:<owner/repo>@<workflow>". Same reasoning as the
+       Lambda case: nobody ran it, so there is no human identity to be
+       missing, and naming the workflow is the truthful answer.
+    3. Otherwise, the local git identity's email (`git config
        user.email`) - raises MissingGitIdentityError if that isn't set,
        since whoever runs this pipeline locally already needs it
        configured to commit their own output anyway, so this never
        blocks a real workflow, only one that's missing basic git setup.
+
+    THE SERVICE CHECKS COME FIRST, and the order is load-bearing rather
+    than tidy: an Actions runner DOES have a `.git` checkout, so a
+    developer's global git config leaking into the image would otherwise
+    attribute a CI run to whoever happened to be configured.
     """
     lambda_function_name = os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
     if lambda_function_name:
         return f"aws-lambda:{lambda_function_name}"
+
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        # Both are set by the runner. Defaulted rather than demanded,
+        # because a partial Actions environment must still attribute
+        # truthfully - "github-actions" alone is honest, where raising
+        # here would take a real CI run down over a missing label.
+        repo = os.environ.get("GITHUB_REPOSITORY") or "unknown-repository"
+        workflow = os.environ.get("GITHUB_WORKFLOW") or "unknown-workflow"
+        return f"github-actions:{repo}@{workflow}"
 
     result = subprocess.run(["git", "config", "user.email"], capture_output=True, text=True)
     email = result.stdout.strip()

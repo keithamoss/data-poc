@@ -4,85 +4,99 @@ bdm_duckdb_dir fixtures tests/test_check_cli.py already built (real
 generator output, not hand-crafted rows), and drives the Click commands
 through click.testing.CliRunner, same as that file."""
 from __future__ import annotations
-import json
+
+from qa_tools.common import hand_filing
 import os
 import re
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
 import cli.bdm as bdm
 import cli.common as common
-import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
-import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
-import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
-import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
-import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 
 _REF_RUN_ID = "pytest_bdm_ref"
 _DIRTY_RUN_ID = "pytest_bdm_dirty"
+
+# The run_ids the same two fixture runs get once they are RECOGNISED as
+# arrivals rather than read from a declaration (REQ-GEN-043). They are
+# not the filenames above and cannot be: a delivery's files are named by
+# the supplier, so a run_id is assigned in received_at order by
+# qa_tools.common.arrivals, which is what the Synthetic --run-id flow
+# picks from. The flat `pytest_bdm_*.csv` names above still matter for
+# the Local files mode, which takes a real path to a real file.
+from fixture_ids import BDM_DIRTY_RUN_ID as _ARRIVAL_DIRTY_RUN_ID  # noqa: E402
+from fixture_ids import BDM_REF_RUN_ID as _ARRIVAL_REF_RUN_ID  # noqa: E402
 
 _runner = CliRunner()
 
 
 def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", duckdb_dir)
-    monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
+    # The run picker recognises arrivals from disk now (REQ-GEN-043),
+    # so pointing it at the fixture means pointing the DELIVERY
+    # directories at it - patching RAW_DIR alone would leave these
+    # tests reading the real data/deliveries/ tree.
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(raw_dir) / "deliveries")
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(raw_dir) / "receipts")
+    # The warehouse used to be three module attributes pointing at a
+    # directory of per-run DuckDB files. It is now one database, named
+    # by MOTHMAN_SUPPLY_DB, which the supply_db_path fixture sets for
+    # this worker - so `duckdb_dir` is that database's path and every
+    # module resolves it the same way the real pipeline does, through
+    # the environment (REQ-PIPE-068).
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
 
 
-def test_raw_dir_reads_build_per_run_warehouses_live_not_a_frozen_import_time_copy(monkeypatch):
-    """Real regression coverage for the exact bug class orchestrate_bdm.
-    run_single()'s own docstring warns about (a module-level constant
-    bound once at import time silently ignoring a later monkeypatch) -
-    cli/bdm.py's own raw_dir()/manifest_path() must re-read
-    build_per_run_warehouses.RAW_DIR fresh on every call, not cache it."""
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", "/some/other/path")
-    assert bdm.raw_dir() == "/some/other/path"
-    assert bdm.manifest_path() == os.path.join("/some/other/path", "manifest.json")
+def _patch_delivery_dirs(monkeypatch, root):
+    """Point arrival recognition at an isolated tree (REQ-GEN-043).
+
+    Patching build_per_run_warehouses.RAW_DIR alone is no longer enough
+    for anything that asks "is there data yet?": that question is now
+    answered by recognising deliveries on disk, so an unpatched test
+    would read - and answer from - the real data/deliveries/ tree."""
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", Path(root) / "deliveries")
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", Path(root) / "receipts")
 
 
-def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promoted(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "run_001.csv").write_text("id\n1\n")
-    manifest = [{"run_id": "run_001", "file": "run_001.csv"}, {"run_id": "run_002", "file": "run_002.csv"}]
-
-    monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: [])
-    assert bdm.default_reference(manifest) == ("run_001", "run_001.csv")
-
-
-def test_default_reference_uses_last_promoted_run_when_its_csv_still_exists(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "run_050.csv").write_text("id\n1\n")
-    manifest = [{"run_id": "run_001", "file": "run_001.csv"}]
-
-    monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_010", "run_050"])
-    assert bdm.default_reference(manifest) == ("run_050", "run_050.csv")
+def test_the_cli_reports_where_the_generator_actually_wrote(monkeypatch):
+    """THE SUCCESSOR to a test of cli/bdm.py's raw_dir(), which is
+    retired with the directory (REQ-PIPE-102). The generator writes
+    one copy of a supply - the delivery - so that is what the command
+    reports having written.
+    """
+    assert not hasattr(bdm, "raw_dir"), "cli/bdm.py still exposes a raw_dir()"
+    assert "deliveries" in bdm.generated_output_dir()
 
 
-def test_default_reference_falls_back_when_last_promoted_runs_csv_no_longer_exists(monkeypatch, tmp_path):
-    """RUN_PLAN's size has changed across versions of this repo before -
-    a Promoted run_id from an older, larger RUN_PLAN might not regenerate
-    under today's code at all."""
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "run_001.csv").write_text("id\n1\n")
-    manifest = [{"run_id": "run_001", "file": "run_001.csv"}]
-
-    monkeypatch.setattr(bdm, "list_run_ids", lambda agency, dataset: ["run_999_no_longer_generated"])
-    assert bdm.default_reference(manifest) == ("run_001", "run_001.csv")
+# THE THREE `default_reference` TESTS WERE DELETED 2026-09-29 with the
+# function they covered (REQ-QAC-108 criterion 4). It picked the last
+# run whose results existed and fell back to the manifest's first entry,
+# which is the anchor receding into the past the criterion forbids - so
+# the behaviour was removed rather than re-tested. What replaced it is
+# covered by tests/test_drift_reference.py.
 
 
 def test_picker_choices_and_run_id_from_choice_round_trip():
-    manifest = [{"run_id": "run_001_2026-01-01", "run_date": "2026-01-01", "dirty_severity": None},
-                {"run_id": "run_002_2026-01-02", "run_date": "2026-01-02", "dirty_severity": "red"}]
+    manifest = [{"run_id": "run_001", "received_at": "2026-01-01T06:00:00+00:00", "delivery": "BDM_20260101",
+                 "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
+                {"run_id": "run_002", "received_at": "2026-01-02T06:00:00+00:00", "delivery": "drop-4471",
+                 "csv_path": "/x/drop-4471/birth_registrations_2026-01-02.csv"}]
     choices = bdm.picker_choices(manifest)
-    assert "clean" in choices[0]
-    assert "red" in choices[1]
-    assert bdm.run_id_from_choice(choices[0]) == "run_001_2026-01-01"
-    assert bdm.run_id_from_choice(choices[1]) == "run_002_2026-01-02"
+    # The picker shows the DELIVERY each run came from, not an
+    # injected severity - severity is generator bookkeeping the CLI has
+    # no business reading (REQ-GEN-043).
+    assert "BDM_20260101" in choices[0]
+    assert "drop-4471" in choices[1]
+    assert bdm.run_id_from_choice(choices[0]) == "run_001"
+    assert bdm.run_id_from_choice(choices[1]) == "run_002"
 
 
 def test_has_failures_true_on_fail_or_error_false_otherwise():
@@ -91,76 +105,117 @@ def test_has_failures_true_on_fail_or_error_false_otherwise():
     assert bdm.has_failures([{"status": "error"}]) is True
 
 
-def test_run_check_does_not_clobber_the_real_batch_manifest(monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
-    """Real bug, found live while building this (a manual smoke test
-    actually corrupted the real data/raw/manifest.json from 176 entries
-    down to 1): orchestrate_bdm.run_single() unconditionally overwrites
-    RAW_DIR/manifest.json with its own synthetic 1-or-2-entry manifest -
-    correct and intentional for its real Lambda use case (no pre-existing
-    manifest there at all), but a real collision when called against a
-    RAW_DIR that already holds the real, full generate_runs.py batch
-    manifest this CLI's own run picker reads from. run_check() must
-    leave the real manifest exactly as it found it.
+def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir, private_supply_dsn):
+    """Re-pointed from the retired `..._does_not_clobber_the_real_batch_
+    manifest` test (REQ-GEN-043), which is worth spelling out rather than
+    quietly deleting. The original guarded a real bug found live - a
+    manual smoke test corrupted the real data/raw/manifest.json from 176
+    entries down to 1, because orchestrate_bdm.run_single()
+    unconditionally overwrote it with its own synthetic 1-or-2-entry
+    manifest. REQ-GEN-043 removed the cause: run_single() writes no
+    manifest at all now, and the run picker recognises arrivals from the
+    delivery tree on disk instead of reading a declaration.
+
+    So the specific thing that test asserted can no longer be false. The
+    GUARANTEE behind it still can be, and is what this asserts instead:
+    running a check against an existing arrival is a READ of the arrival
+    record, never a write. If anything reintroduced a manifest write, or
+    wrote into a delivery or receipt, the recognised arrival list - or
+    the bytes underneath it - would move.
 
     Works on a real COPY of bdm_raw_dir, not the shared session fixture
-    directly - this test is specifically probing a destructive side
-    effect, and bdm_raw_dir is reused by every other test in this file."""
+    directly, for the same reason the original did: this test is
+    specifically probing a destructive side effect."""
+    import hashlib
     import shutil
+    from pathlib import Path
+
+    from qa_tools.common import delivery
+
     raw_copy = tmp_path / "raw_copy"
     shutil.copytree(bdm_raw_dir, raw_copy)
 
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", bdm_duckdb_dir)
-    monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", str(raw_copy))
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", bdm_duckdb_dir)
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", raw_copy / "deliveries")
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", raw_copy / "receipts")
+    # One supply database, named by the environment - the three
+    # module attributes this replaces pointed at a directory of
+    # per-run DuckDB files (REQ-PIPE-068).
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); bdm_duckdb_dir is what staged the data into it.
 
-    before = bdm.load_manifest()
-    assert len(before) == 2, "test precondition - the real fixture manifest must have both entries"
+    def _fingerprint() -> list[tuple[str, str]]:
+        out = []
+        for root in ("deliveries", "receipts"):
+            for path in sorted((raw_copy / root).rglob("*")):
+                if path.is_file():
+                    out.append((str(path.relative_to(raw_copy)),
+                                hashlib.sha256(path.read_bytes()).hexdigest()))
+        return out
 
-    bdm.run_check(_REF_RUN_ID, "test@example.com", reference_run_id=_REF_RUN_ID)
+    before_arrivals = bdm.load_manifest()
+    before_bytes = _fingerprint()
+    assert len(before_arrivals) == 2, "test precondition - the fixture must recognise both arrivals"
+    assert before_bytes, "test precondition - there must be real delivery files to fingerprint"
 
-    after = bdm.load_manifest()
-    assert after == before, "run_check() must not mutate the real batch manifest.json as a side effect"
+    # Kept, and so through the lifecycle with no reference (REQ-PIPE-086
+    # criteria 9 and 14) - the guarantee is unchanged: a read of the arrival.
+    bdm.run_check(_ARRIVAL_REF_RUN_ID, "test@example.com")
+
+    assert bdm.load_manifest() == before_arrivals, \
+        "run_check() must not change which arrivals are recognised on disk"
+    assert _fingerprint() == before_bytes, \
+        "run_check() must not write into the delivery or receipt tree it read"
+    assert not (raw_copy / "manifest.json").exists(), \
+        "nothing may reintroduce a written manifest - arrivals are recognised, not declared"
+    assert not list(Path(raw_copy / "deliveries").glob("manifest.json"))
 
 
-def test_qa_command_flag_mode_reports_real_results_and_never_touches_real_qa_results(
+def test_qa_command_flag_mode_without_commit_is_a_trial(
         monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+    """IT USED TO SAY "local-only check", and the results went to a
+    throwaway directory that was simply never promoted. REQ-PIPE-089
+    records results as a run completes, so "do not keep this" had to
+    become a real thing rather than the absence of a later step: the run
+    takes a TRIAL identity, which records nothing that survives it
+    (REQ-PIPE-103)."""
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
 
-    result = _runner.invoke(bdm.qa_command, ["--run-id", _REF_RUN_ID, "--reference-run-id", _REF_RUN_ID])
+    result = _runner.invoke(bdm.qa_command,
+                             ["--run-id", _ARRIVAL_REF_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID])
 
     assert result.exit_code == 0, result.output
-    assert "local-only check" in result.output
-    assert not fake_qa_results.exists()
+    assert "TRIAL" in result.output
+    assert "nothing was recorded" in result.output
 
 
-def test_qa_command_flag_mode_commit_promotes_into_the_patched_qa_results_dir(
-        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir, clean_qa_history, private_supply_dsn):
+    """The kept case: the run keeps the manifest's own identity and its
+    results are readable afterwards, attributed to whoever ran it."""
+    from qa_tools.common import qa_results_reader as reader
+
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command,
-                             ["--run-id", _REF_RUN_ID, "--reference-run-id", _REF_RUN_ID, "--commit"])
+                             ["--run-id", _ARRIVAL_REF_RUN_ID, "--commit"])
 
     assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
-    dataset_stats_path = fake_qa_results / bdm.AGENCY_ID / bdm.DATASET_ID / _REF_RUN_ID / "dataset_stats.json"
-    assert dataset_stats_path.exists()
-    with open(dataset_stats_path) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+    assert "Recorded" in result.output
+    assert "TRIAL" not in result.output
+    provenance = reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
+                                             _ARRIVAL_REF_RUN_ID)
+    assert provenance is not None, "the kept run recorded nothing"
+    assert provenance["run_by"] == "test@example.com"
 
 
-def test_qa_command_reports_real_failures_and_exits_nonzero(monkeypatch, tmp_path, bdm_raw_dir, bdm_duckdb_dir):
+def test_qa_command_reports_real_failures_and_exits_nonzero(monkeypatch, tmp_path, bdm_raw_dir,
+                                                             bdm_duckdb_dir):
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", tmp_path / "unused")
 
-    result = _runner.invoke(bdm.qa_command, ["--run-id", _DIRTY_RUN_ID, "--reference-run-id", _REF_RUN_ID])
+    result = _runner.invoke(bdm.qa_command,
+                             ["--run-id", _ARRIVAL_DIRTY_RUN_ID, "--reference-run-id", _ARRIVAL_REF_RUN_ID])
 
     assert result.exit_code == 1, result.output
     assert "fail" in result.output.lower()
@@ -173,9 +228,10 @@ def test_qa_command_unknown_run_id_is_a_real_clean_error(monkeypatch, bdm_raw_di
     assert "no manifest entry" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "manifest.json").write_text("[]")
+def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_path, bdm_raw_dir):
+    # Real deliveries already on disk - so there IS something to
+    # overwrite, and the command must ask before it does.
+    _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
     monkeypatch.setattr(common, "confirm", lambda *a, **k: False)
@@ -187,9 +243,8 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
     assert "not regenerated" in result.output.lower()
 
 
-def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path):
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
-    (tmp_path / "manifest.json").write_text("[]")
+def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path, bdm_raw_dir):
+    _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
 
@@ -200,9 +255,9 @@ def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch
 
 
 def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypatch, tmp_path):
-    """No manifest.json yet - nothing to overwrite, so this shouldn't even
-    ask."""
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", str(tmp_path))
+    """No deliveries on disk yet - nothing to overwrite, so this
+    shouldn't even ask."""
+    _patch_delivery_dirs(monkeypatch, tmp_path)
     called = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
 
@@ -221,14 +276,16 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 # check_file.py's own standalone CLI logic folded into qa_command's
 # --file/--reference-file flags (mothman is the only entry point now).
 
-def test_qa_command_local_file_reports_real_failures_and_never_touches_real_qa_results(
+def test_qa_command_local_file_is_a_trial_when_nobody_said_to_keep_it(
         monkeypatch, tmp_path, bdm_raw_dir):
+    """REQ-PIPE-103 criteria 2 and 8. With no flag and no terminal there
+    is nobody to ask, and the two wrong answers are not equally wrong -
+    a trial that should have been kept costs a re-run; a delivery filed
+    on somebody's behalf is a public record of an arrival they did not
+    agree to."""
     raw_dir = str(tmp_path / "raw")
-    duckdb_dir = str(tmp_path / "duckdb_runs")
     os.makedirs(raw_dir)
-    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+    _patch_bdm_dirs(monkeypatch, raw_dir, None)
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_DIRTY_RUN_ID}.csv"),
@@ -237,32 +294,80 @@ def test_qa_command_local_file_reports_real_failures_and_never_touches_real_qa_r
 
     assert result.exit_code == 1, result.output
     assert "fail" in result.output.lower()
-    assert "local-only check" in result.output
-    assert not fake_qa_results.exists()
+    assert "nothing was filed and nothing was recorded" in _flat(result.output)
+    assert not (Path(raw_dir) / "deliveries").exists(), \
+        "a trial filed a delivery"
 
 
-def test_qa_command_local_file_commit_promotes_into_the_patched_qa_results_dir(
+def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
+        monkeypatch, tmp_path, bdm_raw_dir, bdm_delivery_dirs, clean_qa_history):
+    """The other half of criterion 1: keeping files the supply as a
+    real delivery BEFORE anything runs, and the run's id comes back
+    from recognition rather than from the file's name.
+
+    THE FILE IS COPIED FIRST, and named to match the dataset's own
+    arrival pattern, because a name recognition cannot place is
+    refused outright (Keith, 2026-09-27) - the fixture's own
+    `pytest_bdm_ref.csv` is exactly such a name.
+    """
+    # ABOUT FILING, NOT DRIFT: in this test's empty history every earlier
+    # owed period is a gap, so REQ-QAC-108's gap rule would (rightly) make
+    # Evidently red and the command exit 1. That rule has its own tests.
+    from qa_tools.common import drift_reference
+    monkeypatch.setattr(drift_reference, "assess_arrival", lambda *a, **k: None)
+    raw_dir = tmp_path / "raw"
+    (raw_dir).mkdir()
+    _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
+    monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
+
+    supplied = tmp_path / "birth_registrations_2026-01-01.csv"
+    supplied.write_bytes(Path(bdm_raw_dir, f"{_REF_RUN_ID}.csv").read_bytes())
+
+    result = _runner.invoke(bdm.qa_command, [
+        "--file", str(supplied),
+        "--commit", "--originally-received", "not-known",
+    ])
+
+    from qa_tools.common import qa_results_reader as reader
+
+    assert result.exit_code == 0, result.output
+    # THE RUN IS AN ORDINARY ARRIVAL, first in an empty tree.
+    # The id is the staged table's spelling at OUR receipt instant
+    # (REQ-PIPE-105), and the instant is now - so its shape is asserted.
+    assert re.search(r"recognised as birth_registrations__\d{18,}", _flat(result.output)), \
+        result.output
+    assert "is a real arrival" in _flat(result.output)
+    assert (raw_dir / "deliveries").exists(), "keeping filed no delivery"
+
+    # AND ITS RESULTS ARE RECORDED, under the id recognition gave it -
+    # which used to be checked by globbing for a dataset_stats.json.
+    recorded = reader.list_run_ids(bdm.AGENCY_ID, bdm.COLLECTION_ID)
+    assert len(recorded) == 1 and recorded[0].startswith("birth_registrations__"), recorded
+    assert reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
+                                       recorded[0])["run_by"] == "test@example.com"
+
+
+def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(
         monkeypatch, tmp_path, bdm_raw_dir):
-    raw_dir = str(tmp_path / "raw")
-    duckdb_dir = str(tmp_path / "duckdb_runs")
-    os.makedirs(raw_dir)
-    _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir)
-    fake_qa_results = tmp_path / "not_the_real_qa_results"
-    monkeypatch.setattr(common, "QA_RESULTS_DIR", fake_qa_results)
+    """Keith's own call over renaming the file to fit or filing it
+    unplaceable: a run's identity comes from recognising its files by
+    name, so a file we cannot place has no run to be."""
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
     monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--commit",
+        "--commit", "--originally-received", "not-known",
     ])
 
-    assert result.exit_code == 0, result.output
-    assert "Promoted" in result.output
-    matches = list(fake_qa_results.glob(f"{bdm.AGENCY_ID}/{bdm.DATASET_ID}/*/dataset_stats.json"))
-    assert len(matches) == 1
-    with open(matches[0]) as f:
-        assert json.load(f)["run_by"] == "test@example.com"
+    assert result.exit_code != 0
+    assert "matches no dataset" in _flat(result.output)
+    assert "trial" in _flat(result.output), \
+        "the refusal must name the way forward, not just the problem"
+    assert not (raw_dir / "deliveries").exists()
+    assert not (raw_dir / "receipts").exists()
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -341,7 +446,7 @@ def test_run_check_local_file_default_path_never_requires_a_real_git_identity(
     result_commit = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
         "--reference-file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
-        "--commit",
+        "--commit", "--originally-received", "not-known",
     ])
     assert isinstance(result_commit.exception, MissingGitIdentityError), \
         "a --commit run must still fail loudly without a real git identity - that guarantee must not regress"
@@ -359,7 +464,7 @@ def test_s3_config_reads_the_real_committed_contract():
     assert config["local_source"] == "data/raw"
     assert config["arrival_pattern"] == [
         {"type": "single_file", "keyPattern": "bdm/birth_registrations_{date}.csv",
-         "dataset_id": "bdm-birth-registrations"},
+         "dataset_id": "birth-registrations"},
     ]
 
 
@@ -385,27 +490,33 @@ def test_run_check_s3_downloads_both_keys_then_delegates_to_local_file_mode(monk
 
     captured = {}
 
-    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None, run_date=None):
+    def _fake_run_check_local_file(csv_path, reference_csv, run_by, run_id=None,
+                                    run_date=None, keep=None, **kwargs):
         captured["csv_path"] = csv_path
         captured["reference_csv"] = reference_csv
         captured["run_by"] = run_by
-        captured["run_id"] = run_id
-        return [{"status": "pass"}], "/tmp/fake-results"
+        captured["keep"] = keep
+        return ([{"status": "pass"}], "/tmp/fake-results",
+                hand_filing.Filed("", "trial_x", (csv_path,), None))
 
     monkeypatch.setattr(bdm, "run_check_local_file", _fake_run_check_local_file)
 
     _fake_client = MagicMock()
-    results, tmp_dir = bdm.run_check_s3(
+    results, tmp_dir, filed = bdm.run_check_s3(
         "my-bucket", "bdm/run_005.csv", "bdm/run_004.csv", "test@example.com",
-        run_id="s3_run_005", s3_client=_fake_client)
+        s3_client=_fake_client, keep=False)
 
     assert download_calls == ["bdm/run_005.csv", "bdm/run_004.csv"]
     assert captured["csv_path"].endswith("run_005.csv")
     assert captured["reference_csv"].endswith("run_004.csv")
     assert captured["run_by"] == "test@example.com"
-    assert captured["run_id"] == "s3_run_005"
+    # THE ANSWER IS WHAT TRAVELS DOWN, not a run id (REQ-PIPE-103) -
+    # S3 mode is still "download, then Local files mode", and the
+    # thing it must forward unchanged is the operator's decision.
+    assert not captured["keep"]   # a Keep decision, carried whole
     assert results == [{"status": "pass"}]
     assert tmp_dir == "/tmp/fake-results"
+    assert filed.delivery_name == ""
 
 
 def test_qa_command_s3_key_and_run_id_together_is_a_real_clean_error(monkeypatch):
@@ -456,13 +567,17 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
 
     captured = {}
 
-    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None, s3_client=None):
-        captured.update(bucket=bucket, key=key, reference_key=reference_key, run_by=run_by, run_id=run_id)
-        return [{"status": "pass"}], "/tmp/fake-results"
+    def _fake_run_check_s3(bucket, key, reference_key, run_by, run_id=None, run_date=None,
+                            s3_client=None, keep=None, **kwargs):
+        captured.update(bucket=bucket, key=key, reference_key=reference_key,
+                        run_by=run_by, run_id=run_id, keep=keep)
+        return ([{"status": "pass"}],
+                hand_filing.Filed("", "trial_x", (key,), None))
 
     monkeypatch.setattr(bdm, "run_check_s3", _fake_run_check_s3)
 
     result = _runner.invoke(bdm.qa_command, [
+        "--trial",
         "--s3-key", "bdm/birth_registrations_2026-01-02.csv",
         "--s3-reference-key", "bdm/birth_registrations_2026-01-01.csv",
     ])
@@ -471,5 +586,12 @@ def test_qa_command_s3_key_flag_mode_downloads_and_runs_real_checks(monkeypatch)
     assert captured["bucket"] == "my-bucket"
     assert captured["key"] == "bdm/birth_registrations_2026-01-02.csv"
     assert captured["reference_key"] == "bdm/birth_registrations_2026-01-01.csv"
-    assert captured["run_by"] == "local-check:not-persisted"
-    assert captured["run_id"].startswith("s3_birth_registrations_2026-01-02_")
+    assert captured["run_by"] == "trial:not-recorded"
+    # NO RUN ID FROM THE CALLER ANY MORE (REQ-PIPE-103). The command
+    # no longer mints one out of the key's filename - the decision
+    # taken inside run_check_s3() does, from recognition for a kept
+    # supply and from the clock for a trial. What the command passes
+    # down is the ANSWER, not an identity.
+    assert captured["run_id"] is None
+    assert captured["keep"] is False
+    assert "nothing was filed and nothing was recorded" in _flat(result.output)

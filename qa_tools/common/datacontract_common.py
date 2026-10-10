@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 
 import yaml
+from qa_tools.common import config_yaml
 
 ENGINE_TAG = "datacontract-cli 1.2.0"
 
@@ -36,29 +37,77 @@ LABEL_BY_METRIC = {
 }
 
 
-def run_against_local_server(contract_path: str, local_path: str):
-    """Loads contract_path, adds a "local_test" local server pointed at
-    local_path (a CSV file, or a datacontract-cli {model}-templated path
-    for a multi-table contract), and runs DataContract.test() against it.
-    The file on disk is never touched - a deep copy gets the extra
-    server, not the original dict - and its own "production" server (e.g.
-    S3) is untouched too. Returns the DataContract `run` result (caller
-    reads run.checks)."""
+def run_against_warehouse(contract_path: str, schema: str):
+    """Test the contract against the WAREHOUSE, not the file that arrived.
+
+    THIS IS WHAT REQ-QAC-088 IS FOR. Until now this tool read the
+    supplier's CSV directly through a "local_test" server, which made it
+    the one tool answering a different question from the other three:
+    they checked what had been loaded, it checked what had been sent. Two
+    tools can then disagree about a dataset and both be right, which is
+    the failure REQ-PIPE-068 criterion 2 recorded as an outstanding
+    exception and this closes.
+
+    The run's view schema arrives as the server's own `schema`, so a
+    model name in the contract means exactly one arrival's rows - the
+    same resolution dbt and Soda see.
+
+    CREDENTIALS GO THROUGH THE ENVIRONMENT because datacontract-cli
+    wants them there rather than in the document, which is the right way
+    round: the contract is committed and a credential must not be.
+
+    A PASSWORD IS MANDATORY, and that is this tool's constraint on the
+    whole project rather than a detail of this function. Two attempts got
+    it wrong before the source settled it. libpq ignores a password
+    entirely under trust authentication, so setting one only when
+    non-empty looked right; datacontract-cli then failed with
+    `missing_env_DATACONTRACT_POSTGRES_PASSWORD`. Setting it to an empty
+    string failed identically, because its own check is `if required and
+    not value` - an empty string is missing. So every PostgreSQL this
+    project talks to needs a real password, including the local
+    development one, and the DSN must carry it.
+
+    PASSED AS `config=`, NOT THROUGH os.environ. The earlier version set
+    the two DATACONTRACT_POSTGRES_* variables on the process, which is a
+    side effect a library function has no business having - it outlives
+    the call, leaks into everything else in the process, and in a test
+    run leaks between tests.
+
+    The dict is keyed by the ENVIRONMENT VARIABLE NAMES, not by the
+    Config model's field names, which is the opposite of what it looks
+    like from the outside - Config.resolve() reverses env_name() over its
+    own fields, so `postgres_password` is rejected as unknown while
+    `DATACONTRACT_POSTGRES_PASSWORD` is accepted. Its own docstring says
+    so in as many words; reading the source settled it after guessing
+    wrong.
+    """
     from datacontract.data_contract import DataContract
+    from qa_tools.common import supply_db
 
     with open(contract_path) as f:
-        contract_dict = yaml.safe_load(f)
+        contract_dict = config_yaml.parse(f)
 
+    fields = supply_db.connection_fields()
     d = copy.deepcopy(contract_dict)
     d["servers"].append({
-        "server": "local_test",
-        "type": "local",
-        "path": local_path,
-        "format": "csv",
-        "delimiter": "comma",
+        "server": "warehouse",
+        "type": "postgres",
+        "host": fields["host"],
+        "port": int(fields["port"]),
+        "database": fields["dbname"],
+        "schema": schema,
     })
 
-    dc = DataContract(data_contract_str=yaml.dump(d), server="local_test", include_failed_samples=True)
+    if not fields["password"]:
+        raise ValueError(
+            "the supply DSN carries no password, and datacontract-cli requires "
+            "one - it treats an empty value as missing. Give the database a "
+            "real password and put it in MOTHMAN_SUPPLY_DSN.")
+
+    dc = DataContract(data_contract_str=yaml.dump(d), server="warehouse",
+                      include_failed_samples=True,
+                      config={"DATACONTRACT_POSTGRES_USERNAME": fields["user"],
+                              "DATACONTRACT_POSTGRES_PASSWORD": fields["password"]})
     return dc.test()
 
 
@@ -97,7 +146,7 @@ def check_id_from_quality_definition(quality_definition: str | None) -> str | No
     `_QUALITY_CHECK_TYPES` guard before this ever gets called on one."""
     if not quality_definition:
         return None
-    doc = yaml.safe_load(quality_definition) or {}
+    doc = config_yaml.parse(quality_definition) or {}
     for prop in doc.get("customProperties") or []:
         if prop.get("property") == "check_id":
             return prop.get("value")
@@ -142,7 +191,7 @@ def fail_threshold_from_quality_definition(quality_definition: str | None, sever
         return None
     if not quality_definition:
         return 0
-    doc = yaml.safe_load(quality_definition) or {}
+    doc = config_yaml.parse(quality_definition) or {}
     for key in ("mustBe", "mustBeLessThan", "mustBeLessOrEqualTo"):
         if key in doc:
             return doc[key]
@@ -157,4 +206,5 @@ def failing_sample_keys(check, pk_column: str) -> list[str]:
     column, matching every other tool's samples. Empty when the tool
     didn't capture any (metric not sampleable, or a passing check)."""
     samples = getattr(check, "failedSamples", None) or []
-    return [str(s[pk_column]) for s in samples if pk_column in s]
+    # SORTED, so the same data records the same sample (post-build-review #129).
+    return sorted(str(s[pk_column]) for s in samples if pk_column in s)

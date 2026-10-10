@@ -1,9 +1,14 @@
-// Cadence math: cadenceLabel/cycleStartDate/cycleLabel/addDaysToDateStr -
-// the dashboard's own JS-side mirror of pipeline/cadence.py's cycle_start()
-// (see cycleStartDate()'s own comment on why that pairing exists: the
-// server-side Python only ever needs to know a run's OWN cycle, the
-// client-side JS also needs "what cycle does an arbitrary as-of date fall
-// in", so both exist and must agree).
+// Cadence math: cadenceLabel/cycleLabel/addDaysToDateStr, plus the period
+// LOOKUPS that replaced this page's own JS port of pipeline/cadence.py's
+// cycle_start() (REQ-DASH-054).
+//
+// WHY THERE USED TO BE A PORT AT ALL: the server-side Python only ever
+// needs a run's OWN cycle, while the page also needs "what period does an
+// arbitrary as-of date fall in" - so both existed and had to agree. The
+// port could compute a cadence RULE and could never compute an AUTHORED
+// date list, which is what the quarterly calendar is, so the agreement was
+// never achievable for one of the two real calendars. Shipping the
+// sequences removes the second implementation rather than fixing it.
 import { afterEach, describe, expect, it } from "vitest";
 import { loadDashboard } from "./support/loadDashboard.js";
 
@@ -19,58 +24,134 @@ function load() {
   return dashboard.window;
 }
 
+// NO ZONE LABEL since REQ-DASH-071 criterion 6: everything a reader
+// sees is on the asset's clock, so naming one implies a second to
+// distinguish it from. The TIME keeps its written "14:00" form, which
+// is criterion 8 - it is a deadline echoed out of contract/*.yaml, not
+// an instant, and a reader checking the tile against the contract is
+// comparing those two strings.
 describe("cadenceLabel", () => {
   it("labels a daily cadence", () => {
     const w = load();
-    expect(w.cadenceLabel({ type: "daily", expected_time: "14:00" })).toBe("Daily, by 14:00 AWST");
+    expect(w.cadenceLabel({ type: "daily", expected_time: "14:00" })).toBe("Daily, by 14:00");
   });
 
   it("labels a weekly cadence with the real weekday name", () => {
     const w = load();
-    expect(w.cadenceLabel({ type: "weekly", weekday: 2, expected_time: "09:00" })).toBe("Weekly (Wed), by 09:00 AWST");
+    expect(w.cadenceLabel({ type: "weekly", weekday: 2, expected_time: "09:00" })).toBe("Weekly (Wed), by 09:00");
   });
 
   it("labels a quarterly cadence with real month names and day", () => {
     const w = load();
     const label = w.cadenceLabel({ type: "quarterly", anchor_months: [1, 4, 7, 10], day_of_month: 15, expected_time: "17:00" });
-    expect(label).toBe("Quarterly (Jan/Apr/Jul/Oct, day 15), by 17:00 AWST");
+    expect(label).toBe("Quarterly (Jan/Apr/Jul/Oct, day 15), by 17:00");
+  });
+
+  // delivery-critic on REQ-PIPE-167, finding 2 (post-build-review #142).
+  it("says a following-period dataset is due days before each date", () => {
+    const w = load();
+    const label = w.cadenceLabel({ type: "quarterly", anchor_months: [2, 5, 8, 11], day_of_month: 1,
+                                   expected_time: "09:00", days_before: 60 });
+    expect(label).toBe("Quarterly (Feb/May/Aug/Nov, day 1), due 60 days before each date, by 09:00");
   });
 });
 
-describe("cycleStartDate", () => {
-  it("a daily cadence's own cycle start is the run date itself", () => {
+describe("periodStartDate", () => {
+  // IT REPLACED cycleStartDate(cadence, dateStr), a JS port of Python's
+  // cycle_start(). The port is gone rather than kept alongside, so these
+  // are the same QUESTIONS asked of the new mechanism: which period does
+  // this date fall in, and what happens at the edges.
+  //
+  // The cases it could never answer are here too, and they are the reason
+  // for the change: an AUTHORED calendar is not a rule, so a Feb/May/Aug/
+  // Nov quarterly sequence had no computable answer at all.
+
+  it("a daily calendar's period start is the date itself", () => {
     const w = load();
-    expect(w.cycleStartDate({ type: "daily" }, "2026-03-15")).toBe("2026-03-15");
+    expect(w.periodStartDate("birth-registrations", "2026-03-15")).toBe("2026-03-15");
   });
 
-  it("a weekly cadence's cycle start is the most recent occurrence of its weekday, at or before the date", () => {
+  it("an AUTHORED calendar's period start is the latest authored date at or before it", () => {
     const w = load();
-    // weekday 0 = Monday (Python date.weekday() convention, per the
-    // function's own comment) - 2026-03-18 is a Wednesday, so the most
-    // recent Monday on/before it is 2026-03-16.
-    expect(w.cycleStartDate({ type: "weekly", weekday: 0 }, "2026-03-18")).toBe("2026-03-16");
+    // The default fixture's quarterly calendar is 2025-08-01, 2025-11-01,
+    // 2026-02-01, 2026-05-01 - the real asset's own shape, which is NOT
+    // calendar quarters. A rule could not have produced this answer.
+    expect(w.periodStartDate("child-protection", "2026-03-20")).toBe("2026-02-01");
   });
 
-  it("a weekly cadence's cycle start is the date itself when the date IS the anchor weekday", () => {
+  it("a date that IS a period's own start returns that date", () => {
     const w = load();
-    expect(w.cycleStartDate({ type: "weekly", weekday: 0 }, "2026-03-16")).toBe("2026-03-16");
+    expect(w.periodStartDate("child-protection", "2026-02-01")).toBe("2026-02-01");
   });
 
-  it("a quarterly cadence's cycle start is the latest anchor on/before the date", () => {
+  it("a date before every period in the sequence has no period", () => {
     const w = load();
-    const cadence = { type: "quarterly", anchor_months: [1, 4, 7, 10], day_of_month: 15 };
-    expect(w.cycleStartDate(cadence, "2026-05-01")).toBe("2026-04-15");
+    // Not an exception and not the first period - there is genuinely no
+    // period a 2019 date falls in, and saying so is the honest answer.
+    expect(w.periodStartDate("child-protection", "2019-01-01")).toBeNull();
   });
 
-  it("a quarterly cadence rolls back into the PREVIOUS year when the date is before this year's first anchor", () => {
+  it("a dataset with no calendar has no period arithmetic rather than an error", () => {
     const w = load();
-    const cadence = { type: "quarterly", anchor_months: [1, 4, 7, 10], day_of_month: 15 };
-    expect(w.cycleStartDate(cadence, "2026-01-10")).toBe("2025-10-15");
+    // REQ-PIPE-106's subject: a dataset can exist before any supply is
+    // agreed. The picker simply has nothing to compute for it.
+    expect(w.periodStartDate("not-a-dataset", "2026-03-15")).toBeNull();
   });
 
-  it("throws on an unknown cadence type rather than silently misclassifying a real run", () => {
+  it("the unbuilt template answers nothing rather than guessing", () => {
+    dashboard = loadDashboard({ periodSequences: null });
+    expect(dashboard.window.periodStartDate("birth-registrations", "2026-03-15")).toBeNull();
+  });
+});
+
+describe("periodNameFor", () => {
+  it("names the period rather than returning its date", () => {
     const w = load();
-    expect(() => w.cycleStartDate({ type: "fortnightly" }, "2026-01-01")).toThrow(/unknown cadence type/);
+    // The NAME is what a reader recognises - "2026-Q1", not "2026-02-01" -
+    // and it exists only in the authored list. This is the half of
+    // REQ-DASH-054 criterion 6 that the port could not have served at all.
+    expect(w.periodNameFor("child-protection", "2026-03-20")).toBe("2026-Q1");
+  });
+
+  it("a daily calendar's period name is its date, which is the honest answer", () => {
+    const w = load();
+    expect(w.periodNameFor("birth-registrations", "2026-03-15")).toBe("2026-03-15");
+  });
+});
+
+describe("coveredDateRange", () => {
+  it("spans the earliest period start to the latest across every calendar", () => {
+    const w = load();
+    const range = w.coveredDateRange();
+    expect(range.first).toBe("2025-01-01");   // the daily fixture's first day
+    expect(range.last).toBe("2027-03-11");    // its 800th
+  });
+
+  it("is null on the unbuilt template, which covers nothing", () => {
+    dashboard = loadDashboard({ periodSequences: null });
+    expect(dashboard.window.coveredDateRange()).toBeNull();
+  });
+});
+
+describe("no schedule derivation in the browser (criterion 5)", () => {
+  it("the JS port of cycle_start() is gone rather than kept as a fallback", () => {
+    const w = load();
+    // Kept alongside the lookup it would be two implementations wearing
+    // one name, and the one taken would depend on which calendar a
+    // dataset happened to be on - which is how a page ends up right for
+    // one asset and confidently wrong for the next.
+    expect(w.cycleStartDate).toBeUndefined();
+  });
+
+  it("with nothing embedded the page computes nothing rather than falling back", () => {
+    // The honest failure. A page that derived a schedule when the embed
+    // was missing would answer every question plausibly and some of them
+    // wrongly, and nothing on screen would say which.
+    dashboard = loadDashboard({ periodSequences: null });
+    const w = dashboard.window;
+    expect(w.periodStartDate("child-protection", "2026-03-20")).toBeNull();
+    expect(w.periodNameFor("child-protection", "2026-03-20")).toBeNull();
+    expect(w.coveredDateRange()).toBeNull();
   });
 });
 

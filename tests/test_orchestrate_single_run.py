@@ -11,6 +11,8 @@ reason to stub any of them out here."""
 from __future__ import annotations
 import os
 
+from qa_tools.common import supply_db, trial
+
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
@@ -19,10 +21,14 @@ import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
 import qa_tools.bdm.run_soda_bdm as run_soda_bdm
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
-_REF_RUN_ID = "pytest_bdm_ref"
-_DIRTY_RUN_ID = "pytest_bdm_dirty"
-_CP_REF_RUN_ID = "pytest_cp_ref"
-_CP_DIRTY_RUN_ID = "pytest_cp_dirty"
+from fixture_ids import (BDM_REF_RUN_ID as _REF_RUN_ID,
+                          CP_DIRTY_RUN_ID as _CP_DIRTY_RUN_ID, CP_REF_RUN_ID as _CP_REF_RUN_ID)
+
+# The flat CSVs tests/conftest.py writes alongside its deliveries - the
+# "a human downloaded this file" shape run_single() exists for, which is
+# deliberately NOT a delivery and so has no recognised run_id of its own.
+_REF_CSV = "pytest_bdm_ref.csv"
+_DIRTY_CSV = "pytest_bdm_dirty.csv"
 
 
 def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
@@ -31,12 +37,11 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # production this is the same literal path run_datacontract_bdm.py/
     # run_evidently_bdm.py already default to, so all three must point at
     # the SAME tmp dir here for the same reason.
-    monkeypatch.setattr(build_per_run_warehouses, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(build_per_run_warehouses, "OUT_DIR", duckdb_dir)
-    monkeypatch.setattr(run_datacontract_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_evidently_bdm, "RAW_DIR", raw_dir)
-    monkeypatch.setattr(run_dbt_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
-    monkeypatch.setattr(run_soda_bdm, "DUCKDB_RUNS_DIR", duckdb_dir)
+    # One supply database, named by the environment - the three
+    # module attributes this replaces pointed at a directory of
+    # per-run DuckDB files (REQ-PIPE-068).
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_datacontract_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda_bdm, "write_qa_result", lambda *a, **k: None)
@@ -59,56 +64,96 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # RAW_DIR under its final name - exactly the "arrived somewhere else"
     # shape a Lambda's /tmp download would have.
     arrived_csv = tmp_path / "incoming.csv"
-    with open(os.path.join(bdm_raw_dir, f"{_DIRTY_RUN_ID}.csv"), "rb") as src, open(arrived_csv, "wb") as dst:
+    with open(os.path.join(bdm_raw_dir, _DIRTY_CSV), "rb") as src, open(arrived_csv, "wb") as dst:
         dst.write(src.read())
 
     # The reference run must already be resolvable under RAW_DIR (this
     # test's own stand-in for "already present" - see the design doc's
     # own open question on where this lives in real production) - copy
     # the fixture's clean reference CSV in under its own name first.
-    with open(os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"), "rb") as src:
+    with open(os.path.join(bdm_raw_dir, _REF_CSV), "rb") as src:
         with open(os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "wb") as dst:
             dst.write(src.read())
-    build_per_run_warehouses.build_one(_REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01", None,
-                                        out_dir=duckdb_dir)
+    # No out_dir: there is one supply database and it is named by the
+    # environment, which _patch_bdm_dirs() above has already set.
+    build_per_run_warehouses.build_one(
+        _REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01")
 
-    results = orchestrate_bdm.run_single(
-        _DIRTY_RUN_ID, str(arrived_csv), "2026-01-02", "red",
-        reference_run_id=_REF_RUN_ID, reference_csv=f"{_REF_RUN_ID}.csv", run_by="test@example.com")
+    # No injected severity is passed - run_single() has nowhere to put
+    # one any more (REQ-GEN-043), which is the point: a real arriving
+    # file carries no such label.
+    # A TRIAL ID: run_single runs trials only (REQ-PIPE-086 criterion 10).
+    run_id = trial.trial_run_id()
+    try:
+        results = orchestrate_bdm.run_single(
+            run_id, str(arrived_csv), "2026-01-02",
+            reference_run_id=_REF_RUN_ID, run_by="test@example.com")
+    finally:
+        with supply_db.connect(label="test-bdm-trial") as conn:
+            trial.discard(conn, run_id)
 
     assert results, "run_single() produced no real check results at all"
-    assert all(r["run_id"] == _DIRTY_RUN_ID for r in results)
+    assert all(r["run_id"] == run_id for r in results)
     assert all(r["check_id"] for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "the real red-severity dirty run produced no failures via run_single()"
-    # The arrived file really landed at RAW_DIR/<run_id>.csv, not wherever
-    # it was originally downloaded to.
-    assert os.path.exists(os.path.join(raw_dir, f"{_DIRTY_RUN_ID}.csv"))
+    # THE ARRIVED FILE STAYED WHERE IT WAS (REQ-PIPE-102). This used
+    # to assert the opposite - that run_single() had copied it to
+    # RAW_DIR/<run_id>.csv - which was true and existed only so
+    # Evidently could resolve a bare filename. Nothing reads a file
+    # now, so nothing is copied.
+    assert arrived_csv.exists(), "the file handed in should be left alone, not moved"
+    assert not os.path.exists(os.path.join(raw_dir, f"{run_id}.csv")), \
+        "run_single() still copies the arriving file into a directory of its own"
 
 
 def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_present(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
-    """CP's own single-delivery entry point - assumes (as documented in
-    orchestrate_cp.run_single()'s own docstring) that all 6 tables have
-    already landed via 6 real add_table_to_run() calls before this is
-    ever invoked, exactly what a CP ingest Lambda would have done by the
-    time its own completion_tracker says the delivery is complete."""
+    """CP's own single-arrival entry point, with all six tables staged.
+
+    IT NO LONGER ASSUMES THAT, which is REQ-PIPE-105 criterion 1 - a run
+    is triggered by any one arriving file and reads the newest supply
+    staged for its period for every table that file did not carry. This
+    test stages all six because that is the case where the cross-table
+    checks have something to find, which is what it is asserting on; the
+    handler test in tests/test_lambda_handlers.py covers the one-file
+    case. Nothing waits for a completion signal any more, and there is no
+    completion tracker left to consult."""
     import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
     import qa_tools.cp.run_dbt_cp as run_dbt_cp
     import qa_tools.cp.run_evidently_cp as run_evidently_cp
     import qa_tools.cp.run_soda_cp as run_soda_cp
 
-    monkeypatch.setattr(run_dbt_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
-    monkeypatch.setattr(run_soda_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
-    monkeypatch.setattr(run_datacontract_cp, "CP_RAW_DIR", cp_raw_dir)
-    monkeypatch.setattr(run_evidently_cp, "CP_RAW_DIR", cp_raw_dir)
+    # One supply database, named by the environment - the three
+    # module attributes this replaces pointed at a directory of
+    # per-run DuckDB files (REQ-PIPE-068).
+    # The environment already points at this worker's database
+    # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
+    # NOTHING LEFT TO REDIRECT ON DISK (REQ-PIPE-102) - both of these
+    # modules read the warehouse now, so the CP_RAW_DIR they used to
+    # carry is gone rather than pointed somewhere else.
     for mod in (run_dbt_cp, run_soda_cp, run_datacontract_cp, run_evidently_cp):
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(orchestrate_cp, "CP_DUCKDB_RUNS_DIR", cp_duckdb_dir)
 
-    entry = {"run_id": _CP_DIRTY_RUN_ID, "run_date": "2026-04-01", "dirty_severity": "red"}
-    results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID, run_by="test@example.com")
+    # An ARRIVAL RECORD, not a manifest entry: what we observed, and
+    # nothing the generator knew (REQ-GEN-043).
+    # A TRIAL ID, staged the way the terminal's trial route stages one:
+    # run_single runs trials only (REQ-PIPE-086 criterion 10).
+    import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
+    run_id = trial.trial_run_id()
+    for table in build_cp_warehouses.TABLES:
+        build_cp_warehouses.add_table_to_run(
+            run_id, table, os.path.join(cp_raw_dir, _CP_DIRTY_RUN_ID, f"{table}.csv"))
+    entry = {"run_id": run_id, "run_index": 2,
+             "received_at": "2026-04-01T09:00:00+08:00",
+             "delivery": "cp-drop-9104"}
+    try:
+        results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID,
+                                            run_by="test@example.com")
+    finally:
+        with supply_db.connect(label="test-cp-trial") as conn:
+            trial.discard(conn, run_id)
 
     assert results, "run_single() produced no real CP check results at all"
     assert all(r["check_id"] for r in results)
@@ -116,3 +161,83 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     assert len(tables_seen) > 1, "results should span more than one of the 6 real CP tables"
     failing = [r for r in results if r["status"] == "fail"]
     assert failing, "the real red-severity dirty CP delivery produced no failures via run_single()"
+
+
+class TestABirthRegistrationsRunWithNothingItMayRead:
+    """REAL DEFECT, 2026-10-02, found by the first bootstrap after
+    REQ-PIPE-105's overlay landed - which it crashed after two minutes.
+
+    Birth Registrations has one table, so a run that may not read it has
+    nothing it may check - and Soda raised UndefinedTable, taking the
+    whole batch down. A run with nothing it may check checks nothing,
+    says why in its tables_read, and finishes.
+
+    REQ-PIPE-115 criterion 23: BOTH ways the one table can be unreadable
+    - HELD, and CONTESTED (two files for it in one arrival) - each
+    finishing without raising, recording no per-check result, and leaving
+    the dataset's outstanding item open. (The fixture used to withhold the
+    table as held while this docstring described the contested case.)
+    """
+
+    @staticmethod
+    def _run(monkeypatch, *, held=(), contested=()):
+        import uuid
+
+        from conftest import clone_run_views
+        from fixture_ids import BDM_REF_RUN_ID
+        from qa_tools.common import supply_db
+
+        written = []
+        monkeypatch.setattr(orchestrate_bdm, "write_qa_result",
+                            lambda *a, **k: written.append(a[4]))
+        mine = f"bdm_unreadable_{uuid.uuid4().hex[:8]}"
+        with supply_db.connect(label="test-bdm-unreadable") as conn:
+            clone_run_views(conn, BDM_REF_RUN_ID, mine, held=held, contested=contested)
+        entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",
+                 "received_at": "2026-01-01T06:00:00+00:00", "delivery": "d"}
+        results = orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+                                           reference_run_id=None)
+        with supply_db.connect(read_only=True, label="test-bdm-unreadable") as conn:
+            recorded = conn.execute(
+                'SELECT tool, COUNT(*) FROM "qa".check_result '
+                "WHERE run_key LIKE ? GROUP BY tool", [f"%{mine}"]).fetchall()
+        return mine, results, written, dict(recorded)
+
+    def test_a_held_table_records_no_results_and_does_not_raise(self, monkeypatch,
+                                                                 bdm_duckdb_dir):
+        _, results, written, recorded = self._run(monkeypatch, held={"birth_registrations"})
+        assert results == [] and recorded == {}
+        assert "tables_read" in written and "dataset_stats" in written
+
+    def test_a_contested_table_records_no_results_and_does_not_raise(self, monkeypatch,
+                                                                      bdm_duckdb_dir):
+        _, results, written, recorded = self._run(monkeypatch,
+                                                  contested={"birth_registrations"})
+        assert results == [] and recorded == {}
+        assert "tables_read" in written and "dataset_stats" in written
+
+    def test_the_held_supplys_outstanding_item_stays_open(self, monkeypatch, bdm_duckdb_dir):
+        import uuid
+
+        from qa_tools.common import outstanding, supply_db, supply_holds
+
+        supply = f"birth-registrations@t{uuid.uuid4().hex[:12]}"
+        with supply_db.connect(label="test-bdm-unreadable") as conn:
+            supply_holds.raise_hold(conn, dataset_id="birth-registrations",
+                                    supply_id=supply, kind="assignment-rule",
+                                    reason={"why": "no slot open"}, raised_by="test")
+        try:
+            self._run(monkeypatch, held={"birth_registrations"})
+            with supply_db.connect(read_only=True, label="test-bdm-unreadable") as conn:
+                assert supply_holds.hold_on(conn, "birth-registrations", supply) is not None
+                assert any(i.kind == outstanding.HELD_SUPPLY
+                           and i.dataset_id == "birth-registrations"
+                           for i in outstanding.survey(conn).items)
+        finally:
+            # AN OPEN HOLD WITHHOLDS ITS TABLE FROM EVERY LATER RUN on this
+            # worker (supply_holds.held_tables), so it must not outlive the
+            # test - it took seven Birth Registrations tool tests down when
+            # it did.
+            with supply_db.connect(label="test-bdm-unreadable") as conn:
+                conn.execute("DELETE FROM qa.hold WHERE dataset_id = 'birth-registrations' "
+                             "AND supply_id = ?", [supply])

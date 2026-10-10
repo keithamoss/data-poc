@@ -2,7 +2,7 @@
 Parses `plans/*.md` - the project's own persistent planning memory
 (CLAUDE.md's own orientation section) - into structured data the
 dashboard's "Plans" tab (running-thoughts.md #10) can render, filter, and
-search, mirroring dashboard/changelog_md.py's narrow line-based style
+search, mirroring the narrow line-based style dashboard/changelog_md.py used before CHANGELOG became structured YAML
 rather than pulling in a real markdown library.
 
 There are two real, deliberately different tag placements in these files
@@ -37,20 +37,27 @@ plans/running-thoughts.md #10's own write-up):
    **Category:** ...` line immediately under it is simply not captured
    as a thread, same "skip what doesn't match" philosophy as above.
 
-`running-thoughts.md` is deliberately NOT part of either tagged scheme
-(Keith's own call, recorded in plans/running-thoughts.md #10 fork 2: "no
-forced status field... just a looser feed the dashboard shows as-is") -
-`parse_notes()` only extracts each `### N. Title` item's number, title,
-and body, with no status/component parsing at all.
+`running-thoughts.md` used to be a third, untagged shape - `### N. Title`
+headings parsed by their own `parse_notes()`, with no status or
+component at all (Keith's original call, plans/running-thoughts.md #10
+fork 2: "no forced status field... just a looser feed the dashboard
+shows as-is"). Reversed 2026-09-20 at his own suggestion once the
+generated index made the cost visible: 10 of its 12 entries were
+actually done, and showing them untagged was misleading rather than
+loose. They are now ordinary numbered items, the third parser path is
+gone, and the file keeps its character through its own prose and section
+headings rather than through a separate record type.
 
 Every parsed body/text field keeps real markdown (bold, inline code, `-`/
 `*` bullet lists, blank-line paragraph breaks) as a plain string - unlike
-changelog_md.py's single-line items, these can be long multi-paragraph
+a changelog item, these can be long multi-paragraph
 essays, so the dashboard's own JS does a slightly richer (but still not
 full-CommonMark) markdown-to-HTML pass at render time, not this module.
 """
 from __future__ import annotations
 import re
+
+from dashboard.markdown_text import join_wrapped
 from pathlib import Path
 
 _ITEM_RE = re.compile(
@@ -62,7 +69,6 @@ _THREAD_HEADING_RE = re.compile(r"^##\s+(.+)$")
 _THREAD_STATUS_RE = re.compile(
     r"^\*\*Status:\*\*\s*([a-z-]+)\s*\((\d{4}-\d{2}-\d{2})\)\s*·\s*\*\*Category:\*\*\s*(.+)$"
 )
-_NOTE_HEADING_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+)$")
 # A list-item marker within an item's own body - either a "- "/"* " bullet
 # or a "1. "/"2. " ordered marker (real bug, found via Keith's own
 # dashboard report 2026-09-19: only bullets were recognised, so a numbered
@@ -70,22 +76,37 @@ _NOTE_HEADING_RE = re.compile(r"^###\s+(?:(\d+)\.\s+)?(.+)$")
 # silently word-joined into one illegible paragraph).
 _LIST_MARKER_RE = re.compile(r"^(?:[-*]\s+|\d+\.\s+)")
 
-# The 5 numbered-item files and the 2 Thread/Phase essay files, keyed by
-# the short "file" id the dashboard's URL/filter state uses - deliberately
-# not just the filename stem, so a rename of the .md file itself doesn't
-# silently change every embedded id.
-NUMBERED_FILES = {
-    "wider": "wider.md",
-    "qa-pipeline": "qa-pipeline.md",
-    "dashboard": "dashboard.md",
-    "data-generation": "data-generation.md",
-    "tooling": "tooling.md",
-}
-THREAD_FILES = {
-    "publishing-and-history": "publishing-and-history.md",
-    "conceptual-design": "conceptual-design.md",
-}
-NOTES_FILE = "running-thoughts.md"
+# Every `plans/*.md` file is walked, and its `file` id is its filename
+# stem. Keith's own call, 2026-09-20: "I'm happy for it just to walk all
+# of the markdown files in a given directory - that's probably safer
+# because we will probably add more files as we go."
+#
+# This replaced two hardcoded allowlists, and the reason is a real bug
+# they caused: publishing-and-history.md and performance.md had both
+# grown numbered items after being classified as essay/thread files, so
+# 13 items - including the HIGH-priority per-dataset architecture work -
+# were invisible to the dashboard's Plans tab. Nothing looked wrong; the
+# tab just under-reported. An allowlist fails silently by construction,
+# which is the worst shape for a file that is meant to be this project's
+# own memory.
+#
+# What the old indirection bought, and what dropping it costs: a `file`
+# key decoupled from the filename meant renaming a .md file didn't
+# change every embedded id. Now it does. Judged acceptable - a rename is
+# a deliberate act that would want the dashboard's own filter chip
+# renamed too, and the template already falls back to the raw key
+# (`PLANS_FILE_LABEL[i.file] || i.file`), so an unlabelled file degrades
+# to showing its stem rather than breaking.
+#
+# Each file is parsed for BOTH numbered items and threads, since
+# publishing-and-history.md genuinely carries both shapes. Both have
+# strong, unambiguous signals (`N. **[status, YYYY-MM-DD]**`, and a `##`
+# heading followed by a `**Status:** ... · **Category:** ...` line), so
+# walking every file cannot invent entries that aren't there.
+# Deliberately NOT walked: the generated index lives in the same
+# directory and is built FROM these files, so parsing it back in would
+# be circular.
+GENERATED_FILES = {"INDEX.md"}
 
 
 def _join_blocks(blocks: list[str]) -> str:
@@ -130,20 +151,20 @@ def _parse_numbered_items(text: str, file_key: str) -> list[dict]:
             stripped = lines[i].strip()
             if not stripped:
                 if cur_words:
-                    blocks.append(" ".join(cur_words))
+                    blocks.append(join_wrapped(cur_words))
                     cur_words = []
             elif _LIST_MARKER_RE.match(stripped):
                 if cur_words:
-                    blocks.append(" ".join(cur_words))
+                    blocks.append(join_wrapped(cur_words))
                     cur_words = []
                 blocks.append(stripped)
             elif blocks and _LIST_MARKER_RE.match(blocks[-1]) and not cur_words:
-                blocks[-1] += " " + stripped
+                blocks[-1] = join_wrapped([blocks[-1], stripped])
             else:
                 cur_words.extend(stripped.split())
             i += 1
         if cur_words:
-            blocks.append(" ".join(cur_words))
+            blocks.append(join_wrapped(cur_words))
         items.append({
             "file": file_key, "number": number, "status": status, "date": date,
             "components": components, "section": section, "text": _join_blocks(blocks),
@@ -182,39 +203,20 @@ def _parse_threads(text: str, file_key: str) -> list[dict]:
     return threads
 
 
-def _parse_notes(text: str) -> list[dict]:
-    lines = text.splitlines()
-    notes: list[dict] = []
-    i, n = 0, len(lines)
-    while i < n:
-        h = _NOTE_HEADING_RE.match(lines[i])
-        if not h:
-            i += 1
-            continue
-        number = int(h.group(1)) if h.group(1) else None
-        title = h.group(2).strip()
-        i += 1
-        body_lines: list[str] = []
-        while i < n and not _NOTE_HEADING_RE.match(lines[i]) and not lines[i].startswith("## "):
-            body_lines.append(lines[i])
-            i += 1
-        body = "\n".join(body_lines).strip("\n")
-        notes.append({"number": number, "title": title, "body": body})
-    return notes
-
-
 def parse_plans(plans_dir: str | Path) -> dict:
-    """Returns {"items": [...], "threads": [...], "notes": [...]} across
-    every plans/*.md file - items/threads in each file's own top-to-bottom
-    order, grouped by file in NUMBERED_FILES/THREAD_FILES iteration order
-    (not re-sorted; the dashboard's own filters/sort are a rendering
-    concern, not this module's)."""
+    """Returns {"items": [...], "threads": [...]} across
+    every `plans/*.md` file, walked from the directory rather than listed
+    - a new plans file needs no code change here. Items and threads come
+    back in each file's own top-to-bottom order, grouped by file in
+    filename order and not re-sorted; the dashboard's own filters and
+    sort are a rendering concern, not this module's."""
     plans_dir = Path(plans_dir)
     items: list[dict] = []
-    for key, fname in NUMBERED_FILES.items():
-        items.extend(_parse_numbered_items((plans_dir / fname).read_text(), key))
     threads: list[dict] = []
-    for key, fname in THREAD_FILES.items():
-        threads.extend(_parse_threads((plans_dir / fname).read_text(), key))
-    notes = _parse_notes((plans_dir / NOTES_FILE).read_text())
-    return {"items": items, "threads": threads, "notes": notes}
+    for path in sorted(plans_dir.glob("*.md")):
+        if path.name in GENERATED_FILES:
+            continue
+        text = path.read_text()
+        items.extend(_parse_numbered_items(text, path.stem))
+        threads.extend(_parse_threads(text, path.stem))
+    return {"items": items, "threads": threads}

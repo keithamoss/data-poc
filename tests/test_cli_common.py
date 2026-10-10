@@ -1,9 +1,11 @@
 """Tests for cli/common.py - the mothman CLI's shared TUI helpers
 (plans/tooling.md #1): the non-TTY guard, confirm-by-default+--yes, the
-back-navigation-aware select(), and the tmp-dir-first Promote pattern."""
+back-navigation-aware select(), and the record-or-trial decision.
+
+The "tmp-dir-first Promote pattern" this used to cover is gone with
+REQ-PIPE-089 - see test_report_recorded_* and test_decide_record_* below
+for what replaced it and why."""
 from __future__ import annotations
-import os
-import shutil
 
 import pytest
 
@@ -108,28 +110,117 @@ def test_confirm_without_yes_asks_and_returns_the_real_answer(monkeypatch):
     assert common.confirm("Promote?", yes=False) is True
 
 
-def test_promote_copies_the_tmp_run_into_the_real_qa_results_tree(tmp_path):
-    tmp_root = tmp_path / "tmp_qa_results"
-    run_dir = tmp_root / "agency-x" / "dataset-y" / "run_001"
-    run_dir.mkdir(parents=True)
-    (run_dir / "dataset_stats.json").write_text('{"raw_output": {}}')
+def test_report_recorded_states_the_real_count_and_says_nothing_is_published(
+        capsys, monkeypatch):
+    """WHAT THIS REPLACED. `report_promoted()` said how many FILES had
+    landed in the committed tree and where. There is no tree and there
+    are no files (REQ-PIPE-089), so the count is of recorded results -
+    but the affordance survived the change, because Keith asked for it
+    by name: "after the user confirms promotion of results, they should
+    get a success message rather than being bumped straight back to the
+    menu". This is the most consequential action in the tool and it must
+    not look like the end of a no-op.
+    """
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    common.report_recorded("run_042", 137)
+    out = capsys.readouterr().out
+    assert "137" in out
+    assert "run_042" in out
 
-    fake_real_qa_results = tmp_path / "real_qa_results"
-    common_module_qa_results = common.QA_RESULTS_DIR
-    try:
-        common.QA_RESULTS_DIR = fake_real_qa_results
-        dst = common.promote(str(tmp_root), "agency-x", "dataset-y", "run_001")
-    finally:
-        common.QA_RESULTS_DIR = common_module_qa_results
 
-    assert dst == fake_real_qa_results / "agency-x" / "dataset-y" / "run_001"
-    assert (dst / "dataset_stats.json").exists()
+def test_report_recorded_no_longer_tells_anyone_to_commit_and_push(capsys, monkeypatch):
+    """The sentence it used to end with - "commit and push qa_results/
+    yourself to publish. That push is what triggers the real CI rebuild"
+    - is false twice over now: there is nothing to commit, and a git
+    push is not what publishes (REQ-PIPE-092). Asserted rather than
+    assumed, because a stale instruction in a success panel is exactly
+    the kind of thing that survives a refactor and misleads someone
+    months later."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    common.report_recorded("run_042", 1)
+    out = capsys.readouterr().out
+    assert "commit" not in out.lower()
+    assert "push" not in out.lower()
 
 
-def test_new_tmp_results_dir_returns_a_real_fresh_empty_directory():
-    d = common.new_tmp_results_dir()
-    try:
-        assert os.path.isdir(d)
-        assert os.listdir(d) == []
-    finally:
-        shutil.rmtree(d, ignore_errors=True)
+def test_report_recorded_waits_for_a_keypress_in_a_real_terminal(monkeypatch):
+    pressed = []
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setattr(common.questionary, "press_any_key_to_continue",
+                        lambda *a, **k: type("A", (), {"ask": lambda self: pressed.append(True)})())
+    common.report_recorded("run_042", 3)
+    assert pressed == [True]
+
+
+def test_report_recorded_never_blocks_when_stdout_is_not_a_terminal(monkeypatch):
+    """The scriptable paths must not hang waiting for a keypress nobody
+    is there to give."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+
+    def _never(*a, **k):
+        raise AssertionError("asked for a keypress with no terminal to answer it")
+
+    monkeypatch.setattr(common.questionary, "press_any_key_to_continue", _never)
+    common.report_recorded("run_042", 3)
+
+
+def test_decide_record_takes_the_flags_answer_without_asking(monkeypatch):
+    """`--commit`/`--trial` stop the prompt entirely rather than
+    pre-filling it, so a scripted caller never needs a terminal."""
+    def _never(*a, **k):
+        raise AssertionError("prompted despite having been told the answer")
+
+    monkeypatch.setattr(common, "confirm", _never)
+    assert common.decide_record("run_01", keep=True) is True
+    assert common.decide_record("run_01", keep=False) is False
+
+
+def test_decide_record_defaults_to_a_trial_with_no_terminal_and_no_flag(monkeypatch, capsys):
+    """The two wrong answers are not equally wrong. A trial that should
+    have been recorded costs a re-run; a recorded run that should not
+    have been is a verdict in a dataset's permanent quality history that
+    nobody chose."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    assert common.decide_record("run_01", keep=None) is False
+    assert "TRIAL" in capsys.readouterr().out
+
+
+def test_decide_record_asks_before_the_run_rather_than_after(monkeypatch):
+    """REQ-PIPE-089 criterion 8. It used to be asked afterwards, as
+    "promote this run?", which worked only because the results sat in a
+    throwaway directory until somebody accepted them. Asserted on the
+    WORDING because that is what a user reads: the question has to be
+    about what will happen, not about what already did."""
+    asked = []
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setattr(common, "confirm", lambda q, **k: asked.append(q) or True)
+    common.decide_record("run_07", keep=None)
+    assert asked and "run_07" in asked[0]
+    assert "promote" not in asked[0].lower()
+
+
+def test_a_change_production_must_type_for_does_not_point_at_a_flag(monkeypatch):
+    """post-build-review #124 D6: with no terminal, production's refusal read
+    "Use the flag-based form instead: ... cannot be confirmed by a flag" -
+    sending the reader to the very thing it then ruled out."""
+    monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "production")
+    monkeypatch.setattr(common.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(common.sys.stdout, "isatty", lambda: False)
+    with pytest.raises(common.NeedsATerminal) as exc:
+        common.confirm_change("Record promote?", yes=True)
+    message = str(exc.value)
+    assert "flag-based form" not in message
+    assert "production" in message and "terminal" in message
+
+
+def test_the_progress_count_restarts_for_each_arrival():
+    """post-build-review #124 D7: a folder of five arrivals drove one bar,
+    whose count ran past its total (7/5). Each arrival counts its own steps."""
+    counter = common.StepCounter(common.RUN_STEPS)
+    seen = [counter.step(label) for label in list(common.RUN_STEPS) * 2]
+    assert max(done for done, _ in seen) < len(common.RUN_STEPS)
+    assert [n for _, n in seen] == [1] * len(common.RUN_STEPS) + [2] * len(common.RUN_STEPS)

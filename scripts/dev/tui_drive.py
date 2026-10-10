@@ -88,7 +88,6 @@ NAMED_KEYS = {
 # always answers it, and not answering can both delay and corrupt the
 # session.
 _CPR_QUERY = "\x1b[6n"
-_CPR_RESPONSE = b"\x1b[1;1R"
 
 _SETTLE_DELAY = 0.35  # seconds to let the TUI repaint after a sent key
 _MAX_BUFFER_CHARS = 500_000  # cap the decoded-output buffer for a long session
@@ -142,7 +141,14 @@ class TuiSession:
             if _CPR_QUERY in text:
                 for _ in range(text.count(_CPR_QUERY)):
                     try:
-                        os.write(self.master_fd, _CPR_RESPONSE)
+                        # The REAL cursor position, as a real terminal
+                        # answers. A fixed 1;1 made prompt_toolkit redraw
+                        # from the top and wipe everything printed above
+                        # the prompt - a warning panel included
+                        # (post-build-review #112).
+                        cursor = self.screen.cursor
+                        os.write(self.master_fd,
+                                 f"\x1b[{cursor.y + 1};{cursor.x + 1}R".encode())
                     except OSError:
                         pass
 

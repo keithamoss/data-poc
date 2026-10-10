@@ -1,0 +1,19 @@
+# SCRIPTED PERSON DECISIONS, played back into the synthetic history
+# (REQ-GEN-135). Configuration, reviewed like the injection table: each
+# names its scenario and which of that scenario's recorded supplies it acts
+# on (by index - never a generated id), and takes effect `after_hours` after
+# that supply was received. Raised through the one decision path as the
+# synthetic person in contract/people.yaml, only on a synthetic asset, and a
+# refusal stops the replay. `mothman scenarios validate` gates it in CI.
+#
+# TS-45's scripted acknowledgement is parked with its scenario (Keith,
+# 2026-10-05): it needs an amber promotion the generator cannot yet plant.
+decisions:
+  - scenario: TS-47
+    operation: mark-not-supplied
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 2
+    names_supply: false
+    period_from: placement
+    reason: "The supplier's file for this day arrived the next morning and filled that day instead; this day was not supplied."

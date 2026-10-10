@@ -23,12 +23,15 @@ checkout with at least 2 commits of history (`fetch-depth: 2` in CI).
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+from qa_tools.common import check_id as cid
 from qa_tools.common import check_lifecycle as cl
+from qa_tools.common.diff_base import diff_base
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -47,6 +50,8 @@ _YAML_SOURCES = [
     ("contract/bdm-birth-registrations-contract-retired.yaml", cl.parse_contract_check_metadata),
     ("contract/child-protection-contract.yaml", cl.parse_contract_check_metadata),
     ("contract/child-protection-contract-retired.yaml", cl.parse_contract_check_metadata),
+    # REQ-QAC-096: written once, a check per dataset derived from each.
+    ("contract/file-checks.yaml", cl.parse_file_check_metadata),
 ]
 _EVIDENTLY_SOURCES = [
     "qa_tools/bdm/evidently_check_lifecycle.py",
@@ -116,10 +121,113 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
     return checks
 
 
-def main() -> int:
-    old_checks = collect_checks("HEAD~1")
+def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:
+    """REQ-QAC-023's three gates plus REQ-QAC-039's fourth, all on the
+    CURRENT tree only - unlike the changelog rule above there is no
+    old-vs-new comparison to make; a check_id either matches the grammar
+    and the hierarchy or it does not.
+
+    Kept here, beside the existing gate, rather than in a separate
+    command: a contributor who broke one of these broke the same thing
+    the other rules protect, and finding that out in two places is
+    worse than finding it out in one."""
+    ids = [c.check_id for c in checks]
+    errors = cid.validate_grammar(ids)
+    errors += cid.validate_tail_uniqueness(ids)
+    # REQ-QAC-039: shaped right is not the same as meaning something.
+    # An id naming an agency or collection the dataset does not sit
+    # under passes the grammar and resolves to nothing.
+    errors += cid.validate_hierarchy_agreement(ids)
+    for rel_path, parser in _YAML_SOURCES:
+        if parser is not cl.parse_contract_check_metadata:
+            continue  # only the ODCS contracts attach rules to a column
+        if not (ROOT / rel_path).exists():
+            continue
+        errors += cid.validate_column_matches(cl.contract_rule_attachments(ROOT / rel_path))
+    return errors
+
+
+def _looks_like_sentinel(value: str) -> bool:
+    """True for a value that MEANS the sentinel but is not spelled as
+    it - "self evident", "Self_Evident", "selfevident". Letters only,
+    lowercased, so spacing, punctuation and case all collapse."""
+    return re.sub(r"[^a-z]", "", value.lower()) == "selfevident"
+
+
+def _explanation_errors(checks: list[cl.CheckMetadata]) -> list[str]:
+    """REQ-QAC-025: no check ships without a plain-English explanation.
+
+    Two separate requirements, both reported in the same pass so a
+    contributor fixing a batch sees the whole list rather than one at a
+    time:
+
+    - every check states what it VERIFIES (`description`);
+    - every check either states what a failure INDICATES, or declares
+      explicitly that the cause is self-evident from what it verifies.
+
+    An absent `failure_indicates` is neither of those - it is a field
+    nobody filled in, and the whole point of the `self-evident`
+    sentinel is to make a deliberate decision distinguishable from an
+    unfilled one.
+
+    RETIRED CHECKS ARE INCLUDED, on the same terms as active ones. An
+    earlier version of this exempted them, reasoning that they are
+    history nobody reads - but REQ-QAC-025 says otherwise in as many
+    words, and it is right: a retired check still renders in the
+    dashboard behind the retired-checks toggle, so a reader can still
+    meet its prose. There is exactly one retired check today and it was
+    authored rather than excused.
+
+    `technical_note` is never required (REQ-QAC-025 again) - it is
+    sparse by design.
+    """
+    errors = []
+    for c in sorted(checks, key=lambda c: c.check_id):
+        if not (c.description or "").strip():
+            errors.append(
+                f"{c.check_id}: no description. Every check must say in plain English "
+                f"what it verifies - see docs/check-authoring-rules.md")
+        value = (c.failure_indicates or "").strip()
+        if not value:
+            errors.append(
+                f"{c.check_id}: no failure_indicates. Author one, or set it to "
+                f"'{cl.SELF_EVIDENT}' if the cause adds nothing to what the check "
+                f"verifies - see docs/check-authoring-rules.md")
+        elif _looks_like_sentinel(value) and not cl.is_self_evident(value):
+            # Any non-empty value satisfies the rule above, so a
+            # near-miss spelling passes the gate AND renders verbatim on
+            # a public page - "self evident" under a heading, which is
+            # the exact leak the template's own normalisation prevents
+            # for the correct spelling. Caught here because the gate is
+            # the only layer that can tell a typo from real prose.
+            errors.append(
+                f"{c.check_id}: failure_indicates is {value!r}, which reads as the "
+                f"sentinel but is not it. Spell it exactly '{cl.SELF_EVIDENT}' - "
+                f"anything else is treated as authored prose and rendered as-is "
+                f"on the published page.")
+    return errors
+
+
+def main(require_explanations: bool = False) -> int:
+    # Not a literal "HEAD~1" - a push of several commits would then
+    # only ever be checked on its last one, and every retroactive edit
+    # underneath it would pass unread. See qa_tools/common/diff_base.py
+    # (plans/post-build-review.md #44).
+    old_checks = collect_checks(diff_base())
     new_checks = collect_checks(None)
-    errors = cl.validate(old_checks, new_checks)
+    errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
+
+    # Always counted, only sometimes fatal. The counting half was what
+    # made REQ-QAC-024's authoring pass tractable - "257 checks to
+    # write" became a number that visibly moved - and it stays useful
+    # for anyone running the command locally mid-change.
+    unauthored = _explanation_errors(new_checks)
+    if require_explanations:
+        errors += unauthored
+    elif unauthored:
+        print(f"  note: {len(unauthored)} plain-English explanation(s) missing "
+              f"(REQ-QAC-025). Not failing the build - pass "
+              f"--require-explanations to make this a gate.", file=sys.stderr)
 
     if errors:
         print(f"check-lifecycle validation FAILED ({len(errors)} error(s)):", file=sys.stderr)
@@ -133,4 +241,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main("--require-explanations" in sys.argv[1:]))

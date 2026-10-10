@@ -17,9 +17,12 @@ import cli.debug as debug_cli
 
 _runner = CliRunner()
 
+# `csv_path` is the real file INSIDE the delivery that arrived
+# (REQ-GEN-043) - an absolute path with a supplier's own filename, not
+# f"{run_id}.csv", which is why these look nothing like the run ids.
 _BDM_MANIFEST = [
-    {"run_id": "run_001", "file": "run_001.csv"},
-    {"run_id": "run_002", "file": "run_002.csv"},
+    {"run_id": "run_001", "csv_path": "/x/BDM_20260101/birth_registrations_2026-01-01.csv"},
+    {"run_id": "run_002", "csv_path": "/x/drop-4471/birth_registrations_2026-01-02.csv"},
 ]
 _CP_MANIFEST = [{"run_id": "cp_run_01"}, {"run_id": "cp_run_02"}]
 
@@ -36,7 +39,7 @@ def _patch_cp_manifest(monkeypatch, manifest=_CP_MANIFEST):
 
 def test_bdm_manifest_entry_returns_matching_entry(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
-    assert debug_cli._bdm_manifest_entry("run_002") == {"run_id": "run_002", "file": "run_002.csv"}
+    assert debug_cli._bdm_manifest_entry("run_002") == _BDM_MANIFEST[1]
 
 
 def test_bdm_manifest_entry_raises_click_exception_when_missing(monkeypatch):
@@ -58,7 +61,7 @@ def test_run_dbt_bdm_looks_up_nothing_and_calls_evaluate_dbt_bdm(monkeypatch):
         return [{"engine": "dbt", "check": "x", "status": "pass"}]
     monkeypatch.setattr(run_dbt_bdm, "evaluate_dbt_bdm", _fake_evaluate)
 
-    result = _runner.invoke(debug_cli.debug_group, ["run-dbt", "--dataset", "bdm", "--run-id", "run_001"])
+    result = _runner.invoke(debug_cli.debug_group, ["run-dbt", "--collection", "bdm", "--run-id", "run_001"])
 
     assert result.exit_code == 0, result.output
     assert seen["run_id"] == "run_001"
@@ -74,35 +77,34 @@ def test_run_dbt_cp_calls_evaluate_dbt_cp(monkeypatch):
         return []
     monkeypatch.setattr(run_dbt_cp, "evaluate_dbt_cp", _fake_evaluate)
 
-    result = _runner.invoke(debug_cli.debug_group, ["run-dbt", "--dataset", "cp", "--run-id", "cp_run_01"])
+    result = _runner.invoke(debug_cli.debug_group, ["run-dbt", "--collection", "cp", "--run-id", "cp_run_01"])
 
     assert result.exit_code == 0, result.output
     assert seen["run_id"] == "cp_run_01"
 
 
-def test_run_datacontract_bdm_passes_the_manifest_csv_filename(monkeypatch):
+def test_run_datacontract_bdm_passes_only_the_run_id(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
     import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
 
     seen = {}
 
-    def _fake_evaluate(run_id, csv_filename, run_timestamp):
+    def _fake_evaluate(run_id, run_timestamp):
         seen["run_id"] = run_id
-        seen["csv_filename"] = csv_filename
         return []
     monkeypatch.setattr(run_datacontract_bdm, "evaluate_datacontract_bdm", _fake_evaluate)
 
-    result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--dataset", "bdm", "--run-id", "run_002"])
+    result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--collection", "bdm", "--run-id", "run_002"])
 
     assert result.exit_code == 0, result.output
-    assert seen == {"run_id": "run_002", "csv_filename": "run_002.csv"}
+    assert seen == {"run_id": "run_002"}
 
 
 def test_run_datacontract_bdm_unknown_run_id_fails_clearly(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
 
     result = _runner.invoke(debug_cli.debug_group,
-                             ["run-datacontract", "--dataset", "bdm", "--run-id", "does_not_exist"])
+                             ["run-datacontract", "--collection", "bdm", "--run-id", "does_not_exist"])
 
     assert result.exit_code != 0
     assert "does_not_exist" in result.output
@@ -118,7 +120,7 @@ def test_run_datacontract_cp_does_not_need_a_csv_filename(monkeypatch):
         return []
     monkeypatch.setattr(run_datacontract_cp, "evaluate_datacontract_cp", _fake_evaluate)
 
-    result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--dataset", "cp", "--run-id", "cp_run_02"])
+    result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--collection", "cp", "--run-id", "cp_run_02"])
 
     assert result.exit_code == 0, result.output
     assert seen["run_id"] == "cp_run_02"
@@ -130,18 +132,17 @@ def test_run_evidently_bdm_defaults_reference_to_manifests_first_entry(monkeypat
 
     seen = {}
 
-    def _fake_evaluate(run_id, csv_filename, run_timestamp, reference_run_id, reference_csv):
-        seen.update(run_id=run_id, csv_filename=csv_filename,
-                     reference_run_id=reference_run_id, reference_csv=reference_csv)
+    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+        seen.update(run_id=run_id, reference_run_id=reference_run_id)
         return []
     monkeypatch.setattr(run_evidently_bdm, "evaluate_evidently_bdm", _fake_evaluate)
 
-    result = _runner.invoke(debug_cli.debug_group, ["run-evidently", "--dataset", "bdm", "--run-id", "run_002"])
+    result = _runner.invoke(debug_cli.debug_group, ["run-evidently", "--collection", "bdm", "--run-id", "run_002"])
 
     assert result.exit_code == 0, result.output
     assert seen["run_id"] == "run_002"
     assert seen["reference_run_id"] == "run_001"
-    assert seen["reference_csv"] == "run_001.csv"
+    assert "reference_csv" not in seen, "the reference is a run id now, not a file"
 
 
 def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
@@ -150,18 +151,18 @@ def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
 
     seen = {}
 
-    def _fake_evaluate(run_id, csv_filename, run_timestamp, reference_run_id, reference_csv):
-        seen.update(reference_run_id=reference_run_id, reference_csv=reference_csv)
+    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+        seen.update(reference_run_id=reference_run_id)
         return []
     monkeypatch.setattr(run_evidently_bdm, "evaluate_evidently_bdm", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, [
-        "run-evidently", "--dataset", "bdm", "--run-id", "run_002", "--reference-run-id", "run_002",
+        "run-evidently", "--collection", "bdm", "--run-id", "run_002", "--reference-run-id", "run_002",
     ])
 
     assert result.exit_code == 0, result.output
     assert seen["reference_run_id"] == "run_002"
-    assert seen["reference_csv"] == "run_002.csv"
+    assert "reference_csv" not in seen, "the reference is a run id now, not a file"
 
 
 def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypatch):
@@ -175,7 +176,7 @@ def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypat
         return []
     monkeypatch.setattr(run_evidently_cp, "evaluate_evidently_cp", _fake_evaluate)
 
-    result = _runner.invoke(debug_cli.debug_group, ["run-evidently", "--dataset", "cp", "--run-id", "cp_run_02"])
+    result = _runner.invoke(debug_cli.debug_group, ["run-evidently", "--collection", "cp", "--run-id", "cp_run_02"])
 
     assert result.exit_code == 0, result.output
     assert seen == {"run_id": "cp_run_02", "reference_run_id": "cp_run_01"}
@@ -187,7 +188,7 @@ def test_build_warehouses_bdm_calls_build_per_run_warehouses(monkeypatch):
     called = []
     monkeypatch.setattr(build_per_run_warehouses, "build_all", lambda: called.append("bdm"))
 
-    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--dataset", "bdm"])
+    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--collection", "bdm"])
 
     assert result.exit_code == 0, result.output
     assert called == ["bdm"]
@@ -199,22 +200,10 @@ def test_build_warehouses_cp_calls_build_cp_warehouses(monkeypatch):
     called = []
     monkeypatch.setattr(build_cp_warehouses, "build_all", lambda: called.append("cp"))
 
-    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--dataset", "cp"])
+    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--collection", "cp"])
 
     assert result.exit_code == 0, result.output
     assert called == ["cp"]
-
-
-def test_load_warehouse_calls_pipeline_load_all(monkeypatch):
-    import pipeline.load as load_mod
-
-    called = []
-    monkeypatch.setattr(load_mod, "load_all", lambda: called.append(True))
-
-    result = _runner.invoke(debug_cli.debug_group, ["load-warehouse"])
-
-    assert result.exit_code == 0, result.output
-    assert called == [True]
 
 
 def test_changelog_prints_real_build_changelog_output_as_json(monkeypatch):

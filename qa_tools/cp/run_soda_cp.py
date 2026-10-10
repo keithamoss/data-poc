@@ -1,5 +1,5 @@
 """
-Runs REAL Soda Core (soda-core-duckdb) against
+Runs REAL Soda Core (soda-core-postgres) against
 contract/child-protection-soda-checks.yml, via Soda's own Python Scan API -
 the Child Protection counterpart to qa_tools/bdm/run_soda_bdm.py.
 Soda's own scan results carry which table each check belongs to
@@ -15,17 +15,19 @@ shared via qa_tools/common/soda_common.py - see plans/qa-pipeline.md #84.
 from __future__ import annotations
 import os
 
-import duckdb
 
+from qa_tools.common import left_out, supply_db
+from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
+    execute_scan, left_out_checks, not_evaluated_record, readable_checks_yaml,
+    unreported_checks,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "child-protection-soda-checks.yml")
-CP_DUCKDB_RUNS_DIR = os.path.join(ROOT, "data", "cp_duckdb_runs")
 
 # dimension for the 3 named `failed rows` business-rule checks - matches
 # the dimension each rule's contract/child-protection-contract.yaml quality
@@ -49,104 +51,146 @@ _BUSINESS_RULE_DIMENSION = {
 # table-level pseudo-column) since they're not really about one column.
 _CUSTOM_CHECK_COLUMN = {
     "date_of_birth out of range": "date_of_birth",
+    "end_date is not earlier than start_date": "end_date",
 }
 
 
 def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
     from soda.scan import Scan
 
-    db_path = os.path.join(CP_DUCKDB_RUNS_DIR, f"{run_id}.duckdb")
-    conn = duckdb.connect(db_path, read_only=True)
-    conn.execute("SET search_path = 'raw'")
-    n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in cp_common.TABLES}
+    # Read-only, and the run's own view schema on the search path - see
+    # the BDM counterpart for what each now means (REQ-PIPE-087).
+    conn = supply_db.connect(read_only=True)
+    # CLOSED IN A `finally` (2026-09-27). It used to close on the
+    # last line of the happy path, which leaks the connection on
+    # every exception - and a Soda scan raising is exactly the case nobody is watching.
+    try:
+        conn.execute(f'SET search_path TO "{supply_db.run_schema(run_id)}"')
+        # ONLY WHAT THIS RUN CAN READ - see soda_common.readable_checks_yaml()
+        # for the defect this closes. Asked of the run's OWN SCHEMA rather
+        # than of the recorded resolution: what Soda can query is exactly
+        # what has a view, and a resolution record that disagreed with
+        # the schema would make this raise the very error it prevents.
+        unreadable = set(cp_common.TABLES) - supply_db.readable_in(conn, run_id)
+        n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                            for t in cp_common.TABLES if t not in unreadable}
 
-    scan = Scan()
-    scan.set_data_source_name("cp_collection")
-    scan.add_duckdb_connection(conn, data_source_name="cp_collection")
-    scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
-    sampler = CaptureSampler()
-    scan.sampler = sampler
-    scan.disable_telemetry()
-    scan.execute()
-    scan_results = scan.get_scan_results()
-    metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
+        scan = Scan()
+        scan.set_data_source_name("cp_collection")
+        # CONFIGURED RATHER THAN HANDED A CONNECTION (REQ-PIPE-087).
+        # soda-core-duckdb took the live connection object this code already
+        # had open; soda-core-postgres has no equivalent, so the run's view
+        # schema reaches Soda as its data source's own `schema` - which is
+        # what the SET search_path above was doing for the shared connection.
+        scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
+            "cp_collection", supply_db.run_schema(run_id)))
+        handed = readable_checks_yaml(SODA_CHECKS_PATH, unreadable)
+        scan.add_sodacl_yaml_str(handed)
+        left_out.note(run_id, "soda", left_out_checks(SODA_CHECKS_PATH, unreadable))
+        sampler = CaptureSampler()
+        scan.sampler = sampler
+        scan.disable_telemetry()
+        # See the BDM counterpart and execute_scan()'s own docstring -
+        # never `scan.execute()` directly.
+        scan_results = execute_scan(scan)
+        metric_name_by_id = {m["identity"]: m["metricName"] for m in scan_results["metrics"]}
 
-    results = []
-    for c in scan_results["checks"]:
-        table = c["table"]
-        if table not in cp_common.TABLE_DATASET_ID:
-            continue  # not a CP table (shouldn't happen - guard anyway)
+        results = []
+        for c in scan_results["checks"]:
+            table = c["table"]
+            if table not in cp_common.TABLES:
+                continue  # not a CP table (shouldn't happen - guard anyway)
 
-        column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
+            column = c["column"] or _CUSTOM_CHECK_COLUMN.get(c["name"]) or "(table)"
 
-        check_id = check_id_from_resource_attributes(c)
-        if check_id is None:
-            raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
-                              f"the checks YAML is missing attributes.check_id for this check")
+            check_id = check_id_from_resource_attributes(c)
+            if check_id is None:
+                raise ValueError(f"no check_id found in resourceAttributes for soda check {c['name']!r} - "
+                                  f"the checks YAML is missing attributes.check_id for this check")
 
-        diagnostics = c["diagnostics"]
-        value = diagnostics.get("value")
-        outcome = c["outcome"]
+            diagnostics = c["diagnostics"]
+            value = diagnostics.get("value")
+            outcome = c["outcome"]
 
-        base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
-        is_custom_name = "when" not in c["name"]
-        check_name = c["name"] if is_custom_name else base_check
-        is_pct = base_check.endswith("percent")
+            base_check = metric_name_by_id.get(c["metrics"][0], c["name"]) if c["metrics"] else c["name"]
+            is_custom_name = "when" not in c["name"]
+            check_name = c["name"] if is_custom_name else base_check
+            is_pct = base_check.endswith("percent")
 
-        row_count_invalid = None
-        if diagnostics.get("blocks"):
-            row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
-        elif base_check == "row_count":
-            row_count_invalid = 0
-        elif base_check == "reference":
-            row_count_invalid = int(value) if value is not None else None
+            row_count_invalid = None
+            if diagnostics.get("blocks"):
+                row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
+            elif base_check == "row_count":
+                row_count_invalid = 0
+            elif base_check == "reference":
+                row_count_invalid = int(value) if value is not None else None
 
-        if is_custom_name:
-            dimension = _BUSINESS_RULE_DIMENSION.get(check_name, "")
-        elif base_check == "reference":
-            dimension = "consistency"
-        elif base_check == "row_count":
-            dimension = "completeness"
-        else:
-            dimension = ""
+            if is_custom_name:
+                dimension = _BUSINESS_RULE_DIMENSION.get(check_name, "")
+            elif base_check == "reference":
+                dimension = "consistency"
+            elif base_check == "row_count":
+                dimension = "completeness"
+            else:
+                dimension = ""
 
-        # A short, human-readable phrase for what this check actually
-        # measures - written here, where the check result is constructed,
-        # not guessed later from check_name by the dashboard-building
-        # code. None for the 3 named business-rule checks: their own
-        # names are already plain (and match dbt's and datacontract-cli's
-        # own names for the same rule closely enough that a reader sees
-        # the overlap without a further prefix).
-        label = None if is_custom_name else {
-            "row_count": "Row count", "reference": "Referential integrity",
-            "missing_count": "Null rate", "missing_percent": "Null rate",
-            "invalid_percent": "Invalid values", "duplicate_count": "Duplicate rate",
-        }.get(base_check)
+            # A short, human-readable phrase for what this check actually
+            # measures - written here, where the check result is constructed,
+            # not guessed later from check_name by the dashboard-building
+            # code. None for the 3 named business-rule checks: their own
+            # names are already plain (and match dbt's and datacontract-cli's
+            # own names for the same rule closely enough that a reader sees
+            # the overlap without a further prefix).
+            label = None if is_custom_name else {
+                "row_count": "Row count", "reference": "Referential integrity",
+                "missing_count": "Null rate", "missing_percent": "Null rate",
+                "invalid_percent": "Invalid values", "duplicate_count": "Duplicate rate",
+            }.get(base_check)
 
-        results.append({
-            "agency_id": cp_common.AGENCY_ID,
-            "collection_id": cp_common.COLLECTION_ID,
-            "dataset_id": cp_common.TABLE_DATASET_ID[table],
-            "check_id": check_id,
-            "column_name": column,
-            "check_name": check_name,
-            "dimension": dimension,
-            "label": label,
-            "run_id": run_id,
-            "run_timestamp": run_timestamp,
-            "metric_value": value,
-            "unit": "%" if is_pct else "count",
-            "warn_threshold": threshold(diagnostics.get("warn")),
-            "fail_threshold": threshold(diagnostics.get("fail")),
-            "status": outcome,
-            "on_fail_action": "flag",
-            "row_count_total": n_total_by_table[table],
-            "row_count_invalid": row_count_invalid,
-            "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
-            "engine": ENGINE_TAG,
-        })
+            results.append({
+                "agency_id": cp_common.AGENCY_ID,
+                "collection_id": cp_common.COLLECTION_ID,
+                "dataset_id": hierarchy.dataset_for_table(table).dataset_id,
+                "check_id": check_id,
+                "column_name": column,
+                "check_name": check_name,
+                "dimension": dimension,
+                "label": label,
+                "run_id": run_id,
+                "run_timestamp": run_timestamp,
+                "metric_value": value,
+                "unit": "%" if is_pct else "count",
+                "warn_threshold": threshold(diagnostics.get("warn")),
+                "fail_threshold": threshold(diagnostics.get("fail")),
+                "status": outcome,
+                "on_fail_action": "flag",
+                "row_count_total": n_total_by_table[table],
+                "row_count_invalid": row_count_invalid,
+                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
+                "engine": ENGINE_TAG,
+            })
 
-    conn.close()
+        # EVERY DECLARED CHECK SODA DID NOT REPORT IS RED, never absent -
+        # see run_soda_bdm.py. Only what was HANDED to the scan: a check
+        # left out for an unreadable table is recorded as not evaluated
+        # by left_out, not here.
+        for missing in unreported_checks(handed, scan_results, scan):
+            if missing["table"] not in cp_common.TABLES:
+                # NEVER SKIPPED QUIETLY (#131 D6): a check this runner cannot
+                # attribute is a configuration fault, and dropping it would
+                # be the very false green this record exists to prevent.
+                raise ValueError(
+                    f"Soda check {missing['check_id']!r} is declared on "
+                    f"{missing['table']!r}, which is not a Child Protection table - it "
+                    f"could not be evaluated and cannot be recorded against a dataset")
+            results.append(not_evaluated_record(
+                missing, agency_id=cp_common.AGENCY_ID, collection_id=cp_common.COLLECTION_ID,
+                dataset_id=hierarchy.dataset_for_table(missing["table"]).dataset_id,
+                run_id=run_id, run_timestamp=run_timestamp,
+                row_count_total=n_total_by_table.get(missing["table"]), engine=ENGINE_TAG))
+
+    finally:
+        conn.close()
     # Committed only now, after row_count_total's own live per-table
     # query above - see run_soda_bdm.py's own identical comment /
     # qa_results_writer.py's docstring for why.

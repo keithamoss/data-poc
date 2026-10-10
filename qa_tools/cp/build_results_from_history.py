@@ -5,17 +5,17 @@ qa_tools/bdm/build_results_from_history.py (see that file's own
 docstring for the full rationale). Runs no real tool, touches no local
 data of any kind.
 
-Reads every tool's output from the same qa_results/ dataset segment per
-run - cp_common.COLLECTION_ID. All 5 files (dbt/soda/datacontract/
-evidently/dataset_stats) live together under one run_id directory now;
-Evidently briefly wrote under its own table-scoped dataset id
-(cp_common.TABLE_DATASET_ID["cp_notifications"]) instead, a real bug
-fixed 2026-09-16 (run_evidently_cp.py's own comment on the write side)
-- Evidently's own per-result "dataset_id" field still correctly says
-"cp-notifications" for dashboard per-table grouping, only the file
-location was wrong. Interleaved per run_id (not two separate
-concatenated blocks) to match orchestrate_cp.py's own _run_one() order
-exactly.
+Reads per DATASET since REQ-PIPE-038 - qa_results/<agency>/<collection>/
+<dataset>/<run_id>/<tool>.json - with the raw output in `_raw/` and the
+spanning records in `_cross-table/`. read_one() walks every dataset
+under the collection and concatenates, so this module asks for "this
+run's dbt results" exactly as it did when they lived in one file.
+
+Interleaved per run_id (not two separate concatenated blocks) to match
+orchestrate_cp.py's own _run_one() order, and then put through
+canonical_order() so the two paths produce the identical file - see
+that function's own docstring for why they stopped agreeing on their
+own.
 
 "runs" used to come from local data/cp_raw/manifest.json - changed
 2026-09-16, Keith's hard rule: CI must never touch data, only committed
@@ -26,17 +26,22 @@ Run as `python3 -m qa_tools.cp.build_results_from_history`.
 from __future__ import annotations
 import json
 import os
-from datetime import datetime, timezone
 
-from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_one, TOOL_ORDER
+from qa_tools.common import hierarchy
+from qa_tools.common.qa_results_reader import canonical_order
+from qa_tools.common.qa_results_reader import read_cross_table_results  # noqa: F401
+from qa_tools.common.qa_results_reader import (RESULT_TOOLS, current_runs_only, list_run_ids,
+                                              read_dataset_stats, read_one)
 from . import cp_common
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 
 
 def build_results_from_history() -> dict:
-    run_ids = list_run_ids(cp_common.AGENCY_ID, cp_common.COLLECTION_ID)
+    # A SUPPLY BY ITS CURRENT RUN (REQ-PIPE-140 criterion 5).
+    run_ids = current_runs_only(list_run_ids(cp_common.AGENCY_ID, cp_common.COLLECTION_ID))
 
     manifest = []
     dataset_stats_by_run = {}
@@ -44,25 +49,58 @@ def build_results_from_history() -> dict:
         stats = read_dataset_stats(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id)
         if stats is None:
             continue
-        manifest.append(stats["manifest_entry"])
+        manifest.append(stats["arrival_record"])
         dataset_stats_by_run[run_id] = stats
     manifest.sort(key=lambda m: m["run_index"])
 
     all_results: list[dict] = []
+    # AND THE IN-DEVELOPMENT ONES (REQ-PIPE-106 criterion 7). `None` means
+    # every supply_state, and asking for it explicitly is the point: the
+    # reader defaults to AGREED so nothing counts check development as
+    # quality history by accident, and the dashboard is the one reader that
+    # has to show a calendar-less dataset's REAL verdicts - red, amber or
+    # green as the checks actually found - because developing a check means
+    # seeing whether it passes. What keeps them apart from here on is the
+    # `supply_state` each such record carries, and the rollup exclusion
+    # criterion 9 already built on both sides.
     for entry in manifest:
         run_id = entry["run_id"]
-        for tool in TOOL_ORDER:
-            all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, tool))
+        for tool in RESULT_TOOLS:
+            all_results.extend(read_one(cp_common.AGENCY_ID, cp_common.COLLECTION_ID,
+                                        run_id, tool, supply_state=None))
+    # THE CROSS-TABLE SCOPE IS A SIBLING OF THE RUN DIRECTORIES, so a
+    # walk of the run ids does not reach it (REQ-QAC-037 criterion 1).
+    # Missing this is not a visible failure: the live run assembles its
+    # results in memory and looks perfectly correct, while THIS path -
+    # the one CI rebuilds the published dashboard from - quietly drops
+    # every cross-table check. Measured when it happened: 3,204 results
+    # live against 2,772 rebuilt, with all 126 relationships_soda and
+    # 126 relationships_dbt gone and nothing anywhere saying so.
+    all_results.extend(read_cross_table_results(
+        cp_common.AGENCY_ID, cp_common.COLLECTION_ID, supply_state=None))
 
+    # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
+    # emits a collection's tables interleaved; a rebuild reads them as
+    # per-dataset files one after another. Same records either way, so
+    # this is what keeps a diff between the two a real correctness
+    # check rather than noise.
+    all_results = canonical_order(all_results)
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
     n_error = sum(1 for r in all_results if r["status"] == "error")
+    # THE FIFTH VERDICT (REQ-QAC-108 criterion 5, 2026-09-29). A drift
+    # or volume check with no reference period has measured nothing, and
+    # counting it under any of the four above would say it did. Left out
+    # of the summary entirely, the four stopped adding up to
+    # total_checks - which is what the history rebuild's own test
+    # noticed before anybody else did.
+    n_nodata = sum(1 for r in all_results if r["status"] == "nodata")
 
     output = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": asset_time.now().isoformat(),
         "collection": f"{cp_common.AGENCY_ID}.{cp_common.COLLECTION_ID}",
-        "datasets": sorted(cp_common.TABLE_DATASET_ID.values()),
+        "datasets": sorted(d.dataset_id for d in hierarchy.datasets_in_collection(cp_common.COLLECTION_ID)),
         "runs": manifest,
         "dataset_stats": dataset_stats_by_run,
         "results": all_results,
@@ -72,6 +110,7 @@ def build_results_from_history() -> dict:
             "warn": n_warn,
             "fail": n_fail,
             "error": n_error,
+            "nodata": n_nodata,
             "engines": sorted(set(r["engine"] for r in all_results)),
         },
     }
@@ -81,8 +120,9 @@ def build_results_from_history() -> dict:
         json.dump(output, f, indent=2, default=str)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
-          f"{f' / {n_error} error' if n_error else ''}) across {len(manifest)} runs, "
-          f"from committed history -> {RESULTS_PATH}")
+          f"{f' / {n_error} error' if n_error else ''}"
+          f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs, "
+          f"from recorded history -> {RESULTS_PATH}")
     return output
 
 

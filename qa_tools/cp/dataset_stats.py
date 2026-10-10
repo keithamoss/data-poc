@@ -20,9 +20,14 @@ from typing import Any
 
 import duckdb
 
+from qa_tools.common import hierarchy
+from qa_tools.bdm import dataset_stats as bdm_stats
+from qa_tools.common import asset_time
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 
-TABLES = ["cp_clients", "cp_notifications", "cp_investigations", "cp_placements", "cp_carers", "cp_case_workers"]
+# The six CP tables, in the order contract/data-asset.yaml declares
+# them - resolved, not restated (REQ-QAC-039).
+TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 
 _POSTCODE_VALID = ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056",
                     "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148",
@@ -59,11 +64,29 @@ AGGREGATE_SPEC = {
 }
 
 
-def _check_aggregates(conn: duckdb.DuckDBPyConnection) -> dict[str, dict]:
+def _readable(conn) -> frozenset[str]:
+    """The tables this run's view schema actually holds.
+
+    NOT ALL SIX, since REQ-PIPE-105: one file is one arrival, and a run
+    reads its siblings from its period - so a sibling held, contested
+    with nothing promoted, or filed to a different period (Case Workers'
+    off-quarter files) has no view. Counting it raised UndefinedTable
+    and took the whole run's QA down after every tool had already
+    recorded its results. A table that is not there is left out of the
+    statistics, which is what "not measured" honestly looks like.
+    """
+    return frozenset(row[0] for row in conn.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema = current_schema()").fetchall())
+
+
+def _check_aggregates(conn: duckdb.DuckDBPyConnection, readable=None) -> dict[str, dict]:
     """Keyed by "table.column" (a string, not a tuple - this becomes JSON)."""
     out = {}
     for (table, col), spec in AGGREGATE_SPEC.items():
-        full_table = f"raw.{table}"
+        if readable is not None and table not in readable:
+            continue
+        full_table = f"{table}"
         if spec["kind"] == "categorical":
             value = categorical_aggregate(conn, full_table, col, spec["invalid_condition"], spec["classification"])
         else:
@@ -74,7 +97,7 @@ def _check_aggregates(conn: duckdb.DuckDBPyConnection) -> dict[str, dict]:
 
 def _concern_type_value_counts(conn: duckdb.DuckDBPyConnection) -> list[list]:
     rows = conn.execute(
-        "SELECT concern_type, COUNT(*) FROM raw.cp_notifications GROUP BY concern_type"
+        "SELECT concern_type, COUNT(*) FROM cp_notifications GROUP BY concern_type"
     ).fetchall()
     known = ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
              "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
@@ -91,35 +114,57 @@ def _concern_type_value_counts(conn: duckdb.DuckDBPyConnection) -> list[list]:
     return out
 
 
-def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str) -> dict[str, dict]:
+def _arrival(conn: duckdb.DuckDBPyConnection, run_date: str,
+             readable=None) -> dict[str, dict]:
     """Per table, not one dataset-level stat - build_cp_dashboard_data.py
     computes "extracted within 24h of the snapshot date" independently
     for each of the 6 tables (its own build_one_table() call), a real
     gap missed on the first pass at this module (found re-tracing the
     live-query call sites a second time, not assumed complete)."""
+    # MAX_LAG_HOURS RETIRED 2026-09-25 - see the counterpart in
+    # qa_tools/bdm/dataset_stats.py for the full reasoning. In short:
+    # never an arrival measure, carried through both dashboard build
+    # paths, and rendered nowhere at all.
     out = {}
     for table in TABLES:
-        max_lag_hours = conn.execute(
-            f"SELECT MAX(date_diff('second', TIMESTAMP '{run_date}', extract_timestamp)) / 3600.0 "
-            f"FROM raw.{table}"
-        ).fetchone()[0]
-        earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM raw.{table}").fetchone()[0]
-        out[table] = {"max_lag_hours": max_lag_hours, "earliest_extract": str(earliest_extract) if earliest_extract else None}
+        if readable is not None and table not in readable:
+            continue
+        earliest_extract = conn.execute(f"SELECT MIN(extract_timestamp) FROM {table}").fetchone()[0]
+        out[table] = {"earliest_extract": asset_time.record_source_instant(
+            earliest_extract, f"earliest_extract for table {table}")}
     return out
 
 
-def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, manifest_entry: dict) -> dict[str, Any]:
+def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, arrival: dict) -> dict[str, Any]:
     """`conn` is a connection to this run's own per-run warehouse
     (data/cp_duckdb_runs/<run_id>.duckdb, `raw` schema) - the same one
     build_cp_dashboard_data.py used to open directly per run. No run_id
     scoping needed in the queries themselves (unlike BDM's combined
     warehouse) - this file only ever holds this one run's data.
-    `manifest_entry` is this run's own entry from data/cp_raw/
-    manifest.json, embedded for the same reason dataset_stats.py's BDM
-    counterpart does."""
+
+    THE ARRIVAL RECORD, NOT THE GENERATOR'S MANIFEST ENTRY
+    (REQ-GEN-043 criterion 7). This used to embed the whole entry -
+    injected severity, seed, id_offset, which slot it filled - into
+    committed qa_results/, where acceptance_sync.py then read it back.
+    That put the generator's own bookkeeping inside the permanent QA
+    record and let a downstream module file supplies from a
+    declaration.
+
+    What survives is what the pipeline legitimately observed: which run
+    this is, when WE received it, and which delivery it came from. The
+    rest is in data/generator_bookkeeping.json, which nothing here may
+    read.
+    """
+    readable = _readable(conn)
     return {
-        "manifest_entry": manifest_entry,
-        "value_counts": {"concern_type": _concern_type_value_counts(conn)},
-        "check_aggregates": _check_aggregates(conn),
-        "arrival": _arrival(conn, manifest_entry["run_date"]),
+        "arrival_record": bdm_stats._arrival_record(arrival),
+        # Measured per table, for the reason BDM's own counterpart
+        # gives - the generator's row_counts were bookkeeping.
+        "row_counts": {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                        for t in TABLES if t in readable},
+        "value_counts": ({"concern_type": _concern_type_value_counts(conn)}
+                          if "cp_notifications" in readable else {}),
+        "check_aggregates": _check_aggregates(conn, readable),
+        "arrival": _arrival(conn, asset_time.local_date(arrival["received_at"]).isoformat(),
+                            readable),
     }

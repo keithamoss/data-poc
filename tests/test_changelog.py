@@ -1,45 +1,65 @@
-"""Tests for qa_tools/common/changelog.py - plans/publishing-and-
-history.md Phase 3's changelog/activity-feed DATA logic (2026-09-16).
-Uses a real temp git repo (not a mocked subprocess), same pattern as
-tests/test_validate_check_lifecycle.py - the git-history-reading
-mechanism (walking commits, reading each one's own diff) is exactly the
-part worth testing for real."""
+"""Tests for qa_tools/common/changelog.py - "who published what, when".
+
+IT USED TO DRIVE A REAL TEMP GIT REPO, because the mechanism worth
+testing was the git-history walk: a run's `run_by`/`run_timestamp` came
+from committed file content, and its commit sha and commit date had to
+be resolved by walking the branch those files actually landed on.
+
+REQ-PIPE-089 removed that walk, and the reason is worth keeping rather
+than inferring from the diff. Results are not committed any longer, so
+there is no commit to be rebased and no gap between running QA and
+publishing it - a result is visible the moment its run completes.
+`completed_at` IS the "when did this land" answer, recorded by the run
+itself, and nothing downstream can rewrite it.
+
+WHAT WAS LOST, so it is a choice rather than a discovery: `commit_sha`
+is gone from every event, and the feed can no longer distinguish "QA'd
+on Monday, published on Thursday". That gap was an artefact of results
+travelling through git.
+
+THE CLAIM THAT SURVIVES, and it is the one that mattered: grouping is
+by (agency, dataset, run_timestamp) rather than by commit, so two
+datasets QA'd in one go stay two events. The scenario that motivated it
+is kept below, with the commit removed from it.
+"""
 from __future__ import annotations
 
-import subprocess
+import pytest
 
 from qa_tools.common import changelog
-from qa_tools.common.qa_results_writer import write_qa_result
+from qa_tools.common.qa_results_writer import finish_run, open_run, write_qa_result
 
 
-def _git(repo, *args):
-    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+@pytest.fixture(autouse=True)
+def history(clean_qa_history):
+    """An empty QA history per test - what `tmp_path` used to give.
+
+    IT ALSO TOOK `tmp_path` UNTIL REQ-PIPE-089'S LAST PHASE, and the
+    reason is worth keeping as a caution rather than deleting with the
+    parameter: `write_qa_result` wrote FILES as well as rows, and its
+    default results directory was the real committed one, so two of
+    these tests wrote `qa_results/agency-a/` into project history before
+    anybody noticed. The session guard in conftest covers the delivery
+    log, the processing log, observations and filings, and never covered
+    qa_results/. There are no files to misdirect now; a test that starts
+    writing somewhere real again will have the same lack of a guard.
+    """
+    return clean_qa_history
 
 
-def _init_repo(tmp_path):
-    repo = tmp_path
-    _git(repo, "init", "-q")
-    _git(repo, "config", "user.email", "test@example.com")
-    _git(repo, "config", "user.name", "Test")
-    return repo
+def _event(agency, collection, run_id, when, run_by):
+    """One recorded QA event, written and completed the real way."""
+    open_run(agency, collection, run_id, when, run_by)
+    write_qa_result(agency, collection, run_id, when, "dataset_stats",
+                     {"arrival_record": {"run_id": run_id}}, run_by=run_by)
+    finish_run(run_id)
 
 
-def _commit_qa_results(repo, message="qa results"):
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-q", "-m", message)
+def test_build_changelog_resolves_run_by_and_run_timestamp():
+    _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+           "keith@example.com")
 
-
-def test_build_changelog_resolves_run_by_run_timestamp_and_commit_info(tmp_path):
-    repo = _init_repo(tmp_path)
-    qa_results_dir = repo / "qa_results"
-    write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {"run_id": "run_01"}},
-                     run_by="keith@example.com", results_dir=qa_results_dir)
-    _commit_qa_results(repo)
-    expected_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
-                                   capture_output=True, text=True, check=True).stdout.strip()
-
-    events = changelog.build_changelog("agency-a", "dataset-a", qa_results_dir=qa_results_dir, repo_root=repo)
+    events = changelog.build_changelog("agency-a", "dataset-a")
 
     assert len(events) == 1
     event = events[0]
@@ -47,65 +67,108 @@ def test_build_changelog_resolves_run_by_run_timestamp_and_commit_info(tmp_path)
     assert event["dataset"] == "dataset-a"
     assert event["run_timestamp"] == "2026-01-01T09:00:00+00:00"
     assert event["run_by"] == "keith@example.com"
-    assert event["commit_sha"] == expected_sha
-    assert event["committed_at"] is not None
+    assert event["published_at"] is not None, \
+        "an event with no landing time cannot be placed on a feed"
 
 
-def test_build_changelog_keeps_separate_datasets_from_the_same_commit_apart(tmp_path):
+def test_build_changelog_keeps_separate_datasets_apart():
     """The exact scenario that motivated grouping by (agency, dataset,
-    run_timestamp) rather than by commit: someone QAs two datasets and
-    commits both in one go. Each dataset's changelog must show only its
-    own event, not the other's - even though both share a commit_sha."""
-    repo = _init_repo(tmp_path)
-    qa_results_dir = repo / "qa_results"
-    write_qa_result("agency-a", "birth-registrations", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="keith@example.com",
-                     results_dir=qa_results_dir)
-    write_qa_result("agency-b", "child-protection", "cp_run_01", "2026-01-01T09:05:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="colleague@example.com",
-                     results_dir=qa_results_dir)
-    _commit_qa_results(repo, "QA both datasets in one commit")
+    run_timestamp) rather than by commit: someone QAs two datasets in
+    one go. Each dataset's changelog must show only its own event.
 
-    bdm_events = changelog.build_changelog("agency-a", "birth-registrations",
-                                            qa_results_dir=qa_results_dir, repo_root=repo)
-    cp_events = changelog.build_changelog("agency-b", "child-protection",
-                                           qa_results_dir=qa_results_dir, repo_root=repo)
+    The commit that used to carry both is gone; the grouping rule it
+    was protecting against is not, because two runs can still be
+    minutes apart in one sitting.
+    """
+    _event("agency-a", "birth-registrations", "run_01", "2026-01-01T09:00:00+00:00",
+           "keith@example.com")
+    _event("agency-b", "child-protection", "cp_run_01", "2026-01-01T09:05:00+00:00",
+           "colleague@example.com")
+
+    bdm_events = changelog.build_changelog("agency-a", "birth-registrations")
+    cp_events = changelog.build_changelog("agency-b", "child-protection")
 
     assert [e["run_timestamp"] for e in bdm_events] == ["2026-01-01T09:00:00+00:00"]
     assert bdm_events[0]["run_by"] == "keith@example.com"
     assert [e["run_timestamp"] for e in cp_events] == ["2026-01-01T09:05:00+00:00"]
     assert cp_events[0]["run_by"] == "colleague@example.com"
-    # same commit landed both - the split is purely by dataset, not by commit
-    assert bdm_events[0]["commit_sha"] == cp_events[0]["commit_sha"]
 
 
-def test_build_changelog_finds_the_right_commit_across_multiple_regenerations(tmp_path):
-    repo = _init_repo(tmp_path)
-    qa_results_dir = repo / "qa_results"
+def test_build_changelog_orders_events_across_several_runs():
+    _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+           "keith@example.com")
+    _event("agency-a", "dataset-a", "run_02", "2026-01-08T09:00:00+00:00",
+           "colleague@example.com")
 
+    events = changelog.build_changelog("agency-a", "dataset-a")
+
+    assert [e["run_timestamp"] for e in events] == [
+        "2026-01-01T09:00:00+00:00", "2026-01-08T09:00:00+00:00"]
+    assert [e["run_by"] for e in events] == [
+        "keith@example.com", "colleague@example.com"]
+    assert all(e["published_at"] is not None for e in events)
+
+
+def test_an_unfinished_run_is_not_on_the_feed():
+    """A run that never completed has not published anything, so it has
+    no place on a "who published what" feed - which is criterion 13
+    holding at one more reader rather than a special case here."""
+    open_run("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+             "keith@example.com")
     write_qa_result("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="keith@example.com",
-                     results_dir=qa_results_dir)
-    _commit_qa_results(repo, "first QA event")
-    first_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
-                                capture_output=True, text=True, check=True).stdout.strip()
+                     "dataset_stats", {"arrival_record": {}},
+                     run_by="keith@example.com")
 
-    write_qa_result("agency-a", "dataset-a", "run_02", "2026-01-08T09:00:00+00:00",
-                     "dataset_stats", {"manifest_entry": {}}, run_by="colleague@example.com",
-                     results_dir=qa_results_dir)
-    _commit_qa_results(repo, "second QA event, a week later")
-    second_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
-                                 capture_output=True, text=True, check=True).stdout.strip()
+    assert changelog.build_changelog("agency-a", "dataset-a") == []
 
-    events = changelog.build_changelog("agency-a", "dataset-a", qa_results_dir=qa_results_dir, repo_root=repo)
 
-    assert [e["run_timestamp"] for e in events] == ["2026-01-01T09:00:00+00:00", "2026-01-08T09:00:00+00:00"]
-    assert events[0]["commit_sha"] == first_sha
-    assert events[0]["run_by"] == "keith@example.com"
-    assert events[1]["commit_sha"] == second_sha
-    assert events[1]["run_by"] == "colleague@example.com"
-    # first_sha != second_sha above is the real assertion that each event
-    # resolved to its own commit - committed_at isn't compared for
-    # inequality here since two commits made back-to-back in a fast test
-    # can legitimately land in the same wall-clock second.
-    assert events[0]["committed_at"] is not None and events[1]["committed_at"] is not None
+def test_the_commit_walk_is_gone():
+    """RETIRED MECHANISM, asserted rather than assumed.
+
+    The walk was a real performance hazard, documented at length in
+    CLAUDE.md: one `git show` per commit touching the subtree, diffing
+    each commit's entire changed tree - 225 MB and 5.3 M lines of diff
+    output for one dataset's twelve commits, growing with both commit
+    count and diff size. Two fixes got it to 0.7s. A column needs none,
+    and this is here so nobody reintroduces the walk without noticing
+    they are undoing that.
+    """
+    source = open(changelog.__file__).read()
+    for name in ("git log", "git show", "subprocess", "commit_sha"):
+        assert name not in source.split('"""', 2)[2], \
+            f"{name!r} is back in changelog.py's code"
+
+
+class TestNoCommitSurvivesInTheFEED:
+    """REQ-PIPE-090 criteria 5 and 6. The git walk went with REQ-PIPE-089;
+    what remained was its VOCABULARY, and a field named for a mechanism
+    that no longer exists is worse than an absent one - a reader trusts
+    it."""
+
+    def test_the_instant_is_named_for_what_it_is(self):
+        """`committed_at` held a completion time, which made the name a
+        claim the value could not support."""
+        _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+               "keith@example.com")
+        event = changelog.build_changelog("agency-a", "dataset-a")[0]
+        assert "published_at" in event
+        assert "committed_at" not in event
+        assert "commit_sha" not in event
+
+    def test_no_event_carries_anything_about_a_commit(self):
+        _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+               "keith@example.com")
+        for event in changelog.build_changelog("agency-a", "dataset-a"):
+            assert not any("commit" in key for key in event), event
+
+    def test_the_feed_is_ordered_by_when_each_run_happened(self):
+        """Criterion 4. Ordered by the run's own instant rather than by
+        anything about how its results travelled, because nothing about
+        them travels now."""
+        _event("agency-a", "dataset-a", "run_02", "2026-01-08T09:00:00+00:00",
+               "b@example.com")
+        _event("agency-a", "dataset-a", "run_01", "2026-01-01T09:00:00+00:00",
+               "a@example.com")
+        events = changelog.build_changelog("agency-a", "dataset-a")
+        assert [e["run_timestamp"] for e in events] == [
+            "2026-01-01T09:00:00+00:00", "2026-01-08T09:00:00+00:00"]

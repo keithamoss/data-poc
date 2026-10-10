@@ -1,6 +1,6 @@
 """Regression test for a real bug fixed 2026-09-16: run_evidently_cp.py
 wrote its qa_results/ output under its own table-scoped dataset id
-(cp_common.TABLE_DATASET_ID["cp_notifications"]) instead of the
+(hierarchy.dataset_for_table("cp_notifications").dataset_id) instead of the
 collection id (cp_common.COLLECTION_ID) every other CP tool writes
 under - see that file's own comment on the fix, and
 plans/publishing-and-history.md's Thread B entry for the restructuring
@@ -13,14 +13,20 @@ from __future__ import annotations
 
 import pandas as pd
 
+from qa_tools.common import hierarchy
 from qa_tools.cp import cp_common, run_evidently_cp
 
 
 def test_evaluate_evidently_cp_writes_under_the_collection_id_not_the_table_id(monkeypatch):
     reference = pd.DataFrame({"concern_type": ["neglect", "physical", "neglect", "emotional"]})
     current = pd.DataFrame({"concern_type": ["neglect", "physical", "neglect", "physical"]})
-    monkeypatch.setattr(run_evidently_cp, "read_csv_explicit_nulls",
-                         lambda path, null_values: reference if "cp_run_01" in path else current)
+    # THE FRAMES, NOT THE FILES (REQ-PIPE-102). These used to stub
+    # read_csv_explicit_nulls, because both sides came off disk; the
+    # current side now comes from the warehouse and the reference from
+    # a recorded distribution, so the two private frame helpers are
+    # what a unit test of the write path substitutes.
+    monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
+    monkeypatch.setattr(run_evidently_cp, "_reference_frame", lambda run_id: reference)
 
     captured = {}
 
@@ -32,7 +38,7 @@ def test_evaluate_evidently_cp_writes_under_the_collection_id_not_the_table_id(m
     run_evidently_cp.evaluate_evidently_cp("cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
 
     assert captured["dataset"] == cp_common.COLLECTION_ID
-    assert captured["dataset"] != cp_common.TABLE_DATASET_ID["cp_notifications"]
+    assert captured["dataset"] != hierarchy.dataset_for_table("cp_notifications").dataset_id
 
 
 def test_evaluate_evidently_cp_still_tags_its_own_result_with_the_table_dataset_id(monkeypatch):
@@ -41,10 +47,56 @@ def test_evaluate_evidently_cp_still_tags_its_own_result_with_the_table_dataset_
     only the file LOCATION changed."""
     reference = pd.DataFrame({"concern_type": ["neglect", "physical", "neglect", "emotional"]})
     current = pd.DataFrame({"concern_type": ["neglect", "physical", "neglect", "physical"]})
-    monkeypatch.setattr(run_evidently_cp, "read_csv_explicit_nulls",
-                         lambda path, null_values: reference if "cp_run_01" in path else current)
+    # THE FRAMES, NOT THE FILES (REQ-PIPE-102). These used to stub
+    # read_csv_explicit_nulls, because both sides came off disk; the
+    # current side now comes from the warehouse and the reference from
+    # a recorded distribution, so the two private frame helpers are
+    # what a unit test of the write path substitutes.
+    monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
+    monkeypatch.setattr(run_evidently_cp, "_reference_frame", lambda run_id: reference)
     monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **kw: None)
 
     results = run_evidently_cp.evaluate_evidently_cp("cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
 
-    assert results[0]["dataset_id"] == cp_common.TABLE_DATASET_ID["cp_notifications"]
+    assert results[0]["dataset_id"] == hierarchy.dataset_for_table("cp_notifications").dataset_id
+
+
+class TestNoReferenceIsNotAPass:
+    """REQ-QAC-108 criterion 5, Child Protection's side of it.
+
+    Its BDM twin (tests/test_run_evidently_bdm.py) drives the real tool
+    against real fixtures; this asserts the same rule on the unit that
+    decides it, and specifically that NOTHING IS COMPUTED - a PSI value
+    beside a "no reference" status would mean a comparison happened
+    against something nobody named.
+    """
+
+    def _run(self, monkeypatch, *, reference_run_id):
+        current = pd.DataFrame({"concern_type": ["neglect", "physical"]})
+        monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
+        monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **kw: None)
+
+        def _refuse(run_id):
+            raise AssertionError(
+                "the reference frame was built although there is no reference")
+
+        monkeypatch.setattr(run_evidently_cp, "_reference_frame", _refuse)
+        return run_evidently_cp.evaluate_evidently_cp(
+            "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id=reference_run_id)
+
+    def test_it_reports_no_reference_rather_than_passing(self, monkeypatch):
+        psi = self._run(monkeypatch, reference_run_id=None)[0]
+        assert psi["status"] == "nodata"
+        assert psi["status"] != "pass"
+
+    def test_it_computes_nothing_at_all(self, monkeypatch):
+        """The stubbed _reference_frame raises if it is reached - so a
+        pass here is the assertion, not an accident of it not being
+        called."""
+        psi = self._run(monkeypatch, reference_run_id=None)[0]
+        assert psi["metric_value"] is None
+        assert psi["reference_run_id"] is None
+
+    def test_the_row_count_it_did_measure_is_still_there(self, monkeypatch):
+        psi = self._run(monkeypatch, reference_run_id=None)[0]
+        assert psi["row_count_total"] == 2

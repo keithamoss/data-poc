@@ -26,43 +26,76 @@ a warehouse of its own, which is Phase 3's other half.
 from __future__ import annotations
 import json
 import os
-from datetime import datetime, timezone
 
-from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats, read_qa_results
+from . import bdm_common
+from qa_tools.common.qa_results_reader import canonical_order
+from qa_tools.common.qa_results_reader import (current_runs_only, list_run_ids,
+                                              read_cross_table_results,
+                                               read_dataset_stats, read_qa_results)
+from qa_tools.common import asset_time
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 
-AGENCY_ID = "registry-services"
-DATASET_ID = "birth-registrations"
+AGENCY_ID = bdm_common.AGENCY_ID
+COLLECTION_ID = bdm_common.COLLECTION_ID
+DATASET_ID = bdm_common.DATASET_ID
 
 
 def build_results_from_history() -> dict:
-    run_ids = list_run_ids(AGENCY_ID, DATASET_ID)
+    # A SUPPLY BY ITS CURRENT RUN (REQ-PIPE-140 criterion 5).
+    run_ids = current_runs_only(list_run_ids(AGENCY_ID, COLLECTION_ID))
 
     manifest = []
     dataset_stats_by_run = {}
     for run_id in run_ids:
-        stats = read_dataset_stats(AGENCY_ID, DATASET_ID, run_id)
+        stats = read_dataset_stats(AGENCY_ID, COLLECTION_ID, run_id)
         if stats is None:
             continue  # shouldn't happen for any real committed run - see dataset_stats.py
-        manifest.append(stats["manifest_entry"])
+        manifest.append(stats["arrival_record"])
         dataset_stats_by_run[run_id] = stats
     # run_index (not run_date) matches the original generation order - a
     # resupply attempt's own run_date is when it actually arrived, which
     # sorts it away from its parent delivery; run_index doesn't.
     manifest.sort(key=lambda m: m["run_index"])
 
-    all_results = read_qa_results(AGENCY_ID, DATASET_ID)
+    # AND THE IN-DEVELOPMENT ONES (REQ-PIPE-106 criterion 7). `None` means
+    # every supply_state, and asking for it explicitly is the point: the
+    # reader defaults to AGREED so nothing counts check development as
+    # quality history by accident, and the dashboard is the one reader that
+    # has to show a calendar-less dataset's REAL verdicts - red, amber or
+    # green as the checks actually found - because developing a check means
+    # seeing whether it passes. What keeps them apart from here on is the
+    # `supply_state` each such record carries, and the rollup exclusion
+    # criterion 9 already built on both sides.
+    all_results = read_qa_results(AGENCY_ID, COLLECTION_ID, supply_state=None)
+    # Symmetric with the Child Protection rebuild - see its own comment.
+    # Birth Registrations declares no cross-table check today, so this
+    # reads nothing; written anyway, because the collection that gets
+    # one later must not be the thing that discovers the omission.
+    all_results += read_cross_table_results(AGENCY_ID, COLLECTION_ID, supply_state=None)
 
+    # ONE AGREED ORDERING down both paths (REQ-PIPE-038). A live run
+    # emits a collection's tables interleaved; a rebuild reads them as
+    # per-dataset files one after another. Same records either way, so
+    # this is what keeps a diff between the two a real correctness
+    # check rather than noise.
+    all_results = canonical_order(all_results)
     n_pass = sum(1 for r in all_results if r["status"] == "pass")
     n_warn = sum(1 for r in all_results if r["status"] == "warn")
     n_fail = sum(1 for r in all_results if r["status"] == "fail")
     n_error = sum(1 for r in all_results if r["status"] == "error")
+    # THE FIFTH VERDICT (REQ-QAC-108 criterion 5, 2026-09-29). A drift
+    # or volume check with no reference period has measured nothing, and
+    # counting it under any of the four above would say it did. Left out
+    # of the summary entirely, the four stopped adding up to
+    # total_checks - which is what the history rebuild's own test
+    # noticed before anybody else did.
+    n_nodata = sum(1 for r in all_results if r["status"] == "nodata")
 
     output = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "dataset": "registry-services.civil-registration.birth-registrations",
+        "generated_at": asset_time.now().isoformat(),
+        "dataset": f"{AGENCY_ID}.{COLLECTION_ID}.{DATASET_ID}",
         "runs": manifest,
         "dataset_stats": dataset_stats_by_run,
         "results": all_results,
@@ -72,6 +105,7 @@ def build_results_from_history() -> dict:
             "warn": n_warn,
             "fail": n_fail,
             "error": n_error,
+            "nodata": n_nodata,
             "engines": sorted(set(r["engine"] for r in all_results)),
         },
     }
@@ -81,8 +115,9 @@ def build_results_from_history() -> dict:
         json.dump(output, f, indent=2, default=str)
 
     print(f"\n{len(all_results)} real check results ({n_pass} pass / {n_warn} warn / {n_fail} fail"
-          f"{f' / {n_error} error' if n_error else ''}) across {len(manifest)} runs, "
-          f"from committed history -> {RESULTS_PATH}")
+          f"{f' / {n_error} error' if n_error else ''}"
+          f"{f' / {n_nodata} no reference' if n_nodata else ''}) across {len(manifest)} runs, "
+          f"from recorded history -> {RESULTS_PATH}")
     return output
 
 

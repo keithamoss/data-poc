@@ -131,7 +131,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    linkage work. Needs a scoping pass with Keith before building, same as
    this item's own original 2026-09-14 scoping rounds.
 
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
    explicit ask).**
 
 4. **[todo, 2026-09-18]** **[Data generation]** Document/explain how the
@@ -368,7 +368,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    current mechanics first, then a scoping conversation with Keith
    before building, same as every other design-fork item in this file.
 
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
    explicit ask).**
 
 10. **[todo, 2026-09-19]** **[Data generation]** A synthetic "education"
@@ -391,5 +391,63 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     `synthetic_data_generator/` or `generator/`. Needs a scoping
     conversation with Keith before building.
 
-    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
+
+11. **[todo, 2026-09-30]** **[Data generation]** The generator ignores
+    `delivery_months:`, so partial-participation datasets arrive in
+    quarters they are not due for.
+
+    **Found while measuring REQ-PIPE-077's mixed-period gate against
+    the real recorded corpus** (NFR 2 asks for a measured firing rate
+    rather than an assumed one). The gate fires on 9 of 60 deliveries,
+    and the dataset in the minority period is `cp-case-workers` **every
+    single time** - checked, not sampled.
+
+    **The cause is configured and deliberate**: `contract/data-asset.yaml`
+    gives `cp-case-workers` `delivery_months: [February, August]` and
+    calls it "the worked example of partial participation" - a staffing
+    register rather than casework, resupplied twice a year. It has 6
+    slots where `cp-clients` has 12, and no 2026-Q2 slot at all.
+
+    **Nothing in `generator/` reads `delivery_months`** (grepped), so
+    the synthetic supplier sends all six Child Protection tables in
+    every quarterly drop, including the two quarters case-workers is
+    not due for. The assignment rule then has nowhere to put it, falls
+    through to its third branch, and records it as
+    `resupply-of-most-recently-filled` - which reads as a resupply and
+    is nothing of the kind.
+
+    **Keith, 2026-09-30, on whether this shape is realistic**: it is
+    not - a partial-participation dataset would not turn up in the same
+    delivery as the quarterly ones. So the corpus is exercising a shape
+    the real world would not produce, and any rate measured against it
+    is measuring the generator rather than the model.
+
+    **But he also settled what SHOULD happen if it ever did**: an
+    off-cycle arrival of a partial-participation dataset is worth
+    flagging, and is a human decision rather than an auto-promotion.
+    Which means REQ-PIPE-077's gate did the RIGHT thing on all nine -
+    they were never false positives. What is wrong is only the
+    frequency, and the explanation it gives ("filed to more than one
+    period" rather than "this dataset is not due this quarter").
+
+    **So there are two separate pieces of work here**, and they should
+    not be conflated: teaching the generator to honour
+    `delivery_months` so the corpus is honest, and giving the gate a
+    clearer reason for the off-cycle case. The first is this item.
+
+    **The second is DONE, 2026-10-02** - and turned out to be the
+    condition rather than the wording. `REQ-PIPE-077` was amended and
+    retitled: the gate now fires on a supply ARRIVING in a period its
+    dataset does not participate in, says exactly that, and withholds
+    only that supply rather than its whole delivery. It still fires on
+    the same nine arrivals here, which is the right answer for as long
+    as this item is open - the corpus really does deliver case-workers
+    off-cycle. What changed is that the other 45 supplies in those
+    deliveries no longer wait with it.
+
+    Likely relevant to `REQ-GEN-044`, whose whole point is that the
+    generated history contains the shapes the model needs - a history
+    that contradicts its own configured participation is a history
+    nobody should measure against.
