@@ -789,3 +789,8 @@ one or more component tags, and a date.
         amendment wording, and accepted the scoper's boundary fixes. The
         review batch's other ten requirements stay unsigned for a sign-off
         session.
+      - ALSO SIGNED (23:40): REQ-PIPE-181, settled the same way - four
+        amendment wordings approved (110 c33, 113 c2, 131 c2, 111 c4). With
+        110 and 181 signed, the whole signed calendar chain is buildable in
+        order; what stays unsigned is REQ-DASH-182 and the turn-off pair
+        REQ-PIPE-179 / REQ-DASH-180, for a fresh sign-off session.
