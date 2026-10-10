@@ -801,3 +801,6 @@ one or more component tags, and a date.
         REQ-TEST-117 move to the next night. Signing more of the calendar
         group would not have let more be built tonight - the limit is the
         build order, not sign-off.
+      - #136 DONE: every runner of an owed re-check claims it first; a claimed
+        one is skipped and stays owed. Failing test first. Written up in
+        plans/post-build-review.md #136.

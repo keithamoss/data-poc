@@ -6887,7 +6887,7 @@ twice. It deliberately did not re-find the `TypeError`.
     REQ-PIPE-179 is built), and that half is fixed in the overnight run,
     failing test first (plans/morning-reports.md #3).
 
-136. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Two runners can run
+136. **[done, 2026-10-10]** **[Pipeline & publishing]** **Two runners can run
     the same owed re-check at once.** Found by delivery-architect reviewing
     the REQ-PIPE-164 split, and the shape confirmed by the main session
     reading `qa_tools/common/recheck.py::run` (lines 214-245): it reads the
@@ -6908,3 +6908,16 @@ twice. It deliberately did not re-find the `TypeError`.
     this path), so it does not have to wait for them.
     **Keith, 2026-10-10 (night): fix it tonight**, failing test first, as part of
     the overnight run (plans/morning-reports.md #3).
+    **FIXED 2026-10-11 (overnight #3).** `recheck.run` now claims the owed item
+    first - a session advisory lock (`OWED_CLAIM_SPACE`, beside the processing
+    pass's two) on a connection held for the whole run, so it is released when
+    the run ends or its process dies - and the old body is `_run_claimed`,
+    which reads the item only after the claim. A runner that finds the item
+    claimed returns 'this is already being run elsewhere - it will finish
+    there, and it stays owed until it does', records no failure, and leaves it
+    owed; `run_all_owed` and the terminal both go through `run`, so every
+    runner claims. FAILING TEST FIRST: tests/test_recheck.py
+    `TestTwoRunnersNeverRunOneOwedItem` - a second connection holds the claim
+    and `run` must not execute; it failed against the old code with 'a claimed
+    owed item was executed by a second runner', and passes now, beside a test
+    that the claim is released when a run ends.

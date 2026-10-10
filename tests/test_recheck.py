@@ -374,3 +374,59 @@ class TestAReloadIsACauseLikeADecision:
             row = conn.execute("SELECT caused_by_load, caused_by_decision, supply_id "
                                "FROM qa.run WHERE run_key = ?", [got.run_key]).fetchall()[0]
         assert row == (loaded.id, None, SUPPLY)
+
+
+class TestTwoRunnersNeverRunOneOwedItem:
+    """post-build-review #136: `run` read the owed item and minted a run id
+    with no claim, so the terminal's immediate run after a decision and a
+    processing pass reaching the same owed item could both execute it under
+    one run key - and one's schema tidy-up could drop the other's views
+    mid-run. A runner must claim the item first, and one that finds it
+    claimed skips it, leaving it owed (Keith, 2026-10-10: fix tonight)."""
+
+    def test_a_runner_finding_the_item_claimed_skips_it_and_leaves_it_owed(
+            self, owed_one, monkeypatch):
+        from qa_tools.common import period_overlay
+
+        owed_id, _ = owed_one
+        executed = []
+
+        def would_run(*a, **k):
+            executed.append(True)
+            raise RuntimeError("the claimed item was run anyway")
+        monkeypatch.setattr(period_overlay, "rebuild_for_arrival", would_run)
+        space = getattr(recheck, "OWED_CLAIM_SPACE", 51512)
+        # ANOTHER RUNNER HOLDS THE CLAIM, on a connection of its own.
+        with supply_db.connect(label="test-recheck-other-runner") as other:
+            assert other.execute("SELECT pg_try_advisory_lock(?, ?)",
+                                 [space, owed_id]).fetchone()[0]
+            try:
+                got = recheck.run(owed_id, run_by="pytest@example.org")
+            finally:
+                other.execute("SELECT pg_advisory_unlock(?, ?)", [space, owed_id])
+        assert not executed, "a claimed owed item was executed by a second runner"
+        assert not got.completed
+        assert "elsewhere" in got.message, got.message
+        with supply_db.connect(label="test-recheck") as conn:
+            cleared, failure = conn.execute(
+                f"SELECT cleared_at, last_failure FROM {recheck.TABLE} WHERE id = ?",
+                [owed_id]).fetchall()[0]
+        # STILL OWED, AND NOT RECORDED AS A FAILURE: nothing broke - another
+        # runner has it.
+        assert cleared is None and failure is None
+
+    def test_the_claim_is_released_once_the_run_ends(self, owed_one, monkeypatch):
+        from qa_tools.common import period_overlay
+
+        owed_id, _ = owed_one
+
+        def boom(*a, **k):
+            raise RuntimeError("no overlay today")
+        monkeypatch.setattr(period_overlay, "rebuild_for_arrival", boom)
+        got = recheck.run(owed_id, run_by="pytest@example.org")
+        assert not got.completed
+        space = getattr(recheck, "OWED_CLAIM_SPACE", 51512)
+        with supply_db.connect(label="test-recheck-other-runner") as other:
+            assert other.execute("SELECT pg_try_advisory_lock(?, ?)",
+                                 [space, owed_id]).fetchone()[0]
+            other.execute("SELECT pg_advisory_unlock(?, ?)", [space, owed_id])

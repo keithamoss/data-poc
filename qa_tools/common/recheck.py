@@ -211,10 +211,43 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     return arrival, results
 
 
+#: The advisory-lock space an owed item's claim lives in - beside the
+#: processing pass's own (processing_pass.PASS_LOCK_SPACE, ARRIVAL_LOCK_SPACE).
+OWED_CLAIM_SPACE = 51512
+
+#: What a runner says when another runner already has the item.
+CLAIMED_ELSEWHERE = ("this is already being run elsewhere - it will finish there, and it "
+                     "stays owed until it does")
+
+
 def run(owed_id: int, *, run_by: str | None = None, on_step=None) -> Outcome:
-    """Run one owed item: a re-check (a supply's own checks again, then the
-    gate) or a re-evaluation (REQ-PIPE-121's knock-on, knock_on.complete) -
-    and clear it."""
+    """Run one owed item - claimed first, so no two runners run it at once.
+
+    THE CLAIM (post-build-review #136): the terminal runs an owed item
+    straight after the decision that owed it, and the processing pass runs
+    whatever is owed - so both can reach one item, and without a claim both
+    executed it under one run key, one's schema tidy-up able to drop the
+    other's views mid-run. A session advisory lock on a connection held for
+    the whole run: released when the run ends, or when its process does,
+    so a crash never leaves an item claimed for ever. A runner that finds
+    it claimed skips it and leaves it owed - nothing broke, so nothing is
+    recorded as a failure."""
+    with supply_db.connect(label="mothman:recheck-claim") as claim:
+        got = claim.execute("SELECT pg_try_advisory_lock(?, ?)",
+                            [OWED_CLAIM_SPACE, owed_id]).fetchone()[0]
+        if not got:
+            return Outcome(owed_id, "", False, CLAIMED_ELSEWHERE)
+        try:
+            return _run_claimed(owed_id, run_by=run_by, on_step=on_step)
+        finally:
+            claim.execute("SELECT pg_advisory_unlock(?, ?)", [OWED_CLAIM_SPACE, owed_id])
+
+
+def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Outcome:
+    """Run one owed item this process has claimed: a re-check (a supply's own
+    checks again, then the gate) or a re-evaluation (REQ-PIPE-121's knock-on,
+    knock_on.complete) - and clear it. Read only after the claim, so an item
+    another runner finished meanwhile reads as already run."""
     from qa_tools.common import decision_log, hierarchy, promotion
 
     with supply_db.connect(label="mothman:recheck") as conn:
