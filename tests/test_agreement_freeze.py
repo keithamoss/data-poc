@@ -79,7 +79,7 @@ PAST_KEY_PREFIX = "calendar quarterly version "
 
 def _past_key(doc):
     version, _ = _date_entry(doc, PAST)
-    return f"calendar quarterly version {version['effective_from']} date {PAST}"
+    return f"calendar quarterly period {PAST}"
 
 
 class TestNothingToRefuse:
@@ -375,3 +375,92 @@ def test_inside_a_pre_commit_hook_the_base_is_head(monkeypatch):
     assert diff_base.diff_base() == "HEAD"
     monkeypatch.delenv("PRE_COMMIT")
     assert diff_base.diff_base() == diff_base.FALLBACK
+
+
+class TestCriticFindingsOn111:
+    """delivery-critic, 2026-10-11, on REQ-PIPE-111 as built (100fd0d).
+    Each test failed before its fix."""
+
+    def test_a_past_version_taking_later_dates_out_of_force_is_a_removal(self, state):
+        """H1: the old version's later dates stop governing; that is a change
+        to frozen items whether or not any entry was edited."""
+        old_cal, old_asset, people_doc = state
+        old_asset = dict(old_asset, synthetic=False)
+
+        def mutate(doc):
+            _quarterly(doc)["versions"].append({
+                "effective_from": "2025-06-01", "claim_window": "14d",
+                "changelog": [{"date": "2026-10-11", "author": "a", "change": "new"}],
+                "dates": [{"period": "2025-Q3x", "date": "2025-08-04"}]})
+
+        def keep_unsynthetic(asset):
+            asset["synthetic"] = False
+        found = _check((old_cal, old_asset, people_doc), mutate, keep_unsynthetic)
+        assert any("2025-Q4" in (f.scope or "") and "removed" in f.problem
+                   for f in found), _text(found)
+
+    def test_moving_a_dataset_to_another_calendar_is_frozen(self, state):
+        """H2, PROVISIONAL: a dataset's calendar membership freezes once its
+        first slot could be filed."""
+        def mutate(doc):
+            _entry(doc, "cp-clients")["calendar"] = "daily"
+        found = _check(state, mutate)
+        assert any(f.scope == "dataset cp-clients calendar" for f in found), _text(found)
+
+    def test_moving_a_whole_collection_is_frozen_for_each_dataset(self, state):
+        def mutate(doc):
+            next(c for c in doc["collections"] if c["id"] == "child-protection")["calendar"] = \
+                "daily"
+        found = _check(state, mutate)
+        assert {f.scope for f in found} >= {"dataset cp-clients calendar",
+                                             "dataset cp-carers calendar"}, _text(found)
+
+    def test_the_paste_ready_entry_round_trips_for_a_removal(self, state):
+        """M1: pasting what the refusal printed must clear it."""
+        def remove(doc):
+            version, entry = _date_entry(doc, PAST)
+            version["dates"].remove(entry)
+        found = _check(state, remove)
+        (refusal,) = found
+        block = refusal.fix.split("corrections:\n", 1)[1].split("\nMay approve")[0]
+        entry = yaml.safe_load(block)[0]
+        entry.update(change_reference="CAB-9", author="a test", approver=KEITH,
+                     reason="the date was never agreed")
+
+        def remove_and_declare(doc):
+            remove(doc)
+            _quarterly(doc).setdefault("corrections", []).append(entry)
+        assert _check(state, remove_and_declare) == []
+
+    def test_a_missing_previous_calendar_alone_passes(self, state):
+        """M2 (criterion 14): a new asset whose data-asset.yaml predates its
+        calendar.yaml - the calendar has no previous state to compare."""
+        cal, asset, people_doc = state
+        asset = dict(asset, synthetic=False)
+        assert freeze.check(None, cal, asset, asset, people_doc,
+                            instant_of=lambda key: NOW) == []
+
+    def test_corrections_cannot_vanish_with_their_owner(self, state):
+        """L4: removing an owner that carries corrections removes the record."""
+        key = _past_key(state[0])
+        old_cal, old_asset, people_doc = copy.deepcopy(state)
+        _date_entry(old_cal, PAST)[1]["date"] = "2024-02-05"
+        _correction(_entry(old_cal, "cp-carers"), (key, "2024-02-01", "2024-02-05"))
+
+        def mutate(doc):
+            doc["datasets"] = [d for d in doc["datasets"] if d["id"] != "cp-carers"]
+        found = _check((old_cal, old_asset, people_doc), mutate)
+        assert any("append-only" in f.problem for f in found), _text(found)
+
+    def test_own_dates_are_frozen(self, state):
+        """Coverage the critic found missing: a dataset's own dates."""
+        old_cal, old_asset, people_doc = copy.deepcopy(state)
+        _entry(old_cal, "cp-carers")["dates"] = {"versions": [{
+            "effective_from": "2023-01-01",
+            "changelog": [{"date": "2023-01-01", "author": "a", "change": "own"}],
+            "dates": [{"period": "own-2024", "date": "2024-03-03"}]}]}
+
+        def mutate(doc):
+            _entry(doc, "cp-carers")["dates"]["versions"][0]["dates"][0]["date"] = "2024-03-09"
+        found = _check((old_cal, old_asset, people_doc), mutate)
+        assert any("own-2024" in (f.scope or "") for f in found), _text(found)

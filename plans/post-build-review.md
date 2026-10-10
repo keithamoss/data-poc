@@ -7034,3 +7034,44 @@ twice. It deliberately did not re-find the `TypeError`.
     tests/test_agreement_freeze.py `TestTheSettingsGuardDatesByTheCommitter`
     failed against the `%aI` code (a stamp a week before the base came back
     as the added-on date) and passes now.
+
+140. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-111 as built (100fd0d)** - overnight #3; report saved
+    in the session's reviews/2026-10-11-critic-111.md. Every finding probed
+    by the critic itself, then re-verified here with a failing test
+    (tests/test_agreement_freeze.py `TestCriticFindingsOn111`, all but the
+    own-dates coverage test failing before the fixes):
+    - **H1, FIXED: a past-dated calendar version took later frozen dates out
+      of force with no correction** - items were keyed by the version that
+      LISTED a date, so nothing "changed". Dates are now frozen as they stand
+      IN FORCE, keyed by period (`calendar quarterly period 2024-Q1`), so a
+      date leaving force is a removal and a date restated unchanged in a new
+      version is no change. Same for a dataset's own dates.
+    - **H2, FIXED PROVISIONALLY - KEITH'S FORK: calendar membership was not
+      frozen.** REQ-PIPE-110 left it to REQ-PIPE-111 (plans/running-thoughts.md
+      #79) and 111 had not settled it. Taken the strict way overnight: each
+      dataset's RESOLVED calendar (`dataset cp-clients calendar`) freezes with
+      its first participation version, so moving a dataset - or its whole
+      collection, which is one change per dataset - to another calendar or to
+      none needs a declared correction. The alternatives - refuse outright, or
+      version membership - are his to choose.
+    - **M1, FIXED: the paste-ready block printed "(nothing)"** for an added or
+      removed item, which never matched once pasted. It prints `null`; a test
+      pastes the printed entry and the change passes.
+    - **M2, FIXED: criterion 14 with only one file new** - a calendar.yaml
+      with no previous state is no longer compared, even where data-asset.yaml
+      has one.
+    - **L2, FIXED:** an old state today's loader cannot read is still checked,
+      against freeze instants from the new state, instead of skipping the gate.
+    - **L3, FIXED:** a commit whose file did not parse dates nothing in the
+      walk.
+    - **L4, FIXED:** removing an owner that carries corrections is refused as
+      breaking append-only.
+    - **Dead code removed:** `_window_of`.
+    - **LEFT:** L1 (the freeze instant reads the dataset list from the
+      current hierarchy, not the old state's - only a dataset removed in the
+      same change is affected, and removing a dataset is itself refused); L5
+      (a duplicate declaration is harmless - both must match); L6 (a local run
+      over a dirty tree dates everything now - errs strict). The multi-commit
+      walk and the invalid-zone fallback still have no test of their own; the
+      critic exercised the walk end to end in a scratch clone.

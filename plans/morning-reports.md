@@ -939,3 +939,11 @@ one or more component tags, and a date.
         QUESTION: should a correction's approver (REQ-PIPE-111, tonight's
         PROVISIONAL "anyone with the manager role") now mean the ASSET
         manager specifically? I have not changed it.
+      - REQ-PIPE-111 CRITIC: two real holes and some smaller ones, fixed
+        test-first (post-build-review #140). The big one: adding a past-dated
+        calendar version silently took ten later dates out of force - now
+        dates are frozen as they stand in force. ONE FORK FOR YOU, taken the
+        strict way PROVISIONALLY: moving a dataset (or its collection) to
+        another calendar re-judges its whole history, and nothing stopped it.
+        It now needs a declared correction on each dataset moved. Your other
+        options: refuse such a move outright, or version membership.

@@ -893,12 +893,14 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
         if not walked:
             for sha, at in freeze.commits_since(ref, rels):
                 def doc_at(r, sha=sha):
-                    try:
-                        return yaml.safe_load(_content_at(r, sha) or "") or {}
-                    except yaml.YAMLError:
-                        return {}
-                cal_doc = doc_at(rel(cal_path)) if rel(cal_path) else {}
-                asset_doc = doc_at(rel(asset_path)) if rel(asset_path) else {}
+                    return yaml.safe_load(_content_at(r, sha) or "") or {}
+                try:
+                    cal_doc = doc_at(rel(cal_path)) if rel(cal_path) else {}
+                    asset_doc = doc_at(rel(asset_path)) if rel(asset_path) else {}
+                except yaml.YAMLError:
+                    # A commit whose file did not parse dates nothing - its
+                    # items would all read as absent (delivery-critic, L3).
+                    continue
                 walked.append((at, freeze.flatten(cal_doc, asset_doc)))
         return walked
 

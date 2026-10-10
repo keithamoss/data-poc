@@ -106,11 +106,6 @@ def _windows(versions: list[dict]) -> list[tuple[str, str | None]]:
     return [(a, starts[i + 1] if i + 1 < len(starts) else None) for i, a in enumerate(starts)]
 
 
-def _window_of(versions: list[dict], eff: str) -> tuple[str, str | None]:
-    return dict(_windows(versions)).get(eff, None) and (eff, dict(_windows(versions))[eff]) \
-        or (eff, None)
-
-
 _SKIPPED = ("changelog", "corrections")
 
 
@@ -140,11 +135,20 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
                      _plain({k: val for k, val in v.items()
                              if k not in _SKIPPED + ("dates", "effective_from")}),
                      {"calendar": name, "eff": eff, "first": first}))
+            # THE DATES IN FORCE, not the entries listed (delivery-critic on
+            # 111, H1): a version that starts later takes the earlier one's
+            # later dates out of force without touching a line of it, and
+            # that is a removal of frozen dates like any other. Keyed by
+            # period, so restating a date unchanged in a new version is no
+            # change at all.
             for d in (v.get("dates") or []):
                 d = d or {}
-                add(Item(f"calendar {name} version {eff} date {d.get('period')}",
+                when = str(d.get("date"))
+                if when < eff or (end is not None and when >= end):
+                    continue
+                add(Item(f"calendar {name} period {d.get('period')}",
                          ("calendar", name), "cal_date", _plain(d.get("date")),
-                         {"calendar": name, "date": str(d.get("date")), "version": eff}))
+                         {"calendar": name, "date": when, "version": eff}))
     for entry in (cal_doc or {}).get("datasets") or []:
         entry = entry or {}
         ds = str(entry.get("id"))
@@ -162,8 +166,10 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             add(Item(f"dataset {ds} not_expected {ne.get('period')}", owner, "not_expected",
                      _plain(ne.get("reason")), {"dataset": ds, "period": str(ne.get("period"))}))
         own = [(v or {}) for v in (((entry.get("dates") or {}).get("versions")) or [])]
+        own_windows = dict(_windows(own))
         for v in own:
             eff = str(v.get("effective_from"))
+            end = own_windows.get(eff)
             dates = sorted(str((d or {}).get("date")) for d in (v.get("dates") or []))
             add(Item(f"dataset {ds} dates version {eff}", owner, "own_version",
                      _plain({k: val for k, val in v.items()
@@ -171,9 +177,35 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
                      {"dataset": ds, "eff": eff, "first": dates[0] if dates else None}))
             for d in (v.get("dates") or []):
                 d = d or {}
-                add(Item(f"dataset {ds} dates version {eff} date {d.get('period')}", owner,
-                         "own_date", _plain(d.get("date")),
-                         {"dataset": ds, "date": str(d.get("date"))}))
+                when = str(d.get("date"))
+                if when < eff or (end is not None and when >= end):
+                    continue
+                add(Item(f"dataset {ds} dates period {d.get('period')}", owner,
+                         "own_date", _plain(d.get("date")), {"dataset": ds, "date": when}))
+    # WHICH CALENDAR EACH DATASET IS ON, as resolved (delivery-critic on
+    # 111, H2; PROVISIONAL, Keith's fork from REQ-PIPE-110 and
+    # plans/running-thoughts.md #79): moving a dataset - or its whole
+    # collection - to another calendar, or to none, re-judges its history
+    # against a different schedule, so it freezes like a date. Per dataset,
+    # on the dataset's own entry, because that is the owner a correction
+    # names; a collection move is one change to each of its datasets.
+    collections = {(c or {}).get("id"): (c or {}).get("calendar")
+                   for c in (cal_doc or {}).get("collections") or []}
+    entries = {(e or {}).get("id"): (e or {}) for e in (cal_doc or {}).get("datasets") or []}
+    for agency in (((asset_doc or {}).get("hierarchy") or {}).get("agencies") or []):
+        for coll in ((agency or {}).get("collections") or []):
+            for dataset in ((coll or {}).get("datasets") or []):
+                ds = str((dataset or {}).get("id"))
+                entry = entries.get(ds, {})
+                if entry.get("no_calendar") is not None:
+                    value = f"no calendar ({entry['no_calendar']})"
+                else:
+                    value = entry.get("calendar") or collections.get((coll or {}).get("id"))
+                if value is None:
+                    continue
+                add(Item(f"dataset {ds} calendar", ("dataset", ds), "membership", value,
+                         {"dataset": ds}))
+
     tz = (asset_doc or {}).get("timezone") or {}
     for v in (tz.get("versions") or []) if isinstance(tz, dict) else []:
         v = v or {}
@@ -265,6 +297,17 @@ def freeze_instant(item: Item, agr) -> datetime | None:
     if item.kind == "own_date":
         day = date.fromisoformat(c["date"])
         return _claim_open(c["dataset"], day, agr) or asset_time.start_of_day(day)
+    if item.kind == "membership":
+        # From the first instant the dataset's first slot could be filed:
+        # its first participation version's freeze point.
+        own = agr.dataset(c["dataset"])
+        if own is None or not own.participation:
+            return None
+        first = own.participation[0]
+        probe = Item("", ("dataset", c["dataset"]), "participation", None,
+                     {"dataset": c["dataset"], "eff": first.effective_from.isoformat(),
+                      "end": None})
+        return freeze_instant(probe, agr)
     if item.kind == "tz_version":
         from zoneinfo import ZoneInfo
 
@@ -373,13 +416,21 @@ def _paste_ready(owner: tuple, changes: list[tuple[str, object, object]], allowe
              "      reason: <why the agreement was wrong>",
              "      changes:"]
     for key, old, new in changes:
+        # null, not the "(nothing)" a reader is shown: this block is pasted
+        # and parsed, and a string would never match (delivery-critic, M1).
         lines += [f"        - item: {key}",
-                  f"          old: {_value_text(old)}",
-                  f"          new: {_value_text(new)}"]
+                  f"          old: {'null' if old is None else _value_text(old)}",
+                  f"          new: {'null' if new is None else _value_text(new)}"]
     lines.append(f"May approve: {who}.")
     lines.append("Preview what this would re-judge before asking for approval - the impact "
                  "preview is REQ-PIPE-169, not built yet.")
     return "\n".join(lines)
+
+
+def old_asset_like(new_asset: dict) -> dict:
+    """The asset file with no previous state, standing in as its own
+    previous state for every item it holds."""
+    return dict(new_asset or {})
 
 
 def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset: dict,
@@ -392,18 +443,30 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
 
     if old_cal is None and old_asset is None:
         return []
-    old_cal = old_cal or {}
-    old_asset = old_asset or {}
+    # A FILE WITH NO PREVIOUS STATE IS NOT COMPARED (criterion 14), even when
+    # the other file has one - a new asset's calendar.yaml can postdate its
+    # data-asset.yaml (delivery-critic, M2). Its items are taken as they now
+    # stand on both sides.
+    if old_cal is None:
+        old_cal = new_cal
+    if old_asset is None:
+        old_asset = {**old_asset_like(new_asset)}
     today = today or asset_time.local_date(datetime.now(UTC))
     instant_of = instant_of or (lambda key: datetime.now(UTC))
     out: list[Finding] = []
 
     old_items, new_items = flatten(old_cal, old_asset), flatten(new_cal, new_asset)
     try:
-        old_agr = agreement.from_doc(old_cal) if old_cal else None
         new_agr = agreement.from_doc(new_cal)
-    except Exception:  # noqa: BLE001 - an unreadable file is the schema gate's to report
+    except Exception:  # noqa: BLE001 - an unreadable NEW file is the schema gate's to report
         return []
+    try:
+        old_agr = agreement.from_doc(old_cal) if old_cal else None
+    except Exception:  # noqa: BLE001
+        # An OLD state today's loader cannot read still has its changes
+        # checked, against freeze instants from the new state, rather than
+        # the whole check being skipped (delivery-critic, L2).
+        old_agr = new_agr
     synthetic = bool(old_asset.get("synthetic")) and bool(new_asset.get("synthetic"))
     allowed = approvers(base_people or {})
 
@@ -430,6 +493,15 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
     declared: set[str] = set()
     old_corr = _corrections_by_owner(old_cal, old_asset)
     new_corr = _corrections_by_owner(new_cal, new_asset)
+    for owner, before in old_corr.items():
+        if before and owner not in new_corr:
+            file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
+            out.append(Finding(file, f"{owner[0]} {owner[1]!r}" if len(owner) > 1 else owner[0],
+                               "was removed, and its declared corrections with it - a "
+                               "corrections list is append-only, and removing its owner "
+                               "removes the record of every governed change it holds. "
+                               "Nothing was committed.",
+                               "Keep the entry and its corrections."))
     for owner, entries in new_corr.items():
         before = old_corr.get(owner, [])
         file = "data-asset.yaml" if owner[0] == "timezone" else "calendar.yaml"
