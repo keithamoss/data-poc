@@ -4919,3 +4919,15 @@ Belongs with batch 5's check work.
     periods and its checks; how cross-table checks that read it are retired
     (check lifecycle's retirement already exists for checks); and whether a
     removed dataset can ever come back.
+
+78. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Does excusing a late
+    supply stop the gate promoting it?** Found by delivery-architect in review
+    round 3, outside that round's remit. `rejection.decided_by_a_person()`
+    bars the gate from promoting any supply a person has decided, exempting
+    only supersede, un-supersede and re-file (`qa_tools/common/rejection.py`).
+    REQ-PIPE-161's excuse is a person's decision, so excusing a WAITING late
+    supply would, as built today, stop it ever promoting itself - the same
+    shape as the placement and re-check findings, which were fixed by naming
+    them beside re-file in REQ-PIPE-076 criterion 7. REQ-PIPE-161 is signed
+    and not built, so this needs Keith before it is built: should an excuse
+    also be exempt?
