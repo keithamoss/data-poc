@@ -60,6 +60,7 @@ console = Console()
 _MAIN_MENU_QA = "Quality Assurance - run the real check chain against a dataset"
 _MAIN_MENU_GENERATE = "Generate synthetic data"
 _MAIN_MENU_DECIDE = "Filing decisions - what goes into a period"
+_MAIN_MENU_CALENDAR = "Calendar - the delivery agreement, and previewing a correction"
 _MAIN_MENU_BOOTSTRAP = "Set up this environment - generate data and run the checks over it"
 _MAIN_MENU_PROCESS = "Process what has arrived - check and gate it, finish what is owed"
 _MAIN_MENU_EXIT = "Exit"
@@ -73,9 +74,10 @@ def _main_menu_loop() -> None:
     while True:
         choice = common.select(
             "What would you like to do?",
-            [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_PROCESS, _MAIN_MENU_GENERATE,
-             _MAIN_MENU_BOOTSTRAP],
-            flag_hint="mothman bdm qa / mothman supply queue / mothman pipeline process / "
+            [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_CALENDAR, _MAIN_MENU_PROCESS,
+             _MAIN_MENU_GENERATE, _MAIN_MENU_BOOTSTRAP],
+            flag_hint="mothman bdm qa / mothman supply queue / "
+                       "mothman schedule preview-correction / mothman pipeline process / "
                        "mothman bdm generate-synthetic-data / "
                        "mothman pipeline bootstrap",
         )
@@ -112,6 +114,13 @@ def _run_choice(choice: str) -> None:
         # old rule that kept it off this menu entirely was reversed
         # knowingly (see cli/supply.py's own note on why).
         filing_tui.filing_menu()
+    elif choice == _MAIN_MENU_CALENDAR:
+        # REQ-PIPE-169 criterion 13 - Keith, 2026-10-07: the terminal is the
+        # primary tool besides the dashboard, so a preview only reachable as
+        # a command would be forgotten before a change board's request.
+        from cli import schedule
+
+        schedule.calendar_menu()
     elif choice == _MAIN_MENU_GENERATE:
         _generate_menu()
     elif choice == _MAIN_MENU_BOOTSTRAP:

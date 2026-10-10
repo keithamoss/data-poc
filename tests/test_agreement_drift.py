@@ -28,7 +28,7 @@ def conn(supply_dsn):
         qa_store.ensure_schema(c)
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         filing_support.file(assignment.Assignment(
-            dataset_id=DATASET, supply_id="s", slot="2023-Q3",
+            dataset_id=DATASET, supply_id="drift-s", slot="2023-Q3",
             branch=assignment.OPEN_UNFILLED, considered=("2023-Q3",), received_at=RECEIVED))
         yield c
 

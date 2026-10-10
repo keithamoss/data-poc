@@ -477,16 +477,25 @@ def _value_text(value) -> str:
     return yaml.safe_dump(_plain(value), default_flow_style=True, sort_keys=False).strip()
 
 
+def _quoted(value: str) -> str:
+    """A free-text answer as a YAML scalar that parses back to itself."""
+    return yaml.safe_dump(value, default_flow_style=True, width=10**6).strip().removesuffix(
+        "\n...").strip()
+
+
 def _paste_ready(owner: tuple, changes: list[tuple[str, object, object]], allowed: list[dict],
-                 today: date) -> str:
+                 today: date, *, reference: str | None = None, author: str | None = None,
+                 approver: str | None = None, reason: str | None = None) -> str:
+    """The correction entry to paste - placeholders for whatever was not
+    given (REQ-PIPE-169 criterion 14), the same text the refusal prints."""
     who = ", ".join(p.get("email") for p in allowed) or "nobody - people.yaml names no approver"
     lines = [f"Add to the corrections list of {_owner_label(owner)}:",
              "  corrections:",
-             "    - change_reference: <CHANGE-REF>",
+             f"    - change_reference: {_quoted(reference) if reference else '<CHANGE-REF>'}",
              f"      date: '{today.isoformat()}'",
-             "      author: <you>",
-             "      approver: <one of the people below>",
-             "      reason: <why the agreement was wrong>",
+             f"      author: {_quoted(author) if author else '<you>'}",
+             f"      approver: {_quoted(approver) if approver else '<one of the people below>'}",
+             f"      reason: {_quoted(reason) if reason else '<why the agreement was wrong>'}",
              "      changes:"]
     for key, old, new in changes:
         # null, not the "(nothing)" a reader is shown: this block is pasted
@@ -495,8 +504,9 @@ def _paste_ready(owner: tuple, changes: list[tuple[str, object, object]], allowe
                   f"          old: {'null' if old is None else _value_text(old)}",
                   f"          new: {'null' if new is None else _value_text(new)}"]
     lines.append(f"May approve: {who}.")
-    lines.append("Preview what this would re-judge before asking for approval - the impact "
-                 "preview is REQ-PIPE-169, not built yet.")
+    lines.append("Preview what this would re-judge and move before asking for approval, and "
+                 "attach it to the change reference: `mothman schedule preview-correction "
+                 "--output impact.md`.")
     return "\n".join(lines)
 
 
@@ -506,17 +516,57 @@ def old_asset_like(new_asset: dict) -> dict:
     return dict(new_asset or {})
 
 
+def _agreements(old_cal: dict | None, new_cal: dict):
+    """(new, old) agreements; raises where the NEW file cannot be read."""
+    from qa_tools.common import agreement
+
+    new_agr = agreement.from_doc(new_cal)
+    try:
+        old_agr = agreement.from_doc(old_cal) if old_cal else None
+    except Exception:  # noqa: BLE001
+        # An OLD state today's loader cannot read still has its changes
+        # checked, against freeze instants from the new state, rather than
+        # the whole check being skipped (delivery-critic, L2).
+        old_agr = new_agr
+    return new_agr, old_agr
+
+
+def _changed(old_items: dict, new_items: dict, old_agr, new_agr) -> dict:
+    changes: dict[str, tuple[Item, object, object, datetime | None]] = {}
+    for key in set(old_items) | set(new_items):
+        before, after = old_items.get(key), new_items.get(key)
+        if before is not None and after is not None and before.norm == after.norm:
+            continue
+        if before is not None and old_agr is not None:
+            frozen_at = freeze_instant(before, old_agr)   # a change or a removal
+        else:
+            frozen_at = freeze_instant(after, new_agr)    # an addition
+        changes[key] = (before or after, before.value if before else None,
+                        after.value if after else None, frozen_at)
+    return changes
+
+
+def changed(old_cal: dict, new_cal: dict, old_asset: dict, new_asset: dict) -> dict:
+    """Every item that differs between two states of the agreement, by key:
+    (item, old value, new value, the instant it froze or None) - the gate's
+    own comparison, for the impact preview (REQ-PIPE-169) to share."""
+    new_agr, old_agr = _agreements(old_cal, new_cal)
+    return _changed(flatten(old_cal, old_asset), flatten(new_cal, new_asset), old_agr, new_agr)
+
+
 def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset: dict,
           base_people: dict | None, instant_of=None, today: date | None = None, *,
-          base_codeowners: str | None) -> list[Finding]:
+          base_codeowners: str | None, needs: dict | None = None) -> list[Finding]:
     """Every refusal for one change from (old_cal, old_asset) to (new_cal,
     new_asset). `instant_of(item_key) -> datetime` is when that change was
     introduced (criterion 12); a missing previous state passes (criterion
     14). `base_codeowners` is .github/CODEOWNERS's text at the base, or
     None where it did not exist - REQUIRED, with no default, so no caller
-    can leave the code-owner check out by forgetting it (REQ-GHUB-174)."""
-    from qa_tools.common import agreement
+    can leave the code-owner check out by forgetting it (REQ-GHUB-174).
 
+    `needs`, where given, is filled with every undeclared frozen change by
+    owner - what `drafts()` turns into correction entries (REQ-PIPE-169
+    criterion 14), so the draft and the refusal are one computation."""
     if old_cal is None and old_asset is None:
         return []
     # A FILE WITH NO PREVIOUS STATE IS NOT COMPARED (criterion 14), even when
@@ -533,31 +583,14 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
 
     old_items, new_items = flatten(old_cal, old_asset), flatten(new_cal, new_asset)
     try:
-        new_agr = agreement.from_doc(new_cal)
+        new_agr, old_agr = _agreements(old_cal, new_cal)
     except Exception:  # noqa: BLE001 - an unreadable NEW file is the schema gate's to report
         return []
-    try:
-        old_agr = agreement.from_doc(old_cal) if old_cal else None
-    except Exception:  # noqa: BLE001
-        # An OLD state today's loader cannot read still has its changes
-        # checked, against freeze instants from the new state, rather than
-        # the whole check being skipped (delivery-critic, L2).
-        old_agr = new_agr
     synthetic = bool(old_asset.get("synthetic")) and bool(new_asset.get("synthetic"))
     allowed = approvers(base_people or {})
 
     # WHAT ACTUALLY CHANGED, by item: (item, old value, new value, frozen at).
-    changes: dict[str, tuple[Item, object, object, datetime | None]] = {}
-    for key in set(old_items) | set(new_items):
-        before, after = old_items.get(key), new_items.get(key)
-        if before is not None and after is not None and before.norm == after.norm:
-            continue
-        if before is not None and old_agr is not None:
-            frozen_at = freeze_instant(before, old_agr)   # a change or a removal
-        else:
-            frozen_at = freeze_instant(after, new_agr)    # an addition
-        changes[key] = (before or after, before.value if before else None,
-                        after.value if after else None, frozen_at)
+    changes = _changed(old_items, new_items, old_agr, new_agr)
 
     # CRITERION 8: appended dates after a calendar's last one, moving nothing.
     appended_ok: set[str] = set()
@@ -651,7 +684,7 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
                 declared.add(key)
 
     # CRITERIA 3 AND 7: a frozen item changed, removed or added undeclared.
-    needs: dict[tuple, list] = {}
+    needs = {} if needs is None else needs
     for key, (item, old, new, frozen_at) in sorted(changes.items()):
         if key in declared or key in appended_ok or frozen_at is None:
             continue
@@ -726,3 +759,26 @@ def _appended_dates_allowed(changes, old_items, old_agr, new_agr) -> set[str]:
         if ok:
             allowed |= {i.key for i in later}
     return allowed
+
+
+def drafts(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset: dict,
+           base_people: dict | None, *, base_codeowners: str | None, today: date,
+           reference: str | None = None, author: str | None = None,
+           approver: str | None = None, reason: str | None = None) -> list[str]:
+    """One correction entry per owning item, for every frozen change no
+    declared correction covers yet (REQ-PIPE-169 criterion 14) - computed by
+    the gate's own check and written by the refusal's own `_paste_ready`."""
+    needs: dict[tuple, list] = {}
+    check(old_cal, new_cal, old_asset, new_asset, base_people, today=today,
+          base_codeowners=base_codeowners, needs=needs)
+    out = []
+    for owner in sorted(needs, key=_owner_label):
+        rows = needs[owner]
+        owners = code_owners(base_codeowners, ASSET_REL if owner[0] == "timezone"
+                             else CALENDAR_REL)
+        may = [p for p in approvers(base_people or {})
+               if str(p.get("github", "")).lower() in owners]
+        out.append(_paste_ready(owner, [(i.key, o, n) for i, o, n, _ in rows], may, today,
+                                reference=reference, author=author, approver=approver,
+                                reason=reason))
+    return out

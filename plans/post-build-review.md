@@ -7307,3 +7307,56 @@ twice. It deliberately did not re-find the `TypeError`.
       still does. The banner lost its stray comma. The notice names
       `contract/data-asset.yaml` for the timezone.
     - **#11, FOR KEITH:** a refusal exits 1, the same as red data.
+
+147. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-169 as built (before its first commit)** - overnight
+    #3; report saved in the session's reviews/2026-10-11-critic-169.md.
+    Fixed in the same commit as the build, each with a test that failed
+    first (tests/test_correction_trial.py `TestCriticFindingsOn169`):
+    - **F1 HIGH, FIXED - a moving supply's old verdict was dropped,** so
+      the summary said 0 verdicts changed while five On time supplies would
+      become late. A move now carries both; it is counted and reads
+      "2023-Q3 (On time) -> 2023-Q2, late".
+    - **F2, FIXED - "a person put it there" was guessed** from the base
+      agreement's answer, which called an agreement-refused hold a person's
+      and could propose moving a person's re-file. It is now read from the
+      record: refiled_by, and whether that decision was the rule's.
+    - **F3, FIXED - a rejected supply was not blocked, and a held one read
+      as an ordinary re-file;** refiling.plan refuses both. Rejected is
+      blocked naming the remedy; held reads "placed into".
+    - **F4, FIXED - a working copy part-way through an edit crashed the
+      Calendar entry and draft-correction said "nothing to declare".** Both
+      states are now read through the agreement loader and refused in words.
+    - **F5, FIXED IN PART - wording:** values print as YAML, not Python;
+      the summary says gained / lost; a multi-line blocked reason stays in
+      its bullet. LEFT: a superseded version is not marked as superseded,
+      and the report does not mention a target period already filled or a
+      period left empty by a move.
+    - **F8, FIXED - recorded facts that could not be read were a footnote.**
+      Only a schedule that cannot be built is footnoted now; a database
+      error refuses (criterion 9).
+    - **F9, FIXED IN PART:** before a dataset's agreement starts, it "owes
+      nothing yet"; the Calendar entry reads the working copy fresh. LEFT:
+      "applied" means a verdict names the correction, so a correction that
+      changes no verdict reads pending until REQ-PIPE-170 records one; a
+      blank or Ctrl-C date means today.
+    - **F10, FIXED IN PART:** draft-correction asks for a reference only
+      when something needs declaring. LEFT FOR KEITH: one entry per owner
+      (the gate prints one per item); may_approve uses calendar.yaml's
+      owners even for a timezone correction.
+    - **F6, FOR KEITH:** a change to a daily feed's due time lists every
+      slot to 400 days ahead - about 1,800 lines - and that horizon moves
+      with the day it is run.
+    - **F7, FOR KEITH:** a timezone correction shows both instants in one
+      zone; showing each in its own would say what changed.
+    - **Found by the gate, not the critic:** two test modules shared the
+      supply id `s` on cp-clients, and a delivery record is written once,
+      so whichever ran first fixed the other's receipt instant - three
+      failures in tests/test_recorded_arrival_classification.py. Both new
+      modules now use their own id (test_agreement_drift.py had the same
+      latent clash).
+    - **For REQ-PIPE-170, from the same review:** trial() takes a base and a
+      working state, so 170 must rebuild the pre-correction state from git;
+      nothing records which correction caused which change, which 170 c2's
+      "grouped by correction" needs; and _blocked should share refiling's
+      rules rather than mirror them.

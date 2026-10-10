@@ -125,7 +125,7 @@ class TestAFrozenItemChangesOnlyByCorrection:
         assert "change_reference" in f.fix and _past_key(state[0]) in f.fix
         assert "old: '2024-02-01'" in f.fix and "new: '2024-02-05'" in f.fix
         assert KEITH in f.fix, "it lists who may approve"
-        assert "REQ-PIPE-169" in f.fix, "it names the impact preview"
+        assert "mothman schedule preview-correction" in f.fix, "it names the impact preview"
 
     def test_a_changelog_line_is_no_licence(self, state):
         """Criterion 6 - REQ-PIPE-050's route is gone."""

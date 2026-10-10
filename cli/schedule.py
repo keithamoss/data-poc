@@ -15,12 +15,15 @@ run while editing a calendar.
 """
 from __future__ import annotations
 
+import sys
 from datetime import date, timedelta
+from pathlib import Path
 
 import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
+from cli import common
 from qa_tools.common import display_time
 
 console = Console()
@@ -507,3 +510,242 @@ def check_agreement_command(dataset_id: str | None) -> None:
     for refusal in found.values():
         console.print(refusal.message(), style="red")
     raise SystemExit(1)
+
+
+@schedule_group.command("preview-correction")
+@click.option("--against", "ref", default=None,
+              help="The git ref to compare the working copy against. Defaults to the base "
+                   "the schedule gate uses - once a correction is committed, the working "
+                   "copy and HEAD agree, so name the ref it is going into.")
+@click.option("--output", type=click.Path(dir_okay=False), default=None,
+              help="Also write the report as Markdown, to attach to the change reference.")
+def preview_correction_command(ref: str | None, output: str | None) -> None:
+    """Preview what a correction to the delivery agreement would change.
+
+    \b
+    Examples:
+      mothman schedule preview-correction
+      mothman schedule preview-correction --against origin/main --output impact.md
+
+    READS THE DATABASE. Compares the working copy of contract/calendar.yaml
+    and contract/data-asset.yaml with the same files at a git ref, and lists
+    each slot whose times move, each period that gains or loses an
+    obligation, each recorded verdict that would change and each supply the
+    filing rule would file elsewhere or hold - marking any a later period
+    stands on. Records nothing. Run it, and attach the report, before
+    asking the change board to approve a correction.
+    """
+    # REQ-PIPE-169: the computation REQ-PIPE-170's trial shares.
+    text = _preview(ref)
+    if output:
+        Path(output).write_text(text)
+        console.print(f"Written to {output} - attach it to the correction's change reference.",
+                      style="green", markup=False)
+
+
+def _preview(ref) -> str:
+    """Print the impact preview and return it - the command's body and the
+    Calendar entry's. Exits 2 where nothing could be compared."""
+    import psycopg
+
+    from qa_tools.common import correction_trial, supply_db
+
+    try:
+        text = correction_trial.preview(ref)
+    except correction_trial.Unreadable as exc:
+        console.print(f"Nothing was compared: {exc}", style="red", markup=False)
+        raise SystemExit(2) from exc
+    except (supply_db.SupplyDbError, psycopg.Error) as exc:
+        # Criterion 9: configuration alone is not the impact - and a database
+        # that answers but cannot give the facts is the same (F8).
+        console.print(f"The recorded facts could not be read, so no impact is reported - "
+                      f"one computed from configuration alone would not be complete: {exc}",
+                      style="red", markup=False)
+        raise SystemExit(2) from exc
+    console.print(text, markup=False, highlight=False, soft_wrap=True)
+    return text
+
+
+@schedule_group.command("draft-correction")
+@click.option("--against", "ref", default=None,
+              help="The git ref to compare the working copy against. Defaults to the base "
+                   "the schedule gate uses.")
+@click.option("--reference", default=None, help="The change reference, e.g. CAB-123.")
+@click.option("--reason", default=None, help="Why the agreement was wrong.")
+@click.option("--approver", default=None,
+              help="Who approves it - a person contract/people.yaml allows to.")
+@click.option("--author", default=None, help="You.")
+def draft_correction_command(ref, reference, reason, approver, author) -> None:
+    """Print the correction entry to declare for each change you made.
+
+    \b
+    Examples:
+      mothman schedule draft-correction
+      mothman schedule draft-correction --reference CAB-123 --reason 'the date was a typo'
+
+    Compares the working copy with the same base the schedule gate uses and
+    prints, for every frozen item you changed and have not declared yet, the
+    same entry the gate's refusal would - grouped by the item that owns it,
+    ready to paste into its corrections list. Asks for anything not given
+    when run in a terminal, and leaves a placeholder otherwise. It never
+    edits the file: you make the edit, and git records who.
+    """
+    # REQ-PIPE-169 criterion 14.
+    _draft(ref, reference=reference, reason=reason, approver=approver, author=author,
+           interactive=sys.stdin.isatty())
+
+
+def _draft(ref, *, reference=None, reason=None, approver=None, author=None,
+           interactive: bool) -> None:
+    """Print the correction entries - the command's body and the Calendar
+    entry's, so the two cannot differ."""
+    from qa_tools.common import correction_trial
+
+    try:
+        # ONLY ASK WHERE SOMETHING NEEDS DECLARING (delivery-critic on 169,
+        # F10): the reference and reason were asked for, then thrown away.
+        if interactive and correction_trial.draft(ref):
+            reference = reference or common.text_prompt(
+                "Change reference (blank leaves a placeholder):", flag_hint="--reference")
+            reason = reason or common.text_prompt(
+                "Why was the agreement wrong? (blank leaves a placeholder):",
+                flag_hint="--reason")
+            if not approver:
+                allowed = correction_trial.may_approve(ref)
+                if allowed:
+                    approver = common.select("Who will approve it?",
+                                             allowed + ["Leave a placeholder"],
+                                             flag_hint="--approver")
+                    approver = None if approver == "Leave a placeholder" else approver
+        entries = correction_trial.draft(ref, reference=reference or None,
+                                         reason=reason or None, approver=approver or None,
+                                         author=author or None)
+    except correction_trial.Unreadable as exc:
+        console.print(f"Nothing was compared: {exc}", style="red", markup=False)
+        raise SystemExit(2) from exc
+    if not entries:
+        console.print("Nothing frozen changed without a declared correction - there is "
+                      "nothing to declare.", style="green")
+        return
+    for entry in entries:
+        console.print(entry, markup=False, highlight=False, soft_wrap=True)
+        console.print()
+
+
+_CAL_PREVIEW = "Preview what my working copy's changes would re-judge and move"
+_CAL_DRAFT = "Draft the correction entry to declare them"
+_CAL_ANOTHER = "Look at another dataset or date"
+
+
+def calendar_menu() -> None:
+    """The terminal's Calendar entry (REQ-PIPE-169 criterion 13): the
+    agreement in force for a dataset on a date, the corrections declared
+    and whether each is applied, and the impact preview and draft entry for
+    the working copy. VIEWING AND PREVIEWING ONLY - configuration is edited
+    in git, where it is reviewed and the schedule gate runs."""
+    from qa_tools.common import agreement, asset_time, correction_trial, hierarchy, supply_db
+
+    while True:
+        ids = [d.dataset_id for d in hierarchy.all_datasets()]
+        dataset_id = common.select("Which dataset?", ids,
+                                   flag_hint="mothman schedule show --dataset <id>")
+        if dataset_id is None:
+            return
+        today = asset_time.local_date(asset_time.now())
+        raw = common.text_prompt(f"As at which date? YYYY-MM-DD, or blank for today "
+                                 f"({today.isoformat()}):", flag_hint="mothman schedule show")
+        try:
+            on = date.fromisoformat(raw) if raw else today
+        except ValueError:
+            console.print(f"{raw!r} is not a date like {today.isoformat()}.", style="red",
+                          markup=False)
+            continue
+        try:
+            # THE WORKING COPY, read fresh (F9): the agreement cached at start
+            # would mix with a preview read from disk after an edit.
+            fresh = agreement.from_doc(correction_trial.working()[0])
+            _show_in_force(correction_trial.in_force(dataset_id, on, fresh))
+        except correction_trial.Unreadable as exc:
+            # F4: part-way through an edit, said - not a crashed session.
+            console.print(str(exc), style="red", markup=False)
+            return
+        try:
+            with supply_db.connect(read_only=True, label="mothman:calendar") as conn:
+                found = correction_trial.declared(conn)
+            known = True
+        except supply_db.SupplyDbError:
+            found, known = correction_trial.declared(None), False
+        _show_declared(found, known)
+        while True:
+            choice = common.select("What next?", [_CAL_PREVIEW, _CAL_DRAFT, _CAL_ANOTHER],
+                                   flag_hint="mothman schedule preview-correction / "
+                                             "mothman schedule draft-correction")
+            if choice is None:
+                return
+            if choice == _CAL_ANOTHER:
+                break
+            try:
+                if choice == _CAL_PREVIEW:
+                    text = _preview(None)
+                    path = common.path_prompt("Write it to a file to attach to the change "
+                                              "reference? A path, or blank to skip:",
+                                              flag_hint="--output")
+                    if path:
+                        Path(path).write_text(text)
+                        console.print(f"Written to {path}.", style="green", markup=False)
+                else:
+                    _draft(None, interactive=True)
+            except SystemExit:
+                pass
+
+
+def _show_in_force(f) -> None:
+    console.print(f"[bold]{f.dataset_id}[/bold] as at {f.on:%-d %b %Y}", highlight=False)
+    console.print(f"  Calendar: {f.calendar}; times read in {f.zone}", markup=False)
+    console.print(f"  Owes: {f.owes}", markup=False)
+    if f.next_period and f.inputs:
+        i = f.inputs
+        console.print(f"  Next period owed: {f.next_period} ({f.next_date:%-d %b %Y}) - due "
+                      f"{i['due_date']} at {i['expected_time']}"
+                      + (f", {i['days_before']} day(s) before the period's date"
+                         if i.get("days_before") else "")
+                      + f"; grace {_duration(i['grace_seconds'])}; claim window opens "
+                        f"{_duration(i['claim_window_seconds'])} before", markup=False)
+    elif f.next_period:
+        console.print(f"  Next period owed: {f.next_period} - its times cannot be resolved",
+                      markup=False)
+    else:
+        console.print("  Nothing is owed within the next 400 days of that date.", markup=False)
+    for period, why in f.not_expected:
+        console.print(f"  Owes nothing for {period}: {why}", markup=False)
+    console.print()
+
+
+def _duration(seconds) -> str:
+    if seconds is None:
+        return "none"
+    if seconds % 86400 == 0:
+        return f"{seconds // 86400}d"
+    if seconds % 3600 == 0:
+        return f"{seconds // 3600}h"
+    return f"{seconds // 60}m"
+
+
+def _show_declared(found, known: bool) -> None:
+    if not found:
+        console.print("No corrections have been declared.", style="dim")
+        console.print()
+        return
+    console.print("Declared corrections, newest first:", style="bold")
+    for d in found:
+        if not known:
+            state = "applied or not unknown - the database could not be read"
+        elif d.applied:
+            state = "applied"
+        else:
+            state = "pending - awaiting the asset manager's confirmation"
+        console.print(f"  {d.date} {d.reference} on {d.owner}: {d.reason} [{state}]",
+                      markup=False)
+        for item in d.items:
+            console.print(f"      {item}", markup=False, style="dim")
+    console.print()

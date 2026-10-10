@@ -203,6 +203,15 @@ releases:
               dashboard shows it red with what changed and how to fix it. Every
               other dataset carries on. `mothman schedule check-agreement` says
               which datasets are affected.
+          - headline: See what a calendar correction would change
+            components: ["Pipeline & publishing"]
+            description: >
+              Before asking for a correction to be approved, `mothman schedule
+              preview-correction` lists every slot whose times move, every
+              verdict that would change and every supply that would land in
+              another period or be held, and writes it as Markdown to attach.
+              `mothman schedule draft-correction` prints the entry to declare,
+              and a new Calendar menu shows each dataset's agreement.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

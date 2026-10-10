@@ -1087,3 +1087,44 @@ one or more component tags, and a date.
             same as red data?
         (i) A retroactive not_expected entry isn't caught. Should the
             fingerprint include it?
+      - REQ-PIPE-169 BUILT (the correction impact preview):
+        - `mothman schedule preview-correction` compares the working copy of
+          the agreement with a git ref (the gate's base by default) and lists
+          what would change, summary first:
+          - every slot whose times move;
+          - every period gained or lost;
+          - every verdict that would change;
+          - every supply that would move or be held, with any that cannot
+            move yet marked "blocked" and why.
+        - `--output` writes it as Markdown for the change reference.
+        - `mothman schedule draft-correction` prints the gate's own entry to
+          paste, filled in with what you give it.
+        - A new Calendar entry on the terminal's main menu shows a dataset's
+          agreement as at a date and the declared corrections, and runs both.
+        - One computation in qa_tools/common/correction_trial.py, which
+          REQ-PIPE-170's trial will reuse.
+        - Measured: moving 2024-Q1's date previews in 0.2s.
+        PROVISIONALS (in the requirement's decisions):
+        - a move is proposed only where the rule's own answer changed, and
+          the supply is still where the rule put it - a person's filing is
+          listed as "not proposed", never overruled;
+        - the Calendar entry reads "in force on a date" as the next period
+          owed from that date.
+      - REQ-PIPE-169 CRITIC (post-build-review #147), fixed before the first
+        commit:
+        - a supply that moves now shows its old verdict too, and counts;
+        - "a person put it there" is now read from the record rather than
+          guessed;
+        - rejected and held supplies are marked;
+        - a half-edited working copy is refused in words rather than
+          crashing;
+        - plainer wording.
+        FOUR QUESTIONS FOR YOU:
+        (j) A due-time change on a daily feed lists every slot 400 days
+            ahead - about 1,800 lines. Should the preview list only slots up
+            to today?
+        (k) Should a timezone correction show each instant in its own zone?
+        (l) The draft gives one entry per owner; the gate's refusal gives
+            one per item. Which do you want?
+        (m) A correction that changes no verdict reads "pending" until
+            REQ-PIPE-170 records one. OK until then?
