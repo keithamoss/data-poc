@@ -3742,13 +3742,24 @@ difference (REQ-PIPE-170 criteria 20-21).
 or the arrival judged against the old date.
 
 **TS-63 `[both]` A dataset turned off for a while.**
-*Config: a participation version with effective_to and a reason, then a
-later version turning it back on.*
-**Expect**: periods in the gap owe nothing and read quiet grey; a supply
-that arrives in the gap is received, file-checked and held, not filed
-(REQ-PIPE-110).
-**Breaks as**: the gap reads as missed supplies; or a gap arrival filed
-into a period.
+*Config: quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim
+window 30 days before due, 2 days' grace; a participation version with
+`effective_to: 2026-03-31` and a `turned_off_reason`, then a later version
+from 2026-10-01 turning it back on.*
+**Expect** (Keith's worked example, 2026-10-10, REQ-PIPE-179 and
+REQ-DASH-180): February 2026 is still owed and its slot closes 15 April,
+when May's window would have opened; May and August owe nothing. A February
+supply arriving 10 March files to February, late; one arriving 5 April
+(dataset off, February still open) also files to February, late - or as a
+resupply if February is filled; one arriving 20 April finds no open owed
+slot and is held as turned off. The dataset keeps its real verdict with a
+'Turning off - last supply owed: February, open until 15 Apr' marker until
+15 April, then 'Turned off since 1 Apr'; gap periods read as owed-nothing
+rows and inherit the last promoted supply. After 1 October it reads as any
+dataset between deliveries, not 'No data'.
+**Breaks as**: the gap reads as missed supplies; the 5 April supply held
+instead of filed late; February going quiet before 15 April; a red verdict
+hidden behind the turn-off; or a gap arrival filed into a gap period.
 
 **TS-64 `[unit]` An undeclared change to a frozen date.**
 **Expect**: the draft-correction command prints a correction entry for
