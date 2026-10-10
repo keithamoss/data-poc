@@ -4894,3 +4894,19 @@ Belongs with batch 5's check work.
     dialects, failing-row samples, drift). Worth a spike on one check type
     before any decision. Pairs with #75: the toolset choice decides which
     config formats Pydantic needs to model.
+
+77. **[todo, 2026-10-10]** **[Pipeline & publishing]** **A dataset being
+    removed altogether, not just turned off.** Keith, 2026-10-10, while
+    deciding that turned-off periods inherit the last promoted supply
+    (REQ-PIPE-110, open question Q-G): "if we weren't ever going to receive a
+    dataset again, why would we want to inherit it? Why would we even want to
+    keep it? Maybe there'd be a reason." Turning off (effective_to with no
+    later version) keeps the dataset, its configuration, its history and -
+    under Q-G - its last supply inherited into every later period for ever.
+    That is right for a temporary turn-off and questionable for a dataset
+    that is gone for good. Not scoped. Questions for when it is: is removal a
+    distinct act from a permanent turn-off; should inheritance stop, perhaps
+    configurably; what happens to the dataset's history, its tables in past
+    periods and its checks; how cross-table checks that read it are retired
+    (check lifecycle's retirement already exists for checks); and whether a
+    removed dataset can ever come back.
