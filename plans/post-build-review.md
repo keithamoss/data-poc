@@ -6895,3 +6895,8 @@ twice. It deliberately did not re-find the `TypeError`.
     `recheck.run`, skipping rather than waiting, as `arrival_lock` does in
     processing_pass.py. Carried into REQ-PIPE-164/177's open questions; a
     failing test (two concurrent runs of one owed id) comes first when fixed.
+    **Update 2026-10-10:** now a criterion rather than an open question -
+    REQ-PIPE-164 criterion 19 (a claim released if its holder ends; a runner
+    finding one claimed skips it) and REQ-PIPE-177 criterion 15. Both are
+    unsigned. The fix is a defect in BUILT code (re-file already reaches
+    this path), so it does not have to wait for them.

@@ -4801,7 +4801,7 @@ Belongs with batch 5's check work.
     results, never actual data" rule). Related: plans/aws.md #4 (where the
     connection string lives).
 
-72. **[todo, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
+72. **[superseded, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
     **A trial run that records nothing - one mechanism for previewing a
     placement and checking a fix.** Keith, 2026-10-08: a predicted verdict is
     possible, and the same mechanism covers "try a fix on one or two
@@ -4814,6 +4814,11 @@ Belongs with batch 5's check work.
     own orchestrator-held connection, not the GitHub route, and it must not
     leave a QA run behind. Feeds REQ-PIPE-163 (placing) and REQ-PIPE-164
     (bulk re-check, as its first step).
+    **Superseded 2026-10-10.** The rolled-back transaction cannot work - the
+    four tools open their own connections and cannot see uncommitted work
+    (REQ-PIPE-178's decisions). The trial is now REQ-PIPE-178, a trial run
+    identity that reads shared staging read-only; the placement preview was
+    rejected in favour of cheap facts only (REQ-PIPE-163's decisions).
 
 73. **[todo, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
     **Recalling a broad class of checks, and re-running everything it touches.**
@@ -4828,18 +4833,19 @@ Belongs with batch 5's check work.
 
     Shape, as he described it: a changelog entry that can name a CHECK TYPE
     (a label such as "allowed values" or "required values") as well as, or
-    instead of, individual checks; the bulk re-check (REQ-PIPE-164) selects
+    instead of, individual checks; the bulk re-check (REQ-PIPE-177) selects
     every check carrying that label across every dataset, and the TUI offers
     it from the changelog entry itself. Also to settle: who labels a check
     (a controlled vocabulary, not free text, or the label is useless); whether
     a bug recall and a configuration change share one changelog; and how a
     label applies to checks in a dataset that adds one later.
 
-    NOT for REQ-PIPE-164 as it stands. Keith, 2026-10-08: "a much bigger
+    NOT for REQ-PIPE-177 as it stands (the bulk re-check, split out of
+    REQ-PIPE-164 on 2026-10-10). Keith, 2026-10-08: "a much bigger
     issue than the requirements we're looking at here". Revisit as its own
     item once the current re-check work is signed off.
 
-74. **[todo, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
+74. **[superseded, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
     **Re-check trial and bulk shape, as agreed with Keith on 2026-10-08** -
     the input to REQ-PIPE-164's next draft. TRIAL: choose one or more
     supplies from a list (multi-select), or give a period range; the verdict
@@ -4856,6 +4862,9 @@ Belongs with batch 5's check work.
     as part of REQ-PIPE-164's draft (not yet signed off).
     **Answered 2026-10-08:** no reason on a trial (it records nothing); the
     shared implementation is agreed. Recorded in REQ-PIPE-164's decisions.
+    **Superseded 2026-10-10.** REQ-PIPE-164 was split into four; this shape
+    now lives in REQ-PIPE-177 (the bulk re-check) and REQ-PIPE-178 (the
+    trial), whose decisions carry everything above.
 
 75. **[todo, 2026-10-10]** **[Pipeline & publishing, QA checks & contract]**
     **Pydantic for the config files, once the toolset is settled.** Keith,
