@@ -404,3 +404,20 @@ def test_deriving_the_sequences_opens_nothing_under_data(monkeypatch, tmp_path):
             pass
 
     assert opened == [], f"the schedule read {len(opened)} file(s) under data/: {opened[:3]}"
+
+
+def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypatch, tmp_path):
+    """REQ-PIPE-154 criterion 3 on the page, after REQ-PIPE-110: the
+    exhausted-schedule notice tells a person which file to edit, and the
+    calendars live in contract/calendar.yaml now. The embed hardcoded
+    contract/data-asset.yaml, so the notice sent people to a file that no
+    longer holds a single delivery date."""
+    from qa_tools.common import supply_holds
+
+    out_html = tmp_path / "out.html"
+    monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
+    edd.embed()
+    match = re.search(r"const SCHEDULE_RUNWAY = (.*?);\n", out_html.read_text())
+    assert match, "SCHEDULE_RUNWAY const not found in built output"
+    assert json.loads(match.group(1))["configFile"] == "contract/calendar.yaml"
+    assert supply_holds.SCHEDULE_FILE == "contract/calendar.yaml"

@@ -78,7 +78,7 @@ class TestTheHoldSaysWhatToEdit:
     def test_it_names_the_file_and_the_command(self, conn):
         """Criterion 3."""
         said = self._held(conn).describe()
-        assert "contract/data-asset.yaml" in said
+        assert "contract/calendar.yaml" in said  # since REQ-PIPE-110
         assert "mothman schedule candidate-dates" in said
         assert "2027-Q4" in said
         assert "next period's claim window" not in said

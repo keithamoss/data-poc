@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { loadDashboard } from "./support/loadDashboard.js";
 
-const RUNWAY = {configFile: "contract/data-asset.yaml", defaultThreshold: 4, calendars: [{
+const RUNWAY = {configFile: "contract/calendar.yaml", defaultThreshold: 4, calendars: [{
   name: "quarterly", threshold: 4, lastPeriod: "2027-Q4", lastDate: "2027-11-01",
   datasets: [
     {id: "cp-clients", lastPeriod: "2027-Q4", lastDate: "2027-11-01", endsOn: "2028-01-31",

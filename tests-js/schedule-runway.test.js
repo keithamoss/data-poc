@@ -35,7 +35,7 @@ function load() {
 // in fewer periods - which is what makes them run out at different
 // times, and is the case a single shared "last date" would get wrong.
 const RUNWAY = {
-  configFile: "contract/data-asset.yaml",
+  configFile: "contract/calendar.yaml",
   defaultThreshold: 4,
   calendars: [{
     name: "quarterly",

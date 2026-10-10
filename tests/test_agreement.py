@@ -294,3 +294,18 @@ class TestTheContractsDetection:
             doc = yaml.safe_load((REAL_CONTRACT_DIR / name).read_text())
             assert doc["kind"] == "DataContract"
             assert "slaProperties" not in doc
+
+
+class TestAnAssetWithNoCalendarsAtAll:
+    def test_an_empty_list_of_calendars_is_accepted(self, broken):
+        """Criterion 36 - the project-extraction shape: every dataset has
+        supplies and no cadence, so the asset has no calendar to name."""
+        from qa_tools.common import hierarchy
+
+        def mutate(doc):
+            doc["calendars"] = []
+            doc["collections"] = []
+            doc["datasets"] = [{"id": d.dataset_id, "no_calendar": "never"}
+                               for d in hierarchy.all_datasets()]
+        errors = broken(mutate)
+        assert errors == [], _text(errors)

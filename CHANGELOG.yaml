@@ -112,8 +112,8 @@ releases:
   - date: "2026-10-11"
     summary: >
       A collection with nothing counted no longer reads green, one re-check
-      never runs twice, and the asset's clock can change without rewriting
-      the past.
+      never runs twice, the asset's clock can change without rewriting the
+      past, and every delivery agreement lives in one file.
     changes:
       - category: Fixed
         items:
@@ -138,6 +138,13 @@ releases:
               changes, every past due time keeps the clock it was judged
               against. A due time daylight saving would skip or repeat is
               refused.
+          - headline: One file for the delivery agreement
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Calendars, which datasets are on them, and when each is due now
+              live together in contract/calendar.yaml, in dated versions. The
+              data contracts no longer carry delivery timing, and the old
+              delivery_months key is refused with the name of its replacement.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

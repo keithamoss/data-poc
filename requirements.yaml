@@ -24931,7 +24931,38 @@ requirements:
     date_written: '2026-09-28'
     story: As the person who agreed a delivery with a supplier, I want the whole agreement for an asset - its calendars, which datasets are on which, and when each dataset is due - written in one file, so that a dataset's cadence, its participation and its due time can never quietly disagree about what was promised.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-11 (overnight #3): pinned first - tests/test_calendar_move_pin.py (tests/fixtures/calendar_move_pin.json, every dataset''s periods and every slot''s instants to 2028) captured before the move in 569bcd8 and confirmed to bite; it passed unchanged after the move, and `mothman dashboard rebuild` reproduced results_*.json byte-identical and the dashboard JSON identical except the clock-relative waitedSeconds.'
+    - '2026-10-11: the one rebuild - `mothman env reset-synthetic` then `mothman pipeline bootstrap` reading contract/calendar.yaml (587s, 47 staged tables, the count before), `mothman dashboard rebuild`, then the arrival-semantics golden and the pin: 11 passed - no arrival changed its verdict or its instant. datacontract-cli lint passes on both contracts with slaProperties removed (criterion 22).'
+    - '2026-10-11: full `mothman check` 4019 passed with 2 failures, both this change''s and both fixed (a hold-message test asserting the old file name; plans/INDEX.md stale after the deletions), each rerun green, plus one defect found by the run''s review and fixed test-first (the exhausted-schedule notice named contract/data-asset.yaml - tests/test_embed_dashboard_data.py''s new test failed before the fix); `npm test` 581 passed; tests/test_agreement.py 27 passed.'
+    implemented_by:
+    - qa_tools/common/agreement.py::load
+    - qa_tools/common/agreement.py::current
+    - qa_tools/common/agreement.py::Agreement
+    - qa_tools/common/agreement.py::cadence
+    - qa_tools/common/schedule.py::periods_for_dataset
+    - qa_tools/common/schedule.py::owes_from
+    - qa_tools/common/schedule.py::dataset_dates_override
+    - qa_tools/common/schedule.py::claim_window
+    - qa_tools/common/slots.py::slots_for_dataset
+    - qa_tools/common/period_overlap.py::overlaps_for
+    - qa_tools/common/validate_schedule.py::_participation_errors
+    - qa_tools/common/validate_schedule.py::_retired_key_errors
+    - qa_tools/common/validate_schedule.py::_sla_properties_errors
+    - qa_tools/common/validate_schedule.py::_merged_view
+    - qa_tools/common/schemas.py::CalendarFile
+    - pipeline/build_dashboard_data.py::build
+    - dashboard/embed_dashboard_data.py::embed
+    - cli/schedule.py::show_command
+    linked_tests:
+    - tests/test_agreement.py
+    - tests/test_calendar_move_pin.py
+    - tests/test_validate_schedule.py
+    - tests/test_schedule.py
+    - tests/test_slots.py
+    - tests/test_no_calendar.py
+    - tests/test_embed_dashboard_data.py
     signed_off:
       by: Keith
       date: "2026-10-10"
@@ -25032,6 +25063,15 @@ requirements:
     - 'AMENDMENT WORDING APPROVED (Keith, 2026-10-10, at sign-off): criterion 24''s amendments read - REQ-PIPE-049 c4 ''let a dataset state, under participates in contract/calendar.yaml, which of an authored calendar''s delivery months it participates in, and treat a dataset stating none as participating in all of them''; c8 ''carry each dataset''s own expected time of day and grace allowance on its participation versions in contract/calendar.yaml''; c9 ''carry a default claim window on each calendar, and let a dataset''s participation version in contract/calendar.yaml override it''; REQ-PIPE-050 c4 ''reject a month name in participates that is not a real, full month name''; c5 ''reject a participates list naming a delivery month for which the dataset''s own calendar has no date''; c15 ''reject a participates list of delivery months against a cadence-rule calendar''; REQ-PIPE-052 c10 ''give each slot its own claim window, taken from its dataset''s participation version in force on that period''s date where it overrides one, and from the version of its calendar in force on that date otherwise''; REQ-PIPE-134 c2 ''the dataset''s expected time, grace and claim window from its participation version in contract/calendar.yaml, and the calendar''s dates, each as effective on that period''s date''; REQ-PIPE-156 c1 adds contract/calendar.yaml to the files read through one shared loader; REQ-PIPE-106 c16 ''record when it graduated, that date being the effective date of its first participation version''. Everything else in each stays as built.'
     - 'BOUNDARY CHECK BEFORE SIGN-OFF (delivery-scoper, 2026-10-10, applied with Keith''s agreement): nothing of the pre-split requirement was lost. Criterion 25''s protection and criterion 31''s later parts and consumers depended on unbuilt requirements (REQ-PIPE-111, 112, 169, 170, 173), so they were reworded to what can be built and tested first, the rest becoming those requirements'' own additions; days before''s restate check waits on REQ-PIPE-167; the terminal''s duty to show an owed-nothing period''s reason, narrowed to the dashboard by the split, was restored as criterion 37; ''carry the reason wherever the list is taken'' moved to REQ-PIPE-181, where it means something; criterion 17 names REQ-PIPE-098 so ''inheritance'' cannot be read as the inherit keyword.'
     - 'SIGNED OFF (Keith, 2026-10-10): after three review rounds and the split, Keith chose not to re-walk criteria already decided, and settled the remaining open question, the amendment wording and the scoper''s boundary findings instead - his words: ''if we''ve already walked through it ... what''s the point in going through it all again''.'
+    - 'BUILT IN ONE MOVE, PINNED FIRST (2026-10-11, overnight #3): tests/calendar_move_pin.py captured every dataset''s periods and every slot''s due, late-after, claim-opening and closing instants to 2028 from the configuration BEFORE contract/calendar.yaml existed (committed 569bcd8, confirmed to bite by moving Child Protection''s expected time to 09:30). The move is the one commit REQ-PIPE-111''s freeze cannot see, so the pin is its only guard, and it passed unchanged after the move.'
+    - 'ONE LOADER, CACHED BY PATH (2026-10-11): agreement.current() memoises agreement.load() keyed by the file''s path rather than a single slot, so a test that points CALENDAR_YAML elsewhere reads its own file and the committed one is never left shadowed afterwards - the stale-cache class tests/test_no_calendar.py''s own docstring warned about, three caches deep, closed by construction rather than by remembering to clear.'
+    - 'THE GATE CHECKS A MERGED VIEW (2026-10-11): the schedule gate''s existing calendar and dataset checks (month names, a cadence rule with months, expects-nothing, the retrospective date guard) were kept and fed a view of both files in the old one-file shape, rather than rewritten against the new one; the new file''s own rules (criteria 3, 8, 13, 14, 16, 18, 28, 29, 33-35) are separate checks on contract/calendar.yaml as written. The view is for checking only and is never written back. REJECTED rewriting every existing check against the new shape in the same change: the pin and the existing tests already proved those rules, and a rewrite would have changed two things at once.'
+    - 'NEWEST PARTICIPATION VERSION FOR EXPECTED TIME AND GRACE, FOR NOW (2026-10-11): slots and the overlap gate read the newest participation version''s expected time and grace for every period; each period''s own version is REQ-PIPE-113 criterion 2, built next. Every dataset carries one version today, so the answer is the same, and the amended REQ-PIPE-052 c10 and REQ-PIPE-134 c2 describe the per-period behaviour 113 delivers. The claim-window override already resolves per period.'
+    - 'A NEGATIVE GRACE CANNOT BE WRITTEN (2026-10-11): grace moved from a signed slaProperty integer to a duration, which has no sign, so ''-30m'' is refused as not a duration at all. The gate''s old ''is negative'' message is unreachable for grace; the test asserts the refusal names the value and the dataset.'
+    - 'OWN DATES AND A MONTHS LIST TOGETHER STAY REFUSED (2026-10-11): schedule.dataset_dates_override raises when a dataset states its own dates and any participation version names months - the rule that lived on the dataset block before, kept rather than lost in the move (tests/test_schedule.py''s test caught it).'
+    - 'TESTS WRITTEN AGAINST THE ONE-FILE SHAPE WERE KEPT, NOT REWRITTEN (2026-10-11): tests/agreement_split.py writes a one-file-shaped configuration out as the two files, so roughly sixty schedule tests keep asserting the rule they are named for; the new file''s own rules are tested against the two files directly in tests/test_agreement.py, never through the helper. tests/test_cadence.py tested pipeline/cadence.py''s slaProperties parser and went with it.'
+    - 'WHAT STILL SAYS slaProperties IS HISTORY (2026-10-11): present-tense comments were repointed (builders, generator, dashboard template, embed docstring); sentences recording what used to be true were left, since the register''s own rule is that history is rewritten rather than deleted. No plans prose was deleted: plans/supply-model.md Thread C feeds REQ-PIPE-110 to 113 together and goes whole once the last of them is built.'
+    - 'THE EXHAUSTED-SCHEDULE NOTICE NAMED THE WRONG FILE (found 2026-10-11 in the build''s own review, fixed test-first): dashboard/embed_dashboard_data.py hardcoded contract/data-asset.yaml as SCHEDULE_RUNWAY.configFile and the template fell back to the same string, so after the move the page would have sent a person to a file holding no delivery dates. The embed now takes supply_holds.SCHEDULE_FILE - the one constant the hold reason and the terminal already use - and the fallback names contract/calendar.yaml. Criterion 17''s ''no hardcoded configuration-file name'' is why it counted.'
   - id: REQ-PIPE-179
     title: A dataset, or a whole collection, can be turned off for a time or for good, and nothing still owed goes quiet
     date_written: '2026-10-10'

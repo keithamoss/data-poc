@@ -363,7 +363,10 @@ def embed() -> None:
     # Only AUTHORED calendars appear. A cadence rule generates periods
     # for ever and can never run out, so including one would invite the
     # page to warn about something that cannot happen.
-    schedule_runway = {"configFile": "contract/data-asset.yaml",
+    # The file a person edits to add dates - supply_holds' one constant,
+    # contract/calendar.yaml since REQ-PIPE-110, never a second copy.
+    from qa_tools.common import supply_holds
+    schedule_runway = {"configFile": supply_holds.SCHEDULE_FILE,
                         "defaultThreshold": runway.DEFAULT_WARNING_SLOTS,
                         "calendars": []}
     for cal in schedule.calendars():

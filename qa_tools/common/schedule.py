@@ -760,12 +760,12 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
     consequence of assignment, so earlyWindow would name the wrong half
     of what this does.
 
-    WHY THE CONTRACT OVERRIDE IS NOT VERSIONED AND THE CALENDAR DEFAULT
-    IS: the override is declared in the dataset's own ODCS contract,
-    which has no effective_from and no version sequence, so there is no
-    date at which one of its values was in force rather than another.
-    The calendar has exactly that, which is the whole reason the
-    default can move under history and the override cannot.
+    BOTH ARE VERSIONED NOW. The override used to be declared in the
+    dataset's own ODCS contract, which had no effective_from, so it
+    could not be; since REQ-PIPE-110 it sits on the dataset's
+    participation versions and resolves, like the calendar's default, on
+    the period's own date. `contract_value` survives only as an explicit
+    value a caller passes.
     """
     if contract_value is not None:
         return parse_duration(contract_value, f"dataset {dataset_id!r} claimWindow")

@@ -1913,7 +1913,7 @@ const BUILD_PROVENANCE = null;
 const REAL_BIRTH_REG_DATA = null;
 const REAL_CP_DATA = null;
 const SNAPSHOT_MANIFEST = [];
-// SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/data-asset.yaml
+// SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/calendar.yaml
 // at build time. Every AUTHORED calendar, its warning threshold, its
 // last authored period, and the dates each dataset on it actually owes
 // a supply for.
@@ -4372,7 +4372,7 @@ function exhaustedNotice(runwayState, onDateStr){
     return `<li><b style="display:inline">${escHtml(name(id))}</b> - its last delivery date is for
       ${escHtml(String(e.lastPeriod || "?"))} (${escHtml(String(e.calendar))} calendar)</li>`;
   }).join("");
-  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
   // "CANNOT BE FILED", NOT "PROCESSED" (#131 D10): an arriving supply is
   // still received and its files checked (REQ-PIPE-154 criterion 5); it is
   // filing it to a period that waits for dates.
@@ -4408,7 +4408,7 @@ function exhaustedNotice(runwayState, onDateStr){
 function lowRunwayNotice(runway){
   const source = runway === undefined ? (DATA && DATA.scheduleRunway) : runway;
   if(!source || !(source.low||[]).length || source.exhaustedCount) return "";
-  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+  const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
   const lines = source.low.map(cal=>{
     const n = cal.datasetCount;
     const who = cal.drivingDataset
@@ -5541,7 +5541,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   let exhaustedBanner = "";
   if(ds.scheduleExhausted){
     const ended = ds.scheduleExhausted;
-    const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/data-asset.yaml";
+    const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
     exhaustedBanner = `
       <div class="notice-exhausted" role="status">
         <b>This dataset's delivery schedule has ended.</b>

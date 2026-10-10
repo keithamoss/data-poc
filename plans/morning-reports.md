@@ -820,3 +820,18 @@ one or more component tags, and a date.
         ONE CORRECTION: the implementation commit's message said 582 JS
         tests; the run said 581 - an added-up number, not a run. Recorded
         in the requirement's evidence.
+      - REQ-PIPE-110 BUILT: contract/calendar.yaml holds the calendars, which
+        calendar each collection and dataset is on, and each dataset's
+        participation as dated versions; slaProperties is gone from both
+        contracts and pipeline/cadence.py with it; delivery_months and
+        owes_from are refused by name. One loader, one immutable value,
+        passed to schedule, slots, the overlap gate and the builders. PINNED
+        FIRST, and PROVEN by the night's one rebuild for it (587s, 47 staged
+        tables) - the pin and the arrival golden unchanged. Full check: 4019
+        passed, 2 failures of this change's own, both fixed. ONE DEFECT CAUGHT
+        IN MY OWN REVIEW, fixed test-first: the dashboard's schedule-ended
+        notice would have told you to edit data-asset.yaml. NOT YET PER
+        PERIOD: expected time and grace still come from each dataset's newest
+        participation version - every dataset has one, so nothing moves -
+        and each period's own version is REQ-PIPE-113, next. Thread C stays
+        until 113 is built, then goes whole.
