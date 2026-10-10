@@ -25834,39 +25834,24 @@ requirements:
       named place exists (filing_decisions.OPERATIONS), and `mothman supply holds` lists ''file it to a
       slot yourself'' with no command.'
     acceptance_criteria:
-    - THE SYSTEM SHALL offer PLACE as a filing decision a person raises about a supply held by the assignment
-      rule (REQ-PIPE-064), naming the period it is to be filed to, on the same terms as every other filing
-      decision - actor, mandatory reason, allowlist, refusal, one implementation behind every route.
-    - WHEN a person places a held supply, THE SYSTEM SHALL record a filing of it to the named period, resolve
-      its hold naming that decision (REQ-PIPE-078 criterion 6), and run its QA against that period and apply
-      the promotion gate exactly as for a re-filed supply (REQ-PIPE-141 criteria 6, 7, 9, 13, 15 and 18).
-    - THE SYSTEM SHALL allow placing into a closed period and into a period whose claim window had not opened
-      at the supply's receipt instant, because a person deciding is not the assignment rule (REQ-PIPE-062
-      criterion 5 and REQ-PIPE-064 criterion 2 bind the rule).
-    - IF the named period is not one the dataset's calendar generates and the dataset participates in, THEN
-      THE SYSTEM SHALL refuse it, naming the command that lists its periods.
-    - IF the named period's slot is resolved by inheritance, THEN THE SYSTEM SHALL refuse it and name un-inherit
-      as the step that must come first, as a re-file does (REQ-PIPE-141 criterion 12).
-    - THE SYSTEM SHALL compute the placed supply's arrival classification against the slot it was placed
-      in, so that a supply placed after its slot closed reads late.
-    - THE SYSTEM SHALL list every held supply in the terminal's filing-decisions door, with why it was held,
-      and SHALL offer place and reject on each.
-    - THE SYSTEM SHALL let a person reject a held supply from the terminal and through mothman supply decide,
-      with a reason, ending its hold.
-    - THE SYSTEM SHALL name, in `mothman supply holds` and in every refusal that points at placing, the
-      exact command that places a held supply.
-    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
-      to list place among the filing decisions.
-    - THE SYSTEM SHALL offer place on the terminal route only - the filing-decisions door and mothman supply
-      decide - and SHALL NOT offer it on the GitHub route; THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082
-      criterion 3 to name place, beside REQ-PIPE-170's correction confirmation, as an operation offered
-      on the terminal route only.
-    - THE SYSTEM SHALL take a placement through --supply and --to-period, and SHALL NOT require --period,
-      which a held supply does not have.
-    - WHEN the terminal asks for the period to place a supply in, or to re-file one to, THE SYSTEM SHALL
-      offer the dataset's periods as a choice, marking those closed and those not yet open, rather than
-      asking for a typed period.
-    - THE SYSTEM SHALL list held supplies in the queue of supplies waiting on a decision, grouped together.
+    - THE SYSTEM SHALL offer PLACE as a filing decision a person raises about a supply held by the assignment rule (REQ-PIPE-064), naming the period it is to be filed to, on the same terms as every other filing decision - actor, mandatory reason, allowlist, refusal, one implementation behind every route.
+    - WHEN a person places a held supply, THE SYSTEM SHALL, in one transaction, record a filing of it to the named period, resolve its hold naming that decision (REQ-PIPE-078 criterion 6) and record an owed re-check (REQ-PIPE-140); SHALL then, on the terminal route, run that owed re-check straight after the transaction commits while the person waits, applying the promotion gate exactly as for a re-filed supply (REQ-PIPE-141 criteria 6, 7, 9, 13, 15 and 18); and SHALL leave it to the processing pass to finish if that run is interrupted.
+    - THE SYSTEM SHALL NOT run any QA inside the transaction that records a placement.
+    - THE SYSTEM SHALL allow placing into a closed period and into a period whose claim window had not opened at the supply's receipt instant, because a person deciding is not the assignment rule (REQ-PIPE-062 criterion 5 and REQ-PIPE-064 criterion 2 bind the rule).
+    - IF the named period is not one the dataset's calendar generates and the dataset participates in, THEN THE SYSTEM SHALL refuse it, naming the command that lists its periods.
+    - IF the named period's slot is resolved by inheritance, THEN THE SYSTEM SHALL refuse it and name un-inherit as the step that must come first, as a re-file does (REQ-PIPE-141 criterion 12).
+    - THE SYSTEM SHALL compute the placed supply's arrival classification against the slot it was placed in, so that a supply placed after its slot closed reads late.
+    - THE SYSTEM SHALL list every held supply in the terminal's filing-decisions door, saying why it was held in words that say the rule could not tell which period - never as a choice between files - and SHALL offer place and reject on each.
+    - THE SYSTEM SHALL let a person reject a held supply from the terminal and through mothman supply decide, with a reason, ending its hold.
+    - THE SYSTEM SHALL name, in `mothman supply holds` and in every refusal that points at placing, both the exact command that places a held supply and the terminal screen that offers it, printing the command on a line of its own.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1 to list place among the filing decisions.
+    - THE SYSTEM SHALL offer place on the terminal route only - the filing-decisions door and mothman supply decide - and SHALL NOT offer it on the GitHub route; THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 3 to name place, beside REQ-PIPE-170's correction confirmation, as an operation offered on the terminal route only.
+    - THE SYSTEM SHALL take a placement through --supply and --to-period, SHALL refuse --period for a placement, which a held supply does not have, and SHALL refuse a --dataset that does not match the supply's own dataset.
+    - WHEN the terminal asks for the period to place a supply in, or to re-file one to, THE SYSTEM SHALL offer periods as a choice rather than asking for a typed period - opening on the periods whose claim windows were nearest the supply's receipt instant on both sides, each marked closed or not yet open and showing its one-word current state, with inherited periods marked as needing un-inherit first - and SHALL offer a choice that pages to earlier or later periods; on the flag route --to-period SHALL accept any period criterion 4 allows.
+    - THE SYSTEM SHALL list held supplies in the queue of supplies waiting on a decision, grouped under their own heading above the slot rows, each showing its dataset and receipt instant in place of a period.
+    - WHEN a period has been chosen, and before the reason is asked for, THE SYSTEM SHALL show how the supply would classify against that period's slot, what the slot holds now and what placing does to it, and SHALL NOT run any QA to predict a verdict.
+    - WHEN a placement's QA finishes, THE SYSTEM SHALL end with one panel saying where the supply now stands - its period, its verdict and what the gate did; WHERE it is waiting, SHALL say that it is filed and nothing is lost and SHALL offer the next decision; and WHERE the checks did not run, SHALL say that they are owed, that the processing pass will finish them, and that the placement stands.
+    - THE SYSTEM SHALL NOT use the words rejected or refused for a gate outcome in that panel, those words naming a person's decision.
     non_functional_requirements:
     - AT THE TARGET SCALE THIS IS NOT RARE. The current synthetic database holds 9 assignment-rule holds
       for Case Workers alone (ran `mothman supply holds`, 2026-10-07), and every one is waiting on an action
@@ -25882,29 +25867,16 @@ requirements:
     - REQ-PIPE-141
     - REQ-GHUB-082
     decisions:
-    - 'A GAP IN BUILT BEHAVIOUR, NOT A NEW IDEA: REQ-PIPE-064''s hold record already names ''file it to
-      a slot yourself'' as the resolution, and qa_tools/common/refiling.py (post-build-review #114) already
-      refuses a held supply by name and points at placing - an operation that was never built. So the system
-      today tells a person to do something it offers no way to do.'
-    - 'PLACE, NOT RE-FILE (REQ-PIPE-141, post-build-review #114): a held supply has no period to leave,
-      and re-file''s whole contract - the old filing kept as history, the old period''s slot emptied and
-      re-checked - has nothing to act on. A separate word keeps both honest.'
-    - 'ALLOWED FORWARD AND INTO A CLOSED PERIOD: criterion 5 of REQ-PIPE-062 is absolute for the RULE because
-      a rule that claims forward silently marks a future obligation met; a person naming a period, with
-      a reason, on the record, is the opposite of silent. Re-file already allows both (REQ-PIPE-141 criterion
-      17; post-build-review #115 D2).'
-    - 'STILL NEEDED UNDER THE CORRECTION ROUTE (Keith, 2026-10-07): the hold exists today, whatever happens
-      to calendars - 9 Case Workers supplies sit in it - and a correction can itself leave a supply with
-      no period (REQ-PIPE-170 criterion 8). Originally scoped as what made a strict REQ-PIPE-111 survivable;
-      built in parallel with it, not before.'
-    - PLACE IS TERMINAL ONLY (Keith, 2026-10-07), against the recommendation to raise it on the target period's
-      ticket. A held supply has no slot and so no ticket, and the GitHub route is disabled. REQ-GHUB-082
-      criterion 3 is amended to name it beside REQ-PIPE-170's confirmation, rather than broken silently.
-    - PLACE REUSES --to-period, NOT --period; PERIODS ARE CHOSEN, NOT TYPED, for place and re-file alike;
-      held supplies are grouped in the waiting-on-a-decision queue (delivery-cli-ux pre-build review, 2026-10-07).
+    - 'A GAP IN BUILT BEHAVIOUR, NOT A NEW IDEA: REQ-PIPE-064''s hold record already names ''file it to a slot yourself'' as the resolution, and qa_tools/common/refiling.py (post-build-review #114) already refuses a held supply by name and points at placing - an operation that was never built. So the system today tells a person to do something it offers no way to do.'
+    - 'PLACE, NOT RE-FILE (REQ-PIPE-141, post-build-review #114): a held supply has no period to leave, and re-file''s whole contract - the old filing kept as history, the old period''s slot emptied and re-checked - has nothing to act on. A separate word keeps both honest.'
+    - 'ALLOWED FORWARD AND INTO A CLOSED PERIOD: criterion 5 of REQ-PIPE-062 is absolute for the RULE because a rule that claims forward silently marks a future obligation met; a person naming a period, with a reason, on the record, is the opposite of silent. Re-file already allows both (REQ-PIPE-141 criterion 17; post-build-review #115 D2).'
+    - 'STILL NEEDED UNDER THE CORRECTION ROUTE (Keith, 2026-10-07): the hold exists today, whatever happens to calendars - 9 Case Workers supplies sit in it - and a correction can itself leave a supply with no period (REQ-PIPE-170 criterion 8). Originally scoped as what made a strict REQ-PIPE-111 survivable; built in parallel with it, not before.'
+    - PLACE IS TERMINAL ONLY (Keith, 2026-10-07), against the recommendation to raise it on the target period's ticket. A held supply has no slot and so no ticket, and the GitHub route is disabled. REQ-GHUB-082 criterion 3 is amended to name it beside REQ-PIPE-170's confirmation, rather than broken silently.
+    - PLACE REUSES --to-period, NOT --period; PERIODS ARE CHOSEN, NOT TYPED, for place and re-file alike; held supplies are grouped in the waiting-on-a-decision queue (delivery-cli-ux pre-build review, 2026-10-07).
     - 'PLACEMENT RUNS QA EXACTLY AS A RE-FILE DOES (Keith, 2026-10-10, on the delivery-architect''s review): the placement, the hold''s resolution and an owed re-check commit in one transaction; the terminal then runs the owed check straight away while the person waits (filing_tui._run_owed), and the processing pass finishes it if the terminal is interrupted. No QA runs inside filing_decisions. REJECTED running QA inside the placement''s own transaction: the four tools open their own connections and cannot see uncommitted work, the decision''s locks would be held for the whole run, and a tool failure would roll back the person''s decision. This replaces the 2026-10-08 wording ''run inline on the terminal''s own connection'', which described the existing re-file behaviour as though it were new.'
     - 'NO PREDICTED VERDICT BEFORE PLACING; CHEAP FACTS ONLY (Keith, 2026-10-10, on the delivery-cli-ux review): once a period is chosen and before the reason is asked for, the terminal shows how the supply would classify against that slot (e.g. ''would read late - 41 days after the window closed'') and what the slot holds now and what placing does to it (''empty - this fills it'', ''holds a promoted supply - this one would wait as another version''). The real checks run after confirmation and the outcome panel reports the verdict. REJECTED offering a trial placement (''try it here first''): a real prediction runs all four tools, about a minute per try, and would extend the trial mechanism to unfiled supplies. This supersedes the 2026-10-08 idea of a predicted verdict in the chooser (plans/running-thoughts.md #72).'
     - 'THE PERIOD CHOOSER OPENS NEAR THE SUPPLY''S ARRIVAL (Keith, 2026-10-10, on the delivery-cli-ux review): it opens on the periods whose claim windows were nearest the supply''s receipt instant, both sides, each marked closed or not yet open with its one-word current state (empty, promoted, inherited - un-inherit first, ...), and offers ''An earlier or later period...'' to page further; --to-period on the flag route accepts any period criterion 4 allows. REJECTED listing every period: thousands of rows on a daily feed. Note for the builder: filing_queue.slots_of stops at today, so reusing it would silently drop the not-yet-open periods criterion 3 permits. The same chooser serves re-file (criterion 13).'
+    - 'REVIEW FOLD-IN, 2026-10-10: criteria on the outcome panel, the held label in the queue, the flag route, the refusal text and the chooser came from the delivery-cli-ux and delivery-architect pre-build reviews of 2026-10-08, with Keith''s answers recorded in the three decisions above. The dashboard half of placing - the ''Placed by hand'' tag and the resolved hold row - is split into REQ-DASH-175 on the REQ-PIPE-154 / REQ-DASH-155 pattern, rather than added here.'
   - id: REQ-PIPE-164
     title: A person can have a supply's checks run again without moving it, singly or for every supply a
       fixed check affects
@@ -25920,102 +25892,95 @@ requirements:
       refuses a recorded re-run of an arrival and names the re-check as ''owed by the decision that calls
       for it''); no decision exists whose purpose is the re-check itself.'
     acceptance_criteria:
-    - THE SYSTEM SHALL offer RE-CHECK as a filing decision a person raises about a supply that is filed
-      and waiting, or filed and promoted, on the same terms as every other - actor, mandatory reason, allowlist,
-      refusal, one implementation behind every route.
-    - WHEN a person re-checks a supply, THE SYSTEM SHALL run its QA through REQ-PIPE-140's mechanism - a
-      run of its own, the supply's own checks and the cross-table checks that read it, against its filed
-      period - and SHALL record that decision as the run's cause.
-    - WHERE the re-checked supply is waiting, THE SYSTEM SHALL apply the promotion gate to the new verdict
-      exactly as for a first arrival, under the settings in force at that instant.
-    - WHERE the re-checked supply is promoted, THE SYSTEM SHALL record the new verdict as its current one
-      and SHALL NOT demote, move or re-gate it, leaving any change of what the period holds to a person's
-      decision.
-    - THE SYSTEM SHALL NOT move the supply, change its filing or change what any period resolves to on a
-      re-check.
-    - THE SYSTEM SHALL offer re-check in the terminal's filing-decisions door on every slot with a filed
-      supply, and through mothman supply decide.
-    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1
-      to list re-check among the filing decisions.
+    - THE SYSTEM SHALL offer RE-CHECK as a filing decision a person raises about a supply that is filed and waiting, or filed and promoted, on the same terms as every other - actor, mandatory reason, allowlist, refusal, one implementation behind every route.
+    - WHEN a person re-checks a supply, THE SYSTEM SHALL run its QA through REQ-PIPE-140's mechanism - a run of its own, the supply's own checks and the cross-table checks that read it, against its filed period - and SHALL record that decision as the run's cause.
+    - WHERE the re-checked supply is waiting, THE SYSTEM SHALL apply the promotion gate to the new verdict exactly as for a first arrival, under the settings in force at that instant.
+    - WHERE the re-checked supply is promoted, THE SYSTEM SHALL record the new verdict as its current one and SHALL NOT demote, move or re-gate it, leaving any change of what the period holds to a person's decision.
+    - THE SYSTEM SHALL NOT move the supply, change its filing or change what any period resolves to on a re-check.
+    - THE SYSTEM SHALL offer re-check in the terminal's filing-decisions door on every slot with a filed supply, and through mothman supply decide.
+    - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1 to list re-check among the filing decisions.
     - THE SYSTEM SHALL offer a BULK re-check, raised by a person naming one check by its check_id, with a mandatory reason. A bulk re-check SHALL cover every dataset and every period that check touches, and SHALL NOT offer the person a period range on it.
-    - THE SYSTEM SHALL choose the supplies a bulk re-check covers as every supply, in any dataset and any period, that is filed and waiting or promoted, whose current run recorded a result for that check, and whose current run is older than the newest changelog entry of that check's definition - and SHALL include none other.
-    - IF the named check has no changelog entry newer than the current run of any supply it would cover, THEN THE SYSTEM SHALL refuse the bulk re-check, saying that nothing about the check has changed since those supplies were checked.
-    - THE SYSTEM SHALL show the number of supplies a bulk re-check covers, by dataset and period, and SHALL
-      require the person to confirm that number before anything runs.
-    - THE SYSTEM SHALL record a bulk re-check as one re-check decision-log entry per supply, each naming
-      the check, its changelog entry and the reason, and SHALL run each as REQ-PIPE-140's re-check with
-      that entry as its cause.
-    - WHERE a supply in a bulk re-check is waiting, THE SYSTEM SHALL re-gate it as for a single re-check;
-      WHERE it is promoted, THE SYSTEM SHALL record its new verdict and SHALL NOT re-gate it.
-    - IF any re-run in a bulk re-check fails to complete, THEN THE SYSTEM SHALL leave it owed under REQ-PIPE-140
-      criterion 8 and SHALL continue with the rest.
-    - THE SYSTEM SHALL offer the bulk re-check as its own command, `mothman supply recheck`, taking the check and no period range. A trial re-check takes the supplies or period range it is given, as the trial criteria below say.
-    - WHEN a bulk re-check is proposed, THE SYSTEM SHALL show the count by dataset and period and the check
-      changelog entry it acts on in the existing consequences panel, and SHALL require --yes with --acknowledge
-      KEY on the flag route, refusing if the set has changed since it was shown, and the asset's production
-      confirmation where that applies.
-    - IF a bulk re-check selects no supplies, THEN THE SYSTEM SHALL refuse it and say why.
-    - WHILE a bulk re-check runs, THE SYSTEM SHALL show its progress (k of N), and WHEN it ends, a summary
-      of verdicts changed, unchanged and still owed.
-    - WHERE a promoted supply's re-check comes back red, THE SYSTEM SHALL say that it is still promoted
-      and the period keeps it, and SHALL name demote as the decision that would take it out.
-    - WHERE a check's definition has a changelog entry newer than the current run of any filed supply that
-      recorded it, THE SYSTEM SHALL say so in the terminal's queue - 'N supplies were checked before <check>
-      changed' - and SHALL name the bulk re-check that would re-run them.
-    - THE SYSTEM SHALL treat a check changelog entry's date as the end of that day on the data asset's clock
-      when comparing it with a run's instant.
-    - THE SYSTEM SHALL offer a TRIAL re-check, raised by a person naming one check by its check_id and choosing either one or more supplies from a list, or a period range.
-    - WHEN a trial runs, THE SYSTEM SHALL run each chosen supply's QA through REQ-PIPE-140's mechanism against its filed period, SHALL show each resulting verdict and what the promotion gate would do with it, and SHALL record no QA run, no verdict, no decision-log entry and no change to any supply.
-    - THE SYSTEM SHALL state, before a trial runs, how many supplies it will run, by dataset and period, and SHALL require the person to confirm that number. A trial SHALL NOT be capped on how many supplies it can run.
+    - THE SYSTEM SHALL choose the supplies a bulk re-check covers as every supply, in any dataset and any period, that is filed and waiting or promoted and whose result for that check - in the run holding its current result for that check - carries a check-definition fingerprint different from the check's current one, and SHALL include none other.
+    - IF no supply's stored fingerprint for the named check differs from the check's current one, THEN THE SYSTEM SHALL refuse the bulk re-check, saying that nothing about the check has changed since those supplies were checked.
+    - IF the named check is retired, THEN THE SYSTEM SHALL refuse a bulk re-check of it.
+    - THE SYSTEM SHALL show the number of supplies a bulk re-check covers, by dataset and period, and SHALL require the person to confirm that number before anything runs.
+    - THE SYSTEM SHALL record a bulk re-check, in one transaction and before any of it runs, as one re-check decision-log entry and one owed re-check per supply, each naming the check, its current changelog entry and the reason.
+    - WHERE a supply in a bulk re-check is waiting, THE SYSTEM SHALL re-gate it as for a single re-check; WHERE it is promoted, THE SYSTEM SHALL record its new verdict and SHALL NOT re-gate it.
+    - IF any re-run in a bulk re-check fails to complete, THEN THE SYSTEM SHALL leave it owed under REQ-PIPE-140 criterion 8 and SHALL continue with the rest.
+    - 'THE SYSTEM SHALL offer the bulk re-check and its trial as their own command, `mothman supply recheck`: the real run taking the check, a reason, --yes and --acknowledge KEY and no period range; the trial taking --trial, the check, and either a repeatable --supply or the shared pair of range flags REQ-PIPE-161 criterion 15 defines, and no reason.'
+    - WHEN a bulk re-check is proposed, THE SYSTEM SHALL show the count by dataset and period and the check changelog entry it acts on in the existing consequences panel, and SHALL require --yes with --acknowledge KEY on the flag route, refusing if the set has changed since it was shown, and the asset's production confirmation where that applies.
+    - WHILE a bulk re-check runs in the terminal, THE SYSTEM SHALL show its progress (k of N, with dataset and period), SHALL say at the start that it can be stopped at any point and that whatever has not run stays owed for the processing pass, and WHEN it ends SHALL show a summary of verdicts changed, unchanged and still owed.
+    - THE SYSTEM SHALL claim each owed re-check before running it, so that the terminal and the processing pass never run the same supply's re-check twice.
+    - WHERE a bulk re-check's estimated run time is long, THE SYSTEM SHALL warn the person before it runs, giving the count and the estimate, and SHALL offer to record it and hand it to the processing pass instead of running it in the terminal.
+    - WHERE a promoted supply's re-check comes back red, THE SYSTEM SHALL say that it is still promoted and the period keeps it, and SHALL name demote as the decision that would take it out.
+    - WHERE any filed supply's stored fingerprint for a check differs from that check's current one, THE SYSTEM SHALL say so in the terminal's queue - 'N supplies were checked before <check> changed' - as a choice that leads to the bulk re-check, saying 'across all collections' where those supplies span more than one.
+    - THE SYSTEM SHALL record, with every check result, a fingerprint of that check's definition as it stood when the result was produced.
+    - THE SYSTEM SHALL compute that fingerprint with the one writer that already fingerprints a check's configuration for the changelog gate (check_lifecycle's config hash), extended so that a setting whose value equals its frozen default is left out before hashing, the result is serialised as RFC 8785 canonical JSON, and the fingerprint carries its scheme version, as 'v1:<sha256>'.
+    - THE SYSTEM SHALL keep the frozen defaults as a versioned table in code, one entry per setting giving the value the system used when that setting was introduced, and SHALL refuse a change to a frozen default except as a new scheme version.
+    - THE SYSTEM SHALL commit a baseline file listing every check's current fingerprint, regenerated by one mothman command, and SHALL have the changelog gate compare against it, so that changing the writer appears as one reviewed diff rather than as every check changing.
+    - THE SYSTEM SHALL have a test that adding a setting at its frozen default leaves every committed fingerprint unchanged, and that changing one check's threshold changes that check's fingerprint alone.
+    - THE SYSTEM SHALL offer a TRIAL re-check, raised by a person naming one check by its check_id and choosing either one or more supplies from a list, or a period range, from among only the supplies the real bulk re-check of that check would cover.
+    - WHEN a trial runs, THE SYSTEM SHALL run each chosen supply's QA through the same implementation as the real re-check, under a trial run identity whose results are discarded when it ends (REQ-PIPE-103's trial mechanism), SHALL show each verdict and what the promotion gate would do with it, computed without writing anything, and SHALL leave no QA run, verdict, decision-log entry, owed re-check or change to any supply behind.
+    - THE SYSTEM SHALL NOT treat a trial's run as any supply's current run at any instant, including between the trial finishing and its results being discarded.
+    - THE SYSTEM SHALL state, before a trial runs, how many supplies it will run, by dataset and period, beside the number the real re-check would cover, and SHALL require the person to confirm. A trial SHALL NOT be capped on how many supplies it can run.
     - WHEN a trial is given a period range, THE SYSTEM SHALL say in the terminal that the range applies to the trial only, and that the real bulk re-check covers everything the check touches with no range.
     - WHEN a trial shows a verdict, THE SYSTEM SHALL say that the verdict comes from a run that has been discarded, and that the real run may differ if the data changes before it runs.
-    - THE SYSTEM SHALL offer the trial on the terminal route only - the filing-decisions door and mothman supply decide - and SHALL NOT offer it on the GitHub route.
+    - THE SYSTEM SHALL offer the trial on the terminal route only - the filing-decisions door and `mothman supply recheck --trial` - and SHALL NOT offer it on the GitHub route or under `mothman supply decide`.
+    - WHEN a trial is stopped part way, THE SYSTEM SHALL say that nothing was recorded.
     non_functional_requirements:
-    - 'No new execution path: REQ-PIPE-140 already built the run identity, the owed record, the failure
-      handling and the ''most recent run is current'' rule. This adds a decision that owes one, nothing
-      more.'
-    - Only the orchestrator path that legitimately holds a supply-row connection runs it (REQ-PIPE-140 criterion
-      6); on the GitHub route the decision is recorded and the processing pass runs it, as for a re-file.
-    - '''BOUNDED BY THE CHECK AND ITS OWN CHANGELOG, NOT BY A RANGE. At thirty datasets and years of daily history ''''every supply that check ever touched'''' is large, so the real run covers the one named check across everything it touches, and only supplies checked before the fix are re-run. There is no period range on the real run (Keith, 2026-10-08): a partial re-run after a fix is not a case anyone needs. The count is shown and confirmed before anything runs.'''
-    - Runs through the processing pass's orchestrator path, one supply at a time like any owed re-check,
-      so a large bulk re-check is slow rather than unsafe; owed re-checks survive an interrupted run (REQ-PIPE-140).
+    - 'No new execution path: REQ-PIPE-140 already built the run identity, the owed record, the failure handling and the ''most recent run is current'' rule. This adds a decision that owes one, nothing more.'
+    - Only the orchestrator path that legitimately holds a supply-row connection runs it (REQ-PIPE-140 criterion 6); on the GitHub route the decision is recorded and the processing pass runs it, as for a re-file.
+    - 'BOUNDED BY THE CHECK AND ITS FINGERPRINT, NOT BY A RANGE. At thirty datasets and years of daily history ''every supply that check ever touched'' is large, so the real run covers the one named check across everything it touches, and only supplies whose stored fingerprint differs from today''s are re-run. There is no period range on the real run (Keith, 2026-10-08): a partial re-run after a fix is not a case anyone needs. The count is shown and confirmed before anything runs.'
+    - Runs through the processing pass's orchestrator path, one supply at a time like any owed re-check, so a large bulk re-check is slow rather than unsafe; owed re-checks survive an interrupted run (REQ-PIPE-140).
     dependencies:
     - REQ-PIPE-140
     - REQ-GHUB-082
     decisions:
-    - 'A DECISION, NOT A BARE COMMAND (scoper''s call): every recorded re-run must carry the decision that
-      caused it (REQ-PIPE-140 criterion 4). A re-check with no cause would be the first recorded QA run
-      nobody can explain, which is what that criterion exists to prevent.'
-    - 'A PROMOTED SUPPLY IS RE-CHECKED BUT NOT RE-GATED (scoper''s call, PROVISIONAL): the gate decides
-      whether to promote what waits; it has no rule for taking back what a person or the rule already accepted,
-      and inventing one here would let a check fix demote data downstream readers depend on without anybody
-      choosing to.'
-    - 'REJECTED re-filing a supply to its own period as the workaround: refiling.plan refuses it (''already
-      filed to'') and would rightly do so - it is not a move.'
-    - 'SHOULD RATHER THAN MUST: a person can already promote a red supply with a reason, so our check mistake
-      is survivable today; what is missing is a way to put the honest verdict on the record.'
-    - BULK RE-CHECK IS IN THIS BATCH (Keith, 2026-10-07), against the recommendation to leave it to check-lifecycle
-      work.
-    - 'THE AFFECTED SET IS CHOSEN BY THE CHECK''S OWN CHANGELOG (scoper''s call): a check whose definition
-      changes must already carry a new changelog entry (qa_tools/common/check_lifecycle.py), so ''fixed
-      after this supply was checked'' is a recorded fact, not a guess. REJECTED selecting only supplies
-      whose result for that check was red or amber: a fix can turn a false pass into a fail as easily as
-      the reverse.'
-    - 'A PERIOD RANGE IS REQUIRED, NOT DEFAULTED TO ALL HISTORY (scoper''s call): re-judging years of promoted
-      supplies because a check was reworded is a decision somebody should make in so many words.'
-    - 'ONE ENTRY PER SUPPLY, as REQ-PIPE-161''s range excuse is recorded: every re-run carries its own cause
-      (REQ-PIPE-140 criterion 4).'
-    - 'THE QUEUE NUDGES A BULK RE-CHECK (Keith, 2026-10-07): ''N supplies were checked before <check> changed''.
-      A nudge, not an automatic re-run - re-judging promoted data stays a person''s call.'
-    - ITS OWN COMMAND, THE SHARED RANGE FLAGS, THE CONSEQUENCES PANEL, PROGRESS AND A SUMMARY (delivery-cli-ux
-      pre-build review, 2026-10-07). A promoted supply re-checked red says the period keeps it and names
-      demote, so 'still red' is never read as 'already taken out'.
-    - 'A CHANGELOG DATE IS END OF DAY ON THE ASSET CLOCK (delivery-architect pre-build review, 2026-10-07):
-      a check fixed on a day and a run later that same day must not both count as ''before the fix''.'
+    - 'A DECISION, NOT A BARE COMMAND (scoper''s call): every recorded re-run must carry the decision that caused it (REQ-PIPE-140 criterion 4). A re-check with no cause would be the first recorded QA run nobody can explain, which is what that criterion exists to prevent.'
+    - 'A PROMOTED SUPPLY IS RE-CHECKED BUT NOT RE-GATED (scoper''s call, PROVISIONAL): the gate decides whether to promote what waits; it has no rule for taking back what a person or the rule already accepted, and inventing one here would let a check fix demote data downstream readers depend on without anybody choosing to.'
+    - 'REJECTED re-filing a supply to its own period as the workaround: refiling.plan refuses it (''already filed to'') and would rightly do so - it is not a move.'
+    - 'SHOULD RATHER THAN MUST: a person can already promote a red supply with a reason, so our check mistake is survivable today; what is missing is a way to put the honest verdict on the record.'
+    - BULK RE-CHECK IS IN THIS BATCH (Keith, 2026-10-07), against the recommendation to leave it to check-lifecycle work.
+    - 'SUPERSEDED 2026-10-10 - the set is chosen by the stored definition fingerprint (see the fingerprint decision below). WAS: THE AFFECTED SET IS CHOSEN BY THE CHECK''S OWN CHANGELOG (scoper''s call): a check whose definition changes must already carry a new changelog entry (qa_tools/common/check_lifecycle.py), so ''fixed after this supply was checked'' is a recorded fact, not a guess. REJECTED selecting only supplies whose result for that check was red or amber: a fix can turn a false pass into a fail as easily as the reverse.'
+    - 'SUPERSEDED 2026-10-10 - the real run takes no range; a range belongs to the trial only (see the AMENDED 2026-10-08 decision). WAS: A PERIOD RANGE IS REQUIRED, NOT DEFAULTED TO ALL HISTORY (scoper''s call): re-judging years of promoted supplies because a check was reworded is a decision somebody should make in so many words.'
+    - 'ONE ENTRY PER SUPPLY, as REQ-PIPE-161''s range excuse is recorded: every re-run carries its own cause (REQ-PIPE-140 criterion 4).'
+    - 'THE QUEUE NUDGES A BULK RE-CHECK (Keith, 2026-10-07): ''N supplies were checked before <check> changed''. A nudge, not an automatic re-run - re-judging promoted data stays a person''s call.'
+    - ITS OWN COMMAND, THE SHARED RANGE FLAGS, THE CONSEQUENCES PANEL, PROGRESS AND A SUMMARY (delivery-cli-ux pre-build review, 2026-10-07). A promoted supply re-checked red says the period keeps it and names demote, so 'still red' is never read as 'already taken out'.
+    - 'SUPERSEDED 2026-10-10 - no date is compared any more, so the end-of-day rule has nothing to apply to. WAS: A CHANGELOG DATE IS END OF DAY ON THE ASSET CLOCK (delivery-architect pre-build review, 2026-10-07): a check fixed on a day and a run later that same day must not both count as ''before the fix''.'
     - 'AMENDED 2026-10-08 (Keith): supersedes the decision above that required a period range. The real run covers everything the check touches with no range at all. A period range now belongs to the TRIAL only, where it is a bounded look at a few supplies, and the screen says so plainly. The concern behind the old decision - not re-judging years of data without anyone deciding to - is met by the changelog cut-off and by the count-and-confirm step, not by a range.'
     - 'TRIAL SHAPE (Keith, 2026-10-08): supplies chosen from a list, several at once, or a period range; the verdict and the gate''s outcome are shown; nothing is recorded. NO CAP on how many supplies a trial runs - Keith''s reason: a trial that refuses past some number pushes people into the real run to get round it. The trial states how many it will run and asks the person to confirm, as the real run does. NO REASON REQUIRED on a trial (Keith, 2026-10-08): it records nothing and requires nothing. AGREED (Keith, 2026-10-08): the trial and the real run share one implementation, differing only in whether results are kept - ''that''s actually perfect''.'
     - 'THE TRIAL LIVES ON `mothman supply recheck --trial` (Keith, 2026-10-10, on the delivery-cli-ux review), beside the real run and matching `mothman bdm qa --trial`, which already means ''the real tools ran, nothing was recorded''. A trial takes no reason, no --acknowledge and no production confirmation - only the count-and-confirm. REJECTED `mothman supply decide`, as the 2026-10-08 draft had it: decide exists to record a decision and always takes a reason, so a command that records nothing does not belong in it. The single re-check stays on decide --operation re-check. The trial-route criterion is to be reworded to match.'
     - 'THE TRIAL OFFERS ONLY WHAT THE REAL RUN WOULD COVER (Keith, 2026-10-10, on the delivery-cli-ux review): the supplies whose stored check fingerprint differs from the check''s current definition, so a trial is a true preview of the real run; its confirmation shows the real run''s total beside the trial count. REJECTED offering any filed supply the check touches: a trial of supplies the real run will never re-check previews nothing.'
+    - 'THE AFFECTED SET IS CHOSEN BY A STORED DEFINITION FINGERPRINT, NOT BY THE CHANGELOG DATE (Keith, 2026-10-10, on the delivery-architect review). Each result records a fingerprint of its check''s definition; the bulk re-check takes every supply whose stored fingerprint differs from today''s. REJECTED the changelog-date cut-off: run instants come from the replay clock, so on a bootstrapped history every supply looks older than every 2026 changelog entry and the whole history would be selected; and a hand-typed or backdated date silently changes what is re-run. Git and the check changelog stay the record of WHAT changed and why - Keith: the fingerprint says only THAT it changed, and nothing else is stored to report the change.'
+    - 'THE FINGERPRINT SURVIVES ADDED SETTINGS (Keith, 2026-10-10, after research): settings at their frozen default are left out before hashing, as the Rust stable_hash crate does, so adding a setting whose default is what the system already did changes no stored fingerprint. Defaults are FROZEN in a versioned table, because a default edited in place would be invisible - the old hash left the field out and so would the new. Implemented in our existing writer rather than a new dependency; RFC 8785 canonical JSON (the rfc8785 package) replaces the hand-rolled json.dumps. REJECTED a fingerprint of tool and code versions: every dbt, Soda or Python upgrade would make every supply look stale (plans/running-thoughts.md #73). REJECTED storing the parsed settings or the YAML text alongside the hash: it would need a parser for every past shape, and Git already holds the history.'
+    - 'THE WRITER CHANGE IS RE-BASELINED BY A COMMITTED BASELINE FILE (Keith, 2026-10-10, ''happy in principle''): switching the writer moves all 258 hashes at once, which the changelog gate would read as every check changing. One file lists every check''s fingerprint, regenerated by one mothman command and reviewed like any configuration, and the gate compares against it. REJECTED a one-off gate exemption for a named commit: a hole in the gate that outlives the change it was made for.'
+    - 'A LARGE BULK RUN WARNS AND OFFERS A HAND-OFF (Keith, 2026-10-10): the terminal records every owed re-check up front, runs them with progress and may be stopped at any point, with the processing pass finishing what is left; where the estimated time is long it warns first and offers to hand the whole run to the pass. PROVISIONAL: what counts as long - proposed at about thirty minutes from the measured per-supply time - is for Keith to confirm at sign-off.'
+  - id: REQ-DASH-175
+    title: The dashboard says when a supply was placed by hand, or re-checked after we fixed a check
+    date_written: '2026-10-10'
+    story: As a data team leader reading a dataset's supply history, I want a supply a person placed by hand, or one whose verdict changed because we fixed a check, to say so - who, when and why - so that I neither mistake a person's decision for the filing rule's nor blame a supplier for a verdict our own check produced.
+    moscow: should
+    status: not_started
+    source: delivery-dashboard-ux pre-build review of REQ-PIPE-163 and REQ-PIPE-164, 2026-10-08, findings 7 to 10. Drafted by the main session from that review on 2026-10-10 and NOT YET THROUGH delivery-scoper - say so before it is presented for sign-off.
+    acceptance_criteria:
+    - WHERE a supply was placed by a person, THE SYSTEM SHALL show on its supply-history row a 'Placed by hand' tag, in the column that says how the row came to be in its cycle, naming the person and the date, with the reason as visible text.
+    - WHERE the period a supply was placed into was closed, or not yet open, at the supply's receipt instant, THE SYSTEM SHALL say which on that row.
+    - WHERE a hold was resolved by placing, THE SYSTEM SHALL show on the resolved hold's row the period the supply was placed into, the person and the date.
+    - THE SYSTEM SHALL show a supply that was both placed and excused (REQ-DASH-162) with two distinct labels in two distinct cells - punctuality in the timing cell, placement in the provenance cell - and SHALL NOT show 'excused' beside the placement or 'placed' beside the excuse.
+    - WHERE a supply's status changed on a re-check, THE SYSTEM SHALL name on its supply-history row the check and the changelog entry that caused it, in words that place the change with our check rather than with the supply.
+    - THE SYSTEM SHALL describe a placement and a re-check in words wherever a past decision is described - 'placed in <period>', 're-checked' - and SHALL NOT show the raw operation name.
+    - THE SYSTEM SHALL compute all of this from recorded decisions and results only, and SHALL NOT read supply rows.
+    non_functional_requirements:
+    - Rendered from data another component computed - placing is REQ-PIPE-163's and re-checking REQ-PIPE-164's; this only consumes them (docs/components.md).
+    - Same date and person formatting as everything else on the page (REQ-DASH-071).
+    dependencies:
+    - REQ-PIPE-163
+    - REQ-PIPE-164
+    - REQ-DASH-162
+    decisions:
+    - 'SPLIT FROM REQ-PIPE-163 AND REQ-PIPE-164 on the REQ-PIPE-154 / REQ-DASH-155 pattern: the decision and its record are one reviewable unit, the rendering another.'
+    - 'PLACEMENT AND EXCUSE IN DIFFERENT CELLS WITH DIFFERENT VERBS (delivery-dashboard-ux pre-build review, 2026-10-08): a supply placed into a closed period reads late, and is exactly the one most likely to be excused too, so sharing a cell would let a reader take one reason for the other.'
+    - 'A RE-CHECK''S CAUSE NAMES OUR CHECK (same review): the requirement''s own story is ''our mistake, not the supplier''s'', so the words must not leave a supplier looking responsible for a verdict a fixed check produced.'
   - id: REQ-GHUB-165
     title: The terminal offers every filing decision that applies, wherever it applies
     date_written: '2026-10-07'
