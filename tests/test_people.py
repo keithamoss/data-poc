@@ -19,12 +19,14 @@ def _write(tmp_path, content):
 class TestParsePeopleConfig:
     def test_a_missing_file_returns_empty_config_rather_than_raising(self, tmp_path):
         config = people_mod.parse_people_config(tmp_path / "does-not-exist.yaml")
-        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
+        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {},
+                          "asset_assignments": [], "roles": []}
 
     def test_a_genuinely_empty_committed_file_also_returns_empty_config(self, tmp_path):
         path = _write(tmp_path, "people: []\nassignments: []\n")
         config = people_mod.parse_people_config(path)
-        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
+        assert config == {"people": {}, "agency_assignments": {}, "dataset_assignments": {},
+                          "asset_assignments": [], "roles": []}
 
     def test_parses_real_people_and_agency_and_dataset_assignments(self, tmp_path):
         path = _write(tmp_path, """

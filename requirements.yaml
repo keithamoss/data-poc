@@ -26779,7 +26779,20 @@ requirements:
       configuration and checked when a decision requires it, so that confirming a correction's filing moves
       is limited to the person accountable for the whole asset.
     moscow: must
-    status: not_started
+    status: built
+    evidence:
+    - '2026-10-11 (overnight #3): tests/test_roles.py 21 passed - the committed people.yaml passes; an undeclared role on a person or an assignment, and a file declaring no roles, are refused (criterion 1); an assignment naming no level or two, or another asset, is refused (2); no real asset manager - none, or a placeholder - fails the gate (6); Keith is the asset manager and an agency manager is not (4, 5); require_role passes the asset manager, refuses anyone else naming the role and level, holds an agency role for its own agency only, refuses a placeholder, and lets the synthetic actor be asset manager only inside playback on a synthetic asset (3, 7); filing_decisions.apply refuses a decision requiring a role before any database is opened (3, NFR 1). tests/test_people.py and tests/test_validate_people.py updated to the new required shape and green.'
+    implemented_by:
+    - qa_tools/common/people.py::require_role
+    - qa_tools/common/people.py::asset_managers
+    - qa_tools/common/people.py::holds
+    - qa_tools/common/people.py::parse_people_config
+    - qa_tools/common/validate_people.py::problems
+    - qa_tools/common/filing_decisions.py::apply
+    linked_tests:
+    - tests/test_roles.py
+    - tests/test_people.py
+    - tests/test_validate_people.py
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -26827,6 +26840,9 @@ requirements:
       or on a real asset, it is refused like any non-person.
     - EXACTLY ONE LEVEL PER ASSIGNMENT, three levels (delivery-architect pre-build review, 2026-10-07),
       S8.
+    - 'THE ASSET LEVEL IS WRITTEN `data_asset: <data_asset_id>` (2026-10-11, overnight #3, PROVISIONAL), beside the existing `agency:` and `dataset:` keys, so all three levels read the same way and the gate can check the id is this asset''s. REJECTED a `level:` field: two keys to say one thing, and the existing two levels already use the key itself.'
+    - 'THE SYNTHETIC ACTOR''S ASSET-MANAGER ROLE IS IMPLICIT (2026-10-11, PROVISIONAL): require_role grants it inside scripted playback on a synthetic asset rather than people.yaml carrying an assignment for it, because the people gate already refuses any assignment of the synthetic actor (REQ-GHUB-082 criterion 29 as amended) and that refusal is the stronger guarantee outside playback.'
+    - 'NO DECISION REQUIRES A ROLE YET (2026-10-11): filing_decisions.REQUIRED_ROLE is the one table every route consults, checked in apply() after the actor is identified and before anything else, and it is empty - the first entry is REQ-PIPE-170''s confirmation of a correction''s filing moves, by the asset manager, which is not built. Adding a role to an existing decision would refuse people who can act today, which nothing signed asks for.'
   - id: REQ-DASH-172
     title: The dashboard shows the corrected verdict, and keeps the original and the correction in the supply's
       history

@@ -17,8 +17,22 @@ from qa_tools.common import validate_people
 
 
 def _write(tmp_path, body: str):
+    """The file as written, plus what REQ-GHUB-171 makes every valid file
+    carry - its declared roles and a real asset manager - unless the test
+    states its own, so each test still breaks exactly one thing."""
+    import yaml
+
+    doc = yaml.safe_load(textwrap.dedent(body)) or {}
+    doc.setdefault("roles", ["qa", "peer_review", "manager"])
+    if not any("data_asset" in (a or {}) for a in doc.get("assignments") or []):
+        doc.setdefault("people", []).append(
+            {"email": "asset.manager@example.com", "name": "Asset Manager",
+             "github": "asset-manager-for-tests", "roles": ["manager"]})
+        doc.setdefault("assignments", []).append(
+            {"data_asset": "data-asset-1", "person": "asset.manager@example.com",
+             "role": "manager"})
     path = tmp_path / "people.yaml"
-    path.write_text(textwrap.dedent(body))
+    path.write_text(yaml.safe_dump(doc, sort_keys=False))
     return path
 
 

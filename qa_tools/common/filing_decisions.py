@@ -84,6 +84,14 @@ PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT, MARK_NOT_SUPPLI
 NEEDS_CONFIRMATION = (REFILE, DE_SUBSTITUTE, UN_INHERIT)
 
 
+#: WHICH DECISIONS REQUIRE A ROLE, and at which level (REQ-GHUB-171 criterion
+#: 3): operation -> (role, people.DATA_ASSET or "agency"). Checked here, in the
+#: one implementation every route shares (its NFR 1). EMPTY TODAY on purpose:
+#: the first decision to need one is REQ-PIPE-170's confirmation of a
+#: correction's filing moves, by the asset manager, which is not built yet.
+REQUIRED_ROLE: dict[str, tuple[str, str]] = {}
+
+
 class NotOffered(Exception):
     """An operation neither route offers.
 
@@ -595,6 +603,11 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
             f"{request.actor.get('email')!r} is the scripted history's synthetic actor, "
             f"which can raise a decision only while a synthetic history is being "
             f"played back.")
+    required = REQUIRED_ROLE.get(request.operation)
+    if required and isinstance(request.actor, dict):
+        role, level = required
+        agency = hierarchy.dataset(request.dataset_id).agency_id if level == "agency" else None
+        people.require_role(request.actor, role, level, agency)
     reason = _reason(request)
     if request.operation != REFILE:
         _confirmation(request)

@@ -32,6 +32,19 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 PEOPLE_YAML = ROOT / "contract" / "people.yaml"
 
 
+#: The three levels an assignment may name, exactly one each (REQ-GHUB-171
+#: criterion 2) - the key it is written under in contract/people.yaml.
+DATA_ASSET = "data_asset"
+LEVELS = (DATA_ASSET, "agency", "dataset")
+#: How a level reads in a refusal.
+LEVEL_WORDS = {DATA_ASSET: "data-asset level", "agency": "agency level", "dataset": "dataset level"}
+
+#: The role that, held at data-asset level, makes a person the ASSET MANAGER
+#: (REQ-GHUB-171 criterion 4) - the existing manager role, at a new level
+#: (decision 2), rather than a new role name.
+MANAGER = "manager"
+
+
 def parse_people_config(path: Path | str = PEOPLE_YAML) -> dict:
     """{"people": {email: {...}}, "agency_assignments": {agencyId:
     [record, ...]}, "dataset_assignments": {datasetId: [record, ...]}} -
@@ -48,13 +61,15 @@ def parse_people_config(path: Path | str = PEOPLE_YAML) -> dict:
     posture ticket_status.py's own parse_open_tickets() already applies
     to an issue missing a real dataset:<id> label)."""
     if not Path(path).exists():
-        return {"people": {}, "agency_assignments": {}, "dataset_assignments": {}}
+        return {"people": {}, "agency_assignments": {}, "dataset_assignments": {},
+                "asset_assignments": [], "roles": []}
     with open(path) as f:
         doc = config_yaml.parse(f) or {}
 
     people = {p["email"]: p for p in doc.get("people") or []}
     agency_assignments: dict[str, list[dict]] = {}
     dataset_assignments: dict[str, list[dict]] = {}
+    asset_assignments: list[dict] = []
     for entry in doc.get("assignments") or []:
         person = people.get(entry.get("person"))
         if person is None:
@@ -70,8 +85,12 @@ def parse_people_config(path: Path | str = PEOPLE_YAML) -> dict:
             dataset_assignments.setdefault(entry["dataset"], []).append(record)
         elif "agency" in entry:
             agency_assignments.setdefault(entry["agency"], []).append(record)
+        elif DATA_ASSET in entry:
+            asset_assignments.append({**record, DATA_ASSET: entry[DATA_ASSET]})
 
-    return {"people": people, "agency_assignments": agency_assignments, "dataset_assignments": dataset_assignments}
+    return {"people": people, "agency_assignments": agency_assignments,
+            "dataset_assignments": dataset_assignments,
+            "asset_assignments": asset_assignments, "roles": list(doc.get("roles") or [])}
 
 
 class UnknownActor(Exception):
@@ -249,3 +268,78 @@ def github_usernames_for(dataset_id: str, agency_id: str, config: dict) -> list[
     badge via assignees_for() directly. Sorted for a deterministic
     `--assignee a,b,c` argument, not dependent on dict insertion order."""
     return sorted({p["github"] for p in assignees_for(dataset_id, agency_id, config) if p.get("github")})
+
+
+def _asset_is_synthetic() -> bool:
+    """Whether contract/data-asset.yaml declares this asset synthetic - read
+    here rather than through the module that resets synthetic history,
+    which nothing but `mothman env` may name."""
+    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+
+    with open(DATA_ASSET_YAML) as f:
+        return (config_yaml.parse(f) or {}).get("synthetic") is True
+
+
+class RoleRefused(UnknownActor):
+    """The person is known, and does not hold the role a decision requires
+    at the level it requires it (REQ-GHUB-171 criterion 3)."""
+
+
+def asset_managers(config: dict | None = None) -> list[dict]:
+    """The data asset's managers: real people assigned the manager role at
+    data-asset level (REQ-GHUB-171 criterion 4) - the asset manager
+    REQ-PIPE-170's confirmation requires. Per-agency managers are not
+    among them; they remain in force for their own agency's decisions."""
+    config = parse_people_config() if config is None else config
+    out = []
+    for record in config.get("asset_assignments") or []:
+        person = (config["people"] or {}).get(record["email"])
+        if record.get("role") == MANAGER and person and not is_placeholder(person) \
+                and not is_synthetic(person):
+            out.append(person)
+    return out
+
+
+def holds(person: dict, role: str, level: str, agency_id: str | None = None,
+          config: dict | None = None) -> bool:
+    """Whether this person is assigned `role` at `level` - the whole data
+    asset, or (for agency level) the agency of the dataset concerned."""
+    config = parse_people_config() if config is None else config
+    email = (person or {}).get("email")
+    if level == DATA_ASSET:
+        return any(r["email"] == email and r.get("role") == role
+                   for r in config.get("asset_assignments") or [])
+    if level == "agency":
+        return any(r["email"] == email and r.get("role") == role
+                   for r in (config.get("agency_assignments") or {}).get(agency_id, []))
+    raise ValueError(f"a decision may require a role at data-asset or agency level, not "
+                     f"{level!r}")
+
+
+def require_role(person: dict, role: str, level: str, agency_id: str | None = None,
+                 config: dict | None = None) -> None:
+    """Refuse unless `person` holds `role` at `level` (REQ-GHUB-171
+    criterion 3), naming the role and the level.
+
+    A placeholder never passes (criterion 7). The scripted history's
+    synthetic actor holds the asset manager role DURING PLAYBACK ONLY, and
+    only on an asset that declares itself synthetic (criterion 7, decision
+    5) - so a generated history can include a confirmed correction."""
+    if is_placeholder(person):
+        raise RoleRefused(f"{person.get('email')!r} is a placeholder and holds no role.")
+    if is_synthetic(person):
+        if role == MANAGER and level == DATA_ASSET and in_playback() and _asset_is_synthetic():
+            return
+        raise RoleRefused(
+            f"{person.get('email')!r} is the scripted history's synthetic actor; it holds the "
+            f"{role} role at {LEVEL_WORDS[DATA_ASSET]} only during scripted playback on a "
+            f"synthetic data asset.")
+    if holds(person, role, level, agency_id, config):
+        return
+    where = (LEVEL_WORDS[level] if level == DATA_ASSET
+             else f"{LEVEL_WORDS[level]} for {agency_id}")
+    raise RoleRefused(
+        f"{person.get('email')!r} does not hold the {role} role at {where}, which this "
+        f"decision requires. Assign it in contract/people.yaml under `assignments:` - "
+        f"{'`data_asset:`' if level == DATA_ASSET else f'`agency: {agency_id}`'}, "
+        f"`role: {role}` - if they should.")

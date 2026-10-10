@@ -47,15 +47,20 @@
 #                                 # assignment (`gh issue create --assignee`), optional
 #                                 # otherwise (a person can be listed/shown without ever
 #                                 # being assignable to a ticket).
-#     roles: [qa, manager]       # one or more roles - not a closed/exhaustive list (Keith's
-#                                 # own framing when this was first raised): qa, peer_review,
-#                                 # and manager have been mentioned so far, but a new role is
-#                                 # just a new string, no schema change needed.
+#     roles: [qa, manager]       # one or more of the roles DECLARED under `roles:` below
+#                                 # (REQ-GHUB-171 criterion 1) - a new role is one new line
+#                                 # there, and a typo'd one fails the people gate.
 #
 # assignments:
-#   - agency: registry-services  # EITHER `agency:` (an agencyId) OR `dataset:` (a datasetId)
-#     person: keith@example.com  # - never both on the same entry. `person` references a
-#     role: qa                   # real people[].email above.
+#   - data_asset: data-asset-1   # EXACTLY ONE LEVEL (REQ-GHUB-171 criterion 2): the whole
+#     person: keith@example.com  # data asset (`data_asset:`, its data_asset_id), an agency
+#     role: manager              # (`agency:`) or a dataset (`dataset:`). The manager at
+#                                 # data-asset level is the ASSET MANAGER, accountable for
+#                                 # the whole asset; a manager at agency level is that
+#                                 # agency's own. The gate fails without a real asset manager.
+#   - agency: registry-services
+#     person: keith@example.com  # `person` references a real people[].email above.
+#     role: qa
 #   - dataset: cp-clients        # A dataset-level entry OVERRIDES its whole agency's entries
 #     person: keith@example.com  # outright for that one dataset (never merged with the
 #     role: peer_review          # agency-level list) - qa_tools/common/people.py's own
@@ -65,6 +70,12 @@
 # the same) roles - a real ticket gets assigned to everyone currently
 # responsible for that dataset/agency, not just one arbitrarily-picked
 # role.
+
+# The roles a person may hold or be assigned (REQ-GHUB-171 criterion 1).
+roles:
+  - qa
+  - peer_review
+  - manager
 
 people:
   - email: fpycnkgvmt@privaterelay.appleid.com
@@ -102,6 +113,10 @@ people:
     synthetic: true
 
 assignments:
+  # The data asset's manager (REQ-GHUB-171 criterion 5; Keith, 2026-10-07).
+  - data_asset: data-asset-1
+    person: fpycnkgvmt@privaterelay.appleid.com
+    role: manager
   - agency: registry-services
     person: fpycnkgvmt@privaterelay.appleid.com
     role: qa

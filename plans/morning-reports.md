@@ -923,3 +923,19 @@ one or more component tags, and a date.
         70bdbe2 and 99d5a3f. Not chased overnight; worth a look: the fixture
         assumes its worker's period schemas are empty. 70bdbe2 and 99d5a3f are
         green on both workflows.
+      - QUEUE EXTENDED (Keith, ~03:00): with 110 done, go on to REQ-GHUB-171,
+        then REQ-TEST-117, then anything else signed off and not built - the
+        calendar group first, then the wider register. A self wake-up every
+        10 minutes keeps the night going (send_later, re-armed each turn).
+      - REQ-GHUB-171 BUILT: contract/people.yaml declares its roles (a
+        misspelt one fails the people gate), every assignment names exactly
+        one level - `data_asset:`, `agency:` or `dataset:` - and you are the
+        data asset's manager. The gate fails without a real asset manager. A
+        decision can now require a role at asset or agency level, checked in
+        the one place every route shares - but NO decision requires one yet:
+        the first is REQ-PIPE-170's confirmation, not built. TWO PROVISIONALS:
+        the `data_asset: <id>` key, and the synthetic actor being asset
+        manager in playback implicitly rather than by an assignment. ONE
+        QUESTION: should a correction's approver (REQ-PIPE-111, tonight's
+        PROVISIONAL "anyone with the manager role") now mean the ASSET
+        manager specifically? I have not changed it.

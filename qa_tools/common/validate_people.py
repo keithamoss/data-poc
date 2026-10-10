@@ -31,6 +31,15 @@ import yaml
 from qa_tools.common.people import PEOPLE_YAML
 
 
+def _data_asset_id() -> str | None:
+    from qa_tools.common.hierarchy import DATA_ASSET_YAML
+
+    try:
+        return (yaml.safe_load(Path(DATA_ASSET_YAML).read_text()) or {}).get("data_asset_id")
+    except (OSError, yaml.YAMLError):
+        return None
+
+
 def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
     """Every problem with this file, or an empty list.
 
@@ -102,6 +111,47 @@ def problems(path: Path | str = PEOPLE_YAML) -> list[str]:
                     f"by that account cannot be attributed to one of them")
             usernames[github] = email
 
+    # THE ROLES, DECLARED (REQ-GHUB-171 criterion 1): a role a person holds
+    # or is assigned that the file does not declare is a typo, refused.
+    declared = set(doc.get("roles") or [])
+    if not declared:
+        found.append("the file declares no `roles:` - list the roles a person may hold "
+                     "(qa, peer_review, manager), so a misspelt one is caught")
+    for entry in doc.get("people") or []:
+        for role in (entry or {}).get("roles") or []:
+            if declared and role not in declared:
+                found.append(f"{(entry or {}).get('email')} holds role {role!r}, which "
+                             f"`roles:` does not declare ({', '.join(sorted(declared))})")
+    from qa_tools.common.people import DATA_ASSET, LEVELS, MANAGER
+    data_asset_id = _data_asset_id()
+    asset_managers = []
+    for entry in doc.get("assignments") or []:
+        entry = entry or {}
+        role = entry.get("role")
+        if declared and role not in declared:
+            found.append(f"an assignment of {entry.get('person')!r} names role {role!r}, "
+                         f"which `roles:` does not declare ({', '.join(sorted(declared))})")
+        # EXACTLY ONE LEVEL (criterion 2).
+        levels = [k for k in LEVELS if k in entry]
+        if len(levels) != 1:
+            found.append(f"the assignment of {entry.get('person')!r} as {role!r} names "
+                         f"{' and '.join(levels) or 'no level'} - it must name exactly one "
+                         f"of `data_asset:`, `agency:` or `dataset:`")
+        elif levels == [DATA_ASSET]:
+            if data_asset_id and entry[DATA_ASSET] != data_asset_id:
+                found.append(f"the assignment of {entry.get('person')!r} names data asset "
+                             f"{entry[DATA_ASSET]!r}; this asset is {data_asset_id!r}")
+            elif role == MANAGER:
+                asset_managers.append(entry.get("person"))
+    # A REAL ASSET MANAGER (criterion 6): an error, not a warning - no
+    # correction can be confirmed without one (decision 3).
+    real = {(p or {}).get("email") for p in doc.get("people") or []
+            if not (p or {}).get("placeholder") and not (p or {}).get("synthetic")}
+    if doc.get("people") and not [p for p in asset_managers if p in real]:
+        found.append("no real person holds the manager role at data-asset level - add an "
+                     "assignment `data_asset: <the data_asset_id>`, `role: manager` for the "
+                     "person accountable for the whole asset. Without one no correction's "
+                     "filing moves can be confirmed (REQ-PIPE-170).")
     people = {(p or {}).get("email") for p in doc.get("people") or []}
     for entry in doc.get("assignments") or []:
         person = (entry or {}).get("person")
