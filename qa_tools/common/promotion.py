@@ -312,7 +312,8 @@ _LAG_SPAN = timedelta(days=3) - _LAG_MIN
 
 
 def effective_at_for(received_at: datetime, *, now: datetime | None = None,
-                      seed: str = "", before: datetime | None = None) -> datetime:
+                      seed: str = "", before: datetime | None = None,
+                      within: timedelta | None = None) -> datetime:
     """When a promotion of this supply took effect.
 
     TWO THINGS ARE TRUE OF ANY PROMOTION, synthetic or real, and this
@@ -353,6 +354,13 @@ def effective_at_for(received_at: datetime, *, now: datetime | None = None,
     # with it if it is ever retuned.
     fraction = int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
     took = min(now, received_at + _LAG_MIN + _LAG_SPAN * fraction)
+    # NO LATER THAN THE CLAIM WINDOW AFTER RECEIPT (Keith, 2026-10-11,
+    # REQ-GEN-185): a scheduled pass gets to a supply within its window. An
+    # uncapped lag put a daily supply's decision on the next day - under the
+    # next day's amber setting, and after a person's decision about it that
+    # same evening, so the log read in the wrong order.
+    if within is not None:
+        took = min(took, received_at + within)
     # NEVER PAST THE NEXT ARRIVAL OF THE SAME DATASET (Keith, 2026-10-06,
     # post-build-review #117 D5): an invented lag that outlived the next
     # supply's receipt showed two versions waiting at once on the asset

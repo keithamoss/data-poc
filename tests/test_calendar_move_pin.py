@@ -16,7 +16,7 @@ def test_every_dataset_computes_what_it_did_before_the_move():
     now = capture()
     assert set(now) == set(pinned), "the datasets themselves changed"
     for dataset_id, before in pinned.items():
-        after = now[dataset_id]
+        after = _from_the_pinned_start(now[dataset_id], before)
         assert after.get("no_calendar") == before.get("no_calendar"), dataset_id
         assert after.get("periods") == before.get("periods"), (
             f"{dataset_id}: its periods changed - "
@@ -24,6 +24,22 @@ def test_every_dataset_computes_what_it_did_before_the_move():
         assert after.get("slots") == before.get("slots"), (
             f"{dataset_id}: its slots changed - "
             f"{_first_difference(before.get('slots'), after.get('slots'))}")
+
+
+def _from_the_pinned_start(after: dict, before: dict) -> dict:
+    """`after` with any period or slot BEFORE the pinned history's first one
+    left out. EARLIER DAYS MAY BE ADDED, and nothing that existed may change:
+    REQ-GEN-185 (Keith, 2026-10-11) added ten days of Birth Registrations
+    before 2026-08-24 as an earlier version, which rewrites no period or slot
+    the move produced - the property this pin guards. Never re-captured to
+    pass (tests/calendar_move_pin.py's own rule)."""
+    out = dict(after)
+    for key in ("periods", "slots"):
+        pinned, now = before.get(key), after.get(key)
+        if pinned and now:
+            first = pinned[0][0]
+            out[key] = [e for e in now if e[0] >= first]
+    return out
 
 
 def _first_difference(before, after):

@@ -134,7 +134,10 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         failure is silent and looks like a supplier who stopped
         delivering.
         """
-        start = schedule.calendar("daily").current.effective_from
+        # THE FIRST VERSION'S START, not the current one's: since REQ-GEN-185
+        # the daily calendar carries an earlier version, and its start is
+        # where the slots begin.
+        start = min(v.effective_from for v in schedule.calendar("daily").versions)
         assert start <= self._generator_first_period(), (
             "the daily calendar starts before the generator supplies anything")
         gap = (self._generator_first_period() - start).days

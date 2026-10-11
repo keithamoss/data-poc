@@ -3540,14 +3540,10 @@ Planting it means widening a pattern, which is Keith's call (REQ-PIPE-118,
 REQ-PIPE-105 criterion 6).
 
 **TS-43 `[INJECT]` An amber supply held under hold.**
-PARKED, NOT IN THE DATA (Keith, 2026-10-05): it needs an AMBER supply -
-warnings and no failure - and the generator has no dial that makes one
-reliably. The 'amber' preset trips checks that fail on any single bad value,
-so the supply reads red as a whole (36 failures on the first rebuild); a
-plain truncation into the row-count warn band splits multiple-birth groups,
-failing the three sibling checks, and compounds across consecutive days.
-Planting it needs a truncation that keeps whole multiple-birth groups, on a
-day whose previous supply was clean.
+PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
+to amber on facility nulls from the checks' own bands (REQ-GEN-184), after
+two green lead-in days and before a green one (REQ-GEN-185); a scripted
+person promotes it five hours after it arrives, once the rule has held it.
 *Config: daily; the amber setting is HOLD from 2026-09-01.*
 **Expect**: the amber supply is not promoted; the rule records a
 promotion-withheld note naming the setting, and the slot reads amber,
@@ -3555,42 +3551,30 @@ waiting for a person (REQ-PIPE-122).
 **Breaks as**: it promotes itself, as it would under promote.
 
 **TS-44 `[INJECT]` An amber supply promoted and awaiting acknowledgement.**
-PARKED, NOT IN THE DATA (Keith, 2026-10-05): it needs an AMBER supply -
-warnings and no failure - and the generator has no dial that makes one
-reliably. The 'amber' preset trips checks that fail on any single bad value,
-so the supply reads red as a whole (36 failures on the first rebuild); a
-plain truncation into the row-count warn band splits multiple-birth groups,
-failing the three sibling checks, and compounds across consecutive days.
-Planting it needs a truncation that keeps whole multiple-birth groups, on a
-day whose previous supply was clean.
+PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
+to amber on parent 1 nulls (REQ-GEN-184), after one green lead-in day - the
+era is too short for two beside TS-2 and TS-1 - and before a green one.
 *Config: daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.*
 **Expect**: promoted by the rule, recorded with the setting, and shown as
 awaiting acknowledgement (REQ-PIPE-122).
 **Breaks as**: promoted with nothing asked, or held.
 
 **TS-45 `[INJECT]` The same, acknowledged by a person.**
-PARKED, NOT IN THE DATA (Keith, 2026-10-05): it needs an AMBER supply -
-warnings and no failure - and the generator has no dial that makes one
-reliably. The 'amber' preset trips checks that fail on any single bad value,
-so the supply reads red as a whole (36 failures on the first rebuild); a
-plain truncation into the row-count warn band splits multiple-birth groups,
-failing the three sibling checks, and compounds across consecutive days.
-Planting it needs a truncation that keeps whole multiple-birth groups, on a
-day whose previous supply was clean.
-*Config: as TS-44; a scripted acknowledgement three hours after receipt.*
+PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
+to amber on parent 2 nulls (REQ-GEN-184), after one green lead-in day and
+before a green one; its acknowledgement is scripted.
+*Config: as TS-44; a scripted acknowledgement five hours after receipt, once
+the rule has promoted it.*
 **Expect**: beside TS-44's, this one reads acknowledged, by the person, with
 their reason (REQ-PIPE-122, REQ-GEN-137 criterion 4).
 **Breaks as**: the acknowledgement refused, or written outside the decision
 path.
 
 **TS-46 `[INJECT]` A green resupply replaces the promoted supply.**
-PARKED, NOT IN THE DATA (Keith, 2026-10-05), for TS-43's reason: the
-generator cannot aim for a verdict. A resend is churned from the supply
-before it, which moved its row count and its distribution of `sex` far
-enough that both checks read it red against the supply it was to replace,
-so it waited for a person rather than replacing it. Planting it needs a
-resend built to stay green against its predecessor
-(plans/running-thoughts.md #63).
+PLANTED 2026-10-11 (parked 2026-10-05: a churned resend read red against
+the supply before it). Both supplies are built to green (REQ-GEN-184) at the
+size of a green lead-in day (REQ-GEN-185), and a resend no longer drops a
+twin (plans/running-thoughts.md #82).
 *Config: daily; the replacement setting is GREEN from 2026-09-18 to
 2026-09-21.*
 Two green supplies for one day, at 14:00 and 16:00.

@@ -154,11 +154,17 @@ class TestTheGeneratedHistory:
 
     def test_reds_are_where_they_were_drawn_and_only_ambers_moved(self):
         """Criterion 10."""
-        g, periods, _b, _s, sevs = self._bdm()
+        g, periods, by_period, suppressed, sevs = self._bdm()
         drawn = [s for _n, s in g.RUN_PLAN[:len(periods)]]
-        assert [i for i, s in enumerate(sevs) if s == "red"] == \
-            [i for i, s in enumerate(drawn) if s == "red"]
-        assert all({a, b} <= {"amber", None} for a, b in zip(drawn, sevs) if a != b)
+        # REDS MOVE OUT OF THE SCENARIO STRETCH (REQ-GEN-185), the count
+        # unchanged: their resends need ordinary days to land on. A red
+        # already clear of it stays where it was drawn.
+        claimed = [i for i, p in enumerate(periods) if p.name in by_period
+                   or p.name in suppressed or p.name in g._built_green(by_period)]
+        stretch = min(claimed) - g.RED_CLEARANCE
+        assert sevs.count("red") == drawn.count("red")
+        assert all(i < stretch for i, s in enumerate(sevs) if s == "red")
+        assert all(sevs[i] == "red" for i, s in enumerate(drawn) if s == "red" and i < stretch)
 
     def test_an_amber_is_never_made_stale(self, monkeypatch):
         from generator import generate_runs as g
@@ -400,8 +406,14 @@ class TestAnInjectedTargetEndToEnd:
         from generator.output import redirect
 
         root = tmp_path_factory.mktemp("targeted")
+        # THE ORDINARY PLAN IS DRAWN ALL CLEAN HERE: the real history is
+        # sized for its own scenarios, and a test injection that claims more
+        # leaves its ordinary ambers and reds nowhere to go - which the
+        # generator refuses, correctly. This tests the injection, not them.
+        drawn = g.RUN_PLAN
+        g.RUN_PLAN = [(n, None) for n, _sev in drawn]
         extra = si.Injection(
-            scenario_id="TS-TARGET", dataset_id=g.DATASET_ID, anchor=-20,
+            scenario_id="TS-TARGET", dataset_id=g.DATASET_ID, anchor=-37,
             config="a test injection",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target("amber", (self.KEY,)),
                                       note="built to amber"),))
@@ -416,6 +428,7 @@ class TestAnInjectedTargetEndToEnd:
         finally:
             restore()
             si.INJECTIONS = original
+            g.RUN_PLAN = drawn
         return book, placements, deliveries
 
     def _record(self, placements):
@@ -479,7 +492,7 @@ class TestRefusedBeforeAnythingIsWritten:
         from generator.output import redirect
 
         bad = si.Injection(
-            scenario_id="TS-BAD", dataset_id=g.DATASET_ID, anchor=-20, config="test",
+            scenario_id="TS-BAD", dataset_id=g.DATASET_ID, anchor=-37, config="test",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target(
                 "amber", ("sex.conformity",))),))
         original = si.INJECTIONS
@@ -622,3 +635,134 @@ class TestFindings155:
             assert sorted(p.name for p in (tmp_path / "deliveries").iterdir()) == before
         finally:
             restore()
+
+
+# ---- REQ-GEN-185: lead-ins and the period after --------------------------
+
+class TestLeadIns:
+    def _periods(self, n=10):
+        from datetime import timedelta
+        start = date(2026, 9, 1)
+        return [type("P", (), {"date": start + timedelta(days=i),
+                               "name": (start + timedelta(days=i)).isoformat()})()
+                for i in range(n)]
+
+    def _inj(self, sid="TS-X", anchor=5, lead_in=2, target=True):
+        from generator import scenario_injection as si
+        return si.Injection(scenario_id=sid, dataset_id=BDM_ID, anchor=anchor, config="t",
+                            lead_in=lead_in, arrivals=(si.ExtraArrival(
+                                0, "14:00",
+                                target=targeting.Target("amber") if target else None),))
+
+    def test_a_targeted_anchor_claims_its_lead_in_and_the_period_after(self):
+        """Criteria 1 and 3, and the default of two."""
+        from generator import scenario_injection as si
+        pl = si.resolve(self._inj(), self._periods())
+        assert pl.lead_in == ("2026-09-04", "2026-09-05") and pl.follow == ("2026-09-07",)
+
+    def test_the_lead_in_is_configurable(self):
+        from generator import scenario_injection as si
+        assert si.resolve(self._inj(lead_in=1), self._periods()).lead_in == ("2026-09-05",)
+
+    def test_an_untargeted_scenario_claims_neither(self):
+        from generator import scenario_injection as si
+        pl = si.resolve(self._inj(target=False), self._periods())
+        assert pl.lead_in == () and pl.follow == ()
+
+    def test_a_lead_in_before_the_history_is_refused(self):
+        from generator import scenario_injection as si
+        with pytest.raises(si.CannotPlace, match="lead-in"):
+            si.resolve(self._inj(anchor=1), self._periods())
+
+    def test_another_scenario_on_a_lead_in_fails_naming_both(self):
+        """Criterion 5."""
+        from generator import scenario_injection as si
+        other = self._inj(sid="TS-Y", anchor=4, target=False)
+        with pytest.raises(si.CannotPlace, match="TS-(X|Y).*TS-(X|Y)"):
+            si.no_two_scenarios_share_a_period([self._inj(), other],
+                                               {BDM_ID: self._periods()})
+
+    def test_a_suppressed_day_on_the_following_period_fails_too(self):
+        from generator import scenario_injection as si
+        other = si.Injection(scenario_id="TS-Y", dataset_id=BDM_ID, anchor=8, config="t",
+                             suppress=(-2,))
+        with pytest.raises(si.CannotPlace, match="TS-(X|Y).*TS-(X|Y)"):
+            si.no_two_scenarios_share_a_period([self._inj(), other],
+                                               {BDM_ID: self._periods()})
+
+
+class TestLeadInsEndToEnd:
+    """Criteria 1-4 through the real generator: two green lead-ins, a
+    targeted anchor with a churned green resend, and a green period after,
+    all measured against what the generator built."""
+
+    @pytest.fixture(scope="class")
+    def generated(self, tmp_path_factory):
+        import json
+
+        from generator import generate_runs as g
+        from generator import scenario_injection as si
+        from generator.output import redirect
+
+        root = tmp_path_factory.mktemp("leadin")
+        # THE ORDINARY PLAN IS DRAWN ALL CLEAN HERE: the real history is
+        # sized for its own scenarios, and a test injection that claims more
+        # leaves its ordinary ambers and reds nowhere to go - which the
+        # generator refuses, correctly. This tests the injection, not them.
+        drawn = g.RUN_PLAN
+        g.RUN_PLAN = [(n, None) for n, _sev in drawn]
+        extra = si.Injection(
+            scenario_id="TS-LEAD", dataset_id=g.DATASET_ID, anchor=-37, config="a test",
+            arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target("amber")),
+                      si.ExtraArrival(0, "16:00", target=targeting.Target("green"))))
+        original = si.INJECTIONS
+        si.INJECTIONS = (*original, extra)
+        restore = redirect(g, root)
+        try:
+            g.main()
+            book = json.loads(g.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
+            records = json.loads(si.PLACEMENTS_PATH.read_text())
+            deliveries = g.DELIVERIES_DIR
+        finally:
+            restore()
+            si.INJECTIONS = original
+            g.RUN_PLAN = drawn
+        if isinstance(records, dict):
+            records = records.get("placements", records)
+        if isinstance(records, dict):
+            records = list(records.values())
+        [record] = [r for r in records if r["scenario_id"] == "TS-LEAD"]
+        return book, record, deliveries
+
+    def _rows(self, deliveries, entry):
+        [csv] = list((deliveries / entry["delivery"]).glob("*.csv"))
+        return pd.read_csv(csv)
+
+    def test_each_lead_in_and_the_period_after_is_one_on_time_green_supply(self, generated):
+        book, record, deliveries = generated
+        for name in (*record["lead_in"], *record["follow"]):
+            mine = [e for e in book if e["period"] == name]
+            assert len(mine) == 1 and mine[0]["dirty_severity"] is None, name
+            assert mine[0]["received_at"][:10] <= name, "it arrives on its own day"
+            assert _unmatched_twins(self._rows(deliveries, mine[0])) == 0
+
+    def test_the_targeted_supplies_are_the_size_of_the_last_lead_in(self, generated):
+        """Criteria 2 and 4: the resend too, though churned."""
+        book, record, _d = generated
+        [lead] = [e for e in book if e["period"] == record["lead_in"][-1]]
+        anchor = [e for e in book if e["period"] == record["period"]]
+        assert len(anchor) == 2
+        assert {e["n_rows_generated"] for e in anchor} == {lead["n_rows_generated"]}
+
+    def test_the_period_after_is_the_same_size(self, generated):
+        """Criterion 3: no compounding into the next supply."""
+        book, record, _d = generated
+        [lead] = [e for e in book if e["period"] == record["lead_in"][-1]]
+        [after] = [e for e in book if e["period"] == record["follow"][0]]
+        assert after["n_rows_generated"] == lead["n_rows_generated"]
+
+    def test_no_other_periods_arrival_lands_on_a_lead_in(self, generated):
+        book, record, _d = generated
+        for name in record["lead_in"]:
+            landed = [e for e in book if e["received_at"][:10] == name and e["period"] != name]
+            assert not landed, name

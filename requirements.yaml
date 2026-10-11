@@ -15428,6 +15428,7 @@ requirements:
       - 'HOW THE CLOCK WORKS, and why not database defaults. Every stamp writer passes its instant explicitly from replay_clock.now(), which is the wall clock outside a replay - so live behaviour is unchanged, and no session setting or trigger has to reach every connection (a run''s four tools write from worker threads, and several connections stay open across arrivals). The clock is PROCESS-WIDE, not a context variable, for the same threads. It RUNS: anchored at each delivery''s and arrival''s receipt and moved forward (never back) to each decision''s effective instant, it advances at wall speed from there, so records written one after another keep their order and follows() keeps its rule unchanged - a cause recorded as it takes effect leaves a lag of the moments the work took. promotion.effective_at_for still caps at the wall clock, so the invented promotion lag is untouched; the batch is always a replay (both entry points refuse over recorded history), so run_pipeline is where the clock is turned on.'
       - 'NOT SIMULATED, deliberately: the in-flight observations file (on disk, not a record of the history) and qa.identity.marked_at (when this database was marked, which is real). A scripted person decision can be recorded up to an hour after it takes effect when it was waiting on the arrival it names - honest, and on the same day, so criterion 6 never reads it as a change.'
       - 'THE ''DECISIONS MADE SINCE THEN'' NOTE IS SCOPED TO THE PAGE (post-build-review #132 A5, 2026-10-07): it lists only the datasets in view, every one of them rather than five and a dead-end ''and N more'', with the receipt instant each run carries rather than a day.'
+      - 'THE INVENTED LAG IS CAPPED AT THE CLAIM WINDOW (Keith, 2026-10-11, REQ-GEN-185): a replayed rule decision takes effect no later than the dataset''s claim window after receipt, as a scheduled pass would reach it - 1 to 4 hours for Birth Registrations; Child Protection''s 14-day window leaves its 1-hour-to-3-day lag as it was. WHY: a daily supply''s decision used to land the next day, under the NEXT day''s amber setting (TS-45 was promoted under promote, not promote-and-acknowledge), and after a person''s decision about it that same evening, so the decision log read in the wrong order. Still capped before the next receipt (#117 D5).'
   - id: REQ-GHUB-082
     title: "An operator records a filing decision from GitHub or from the terminal, and both write the same entry"
     date_written: "2026-09-26"
@@ -29526,15 +29527,6 @@ requirements:
       owner: 'Unowned since 2026-10-11 - plans/running-thoughts.md #63 was scoped as REQ-GEN-183..186 and Keith left these Child Protection cross-table outcomes out of that scope (they need named red targets and referential closure across six tables).'
       blocked_by:
         unowned: true
-    - criterion: Criteria 6 and 7 - amber supplies held and promoted-awaiting-acknowledgement
-        (TS-43, TS-44), and a green resend replacing a promoted supply (TS-46).
-      why: 'PARKED by Keith, 2026-10-05: the generator cannot aim for a verdict.
-        The ''amber'' preset reads red as a whole, a truncation into the warn
-        band still read red, and a churned resend read red against the supply
-        it was to replace. Each was tried on a real rebuild.'
-      owner: 'REQ-GEN-184, REQ-GEN-185 and REQ-GEN-186 - generating a supply to a target verdict, scoped from plans/running-thoughts.md #63 and signed by Keith 2026-10-11.'
-      blocked_by:
-        requirements: [REQ-GEN-184, REQ-GEN-185, REQ-GEN-186]
     - criterion: Criterion 8 - a reader re-checked against the newer version (TS-50).
       why: Waits on TS-48's Child Protection placement and on TS-46's replacement,
         both unplanted.
@@ -29572,6 +29564,7 @@ requirements:
       it has no data behind it (criterion 13): 6 of 30 marked for injection have
       data. tests/test_scenario_injection.py - 33 tests, including the four for
       quiet days, written failing first.'
+    - '2026-10-11, criteria 6 and 7 (REQ-GEN-184, 185): TS-43, TS-44 and TS-46 planted and read back from a regenerate from empty. TS-43''s supply warns on facility nulls alone, the rule records promotion-withheld under hold, and a scripted person promotes it that evening; TS-44''s warns on parent 1 nulls alone and is promoted owing an acknowledgement under promote-and-acknowledge; TS-46''s 14:00 supply is promoted and then superseded when its 16:00 green resend is promoted under the green replacement setting. Their lead-in and following days all read green.'
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - generator/scenario_injection.py::resolve
@@ -29636,13 +29629,6 @@ requirements:
       owner: Keith (morning report question).
       blocked_by:
         unowned: true
-    - criterion: Criterion 4 - an amber supply acknowledged beside one left awaiting
-        acknowledgement (TS-45 beside TS-44).
-      why: 'PARKED with TS-43/44 by Keith, 2026-10-05: no amber supply can be
-        planted reliably yet.'
-      owner: 'REQ-GEN-184, REQ-GEN-185 and REQ-GEN-186 - generating a supply to a target verdict, scoped from plans/running-thoughts.md #63 and signed by Keith 2026-10-11.'
-      blocked_by:
-        requirements: [REQ-GEN-184, REQ-GEN-185, REQ-GEN-186]
     - criterion: Criterion 5 - a period substituted onto an earlier promoted supply
         (TS-54).
       why: The script has no field for the period stood on.
@@ -29664,6 +29650,7 @@ requirements:
       went through the one decision path (criterion 7); the scenarios whose requirements
       or shapes are not ready stay registered and uninjected (criterion 8). tests/test_scripted_decisions.py
       covers the playback itself.'
+    - '2026-10-11, criterion 4 (REQ-GEN-184, 185): TS-45 planted beside TS-44 in the promote-and-acknowledge era and read back from a regenerate from empty - its supply warns on parent 2 nulls alone, is promoted owing an acknowledgement, and a scripted person acknowledges it five hours after it arrived.'
     implemented_by:
     - contract/scripted_decisions.yaml
     - generator/scenario_injection.py::INJECTIONS
@@ -32114,7 +32101,7 @@ requirements:
     date_written: '2026-10-11'
     story: As Keith, I want a scenario whose verdict depends on the supply before it to sit after a run of ordinary green supplies that nothing disturbs, so that its row-count growth and drift checks are measured against something the generator knew when it built it, its own perturbation does not carry into the day after, and a held scenario supply does not leave the rest of the history reading red.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-11'
@@ -32138,6 +32125,28 @@ requirements:
     - REQ-GEN-184
     - REQ-GEN-135
     - REQ-QAC-108
+    linked_tests:
+    - tests/test_generate_to_target.py
+    - tests/test_generate_runs.py
+    - tests/test_promotion_waits_for_next_receipt.py
+    - tests/test_rule_skips_a_promoted_supply.py
+    - tests/test_scenario_injection.py
+    implemented_by:
+    - generator/scenario_injection.py::Injection
+    - generator/scenario_injection.py::resolve
+    - generator/scenario_injection.py::no_two_scenarios_share_a_period
+    - generator/generate_runs.py::_built_green
+    - generator/generate_runs.py::_reds_clear_of_scenarios
+    - generator/generate_runs.py::_away_from_suppressed
+    - generator/generate_runs.py::_plan_injections
+    - generator/generate_cp_runs.py::_ordinary_severities
+    - qa_tools/common/promotion.py::effective_at_for
+    - qa_tools/bdm/orchestrate_bdm.py::_claim_window
+    - qa_tools/cp/orchestrate_cp.py::_claim_window
+    - contract/scripted_decisions.yaml
+    evidence:
+    - '2026-10-11: tests/test_generate_to_target.py''s lead-in tests - a targeted anchor claims two lead-in periods by default and the period after (c1, c3), configurable per injection (c1), none for an untargeted one; a lead-in before the history refuses; another scenario''s anchor or a suppressed day on a lead-in or the period after fails naming both (c5). Through the real generator: each lead-in and the period after is one on-time green supply with every twin matched and no other period''s arrival on it (c1); the targeted supply and its churned green resend are exactly the last lead-in''s size, and so is the period after (c2, c3, c4). tests/test_promotion_waits_for_next_receipt.py: a replayed decision lands within the claim window, both orchestrators passing it. All decided from the placement and configuration alone - nothing reads the decision log or the database to place anything (c6, by construction).'
+    - '2026-10-11, regenerated from empty and read back: TS-43 (09-05) warns on facility nulls alone after two green lead-ins; the rule records promotion-withheld under hold, the scripted person promotes it at 19:00, before 09-06''s supply, which reads green with no gap red (c7, c8). TS-44, TS-45 and TS-46 as on REQ-GEN-136 and 137. Birth Registrations before and after: 42 supplies became 51 (the history is 40 days, Keith''s call), gate verdicts amber 14 / green 13 / red 15 became 18 / 21 / 12, page 10 / 7 / 25 became 16 / 16 / 19, gap reds 28 became 21, promotions 21 became 33, periods with more than one supply 10 became 9; Child Protection unchanged. Bootstrap 8m44s became 9m09s. The arrival-semantics golden re-captured: Birth Registrations 42 arrivals became 51, every Child Protection dataset identical.'
     decisions:
     - 'A CLEAN LEAD-IN (Keith, 2026-10-11, question 2, recommended option), as REQ-GEN-044 already said planting needs - ''on a day whose previous supply was clean'' - using the quiet-day mechanism TS-47 introduced so no resend lands on it. REJECTED predicting the reference by modelling promotion, the amber and replacement settings and the gap rule in the generator, which is the scenario-only logic Keith ruled out in #64. REJECTED sizing against the generator''s own previous payload, which is today''s behaviour and is what failed for TS-43 to TS-46.'
     - 'LEAD-INS ARE FOR INJECTED TARGETS ONLY (Keith, 2026-10-11): ordinary ambers get none, and stay within-supply instead (REQ-GEN-184).'
@@ -32147,6 +32156,15 @@ requirements:
     - THE REFERENCE IS THE LAST PROMOTED EARLIER PERIOD, NOT THE PREVIOUS ARRIVAL (REQ-QAC-108, qa_tools/common/drift_reference.py), and the generator today sizes a dirty supply against the previous slot's last delivery (generator/generate_runs.py's previous_row_count) - the two diverge whenever that slot was not promoted. A green lead-in is what makes them coincide.
     - 'COMPOUNDING IS REAL: a truncated day measured against a truncated day failed row count and drift on the 2026-10-05 rebuild, hence criterion 3.'
     - TS-46'S RECORDED REASON NEEDS CHECKING BEFORE BUILD. REQ-GEN-044's decision says its churned resend read red 'against the supply it was to replace', but drift_reference excludes the current period's own supply from being a reference, so the comparison must have been against an earlier period. Criterion 4 is written to the code; a trial probe should confirm which comparison went red.
+    - 'THE HISTORY IS 40 DAYS, NOT 30 (Keith, 2026-10-11): planted with their lead-ins and following days, TS-43 to TS-46 claim nearly every day from 2026-09-03 to the anchor, and the two ordinary reds drawn on 09-01 and 09-02 then had nowhere to land their resends - on the first planted rebuild they landed on TS-2''s, TS-1''s, TS-45''s and TS-46''s days and ruined TS-45. The daily calendar and Birth Registrations'' participation begin ten days earlier (contract/calendar.yaml, changelog entries) - only earlier days added, none already judged. This adds arrivals, against NFR ''bootstrap cost'', by Keith''s choice: 42 became 51. REJECTED letting TS-43''s lead-ins replace those reds, which left no ordinary red chain in September, and keeping every scenario day clear without making room, which pushed resends past the history''s end.'
+    - 'ORDINARY REDS MOVE OUT OF THE SCENARIO STRETCH and every scenario anchor is kept clear of other periods'' arrivals: a red moves to the latest clean period before the stretch (three periods of clearance, since resend delays are mostly one to three days), the count unchanged, and a resend that would still be pushed past the history''s end fails generation naming it. TS-47''s own day had been clear of other resends only by luck.'
+    - 'THE REPLAYED RULE DECIDES WITHIN THE CLAIM WINDOW (Keith, 2026-10-11, recorded on REQ-PIPE-081): criterion 7''s ''after it has been seen held and before the next supply arrives'' was impossible while the invented lag put the rule''s decision on the next day; TS-45 was promoted under the next day''s setting. So the scripted promotion and acknowledgement take effect five hours after receipt - after the rule (within four), before the next supply. TS-45''s register config said three hours and now says five.'
+    - 'WHAT LOOKED LIKE A PROMOTION DEFECT WAS THE REPLAY''S ORDER: the rule recorded promotion-withheld ''after'' a person''s promotion because its lag stamped it later than the scripted decision it preceded. A test reproducing the suspected defect showed the rule already defers to a person (tests/test_rule_skips_a_promoted_supply.py, kept as a guard); the cap fixed the order. Keith was told it was a defect before this was checked.'
+    - 'TS-44 AND TS-45 TAKE ONE LEAD-IN, TS-43 TWO: the promote-and-acknowledge era is eight days with TS-2 and TS-1 in it. Each one-day lead-in follows a supply that resolves green, so the reference is still the one built. TS-46 sits on a Monday because its 16:00 resend is a resupply and every resupply arrives on a weekday.'
+    - 'LEAD-IN AND FOLLOWING PERIODS REPLACE WHATEVER WAS DRAWN THERE (NFR ''bootstrap cost'': replace, not add), so an ordinary red drawn on one is gone rather than moved; the six ordinary ambers end up in August, the only room left.'
+    - 'TS-46 IS TWO GREEN SUPPLIES, as its register entry says (''Two green supplies for one day, at 14:00 and 16:00''), not an amber then a green. Its resend is churned from the first and built to green at the lead-in''s size; the churn no longer splits twins (plans/running-thoughts.md #82), which was the half of TS-46''s parked reason the old note did not name.'
+    - 'THE TEN DAYS ARE AN EARLIER VERSION, NOT A MOVED ONE: moving the 2026-08-24 daily-calendar and participation versions to 2026-08-14 was refused by the schedule gate (REQ-PIPE-173) - those versions have governed filings and may change only by a declared correction. A version effective 2026-08-14 with the same rule, due time, grace and claim window adds days nothing was judged against and rewrites nothing; check-agreement reads clean on the rebuilt history.'
+    - 'THE CALENDAR-MOVE PIN COMPARES FROM ITS OWN FIRST PERIOD (tests/test_calendar_move_pin.py): it guards that REQ-PIPE-110''s move changed no period or slot, and still does - every pinned period and slot must match exactly - but periods added BEFORE the pinned history are left out of the comparison. Never re-captured, by that file''s own rule. The test helper that turns a hierarchy''s owes_from into participation now collapses to one version from that date, since the real participation carries two.'
     open_questions:
     - Is two lead-in periods enough, and does a quarterly scenario need a different default?
     - 'Verify at build: does a gap-red already recorded on a later supply stay red once the gap is closed, or is it re-evaluated? The answer fixes how soon after TS-43''s receipt the scripted promotion has to take effect.'

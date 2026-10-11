@@ -135,7 +135,11 @@ ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single del
 # RUN_PLAN deliberately ends red instead, see that module's own comment
 # for why.
 _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_offset math
-N_DELIVERIES = 30
+# 40, NOT 30 (Keith, 2026-10-11, REQ-GEN-185): planting TS-43 to TS-46 with
+# their lead-ins and following days claims nearly every day from 2026-09-03
+# to the anchor, and the ordinary reds' resends need ordinary days to land
+# on. The extra ten are August days, before every scenario.
+N_DELIVERIES = 40
 
 
 # The clean/amber/red mix across the scheduled deliveries. Named rather
@@ -212,12 +216,55 @@ def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
     10); the bookends stay clean."""
     from generator import targeting
 
+    green = _built_green(injected_by_period)
     unavailable = frozenset(i for i, p in enumerate(periods)
-                            if p.name in injected_by_period or p.name in suppressed)
-    return targeting.outside_hold([s for _n, s in RUN_PLAN[:len(periods)]],
-                                  [p.date for p in periods], DATASET_ID,
-                                  keep_clean=frozenset({0, len(periods) - 1}),
-                                  unavailable=unavailable)
+                            if p.name in injected_by_period or p.name in suppressed
+                            or p.name in green)
+    drawn = _reds_clear_of_scenarios([s for _n, s in RUN_PLAN[:len(periods)]], unavailable)
+    out = targeting.outside_hold(drawn, [p.date for p in periods], DATASET_ID,
+                                 keep_clean=frozenset({0, len(periods) - 1}),
+                                 unavailable=unavailable)
+    # A LEAD-IN OR FOLLOWING PERIOD IS GREEN, whatever was drawn there
+    # (REQ-GEN-185: it replaces an ordinary period rather than adding one).
+    return [None if p.name in green else sev for p, sev in zip(periods, out)]
+
+
+#: How many periods before the first scenario-claimed one an ordinary red
+#: may not sit in: its resends need ordinary days to land on, and resend
+#: delays are mostly one to three days (generator/resupply.py).
+RED_CLEARANCE = 3
+
+
+def _reds_clear_of_scenarios(severities: list, unavailable: frozenset[int]) -> list:
+    """Every ordinary red moved before the stretch the scenarios claim
+    (REQ-GEN-185; Keith, 2026-10-11, lengthening the history to make room):
+    a red's resends land on the next free weekdays, and inside that stretch
+    there are none - on the first planted rebuild they landed on TS-2's,
+    TS-1's, TS-45's and TS-46's days and ruined TS-45. Each moves to the
+    latest clean period before the stretch, so the count is unchanged and
+    the history stays a daily feed with its reds in it."""
+    if not unavailable:
+        return list(severities)
+    start = max(1, min(unavailable) - RED_CLEARANCE)
+    out = list(severities)
+    for i in range(start, len(out)):
+        if out[i] != "red":
+            continue
+        swap = next((j for j in range(start - 1, 0, -1) if out[j] is None), None)
+        if swap is None:
+            from generator.targeting import TargetError
+            raise TargetError(f"{DATASET_ID}: an ordinary red falls among the scenarios and "
+                              f"no clean period before them is left to take it - lengthen "
+                              f"the history")
+        out[i], out[swap] = None, "red"
+    return out
+
+
+def _built_green(injected_by_period) -> frozenset[str]:
+    """Every period a targeted scenario needs generated green - its lead-in
+    and the period after it (REQ-GEN-185 criteria 1 and 3)."""
+    return frozenset(name for _inj, placement in injected_by_period.values()
+                     for name in placement.built_green)
 
 
 class BirthRegistrationsProvider:
@@ -496,7 +543,8 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     return deliveries
 
 
-def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str]):
+def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str],
+                          last_day: date | None = None):
     """Move any arrival that would land on a day the supplier is down.
 
     THE SCENARIO SAYS THE SUPPLIER IS DOWN, not that one particular
@@ -537,6 +585,13 @@ def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str]
                or (moved and (when.isoformat() in taken_days or when.weekday() >= 5))):
             when += timedelta(days=1)
             moved = True
+        if moved and last_day is not None and when > last_day:
+            # PAST THE END OF THE HISTORY is not a place to put a resupply
+            # quietly (REQ-GEN-185): say so, and how to make room.
+            raise scenario_injection.CannotPlace(
+                f"{item.received_date}'s arrival would be moved off the scenario days to "
+                f"{when}, after the history ends on {last_day} - lengthen the history or "
+                f"move the scenarios")
         if moved:
             taken_days.add(when.isoformat())
         out.append(item if when == item.received_date
@@ -590,7 +645,13 @@ def _plan_injections(periods):
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
     suppressed = {name for _, placement in resolved for name in placement.suppressed}
-    quiet = {name for _, placement in resolved for name in placement.quiet}
+    # A GREEN LEAD-IN OR FOLLOWING PERIOD, AND EVERY SCENARIO'S OWN ANCHOR,
+    # IS QUIET TOO (REQ-GEN-185 criterion 1): it keeps its own supply and no
+    # other period's resend lands on it - on the first planted rebuild one
+    # landed on TS-45's day before TS-45 did, filled it, and TS-45's own
+    # supply was refused. TS-47's own day was only clear before by luck.
+    quiet = {name for _, placement in resolved
+             for name in (*placement.quiet, *placement.built_green, placement.period)}
     return resolved, by_period, suppressed, quiet
 
 
@@ -639,8 +700,10 @@ def main() -> None:
     # NEVER STALE: an ordinary amber, and a period whose injected supply is
     # built to a target (REQ-GEN-184 criterion 4) - a stale delivery fails
     # the freshness checks, whatever it was built to.
+    green_periods = _built_green(injected_by_period)
     provider.amber_dates = frozenset(
         [p.date for p, sev in zip(periods, severities) if sev == "amber"]
+        + [p.date for p in periods if p.name in green_periods]
         + [p.date for p in periods if p.name in injected_by_period and any(
             x.target is not None for x in injected_by_period[p.name][0].arrivals)])
 
@@ -669,7 +732,22 @@ def main() -> None:
             continue
 
         injected = injected_by_period.get(period.name)
-        if injected is not None:
+        if period.name in green_periods:
+            # A GREEN LEAD-IN OR FOLLOWING SUPPLY (REQ-GEN-185 criteria 1 and
+            # 3): once, on its own day, no resupply, built to green at the
+            # size of the supply before it - so the targeted supply's row
+            # count and drift are measured against what was built here.
+            from generator import targeting
+
+            if previous_row_count:
+                n_rows = previous_row_count
+            payload = provider.generate(slot_date, seed=seed, n_rows=n_rows,
+                                        id_offset=id_offset)
+            payload, _moved = targeting.bdm_target(
+                payload, targeting.Target("green"), seed=seed + 700,
+                where=f"the green period {period.name}", rows=previous_row_count)
+            deliveries = [Delivery(received_date=slot_date, severity=None, payload=payload)]
+        elif injected is not None:
             if any(x.target is not None for x in injected[0].arrivals) \
                     and previous_row_count:
                 n_rows = previous_row_count  # asked at that size, trimmed exactly
@@ -681,7 +759,7 @@ def main() -> None:
                 list(run_slot_chain(provider, slot_date, seed, id_offset,
                                      n_rows, severity, previous_row_count)),
                 _days_to_avoid(period.name, suppressed_periods, quiet_periods),
-                shifted_onto)
+                shifted_onto, last_day=periods[-1].date)
         entries = _manifest_entries_for_slot(deliveries, slot_id, period.name,
                                               len(manifest), id_offset, seed)
 

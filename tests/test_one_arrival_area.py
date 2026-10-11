@@ -109,11 +109,18 @@ def test_staging_writes_no_second_copy_of_the_file_it_was_given(tmp_path, supply
     supply_suffixes = {".csv", ".parquet", ".json"}
 
     def supply_files() -> set:
-        if not data_dir.exists():
-            return set()
-        return {p for p in data_dir.rglob("*")
-                if p.is_file() and p.suffix.lower() in supply_suffixes
-                and "dbt_scratch" not in p.parts}
+        # PRUNED, NOT FILTERED AFTERWARDS (2026-10-11): rglob walked INTO
+        # data/dbt_scratch/ and filtered it out later, so another worker
+        # removing its finished dbt target mid-walk raised FileNotFoundError
+        # here - twice in one day's full gates, never alone.
+        import os
+
+        out = set()
+        for root, dirs, files in os.walk(data_dir, onerror=lambda _e: None):
+            dirs[:] = [d for d in dirs if d != "dbt_scratch"]
+            out |= {Path(root) / f for f in files
+                    if Path(f).suffix.lower() in supply_suffixes}
+        return out
 
     data_dir = ROOT / "data"
     before = supply_files()

@@ -147,6 +147,14 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
 
+    RE-CAPTURED 2026-10-11 AGAIN FOR REQ-GEN-185 (TS-43 to TS-46 planted, the
+    history 40 days). The procedure first: 69 deliveries, zero `handfiled-*`,
+    and `mothman dashboard rebuild` BEFORE the capture - the golden reads
+    reports/*.json, so capturing over a stale build pins the old history
+    (it did, once, here: 150 arrivals, unchanged). Birth Registrations 42
+    arrivals became 51 and its days moved wholesale; every Child Protection
+    dataset is identical.
+
     RE-CAPTURED 2026-10-11 FOR plans/running-thoughts.md #82 (churn voids
     single births only). The procedure first: 60 deliveries, zero
     `handfiled-*`. One Birth Registrations arrival moved and NO VERDICT: the
@@ -334,6 +342,16 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         the same status, and 2024-Q3's six-table resend of 13 August,
         late, is gone. No arrival kept under the same id changed.
 
+        AND TO 122 / 6 / 22 / 9 over 159 FOR REQ-GEN-185 (2026-10-11), a corpus
+        change: TS-43 to TS-46 planted with green lead-in and following days,
+        Birth Registrations 40 days rather than 30, and its ordinary reds moved
+        before the scenarios. Procedure first: 69 deliveries, zero
+        `handfiled-*`, the dashboard rebuilt before the capture. Every Child
+        Protection entry is identical; Birth Registrations alone went 22 / 15 /
+        5 to 39 / 6 / 6 (on time / early / late) - nine more arrivals and the
+        green days on time, and the reds' resends no longer filing early into
+        the later periods they used to land on.
+
         AND BACK TO 105 / 15 / 21 / 9 over 150 WHEN TS-56 MOVED (sprint 13,
         2026-10-05). Procedure first: 60 deliveries, zero `handfiled-*`.
         2024-Q3 was the only quarter whose late siblings re-evaluated a
@@ -347,8 +365,8 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 105, "early": 15, "late": 21, "unfiled": 9}
-        assert sum(counts.values()) == 150
+        assert counts == {"on_time": 122, "early": 6, "late": 22, "unfiled": 9}
+        assert sum(counts.values()) == 159
 
 
 class TestTheClassificationBoundaries:

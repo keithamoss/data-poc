@@ -445,6 +445,19 @@ def simultaneous_with(arrival, among) -> list:
     return sorted(same, key=lambda a: (a.sequence, a.run_index, a.run_id))
 
 
+def _claim_window(arrival):
+    """How soon a scheduled pass gets to this delivery - the shortest claim
+    window of the datasets it carries (Keith, 2026-10-11; see
+    promotion.effective_at_for)."""
+    from qa_tools.common import asset_time, schedule
+
+    if getattr(arrival, "received_at", None) is None:
+        return None  # no receipt to measure a window from
+    on = asset_time.local_date(arrival.received_at)
+    datasets = list(getattr(arrival, "files_by_dataset", None) or ()) or ["cp-clients"]
+    return min(schedule.claim_window(d, on=on) for d in datasets)
+
+
 def promote_after(arrival, got: list[dict], run_by: str) -> None:
     """PROMOTION FOLLOWS THE RUN (REQ-PIPE-075 criteria 1 and 13), and is
     deliberately not inside it: a promotion that fails must be retryable
@@ -465,7 +478,8 @@ def promote_after(arrival, got: list[dict], run_by: str) -> None:
         actor=promotion.RULE_ACTOR, actor_kind=decision_log.RULE,
         effective_at=promotion.effective_at_for(
             arrival.received_at, seed=arrival.run_id,
-            before=promotion.next_receipt(arrival)).isoformat()))
+            before=promotion.next_receipt(arrival),
+            within=_claim_window(arrival)).isoformat()))
     # THE KNOCK-ON OF WHAT IT PROMOTED (REQ-PIPE-121): every period the
     # promotions moved a table into owes its readers a re-evaluation, owed in
     # the promotion's own transaction and completed here.

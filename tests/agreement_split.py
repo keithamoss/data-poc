@@ -113,7 +113,10 @@ def split(merged: dict, calendar_doc: dict) -> tuple[dict, dict]:
                 v["participates"] = moved["delivery_months"]
                 v["reason"] = "a test's partial participation"
         if "owes_from" in moved and versions:
-            versions[0]["effective_from"] = str(moved["owes_from"])
+            # ONE VERSION FROM THAT DATE: the real participation can carry
+            # several, and moving only the first left a later one earlier than
+            # it (REQ-GEN-185 added a version before 2026-08-24).
+            versions = [{**versions[-1], "effective_from": str(moved["owes_from"])}]
         if versions:
             entry["participation"] = {"versions": versions}
         if "not_expected" in moved:

@@ -608,10 +608,16 @@ def _ordinary_severities(periods, injected_by_period) -> list:
     post-build-review #154). The first period stays clean."""
     from generator import targeting
 
-    unavailable = frozenset(i for i, p in enumerate(periods) if p.name in injected_by_period)
-    return targeting.outside_hold([sev for _q, sev in RUN_PLAN[:len(periods)]],
-                                  [p.date for p in periods], "cp-clients",
-                                  keep_clean=frozenset({0}), unavailable=unavailable)
+    green = frozenset(name for _inj, placement in injected_by_period.values()
+                      for name in placement.built_green)
+    unavailable = frozenset(i for i, p in enumerate(periods)
+                            if p.name in injected_by_period or p.name in green)
+    out = targeting.outside_hold([sev for _q, sev in RUN_PLAN[:len(periods)]],
+                                 [p.date for p in periods], "cp-clients",
+                                 keep_clean=frozenset({0}), unavailable=unavailable)
+    # A LEAD-IN OR FOLLOWING PERIOD IS A SINGLE CLEAN DELIVERY (REQ-GEN-185):
+    # a clean chain is one arrival, with no resupply.
+    return [None if p.name in green else sev for p, sev in zip(periods, out)]
 
 
 def main() -> None:

@@ -133,6 +133,19 @@ calendars:
       365 authored dates a year would be absurd, and the agreement
       genuinely IS "every day". Birth Registrations' real cadence.
     versions:
+      # TEN EARLIER DAYS (REQ-GEN-185, Keith, 2026-10-11): an EARLIER version
+      # rather than moving the 2026-08-24 one, which has governed filings and
+      # may only change by a declared correction (REQ-PIPE-173). Nothing was
+      # judged against these days, so adding them changes no verdict.
+      - effective_from: "2026-08-14"
+        changelog:
+          - date: "2026-10-11"
+            author: REQ-GEN-185
+            change: >-
+              Ten days of daily supply before 2026-08-24, because the synthetic history grew from 30 daily supplies to 40 (Keith's call): planting TS-43 to TS-46 with their lead-in days claims nearly every day from 2026-09-03 on, and the ordinary resupplies need days of their own. The same rule and claim window as the version after it.
+        claim_window: 4h
+        cadence:
+          rule: daily
       - effective_from: "2026-08-24"
         changelog:
           - date: "2026-08-24"
@@ -185,6 +198,18 @@ datasets:
   - id: birth-registrations
     participation:
       versions:
+        # TEN EARLIER DAYS, AS AN EARLIER VERSION (REQ-GEN-185) - see the daily
+        # calendar above for why not by moving the 2026-08-24 one.
+        - effective_from: "2026-08-14"
+          expected_time: "14:00"
+          grace: 1h
+          changelog:
+            - date: "2026-10-11"
+              author: REQ-GEN-185
+              change: >-
+                Birth Registrations owes a supply from 2026-08-14, ten days earlier -
+                the synthetic history is 40 days now. The same due time and grace
+                as the version after it.
         - effective_from: "2026-08-24"
           expected_time: "14:00"
           grace: 1h

@@ -210,7 +210,8 @@ class TestWhenItGraduated:
         import datetime
 
         _asset_with([AGREED], tmp_path, monkeypatch)
-        assert schedule.owes_from("birth-registrations") == datetime.date(2026, 8, 24)
+        # 2026-08-14 since REQ-GEN-185 added ten earlier days.
+        assert schedule.owes_from("birth-registrations") == datetime.date(2026, 8, 14)
 
     def test_a_date_that_is_not_a_date_is_refused(self, tmp_path, monkeypatch):
         _asset_with([{**AGREED, "owes_from": "November"}], tmp_path, monkeypatch)

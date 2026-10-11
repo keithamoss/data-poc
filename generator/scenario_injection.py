@@ -40,6 +40,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Sequence
 
+from generator.targeting import Target
+
 ROOT = Path(__file__).resolve().parent.parent
 
 #: Where the placements are recorded for the scenario map to read
@@ -129,6 +131,19 @@ class Injection:
     #: placement under both is honest, where generating a second
     #: identical arrival would be padding.
     also_demonstrates: tuple[str, ...] = ()
+    #: For a scenario with a TARGETED arrival (REQ-GEN-185): how many
+    #: periods before the anchor are generated as green, on-time, single
+    #: supplies nobody else's arrival lands on - so the targeted supply is
+    #: measured against something the generator knew when it built it.
+    #: Per injection because a quarterly lead-in is quarters, not days, and
+    #: because the era a scenario must sit in can be too short for two.
+    #: The period AFTER the anchor is generated green too, so the targeted
+    #: perturbation does not carry into it (criterion 3).
+    lead_in: int = 2
+
+    @property
+    def is_targeted(self) -> bool:
+        return any(a.target is not None for a in self.arrivals)
 
 
 @dataclass(frozen=True)
@@ -143,6 +158,14 @@ class Placement:
     arrivals: tuple[dict, ...] = field(default_factory=tuple)
     suppressed: tuple[str, ...] = ()
     quiet: tuple[str, ...] = ()
+    #: The green lead-in periods before a targeted anchor, oldest first,
+    #: and the green period after it (REQ-GEN-185 criteria 1 and 3).
+    lead_in: tuple[str, ...] = ()
+    follow: tuple[str, ...] = ()
+
+    @property
+    def built_green(self) -> tuple[str, ...]:
+        return (*self.lead_in, *self.follow)
 
     def as_record(self) -> dict:
         """The shape qa_tools/common/scenario_map.py reads.
@@ -163,6 +186,8 @@ class Placement:
             "in_place_on": latest.isoformat(),
             "supplies": [a["run_id"] for a in self.arrivals if a.get("run_id")],
             "config": self.config,
+            "lead_in": list(self.lead_in),
+            "follow": list(self.follow),
             "targets": [{"date": a["date"], "at": a["at"], **a["target"]}
                         for a in self.arrivals if a.get("target")],
         }
@@ -309,6 +334,24 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
                 f"is outside the generated history")
         quiet.append(periods[at].name)
 
+    # A TARGETED SCENARIO'S LEAD-IN AND THE PERIOD AFTER IT (REQ-GEN-185):
+    # both must exist in the generated history - placing them anywhere else
+    # would measure the target against something it was not built for.
+    lead_in, follow = [], []
+    if injection.is_targeted:
+        for k in range(injection.lead_in, 0, -1):
+            if index - k < 0:
+                raise CannotPlace(
+                    f"{injection.scenario_id}: its targeted supply needs {injection.lead_in} "
+                    f"lead-in period(s) before {anchor.name}, and the generated history "
+                    f"starts too late for them")
+            lead_in.append(periods[index - k].name)
+        if index + 1 >= len(periods):
+            raise CannotPlace(
+                f"{injection.scenario_id}: its targeted supply needs the period after "
+                f"{anchor.name} generated green, and the history ends there")
+        follow.append(periods[index + 1].name)
+
     arrivals = []
     for extra in injection.arrivals:
         day = anchor.date + timedelta(days=extra.day_offset)
@@ -332,7 +375,9 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
         config=injection.config,
         arrivals=tuple(arrivals),
         suppressed=tuple(suppressed),
-        quiet=tuple(quiet))
+        quiet=tuple(quiet),
+        lead_in=tuple(lead_in),
+        follow=tuple(follow))
 
 
 def for_dataset(dataset_id: str, injections: Sequence[Injection] | None = None
@@ -355,8 +400,11 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
     seen: dict[tuple[str, str], str] = {}
     for injection in injections:
         placement = resolve(injection, periods_by_dataset[injection.dataset_id])
+        # A LEAD-IN OR FOLLOWING PERIOD IS CLAIMED like the anchor itself
+        # (REQ-GEN-185 criterion 5): another scenario's anchor, emptied or
+        # quiet day landing on one fails here naming both.
         for name in dict.fromkeys((placement.period, *placement.suppressed,
-                                   *placement.quiet)):
+                                   *placement.quiet, *placement.built_green)):
             key = (injection.dataset_id, name)
             if key in seen and seen[key] != injection.scenario_id:
                 raise CannotPlace(
@@ -601,17 +649,68 @@ INJECTIONS: tuple[Injection, ...] = (
     # and none shares a period with another. Shapes only: the severity is
     # what the generator puts into the rows, and the QA tools decide.
     #
-    # TS-43, TS-44, TS-45 AND TS-46 ARE PARKED (Keith, 2026-10-05). The
-    # first three each need an AMBER supply - warnings and no failure - and
-    # TS-46 a GREEN resend; no dial this generator
-    # has produces one reliably: the 'amber' preset trips single-tier checks
-    # and reads red as a whole, and a plain truncation into the row-count
-    # warn band splits multiple-birth groups (three sibling checks fail) and
-    # compounds across consecutive days (row count and drift fail). TS-46's
-    # resend is churned from the first supply, which moves its row count and
-    # its distribution enough that those two checks read it red against the
-    # supply it was to replace. All were tried on real rebuilds; the
-    # register says what planting needs (plans/running-thoughts.md #63).
+    # TS-43 TO TS-46, PLANTED 2026-10-11 (REQ-GEN-184, REQ-GEN-185). Parked
+    # on 2026-10-05 because nothing could make an amber supply - warnings
+    # and no failure - or a resend that stayed green. Each is now BUILT TO A
+    # TARGET from the checks' own bands, after green lead-ins and before a
+    # green day, so its row count and drift are measured against what the
+    # generator built. Each sits inside the setting era it needs
+    # (contract/data-asset.yaml); TS-44 and TS-45 take one lead-in, because
+    # the promote-and-acknowledge era is eight days with TS-2 and TS-1 in it.
+    # The real tools still decide - REQ-GEN-186 checks they agreed.
+    Injection(
+        scenario_id="TS-43",
+        dataset_id="birth-registrations",
+        anchor=-18,
+        config="daily; the amber setting is HOLD from 2026-09-01. A scripted person "
+               "promotes the held supply five hours after it arrives, before the next "
+               "day's supply (REQ-GEN-185 criterion 7).",
+        arrivals=(
+            ExtraArrival(0, "14:00", None, "built to amber on facility nulls",
+                         target=Target("amber", ("place_of_birth_facility.completeness",))),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-44",
+        dataset_id="birth-registrations",
+        anchor=-10,
+        lead_in=1,
+        config="daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.",
+        arrivals=(
+            ExtraArrival(0, "14:00", None, "built to amber on parent 1 nulls",
+                         target=Target("amber", ("registering_parent_1_name.completeness",))),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-45",
+        dataset_id="birth-registrations",
+        anchor=-6,
+        lead_in=1,
+        config="as TS-44; a scripted acknowledgement five hours after receipt, once the "
+               "rule has promoted it.",
+        arrivals=(
+            ExtraArrival(0, "14:00", None, "built to amber on parent 2 nulls",
+                         target=Target("amber", ("registering_parent_2_name.completeness",))),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-46",
+        dataset_id="birth-registrations",
+        # A WEEKDAY: its 16:00 resend is a resupply, and every resupply
+        # arrives on a weekday (tests/test_generate_runs.py). 2026-09-21 is the
+        # replacement era's Monday; its lead-in is the Sunday, and the day
+        # after is the history's last.
+        anchor=-2,
+        lead_in=1,
+        config="daily; the replacement setting is GREEN from 2026-09-18 to 2026-09-21. "
+               "Two green supplies for one day, at 14:00 and 16:00.",
+        arrivals=(
+            ExtraArrival(0, "14:00", None, "the first supply, promoted",
+                         target=Target("green")),
+            ExtraArrival(0, "16:00", None, "the green resend that replaces it",
+                         target=Target("green")),
+        ),
+    ),
     Injection(
         scenario_id="TS-47",
         dataset_id="birth-registrations",

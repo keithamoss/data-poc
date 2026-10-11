@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**8 of 37 scenarios marked for injection have data behind them today.** 75 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**12 of 37 scenarios marked for injection have data behind them today.** 75 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -436,7 +436,13 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 *Config: daily; the amber setting is HOLD from 2026-09-01.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202609051400000800` |
+| Period | 2026-09-05 |
+| Set the in-place-on date to | 2026-09-05 |
+| Built to | amber on place_of_birth_facility.completeness (449 of 1,982), the 2026-09-05 14:00 arrival |
 
 ### TS-44 - An amber supply promoted and awaiting acknowledgement
 
@@ -446,7 +452,13 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 *Config: daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202609131400000800` |
+| Period | 2026-09-13 |
+| Set the in-place-on date to | 2026-09-13 |
+| Built to | amber on registering_parent_1_name.completeness (144 of 1,758), the 2026-09-13 14:00 arrival |
 
 ### TS-45 - The same, acknowledged by a person
 
@@ -454,9 +466,15 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 **What it would look like if the rule were wrong.** The acknowledgement refused, or written outside the decision path.
 
-*Config: as TS-44; a scripted acknowledgement three hours after receipt.*
+*Config: as TS-44; a scripted acknowledgement five hours after receipt, once the rule has promoted it.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202609171400000800` |
+| Period | 2026-09-17 |
+| Set the in-place-on date to | 2026-09-17 |
+| Built to | amber on registering_parent_2_name.completeness (625 of 1,989), the 2026-09-17 14:00 arrival |
 
 ### TS-46 - A green resupply replaces the promoted supply
 
@@ -466,7 +484,14 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 *Config: daily; the replacement setting is GREEN from 2026-09-18 to 2026-09-21.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202609211400000800`, `birth_registrations__202609211600000800` |
+| Period | 2026-09-21 |
+| Set the in-place-on date to | 2026-09-21 |
+| Built to | green, the 2026-09-21 14:00 arrival |
+| Built to | green, the 2026-09-21 16:00 arrival |
 
 ### TS-47 - A daily file arriving after the next day's window opened
 
@@ -1322,9 +1347,43 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "breaksAs": "It promotes itself, as it would under promote.",
    "config": "Config: daily; the amber setting is HOLD from 2026-09-01.",
    "requirements": [
-    "REQ-PIPE-122"
+    "REQ-PIPE-122",
+    "REQ-GEN-184",
+    "REQ-GEN-185"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202609051400000800"
+    ],
+    "period": "2026-09-05",
+    "inPlaceOn": "2026-09-05",
+    "targets": [
+     {
+      "date": "2026-09-05",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "place_of_birth_facility.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1982
+       },
+       {
+        "rule": "place_of_birth_facility.completeness",
+        "to": "amber",
+        "nulls": 449,
+        "of_rows": 1982,
+        "was": 43
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "TS-44",
@@ -1335,9 +1394,42 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "breaksAs": "Promoted with nothing asked, or held.",
    "config": "Config: daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.",
    "requirements": [
-    "REQ-PIPE-122"
+    "REQ-PIPE-122",
+    "REQ-GEN-184"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202609131400000800"
+    ],
+    "period": "2026-09-13",
+    "inPlaceOn": "2026-09-13",
+    "targets": [
+     {
+      "date": "2026-09-13",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "registering_parent_1_name.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 474,
+        "of_rows": 1758
+       },
+       {
+        "rule": "registering_parent_1_name.completeness",
+        "to": "amber",
+        "nulls": 144,
+        "of_rows": 1758,
+        "was": 39
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "TS-45",
@@ -1346,12 +1438,39 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
    "demonstrates": "Beside TS-44's, this one reads acknowledged, by the person, with their reason (REQ-PIPE-122, REQ-GEN-137 criterion 4).",
    "breaksAs": "The acknowledgement refused, or written outside the decision path.",
-   "config": "Config: as TS-44; a scripted acknowledgement three hours after receipt.",
+   "config": "Config: as TS-44; a scripted acknowledgement five hours after receipt, once the rule has promoted it.",
    "requirements": [
     "REQ-PIPE-122",
-    "REQ-GEN-137"
+    "REQ-GEN-137",
+    "REQ-GEN-184"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202609171400000800"
+    ],
+    "period": "2026-09-17",
+    "inPlaceOn": "2026-09-17",
+    "targets": [
+     {
+      "date": "2026-09-17",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "registering_parent_2_name.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "amber",
+        "nulls": 625,
+        "of_rows": 1989,
+        "was": 539
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "TS-46",
@@ -1363,9 +1482,49 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "config": "Config: daily; the replacement setting is GREEN from 2026-09-18 to 2026-09-21.",
    "requirements": [
     "REQ-PIPE-123",
-    "REQ-DASH-127"
+    "REQ-DASH-127",
+    "REQ-GEN-184",
+    "REQ-GEN-185"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202609211400000800",
+     "birth_registrations__202609211600000800"
+    ],
+    "period": "2026-09-21",
+    "inPlaceOn": "2026-09-21",
+    "targets": [
+     {
+      "date": "2026-09-21",
+      "at": "14:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1989
+       }
+      ]
+     },
+     {
+      "date": "2026-09-21",
+      "at": "16:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1989
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "id": "TS-47",

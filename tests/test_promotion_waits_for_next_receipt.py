@@ -71,3 +71,44 @@ class TestTheNextReceiptIsKnownInAReplay:
         first, second = arrivals.arrivals_for("child-protection", "")
         assert promotion.next_receipt(first) == second.received_at
         assert promotion.next_receipt(second) is None
+
+
+class TestNoLaterThanTheClaimWindow:
+    """A replayed rule decision takes effect no later than the dataset's
+    claim window after receipt, as a scheduled pass would (Keith,
+    2026-10-11, REQ-GEN-185): with the old 1-hour-to-3-day lag a daily
+    supply's promotion landed the next day, under the NEXT day's amber
+    setting, and after a person's decision about it that same evening."""
+
+    def test_the_cap_holds_whatever_the_lag(self):
+        received = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
+        for n in range(50):
+            at = promotion.effective_at_for(received, seed=f"run_{n}",
+                                            within=timedelta(hours=4))
+            assert received <= at <= received + timedelta(hours=4)
+
+    def test_without_a_cap_the_lag_is_as_it_was(self):
+        received = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
+        assert promotion.effective_at_for(received, seed="run_lag_probe") == \
+            promotion.effective_at_for(received, seed="run_lag_probe", within=None)
+
+    @pytest.mark.parametrize("module", [orchestrate_bdm, orchestrate_cp], ids=["bdm", "cp"])
+    def test_both_orchestrators_pass_the_claim_window(self, module, monkeypatch):
+        from qa_tools.common import schedule
+
+        seen = {}
+        real = promotion.effective_at_for
+
+        def spy(received_at, **kw):
+            seen.update(kw)
+            return real(received_at, **kw)
+        monkeypatch.setattr(promotion, "effective_at_for", spy)
+        monkeypatch.setattr(promotion, "next_receipt", lambda arrival: None)
+        monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: None)
+        monkeypatch.setattr(promotion, "report", lambda *a, **k: None)
+        monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: None)
+        arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_x",
+                                  files_by_dataset={"cp-clients": "x"})
+        module.promote_after(arrival, [], "t@example.com")
+        dataset = "birth-registrations" if module is orchestrate_bdm else "cp-clients"
+        assert seen["within"] == schedule.claim_window(dataset, on=RECEIVED.date())
