@@ -60,7 +60,7 @@ def generated_output_dir() -> str:
 
 
 
-def generate_synthetic_data() -> None:
+def generate_synthetic_data(trial: bool = True) -> None:
     """Runs the real generator directly - the same shape as cli/cp.py's
     own generate_synthetic_data(), which is new.
 
@@ -79,7 +79,10 @@ def generate_synthetic_data() -> None:
     lives in the one PostgreSQL database and none of it in a DuckDB file -
     and staging now happens where it belongs, per arrival, as QA runs
     (REQ-PIPE-068). Generating synthetic data is generating synthetic
-    data again."""
+    data again.
+
+    THEN EACH INJECTED TARGET IS TRIED (REQ-GEN-186 criteria 1, 2 and 5):
+    see try_targets(). `trial=False` skips it, and says so."""
     from generator import generate_runs
     generate_runs.main()
     # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
@@ -89,6 +92,70 @@ def generate_synthetic_data() -> None:
     # fine on their own.
     from qa_tools.common import scenario_map
     scenario_map.write_map()
+    if trial:
+        try_targets()
+    else:
+        console.print("Target trial skipped (--skip-target-trial): no injected target was "
+                      "tried against the real tools. The comparison after a replay still "
+                      "runs.", style="yellow")
+
+
+class TargetTrialFailed(click.ClickException):
+    """The real tools did not read an injected target as it was built
+    (REQ-GEN-186 criterion 2)."""
+
+
+def try_targets(say=None) -> int:
+    """Run the four real tools on every injected Birth Registrations target
+    the generator just wrote, against its last lead-in, through the same
+    trial path `mothman bdm qa --trial` uses - recording nothing (REQ-GEN-186
+    criterion 1). Returns how many were tried.
+
+    A DISAGREEMENT FAILS GENERATION AND TAKES THE HISTORY WITH IT (criterion
+    2): every Birth Registrations delivery just written is removed before
+    the failure is raised, so nothing goes on to be replayed from a history
+    the tools have already said is not the one that was meant. The message
+    names each scenario, target, verdict and the checks responsible.
+
+    The verdict is the promotion gate's own reading of the trial's results
+    (qa_tools/common/target_agreement.py) - never one the generator works
+    out for itself (criterion 4). The trial is checked on the supply's own
+    day, so its freshness checks read it as they will in the replay.
+    Measured 2026-10-11: about nine seconds a trial.
+    """
+    from generator import generate_runs, targets
+    from qa_tools.common import delivery, target_agreement
+
+    say = say or (lambda msg: console.print(msg, style="dim"))
+    # WHERE THE GENERATOR JUST WROTE (targets.just_written) - never the
+    # pipeline's view of data/.
+    built, written_to = targets.just_written()
+    tried = [b for b in built
+             if b.injected and b.dataset_id == build_per_run_warehouses.DATASET_ID]
+    found = []
+    for built in tried:
+        say(f"Trying {built.label} against the real tools (built to {built.target})")
+        if built.reference is None:
+            found.append(target_agreement.Disagreement(
+                built.label, built.dataset_id, built.target, None,
+                ("it has no lead-in to be measured against",)))
+            continue
+        results, _filed = run_check_local_file(
+            str(targets.csv_of(built.delivery, written_to)),
+            str(targets.csv_of(built.reference, written_to)),
+            "target-trial", keep=False, run_date=built.day)
+        disagreement = target_agreement.compare(built.dataset_id, results, built.target,
+                                                built.label, built.rules)
+        if disagreement:
+            found.append(disagreement)
+    if found:
+        removed = delivery.remove_deliveries(generate_runs._previous_delivery_names(),
+                                             written_to, generate_runs.RECEIPTS_DIR)
+        raise TargetTrialFailed(
+            f"{len(found)} of {len(tried)} injected target(s) did not read as built, so "
+            f"the {removed} Birth Registrations deliveries just written were removed:\n"
+            + "\n".join(f"  - {d}" for d in found))
+    return len(tried)
 
 
 def load_manifest() -> list[dict]:
@@ -573,14 +640,18 @@ def bdm_group() -> None:
 
 @bdm_group.command("generate-synthetic-data")
 @click.option("--yes", is_flag=True, help="Skip the overwrite confirmation.")
-def generate_synthetic_data_command(yes: bool) -> None:
+@click.option("--skip-target-trial", is_flag=True,
+              help="Do not try each injected target against the real tools after "
+                   "generating (about nine seconds each). A bootstrap still compares "
+                   "every targeted supply after its replay.")
+def generate_synthetic_data_command(yes: bool, skip_target_trial: bool) -> None:
     """Generate (or deterministically regenerate) the full synthetic Birth Registrations batch."""
     if manifest_exists() and not common.confirm(
             "This will regenerate data/raw/ (deterministic - same content either way). Continue?",
             yes=yes, default=True):
         console.print("Not regenerated.", style="yellow")
         return
-    generate_synthetic_data()
+    generate_synthetic_data(trial=not skip_target_trial)
     console.print(f"Generated -> {generated_output_dir()}", style="green")
 
 

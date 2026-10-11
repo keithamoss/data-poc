@@ -255,6 +255,14 @@ releases:
               they broke rules that allow no exceptions. Each is now built to
               land inside a rule's warning band, so more supplies are promoted
               and fewer periods are left with a gap.
+          - headline: The history checks its own aim
+            components: ["Data generation", "Testing & dev tooling"]
+            description: >
+              Generating the synthetic history now runs the real checks on each
+              scenario supply built to a verdict, and stops if one reads
+              differently. After a bootstrap, every supply built to a verdict is
+              compared with what was recorded, and the bootstrap fails naming
+              any that disagree. `--skip-target-trial` skips the first check.
           - headline: Four more scenarios to look at
             components: ["Data generation"]
             description: >

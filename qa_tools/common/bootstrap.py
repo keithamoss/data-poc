@@ -61,6 +61,10 @@ class BootstrapResult:
     #: The checkpoint taken, if one was asked for - repeated in the closing
     #: summary so it is not lost in the run's output (#133 B6).
     checkpoint: str | None = None
+    #: Every targeted supply whose recorded verdict differed from what it
+    #: was built to (REQ-GEN-186 criterion 3). Non-empty fails the
+    #: bootstrap, though nothing it recorded is changed (criterion 6).
+    disagreements: tuple[str, ...] = ()
 
 
 #: Why a re-run over recorded history is refused (REQ-PIPE-144 criteria
@@ -118,7 +122,8 @@ def already_populated(conn) -> bool:
 def bootstrap(collection: str = "all", force: bool = False,
               sequential: bool = False,
               on_step: Callable[[str], None] | None = None,
-              checkpoint_before: int | None = None) -> BootstrapResult:
+              checkpoint_before: int | None = None,
+              skip_target_trial: bool = False) -> BootstrapResult:
     """Ensure this environment's database has data and QA results.
 
     `force` runs even when staging already holds tables - but NEVER over
@@ -207,7 +212,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             timings = {}
             for name in names:
                 say(f"Generating synthetic data ({_LABEL[name]})")
-                generate[name]()
+                generate[name](trial=not skip_target_trial)
                 after_each = None
                 if checkpoint_before is not None:
                     after_each = _checkpoint_hook(name, checkpoint_before, held, say,
@@ -225,7 +230,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             # DELIVERIES NEITHER CLAIMED are recorded once both are done.
             for name in names:
                 say(f"Generating synthetic data ({_LABEL[name]})")
-                generate[name]()
+                generate[name](trial=not skip_target_trial)
             say("Running the real checks against every supply - "
                 + " and ".join(_LABEL[n] for n in names) + " side by side")
             timings = _run_concurrently(names, sequential)
@@ -241,10 +246,36 @@ def bootstrap(collection: str = "all", force: bool = False,
     finally:
         lock.__exit__(None, None, None)
 
+    say("Comparing every targeted supply's recorded verdict with what it was built to")
+    disagreements = targets_agree(names)
     with supply_db.connect(label="mothman:bootstrap") as conn:
         after = staged_table_count(conn)
     return BootstrapResult(populated=True, staged_before=before, staged_after=after,
-                           timings=timings, checkpoint=taken[0] if taken else None)
+                           timings=timings, checkpoint=taken[0] if taken else None,
+                           disagreements=disagreements)
+
+
+#: Which datasets' targets each collection's replay records.
+_TARGET_DATASETS = {"bdm": ("birth-registrations",), "cp": ("cp-clients",)}
+
+
+def targets_agree(names) -> tuple[str, ...]:
+    """Each targeted supply of the collections just replayed, its RECORDED
+    verdict as the promotion gate reads it against what it was built to
+    (REQ-GEN-186 criterion 3) - injected targets, their green lead-in and
+    following days, and every ordinary amber, in both collections. Reads
+    recorded results only and changes nothing (criterion 6).
+
+    What each supply was built to comes from the generator, by way of cli/
+    (generated_targets), because no QA module may read the generator's
+    bookkeeping (REQ-GEN-043 criterion 7)."""
+    from cli.pipeline import generated_targets
+    from qa_tools.common import target_agreement
+
+    wanted = {d for n in names for d in _TARGET_DATASETS[n]}
+    built = [b for b in generated_targets() if b.dataset_id in wanted]
+    with supply_db.connect(label="mothman:bootstrap") as conn:
+        return tuple(str(d) for d in target_agreement.after_replay(conn, built))
 
 
 _LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in total"}
@@ -317,6 +348,9 @@ class ResumeResult:
     dsn: str | None = None
     first_affected: int | None = None
     refused: bool = False
+    #: As BootstrapResult's: a resume is a replay too (REQ-GEN-186
+    #: criterion 3), compared in the resume's own database.
+    disagreements: tuple[str, ...] = ()
 
 
 def resume(name: str, sequential: bool = False,
@@ -384,6 +418,8 @@ def resume(name: str, sequential: bool = False,
             _run_collection(short, sequential, record_deliveries=True,
                             start_at=cp.before, player=player)
         _rebuild_results(short)
+        say("Comparing every targeted supply's recorded verdict with what it was built to")
+        disagreements = targets_agree([short])
     except BaseException:
         # A FAILED RESUME NAMES WHAT IT LEFT (#131 D5): its database is kept
         # for whoever investigates, and listed by `checkpoint list`.
@@ -397,7 +433,8 @@ def resume(name: str, sequential: bool = False,
         else:
             os.environ[supply_db.SUPPLY_DSN_ENV] = previous
     return ResumeResult(replayed=True, dsn=dsn, first_affected=first.arrival,
-                        reason=f"{first.reason}; replayed from arrival {cp.before}")
+                        reason=f"{first.reason}; replayed from arrival {cp.before}",
+                        disagreements=disagreements)
 
 
 def _rebuild_results(short: str) -> None:

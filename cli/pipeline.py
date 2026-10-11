@@ -261,6 +261,15 @@ def generated_into(root):
     return _generated_into(root)
 
 
+def generated_targets():
+    """What the last generation built each targeted supply to - for the
+    comparison after a replay (REQ-GEN-186 criterion 3), which lives in
+    qa_tools/ and so may not read the generator's bookkeeping itself."""
+    from generator import targets
+
+    return targets.written()
+
+
 @pipeline_group.command("cache-key")
 def cache_key_command() -> None:
     """Print the key CI caches a bootstrapped database under (REQ-TEST-117):
@@ -289,8 +298,12 @@ def cache_key_command() -> None:
                    "one collection, an empty database. If N falls inside a delivery it "
                    "moves back to where that delivery begins. `mothman pipeline checkpoint "
                    "arrivals --collection cp` lists the arrival numbers.")
+@click.option("--skip-target-trial", is_flag=True,
+              help="Do not try each injected target against the real tools after "
+                   "generating. Every targeted supply is still compared with what it was "
+                   "built to once the replay finishes.")
 def bootstrap_command(collection: str, force: bool, sequential: bool,
-                      checkpoint_before: int | None) -> None:
+                      checkpoint_before: int | None, skip_target_trial: bool) -> None:
     """Take an empty environment to one with data and QA results in it.
 
     Run this after cloning, on a fresh dev container, or whenever a
@@ -305,7 +318,8 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     from qa_tools.common.bootstrap import bootstrap
 
     result = bootstrap(collection=collection, force=force, sequential=sequential,
-                        on_step=_step, checkpoint_before=checkpoint_before)
+                        on_step=_step, checkpoint_before=checkpoint_before,
+                        skip_target_trial=skip_target_trial)
     if result.refused:
         raise click.ClickException(result.reason)
     if not result.populated:
@@ -319,6 +333,18 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
         # took it is hundreds of lines up.
         console.print(f"Checkpoint kept: {result.checkpoint}. Resume from it with "
                       f"`mothman pipeline resume {result.checkpoint}`.", style="green")
+    _fail_on_disagreements(result.disagreements)
+
+
+def _fail_on_disagreements(disagreements) -> None:
+    """FAILS, BUT CHANGES NOTHING (REQ-GEN-186 criteria 3 and 6): the history
+    stands as recorded, and the failure names each supply the real tools read
+    differently from how it was built, with the checks responsible."""
+    if disagreements:
+        raise click.ClickException(
+            f"{len(disagreements)} targeted supply/supplies did not read as built once "
+            f"replayed - nothing recorded was changed:\n"
+            + "\n".join(f"  - {d}" for d in disagreements))
 
 
 def _step(msg: str) -> None:
@@ -432,6 +458,7 @@ def resume_command(name: str, sequential: bool) -> None:
     console.print(f"  export {supply_db.SUPPLY_DSN_ENV}={_pasteable(result.dsn)}",
                   soft_wrap=True, highlight=False)
     console.print("To go back, set it to your previous value again.", style="dim")
+    _fail_on_disagreements(result.disagreements)
 
 
 def _on_asset_clock(value) -> str:

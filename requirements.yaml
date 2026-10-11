@@ -6690,7 +6690,7 @@ requirements:
       red against the supply it was to replace, so it waited for a person instead
       of replacing it. Same root cause - the generator cannot aim for a verdict
       - and the same fix is wanted: plans/running-thoughts.md #63, generate to
-      the check rules.'
+      the check rules (built as REQ-GEN-183 to 186, 2026-10-11).'
     - 'CRITERIA 15 AND 16 LANDED 2026-10-05 in a change of their own with its
       own rebuild (criterion 17): TS-12 - cp_clients ragged partway, refused by
       the fields-per-row file check in 2025-Q2 while the other five load - and
@@ -32175,7 +32175,7 @@ requirements:
     date_written: '2026-10-11'
     story: As whoever regenerates the synthetic history, I want each targeted supply's verdict confirmed by the four real tools as soon as it is generated, and checked again against what the pipeline recorded, so that a supply that would land wrong fails in about a minute rather than at the end of a full rebuild, and never ships quietly wrong.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-11'
@@ -32196,6 +32196,23 @@ requirements:
     dependencies:
     - REQ-GEN-184
     - REQ-GEN-185
+    linked_tests:
+    - tests/test_target_agreement.py
+    - tests/test_bootstrap.py
+    implemented_by:
+    - generator/targets.py::written
+    - generator/targets.py::just_written
+    - qa_tools/common/target_agreement.py::compare
+    - qa_tools/common/target_agreement.py::after_replay
+    - cli/bdm.py::try_targets
+    - cli/bdm.py::generate_synthetic_data
+    - cli/pipeline.py::generated_targets
+    - qa_tools/common/bootstrap.py::targets_agree
+    - qa_tools/common/bootstrap.py::bootstrap
+    - qa_tools/common/bootstrap.py::resume
+    evidence:
+    - '2026-10-11: tests/test_target_agreement.py - the comparison names a red check against an amber target, a warning against a green one, and, for an amber that warned on nothing, the checks of the rule that was meant to (c2); a gap red reads as its measurement (the gate''s reading); no results is no verdict, never a guess (c4). Through the real trial path on a real generated TS-43: it agrees and records nothing (c1); claimed as built green it fails naming TS-43, the target, the verdict and the facility checks, and every Birth Registrations delivery written is removed (c2); a target with no lead-in is a disagreement, not a crash. --skip-target-trial says so and the trial does not run; the bootstrap passes the flag to both generators (c5). A bootstrap result carrying a disagreement exits non-zero naming it and saying nothing recorded was changed (c3, c6). Against the deployment: every targeted supply agrees and the decision, filing, check_result and run counts are unchanged by the comparison (c3, c6).'
+    - '2026-10-11, a bootstrap from empty with this live: all five injected arrivals (TS-43, TS-44, TS-45 and both of TS-46''s) agreed in the trial, and all 26 targeted supplies agreed after replay - the 5 injected arrivals, 9 lead-in and following days, and 8 Birth Registrations and 4 Child Protection ordinary ambers. 10m39s against 9m25s before; a trial alone measured nine seconds.'
     decisions:
     - 'BOTH COMPARISONS (Keith, 2026-10-11, question 3, recommended option): a real-tool trial at generation, fast but blind to filing, promotion, the gap rule and scripted decisions; and a comparison of the recorded verdict after replay, complete but slow. REJECTED a generator-side arithmetic prediction against the catalogue, which is a second implementation of every check, cannot evaluate SQL-bodied checks at all, and would make the scenario agree with the generator rather than with the tools. REJECTED the post-replay comparison alone, which only finds a wrong scenario after a full bootstrap. REJECTED no verification.'
     - 'CHECK AGAINST THE REAL READER, NOT BY REASONING (REQ-GEN-044''s TS-12 lesson: an ''unreadable'' file parsed happily on the first attempt). A targeted supply is confirmed by the tools that will judge it.'
@@ -32203,6 +32220,13 @@ requirements:
     - 'TRIAL FOR INJECTED TARGETS ONLY, REPLAY COMPARISON FOR ALL (Keith, 2026-10-11, recommended option). REJECTED trialling ordinary ambers too: an ordinary amber has no lead-in, so there is no single reference to trial it against, and about six of them would add about six minutes to every generation. Its within-supply construction is meant to hold against any reference, and the post-replay comparison checks that against what really ran.'
     - 'THE GATE''S READING, NOT THE PAGE''S (Keith, 2026-10-11, recommended option). REJECTED comparing the status the page shows, which includes gap reds: REQ-QAC-108''s gap rule records a drift or volume check red when the comparison skipped an owed period, keeping the measurement as measured_status, and the promotion gate reads the measurement. An ordinary amber arriving after an unresolved red would otherwise fail the comparison for a gap it did not cause.'
     - 'THE POST-REPLAY COMPARISON READS RECORDED RESULTS ONLY and changes nothing, so it does not add a scenario-only path to filing, QA or promotion; it is the same kind of loud stop REQ-GEN-135''s scripted-decision refusal already gives. Flagged for Keith''s #64 walkthrough because it is new bootstrap code that knows targets exist.'
+    - 'A TRIAL TAKES NINE SECONDS, NOT A MINUTE (measured 2026-10-11, superseding the performance NFR''s 2026-10-05 figure): five injected arrivals add under a minute to a bootstrap, so the trial is on by default. REJECTED making the bootstrap skip it by default.'
+    - 'CHECKED ON THE SUPPLY''S OWN DAY: a trial passes the arrival''s own date as its run date, or the freshness checks would read a September supply against today and every trial would read red.'
+    - 'WHERE IT LIVES: generator/targets.py says what each supply was built to, from the generator''s bookkeeping and the scenario placements; qa_tools/common/target_agreement.py compares; the bootstrap receives the expectations through cli/ (generated_targets), because no QA module may read the bookkeeping (REQ-GEN-043 criterion 7). The trial reads where the generator just wrote, by the generator''s own path constants, so a redirected generator never trials the real tree.'
+    - 'RESULTS ARE READ AS THE GATE READ THEM, extras merged: a first read-only prototype took raw rows and called the 2026-08-28 ordinary amber red, because a gap red''s measured status lives in the record''s extras. With them merged, all 26 agreed.'
+    - 'A DISAGREEMENT AT GENERATION REMOVES EVERY BIRTH REGISTRATIONS DELIVERY JUST WRITTEN (criterion 2, ''SHALL NOT emit the history''), leaving the bookkeeping so the next generation tidies as usual. Child Protection has nothing to trial: a targeted Child Protection injection is refused at planning (REQ-GEN-185), and its ordinary ambers are compared after replay only.'
+    - 'A RESUME IS A REPLAY TOO: `mothman pipeline resume` compares in the resume''s own database and fails the same way. Its regeneration runs the trial too, under a minute.'
+    - 'THE COMPARISON SET: injected targets, the green lead-in and following days around them, and every ordinary amber in both collections - the generator''s built-to list, nothing inferred. Ordinary cleans and reds are not targeted (a clean supply warns by the draw, REQ-GEN-184), so they are not compared.'
   - id: REQ-QAC-187
     title: Child Protection client postcodes tolerate a few unrecognised values, matching their Soda and dbt bands
     date_written: '2026-10-11'

@@ -233,7 +233,7 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
     # overwrite, and the command must ask before it does.
     _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: called.append(True))
     monkeypatch.setattr(common, "confirm", lambda *a, **k: False)
 
     result = _runner.invoke(bdm.generate_synthetic_data_command, [])
@@ -246,7 +246,7 @@ def test_generate_synthetic_data_command_skips_when_declined(monkeypatch, tmp_pa
 def test_generate_synthetic_data_command_yes_flag_skips_confirmation(monkeypatch, tmp_path, bdm_raw_dir):
     _patch_delivery_dirs(monkeypatch, bdm_raw_dir)
     called = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: called.append(True))
 
     result = _runner.invoke(bdm.generate_synthetic_data_command, ["--yes"])
 
@@ -259,7 +259,7 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
     shouldn't even ask."""
     _patch_delivery_dirs(monkeypatch, tmp_path)
     called = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: called.append(True))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: called.append(True))
 
     def _fail_if_called(*a, **k):
         raise AssertionError("should not prompt when there's nothing to overwrite yet")

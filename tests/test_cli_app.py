@@ -61,7 +61,7 @@ def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
     monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
     generated = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: generated.append(True))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: generated.append(True))
 
     def _fail_if_called(*a, **k):
         raise AssertionError("should not prompt when there's nothing to overwrite yet")
@@ -88,7 +88,7 @@ def test_generate_menu_picks_cp_and_generates_via_the_cp_module(monkeypatch):
     monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_CP)
     monkeypatch.setattr(cp, "manifest_exists", lambda: False)
     generated = []
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: generated.append(True))
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: generated.append(True))
     monkeypatch.setattr(cp, "generated_output_dir", lambda: "/fake/cp_deliveries")
 
     def _fail_if_called(*a, **k):

@@ -4376,84 +4376,6 @@ Belongs with batch 5's check work.
     nobody has met yet; worth doing once a clean run's real output has
     been measured.
 
-63. **[todo, 2026-10-05]** **[Data generation]** **Generate to the
-    check rules, not by trial and error.** Keith, after TS-43/44/45 had to
-    be parked: "we need to revisit how we do the generation and make sure
-    it doesn't run into situations like this. I don't think we can brute
-    force it. I think we actually need to have it follow the rules that
-    we've defined in the checks."
-
-    What prompted it: an injected scenario says which OUTCOME it needs
-    (amber - warnings, no failure), but the generator only has blunt
-    dials ('amber'/'red' dirtying presets, row truncation), so whether a
-    supply lands amber is found out by a 25-minute rebuild. Two rebuilds
-    showed the gap. The 'amber' preset trips checks that fail on one bad
-    value, so the supply reads red. A plain truncation splits
-    multiple-birth groups (three sibling checks fail) and compounds
-    across consecutive days (row count, drift). Neither dial knows what
-    the checks will say.
-
-    The direction he set: the generator should READ the committed check
-    definitions - each check's warn and fail thresholds, which checks are
-    single-tier (any violation fails), which relationships must hold
-    (siblings, ordering, uniqueness) - and produce a supply that is
-    amber BY CONSTRUCTION. For example: violate only checks that have a
-    warn band, stay inside it, and keep every invariant another check
-    relies on.
-
-    Open, and to scope with him rather than decide here:
-    - Is the target per check ("this check warns, every other check
-      passes") or per supply ("amber overall")?
-    - How a cross-supply check (row-count growth, drift against the
-      previous supply) is satisfied when the previous supply is itself a
-      scenario.
-    - Whether the generator should verify its own output against the
-      rules before writing, and fail at generation time rather than at
-      replay.
-
-    Unblocks TS-43, TS-44, TS-45 and TS-46 (parked the same evening for
-    the same reason - its "green" resend, churned from the supply before
-    it, read red on row count and drift against it; the register and
-    REQ-GEN-044's decisions say why each is parked), and very likely anything else
-    that needs a precise verdict. Sits with plans/data-generation.md once
-    scoped.
-
-    SCOPED 2026-10-11 by delivery-scoper as draft REQ-GEN-183..186 (unsigned).
-    Keith's answers the same morning: the target is the supply's overall
-    verdict plus an optional named RULE; a clean lead-in of green periods
-    before an injected target (and a clean one after); verify with the real
-    tools in trial mode at generation AND compare the recorded verdict after
-    replay; scope is TS-43..46 PLUS the ordinary 20% amber share (built from
-    within-supply rules only - null rates in their warn band, row count and
-    value mix kept clean - with no lead-in), while the ordinary red share
-    keeps the preset; aiming at a target fits REQ-GEN-044 c6 as written;
-    TS-43's held supply gets a scripted later decision so its gap closes;
-    bands read from each tool's own files; and every SQL-bodied check
-    DECLARES the columns it reads (reads_columns), folded into REQ-GEN-183
-    rather than a QAC requirement of its own. CP cross-table (TS-48/49/51)
-    not in this scope.
-    Second round, same day: ordinary ambers are kept OUT of the hold era
-    (2026-09-01..09) so none is left held with nobody to decide; Child
-    Protection's ordinary ambers ARE in scope too, though its contract has
-    no within-supply amber band, so they need a different lever (still to
-    design with Keith); and reads_columns covers Soda failed-rows, dbt
-    singular, relationship and dbt_utils.expression_is_true tests and ODCS
-    type sql, not Soda reference checks. Third round: CP ambers come from
-    LOOSENING ONE CP CONTRACT RULE to a tolerance matching its Soda/dbt warn
-    band (a QA-checks change - which rule and what tolerance still to put to
-    him), so they work within a supply like BDM's; the generation-time trial
-    is for injected targets only; the after-replay comparison reads the
-    gate's verdict (the measurement), not the page's gap reds; reads_columns
-    is a flat list of table.column. The CP rule loosened is
-    cp_clients.postcode invalid values, mustBe 0 -> under 3% (Keith's pick
-    over the scoper's recommended referral source), so CP ambers land on
-    cp-clients with 1-15 bad postcodes in ~527 clients.
-    SIGNED OFF by Keith 2026-10-11 as REQ-GEN-183, 184, 185, 186 and
-    REQ-QAC-187 (all five through delivery-scoper), with the authoring-
-    standard wording for reads_columns approved as written and carried
-    verbatim in REQ-GEN-183's decisions. Not built yet. Delete this item
-    when the last of the five is built.
-
 64. **[todo, 2026-10-05]** **[Data generation]** **Walk through scenario injection
     with Keith - no scenario-only code paths.** Keith, after the TS-47
     explanation: once the file-check work (sprint 12) is finished, he
@@ -4488,7 +4410,8 @@ Belongs with batch 5's check work.
       carries only for scenarios, which is exactly what he wants
       examined.
 
-    Pairs with #63 (generate to the check rules).
+    Pairs with REQ-GEN-183 to 186 (generating to the check rules, built
+    2026-10-11, which was #63 here).
 
 65. **[todo, 2026-10-05]** **[Testing & dev tooling]** **Rebuilds take far too
     long to iterate on a scenario.** Keith, 2026-10-05 evening, after four
@@ -4529,8 +4452,9 @@ Belongs with batch 5's check work.
       the first a change can affect.
     - SPEED FOR EVERYONE: run a run's four tools in parallel; REQ-TEST-117
       (CI reuses an unchanged bootstrap) for the CI side.
-    Pairs with #63: generating to the check rules would remove most of
-    the trial and error these rebuilds were spent on.
+    Pairs with REQ-GEN-183 to 186 (generating to the check rules, built
+    2026-10-11): they remove most of the trial and error these rebuilds
+    were spent on.
 
     **MEASURED 2026-10-06 - half the bootstrap is re-reading configuration.**
     The last wall-clock rebuild: Child Protection's 108 arrivals took

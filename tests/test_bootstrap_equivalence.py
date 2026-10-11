@@ -162,8 +162,8 @@ def _bootstrap_into(corpus: Path, db_name: str, *, sequential: bool) -> tuple[di
         # orchestrators reconcile real GitHub Issues after every run.
         mp.delenv("GITHUB_REPOSITORY", raising=False)
         # Generated once, by the corpus fixture - both modes read it as is.
-        mp.setattr(bdm, "generate_synthetic_data", lambda: None)
-        mp.setattr(cp, "generate_synthetic_data", lambda: None)
+        mp.setattr(bdm, "generate_synthetic_data", lambda **_: None)
+        mp.setattr(cp, "generate_synthetic_data", lambda **_: None)
         # BOTH MODES through the same wrapper - see its docstring.
         mp.setattr(boot, "_run_collection", equiv_support.redirected_run_collection)
         # bootstrap() sets this per process from `sequential`; put it back.

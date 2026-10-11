@@ -471,9 +471,12 @@ def _write_bookkeeping(manifest: list[dict]) -> None:
     One that did would be making filing decisions from a declaration
     rather than from arrival plus slot state, which is the
     supplier-declared manifest Thread B rejected wearing our own badge.
-    The generator reads it back for one purpose only: to delete what it
+    The generator reads it back for two purposes only: to delete what it
     wrote last time, so a regeneration overwrites rather than
-    accumulates.
+    accumulates, and to say what each supply was built to
+    (generator/targets.py, REQ-GEN-186) - which reaches the comparison
+    after a replay as plain values, through cli/, never by the QA
+    module opening this file.
     """
     path = BOOKKEEPING_PATH
     book = {}

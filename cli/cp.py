@@ -96,9 +96,14 @@ def has_arrival(run_id: str) -> bool:
 
 
 
-def generate_synthetic_data() -> None:
+def generate_synthetic_data(trial: bool = True) -> None:
     """Runs the real generator directly - the same shape as cli/bdm.py's
     own generate_synthetic_data().
+
+    `trial` is accepted for that shape and has nothing to try: a targeted
+    Child Protection injection is refused at planning (REQ-GEN-185), and
+    ordinary ambers are compared after the replay, never trialled
+    (REQ-GEN-186, Keith 2026-10-11).
 
     THE TWO USED TO DIFFER. Birth Registrations went through
     pipeline.orchestrate, which also built a combined DuckDB warehouse of

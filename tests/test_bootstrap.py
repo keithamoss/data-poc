@@ -21,6 +21,14 @@ from qa_tools.common import bootstrap as boot
 from qa_tools.common import supply_db
 
 
+@pytest.fixture(autouse=True)
+def _no_target_comparison(monkeypatch):
+    """These tests stub the pipeline out, so there is no recorded verdict to
+    compare a target with; REQ-GEN-186's comparison has tests of its own
+    (tests/test_target_agreement.py)."""
+    monkeypatch.setattr(boot, "targets_agree", lambda names: ())
+
+
 @pytest.fixture
 def empty_db(monkeypatch):
     """A database of this test's own - see tests/dbsupport.py for why
@@ -82,8 +90,8 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
         empty_db.execute(
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}".t__20260101000000 (id int)')
         called = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda: called.append("gen-bdm"))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda: called.append("gen-cp"))
+        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
+        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
         monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
                             lambda **k: called.append(("bdm", k)))
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
@@ -100,8 +108,8 @@ class TestWhatItRuns:
     @pytest.fixture
     def spy(self, empty_db, monkeypatch):
         called = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda: called.append("gen-bdm"))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda: called.append("gen-cp"))
+        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
+        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
         monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
                             lambda **k: called.append("bdm"))
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
@@ -166,8 +174,8 @@ class TestCollectionsRunSideBySide:
     @pytest.fixture
     def spy(self, empty_db, monkeypatch):
         called = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda: called.append("gen-bdm"))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda: called.append("gen-cp"))
+        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
+        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
         monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
                             lambda **k: called.append(("bdm", k)))
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",

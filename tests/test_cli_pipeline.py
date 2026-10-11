@@ -93,10 +93,10 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: calls.append("bdm-generate"))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline",
                          lambda sequential=False: calls.append(("bdm-run", sequential)))
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: calls.append("cp-generate"))
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp",
                          lambda sequential=False: calls.append(("cp-run", sequential)))
     _patch_dashboard_build_embed(monkeypatch, calls)
@@ -117,7 +117,7 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
     import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: calls.append("bdm-generate"))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: calls.append("bdm-run"))
 
     def _fail_if_called():
@@ -142,7 +142,7 @@ def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
         raise AssertionError("--dataset cp must not touch Birth Registrations")
     monkeypatch.setattr(bdm, "generate_synthetic_data", _fail_if_called)
 
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: calls.append("cp-generate"))
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: calls.append("cp-run"))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -159,9 +159,9 @@ def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     seen = {}
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: seen.__setitem__("bdm", sequential))
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: seen.__setitem__("cp", sequential))
     _patch_dashboard_build_embed(monkeypatch, [])
     _patch_snapshot(monkeypatch, [])
@@ -178,9 +178,9 @@ def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -199,9 +199,9 @@ def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
