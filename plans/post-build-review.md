@@ -7410,3 +7410,56 @@ twice. It deliberately did not re-find the `TypeError`.
     - **Gate history:** none of these came from the gate. The first full
       gate on this build was stopped part way when the critic's report
       arrived, because the fixes would invalidate it.
+
+149. **[done, 2026-10-11]** **[Dashboard UI]** **The delivery critic on
+    REQ-DASH-172 as built (before its first commit)** - overnight #3,
+    Saturday morning; report saved in the session's
+    reviews/2026-10-11-critic-172.md, with the critic's probes beside it.
+    Fixed in the same commit as the build, each with a test that failed
+    first (tests/test_dashboard_corrections.py `TestCriticFindingsOn172`;
+    tests-js/corrections.test.js "delivery-critic on 172"):
+    - **#1, FIXED - ruff failed on the new test file** (F811 on fixtures
+      imported by name). The gate would have gone red; now bound by name.
+    - **#2, FIXED - a supply kept HELD was never shown** (no run, so no
+      row). Listed on its dataset now.
+    - **#3, FIXED - the asset-wide pending-correction item named datasets
+      as bare ids.** It carries them as links.
+    - **#4, FIXED - a keep's correction was parsed back out of its reason**,
+      and so misread for a reference with a colon or a space. Found
+      underneath it while fixing: one supply kept against two corrections
+      mapped both keeps to the newer one. The keep's own decision id now
+      travels in the applied record and is what the page maps by.
+    - **#5, #9, #10, FIXED - wording.** "1 supply' punctuality" fixed. The
+      row reads "re-judged <date> by correction <ref>" as criterion 7 has
+      it, because "re-judged on time Sunday" read as a time of day.
+      Several awaiting corrections now read in the plural.
+    - **#6, FIXED - an awaiting state that could not be worked out was an
+      empty all-clear.** Said on the page and in the build output now.
+    - **#7, FIXED - corrections sit outside the activity panel's 30-entry
+      cap**, so thirty publishes cannot push one out. The panel's intro
+      names them.
+    - **#8, FOR KEITH:** a supply a correction MOVED gets no "at the time"
+      note and is not counted in the past-date note, because its new
+      verdict comes from its new filing rather than a re-judgement naming
+      the correction. Does "re-judged" include moved?
+    - **Found by the tests, not the critic:** the activity feed now reads
+      applied corrections, so the confirmation tests' leftovers appeared in
+      test_embed_dashboard_data.py's feed when run on the same worker. The
+      confirmation tests now clear the table when they finish.
+    - **Found by CI on 0d3af2e (REQ-PIPE-170's push), not the critic:** the
+      same write-once delivery clash as #147, in a third module.
+      tests/test_verdict_record.py filed cp-clients supply `s` at 1 Aug 2023
+      12:00 Perth, and test_recorded_arrival_classification.py read that
+      receipt on the same worker - three failures in the no-deployment half.
+      Renamed to its own id. The pattern is now in three modules; the root
+      is filing_support's delivery name `pytest-<dataset>-<supply>`, written
+      once and never updated, which a test choosing its own receipt instant
+      cannot see.
+    - **Found by the full gate, not the critic:** test_excuse.py's
+      markup-reason test (#145's #9) went red once this sprint's tests
+      wrote later-dated cp-clients decisions on the same worker. `supply
+      decisions` lists the newest twenty by when they took effect, so the
+      excuse fell off the end; the test's loose `"see" in output` fallback
+      had been hiding that the table also wraps at eighty columns. The test
+      now asks for the whole log on a wide console and looks for the exact
+      reason. The command itself is right - a reader wants the newest.

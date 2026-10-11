@@ -33,7 +33,7 @@ def clean(supply_dsn):
         yield conn
 
 
-def _file(slot=SLOT, supply_id="s", received_at=RECEIVED):
+def _file(slot=SLOT, supply_id="verdict-s", received_at=RECEIVED):
     return filing_support.file(assignment.Assignment(
         dataset_id=DATASET, supply_id=supply_id, slot=slot,
         branch=assignment.OPEN_UNFILLED, considered=(slot,), received_at=received_at))
@@ -68,7 +68,7 @@ class TestRecordedWithItsInputs:
 
     def test_a_filing_records_a_verdict_with_the_slots_resolved_inputs(self, clean):
         _file()
-        got = verdict.current(clean, DATASET, "s")
+        got = verdict.current(clean, DATASET, "verdict-s")
         assert got["classification"] == classify_mod.ON_TIME
         assert got["inputs"] == {
             "period_date": "2023-08-01", "due_date": "2023-08-01", "expected_time": "09:00",
@@ -80,7 +80,7 @@ class TestRecordedWithItsInputs:
 
     def test_never_the_closing_instant_nor_the_calendars_dates(self, clean):
         _file()
-        inputs = verdict.current(clean, DATASET, "s")["inputs"]
+        inputs = verdict.current(clean, DATASET, "verdict-s")["inputs"]
         assert "closes_at" not in inputs
         assert not {"dates", "periods"} & set(inputs)
 
@@ -124,7 +124,7 @@ class TestAppendOnly:
 
 def _refile(to_slot):
     with supply_db.connect(label="test-verdict-refile") as conn:
-        return filing.refile(conn, DATASET, "s", to_slot, decision_id=1)
+        return filing.refile(conn, DATASET, "verdict-s", to_slot, decision_id=1)
 
 
 class TestTheNewestForTheCurrentFiling:
@@ -133,9 +133,9 @@ class TestTheNewestForTheCurrentFiling:
     def test_a_refile_brings_its_own_verdict_and_keeps_the_old_one(self, clean):
         _file()
         _refile("2023-Q2")
-        assert verdict.current(clean, DATASET, "s")["classification"] == classify_mod.LATE
-        assert filing.filing_for(DATASET, "s")["classification"] == classify_mod.LATE
-        assert [v["classification"] for v in verdict.history(clean, DATASET, "s")] == [
+        assert verdict.current(clean, DATASET, "verdict-s")["classification"] == classify_mod.LATE
+        assert filing.filing_for(DATASET, "verdict-s")["classification"] == classify_mod.LATE
+        assert [v["classification"] for v in verdict.history(clean, DATASET, "verdict-s")] == [
             classify_mod.ON_TIME, classify_mod.LATE]
 
 
@@ -153,7 +153,7 @@ class TestReJudgement:
     def test_a_correction_to_the_version_rejudges_the_supply(self, clean):
         _file()
         [found] = verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))
-        assert found.supply_id == "s" and found.slot == SLOT
+        assert found.supply_id == "verdict-s" and found.slot == SLOT
         assert found.old["classification"] == classify_mod.ON_TIME
         assert found.new.classification == classify_mod.LATE
         assert found.new.inputs["grace_seconds"] == 3600
@@ -161,33 +161,33 @@ class TestReJudgement:
     def test_it_is_computed_not_recorded(self, clean):
         _file()
         verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))
-        assert len(verdict.history(clean, DATASET, "s")) == 1
+        assert len(verdict.history(clean, DATASET, "verdict-s")) == 1
 
     def test_recording_it_names_the_correction_and_what_it_replaced(self, clean):
         _file()
-        before = verdict.current(clean, DATASET, "s")
+        before = verdict.current(clean, DATASET, "verdict-s")
         [found] = verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))
         verdict.record_rejudgement(clean, found, correction_ref="CHG-1",
                                    correction_changelog="grace cut to 1h",
                                    recorded_at=datetime(2026, 10, 11, tzinfo=PERTH))
-        now = verdict.current(clean, DATASET, "s")
+        now = verdict.current(clean, DATASET, "verdict-s")
         assert now["classification"] == classify_mod.LATE
         assert (now["correction_ref"], now["correction_changelog"], now["supersedes"]) == (
             "CHG-1", "grace cut to 1h", before["id"])
         # every reader of "the" classification sees it (criterion 6)
-        assert filing.filing_for(DATASET, "s")["classification"] == classify_mod.LATE
+        assert filing.filing_for(DATASET, "verdict-s")["classification"] == classify_mod.LATE
         # and the earlier verdict is still there to read
-        assert [v["classification"] for v in verdict.history(clean, DATASET, "s")] == [
+        assert [v["classification"] for v in verdict.history(clean, DATASET, "verdict-s")] == [
             classify_mod.ON_TIME, classify_mod.LATE]
 
     def test_a_rejudgement_moves_nothing(self, clean):
         """Criterion 7: the same filing, the same slot, no new filing row."""
         _file()
-        before = filing.filing_for(DATASET, "s")
+        before = filing.filing_for(DATASET, "verdict-s")
         [found] = verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))
         verdict.record_rejudgement(clean, found, correction_ref="CHG-1",
                                    correction_changelog="c", recorded_at=RECEIVED)
-        after = filing.filing_for(DATASET, "s")
+        after = filing.filing_for(DATASET, "verdict-s")
         assert {k: v for k, v in after.items() if k != "classification"} == \
             {k: v for k, v in before.items() if k != "classification"}
         rows = clean.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".filing').fetchall()
@@ -202,9 +202,9 @@ class TestReJudgement:
 
     def test_the_database_refuses_a_half_named_rejudgement(self, clean):
         _file()
-        v = verdict.current(clean, DATASET, "s")
+        v = verdict.current(clean, DATASET, "verdict-s")
         with pytest.raises(Exception, match="check"):
-            verdict.record(clean, v["filing_id"], DATASET, "s",
+            verdict.record(clean, v["filing_id"], DATASET, "verdict-s",
                            verdict.Judged("late", None, None), recorded_at=RECEIVED,
                            correction_ref="CHG-1", correction_changelog="c")
 
@@ -270,14 +270,14 @@ class TestCriticFindingsOn168:
 
     def test_M3_a_second_verdict_must_name_a_correction(self, clean):
         _file()
-        v = verdict.current(clean, DATASET, "s")
+        v = verdict.current(clean, DATASET, "verdict-s")
         with pytest.raises(Exception, match="verdict_first_once|duplicate key"):
-            verdict.record(clean, v["filing_id"], DATASET, "s",
+            verdict.record(clean, v["filing_id"], DATASET, "verdict-s",
                            verdict.Judged("late", None, None), recorded_at=RECEIVED)
 
     def test_M3_a_verdict_names_its_own_filings_supply(self, clean):
         _file()
-        v = verdict.current(clean, DATASET, "s")
+        v = verdict.current(clean, DATASET, "verdict-s")
         with pytest.raises(Exception, match="does not match its filing"):
             verdict.record(clean, v["filing_id"], "birth-registrations", "zzz",
                            verdict.Judged("late", None, None), recorded_at=RECEIVED,
@@ -301,8 +301,8 @@ class TestCriticFindingsOn168:
 
     def test_M3_an_empty_reference_is_refused_by_the_database(self, clean):
         _file()
-        v = verdict.current(clean, DATASET, "s")
+        v = verdict.current(clean, DATASET, "verdict-s")
         with pytest.raises(Exception, match="check"):
-            verdict.record(clean, v["filing_id"], DATASET, "s",
+            verdict.record(clean, v["filing_id"], DATASET, "verdict-s",
                            verdict.Judged("late", None, None), recorded_at=RECEIVED,
                            correction_ref="", correction_changelog="c", supersedes=v["id"])

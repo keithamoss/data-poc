@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from pipeline import (acknowledgements, closed_slots, excuses, file_check_panel, recorded_arrival,
+from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel, recorded_arrival,
                       red_promoted, slot_timeline)
 from qa_tools.common import schedule_ended
 from qa_tools.common import amber_setting, census, drift_reference
@@ -647,6 +647,10 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
         # each with its withdrawal and lapse - see pipeline/excuses.py.
         "excuses": excuses.for_dataset(dataset_id),
+        # REQ-DASH-172: the original verdict and the correction that re-judged
+        # it, a supply kept against a correction, and a correction awaiting the
+        # asset manager - see pipeline/corrections.py.
+        "corrections": corrections.for_dataset(dataset_id),
         # REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4), from
         # configuration and recorded verdicts only - None where it is not.
         "agreementRefusal": _agreement_refusal(dataset_id),

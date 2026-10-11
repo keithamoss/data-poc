@@ -379,15 +379,22 @@ class TestCriticFindingsOn161:
             branch=assignment.OPEN_UNFILLED, considered=(slot,), received_at=received))
         return supply
 
-    def test_9_a_reason_with_markup_lists_without_crashing(self, conn):
+    def test_9_a_reason_with_markup_lists_without_crashing(self, conn, monkeypatch):
         from click.testing import CliRunner
 
         from cli import supply as supply_cli
         supply = _late()
         _apply(conn, _req(fd.EXCUSE_LATENESS, supply, reason="outage [/] see [bold]x"))
-        got = CliRunner().invoke(supply_cli.supply_group, ["decisions", "--dataset", DATASET])
+        # A WIDE CONSOLE, so the reason is one unbroken line to look for
+        # rather than wrapped mid-word at eighty columns.
+        monkeypatch.setattr(supply_cli.console, "width", 400)
+        # THE WHOLE LOG: the listing shows the newest twenty by when they
+        # took effect, and on a shared worker other modules' later-dated
+        # decisions for this dataset pushed this one off the end.
+        got = CliRunner().invoke(supply_cli.supply_group,
+                                 ["decisions", "--dataset", DATASET, "--limit", "100000"])
         assert got.exit_code == 0, got.output
-        assert "outage [/] see [bold]x" in got.output.replace("\n", " ") or "see" in got.output
+        assert "outage [/] see [bold]x" in got.output
 
     @pytest.mark.parametrize("extra", [["--supply", "s"], ["--to-period", "2024-Q3"],
                                        ["--stands-on", "2024-Q1"]])

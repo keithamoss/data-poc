@@ -36,6 +36,10 @@ def conn(supply_dsn):
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
         _file(SUPPLY, "2023-Q3", RECEIVED)
         yield c
+        # LEFT EMPTY FOR THE NEXT MODULE ON THIS WORKER: the activity feed
+        # reads every applied correction, so one left behind here appeared in
+        # tests/test_embed_dashboard_data.py's feed.
+        c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
 
 
 @pytest.fixture
@@ -144,7 +148,7 @@ class TestConfirming:
         assert _current(conn)["slot"] == "2023-Q2"
         [(actor, kind, reason)] = conn.execute(
             f"SELECT actor, actor_kind, reason FROM {decision_log.TABLE} WHERE supply = ? "
-            "AND action = 'refile'", [SUPPLY]).fetchall()
+            "AND action = 'refile' ORDER BY id DESC LIMIT 1", [SUPPLY]).fetchall()
         assert actor == manager["email"] and kind == "person" and "CAB-1" in reason
         assert done.owed_rechecks, "it re-runs QA and re-gates through an owed re-check"
 
@@ -168,8 +172,8 @@ class TestConfirming:
         assert not done.moved and done.kept
         assert _current(conn)["slot"] == "2023-Q3"
         [(reason,)] = conn.execute(
-            f"SELECT reason FROM {decision_log.TABLE} WHERE supply = ? AND action = 'keep'",
-            [SUPPLY]).fetchall()
+            f"SELECT reason FROM {decision_log.TABLE} WHERE supply = ? AND action = 'keep' "
+            "ORDER BY id DESC LIMIT 1", [SUPPLY]).fetchall()
         assert "CAB-1" in reason and "sent early" in reason
 
     def test_keeping_needs_a_reason(self, conn, manager):
@@ -389,7 +393,7 @@ class TestThePassNotesIt:
         [item] = [i for i in outstanding._from_pending_corrections(conn)]
         assert item.kind == outstanding.PENDING_CORRECTION
         assert item.severity == outstanding.NEEDS_ACTION and "CAB-1" in item.headline
-        assert "cp-clients" in item.detail
+        assert "cp-clients" in [ds for _a, _c, ds in item.affects]
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         assert outstanding._from_pending_corrections(conn) == []
 

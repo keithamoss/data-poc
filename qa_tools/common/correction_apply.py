@@ -247,9 +247,12 @@ def confirm(conn, reference: str, *, actor: dict, keep: set[tuple[str, str]] = f
                         effective_at=effective_at, to_slot=m.from_period,
                         from_slot=None if m.from_period else m.to_period,
                         reason=f"Kept where it is under correction {reference}: "
-                               f"{keep_reason}")):
+                               f"{keep_reason}")) as keep_id:
                     pass
-                kept.append((m.dataset_id, m.supply_id, m.from_period, keep_reason))
+                # THE KEEP'S OWN DECISION ID travels in the applied record, so a
+                # reader maps each keep to its correction exactly - one supply
+                # can be kept against two corrections (delivery-critic on 172, #4).
+                kept.append((m.dataset_id, m.supply_id, m.from_period, keep_reason, keep_id))
             elif m.placing:
                 owed.append(_place(conn, m, entry, email, reference, effective_at))
                 placed.append((m.dataset_id, m.supply_id, m.to_period))
@@ -355,5 +358,5 @@ def summary(p: Pending, t, done: Applied, *, as_at: datetime, database: str) -> 
                                    title=f"Applied: correction {p.reference}", applied=True)
     if done.kept:
         text += "\n## Kept where they are\n\n" + "".join(
-            f"- {d} `{s}` in {period or 'no period'}: {why}\n" for d, s, period, why in done.kept)
+            f"- {d} `{s}` in {period or 'no period'}: {why}\n" for d, s, period, why, *_ in done.kept)
     return text

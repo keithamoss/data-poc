@@ -35,7 +35,7 @@ from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from qa_tools.common import agreement
 from qa_tools.common import asset_time
-from pipeline import (acknowledgements, closed_slots, excuses, file_check_panel, recorded_arrival,
+from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel, recorded_arrival,
                       red_promoted, slot_timeline)
 from qa_tools.common import promotion_state
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
@@ -551,6 +551,10 @@ def build() -> dict:
         # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
         # each with its withdrawal and lapse - see pipeline/excuses.py.
         "excuses": excuses.for_dataset("birth-registrations"),
+        # REQ-DASH-172: the original verdict and the correction that re-judged
+        # it, a supply kept against a correction, and a correction awaiting the
+        # asset manager - see pipeline/corrections.py.
+        "corrections": corrections.for_dataset("birth-registrations"),
         # REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4), from
         # configuration and recorded verdicts only - None where it is not.
         "agreementRefusal": _agreement_refusal("birth-registrations"),

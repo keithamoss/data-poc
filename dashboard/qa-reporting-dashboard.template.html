@@ -4966,6 +4966,17 @@ function queueItemLink(item){
                datasetId:item.datasetId};
   return `<div style="margin-top:4px;"><a class="link-btn" href="${navHref(nav)}" data-nav='${JSON.stringify(nav)}'>Open the dataset</a></div>`;
 }
+// AN ASSET-WIDE ITEM'S DATASETS, EACH A LINK (REQ-DASH-172 criterion 11;
+// delivery-critic on 172, #3) - never a list of bare ids.
+function affectsLinks(item){
+  const list = (item && item.affects) || [];
+  if(!list.length) return "";
+  const links = list.map(a => {
+    const nav = {tier:"dataset", agencyId:a.agencyId, collectionId:a.collectionId, datasetId:a.datasetId};
+    return `<a class="dataset-name dataset-link" href="${navHref(nav)}" data-nav='${JSON.stringify(nav)}'>${escHtml(a.name || a.datasetId)}</a>`;
+  }).join(", ");
+  return `<div style="margin-top:4px; font-size:13px;">Affects ${links}</div>`;
+}
 function outstandingItemHtml(item){
   // CRITERION 3, on its own channel: the left bar says blocking or
   // not, the pill says how loudly, and neither is doing the other's
@@ -4991,6 +5002,7 @@ function outstandingItemHtml(item){
       ${when}
     </div>
     <div class="queue-detail">${escHtml(item.detail||"")}</div>
+    ${affectsLinks(item)}
     ${queueItemLink(item)}
     ${outstandingResponses(item)}
   </div>`;
@@ -5343,6 +5355,61 @@ function excuseNote(datasetId, runId, inPlaceOnDateStr){
   });
   return lines.join("");
 }
+// WHAT A CALENDAR CORRECTION DID TO THIS SUPPLY (REQ-DASH-172 criteria 2, 5
+// and 7), one interaction away from the corrected verdict the row already
+// shows (NFR 1): in the existing "changed after" shape - "Late at the time ·
+// re-judged <date> by correction <ref>, approved by <person>" - and, for a
+// supply kept against a correction's move, that it was kept and why. ON
+// EVERY DATE, past ones included (criterion 3): the corrected verdict is the
+// answer, and what the page said then is the snapshot archive's.
+function correctionNote(datasetId, runId){
+  const raw = rawRealDatasetById(datasetId);
+  const c = raw && raw.corrections;
+  if(!c) return "";
+  const said = v => ARRIVAL_STATUS_LABEL[v] || (v ? String(v).replace(/_/g, " ") : "Not judged");
+  const lines = ((c.rejudged || {})[runId] || []).map(r =>
+    // THE DATE STRAIGHT AFTER "re-judged" (criterion 7's own shape; delivery-
+    // critic on 172, #9): "re-judged on time Sunday" read as a time of day.
+    // The new verdict is the pill's, beside it.
+    `<div class="changed-by" data-rejudged style="color:var(--ink-muted); font-size:12px;">${escHtml(said(r.original))} at the time · re-judged ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))} by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}</div>`);
+  ((c.kept || {})[runId] || []).forEach(k => lines.push(
+    `<div class="changed-by" data-kept style="color:var(--ink-muted); font-size:12px;">Kept ${k.period ? `in ${escHtml(fmtPeriodName(k.period))}` : "held"} against correction ${escHtml(k.reference || "")}${k.actor ? ` by ${escHtml(k.actor)}` : ""}: ${escHtml(k.reason)}</div>`));
+  return lines.join("");
+}
+// A CORRECTION AWAITING THE ASSET MANAGER, said on each dataset it affects
+// (REQ-DASH-172 criterion 4): its supplies keep their period and verdict
+// until it is confirmed.
+function awaitingCorrectionLine(datasetId){
+  const raw = rawRealDatasetById(datasetId);
+  const c = (raw && raw.corrections) || {};
+  // NEVER A SILENT ALL-CLEAR (delivery-critic on 172, #6).
+  if(c.awaitingUnknown){
+    return `<div class="notice-exhausted" role="status" data-awaiting-correction-unknown style="border-color:var(--amber, #b7791f);">
+      Whether a calendar correction is awaiting confirmation for this dataset could not be worked out
+      when this page was built. <code>mothman supply corrections</code> says.</div>`;
+  }
+  const list = c.awaiting || [];
+  if(!list.length) return "";
+  const refs = list.map(a => `<b style="display:inline">${escHtml(a.reference)}</b>`).join(", ");
+  const one = list.length === 1;
+  return `<div class="notice-exhausted" role="status" data-awaiting-correction style="border-color:var(--amber, #b7791f);">
+    ${one ? "A calendar correction" : "Calendar corrections"} to this dataset's delivery agreement - ${refs} -
+    ${one ? "is" : "are"} awaiting the data asset's manager to confirm ${one ? "it" : "them"}. Until then its
+    supplies keep the period and verdict shown here. <code>mothman supply corrections</code> lists
+    what confirming ${one ? "it" : "them"} would change.</div>`;
+}
+// A SUPPLY KEPT HELD AGAINST A CORRECTION has no history row - it was never
+// checked - so it is said on its dataset (delivery-critic on 172, #2).
+function keptHeldLine(datasetId){
+  const raw = rawRealDatasetById(datasetId);
+  const list = (raw && raw.corrections && raw.corrections.keptHeld) || [];
+  if(!list.length) return "";
+  const items = list.map(k => `<li>${escHtml(k.supply)}: kept held rather than placed into
+    ${escHtml(fmtPeriodName(k.keptOutOf || ""))} under correction ${escHtml(k.reference || "")}${k.actor ? `, by ${escHtml(k.actor)}` : ""} - ${escHtml(k.reason || "")}</li>`).join("");
+  return `<div class="notice-exhausted" role="status" data-kept-held>
+    ${list.length} ${pluralize(list.length, "supply", "supplies")} kept held against a calendar correction:
+    <ul style="margin:4px 0 0 18px; padding:0;">${items}</ul></div>`;
+}
 function acknowledgementBadge(datasetId, runId, inPlaceOnDateStr){
   const raw = rawRealDatasetById(datasetId);
   const a = raw && raw.acknowledgements && raw.acknowledgements[runId];
@@ -5506,11 +5573,11 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     const arrivalCell = e.isResupply
       ? excusedResupply + (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
-          : "") + excuseNote(datasetId, e.run_id)
+          : "") + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id)
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillFor(datasetId, e.run_id, e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${waitedChip(e)} ${filedNote(e)}${excuseNote(datasetId, e.run_id)}`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillFor(datasetId, e.run_id, e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${waitedChip(e)} ${filedNote(e)}${excuseNote(datasetId, e.run_id)}${correctionNote(datasetId, e.run_id)}`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
@@ -5808,6 +5875,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       ${amberSettingLine(ds, CURRENT_IN_PLACE_ON)}
       ${censusBanner(ds, CURRENT_IN_PLACE_ON)}
+      ${awaitingCorrectionLine(ds.id)}
+      ${keptHeldLine(ds.id)}
       ${blockedBanner}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
@@ -5859,6 +5928,8 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${amberSettingLine(ds, CURRENT_IN_PLACE_ON)}
     ${censusBanner(ds, CURRENT_IN_PLACE_ON)}
     ${arrivalBanner(ds)}
+    ${awaitingCorrectionLine(ds.id)}
+    ${keptHeldLine(ds.id)}
     ${blockedBanner}
     ${waitingBanner}
     ${exhaustedBanner}
@@ -6844,8 +6915,8 @@ function renderActivityPanel(){
     return;
   }
   const intro = `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:14px;">
-    Who published QA results for which dataset, and when — the last
-    ${CHANGELOG_FEED.length} ${pluralize(CHANGELOG_FEED.length,"event")}, newest first.
+    Who published QA results for which dataset, and every calendar correction confirmed,
+    and when — the last ${CHANGELOG_FEED.length} ${pluralize(CHANGELOG_FEED.length,"event")}, newest first.
   </div>`;
   // THE INTRO USED TO EXPLAIN that "Published" meant when the results
   // landed on the shared branch, which could be meaningfully later than
@@ -6869,6 +6940,18 @@ function renderActivityPanel(){
     // resolve. A run that has completed always has a completion instant,
     // and one that has not completed is not on this feed at all.
     const publishedText = `${fmtRelativeTime(e.published_at)} (${fmtDate(new Date(e.published_at))})`;
+    // A CALENDAR CORRECTION, listed once asset-wide (REQ-DASH-172 criterion 8).
+    if(e.kind === "correction"){
+      const did = [e.moved ? `${e.moved} moved` : "", e.held ? `${e.held} held` : "",
+                   e.kept ? `${e.kept} kept` : "",
+                   e.rejudged ? `${e.rejudged} re-judged` : ""].filter(Boolean).join(", ");
+      return `<div class="snapshot-row" data-activity-correction>
+        <div class="meta">
+          <div class="date">Calendar correction ${escHtml(e.reference)}</div>
+          <div class="sub">confirmed by ${escHtml(e.run_by || "")}${e.approver ? `, approved by ${escHtml(e.approver)}` : ""} — ${publishedText}${did ? ` · ${escHtml(did)}` : ""}</div>
+        </div>
+      </div>`;
+    }
     return `<div class="snapshot-row">
         <div class="meta">
           <div class="date">${e.label}</div>
@@ -7796,7 +7879,10 @@ function rawRealDatasets(){
 const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   supersede:"superseded", "un-supersede":"restored", refile:"re-filed",
   substitute:"substituted", inherit:"carried forward", "promotion-withheld":"held back",
-  "promotion-refused":"refused promotion"};
+  "promotion-refused":"refused promotion",
+  // REQ-DASH-172 criterion 10: every action the calendar batch added.
+  keep:"kept where it was", "excuse-lateness":"excused for lateness",
+  "withdraw-excuse":"un-excused", acknowledge:"acknowledged"};
 // DECISIONS THAT CHANGED AN EARLIER DATE (REQ-PIPE-081 criterion 6): taking
 // effect on or before the date on show, recorded after it - so the page now
 // shows that date differently from how it could have looked then. The plain
@@ -7828,6 +7914,27 @@ function decisionsChangingDate(onDateStr, inView){
       }
     }));
   });
+  // A CORRECTION'S RE-JUDGEMENTS, ONE ITEM PER CORRECTION PER DATASET
+  // (REQ-DASH-172 criteria 3 and 9): a supply received on or before the date
+  // on show whose verdict a correction applied after it changed.
+  rawRealDatasets().filter(raw=> !ids || ids.has(raw.id)).forEach(raw=>{
+    const runs = Object.fromEntries((raw.runs || []).map(r=> [r.run_id, r]));
+    const grouped = {};
+    Object.entries((raw.corrections && raw.corrections.rejudged) || {}).forEach(([runId, list])=>{
+      const run = runs[runId];
+      const received = run && (run.received_at || run.arrivedAt || run.run_date);
+      (list || []).forEach(r=>{
+        if(!r.appliedAt || !received) return;
+        if(assetDateStrOf(received) <= onDateStr && assetDateStrOf(r.appliedAt) > onDateStr){
+          const g = grouped[r.reference] || (grouped[r.reference] = {
+            datasetName: raw.name || raw.id, correction: r.reference, approver: r.approver,
+            recordedAt: r.appliedAt, count: 0});
+          g.count += 1;
+        }
+      });
+    });
+    out.push(...Object.values(grouped));
+  });
   return out.sort((a, b)=> a.recordedAt < b.recordedAt ? -1 : a.recordedAt > b.recordedAt ? 1 : 0);
 }
 function changedSinceNote(onDateStr){
@@ -7836,6 +7943,11 @@ function changedSinceNote(onDateStr){
   // EVERY ONE, NOT FIVE AND A DEAD END (#132 A5): the list is already
   // scoped to the page, and "and 1 more" offered nothing to open.
   const items = found.map(d=>{
+    if(d.correction){
+      return `<li>${escHtml(d.datasetName)}: correction ${escHtml(d.correction)}, applied
+        ${fmtDay(assetDateStrOf(d.recordedAt))}${d.approver ? ` and approved by ${escHtml(d.approver)}` : ""},
+        changed whether ${d.count} ${pluralize(d.count, "supply", "supplies")} ${d.count === 1 ? "was" : "were"} on time</li>`;
+    }
     // THE RECEIPT INSTANT, which the runs carry as received_at - a day
     // alone cannot tell two same-day resupplies apart (#132 A5).
     const at = d.run && (d.run.received_at || d.run.arrivedAt);

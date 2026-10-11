@@ -27014,7 +27014,7 @@ requirements:
       shown, with the original verdict and the approved correction that changed it one step away, so that
       I see the current answer without losing how it came to be.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -27057,6 +27057,25 @@ requirements:
     - THE EXISTING 'changed after' ROW SHAPE, ONE CHANGELOG ENTRY PER CORRECTION, ONE PAST-DATE ITEM PER
       CORRECTION PER DATASET, DECISION_DONE WORDING FOR EVERY NEW ACTION, AND REAL LINKS (delivery-dashboard-ux
       pre-build review, 2026-10-07).
+    - 'BUILT 2026-10-11 (overnight #3, Saturday morning). pipeline/corrections.py embeds, per dataset and keyed by the run that checked each supply (as pipeline/excuses.py does): each re-judgement with its original verdict, new verdict, change reference, approver (from the declared correction) and the instant the correction was applied; each supply kept against a correction, with the reference parsed from the keep''s own reason (correction_apply writes it there - the one place it travels) and the reason itself; and each pending correction whose declared changes name the dataset. applied_feed() lists each applied correction once for the activity panel.'
+    - 'THE CORRECTED VERDICT NEEDED NOTHING NEW (criterion 1): qa.filing_current already reads the newest verdict (REQ-PIPE-168), so every pill on the page shows it. This requirement adds only what is one step away.'
+    - 'ON EVERY DATE (criterion 3): the history row''s note is shown whatever the in-place-on date, because the corrected verdict is the answer on every date; the past-date note says a correction applied since changed it, grouped one item per correction per dataset (criterion 9), from each re-judged supply''s receipt and the correction''s applied instant.'
+    - 'THE AWAITING LINE (criterion 4) sits with the dataset page''s other notices, above the blocked banner, on both the ordinary and the blocked layout. PROVISIONAL: amber-bordered rather than red - nothing is wrong yet, and the supplies keep their verdicts until it is confirmed.'
+    - 'THE ACTIVITY PANEL''S CORRECTION ENTRY (criterion 8) is an entry of its own kind in CHANGELOG_FEED, merged and sorted with the QA publishes by its applied instant, naming who confirmed it, who approved it and what it did (moved, held, kept, re-judged counts).'
+    - 'DECISION_DONE gains keep, excuse-lateness, withdraw-excuse and acknowledge (criterion 10). Criterion 11 needed nothing new: the only asset-level notices naming datasets (the refusal notice and the exhausted-calendar notice) already link each.'
+    - 'FIXED BEFORE THE FIRST COMMIT (delivery-critic on 172, post-build-review #149): a supply kept HELD has no run and so no history row - it is now listed on its dataset (keptHeld); a keep is mapped to its correction by the keep''s own decision id, which correction_apply now records in the applied summary, never parsed back out of the reason (a reference with a colon was misread, one with a space lost, and one supply kept against two corrections was mis-mapped); an awaiting state that cannot be worked out is said on the page and in the build''s output, never an empty all-clear; applied corrections sit OUTSIDE the activity panel''s 30-entry cap; the asset-wide pending-correction item carries the datasets it affects as links (outstanding.Item.affects); the row reads ''re-judged <date> by correction <ref>, approved by <person>'', the date straight after, as criterion 7 has it - the new verdict is the pill''s beside it.'
+    - 'OPEN FOR KEITH (#149): a supply a correction MOVED gets its new verdict from its new filing, which names no correction, so its row carries no ''at the time'' note and the past-date note does not count it. Whether ''re-judged'' in criteria 2, 3 and 9 includes moved is not settled by the requirement.'
+    linked_tests:
+    - tests/test_dashboard_corrections.py
+    - tests-js/corrections.test.js
+    implemented_by:
+    - pipeline/corrections.py::for_dataset
+    - pipeline/corrections.py::applied_feed
+    - dashboard/qa-reporting-dashboard.template.html::correctionNote
+    - dashboard/qa-reporting-dashboard.template.html::awaitingCorrectionLine
+    - dashboard/qa-reporting-dashboard.template.html::decisionsChangingDate
+    evidence:
+    - 'tests/test_dashboard_corrections.py (11 tests, run 2026-10-11, six of them the critic''s findings, each failing first) against real confirmations on the test database: a re-judged supply carries original, new, reference, approver and applied instant; a kept supply its correction and reason; a pending correction is awaiting only on the datasets it affects; each applied correction is one activity entry; no supply rows are read. tests-js/corrections.test.js (13, six of them the critic''s findings): the history row''s ''Late at the time - re-judged on time ... by correction CAB-1, approved by'' note, nothing on an untouched row, the kept note, the awaiting line present and absent, a completed-action word for every new action, and one past-date item per correction per dataset. `mothman dashboard rebuild` against the sandbox passes its own render check with the new data embedded.'
   - id: REQ-PIPE-173
     title: The pipeline refuses a dataset whose judged past changed without a declared correction
     date_written: '2026-10-07'

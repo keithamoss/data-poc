@@ -153,13 +153,18 @@ class Item:
     observed_at: str | None = None
     responses: tuple[str, ...] = ()
     actionable: bool = False
+    #: The datasets an ASSET-WIDE item affects, each (agency, collection,
+    #: dataset), so the page links each (REQ-DASH-172 criterion 11).
+    affects: tuple[tuple[str, str, str], ...] = ()
 
     def as_record(self) -> dict:
         return {"kind": self.kind, "severity": self.severity, "blocking": self.blocking,
                 "headline": self.headline, "detail": self.detail,
                 "agencyId": self.agency_id, "collectionId": self.collection_id,
                 "datasetId": self.dataset_id, "observedAt": self.observed_at,
-                "responses": list(self.responses), "actionable": self.actionable}
+                "responses": list(self.responses), "actionable": self.actionable,
+                "affects": [{"agencyId": a, "collectionId": c, "datasetId": d,
+                             "name": _name_of(d)} for a, c, d in self.affects]}
 
 
 @dataclass(frozen=True)
@@ -598,9 +603,9 @@ def _from_pending_corrections(conn=None) -> list[Item]:
         kind=PENDING_CORRECTION, severity=NEEDS_ACTION, blocking=False,
         headline=f"Calendar correction {p.reference} awaits the data asset's manager",
         detail=(f"Declared {p.date} on {p.label}: {p.reason}. Until it is confirmed, the "
-                f"supplies it affects keep their period and verdict - "
-                f"{', '.join(affected[p.reference]) or 'no dataset'} - and the moves it makes "
+                f"supplies it affects keep their period and verdict, and the moves it makes "
                 f"are worked out when it is opened."),
+        affects=tuple((*_scope_of(ds), ds) for ds in affected[p.reference]),
         responses=(f"see its moves: mothman supply corrections --reference {p.reference}",
                    "the data asset's manager confirms it, keeping any supply where it is"))
         for p in found]

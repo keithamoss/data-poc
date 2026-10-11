@@ -232,6 +232,7 @@ def _build_changelog_feed() -> list[dict]:
     for agency, dataset, label in CHANGELOG_SOURCES:
         for entry in build_changelog(agency, dataset):
             feed.append({**entry, "label": label})
+
     # Newest-published-first ("recent activity", not "oldest first" -
     # build_changelog()'s own return order - its docstring explicitly
     # leaves re-sorting to the UI). published_at is the "recent
@@ -240,7 +241,15 @@ def _build_changelog_feed() -> list[dict]:
     # stays on each entry for the UI to show alongside it, not as the
     # sort key.
     feed.sort(key=lambda e: e["published_at"] or "", reverse=True)
-    return feed[:CHANGELOG_DEPTH]
+    # EACH APPLIED CALENDAR CORRECTION ONCE, asset-wide (REQ-DASH-172
+    # criterion 8) - an event of its own kind beside the QA publishes, and
+    # OUTSIDE THE CAP (delivery-critic on 172, #7): corrections are rare, and
+    # at thirty daily datasets thirty publishes would push one out in a day.
+    from pipeline import corrections
+
+    feed = feed[:CHANGELOG_DEPTH] + corrections.applied_feed()
+    feed.sort(key=lambda e: e["published_at"] or "", reverse=True)
+    return feed
 
 
 def _replace_const(html: str, const_name: str, value_json: str) -> str:

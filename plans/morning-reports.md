@@ -1176,3 +1176,21 @@ one or more component tags, and a date.
             open until the blocker is cleared?
         (q) The list you confirm is the preview's report rather than the
             filing menu's warning panel. OK?
+      - REQ-DASH-172 BUILT (the dashboard side of a correction):
+        - a re-judged supply's history row says "Late at the time -
+          re-judged on time <date> by correction <ref>, approved by
+          <person>";
+        - a kept supply says it was kept, against which correction, and why;
+        - a dataset with a correction awaiting your confirmation says so in
+          an amber line (PROVISIONAL - amber, since nothing is wrong yet);
+        - a past date's note gives one item per correction per dataset;
+        - each confirmed correction appears once in Recent activity.
+        The corrected verdict itself needed nothing new: the page already
+        shows the newest recorded verdict.
+      - REQ-DASH-172 CRITIC (post-build-review #149): seven findings fixed
+        before the first commit, including a ruff error that would have
+        turned the gate red. ONE QUESTION FOR YOU:
+        (r) A supply a correction MOVED shows its new verdict but no "late
+            at the time" note, and the past-date note does not count it. Do
+            you want moved supplies to carry the same note as ones
+            re-judged in place?
