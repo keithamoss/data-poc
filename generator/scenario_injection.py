@@ -81,6 +81,17 @@ class ExtraArrival:
     #: about what a delivery's file set looks like, and a lambda in a
     #: declaration is the point at which a table stops being one.
     file_shape: str | None = None
+    #: What this arrival's rows are BUILT TO (REQ-GEN-184 criteria 1-2): a
+    #: generator/targeting.Target, in place of `severity` - a target
+    #: replaces the preset outright, so naming both is refused. Still a
+    #: shape, not a verdict: the real tools decide (criterion 6 above).
+    target: object | None = None
+
+    def __post_init__(self):
+        if self.target is not None and self.severity is not None:
+            raise CannotPlace(f"an arrival at {self.at} names both a severity "
+                              f"({self.severity}) and a target - a target replaces the "
+                              f"preset, so it is one or the other")
 
 
 @dataclass(frozen=True)
@@ -152,6 +163,8 @@ class Placement:
             "in_place_on": latest.isoformat(),
             "supplies": [a["run_id"] for a in self.arrivals if a.get("run_id")],
             "config": self.config,
+            "targets": [{"date": a["date"], "at": a["at"], **a["target"]}
+                        for a in self.arrivals if a.get("target")],
         }
 
 
@@ -305,6 +318,11 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
             "severity": extra.severity,
             "note": extra.note,
             "file_shape": extra.file_shape,
+            # WHAT IT WAS BUILT TO, AND WHAT WAS MOVED (REQ-GEN-184
+            # criterion 12): the target as asked here, the rules and their
+            # intended counts filled in once the rows are built. Never a
+            # verdict, never a value from a row.
+            "target": extra.target.as_record() if extra.target is not None else None,
         })
     return Placement(
         scenario_id=injection.scenario_id,

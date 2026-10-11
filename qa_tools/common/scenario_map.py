@@ -74,6 +74,9 @@ class Placement:
     supplies: tuple[str, ...]
     period: str
     in_place_on: str
+    #: What each targeted arrival was built to, and the rules moved with
+    #: their intended counts (REQ-GEN-184 criterion 12). Never a verdict.
+    targets: tuple = ()
 
     @classmethod
     def of(cls, record: Mapping) -> "Placement":
@@ -85,7 +88,8 @@ class Placement:
             # The key the generator wrote before the "In place on" rename
             # (REQ-PIPE-081 criterion 25) is still read, so a placements file
             # from an earlier bootstrap keeps its coordinates.
-            in_place_on=str(record.get("in_place_on") or record.get("as" + "_of") or ""))
+            in_place_on=str(record.get("in_place_on") or record.get("as" + "_of") or ""),
+            targets=tuple(record.get("targets") or ()))
 
     @property
     def is_complete(self) -> bool:
@@ -167,6 +171,18 @@ def _sentence(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
 
 
+def _target_text(target: Mapping) -> str:
+    """"amber on place_of_birth_facility.completeness (450 of 2,078 blank),
+    the 2026-09-14 14:00 arrival" - what the rows were built to, never
+    what the tools found."""
+    moved = [m for m in target.get("moved") or () if m.get("to") == target.get("verdict")]
+    rules = ", ".join(
+        f"{m['rule']} ({m.get('nulls', m.get('values'))} of {m['of_rows']:,})" for m in moved
+    ) or ", ".join(target.get("rules") or ()) or "the seed's choice"
+    on = "" if target.get("verdict") == "green" else f" on {rules}"
+    return f"{target.get('verdict')}{on}, the {target.get('date')} {target.get('at')} arrival"
+
+
 def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> list[str]:
     lines = [f"### {scenario.id} - {scenario.title}", ""]
     # CRITERION 9: what it is meant to demonstrate, not only where it
@@ -195,6 +211,7 @@ def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> lis
             f"| Supplies | {supplies} |",
             f"| Period | {placement.period} |",
             f"| Set the in-place-on date to | {placement.in_place_on} |",
+            *[f"| Built to | {_target_text(t)} |" for t in placement.targets],
             "",
         ]
     elif scenario.is_injected:
@@ -243,6 +260,8 @@ def _data_block(scenarios: Iterable[scenarios_mod.Scenario],
                 "period": placement.period,
                 "inPlaceOn": placement.in_place_on,
             }
+            if placement.targets:
+                entry["coordinates"]["targets"] = list(placement.targets)
         entries.append(entry)
     return _DATA_OPEN + json.dumps({"scenarios": entries}, indent=1) + _DATA_CLOSE
 

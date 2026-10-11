@@ -4999,3 +4999,17 @@ Belongs with batch 5's check work.
     most often breaks - the 2026-09-23 incident's own failure. Caught here
     only because the plans test was run by hand. Probably a `plans-index
     --check` gate in `mothman check`'s list.
+
+82. **[todo, 2026-10-11]** **[Data generation]** **A resend drawn clean
+    fails the three sibling checks.** Found re-measuring REQ-GEN-184:
+    Birth Registrations' run_015 (slot_010, the 2026-09-02 period's third
+    arrival, dirty_severity None, received 2026-09-14) fails
+    sibling_match in Soda, the contract and dbt and nothing else. It is
+    byte-identical at 3115cdd, before any #63 work, so it is not that
+    work - almost certainly `churn()` changing a column the sibling check
+    matches twins on, in one twin and not the other. It matters beyond
+    the one supply: a "clean" resupply that reads red leaves its period
+    unfilled, and it is the same mechanism the parked TS-46 note blames
+    (a resend churned from the first supply). REQ-GEN-184 criterion 5 is
+    about TARGETED supplies; churn is the ordinary chain's, so this wants
+    its own fix or a line in REQ-GEN-185, which plants TS-46.

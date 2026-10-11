@@ -532,7 +532,8 @@ def _previous_delivery_names() -> list[str]:
         book = json.load(f)
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
-def _injected_chain(provider: DatasetProvider, injection, period, seed: int):
+def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
+                    placement=None):
     """The arrivals ONE injected scenario needs, in place of the
     ordinary chain (REQ-GEN-044) - the Child Protection counterpart to
     generate_runs.py's own, and see that one's docstring for why an
@@ -550,7 +551,16 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int):
             payload = provider.churn(payload, seed=seed + 900 + n,
                                       run_date=period.date, id_offset=0)
         this = payload
-        if extra.severity:
+        if extra.target is not None:
+            # BUILT TO A TARGET, NEVER THE PRESET (REQ-GEN-184 criterion 1).
+            from generator import targeting
+
+            this, moved = targeting.cp_target(
+                payload, extra.target, seed=seed + 800 + n,
+                where=f"{injection.scenario_id}, its {extra.at} arrival")
+            if placement is not None:
+                placement.arrivals[n]["target"]["moved"] = moved
+        elif extra.severity:
             this = provider.dirty(payload, severity=extra.severity,
                                    seed=seed + 800 + n, previous_row_count=None)
         deliveries.append(Delivery(
@@ -576,6 +586,14 @@ def _plan_injections(periods):
         [dataclasses.replace(i, dataset_id=DATASET_ID) for i in mine], {DATASET_ID: periods})
     resolved = [(injection, scenario_injection.resolve(injection, periods))
                 for injection in mine]
+    # EVERY TARGET CHECKED BEFORE THE FIRST WRITE (REQ-GEN-184 criterion 11).
+    from generator import targeting
+
+    for injection in mine:
+        for extra in injection.arrivals:
+            if extra.target is not None:
+                targeting.check_target(extra.target, injection.dataset_id,
+                                       f"{injection.scenario_id}, its {extra.at} arrival")
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
     return resolved, by_period
@@ -607,13 +625,6 @@ def main() -> None:
     manifest = []
     # Arbitrary names can collide, and a collision would merge two
     # arrivals into one directory. Enforced, not hoped for.
-    # Clear what THIS generator wrote last time, so a regeneration
-    # overwrites its own history rather than accumulating beside it
-    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
-    # generator has on disk so two arrivals can never share a
-    # directory (REQ-GEN-043).
-    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
-    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
     # The same quarterly calendar the pipeline judges these supplies
     # against - not a private copy of the cadence (REQ-GEN-042). A
     # generator carrying its own would place supplies against one
@@ -624,6 +635,16 @@ def main() -> None:
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
     resolved_injections, injected_by_period = _plan_injections(periods)
+    # ONLY THEN is the last history cleared: a scenario or target refused
+    # above leaves the one already on disk standing (REQ-GEN-184
+    # criterion 11).
+    # Clear what THIS generator wrote last time, so a regeneration
+    # overwrites its own history rather than accumulating beside it
+    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
+    # generator has on disk so two arrivals can never share a
+    # directory (REQ-GEN-043).
+    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
+    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
 
     severities = _ordinary_severities(periods, injected_by_period)
     for i, (severity, period) in enumerate(zip(severities, periods), start=1):
@@ -633,7 +654,8 @@ def main() -> None:
 
         injected = injected_by_period.get(period.name)
         if injected is not None:
-            deliveries = _injected_chain(provider, injected[0], period, seed)
+            deliveries = _injected_chain(provider, injected[0], period, seed,
+                                          placement=injected[1])
         else:
             deliveries = list(run_slot_chain(
                 provider, snapshot_date, seed, id_offset=0, n_rows=0,

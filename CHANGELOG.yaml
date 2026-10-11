@@ -249,6 +249,13 @@ releases:
               they broke rules that allow no exceptions. Each is now built to
               land inside a rule's warning band, so more supplies are promoted
               and fewer periods are left with a gap.
+          - headline: A scenario can ask for green, amber or red
+            components: ["Data generation"]
+            description: >
+              An injected scenario can now say what its supply should read -
+              green, or amber or red on a named rule - and the generator
+              builds it to that from the checks' own thresholds. One that
+              cannot be built stops generation before anything is changed.
           - headline: Rebuilt history replays corrections as they happened
             components: ["Pipeline & publishing", "Data generation"]
             description: >

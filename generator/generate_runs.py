@@ -441,7 +441,7 @@ def _previous_delivery_names() -> list[str]:
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
 def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
-                    id_offset: int, n_rows: int, previous_row_count):
+                    id_offset: int, n_rows: int, previous_row_count, placement=None):
     """The arrivals ONE injected scenario needs, in place of the ordinary
     chain (REQ-GEN-044 criteria 1 and 6).
 
@@ -468,7 +468,20 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
             payload = provider.churn(payload, seed=seed + 900 + n, run_date=period.date,
                                       id_offset=id_offset + (n + 1) * (ID_BLOCK // 10))
         this = payload
-        if extra.severity:
+        if extra.target is not None:
+            # BUILT TO A TARGET, NEVER THE PRESET (REQ-GEN-184 criterion 1),
+            # the size of the supply before it (criterion 4), and what was
+            # moved recorded on the placement for the scenario map
+            # (criterion 12).
+            from generator import targeting
+
+            this, moved = targeting.bdm_target(
+                payload, extra.target, seed=seed + 800 + n,
+                where=f"{injection.scenario_id}, its {extra.at} arrival",
+                rows=previous_row_count)
+            if placement is not None:
+                placement.arrivals[n]["target"]["moved"] = moved
+        elif extra.severity:
             this = provider.dirty(payload, severity=extra.severity, seed=seed + 800 + n,
                                    previous_row_count=previous_row_count)
         deliveries.append(Delivery(
@@ -560,6 +573,14 @@ def _plan_injections(periods):
     scenario_injection.no_two_scenarios_share_a_period(mine, {DATASET_ID: periods})
     resolved = [(injection, scenario_injection.resolve(injection, periods))
                 for injection in mine]
+    # EVERY TARGET CHECKED BEFORE THE FIRST WRITE (REQ-GEN-184 criterion 11).
+    from generator import targeting
+
+    for injection in mine:
+        for extra in injection.arrivals:
+            if extra.target is not None:
+                targeting.check_target(extra.target, injection.dataset_id,
+                                       f"{injection.scenario_id}, its {extra.at} arrival")
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
     suppressed = {name for _, placement in resolved for name in placement.suppressed}
@@ -581,13 +602,6 @@ def main() -> None:
     # collide - and a collision would write two arrivals into one
     # directory, silently merging deliveries that never arrived
     # together. Uniqueness is enforced rather than hoped for.
-    # Clear what THIS generator wrote last time, so a regeneration
-    # overwrites its own history rather than accumulating beside it
-    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
-    # generator has on disk so two arrivals can never share a
-    # directory (REQ-GEN-043).
-    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
-    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
     previous_row_count = None  # the last RESOLVED delivery's row count, for
     # the row-count-growth check's dirty preset - deliberately NOT updated
     # mid-chain: a viewer comparing "is this delivery's row count
@@ -600,13 +614,28 @@ def main() -> None:
     # _plan_injections()'s own docstring.
     (resolved_injections, injected_by_period, suppressed_periods,
      quiet_periods) = _plan_injections(periods)
+    # ONLY THEN is the last history cleared: a scenario or target refused
+    # above leaves the one already on disk standing (REQ-GEN-184
+    # criterion 11).
+    # Clear what THIS generator wrote last time, so a regeneration
+    # overwrites its own history rather than accumulating beside it
+    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
+    # generator has on disk so two arrivals can never share a
+    # directory (REQ-GEN-043).
+    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
+    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
     #: Days a shifted arrival has already claimed - see
     #: _away_from_suppressed(). Shared across slots, because the
     #: collision it prevents is between them.
     shifted_onto: set[str] = set()
     severities = _ordinary_severities(periods, injected_by_period, suppressed_periods)
-    provider.amber_dates = frozenset(p.date for p, sev in zip(periods, severities)
-                                     if sev == "amber")
+    # NEVER STALE: an ordinary amber, and a period whose injected supply is
+    # built to a target (REQ-GEN-184 criterion 4) - a stale delivery fails
+    # the freshness checks, whatever it was built to.
+    provider.amber_dates = frozenset(
+        [p.date for p, sev in zip(periods, severities) if sev == "amber"]
+        + [p.date for p in periods if p.name in injected_by_period and any(
+            x.target is not None for x in injected_by_period[p.name][0].arrivals)])
 
     for i, ((drawn_rows, _drawn), severity, period) in enumerate(
             zip(RUN_PLAN, severities, periods), start=1):
@@ -634,8 +663,12 @@ def main() -> None:
 
         injected = injected_by_period.get(period.name)
         if injected is not None:
+            if any(x.target is not None for x in injected[0].arrivals) \
+                    and previous_row_count:
+                n_rows = previous_row_count  # asked at that size, trimmed exactly
             deliveries = _injected_chain(provider, injected[0], period, seed,
-                                          id_offset, n_rows, previous_row_count)
+                                          id_offset, n_rows, previous_row_count,
+                                          placement=injected[1])
         else:
             deliveries = _away_from_suppressed(
                 list(run_slot_chain(provider, slot_date, seed, id_offset,
