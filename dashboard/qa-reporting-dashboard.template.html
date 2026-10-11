@@ -3058,23 +3058,17 @@ function buildData(inPlaceOnDateStr){
         if(ds.acceptedGaps){ col.acceptedCount = (col.acceptedCount||0) + 1; ag.acceptedCount = (ag.acceptedCount||0) + 1; }
         const blanking = blocked && blockerWithoutARunOfItsOwn(ds, inPlaceOnDateStr);
         // REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4): RED,
-        // through the blocked banner, worded as our configuration problem -
-        // and its last verdict is NOT shown as current: every own check
-        // reads not run, as for any blocked dataset. Counted by kind on the
-        // cards (criterion 7). PROVISIONAL: it is a present state of the
-        // configuration, so it shows on every in-place-on date.
-        const refusal = agreementRefusalOf(ds.id);
+        // worded as our configuration problem, counted by kind on the cards
+        // (criterion 7). Only on dates on or after the earliest period it
+        // affects, and BESIDE another blocker rather than over it (Keith,
+        // 2026-10-11, morning-report (g)).
+        const refusal = refusalInPlaceOn(ds.id, inPlaceOnDateStr);
+        ds.refusalEvaluated = true;
+        ds.refusal = refusal;
         if(refusal){
-          ds.blocked = {kind:"agreement-refused", count:1, openedAt:null,
-                        reason:refusalReasonText(refusal), refusal};
-          ds.status = "red";
-          (ds.columns||[]).forEach(c=>{
-            c.status = "nodata";
-            c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
-          });
           col.refusedCount = (col.refusedCount||0) + 1;
           ag.refusedCount = (ag.refusedCount||0) + 1;
-          return;
+          if(applyRefusal(ds, refusal, blocked || null)) return;
         }
         if(blocked && !blanking){
           // RED, BUT THE PERIOD'S OWN RESULTS STAND (REQ-PIPE-115
@@ -3556,11 +3550,14 @@ function agreementNotice(data){
   const source = data !== undefined ? data : (typeof DATA !== "undefined" ? DATA : null);
   ((source && source.agencies) || []).forEach(ag=>
     (ag.collections||[]).forEach(col=>(col.datasets||[]).forEach(ds=>{
-      if(agreementRefusalOf(ds.id)) ids.push([ag, col, ds]);
+      // As the page was built for its date where it was; the record alone
+      // otherwise.
+      if(ds.refusalEvaluated ? ds.refusal : agreementRefusalOf(ds.id)) ids.push([ag, col, ds]);
     })));
   if(!ids.length) return "";
   const n = ids.length;
-  const synthetic = ids.some(([, , ds]) => /reset-synthetic/.test(agreementRefusalOf(ds.id).remedy||""));
+  const synthetic = ids.some(([, , ds]) => /reset-synthetic/.test(
+    ((ds.refusalEvaluated ? ds.refusal : agreementRefusalOf(ds.id)) || {}).remedy || ""));
   const which = ids.map(([ag, col, ds])=>`<li>${datasetLink(ag, col, ds)}</li>`).join("");
   return `<div class="notice-exhausted" role="status" data-agreement-refused>
     <b>${n} dataset${n===1?" is":"s are"} refused — the delivery agreement changed without a declared correction</b>
@@ -4669,6 +4666,44 @@ function blockerSays(b){
 function blockerUntil(b){
   if(b.kind === "agreement-refused") return "until the agreement is restored or the change is declared as a correction";
   return b.scheduleEnded ? "until its next delivery dates are added" : "until a person resolves it";
+}
+// A REFUSAL ON A DATE (Keith, 2026-10-11, (g)): from the earliest period it
+// affects - an earlier date's view was right at the time. A record naming no
+// period shows on every date.
+function refusalInPlaceOn(datasetId, inPlaceOnDateStr){
+  const r = agreementRefusalOf(datasetId);
+  if(!r) return null;
+  if(r.from && inPlaceOnDateStr && inPlaceOnDateStr < r.from) return null;
+  return r;
+}
+// ALONE, the refusal is the dataset's blocker and blanks its checks; BESIDE
+// another blocker, that one stays as it is and the refusal is said too.
+// True where the caller has nothing more to do for this dataset.
+function applyRefusal(ds, refusal, other){
+  ds.status = "red";
+  if(other){
+    ds.alsoRefused = refusal;
+    return false;
+  }
+  ds.blocked = {kind:"agreement-refused", count:1, openedAt:null,
+                reason:refusalReasonText(refusal), refusal};
+  (ds.columns||[]).forEach(c=>{
+    c.status = "nodata";
+    c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
+  });
+  return true;
+}
+function refusedBesideBanner(ds){
+  if(!ds.alsoRefused) return "";
+  const b = {kind:"agreement-refused"};
+  return `
+      <div class="notice-exhausted" role="status" data-agreement-refused-beside>
+        <b>${escHtml(blockerLabel(b))} — ${escHtml(blockerSays(b))}.</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
+          ${withCode(refusalReasonText(ds.alsoRefused))}<br><br>
+          New supplies are held and not checked ${blockerUntil(b)}.
+        </div>
+      </div>`;
 }
 // THE AGREEMENT BACKSTOP'S REFUSAL of one dataset (REQ-PIPE-173), as the
 // build computed it from configuration and recorded verdicts - or null.
@@ -5878,6 +5913,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       ${awaitingCorrectionLine(ds.id)}
       ${keptHeldLine(ds.id)}
       ${blockedBanner}
+      ${refusedBesideBanner(ds)}
       ${outstandingQueue("dataset", ds.id)}
       <div class="sla-strip">
         <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"}</div></div>
@@ -5931,6 +5967,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${awaitingCorrectionLine(ds.id)}
     ${keptHeldLine(ds.id)}
     ${blockedBanner}
+    ${refusedBesideBanner(ds)}
     ${waitingBanner}
     ${exhaustedBanner}
     ${noSupplyBanner}

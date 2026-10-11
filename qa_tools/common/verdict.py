@@ -316,10 +316,14 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
     horizon = max(date.fromisoformat(i["period_date"]) for *_, i, _, _, _ in parsed) \
         + timedelta(days=400)
     try:
-        dated = {p.name: p.date for p in
-                 schedule.periods_for_dataset(dataset_id, until=horizon, agreement=agreement)}
+        periods = schedule.periods_for_dataset(dataset_id, until=horizon, agreement=agreement)
+        dated = {p.name: p.date for p in periods}
+        # A JUDGED PERIOD DECLARED NOT EXPECTED SINCE (Keith, 2026-10-11,
+        # morning-report (i)): it owes nothing now, so its recorded verdict
+        # no longer stands on the schedule - as if the period had gone.
+        unowed = {p.name: p.not_expected_reason for p in periods if not p.expected}
     except Exception as exc:  # noqa: BLE001 - no schedule now: every slot is missing
-        dated, no_schedule = {}, f"the dataset has no schedule now ({exc})"
+        dated, unowed, no_schedule = {}, {}, f"the dataset has no schedule now ({exc})"
     else:
         no_schedule = None
     by_slot: dict[str, tuple] = {}
@@ -327,7 +331,10 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
     for supply_id, slot_name, vid, classification, inputs, fingerprint, received, at in parsed:
         if slot_name not in by_slot:
             when = dated.get(slot_name)
-            if when is None:
+            if no_schedule is None and slot_name in unowed:
+                by_slot[slot_name] = (None, f"{slot_name} is now declared not expected "
+                                            f"({unowed[slot_name]})")
+            elif when is None:
                 by_slot[slot_name] = (None, no_schedule or
                                       f"{slot_name} is no longer a period of its schedule")
             else:

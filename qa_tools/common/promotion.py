@@ -819,6 +819,10 @@ class AfterRun:
     promoted: tuple[str, ...] = ()
     refused: dict[str, str] = field(default_factory=dict)
     failed: dict[str, str] = field(default_factory=dict)
+    #: Left ungated because the agreement backstop refuses the dataset
+    #: (Keith, 2026-10-11, morning-report (f)) - no record is written, so the
+    #: first pass after it is cleared gates the supply as usual.
+    frozen: dict[str, str] = field(default_factory=dict)
 
     @property
     def nothing_happened(self) -> bool:
@@ -857,9 +861,26 @@ def after_run(conn: supply_db.SupplyConnection, *,
 
     work: list[dict] = []
     refused: dict[str, str] = {}
+    frozen: dict[str, str] = {}
+    # A REFUSED DATASET IS FROZEN for the rule (Keith, 2026-10-11, (f)). A
+    # person's own promotion is a decision taken knowing the refusal, and
+    # stands (PROVISIONAL).
+    barred: dict = {}
+    if actor_kind == decision_log.RULE:
+        from qa_tools.common import agreement_drift
+
+        try:
+            barred = agreement_drift.refusals(
+                conn, sorted({item["dataset_id"] for item in supplies}))
+        except Exception:  # noqa: BLE001 - an unevaluable backstop refuses nothing
+            barred = {}
 
     for item in supplies:
         dataset_id = item["dataset_id"]
+        if dataset_id in barred:
+            frozen[dataset_id] = ("the agreement backstop refuses this dataset, so nothing is "
+                                  "promoted until the change is restored or declared")
+            continue
         period = item.get("period")
         # NO AUTOMATIC RULE PROMOTES A SUPERSEDED SUPPLY (REQ-PIPE-118
         # criterion 14): a later version of its table arrived for the same
@@ -997,7 +1018,7 @@ def after_run(conn: supply_db.SupplyConnection, *,
         period="", actor=actor, actor_kind=actor_kind,
         effective_at=effective_at)
     return AfterRun(promoted=tuple(promoted), refused=refused,
-                    failed={**failed, **record_failures})
+                    failed={**failed, **record_failures}, frozen=frozen)
 
 
 def _record_amber_waiting(conn, *, agency_id: str, collection_id: str, dataset_id: str,
@@ -1135,8 +1156,9 @@ def after_runs(found_arrivals, results: Sequence[dict], *,
             # the earlier arrival's success is already in the log.
             merged.refused.update(outcome.refused)
             merged.failed.update(outcome.failed)
+            merged.frozen.update(outcome.frozen)
     return AfterRun(promoted=tuple(promoted), refused=merged.refused,
-                     failed=merged.failed)
+                    failed=merged.failed, frozen=merged.frozen)
 
 
 def _declared_reads() -> dict[str, list[str]]:
@@ -1181,6 +1203,8 @@ def report(outcome: AfterRun) -> None:
               f"{', '.join(sorted(outcome.promoted))}")
     for dataset_id, why in sorted(outcome.refused.items()):
         print(f"not promoted - {dataset_id}: {why}")
+    for dataset_id, why in sorted(outcome.frozen.items()):
+        print(f"not gated - {dataset_id}: {why}")
     for dataset_id, why in sorted(outcome.failed.items()):
         print(f"PROMOTION FAILED - {dataset_id}: {why} "
               f"(the QA results are recorded; re-run to retry the promotion)")

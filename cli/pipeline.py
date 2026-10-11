@@ -152,6 +152,8 @@ def process_command() -> None:
       0   everything it attempted completed, and nothing it recorded is red
       1   everything completed, and at least one recorded result is red
       2   an arrival, an owed item or a stage failed - it is left for the next pass
+      3   a dataset is refused: its judged past no longer matches the delivery
+          agreement and no correction declares why (see check-agreement)
       75  another pass holds this database's lock; nothing was changed
     """
     from . import common

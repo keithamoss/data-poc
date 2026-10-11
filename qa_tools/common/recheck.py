@@ -79,6 +79,9 @@ class Outcome:
     message: str
     #: The supply's status after the run - green, amber, red - or None.
     status: str | None = None
+    #: Not run because the agreement backstop refuses its dataset (Keith,
+    #: 2026-10-11, morning-report (f)) - left owed, and not a failure.
+    frozen: bool = False
 
 
 _OWED_COLUMNS = ("id", "kind", "dataset_id", "supply_id", "period", "caused_by_decision",
@@ -254,6 +257,21 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
         item, cleared_at = _owed_item(conn, owed_id)
         if cleared_at is not None:
             return Outcome(item.id, item.run_key or "", True, "already run")
+        # A REFUSED DATASET IS FROZEN (Keith, 2026-10-11, morning-report (f)):
+        # nothing about it moves until its undeclared change is restored or
+        # declared, so a re-check or re-evaluation owed to it waits - still
+        # owed, never a failure.
+        from qa_tools.common import agreement_drift
+
+        try:
+            refused = agreement_drift.refusals(conn, [item.dataset_id])
+        except Exception:  # noqa: BLE001 - an unevaluable backstop refuses nothing
+            refused = {}
+        if item.dataset_id in refused:
+            return Outcome(item.id, item.run_key or "", False,
+                           f"{item.dataset_id} is refused by the agreement backstop, so this "
+                           f"waits until the change is restored or declared - still owed.",
+                           frozen=True)
         if item.kind == REEVALUATE:
             from qa_tools.common import knock_on
 

@@ -71,3 +71,50 @@ describe("the wording (delivery-critic on 173, #10)", () => {
     expect(w.agreementNotice(DATA_)).toContain("contract/data-asset.yaml");
   });
 });
+
+// Keith, 2026-10-11 (morning-report (g)): a refusal shows only on in-place-on
+// dates on or after the earliest period it affects, and sits BESIDE another
+// blocker rather than replacing it.
+describe("when and where a refusal shows", () => {
+  const FROM = {...REFUSAL, from: "2024-02-01"};
+
+  it("shows only on dates on or after its earliest affected period", () => {
+    const w = withRefusal({"cp-clients": FROM});
+    expect(w.refusalInPlaceOn("cp-clients", "2024-01-31")).toBe(null);
+    expect(w.refusalInPlaceOn("cp-clients", "2024-02-01")).toBe(FROM);
+    expect(w.refusalInPlaceOn("cp-clients", "2025-06-01")).toBe(FROM);
+  });
+
+  it("shows on every date where the record names no period", () => {
+    const w = withRefusal({"cp-clients": REFUSAL});
+    expect(w.refusalInPlaceOn("cp-clients", "2020-01-01")).toBe(REFUSAL);
+  });
+
+  it("the asset notice follows the date the page is built for", () => {
+    const w = withRefusal({"cp-clients": FROM});
+    const data = {agencies: [{id: "a", name: "A", collections: [{id: "c", name: "C", datasets: [
+      {id: "cp-clients", name: "Clients", refusalEvaluated: true, refusal: null}]}]}]};
+    expect(w.agreementNotice(data)).toBe("");
+  });
+
+  it("alone, it is the dataset's blocker", () => {
+    const w = withRefusal({});
+    const ds = {id: "cp-clients", columns: []};
+    expect(w.applyRefusal(ds, REFUSAL, null)).toBe(true);
+    expect(ds.blocked.kind).toBe("agreement-refused");
+    expect(ds.status).toBe("red");
+  });
+
+  it("beside another blocker, that blocker stays and the refusal is added", () => {
+    const w = withRefusal({});
+    const held = {kind: "held", count: 1, openedAt: "2024-03-01T00:00:00Z", reason: "two files"};
+    const ds = {id: "cp-clients", columns: []};
+    expect(w.applyRefusal(ds, REFUSAL, held)).toBe(false);
+    expect(ds.blocked).toBeUndefined();
+    expect(ds.alsoRefused).toBe(REFUSAL);
+    expect(ds.status).toBe("red");
+    const banner = w.refusedBesideBanner(ds);
+    expect(banner).toContain("Refused: the delivery agreement changed");
+    expect(banner).toContain("data-agreement-refused-beside");
+  });
+});

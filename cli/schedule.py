@@ -482,8 +482,8 @@ def check_agreement_command(dataset_id: str | None) -> None:
     judged it, and this compares that with the agreement as it stands. A
     difference no declared correction accounts for refuses the dataset -
     its new supplies are held until the agreement is restored or the change
-    is declared. Exits 1 where any dataset is refused, 2 where any could not
-    be checked at all.
+    is declared. Exits 3 where any dataset is refused - its own status, never
+    the 1 that red data gives - and 2 where any could not be checked at all.
     """
     # REQ-PIPE-173: the backstop's own report, the same computation the
     # pass and the dashboard build make.
@@ -516,7 +516,7 @@ def check_agreement_command(dataset_id: str | None) -> None:
         return
     for refusal in found.values():
         console.print(refusal.message(), style="red")
-    raise SystemExit(1)
+    raise SystemExit(3)
 
 
 @schedule_group.command("preview-correction")

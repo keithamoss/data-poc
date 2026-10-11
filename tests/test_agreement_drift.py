@@ -166,7 +166,7 @@ def test_it_reads_recorded_metadata_and_configuration_only():
 class TestTheCommandAndThePass:
     """Criteria 2-4 through the routes a person and a scheduler see."""
 
-    def test_check_agreement_names_the_change_and_exits_1(self, conn, monkeypatch):
+    def test_check_agreement_names_the_change_and_exits_3(self, conn, monkeypatch):
         from click.testing import CliRunner
 
         from cli import schedule as schedule_cli
@@ -175,7 +175,7 @@ class TestTheCommandAndThePass:
         monkeypatch.setattr(agreement_drift, "_load_docs", lambda: (cal, asset))
         got = CliRunner().invoke(schedule_cli.schedule_group,
                                  ["check-agreement", "--dataset", DATASET])
-        assert got.exit_code == 1
+        assert got.exit_code == 3  # its own status (Keith, 2026-10-11, (h))
         assert "grace_seconds was 28800" in got.output
 
     def test_nothing_refused_exits_0(self, conn):
@@ -328,4 +328,29 @@ class TestCriticFindingsOn173:
         report = processing_pass.PassReport(refused=["cp-clients"])
         pipeline._say_pass(report)
         assert "recorded result is red" not in capsys.readouterr().out
-        assert report.exit_status == processing_pass.EXIT_RED
+        assert report.exit_status == processing_pass.EXIT_REFUSED  # (h)
+
+
+class TestARetroactiveNotExpectedIsCaught:
+    """Keith, 2026-10-11 (morning-report (i)): declaring after the fact that
+    a judged period owed nothing changes how it was judged - the same kind
+    of change the backstop exists for."""
+
+    def test_a_judged_period_declared_not_expected_is_refused(self, conn):
+        cal, asset = _docs()
+        _clients(cal)["not_expected"] = [{"period": "2023-Q3",
+                                         "reason": "declared after the fact"}]
+        found = _refusal(conn, cal, asset)
+        assert found is not None and "2023-Q3" in found.message()
+        assert "not expected" in found.message()
+
+    def test_a_declared_correction_of_it_accounts_for_it(self, conn):
+        cal, asset = _docs()
+        entry = _clients(cal)
+        entry["not_expected"] = [{"period": "2023-Q3", "reason": "declared after the fact"}]
+        entry["corrections"] = [{
+            "change_reference": "CAB-NE", "date": "2026-10-11", "author": "a",
+            "approver": "b", "reason": "r",
+            "changes": [{"item": f"dataset {DATASET} not_expected 2023-Q3", "old": None,
+                         "new": "declared after the fact"}]}]
+        assert _refusal(conn, cal, asset) is None

@@ -50,6 +50,9 @@ class Drift:
     changes: tuple[tuple[str, object, object], ...]
     #: How many recorded verdicts were judged under the old terms.
     supplies: int = 1
+    #: The period's date as recorded (ISO), so the page can show the refusal
+    #: from the earliest period it affects (Keith, 2026-10-11, (g)).
+    period_date: str | None = None
 
     def describe(self) -> str:
         if not self.changes:
@@ -95,7 +98,9 @@ class Refusal:
         return "\n".join(lines)
 
     def as_record(self) -> dict:
+        dates = [d.period_date for d in self.drifts if d.period_date]
         return {"datasetId": self.dataset_id, "remedy": self.remedy,
+                "from": min(dates) if dates else None,
                 "drifts": [d.as_record() for d in self.drifts]}
 
 
@@ -260,8 +265,10 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
         if not c.moved:
             continue
         if c.now is None:
-            changes = ((f"no longer a period of its schedule (it was dated "
-                        f"{c.inputs.get('period_date')})", None, None),)
+            gone = (c.missing if c.missing and "not expected" in c.missing else
+                    f"no longer a period of its schedule (it was dated "
+                    f"{c.inputs.get('period_date')})")
+            changes = ((gone, None, None),)
             needed = [_MISSING_KINDS]
         else:
             changes = tuple((f, c.inputs.get(f), c.now[0].get(f)) for f in _FIELDS
@@ -282,9 +289,11 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
             continue
         if c.slot in by_slot:
             d = by_slot[c.slot]
-            by_slot[c.slot] = Drift(d.dataset_id, d.slot, d.changes, d.supplies + 1)
+            by_slot[c.slot] = Drift(d.dataset_id, d.slot, d.changes, d.supplies + 1,
+                                    d.period_date)
             continue
-        by_slot[c.slot] = Drift(dataset_id, c.slot, changes)
+        by_slot[c.slot] = Drift(dataset_id, c.slot, changes,
+                                period_date=c.inputs.get("period_date"))
     if not by_slot:
         return None
     return Refusal(dataset_id, tuple(by_slot[s] for s in sorted(by_slot)),

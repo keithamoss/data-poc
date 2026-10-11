@@ -230,6 +230,13 @@ releases:
               says so and why, a dataset with a correction waiting to be
               confirmed says that too, and each confirmed correction appears
               once in Recent activity.
+          - headline: Refused means frozen
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A dataset whose agreement changed without a declared correction
+              now has nothing promoted or re-checked until it is explained, exits
+              with its own status (3), and shows the refusal only from the
+              period it affects, beside any other blocker.
           - headline: Say it once for the collection
             components: ["Pipeline & publishing"]
             description: >

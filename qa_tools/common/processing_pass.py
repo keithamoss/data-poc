@@ -47,6 +47,10 @@ PASS_LOCK_LABEL = "mothman-pass:"
 
 #: Exit statuses (criterion 20), stated in the command's help.
 EXIT_OK, EXIT_RED, EXIT_FAILED, EXIT_LOCKED = 0, 1, 2, 75
+#: A dataset the agreement backstop refused - configuration drift, not red
+#: data (Keith, 2026-10-11, morning-report (h)): its own status, so a
+#: scheduler can send it to whoever owns the agreement.
+EXIT_REFUSED = 3
 
 #: The decision-log actions that mean "the gate ran on this supply".
 GATED_ACTIONS = ("promote", "promotion-withheld", "promotion-refused")
@@ -275,10 +279,21 @@ class PassReport:
 
     @property
     def exit_status(self) -> int:
-        """Criterion 20: a failure outranks a red result."""
+        """Criterion 20: a failure outranks a red result - and a refusal sits
+        between them (PROVISIONAL, 2026-10-11): something must be retried
+        before anything else, but an agreement that no longer matches what
+        was judged is a bigger problem than one red verdict."""
         if self.failures:
             return EXIT_FAILED
-        return EXIT_RED if self.red or self.refused else EXIT_OK
+        if self.refused:
+            return EXIT_REFUSED
+        return EXIT_RED if self.red else EXIT_OK
+
+
+def _owed_failure(outcome) -> bool:
+    """An owed item that did not complete is a failure of the pass - unless
+    it waited on a refused dataset, which is the backstop working."""
+    return not outcome.completed and not getattr(outcome, "frozen", False)
 
 
 def _red(results) -> bool:
@@ -475,7 +490,7 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         for outcome in recheck.run_all_owed(kinds=(recheck.REEVALUATE, recheck.RECHECK),
                                             run_by=run_by):
             report.owed.append(outcome)
-            if not outcome.completed:
+            if _owed_failure(outcome):
                 report.failures.append((f"owed #{outcome.owed_id}", outcome.message))
             elif outcome.status == "red":
                 report.red = True
