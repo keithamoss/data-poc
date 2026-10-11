@@ -4763,8 +4763,20 @@ Belongs with batch 5's check work.
     three staging-order tests deleted, the other three rewritten as real
     checks (qa.dataset_stats in the deployment; the e2e floor from qa.run;
     the trial tidy-up by making its last delete fail), and the stale
-    orchestrator docstrings rewritten. The rest of docs/test-review-pass2.md
-    is still to walk.
+    orchestrator docstrings rewritten. **THE REST WALKED THE SAME MORNING,
+    every recommendation taken (Keith):** group A - delete the ~35
+    memorials and trim 4, replace the 7 live-rule greps with behaviour
+    tests, keep the ~11 that guard live rules; group B - replace the 31
+    source greps with behaviour tests, delete 2, trim 1, keep the ~25
+    architecture guards; the 13 data-boundary greps become ONE test running
+    the dashboard build and its readers over the publisher role; groups C
+    and D - delete the 12 duplicates and tautologies (including the sprint
+    test that needs the real plan to hold a blocked and a todo sprint, and
+    the two 'retired-check registry is empty' tests), collapse ~75
+    validator tests into ~12 tables keeping every case, delete the 11
+    proven-twice tests. Being done in three passes (deletions, replacements,
+    the role test). Step 3 of this item - the testing GUIDANCE wording for
+    CLAUDE.md - is still to draft for Keith's word-for-word approval.
 
 68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
     **No custom code per dataset - everything in configuration, if we can.**
