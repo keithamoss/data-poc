@@ -7703,3 +7703,33 @@ twice. It deliberately did not re-find the `TypeError`.
     - **Noted, not a finding:** the critic's first runs used the default
       test database name and may have dropped another session's scratch
       database - test data only.
+
+155. **[done, 2026-10-11]** **[Data generation]** **The delivery critic on
+     REQ-GEN-184 part B, injected targets (796b537).** Run after the push;
+     every claim checked against the code before acting, and each fix had a
+     test that failed first.
+    - **1 (high):** a targeted resend is churned before it is targeted, and
+      churn voided a twin about four times in ten, so a green resend could
+      read red. Fixed at the source in 8070c58 (running-thoughts #82,
+      Keith: void singles only); the new test fails against the old churn.
+    - **2 (medium-high):** the twin flag was a lever - a red target that
+      picked it wrote NA into a boolean column and crashed mid-generation,
+      after the old history was cleared. It is never a lever now, refused
+      up front naming why.
+    - **3 (medium):** every same-column single-tier check was treated as
+      safe, including a uniqueness check a fill can break and a check that
+      also reads another column. Narrowed: own rule, a value check reading
+      that column alone, or the named sibling rule.
+    - **4 (Keith's call):** criterion 3's "an amber band in every tool"
+      admits no rule read literally. Reworded to the catalogue's meaning,
+      in wording Keith approved.
+    - **5 (low-medium):** the ordinary amber plan could still refuse after
+      the old history was cleared. Planned before the clear now.
+    - **6 (low):** green left no margin on a lever sitting exactly at its
+      bound. It leaves one on every lever.
+    - **7 (low):** the record's key was `verdict`; it is `built_to`. `was`
+      is the count before any change.
+    - **8 (context, not a defect):** a clean supply after a missing period
+      reads gap-red whatever its rows - REQ-GEN-185's lead-in is the answer.
+    - **Not fixed, noted:** several refusal branches stay untested by line
+      (the critic listed them); each raises a TargetError naming why.

@@ -175,12 +175,12 @@ def _target_text(target: Mapping) -> str:
     """"amber on place_of_birth_facility.completeness (450 of 2,078 blank),
     the 2026-09-14 14:00 arrival" - what the rows were built to, never
     what the tools found."""
-    moved = [m for m in target.get("moved") or () if m.get("to") == target.get("verdict")]
+    moved = [m for m in target.get("moved") or () if m.get("to") == target.get("built_to")]
     rules = ", ".join(
         f"{m['rule']} ({m.get('nulls', m.get('values'))} of {m['of_rows']:,})" for m in moved
     ) or ", ".join(target.get("rules") or ()) or "the seed's choice"
-    on = "" if target.get("verdict") == "green" else f" on {rules}"
-    return f"{target.get('verdict')}{on}, the {target.get('date')} {target.get('at')} arrival"
+    on = "" if target.get("built_to") == "green" else f" on {rules}"
+    return f"{target.get('built_to')}{on}, the {target.get('date')} {target.get('at')} arrival"
 
 
 def _entry(scenario: scenarios_mod.Scenario, placement: Placement | None) -> list[str]:

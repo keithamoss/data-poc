@@ -441,7 +441,7 @@ class TestAnInjectedTargetEndToEnd:
     def test_the_placement_records_the_target_and_what_moved(self, generated):
         _book, placements, _d = generated
         [target] = self._record(placements)["targets"]
-        assert target["verdict"] == "amber" and target["rules"] == [self.KEY]
+        assert target["built_to"] == "amber" and target["rules"] == [self.KEY]
         assert any(m["rule"] == self.KEY and m["to"] == "amber" for m in target["moved"])
         assert "verdict" not in {k for m in target["moved"] for k in m}
 
@@ -517,3 +517,108 @@ class TestRefusedBeforeAnythingIsWritten:
                 cp._plan_injections(periods)
         finally:
             si.INJECTIONS = original
+
+
+# ---- post-build-review #155: the critic's findings on part B, each failing first ----
+
+def _unmatched_twins(df):
+    twins = df[df["is_multiple_birth"].astype(bool)]
+    keys = ["date_of_birth", "place_of_birth_facility", "registering_parent_1_name"]
+    sizes = twins.fillna({k: "<null>" for k in keys}).groupby(keys)["registration_number"] \
+        .transform("count")
+    return int((sizes < 2).sum())
+
+
+class TestFindings155:
+    def test_a_targeted_resend_keeps_every_twin(self):
+        """Finding 1: the resend is churned before it is targeted."""
+        from generator import generate_runs as g
+        from generator import scenario_injection as si
+
+        inj = si.Injection(scenario_id="TS-X", dataset_id=g.DATASET_ID, anchor=-20,
+                           config="t", arrivals=(
+                               si.ExtraArrival(0, "14:00", target=targeting.Target("amber")),
+                               si.ExtraArrival(0, "16:00", target=targeting.Target("green"))))
+        period = type("P", (), {"date": date(2026, 9, 3), "name": "2026-09-03"})()
+        for seed in range(8):
+            # A targeted period is never made stale (main() puts it in
+            # amber_dates), and a stale batch splits twins by design.
+            provider = g.BirthRegistrationsProvider(amber_dates=frozenset({period.date}))
+            out = g._injected_chain(provider, inj, period, 1000 + seed, 0, 2000, 2050)
+            assert [_unmatched_twins(d.payload) for d in out] == [0, 0], seed
+
+    def test_the_twin_flag_is_never_a_lever(self, batch, cat):
+        """Finding 2: blanking it crashed mid-generation."""
+        with pytest.raises(targeting.TargetError, match="is_multiple_birth"):
+            targeting.check_target(targeting.Target("red", ("is_multiple_birth.completeness",)),
+                                   BDM_ID, "TS-X")
+        for seed in range(40):
+            targeting.bdm_target(batch, targeting.Target("red"), seed=seed, catalogue=cat)
+
+    def test_a_uniqueness_check_on_the_column_takes_it_away(self, batch, cat):
+        """Finding 3: a fill draws from the column's own values, which a
+        uniqueness check fails."""
+        import dataclasses
+
+        from qa_tools.common import check_bands as cb
+        uniq = cb.Check("a.b.c.birth-registrations.place_of_birth_facility.unique_x_dbt",
+                        "dbt", BDM_ID, "place_of_birth_facility", "uniqueness", "unique", "f",
+                        fail=(cb.Bound(">", 0, cb.ROWS),))
+        poisoned = dataclasses.replace(cat, checks=[*cat.checks, uniq])
+        with pytest.raises(targeting.TargetError, match="unique_x_dbt"):
+            targeting.bdm_target(batch, targeting.Target(
+                "amber", ("place_of_birth_facility.completeness",)), seed=1, catalogue=poisoned)
+
+    def test_a_same_column_check_reading_other_columns_takes_it_away(self, batch, cat):
+        import dataclasses
+
+        from qa_tools.common import check_bands as cb
+        cross = cb.Check("a.b.c.birth-registrations.place_of_birth_facility.ordering_x_soda",
+                         "soda", BDM_ID, "place_of_birth_facility", "consistency",
+                         "failed_rows", "f", fail=(cb.Bound(">", 0, cb.ROWS),),
+                         reads_columns=("birth_registrations.place_of_birth_facility",
+                                        "birth_registrations.date_registered"))
+        poisoned = dataclasses.replace(cat, checks=[*cat.checks, cross])
+        with pytest.raises(targeting.TargetError, match="ordering_x_soda"):
+            targeting.bdm_target(batch, targeting.Target(
+                "amber", ("place_of_birth_facility.completeness",)), seed=1, catalogue=poisoned)
+
+    def test_green_leaves_every_lever_a_margin(self, batch, cat):
+        """Finding 6: 550 nulls against dbt's > 550 passed with none."""
+        edge = batch.copy()
+        singles = edge.index[~edge["is_multiple_birth"].astype(bool)]
+        edge["registering_parent_2_name"] = "Someone"
+        edge.loc[singles[:550], "registering_parent_2_name"] = pd.NA
+        out, _ = targeting.bdm_target(edge, targeting.Target("green"), seed=1, catalogue=cat)
+        for rule in targeting._levers(cat, out)[0]:
+            trip = targeting._first(rule, len(out), lambda c, x, r: c.warns(x, r) or c.fails(x, r))
+            if trip:
+                assert _nulls(out, rule.column) <= (trip - 1) * 9 // 10, rule.column
+
+    def test_the_record_says_built_to_and_was_is_the_original_count(self, batch, cat):
+        """Finding 7: never a key called `verdict`."""
+        t = targeting.Target("amber", ("registering_parent_2_name.completeness",))
+        assert "verdict" not in t.as_record() and t.as_record()["built_to"] == "amber"
+        _out, moved = targeting.bdm_target(batch, t, seed=1, catalogue=cat)
+        [m] = [m for m in moved if m["rule"] == "registering_parent_2_name.completeness"]
+        assert m["was"] == _nulls(batch, "registering_parent_2_name")
+
+    def test_an_ordinary_amber_refusal_leaves_the_last_history_standing(self, tmp_path,
+                                                                        monkeypatch):
+        """Finding 5."""
+        from generator import generate_runs as g
+        from generator.output import redirect
+
+        restore = redirect(g, tmp_path)
+        try:
+            g.main()
+            before = sorted(p.name for p in (tmp_path / "deliveries").iterdir())
+
+            def refuse(*a, **k):
+                raise targeting.TargetError("refused")
+            monkeypatch.setattr(targeting, "outside_hold", refuse)
+            with pytest.raises(targeting.TargetError):
+                g.main()
+            assert sorted(p.name for p in (tmp_path / "deliveries").iterdir()) == before
+        finally:
+            restore()

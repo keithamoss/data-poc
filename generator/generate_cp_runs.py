@@ -635,6 +635,8 @@ def main() -> None:
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
     resolved_injections, injected_by_period = _plan_injections(periods)
+    # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
+    severities = _ordinary_severities(periods, injected_by_period)
     # ONLY THEN is the last history cleared: a scenario or target refused
     # above leaves the one already on disk standing (REQ-GEN-184
     # criterion 11).
@@ -646,7 +648,6 @@ def main() -> None:
     delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
     taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
 
-    severities = _ordinary_severities(periods, injected_by_period)
     for i, (severity, period) in enumerate(zip(severities, periods), start=1):
         snapshot_date = period.date
         slot_id = f"cp_slot_{i:02d}"

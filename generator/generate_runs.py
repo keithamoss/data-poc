@@ -620,6 +620,8 @@ def main() -> None:
     # _plan_injections()'s own docstring.
     (resolved_injections, injected_by_period, suppressed_periods,
      quiet_periods) = _plan_injections(periods)
+    # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
+    severities = _ordinary_severities(periods, injected_by_period, suppressed_periods)
     # ONLY THEN is the last history cleared: a scenario or target refused
     # above leaves the one already on disk standing (REQ-GEN-184
     # criterion 11).
@@ -634,7 +636,6 @@ def main() -> None:
     #: _away_from_suppressed(). Shared across slots, because the
     #: collision it prevents is between them.
     shifted_onto: set[str] = set()
-    severities = _ordinary_severities(periods, injected_by_period, suppressed_periods)
     # NEVER STALE: an ordinary amber, and a period whose injected supply is
     # built to a target (REQ-GEN-184 criterion 4) - a stale delivery fails
     # the freshness checks, whatever it was built to.

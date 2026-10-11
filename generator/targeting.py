@@ -38,6 +38,10 @@ import numpy as np
 import pandas as pd
 
 BDM = "birth-registrations"
+TABLE = "birth_registrations"
+TWIN_FLAG = "is_multiple_birth"
+#: The authored name the three tools' multiple-birth sibling checks share.
+SIBLING_RULE = "Multiple-birth sibling match"
 CP_CLIENTS = "cp-clients"
 
 #: Four-character postcodes no supplier would send and no reader treats as
@@ -133,7 +137,10 @@ class Target:
             raise TargetError("a green target names no rules - nothing is to warn or fail")
 
     def as_record(self) -> dict:
-        return {"verdict": self.verdict, "rules": list(self.rules)}
+        """`built_to`, never `verdict` (post-build-review #155): this is
+        what the rows were aimed at, and criterion 12 forbids recording a
+        verdict - a key that reads like one invites the mistake."""
+        return {"built_to": self.verdict, "rules": list(self.rules)}
 
 
 def rule_key(rule) -> str:
@@ -181,22 +188,40 @@ def _levers(cat, df: pd.DataFrame | None) -> tuple[list, dict[str, str]]:
     """The null-rate rules on Birth Registrations a target may move, and
     why each other one may not (criterion 5).
 
-    A COLUMN IS A LEVER ONLY IF EVERY SINGLE-TIER CHECK READING IT IS ITS
-    OWN or one blanking leaves alone by construction: a check on that
-    same column (which reads the values a blank or a fill leaves valid),
-    or a multiple-birth sibling check, which reads only twins' rows and
-    twins are never touched. Any other reader - a SQL check that joins on
-    the column, say - would be broken by a blank, so the rule is refused
-    rather than moved."""
+    A COLUMN IS A LEVER ONLY IF EVERY SINGLE-TIER CHECK READING IT IS ONE
+    A BLANK OR A FILL LEAVES ALONE BY CONSTRUCTION: a check of the rule
+    itself; a value check on that same column reading nothing else (a
+    blank is not a value, a fill is one the column already carries); or a
+    multiple-birth sibling check, named as such, which reads only twins'
+    rows, never touched. NOT a uniqueness check, which a fill from the
+    column's own values can break, nor a check that also reads another
+    column (post-build-review #155). Any other reader refuses the rule.
+
+    THE TWIN FLAG ITSELF IS NEVER A LEVER: twin protection reads it, and
+    a blank in a boolean column is not a blank (#155 - it crashed)."""
     readers = cat.single_tier_readers(BDM)
-    columns_of = {c.check_id: c.column for c in cat.checks}
+    by_id = {c.check_id: c for c in cat.checks}
+
+    def harmless(check_id: str, rule) -> bool:
+        c = by_id.get(check_id)
+        if c is None:
+            return False
+        if c in rule.checks or c.name == SIBLING_RULE:
+            return True
+        own = {f"{TABLE}.{rule.column}"}
+        return (c.column == rule.column and c.category != "uniqueness"
+                and set(c.reads_columns) <= own)
+
     usable, refused = [], {}
     for rule in cat.rules():
         if (rule.dataset_id, rule.category, rule.measure) != (BDM, "completeness", "rows") \
                 or not rule.column or (df is not None and rule.column not in df.columns):
             continue
-        others = [r for r in readers.get(rule.column, [])
-                  if columns_of.get(r) != rule.column and ".is_multiple_birth." not in r]
+        if rule.column == TWIN_FLAG:
+            refused[rule_key(rule)] = (f"{TWIN_FLAG} is what keeps twins whole, so it is "
+                                       f"never moved")
+            continue
+        others = [r for r in readers.get(rule.column, []) if not harmless(r, rule)]
         if others:
             refused[rule_key(rule)] = ("a single-tier check reads its column: "
                                        + ", ".join(o.rsplit(".", 1)[-1] for o in others))
@@ -264,12 +289,15 @@ def bdm_target(df: pd.DataFrame, target: Target, seed: int, catalogue=None,
     levers, refused = _levers(cat, df)
     by_key = {rule_key(r): r for r in levers}
     moved: list[dict] = []
+    original = {r.column: int(df[r.column].isna().sum()) for r in levers}
 
     out = df
     for rule in levers:
         trip = _first(rule, n, lambda c, x, r: c.warns(x, r) or c.fails(x, r))
         now = int(out[rule.column].isna().sum())
-        if trip is not None and now >= trip:
+        # A MARGIN EVERYWHERE, not only past the first warning: 550 blanks
+        # against dbt's "> 550" passes with none (post-build-review #155).
+        if trip is not None and now > (trip - 1) * 9 // 10:
             want = max(0, (trip - 1) * 9 // 10)
             out = _set_nulls(out, rule.column, want, rng, where)
             moved.append({"rule": rule_key(rule), "to": "green", "nulls": want, "of_rows": n})
@@ -291,7 +319,6 @@ def bdm_target(df: pd.DataFrame, target: Target, seed: int, catalogue=None,
         raise TargetError(f"{where}: {target.verdict} was asked for, and no null-rate rule "
                           f"can be moved there at {n} rows")
     for rule in chosen:
-        now = int(out[rule.column].isna().sum())
         if target.verdict == "amber":
             bands = rule.amber(n)
             if not bands:
@@ -308,7 +335,7 @@ def bdm_target(df: pd.DataFrame, target: Target, seed: int, catalogue=None,
         out = _set_nulls(out, rule.column, want, rng, where)
         moved = [m for m in moved if m["rule"] != rule_key(rule)]
         moved.append({"rule": rule_key(rule), "to": target.verdict, "nulls": want,
-                      "of_rows": n, "was": now})
+                      "of_rows": n, "was": original[rule.column]})
     return out, moved
 
 
