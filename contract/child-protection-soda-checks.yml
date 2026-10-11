@@ -459,6 +459,7 @@ checks for cp_notifications:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_soda
         reads_columns: ["cp_notifications.notification_id", "cp_notifications.outcome", "cp_investigations.notification_id", "cp_investigations.investigation_id"]
         reads_tables: [cp_investigations]
+        name: Escalation completeness
         category: completeness
         introduced_date: "2023-01-15"
         description: >

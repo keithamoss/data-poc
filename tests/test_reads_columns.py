@@ -215,3 +215,40 @@ class TestMothmanCheckRunsIt:
     def test_the_committed_tree_passes(self):
         from qa_tools.common import validate_reads_columns as vrc
         assert vrc.main() == 0
+
+
+class TestAJsonStringValue:
+    def test_a_contract_value_given_as_a_json_string_is_read_as_the_list(self, tmp_path):
+        """post-build-review #153 finding 10: the recorded decision says it
+        survives customProperties' scalar values as a JSON string, the way
+        changelog does."""
+        [c] = cl.parse_contract_check_metadata(_write(tmp_path, "contract.yaml", """
+            schema:
+              - name: birth_registrations
+                quality:
+                  - type: sql
+                    dimension: consistency
+                    query: SELECT COUNT(*) FROM {model} WHERE sex IS NULL
+                    mustBe: 0
+                    customProperties:
+                      - {property: check_id, value: a.b.c.d.x.sql_datacontract}
+                      - property: reads_columns
+                        value: '["birth_registrations.sex"]'
+            """))
+        assert c.reads_columns == ["birth_registrations.sex"]
+        assert cl.reads_columns_errors([c], DEFINED) == []
+
+
+class TestItIsAMothmanCommand:
+    def test_mothman_dashboard_validate_reads_columns(self):
+        """Finding 14: every gate has a mothman subcommand."""
+        from click.testing import CliRunner
+
+        from cli import dashboard
+        got = CliRunner().invoke(dashboard.dashboard_group, ["validate-reads-columns"])
+        assert got.exit_code == 0, got.output
+
+    def test_mothman_check_calls_it_through_mothman(self):
+        from cli import check
+        [cmd] = [c for label, c, *_ in check._GATES if label == "columns"]
+        assert "mothman" in " ".join(cmd)

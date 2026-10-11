@@ -786,7 +786,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_datacontract
               - property: reads_columns
-                value: ["cp_investigations.investigation_id", "cp_investigations.cp_client_id", "cp_investigations.end_date", "cp_clients.cp_client_id", "cp_clients.case_status"]
+                value: ["cp_investigations.cp_client_id", "cp_investigations.end_date", "cp_clients.cp_client_id", "cp_clients.case_status"]
               - property: reads_tables
                 value: ["cp_clients"]
               - property: name
@@ -1181,7 +1181,7 @@ schema:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_datacontract
               - property: reads_columns
-                value: ["cp_placements.placement_id", "cp_placements.carer_id", "cp_carers.carer_id", "cp_carers.approval_status"]
+                value: ["cp_placements.carer_id", "cp_carers.carer_id", "cp_carers.approval_status"]
               - property: reads_tables
                 value: ["cp_carers"]
               - property: name

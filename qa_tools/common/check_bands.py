@@ -8,18 +8,27 @@ implements it warns and where it fails. That knowledge already exists, in each
 tool's own definitions; a second copy for the generator would drift (Keith,
 2026-10-11: read the bands from each tool's own files).
 
-A RULE IS THE CHECKS THAT IMPLEMENT IT ACROSS TOOLS, grouped by dataset,
-column and category (Keith, 2026-10-11) - all three already in every check's
-metadata and check_id, so nothing new is authored. The same rule commonly runs
+A RULE IS THE CHECKS THAT IMPLEMENT IT ACROSS TOOLS. Checks sharing an
+authored name are one rule, whatever column each hangs on; a check with no
+name is grouped by dataset, column, category and what it measures (Keith,
+2026-10-11, post-build-review #153 - grouping by column alone put the
+escalation-completeness business rule in with notification_id's nulls, and
+four file checks in one rule). Nothing new is authored. The same rule commonly runs
 in up to four tools with different units and bounds, so its AMBER BAND is the
 intersection: the metric values at which no implementing check fails and at
 least one warns, honouring each tool's own unit and comparison operator. At
 exactly 35% a contract's `mustBeLessThan 35` fails where Soda's `> 35%` does
 not, and that difference is kept rather than smoothed over.
 
-SINGLE-TIER (criterion 3) is a check with no warn bound: a dbt test with no
-`warn_if` (dbt fails it on any violation), every contract rule of severity
-error, every SQL-bodied check unless it states a band of its own.
+SINGLE-TIER (criterion 3) is a check that cannot warn without failing: a dbt
+test whose warn and error conditions coincide (dbt defaults both to `!= 0`, so
+one with only `error_if: ">5"` warns from 1 to 5), every contract rule of
+severity error, every SQL-bodied check unless it states a band of its own.
+
+EACH TOOL'S OWN ARITHMETIC: Soda rounds a percentage to two places before
+comparing it (derived_metric.py), and a dbt `unique` test whose fail_calc
+sums n_records counts the ROWS in duplicated groups where Soda and the
+contract count the duplicated KEYS - a different quantity, so never one rule.
 
 FAIL LOUDLY, NEVER DEFAULT (criterion 4): a threshold this cannot parse
 raises, naming the check and its file. plans/qa-pipeline.md item 74 is the
@@ -52,6 +61,10 @@ FILE_CHECKS = "contract/file-checks.yaml"
 #: DROP are the cross-supply measures Evidently computes.
 ROWS, PERCENT, TABLE_ROWS, RATIO, DROP, FILE = (
     "rows", "percent", "table rows", "ratio", "drop", "file")
+#: dbt's `unique` with fail_calc sum(n_records): every row of a duplicated
+#: group, so two per duplicated pair - not the key count Soda and the
+#: contract use.
+DUP_ROWS = "rows in duplicated groups"
 
 
 class CatalogueError(ValueError):
@@ -88,6 +101,7 @@ class Check:
     warn: tuple[Bound, ...] = ()
     fail: tuple[Bound, ...] = ()
     reads_columns: tuple[str, ...] = ()
+    name: str | None = None
 
     @property
     def single_tier(self) -> bool:
@@ -106,7 +120,9 @@ class Check:
 
     def _value(self, bound: Bound, bad: float, rows: int) -> float:
         if bound.unit == PERCENT:
-            return 100.0 * bad / rows if rows else 0.0
+            pct = 100.0 * bad / rows if rows else 0.0
+            # Soda compares the percentage rounded to two places.
+            return round(pct, 2) if self.tool == "soda" else pct
         return bad
 
     def fails(self, bad: float, rows: int) -> bool:
@@ -126,6 +142,8 @@ class Rule:
     #: last supply share a category and no unit.
     measure: str = ROWS
     checks: list[Check] = field(default_factory=list)
+    #: The authored name the checks share, for a rule grouped by it.
+    name: str | None = None
 
     def _continuous(self) -> bool:
         return all(c.unit in (RATIO, DROP) for c in self.checks)
@@ -145,8 +163,9 @@ class Rule:
             fails = [b.value for c in self.checks for b in c.fail]
             lo, hi = (max(warns) if warns else None), (min(fails) if fails else math.inf)
             return [(lo, hi)] if lo is not None and lo < hi else []
-        out: list[tuple[int, int]] = []
-        for x in self._domain(rows):
+        out: list[tuple] = []
+        domain = self._domain(rows)
+        for x in domain:
             size = x if all(c.unit == TABLE_ROWS for c in self.checks) else rows
             ok = not any(c.fails(x, size) for c in self.checks) and \
                 any(c.warns(x, size) for c in self.checks)
@@ -154,6 +173,11 @@ class Rule:
                 out[-1] = (out[-1][0], x)
             elif ok:
                 out.append((x, x))
+        # A SIZE BAND NOTHING FAILS ABOVE IS OPEN-ENDED: the search stops
+        # somewhere, the band does not (post-build-review #153).
+        if out and out[-1][1] == domain[-1] and not any(
+                b.op in (">", ">=", "!=") for c in self.checks for b in c.fail):
+            out[-1] = (out[-1][0], math.inf)
         return out
 
     def closed_by(self, rows: int) -> list[str]:
@@ -178,17 +202,38 @@ class Catalogue:
     def rules(self) -> list[Rule]:
         by: dict[tuple, Rule] = {}
         for c in self.checks:
-            key = (c.dataset_id, c.column, c.category, c.measure)
-            by.setdefault(key, Rule(*key)).checks.append(c)
+            if c.name:
+                key = ("name", c.dataset_id, c.name, c.measure)
+                rule = by.setdefault(key, Rule(c.dataset_id, c.column, c.category,
+                                               c.measure, name=c.name))
+            else:
+                key = (c.dataset_id, c.column, c.category, c.measure)
+                rule = by.setdefault(key, Rule(*key))
+            rule.checks.append(c)
+        for rule in by.values():
+            if rule.name:
+                # A named rule can hang on several columns - dbt states a
+                # date ordering at table level - so it takes the commonest.
+                cols = [c.column for c in rule.checks if c.column]
+                rule.column = max(set(cols), key=cols.count) if cols else None
         return list(by.values())
 
     def rule(self, dataset_id: str, column: str | None, category: str,
              measure: str = ROWS) -> Rule:
-        found = [r for r in self.rules()
+        """The unnamed rule on a column; failing that, the one named rule
+        there is on it."""
+        match = [r for r in self.rules()
                  if (r.dataset_id, r.column, r.category, r.measure)
                  == (dataset_id, column, category, measure)]
+        found = [r for r in match if not r.name] or (match if len(match) == 1 else [])
         if not found:
             raise KeyError(f"no rule for {dataset_id} {column} {category}")
+        return found[0]
+
+    def named(self, dataset_id: str, name: str) -> Rule:
+        found = [r for r in self.rules() if (r.dataset_id, r.name) == (dataset_id, name)]
+        if not found:
+            raise KeyError(f"no rule named {name!r} on {dataset_id}")
         return found[0]
 
     def single_tier_readers(self, dataset_id: str) -> dict[str, list[str]]:
@@ -260,11 +305,11 @@ def soda_bounds(path: Path) -> dict[str, tuple]:
     return out
 
 
-def _dbt_cond(text, where: str) -> tuple[Bound, ...]:
+def _dbt_cond(text, where: str, unit: str = ROWS) -> tuple[Bound, ...]:
     m = _DBT_COND.match(str(text))
     if not m:
         raise CatalogueError(f"{where}: cannot read the dbt condition {text!r}")
-    return (Bound(m.group(1), float(m.group(2)), ROWS),)
+    return (Bound(m.group(1), float(m.group(2)), unit),)
 
 
 def _dbt_one(metric: str, cfg: dict, meta: dict, path) -> tuple[str, tuple]:
@@ -273,10 +318,21 @@ def _dbt_one(metric: str, cfg: dict, meta: dict, path) -> tuple[str, tuple]:
     check_id = meta.get("check_id")
     where = f"{check_id} ({path})"
     severity = str(conf.get("severity") or "error").lower()
-    warn = _dbt_cond(conf["warn_if"], where) if conf.get("warn_if") else ()
-    fail = _dbt_cond(conf.get("error_if") or ">0", where)
+    unit = DUP_ROWS if metric == "unique" and "n_records" in str(conf.get("fail_calc")) \
+        else ROWS
+    # dbt defaults BOTH warn_if and error_if to "!= 0" (dbt-core's
+    # TestConfig). With neither stated they coincide, so the test fails on
+    # any violation; with only error_if stated, the default warn_if warns
+    # below it.
+    if conf.get("warn_if"):
+        warn = _dbt_cond(conf["warn_if"], where, unit)
+    elif conf.get("error_if"):
+        warn = (Bound("!=", 0, unit),)
+    else:
+        warn = ()
+    fail = _dbt_cond(conf.get("error_if") or ">0", where, unit)
     if severity == "warn":
-        warn, fail = warn or (Bound(">", 0, ROWS),), ()
+        warn, fail = warn or (Bound(">", 0, unit),), ()
     return check_id, (metric, warn, fail)
 
 
@@ -330,37 +386,48 @@ def contract_bounds(path: Path) -> dict[str, tuple]:
                     raise CatalogueError(f"{where}: cannot read {key}")
             if not bounds:
                 raise CatalogueError(f"{where}: the rule states no threshold")
-            if str(rule.get("severity") or "error").lower() == "warning":
+            severity = str(rule.get("severity") or "error").lower()
+            if severity == "warning":
                 out[check_id] = (metric, tuple(bounds), ())
-            else:
+            elif severity == "error":
                 out[check_id] = (metric, (), tuple(bounds))
+            else:
+                raise CatalogueError(f"{where}: severity {severity!r} is neither error "
+                                     f"nor warning")
     return out
 
 
-def evidently_bounds() -> dict[str, tuple]:
+def evidently_bounds(check_ids=None) -> dict[str, tuple]:
     """Evidently's bands are constants in their own module (Keith, 2026-10-11:
     read where they live), the PSI ones on a column and the row-drop ones per
-    table, each tripping on a strict `>`."""
+    table, each tripping on a strict `>`. A check of any other kind is
+    refused rather than given the row-drop bands."""
     from qa_tools.bdm import evidently_check_lifecycle as bdm_ev
     from qa_tools.common import evidently_common as ec
     from qa_tools.cp import evidently_check_lifecycle as cp_ev
 
+    if check_ids is None:
+        check_ids = [c for m in (bdm_ev, cp_ev) for c in m.CHECK_LIFECYCLE]
     out = {}
-    for module in (bdm_ev, cp_ev):
-        for check_id in module.CHECK_LIFECYCLE:
-            if "drift_psi" in check_id:
-                out[check_id] = ("psi", (Bound(">", ec.WARN_THRESHOLD, RATIO),),
-                                 (Bound(">", ec.FAIL_THRESHOLD, RATIO),))
-            else:
-                out[check_id] = ("row_drop", (Bound(">", ec.WARN_ROW_DROP, DROP),),
-                                 (Bound(">", ec.FAIL_ROW_DROP, DROP),))
+    for check_id in check_ids:
+        if "drift_psi" in check_id:
+            out[check_id] = ("psi", (Bound(">", ec.WARN_THRESHOLD, RATIO),),
+                             (Bound(">", ec.FAIL_THRESHOLD, RATIO),))
+        elif "row_count_growth" in check_id:
+            out[check_id] = ("row_drop", (Bound(">", ec.WARN_ROW_DROP, DROP),),
+                             (Bound(">", ec.FAIL_ROW_DROP, DROP),))
+        else:
+            raise CatalogueError(f"{check_id}: an Evidently check neither drift_psi nor "
+                                 f"row_count_growth - no band is known for it")
     return out
 
 
-def file_bounds(metadata) -> dict[str, tuple]:
+def file_bounds(metadata, doc=None) -> dict[str, tuple]:
     """A file check fails (severity failure) or only warns (warning) on any
-    problem with the file - it has no band of its own."""
-    doc = config_yaml.parse((ROOT / FILE_CHECKS).read_text()) or {}
+    problem with the file - it has no band of its own. One file-checks.yaml
+    does not name, or names with another severity, is refused."""
+    if doc is None:
+        doc = config_yaml.parse((ROOT / FILE_CHECKS).read_text()) or {}
     severity = {str(c.get("check")): str(c.get("severity")) for c in doc.get("checks") or []}
     out = {}
     for m in metadata:
@@ -368,8 +435,37 @@ def file_bounds(metadata) -> dict[str, tuple]:
             continue
         name = m.check_id.rsplit(".", 1)[-1].removesuffix("_file")
         trip = (Bound(">", 0, FILE),)
-        out[m.check_id] = ("file",) + ((trip, ()) if severity.get(name) == "warning"
-                                       else ((), trip))
+        if severity.get(name) == "warning":
+            out[m.check_id] = ("file", trip, ())
+        elif severity.get(name) == "failure":
+            out[m.check_id] = ("file", (), trip)
+        else:
+            raise CatalogueError(f"{m.check_id} ({FILE_CHECKS}): {name} has severity "
+                                 f"{severity.get(name)!r}, neither failure nor warning")
+    return out
+
+
+_SODA_REFERENCE = re.compile(
+    r"^values in \((\w+)\) must exist in (\w+) \((\w+)\)")
+
+
+def soda_reference_reads(path: Path) -> dict[str, tuple[str, str]]:
+    """{check_id: (child table.column, parent table.column)} for each Soda
+    reference check - its columns are structured fields of the check
+    itself, so it declares no reads_columns, and without this the parent's
+    column would not list it among its single-tier readers."""
+    doc = config_yaml.parse(Path(path).read_text()) or {}
+    out = {}
+    for key, checks in doc.items():
+        if not str(key).startswith("checks for"):
+            continue
+        table = str(key).removeprefix("checks for").strip()
+        for check in checks or []:
+            (expr, cfg), = check.items()
+            m = _SODA_REFERENCE.match(str(expr))
+            if m:
+                check_id = ((cfg or {}).get("attributes") or {}).get("check_id")
+                out[check_id] = (f"{table}.{m.group(1)}", f"{m.group(2)}.{m.group(3)}")
     return out
 
 
@@ -381,8 +477,10 @@ def catalogue() -> Catalogue:
 
     metadata = [m for m in vcl.collect_checks(None) if not m.retired_as_of]
     bounds: dict[str, tuple] = {}
+    references: dict[str, tuple[str, str]] = {}
     for rel in SODA:
         bounds.update(soda_bounds(ROOT / rel))
+        references.update(soda_reference_reads(ROOT / rel))
     bounds.update(dbt_bounds(ROOT / DBT))
     for rel in CONTRACTS:
         bounds.update(contract_bounds(ROOT / rel))
@@ -398,17 +496,20 @@ def catalogue() -> Catalogue:
             check_id=m.check_id, tool=m.tool, dataset_id=parts[3],
             column=parts[4] if len(parts) == 6 else None, category=m.category, metric=metric,
             source=m.source_file, warn=tuple(warn), fail=tuple(fail),
-            reads_columns=tuple(m.reads_columns)))
+            reads_columns=tuple(m.reads_columns) + references.get(m.check_id, ()),
+            name=m.name))
     return Catalogue(checks)
 
 
 def default_rows(dataset_id: str, cat: Catalogue) -> int:
     """The row count a listing is computed at when none is given: the lower
     edge of the contract's own row-count band for the dataset - the smallest
-    supply it calls ordinary - or 1,000 where it states none."""
+    supply it calls ordinary. Where it states none, refused: a guessed size
+    gives a guessed band."""
     for c in cat.checks:
         if c.dataset_id == dataset_id and c.metric == "rowCount":
             lows = [b.value for b in c.warn + c.fail if b.op == "<"]
             if lows:
                 return int(max(lows))
-    return 1000
+    raise CatalogueError(f"{dataset_id}: its contract states no ordinary size to work "
+                         f"the bands out at - pass --rows")

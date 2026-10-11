@@ -7614,3 +7614,55 @@ twice. It deliberately did not re-find the `TypeError`.
     - **On REQ-PIPE-161:** criteria 20 and 21 met, verified end to end by the
       critic. Its decision's "excusing one by name is still open" read as
       "not yet possible"; it is possible, and now says so, with a test.
+
+153. **[done, 2026-10-11]** **[QA checks & contract]** **[Data generation]** **The
+     delivery critic on the band catalogue and declared columns (3115cdd,
+     1e6e329, REQ-GEN-183) and the postcode tolerance (defc2ec, REQ-QAC-187).**
+     Run after the push; every claim was checked against the code before
+     acting, and each fix had a test that failed first. REQ-QAC-187 was met
+     in full. Its criteria 6 and 7 are only partly asserted: dbt's warning
+     and the other tools at 5% agree on a read but are not each tested.
+    - **1 (medium-high, Keith's call):** grouping by column merged rules
+      that only shared a column - escalation completeness with
+      notification_id's nulls, carer reference with approval compliance,
+      four file checks in one - and split one rule dbt states at table
+      level. Keith chose "same name, else column": checks sharing an
+      authored name are one rule. A name only one check holds is still its
+      own rule, which is what separates the file checks; recorded as a
+      decision. Soda's escalation check gained the name its siblings carry.
+    - **2 (medium):** the listing said "fails on any" for every single-tier
+      check, hiding the contract's 3% postcode tolerance among others. It
+      now prints each tool's bound, and "on any" only where that is true.
+    - **3 (medium, not yet triggered):** dbt's `unique` summing n_records
+      counts rows in duplicated groups; Soda and the contract count keys.
+      It is now a measure of its own.
+    - **4 (medium-low):** Soda compares a percentage rounded to two places;
+      the catalogue now does too. Simulated with Soda's formula, not a run.
+    - **5 (medium-low, not yet triggered):** dbt defaults warn_if to `!= 0`,
+      so a test with only error_if warns below it. Modelled; criterion 3
+      reworded to match (Keith approved the wording, 2026-10-11).
+    - **6 (low):** a size band nothing fails above had an invented upper
+      edge; it now reads "N and up".
+    - **7 (low):** two contract SQL checks declared a key their
+      `SELECT COUNT(*)` never reads; removed.
+    - **8 (low):** Soda reference checks were missing from the parent
+      column's single-tier readers; derived from the expression now.
+    - **9 (low):** the listing ran past 80 columns, wrapped to column 0,
+      cut ids to their last segment and printed four bare "file" rows. It
+      wraps itself, indents continuations, names another table's checks
+      with the table, and heads a named rule with its name.
+    - **10 (low):** the decision said a JSON-string reads_columns was read
+      like changelog's; the parser refused it. The parser now matches the
+      decision rather than the decision being rewritten.
+    - **11 (low):** four silent defaults now refuse, naming what. One was
+      live: the Evidently row-count checks are named row_count_growth and
+      reached their bands only through the default.
+    - **12 (low, not fixed):** the page prints "fail > 3.00%" for a rule
+      that fails at exactly 3%. Existing convention, older than this work,
+      and noted on REQ-QAC-187.
+    - **13 (low):** the old provisional grouping decision is marked
+      superseded; criterion 3 reworded (5 above).
+    - **14 (low):** the gate is `mothman dashboard validate-reads-columns`,
+      and `mothman check` calls that.
+    - **Checked, not a finding:** no band the generator aims at moved -
+      compared against HEAD's code - so the generated history is unchanged.

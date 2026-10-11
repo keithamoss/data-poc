@@ -4990,3 +4990,12 @@ Belongs with batch 5's check work.
     "Unable to do partial parsing" line is absent) than through wall-clock
     time on a shared four-core sandbox. Not fixed here: noticed during
     REQ-GEN-183's gate, outside its scope.
+
+81. **[todo, 2026-10-11]** **[Testing & dev tooling]** **`mothman check
+    --no-pytest` passes with a stale `plans/INDEX.md`.** Seen writing
+    post-build-review #153: the index check lives only in
+    tests/test_plans_index.py, so the cheap gate CLAUDE.md's commit rule B
+    prescribes after a plans edit cannot catch the one thing a plans edit
+    most often breaks - the 2026-09-23 incident's own failure. Caught here
+    only because the plans test was run by hand. Probably a `plans-index
+    --check` gate in `mothman check`'s list.

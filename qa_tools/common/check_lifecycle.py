@@ -520,6 +520,10 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     changelog = meta.get("changelog")
     if isinstance(changelog, str):
         changelog = json.loads(changelog)  # ODCS customProperties values are scalar - a list gets stored as a JSON string
+    # The same for reads_columns (REQ-GEN-183's decision): a YAML list is
+    # read as is, a JSON string decoded rather than refused as one entry.
+    if isinstance(meta.get("reads_columns"), str) and meta["reads_columns"].lstrip().startswith("["):
+        meta["reads_columns"] = json.loads(meta["reads_columns"])
     # Spread `_lifecycle_fields()` and override the two keys this tool
     # genuinely handles differently, rather than listing every field by
     # hand. That listing was a real bug (REQ-QAC-024, 2026-09-20): it

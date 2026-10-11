@@ -115,8 +115,9 @@ def bands_command(dataset_id: str | None, rows: int | None) -> None:
       mothman scenarios bands --dataset birth-registrations --rows 2000
       mothman scenarios bands
 
-    A rule is the checks that implement it across tools - one dataset, column
-    and category - and its amber band is where no implementing check fails and
+    A rule is the checks that implement it across tools - those sharing an
+    authored name, or else one dataset, column, category and measure - and
+    its amber band is where no implementing check fails and
     at least one warns, honouring each tool's own unit and operator. Read from
     the committed definitions the tools run; opens no database. What the
     synthetic generator reads to build a supply to a verdict.
@@ -132,31 +133,74 @@ def bands_command(dataset_id: str | None, rows: int | None) -> None:
     for ds in datasets:
         if ds not in known:
             raise click.ClickException(f"{ds} has no checks - is it a dataset id?")
-        n = rows or cb.default_rows(ds, cat)
+        try:
+            n = rows or cb.default_rows(ds, cat)
+        except cb.CatalogueError as exc:
+            raise click.ClickException(str(exc)) from exc
         console.print(f"\n[bold]{hierarchy.dataset(ds).dataset_name}[/bold] ({ds}) - bands at {n} rows",
                       highlight=False)
         for r in sorted((r for r in cat.rules() if r.dataset_id == ds),
-                        key=lambda r: (r.column or "", r.category, r.measure)):
-            where = f"{r.column or '(the table)'} - {r.category}, {r.measure}"
+                        key=lambda r: (r.column or "", r.name or "", r.category, r.measure)):
+            what = f"{r.name} ({r.column})" if r.name and r.column else (
+                r.name or r.column or "(the table)")
             amber = r.amber(n)
             if amber:
-                said = ", ".join(f"{lo}-{hi}" if lo != hi else f"{lo}" for lo, hi in amber)
-                head = f"amber at {said}"
+                head = "amber at " + ", ".join(_band_text(lo, hi) for lo, hi in amber)
             else:
                 head = "no amber band - closed by " + ", ".join(
-                    c.rsplit(".", 1)[-1] for c in r.closed_by(n))
-            console.print(f"  {where}: {head}", markup=False, highlight=False)
+                    _short(c, ds) for c in r.closed_by(n))
+            _say(f"{what} - {r.category}, {r.measure}: {head}", indent=2)
             for c in r.checks:
-                bands = ("fails on any" if c.single_tier else
-                         "; ".join(filter(None, [
-                             "warns " + " or ".join(b.text() for b in c.warn) if c.warn else "",
-                             "fails " + " or ".join(b.text() for b in c.fail) if c.fail
-                             else "never fails"])))
-                console.print(f"      {c.tool:<12} {bands}", markup=False, highlight=False,
-                              style="dim")
+                _say(f"{c.tool:<12} {_bounds_text(c)}", indent=6, style="dim")
         readers = cat.single_tier_readers(ds)
         if readers:
             console.print("  Single-tier checks reading each column:", style="bold")
             for col, ids in readers.items():
-                console.print(f"    {col}: " + ", ".join(i.rsplit(".", 1)[-1] for i in ids),
-                              markup=False, highlight=False, soft_wrap=True)
+                _say(f"{col}: " + ", ".join(_short(i, ds) for i in ids), indent=4)
+
+
+#: The listing wraps itself, so it reads the same in any terminal and a
+#: wrapped line continues indented rather than at column 0.
+_WIDTH = 80
+
+
+def _say(text: str, indent: int, style: str | None = None) -> None:
+    import textwrap
+
+    lines = textwrap.wrap(text, width=_WIDTH, initial_indent=" " * indent,
+                          subsequent_indent=" " * (indent + 4), break_on_hyphens=False)
+    for line in lines:
+        console.print(line, markup=False, highlight=False, soft_wrap=True, style=style)
+
+
+def _short(check_id: str, dataset_id: str) -> str:
+    """A check id without its asset, agency and collection - and without its
+    dataset too when it is the one listed, so another table's check reads
+    as that table's."""
+    parts = check_id.split(".")
+    return ".".join(parts[4:] if parts[3] == dataset_id else parts[3:])
+
+
+def _band_text(lo, hi) -> str:
+    import math
+
+    if hi == math.inf:
+        return f"{lo} and up"
+    return f"{lo}-{hi}" if lo != hi else f"{lo}"
+
+
+def _bounds_text(c) -> str:
+    """Each tool's own bound, as stated. "fails on any" only for a check
+    that truly does - one tripping on more than nothing."""
+    def on_any(bounds):
+        return len(bounds) == 1 and bounds[0].value == 0 and bounds[0].op in (">", "!=")
+    parts = []
+    if c.warn:
+        parts.append("warns on any" if on_any(c.warn) else
+                     "warns " + " or ".join(b.text() for b in c.warn))
+    if c.fail:
+        parts.append("fails on any" if on_any(c.fail) else
+                     "fails " + " or ".join(b.text() for b in c.fail))
+    else:
+        parts.append("never fails")
+    return "; ".join(parts)

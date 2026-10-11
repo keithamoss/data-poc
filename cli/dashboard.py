@@ -91,6 +91,15 @@ def _validate_hierarchy() -> None:
         raise click.ClickException("hierarchy validation failed - see output above.")
 
 
+@dashboard_group.command("validate-reads-columns")
+def validate_reads_columns_command() -> None:
+    """Gate: every SQL-bodied check names the columns its SQL reads, in the
+    contract's own table names (REQ-GEN-183 criterion 9)."""
+    from qa_tools.common.validate_reads_columns import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("reads_columns validation failed - see output above.")
+
+
 @dashboard_group.command("validate-soda")
 def validate_soda_command() -> None:
     """Gate: every active SodaCL check parses and can be evaluated without
