@@ -904,6 +904,30 @@ Rough layout:
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
+- **Commit cadence (Keith, 2026-10-11).** The rule that matters is about
+  claims, not timing: a commit message states only results from a run of
+  exactly that tree, and says which run it was (the full gate, named test
+  modules, or none). Within that:
+  - **A.** Commit and push once a build's own gate is green. The post-build
+    critic runs after the push, and its fixes are their own commit, fixed
+    test-first as before.
+  - **B.** Gate in proportion to the edit. An edit to `plans/*.md`,
+    `CHANGELOG.yaml` or `requirements.yaml` after the last full gate
+    re-runs only `mothman check --no-pytest` (about 45 seconds). A code or
+    test edit re-runs the suite.
+  - **C.** A small fix touching one or two modules runs its own test files
+    plus `--no-pytest`, then pushes, and CI runs the full suite. The full
+    local gate is for large or cross-cutting changes.
+  - **D.** Long work may be committed locally as checkpoints, with no test
+    claims in those messages. A gate runs before anything is pushed.
+
+  Why it changed: holding every commit until the critic's fixes and a
+  final full gate kept the tree dirty for an hour at a time, and any
+  late plans or changelog edit restarted a six-minute run. Keith's own
+  overnight terms only ever said critic fixes go in "before the next
+  item", never before the first commit. The rules below about never
+  reusing an old result still stand in full.
+
 - **Never report a test result you did not just run.** Real incident,
   2026-09-20: a commit message claimed "npm test 140 passed" when that
   run had actually been 2 failed | 138 passed. Nothing was fabricated

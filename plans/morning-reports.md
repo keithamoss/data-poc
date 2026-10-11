@@ -1229,3 +1229,33 @@ one or more component tags, and a date.
         months is not restated and is refused if written; the once-only
         report only where the collection has defaults. All in
         post-build-review #150 and on the requirement.
+      - KEITH'S ANSWERS, 2026-10-11 morning, to (a)-(m):
+        (a) a range excuse covers current AND rejected supplies, not
+            superseded ones - to build;
+        (b) a lapsed excuse stays lapsed - confirmed;
+        (c) the range form goes in the terminal menu - to build;
+        (e) the three-part accounting rule - confirmed;
+        (f) a refused dataset freezes owed re-checks and promotion too -
+            to build;
+        (g) the refusal shows only on dates on/after the affected period,
+            beside another blocker - to build;
+        (h) a refusal exits with its own status - to build;
+        (i) the fingerprint includes not_expected - to build;
+        (j) the preview lists past slots in full and future ones as a
+            summary line - to build;
+        (k) each instant in its own zone - to build;
+        (l) one correction entry per owner, the gate's refusal to match -
+            to build;
+        (m) every correction is confirmed, no-ops included - confirmed.
+        Also approved: the commit-cadence rule, now in CLAUDE.md.
+        (n) replay stages a correction by reverting it until its merge date,
+            then confirming it as the manager would - to build;
+        (o) a confirmed correction's moves are recorded as the rule's, so a
+            later correction may move them again - to build;
+        (p) confirm what can move and park a blocked move on the
+            outstanding list until its blocker clears, then move it - to
+            build;
+        (q) what is confirmed is the preview's report - confirmed.
+        (r) a supply a correction MOVED carries the same "at the time" note
+            and counts in the past-date note - to build.
+        ORDER (Keith): the backstop answers (f)-(i) first, then the rest.
