@@ -511,7 +511,7 @@ def delivery_months(dataset_id: str, on: date | None = None,
     if entry is None or not entry.participation:
         return None
     if on is None:
-        return entry.participation[-1].participates
+        return _agreement(agreement).resolved_versions(dataset_id)[-1].participates
     version = _agreement(agreement).participation_on(dataset_id, on)
     return version.participates if version else None
 
@@ -543,7 +543,8 @@ def dataset_dates_override(dataset_id: str, agreement=None) -> tuple[Period, ...
     own = entry.own_dates if entry else None
     if own is None:
         return None
-    if any(v.participates is not None for v in entry.participation):
+    if any(v.participates is not None
+           for v in _agreement(agreement).resolved_versions(dataset_id)):
         raise ScheduleConfigError(
             f"dataset {dataset_id!r} dates: a dataset states EITHER its own `dates:` "
             f"(overriding its calendar) OR a `participates:` list of months (subsetting it), "
@@ -786,9 +787,12 @@ def claim_window(dataset_id: str, contract_value: str | None = None,
         # inputs - all of them, this override included (REQ-PIPE-113's
         # PROVISIONAL rule, as slots._participation_for applies it).
         version = (_agreement(agreement).participation_on(dataset_id, on)
-                   or (entry.participation[0] if entry and entry.participation else None))
+                   or (_agreement(agreement).participation_on(
+                       dataset_id, entry.participation[0].effective_from)
+                       if entry and entry.participation else None))
     else:
-        version = entry.participation[-1] if entry and entry.participation else None
+        resolved = _agreement(agreement).resolved_versions(dataset_id)
+        version = resolved[-1] if resolved else None
     if version is not None and version.claim_window is not None:
         return version.claim_window
     cal = calendar_for_dataset(dataset_id, agreement)

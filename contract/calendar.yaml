@@ -155,6 +155,19 @@ collections:
     calendar: daily
   - id: child-protection
     calendar: quarterly
+    # STATED ONCE FOR THE COLLECTION (REQ-PIPE-181): every Child Protection
+    # dataset takes its due time and grace from here unless it states its own.
+    participation_defaults:
+      versions:
+        - effective_from: "2023-01-01"
+          expected_time: "09:00"
+          grace: 8h
+          changelog:
+            - date: "2026-10-11"
+              author: REQ-PIPE-181
+              change: >-
+                Moved up from each Child Protection dataset's own participation,
+                unchanged - 09:00 with 8 hours' grace, as every one of them stated.
 
 # ---------------------------------------------------------------------
 # EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
@@ -188,28 +201,94 @@ datasets:
       versions:
         - &cp_participation
           effective_from: "2023-01-01"
-          expected_time: "09:00"
-          grace: 8h
           changelog:
             - date: "2026-10-11"
               author: REQ-PIPE-110
               change: Moved from the contract's slaProperties (expectedTime 09:00, latency 480 minutes), unchanged.
+            - date: "2026-10-11"
+              author: REQ-PIPE-181
+              change: Due time and grace now come from Child Protection's participation_defaults, unchanged.
+    corrections:
+      - change_reference: REQ-PIPE-181
+        date: "2026-10-11"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          Child Protection's due time and grace are stated once for the collection
+          rather than on each dataset (REQ-PIPE-181); the values are unchanged, so no
+          slot moves and no verdict changes.
+        changes:
+          - item: dataset cp-clients participation 2023-01-01
+            old: {expected_time: '09:00', grace: 8h}
+            new: {}
   - id: cp-notifications
     participation:
       versions:
         - *cp_participation
+    corrections:
+      - change_reference: REQ-PIPE-181
+        date: "2026-10-11"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          Child Protection's due time and grace are stated once for the collection
+          rather than on each dataset (REQ-PIPE-181); the values are unchanged, so no
+          slot moves and no verdict changes.
+        changes:
+          - item: dataset cp-notifications participation 2023-01-01
+            old: {expected_time: '09:00', grace: 8h}
+            new: {}
   - id: cp-investigations
     participation:
       versions:
         - *cp_participation
+    corrections:
+      - change_reference: REQ-PIPE-181
+        date: "2026-10-11"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          Child Protection's due time and grace are stated once for the collection
+          rather than on each dataset (REQ-PIPE-181); the values are unchanged, so no
+          slot moves and no verdict changes.
+        changes:
+          - item: dataset cp-investigations participation 2023-01-01
+            old: {expected_time: '09:00', grace: 8h}
+            new: {}
   - id: cp-placements
     participation:
       versions:
         - *cp_participation
+    corrections:
+      - change_reference: REQ-PIPE-181
+        date: "2026-10-11"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          Child Protection's due time and grace are stated once for the collection
+          rather than on each dataset (REQ-PIPE-181); the values are unchanged, so no
+          slot moves and no verdict changes.
+        changes:
+          - item: dataset cp-placements participation 2023-01-01
+            old: {expected_time: '09:00', grace: 8h}
+            new: {}
   - id: cp-carers
     participation:
       versions:
         - *cp_participation
+    corrections:
+      - change_reference: REQ-PIPE-181
+        date: "2026-10-11"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          Child Protection's due time and grace are stated once for the collection
+          rather than on each dataset (REQ-PIPE-181); the values are unchanged, so no
+          slot moves and no verdict changes.
+        changes:
+          - item: dataset cp-carers participation 2023-01-01
+            old: {expected_time: '09:00', grace: 8h}
+            new: {}
   - id: cp-case-workers
     participation:
       versions:
@@ -223,9 +302,23 @@ datasets:
           reason: >-
             A staffing register rather than casework, so it is resupplied twice a
             year rather than quarterly.
-          expected_time: "09:00"
-          grace: 8h
           changelog:
             - date: "2026-10-11"
               author: REQ-PIPE-110
               change: Moved from data-asset.yaml's delivery_months and the contract's slaProperties, unchanged.
+            - date: "2026-10-11"
+              author: REQ-PIPE-181
+              change: Due time and grace now come from Child Protection's participation_defaults, unchanged.
+    corrections:
+      - change_reference: REQ-PIPE-181
+        date: "2026-10-11"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          Child Protection's due time and grace are stated once for the collection
+          rather than on each dataset (REQ-PIPE-181); the values are unchanged, so no
+          slot moves and no verdict changes.
+        changes:
+          - item: dataset cp-case-workers participation 2023-01-01
+            old: {participates: [February, August], reason: 'A staffing register rather than casework, so it is resupplied twice a year rather than quarterly.', expected_time: '09:00', grace: 8h}
+            new: {participates: [February, August], reason: 'A staffing register rather than casework, so it is resupplied twice a year rather than quarterly.'}

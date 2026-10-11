@@ -129,6 +129,15 @@ def _empty_database_records(clean_delivery_log, clean_load_log):
     return clean_delivery_log
 
 
+@pytest.fixture(autouse=True)
+def _no_pending_corrections(monkeypatch):
+    """The committed contract may itself declare a correction not yet
+    confirmed - REQ-PIPE-181's migration of Child Protection does - and the
+    queue lists it. These tests count the other producers, so that one is
+    left out; tests/test_correction_apply.py covers it in the queue."""
+    monkeypatch.setattr(outstanding, "_from_pending_corrections", lambda conn=None: [])
+
+
 def _survey(tmp_path, **kwargs):
     # NO `filings_dir` since REQ-PIPE-104 - filings are a table, and
     # isolation comes from this worker's own database rather than from a

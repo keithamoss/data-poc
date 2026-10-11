@@ -109,6 +109,12 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
     try:
         version = slots._participation_for(dataset_id, period_date, agreement)
         keys.add(f"dataset {dataset_id} participation {version.effective_from.isoformat()}")
+        # A VALUE TAKEN FROM THE COLLECTION (REQ-PIPE-181) comes from its
+        # defaults version, which a correction names under the collection.
+        collection = agreement.collection_of(dataset_id)
+        for level, since in version.sources.values():
+            if level == "collection" and since is not None:
+                keys.add(f"collection {collection} participation_defaults {since.isoformat()}")
     except Exception:  # noqa: BLE001
         pass
     entry = agreement.dataset(dataset_id)
@@ -137,6 +143,8 @@ def _kind(key: str) -> str | None:
         return "tz_version"
     if parts and parts[0] == "calendar" and len(parts) >= 3:
         return {"version": "cal_version", "period": "cal_date"}.get(parts[2])
+    if parts[:1] == ["collection"] and len(parts) >= 3 and parts[2] == "participation_defaults":
+        return "defaults"
     if parts and parts[0] == "dataset" and len(parts) >= 3:
         if parts[2] == "calendar":
             return "membership"
@@ -153,19 +161,21 @@ def _kind(key: str) -> str | None:
 #: differs (delivery-critic on 173, #1). A grace change is a participation
 #: change and nothing else; a timezone change is a timezone version's.
 _KINDS_FOR = {
-    "period_date": {"cal_date", "own_date", "membership", "participation", "cal_version"},
-    "due_date": {"cal_date", "own_date", "membership", "participation", "cal_version"},
-    "expected_time": {"participation"},
-    "days_before": {"participation"},
-    "grace_seconds": {"participation"},
-    "claim_window_seconds": {"participation", "cal_version"},
+    "period_date": {"cal_date", "own_date", "membership", "participation", "cal_version",
+                    "defaults"},
+    "due_date": {"cal_date", "own_date", "membership", "participation", "cal_version",
+                 "defaults"},
+    "expected_time": {"participation", "defaults"},
+    "days_before": {"participation", "defaults"},
+    "grace_seconds": {"participation", "defaults"},
+    "claim_window_seconds": {"participation", "cal_version", "defaults"},
     "timezone": {"tz_version"},
 }
 #: A version's own settings changed with no input moving.
-_FINGERPRINT_KINDS = {"participation", "cal_version", "tz_version", "membership"}
+_FINGERPRINT_KINDS = {"participation", "cal_version", "tz_version", "membership", "defaults"}
 #: The slot is no longer a period of the dataset's schedule.
 _MISSING_KINDS = {"cal_date", "own_date", "membership", "not_expected", "cal_version",
-                  "participation"}
+                  "participation", "defaults"}
 
 
 def _declared(cal_doc: dict, asset_doc: dict) -> dict[str, list[tuple[object, date | None]]]:

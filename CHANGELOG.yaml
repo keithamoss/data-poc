@@ -230,6 +230,13 @@ releases:
               says so and why, a dataset with a correction waiting to be
               confirmed says that too, and each confirmed correction appears
               once in Recent activity.
+          - headline: Say it once for the collection
+            components: ["Pipeline & publishing"]
+            description: >
+              A collection can now state a due time, grace or months owed once,
+              and its datasets take each value unless they say otherwise -
+              `inherit` goes back to it. `mothman schedule show --on` says where
+              each value came from.
   - date: "2026-10-07"
     summary: >
       A promoted supply's colour now matches the page, held supplies say how

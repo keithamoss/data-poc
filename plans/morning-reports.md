@@ -1194,3 +1194,38 @@ one or more component tags, and a date.
             at the time" note, and the past-date note does not count it. Do
             you want moved supplies to carry the same note as ones
             re-judged in place?
+      - SUNDAY MORNING, CARRIED ON (08:30-09:15 Perth): the full gate for
+        REQ-DASH-172 caught one more test leaning on shared worker state - a
+        CLI test asking for the newest twenty decisions on an eighty-column
+        console (post-build-review #149's last bullet). Fixed, gated green
+        (4343 pytest, 616 JS), pushed as 94f1ea6.
+      - REQ-PIPE-181 BUILT (collection participation_defaults and inherit).
+        A collection can state participates, due time, grace, days before
+        and claim window as dated versions; each dataset takes each value
+        from its own version where it states it, else from its collection on
+        that period's date, else the fallback. `inherit` goes back to the
+        collection. The gate enforces the restate rule at both levels,
+        inherit only after a value was stated, never a collection inherit of
+        a due time or grace, no widening by inherit (with the months to
+        paste), no collection values for a dataset on another calendar, and
+        reports a collection-wide gap once. `mothman schedule show --on` and
+        the Calendar entry say where each value came from and when a value
+        from above changes. Past collection defaults freeze and take
+        corrections on the collection. The four amendments you approved are
+        in the register's text. PROVISIONAL, all on the requirement:
+        (s) a dataset on another calendar takes nothing from its collection
+            at run time as well as being refused at the gate;
+        (t) the reason travels with whichever level gave the months;
+        (u) the once-only report is for due time and grace left unresolved
+            for two or more datasets of one collection;
+        (v) the real contract is NOT migrated - Child Protection still
+            states due time and grace per dataset through one anchor.
+            Moving them to the collection changes frozen items, so it needs
+            a correction you approve. Do you want that done?
+      - KEITH'S ANSWERS, 2026-10-11 morning: (v) migrate Child Protection,
+        with a correction - done, previewed at zero impact; it reads as
+        pending until you confirm it (`mothman supply confirm-correction
+        REQ-PIPE-181`). The critic's two forks: a reason beside inherited
+        months is not restated and is refused if written; the once-only
+        report only where the collection has defaults. All in
+        post-build-review #150 and on the requirement.

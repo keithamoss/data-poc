@@ -34,8 +34,14 @@ def conn(supply_dsn):
 
 
 def _docs():
+    """The committed files with no corrections declared - the ones the real
+    contract carries (REQ-PIPE-181's migration, for one) are not this
+    module's subject, and would read as pending beside its own."""
     cal = copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text()))
     asset = copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()))
+    for owner in (cal.get("calendars") or []) + (cal.get("datasets") or []) \
+            + (cal.get("collections") or []):
+        owner.pop("corrections", None)
     return cal, asset
 
 

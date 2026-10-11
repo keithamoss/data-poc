@@ -184,6 +184,23 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
                     continue
                 add(Item(f"dataset {ds} dates period {d.get('period')}", owner,
                          "own_date", _plain(d.get("date")), {"dataset": ds, "date": when}))
+    # A COLLECTION'S DEFAULTS FREEZE LIKE A DATASET'S OWN VERSIONS
+    # (REQ-PIPE-181, amending REQ-PIPE-111 criterion 4): a value its datasets
+    # take governs their filings as much as one they state, and the
+    # collection carries its own corrections list.
+    for coll in (cal_doc or {}).get("collections") or []:
+        coll = coll or {}
+        cid = str(coll.get("id"))
+        versions = [(v or {}) for v in
+                    (((coll.get("participation_defaults") or {}).get("versions")) or [])]
+        windows = dict(_windows(versions))
+        for v in versions:
+            eff = str(v.get("effective_from"))
+            add(Item(f"collection {cid} participation_defaults {eff}", ("collection", cid),
+                     "defaults",
+                     _plain({k: val for k, val in v.items()
+                             if k not in _SKIPPED + ("effective_from",)}),
+                     {"collection": cid, "eff": eff, "end": windows.get(eff)}))
     # WHICH CALENDAR EACH DATASET IS ON, as resolved (delivery-critic on
     # 111, H2; PROVISIONAL, Keith's fork from REQ-PIPE-110 and
     # plans/running-thoughts.md #79): moving a dataset - or its whole
@@ -281,6 +298,18 @@ def freeze_instant(item: Item, agr) -> datetime | None:
         first = _first_period_on_or_after(c["dataset"], eff, end, agr)
         return _min(asset_time.start_of_day(eff),
                     _claim_open(c["dataset"], first, agr) if first else None)
+    if item.kind == "defaults":
+        # The earliest instant any dataset taking it could be filed under it.
+        eff = date.fromisoformat(c["eff"])
+        end = date.fromisoformat(c["end"]) if c.get("end") else None
+        opens = []
+        for ds in agr.datasets:
+            if agr.collection_of(ds) != c["collection"] or not agr.defaults_for(ds):
+                continue
+            first = _first_period_on_or_after(ds, eff, end, agr)
+            if first:
+                opens.append(_claim_open(ds, first, agr))
+        return _min(asset_time.start_of_day(eff), *opens)
     if item.kind == "not_expected":
         from qa_tools.common import slots
 
@@ -363,6 +392,8 @@ def _corrections_by_owner(cal_doc: dict, asset_doc: dict) -> dict[tuple, list]:
         out[("calendar", str((cal or {}).get("name")))] = list((cal or {}).get("corrections") or [])
     for entry in (cal_doc or {}).get("datasets") or []:
         out[("dataset", str((entry or {}).get("id")))] = list((entry or {}).get("corrections") or [])
+    for coll in (cal_doc or {}).get("collections") or []:
+        out[("collection", str((coll or {}).get("id")))] = list((coll or {}).get("corrections") or [])
     tz = (asset_doc or {}).get("timezone") or {}
     if isinstance(tz, dict):
         out[("timezone",)] = list(tz.get("corrections") or [])
@@ -475,7 +506,11 @@ class Finding:
 def _value_text(value) -> str:
     if value is None:
         return "(nothing)"
-    return yaml.safe_dump(_plain(value), default_flow_style=True, sort_keys=False).strip()
+    # ONE LINE, however long: wrapped at YAML's default eighty columns, a
+    # long reason broke the pasted entry's indentation (REQ-PIPE-181's
+    # migration, 2026-10-11).
+    return yaml.safe_dump(_plain(value), default_flow_style=True, sort_keys=False,
+                          width=10**6).strip()
 
 
 def _quoted(value: str) -> str:
@@ -693,7 +728,8 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         if when < frozen_at:
             continue  # not frozen yet when introduced (criterion 10)
         added = old is None
-        if added and synthetic and item.kind in ("cal_version", "participation", "tz_version"):
+        if added and synthetic and item.kind in ("cal_version", "participation", "tz_version",
+                                                  "defaults"):
             continue  # criterion 9
         if added and synthetic and item.kind == "cal_date" and \
                 f"calendar {item.ctx['calendar']} version {item.ctx['version']}" not in old_items:
@@ -869,6 +905,13 @@ def revert(cal_doc: dict, asset_doc: dict,
                 _set_period(versions, p[3], old)
         elif len(p) == 4 and p[0] == "dataset" and p[2] == "participation":
             part = _own(entry(p[1]), "participation", {})
+            _set_settings(part.setdefault("versions", []), p[3], old, keep=_SKIPPED)
+        elif len(p) == 4 and p[0] == "collection" and p[2] == "participation_defaults":
+            coll = next((c for c in cal.get("collections") or [] if str((c or {}).get("id")) == p[1]),
+                        None)
+            if coll is None:
+                raise ValueError(f"{key!r} names a collection the file does not hold.")
+            part = _own(coll, "participation_defaults", {})
             _set_settings(part.setdefault("versions", []), p[3], old, keep=_SKIPPED)
         elif len(p) == 4 and p[0] == "dataset" and p[2] == "not_expected":
             listed = [n for n in _own(entry(p[1]), "not_expected", [])

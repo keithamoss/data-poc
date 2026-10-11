@@ -23,7 +23,7 @@ schema, nothing under data/.
 from __future__ import annotations
 
 import functools
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from pathlib import Path
 from types import MappingProxyType
@@ -36,6 +36,14 @@ CALENDAR_YAML = Path(__file__).resolve().parent.parent.parent / "contract" / "ca
 PARTICIPATES = "participates"
 #: `participates: all` - every period the calendar generates.
 ALL = "all"
+#: A value written as `inherit` - the value from the nearest level above on
+#: each period's date (REQ-PIPE-181 criterion 5).
+INHERIT = "inherit"
+#: The participation values that resolve one at a time (REQ-PIPE-181
+#: criterion 2). `reason` travels with `participates` rather than on its own.
+VALUES = (PARTICIPATES, "expected_time", "grace", "claim_window", "days_before")
+#: Where a resolved value came from.
+DATASET, COLLECTION, FALLBACK = "dataset", "collection", "fallback"
 
 
 @dataclass(frozen=True)
@@ -54,8 +62,20 @@ class ParticipationVersion:
     #: Whole days before the period's date the supply is due (REQ-PIPE-113
     #: criterion 1); zero unless stated.
     days_before: int = 0
-    #: The keys this version wrote, for the restate rule (criterion 33).
+    #: The keys this version wrote, for the restate rule (criterion 33) - a
+    #: key written as `inherit` counts as stated (REQ-PIPE-181 criterion 4).
     stated: frozenset[str] = frozenset()
+    #: The keys this version wrote as `inherit` (REQ-PIPE-181 criterion 5).
+    inherits: frozenset[str] = frozenset()
+    #: ON A RESOLVED VERSION ONLY: {value: (level, that level's version's
+    #: effective_from or None)} - where each value came from (REQ-PIPE-181
+    #: criterion 13). Empty on a version as written.
+    sources: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
+
+    def gives(self, key: str) -> bool:
+        """Whether this version, as written, supplies `key` itself - stated
+        and not `inherit`."""
+        return key in self.stated and key not in self.inherits
 
 
 @dataclass(frozen=True)
@@ -78,6 +98,9 @@ class Agreement:
     calendars: MappingProxyType          # name -> schedule.Calendar
     collections: MappingProxyType        # collection id -> calendar name
     datasets: MappingProxyType           # dataset id -> DatasetAgreement
+    #: collection id -> its participation_defaults versions, oldest first
+    #: (REQ-PIPE-181 criterion 1).
+    defaults: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
 
     def dataset(self, dataset_id: str) -> DatasetAgreement | None:
         return self.datasets.get(dataset_id)
@@ -92,13 +115,107 @@ class Agreement:
             return own.calendar
         return self.collections.get(hierarchy.dataset(dataset_id).collection_id)
 
-    def participation_on(self, dataset_id: str, on: date) -> ParticipationVersion | None:
-        """The participation version in force on a date, or None where the
-        dataset's first version has not begun - NOT YET OWING (criterion 30)."""
-        from qa_tools.common import in_force
+    def collection_of(self, dataset_id: str) -> str | None:
+        from qa_tools.common import hierarchy
 
+        try:
+            return hierarchy.dataset(dataset_id).collection_id
+        except hierarchy.UnknownDatasetError:
+            return None
+
+    def defaults_for(self, dataset_id: str) -> tuple[ParticipationVersion, ...]:
+        """The collection defaults a dataset may take values from - none
+        where it names a calendar other than its collection's, whose months
+        and windows were written for another calendar (REQ-PIPE-181
+        criterion 9; the gate refuses the configuration that would rely
+        on them)."""
+        collection = self.collection_of(dataset_id)
+        own = self.dataset(dataset_id)
+        if own is not None and own.calendar and own.calendar != self.collections.get(collection):
+            return ()
+        return self.defaults.get(collection, ())
+
+    def participation_on(self, dataset_id: str, on: date) -> ParticipationVersion | None:
+        """The participation in force on a date, each value RESOLVED from the
+        dataset or its collection (REQ-PIPE-181 criterion 2) - or None where
+        the dataset's first version has not begun: NOT YET OWING
+        (REQ-PIPE-110 criterion 30, REQ-PIPE-181 criterion 3)."""
         entry = self.dataset(dataset_id)
-        return in_force.version_on(entry.participation, on) if entry else None
+        if entry is None:
+            return None
+        return resolve(entry.participation, self.defaults_for(dataset_id), on)
+
+    def resolved_versions(self, dataset_id: str) -> tuple[ParticipationVersion, ...]:
+        """The resolved participation at every date any of it changes - the
+        dataset's own versions and every later collection version - for the
+        consumers that ask about all of a dataset's history at once (the
+        widest window, the largest days before, the earliest due time)."""
+        entry = self.dataset(dataset_id)
+        if entry is None or not entry.participation:
+            return ()
+        first = entry.participation[0].effective_from
+        dates = sorted({v.effective_from for v in entry.participation}
+                       | {v.effective_from for v in self.defaults_for(dataset_id)
+                          if v.effective_from > first})
+        return tuple(r for d in dates
+                     if (r := self.participation_on(dataset_id, d)) is not None)
+
+
+def describe_source(source: tuple, *, collection_name: str | None = None,
+                    calendar_name: str | None = None, key: str | None = None) -> str:
+    """Where a resolved value came from, in words that name the level
+    (REQ-PIPE-181 criterion 15) - phrased as amber_setting.describe phrases
+    a setting's provenance, and never 'inherited', which names a period
+    standing on an earlier period's supply (REQ-PIPE-098)."""
+    level, since = source
+    when = f", since {since.day} {since.strftime('%b %Y')}" if since else ""
+    if level == DATASET:
+        return f"set for this dataset{when}"
+    if level == COLLECTION:
+        return f"set for {collection_name or 'its collection'}{when}"
+    if key == "claim_window" and calendar_name:
+        return f"from the {calendar_name} calendar{when}"
+    return "no level states this"
+
+
+def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[ParticipationVersion, ...],
+            on: date) -> ParticipationVersion | None:
+    """THE ONE RESOLUTION FUNCTION (REQ-PIPE-181's second NFR): each value
+    separately, on the date - from the dataset's version in force where it
+    states it, else from the collection's version in force where that
+    states it, else the fallback (REQ-PIPE-110 criterion 6: every period,
+    no days before, the calendar's claim window, and no due time or grace -
+    which the gate refuses). None before the dataset's first version: a
+    dataset not yet owing never takes a value from its collection
+    (criterion 3).
+
+    PER VALUE, NOT PER SETTING (the delivery-architect's decision): a
+    collection version in force says nothing about a dataset that has not
+    started, so only values fall through, one at a time. `reason` travels
+    with `participates` from whichever level gave the months (criterion
+    18), so a list is never read without its reason."""
+    from qa_tools.common import in_force
+
+    mine = in_force.version_on(own, on)
+    if mine is None:
+        return None
+    above = in_force.version_on(defaults, on) if defaults else None
+    picked: dict = {}
+    sources: dict = {}
+    for key in VALUES:
+        if mine.gives(key):
+            picked[key], sources[key] = getattr(mine, key), (DATASET, mine.effective_from)
+        elif above is not None and above.gives(key):
+            picked[key], sources[key] = getattr(above, key), (COLLECTION, above.effective_from)
+        else:
+            picked[key] = 0 if key == "days_before" else None
+            sources[key] = (FALLBACK, None)
+    level = sources[PARTICIPATES][0]
+    reason = (mine.reason if level == DATASET else above.reason if level == COLLECTION else None)
+    return replace(mine, participates=picked[PARTICIPATES], reason=reason,
+                   expected_time=picked["expected_time"], grace=picked["grace"],
+                   claim_window=picked["claim_window"], days_before=picked["days_before"],
+                   sources=MappingProxyType(sources))
 
 
 def _changelog(raw, where: str) -> tuple[tuple[str, str, str], ...]:
@@ -119,6 +236,8 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
 
     stated = frozenset(k for k in (PARTICIPATES, "reason", "expected_time", "grace", "claim_window",
                                    "days_before") if k in raw)
+    inherits = frozenset(k for k in VALUES if raw.get(k) == INHERIT)
+    raw = {k: v for k, v in raw.items() if k not in inherits}
     months = raw.get(PARTICIPATES)
     if months is None or months == ALL:
         participates = None
@@ -147,7 +266,7 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
                       if window is not None else None),
         changelog=_changelog(raw.get("changelog"), where),
         days_before=days_before,
-        stated=stated)
+        stated=stated, inherits=inherits)
 
 
 def _own_dates(raw: dict, dataset_id: str):
@@ -198,6 +317,13 @@ def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreemen
                 f"{path}: collection {c.get('id')!r} is listed twice - the later entry would "
                 f"silently decide its calendar.")
         collections[c.get("id")] = c.get("calendar")
+    defaults: dict = {}
+    for c in doc.get("collections") or []:
+        where = f"collection {c.get('id')!r} participation_defaults"
+        defaults[c.get("id")] = tuple(sorted(
+            (_participation_version(v, f"{where} version {i + 1}")
+             for i, v in enumerate(((c.get("participation_defaults") or {}).get("versions")) or [])),
+            key=lambda v: v.effective_from))
     datasets: dict = {}
     for raw in doc.get("datasets") or []:
         ds = raw.get("id")
@@ -230,7 +356,8 @@ def from_doc(doc: dict, path: Path | str = "contract/calendar.yaml") -> Agreemen
             own_dates=_own_dates(raw, ds))
     return Agreement(path=Path(path), calendars=MappingProxyType(calendars),
                      collections=MappingProxyType(collections),
-                     datasets=MappingProxyType(datasets))
+                     datasets=MappingProxyType(datasets),
+                     defaults=MappingProxyType({k: v for k, v in defaults.items() if v}))
 
 
 def current() -> Agreement:
@@ -276,7 +403,9 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
         raise schedule.ScheduleConfigError(
             f"dataset {dataset_id!r} has no participation in contract/calendar.yaml, so it has "
             f"no delivery time to label.")
-    newest = entry.participation[-1]
+    # RESOLVED (REQ-PIPE-181): a value the collection states is this
+    # dataset's as much as one it states itself.
+    newest = agreement.resolved_versions(dataset_id)[-1]
     out["expected_time"] = newest.expected_time
     out["latency_minutes"] = int(newest.grace.total_seconds() // 60)
     # A FOLLOWING-PERIOD DATASET (REQ-PIPE-167) is due days before each

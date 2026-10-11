@@ -638,14 +638,18 @@ class ParticipationVersionConfig(_Strict):
     every period owed - because 'exactly these, given history' is not a
     schema statement."""
     effective_from: str = Field(pattern=_DATE_PATTERN)
-    participates: list[NonEmptyStr] | Literal["all"] | None = None
+    #: Each value may also be written `inherit` - the value from the nearest
+    #: level above on each period's date (REQ-PIPE-181 criterion 5). Where
+    #: inherit may be written is the gate's rule, not the schema's.
+    participates: list[NonEmptyStr] | Literal["all", "inherit"] | None = None
     reason: NonEmptyStr | None = None
-    expected_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    expected_time: str | None = Field(default=None,
+                                      pattern=r"^(([01]\d|2[0-3]):[0-5]\d|inherit)$")
     grace: str | None = None
     claim_window: str | None = None
     #: A whole number of days before the period's date the supply is due
     #: (REQ-PIPE-113 criterion 1) - zero unless stated.
-    days_before: StrictInt | None = Field(default=None, ge=0)
+    days_before: Annotated[StrictInt, Field(ge=0)] | Literal["inherit"] | None = None
     changelog: list[ConfigChangelogEntry] = Field(min_length=1)
 
 
@@ -698,6 +702,13 @@ class DatasetAgreementConfig(_Strict):
 class CollectionAgreementConfig(_Strict):
     id: NonEmptyStr
     calendar: NonEmptyStr | None = None
+    #: Participation values the collection's datasets take value by value
+    #: unless they state their own (REQ-PIPE-181 criterion 1). A collection
+    #: owes nothing itself - it holds values its datasets take.
+    participation_defaults: Participation | None = None
+    #: Declared corrections to its frozen defaults (REQ-PIPE-111 criterion
+    #: 4, as REQ-PIPE-181 amends it).
+    corrections: list[Correction] = Field(default_factory=list)
 
 
 class CalendarFile(_Strict):

@@ -114,7 +114,10 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
         raise schedule.ScheduleConfigError(
             f"dataset {dataset_id!r} has no participation version in contract/calendar.yaml, "
             f"so none of its slots has a due instant.")
-    version = agreement.participation_on(dataset_id, period_date) or entry.participation[0]
+    # RESOLVED, value by value, from the dataset or its collection
+    # (REQ-PIPE-181, amending REQ-PIPE-113 criterion 2).
+    version = (agreement.participation_on(dataset_id, period_date)
+               or agreement.participation_on(dataset_id, entry.participation[0].effective_from))
     if version.expected_time is None or version.grace is None:
         raise schedule.ScheduleConfigError(
             f"dataset {dataset_id!r}'s participation version effective "
@@ -153,8 +156,8 @@ def max_days_before(dataset_id: str, agreement=None) -> int:
     """The largest days before any of a dataset's participation versions
     states - what every slot-generation horizon has to reach past
     (REQ-PIPE-113 criterion 11)."""
-    entry = schedule._agreement(agreement).dataset(dataset_id)
-    return max((v.days_before for v in (entry.participation if entry else ())), default=0)
+    return max((v.days_before for v in
+                schedule._agreement(agreement).resolved_versions(dataset_id)), default=0)
 
 
 def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
@@ -202,8 +205,7 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
     # blunt round-up added a day the daily feed can never claim. The
     # EARLIEST expected time any version has is the conservative one.
     window = claim_window(dataset_id, agreement)
-    entry = schedule._agreement(agreement).dataset(dataset_id)
-    times = [v.expected_time for v in (entry.participation if entry else ())
+    times = [v.expected_time for v in schedule._agreement(agreement).resolved_versions(dataset_id)
              if v.expected_time]
     earliest = min((timedelta(hours=int(t[:2]), minutes=int(t[3:5])) for t in times),
                    default=timedelta(0))
@@ -227,8 +229,7 @@ def claim_window(dataset_id: str, agreement=None) -> timedelta:
     agreement = schedule._agreement(agreement)
     candidates = [v.claim_window for v in
                   schedule.calendar_for_dataset(dataset_id, agreement).versions]
-    entry = agreement.dataset(dataset_id)
-    candidates += [v.claim_window for v in (entry.participation if entry else ())
+    candidates += [v.claim_window for v in agreement.resolved_versions(dataset_id)
                    if v.claim_window is not None]
     return max(candidates)
 

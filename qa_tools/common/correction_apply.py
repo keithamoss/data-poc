@@ -93,6 +93,14 @@ def pending(conn, docs: tuple[dict, dict] | None = None) -> list[Pending]:
     return [p for p in _declared(cal, asset) if p.reference not in done]
 
 
+def _on_own_calendar(agr, dataset_id: str) -> bool:
+    """A dataset naming a calendar other than its collection's takes none of
+    the collection's defaults (REQ-PIPE-181 criterion 9)."""
+    own = agr.dataset(dataset_id)
+    return bool(own and own.calendar
+                and own.calendar != agr.collections.get(agr.collection_of(dataset_id)))
+
+
 def affected_datasets(p: Pending, cal: dict) -> list[str]:
     """The datasets a correction's declared changes name - from configuration
     alone, which is all the pass's 'awaiting confirmation' marking reads."""
@@ -107,6 +115,11 @@ def affected_datasets(p: Pending, cal: dict) -> list[str]:
             out.add(parts[1])
         elif parts[:1] == ["calendar"] and len(parts) > 1:
             out.update(agreement_freeze._datasets_on(parts[1], agr))
+        elif parts[:1] == ["collection"] and len(parts) > 1:
+            # Every dataset of the collection that takes its defaults
+            # (REQ-PIPE-181) - from the configuration before or after.
+            out.update(d for d in every
+                       if agr.collection_of(d) == parts[1] and not _on_own_calendar(agr, d))
         elif parts[:1] == ["timezone"]:
             out.update(every)
     return [d for d in every if d in out]

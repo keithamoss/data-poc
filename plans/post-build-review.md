@@ -7463,3 +7463,66 @@ twice. It deliberately did not re-find the `TypeError`.
       had been hiding that the table also wraps at eighty columns. The test
       now asks for the whole log on a wide console and looks for the exact
       reason. The command itself is right - a reader wants the newest.
+
+150. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery critic on
+     REQ-PIPE-181 (collection participation_defaults and inherit).** The
+     resolution held up - one function, value by value, and no consumer
+     still reading a raw dataset version. The holes were in the gate's
+     wording of what inherit would do. Each fix below has a test in
+     tests/test_collection_defaults.py `TestCriticFindingsOn181`, failing
+     first.
+    - **F1 (high):** a collection's `participates: inherit` silently widened a
+      dataset that named its collection's own calendar explicitly - the
+      affected list excluded any dataset with a `calendar:` key at all.
+      Now it excludes only a dataset on ANOTHER calendar.
+    - **F2 (Keith's call):** inherited months could not be written without
+      restating the old `reason:`, which was then ignored. Keith: the reason
+      belongs to the months, so it comes with them - exempt from the
+      restate rule beside `participates: inherit`, and refused if written
+      there. His question first ("aren't there other properties we'd want a
+      reason for?") is answered on the requirement: every version's
+      changelog line already says why it changed.
+    - **F3:** the restate refusal offered `participates: inherit` where the
+      widening rule would refuse it. Not offered there now.
+    - **F4:** the claim-window offer said "the calendar's" where the
+      collection states one for part of the window. It names both now.
+    - **F5:** the collection's widening error left out a dataset that stated
+      months once and inherited later. Named now.
+    - **F6 (Keith's call):** the once-only report fired with no collection
+      defaults at all, and for datasets on another calendar. Now only where
+      the collection's defaults could be the fix.
+    - **F7:** the calendar level showed no "since" date, and a later calendar
+      version's window was never shown as a change. Both are now.
+    - **F8:** the Calendar entry crashed on a dataset with no participation.
+    - **F9:** `Inherit` in the wrong case read as a broken duration; it is
+      named as a miscased keyword now. A collection correction no longer
+      lists datasets on another calendar as affected. The drift attribution
+      to a collection item is covered.
+    - **Found by the critic, not about 181:** tests/test_correction_apply.py's
+      `test_d2` went red at 09:00 Perth on 11 Oct - its promotion was written
+      at the database's `now()` and the correction confirmed at a fixed
+      09:00 that morning, so once the wall clock passed it the promotion read
+      as newer. A fixed instant now, which is the same lesson CLAUDE.md
+      records for daily datasets: never mix the real clock with a fixed one.
+    - **Found migrating Child Protection, not by the critic:** a drafted
+      correction's `old:` wrapped a long reason at eighty columns across
+      lines, at an indent that could not be pasted. One line now, however
+      long. And a dataset naming a calendar that does not exist got three
+      follow-on errors beside the one that mattered, once it took nothing
+      from its collection; it gets the one again.
+    - **The migration itself (Keith, (v)):** Child Protection's 09:00 and 8h
+      are stated once on the collection, by declared correction
+      REQ-PIPE-181 on each dataset, previewed first: no slot moved and no
+      verdict changed. It now reads as PENDING on the dashboard and in the
+      pass until the asset manager confirms it with `mothman supply
+      confirm-correction REQ-PIPE-181` - which is Keith's to do, not this
+      session's. Correction-mechanics tests now build their base with the
+      real file's own corrections removed, since a real pending one is not
+      their subject.
+    - **Found by CI on 94f1ea6 (REQ-DASH-172's push), not the critic:** four
+      unit tests of the changelog merge went red in the deployment half -
+      the feed now also reads applied corrections from the database, and a
+      fresh worker database has no qa schema. Green locally because an
+      earlier module on the same worker had created it; reproduced by running
+      the module alone. The tests stub that read now, and one more asserts an
+      applied correction is listed outside the thirty-entry cap.

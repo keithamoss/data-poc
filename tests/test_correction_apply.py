@@ -56,8 +56,14 @@ def _file(supply, slot, received):
 
 
 def _docs():
+    """The committed files with no corrections declared - the ones the real
+    contract carries (REQ-PIPE-181's migration, for one) are not this
+    module's subject, and would read as pending beside its own."""
     cal = copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text()))
     asset = copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()))
+    for owner in (cal.get("calendars") or []) + (cal.get("datasets") or []) \
+            + (cal.get("collections") or []):
+        owner.pop("corrections", None)
     return cal, asset
 
 
@@ -518,7 +524,11 @@ def _promote(conn, dataset, supply, slot):
     return conn.execute(
         f"INSERT INTO {decision_log.TABLE} (agency_id, collection_id, dataset_id, action, "
         "supply, to_slot, actor, actor_kind, effective_at) VALUES ('a', 'c', ?, 'promote', ?, "
-        "?, 'x', 'person', now()) RETURNING id", [dataset, supply, slot]).fetchall()[0][0]
+        "?, 'x', 'person', ?) RETURNING id",
+        # A FIXED INSTANT BEFORE AT, never now(): with now() the promotion
+        # read as newer than a correction confirmed at AT once the wall clock
+        # passed 09:00 on 11 Oct 2026, and the period stayed held by it.
+        [dataset, supply, slot, RECEIVED + timedelta(days=1)]).fetchall()[0][0]
 
 
 class TestCriticFindingsOn170:

@@ -428,9 +428,22 @@ class TestCriticFindingsOn110:
         assert any("expected_time" in (e.problem + (e.field or "")) for e in errors), _text(errors)
 
     def test_a_missing_due_time_names_the_periods_and_where_it_looked(self, broken):
-        """Criterion 29's message."""
+        """Criterion 29's message, for ONE dataset - the real file shares one
+        anchored version across five, which REQ-PIPE-181 criterion 12
+        reports once at the collection (TestOneRootCauseOnce)."""
         def mutate(doc):
-            _first(doc, "cp-clients").pop("grace")
+            # With nothing above it either: Child Protection states its grace
+            # once for the collection since REQ-PIPE-181's migration, so the
+            # other datasets state theirs here and cp-clients does not.
+            coll = next(c for c in doc["collections"] if c["id"] == "child-protection")
+            coll.pop("participation_defaults")
+            for entry in doc["datasets"]:
+                if entry["id"].startswith("cp-"):
+                    entry["participation"]["versions"] = [
+                        {**v, "expected_time": "09:00", "grace": "8h"}
+                        for v in entry["participation"]["versions"]]
+            versions = _entry(doc, "cp-clients")["participation"]["versions"]
+            versions[0] = {k: v for k, v in versions[0].items() if k != "grace"}
         errors = broken(mutate)
         hit = [e for e in errors if "grace" in e.problem and "cp-clients" in (e.scope or "")]
         assert hit, _text(errors)

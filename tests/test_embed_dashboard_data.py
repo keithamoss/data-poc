@@ -59,6 +59,18 @@ def _isolate_embed_data_targets(monkeypatch, tmp_path):
     monkeypatch.setattr(edd, "TARGETS", targets)
 
 
+@pytest.fixture(autouse=True)
+def _no_applied_corrections_read(monkeypatch):
+    """The feed also lists each applied calendar correction (REQ-DASH-172),
+    read from the database. These are unit tests of the merge, so that read
+    is stubbed: on a fresh worker database with no qa schema it failed every
+    one of them in CI (94f1ea6) while passing locally, where an earlier
+    module on the same worker had created the schema."""
+    from pipeline import corrections
+
+    monkeypatch.setattr(corrections, "applied_feed", lambda: [])
+
+
 def _entry(dataset, published_at, run_timestamp="2026-01-01T00:00:00+00:00", run_by="a@b.com"):
     """One feed entry as build_changelog() produces it.
 
@@ -448,3 +460,19 @@ def test_slot_due_dates_name_a_following_period_datasets_due_date():
                                             Slot("2026-05-01", "2026-05-01T01:00:00")]})
     assert got == {"cp-early": {"2026-02-01": "2026-01-04"}}
     assert slots  # imported for the shape the real call passes
+
+
+def test_applied_corrections_are_listed_outside_the_cap(monkeypatch):
+    """REQ-DASH-172 criterion 8 (delivery-critic on 172, #7): rare, so never
+    pushed out by thirty publishes."""
+    from pipeline import corrections
+
+    monkeypatch.setattr(edd, "CHANGELOG_SOURCES", [("agency-a", "dataset-a", "Dataset A")])
+    monkeypatch.setattr(edd, "build_changelog", lambda agency, dataset: [
+        _entry("dataset-a", f"2026-01-{d:02d}T09:00:00+00:00")
+        for d in range(1, edd.CHANGELOG_DEPTH + 6)])
+    monkeypatch.setattr(corrections, "applied_feed", lambda: [{
+        "kind": "correction", "reference": "CAB-1", "published_at": "2025-01-01T00:00:00+00:00"}])
+    feed = edd._build_changelog_feed()
+    assert [e.get("reference") for e in feed if e.get("kind") == "correction"] == ["CAB-1"]
+    assert len([e for e in feed if e.get("kind") != "correction"]) == edd.CHANGELOG_DEPTH

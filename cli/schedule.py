@@ -113,7 +113,10 @@ def _calendars() -> list[str]:
 @click.option("--all", "show_all", is_flag=True,
               help="Every period, not just the ones around today. For a daily "
                    "calendar that is thousands of rows - pair it with --until.")
-def show_command(dataset: str | None, until, show_all: bool) -> None:
+@click.option("--on", "on", type=click.DateTime(formats=["%Y-%m-%d"]),
+              help="With --dataset: the date its participation values are resolved "
+                   "for, and where each came from. Defaults to today.")
+def show_command(dataset: str | None, until, show_all: bool, on) -> None:
     """Print the delivery calendars, or one dataset's own periods.
 
     \b
@@ -121,6 +124,7 @@ def show_command(dataset: str | None, until, show_all: bool) -> None:
       mothman schedule show
       mothman schedule show --dataset cp-case-workers
       mothman schedule show --dataset birth-registrations --until 2026-12-31
+      mothman schedule show --dataset cp-clients --on 2024-06-01
 
     By default a single dataset shows a WINDOW around today - the last
     few periods and the next few - because at daily cadence the full
@@ -138,7 +142,7 @@ def show_command(dataset: str | None, until, show_all: bool) -> None:
         # messages themselves were already good; they were buried.
         try:
             _show_dataset(dataset, until.date() if until else None, show_all,
-                           hierarchy, schedule)
+                           hierarchy, schedule, on.date() if on else None)
         except (hierarchy.UnknownDatasetError, schedule.ScheduleConfigError) as exc:
             raise click.ClickException(_unwrap(exc)) from None
         return
@@ -173,7 +177,7 @@ def _calendar_name(schedule, dataset_id: str) -> str | None:
 
 
 def _show_dataset(dataset: str, until: date | None, show_all: bool,
-                   hierarchy, schedule) -> None:
+                   hierarchy, schedule, on: date | None = None) -> None:
     entry = hierarchy.dataset(dataset)
     declared = schedule.no_calendar(dataset)
     if declared is not None:
@@ -212,8 +216,11 @@ def _show_dataset(dataset: str, until: date | None, show_all: bool,
     console.print(f"  claim window: {schedule.format_duration(schedule.claim_window(dataset))} "
                    f"before each deadline [dim](opens early; closes when the next period's opens)[/dim]")
 
-    from qa_tools.common import asset_time
+    from qa_tools.common import asset_time, participation_view
     today = asset_time.local_date(asset_time.now())
+    # EACH VALUE AND WHERE IT CAME FROM (REQ-PIPE-181 criterion 13), on
+    # --on or today - the renderer the Calendar entry shares.
+    _show_values(participation_view.view(dataset, on or today))
 
     # A CADENCE RULE GENERATES FOR EVER, so it needs a stop date - and
     # until this window existed, not passing one was a 34-frame
@@ -665,6 +672,9 @@ def calendar_menu() -> None:
             # would mix with a preview read from disk after an edit.
             fresh = agreement.from_doc(correction_trial.working()[0])
             _show_in_force(correction_trial.in_force(dataset_id, on, fresh))
+            from qa_tools.common import participation_view
+
+            _show_values(participation_view.view(dataset_id, on, fresh))
         except correction_trial.Unreadable as exc:
             # F4: part-way through an edit, said - not a crashed session.
             console.print(str(exc), style="red", markup=False)
@@ -697,6 +707,28 @@ def calendar_menu() -> None:
                     _draft(None, interactive=True)
             except SystemExit:
                 pass
+
+
+def _show_values(v) -> None:
+    """THE ONE RENDERER for a dataset's resolved participation values
+    (REQ-PIPE-181 criterion 13) - `schedule show --on` and the Calendar
+    entry both call this."""
+    when = f"{v.on.day} {v.on.strftime('%b %Y')}"
+    if v.not_yet is not None:
+        console.print(f"  On {when}: not yet owing - first version takes effect "
+                      f"{v.not_yet.day} {v.not_yet.strftime('%b %Y')}", markup=False)
+        return
+    if not v.values:
+        # A DATASET WITH NO PARTICIPATION AT ALL (delivery-critic on 181, F8):
+        # one declared as having no calendar, listed by the Calendar entry.
+        console.print(f"  On {when}: it has no participation versions, so it owes nothing.",
+                      markup=False)
+        return
+    console.print(f"  On {when}:", markup=False)
+    width = max(len(x.label) for x in v.values)
+    for x in v.values:
+        console.print(f"    {x.label:<{width}}  {x.text}  ({x.source})"
+                      + (f"; changes {x.changes}" if x.changes else ""), markup=False)
 
 
 def _show_in_force(f) -> None:

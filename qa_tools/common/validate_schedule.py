@@ -1077,6 +1077,208 @@ def _governed_periods(calendar: dict, start: str, end: str | None, limit: int = 
     return ", ".join(named[:limit]) + more
 
 
+#: The values that resolve from the level above (REQ-PIPE-181 criterion 2).
+_RESOLVED = ("participates", "expected_time", "grace", "claim_window", "days_before")
+_INHERIT = "inherit"
+
+
+def _raw_versions(block) -> list[dict]:
+    return [(v or {}) for v in (((block or {}).get("versions")) or [])]
+
+
+def _gives(version: dict | None, key: str) -> bool:
+    """A raw version supplies `key` itself - stated, and not `inherit`."""
+    return version is not None and key in version and version[key] != _INHERIT
+
+
+def _governing(versions: list[dict], start: str, end: str | None) -> list[dict] | None:
+    """The raw versions in force at some point in [start, end), oldest
+    first - None where none is in force at `start` itself, so some of the
+    window has no version at all."""
+    windows = _version_windows(versions)
+    hit = [v for v, (a, b) in zip(versions, windows)
+           if (end is None or a < end) and (b is None or start < b)]
+    if not hit or str(hit[0].get("effective_from")) > start:
+        return None
+    return hit
+
+
+def _months_owed(value, calendar: dict) -> set[int]:
+    """The months a raw participates value owes - every month the calendar
+    carries for `all` or a value nobody stated."""
+    if isinstance(value, list):
+        return {n for n in (_month_number(m) for m in value) if n is not None}
+    carried = set()
+    for version in (calendar.get("versions") or []):
+        if (version or {}).get("cadence"):
+            return set(range(1, 13))
+        for entry in ((version or {}).get("dates") or []):
+            try:
+                carried.add(date.fromisoformat(str((entry or {}).get("date"))).month)
+            except (TypeError, ValueError):
+                continue
+    return carried or set(range(1, 13))
+
+
+def _month_list(months) -> str:
+    return "[" + ", ".join(_MONTHS[m - 1] for m in sorted(months)) + "]"
+
+
+def _since(iso: str) -> str:
+    d = date.fromisoformat(iso)
+    return f"{d.day} {d.strftime('%b %Y')}"
+
+
+def _inherit_misuse(version: dict, label: str) -> list[tuple[str, str]]:
+    """(problem, fix) for `inherit` written wrongly on one raw version: in
+    the wrong case (delivery-critic on 181, F9), and a `reason:` beside
+    inherited months - the reason belongs to the months and comes with them
+    from the level that gives them (Keith, 2026-10-11, on the critic's F2)."""
+    out = []
+    for key in _RESOLVED:
+        value = version.get(key)
+        if isinstance(value, str) and value.lower() == _INHERIT and value != _INHERIT:
+            out.append((f"{label} writes {key}: {value}.",
+                        "Write `inherit` in lower case - it is a keyword, and any other "
+                        "spelling is read as a value."))
+    if version.get("participates") == _INHERIT and "reason" in version:
+        out.append((f"{label} writes participates: inherit beside its own reason.",
+                    "Leave `reason:` out. Inherited months come with the reason of the level "
+                    "that gives them, so a reason here would read as explaining months it does "
+                    "not decide."))
+    return out
+
+
+def _dropped(previous: dict, version: dict) -> list[str]:
+    """The restate rule's dropped keys - except `reason` beside inherited
+    months, which comes with them (Keith, 2026-10-11)."""
+    out = [k for k in _RESTATED if k in previous and k not in version]
+    if version.get("participates") == _INHERIT and "reason" in out:
+        out.remove("reason")
+    return out
+
+
+def _defaults_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
+    """REQ-PIPE-181's rules about a collection's participation_defaults:
+    the restate rule at every level (criterion 4), inherit only where an
+    earlier version stated the value (criterion 6) and never for a due time
+    or grace (criterion 10), an inherit that widens what its datasets owe
+    refused (criterion 8), and one date per version in order (criterion
+    11)."""
+    out: list[ConfigError] = []
+    file_name = src.calendar_name
+    cal_src = replace(src, asset_path=src.agreement_path)
+    calendars = {(c or {}).get("name"): (c or {}) for c in (cal_raw.get("calendars") or [])}
+    entries = {(e or {}).get("id"): (e or {}) for e in (cal_raw.get("datasets") or [])}
+    members: dict = {}
+    for d, c in _walk_datasets(raw):
+        members.setdefault((c or {}).get("id"), []).append((d or {}).get("id"))
+    for c in (cal_raw.get("collections") or []):
+        c = c or {}
+        cid = c.get("id")
+        versions = _raw_versions(c.get("participation_defaults"))
+        if not versions:
+            continue
+        scope = f"collection {cid!r}"
+        cal_name = c.get("calendar")
+        calendar = calendars.get(cal_name, {})
+        windows = _version_windows(versions)
+        for i, (version, (start, end)) in enumerate(zip(versions, windows), start=1):
+            label = f"participation_defaults version {i} (effective {start})"
+            out += [ConfigError(file_name, scope, prob, fix)
+                    for prob, fix in _inherit_misuse(version, label)]
+            for key in ("expected_time", "grace"):
+                if version.get(key) == _INHERIT:
+                    out.append(ConfigError(
+                        file_name, scope,
+                        f"{label} writes {key}: inherit, and a calendar states no "
+                        f"{key.replace('_', ' ')}, so inherit here resolves to nothing.",
+                        f"State `{key}:` on this version instead. A period owed with no "
+                        f"{key.replace('_', ' ')} has no due instant to judge a supply against."))
+            for key in ("participates", "claim_window", "days_before"):
+                if version.get(key) == _INHERIT and not any(key in p for p in versions[:i - 1]):
+                    out.append(ConfigError(
+                        file_name, scope,
+                        f"{label} writes {key}: inherit, and no earlier version of this "
+                        f"collection's defaults stated {key}.",
+                        f"Leave `{key}` out instead - a value no earlier version stated is "
+                        f"already taken from the level above."))
+            months = version.get("participates")
+            if isinstance(months, list) and not version.get("reason"):
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label} owes only {', '.join(map(str, months))} and gives no reason.",
+                    "Add `reason:` saying why - it travels with the months to every dataset "
+                    "that takes them."))
+            if isinstance(months, list) and months and calendar:
+                window = {"versions": _overlapping(calendar, start, end)}
+                for e in _month_errors(scope, cal_name, window, months, cal_src):
+                    out.append(replace(e, problem=f"{label} " + e.problem))
+            for key in ("grace", "claim_window"):
+                if _gives(version, key):
+                    problem = _duration_error(version.get(key), f"{scope} {key}")
+                    if problem:
+                        out.append(ConfigError(file_name, scope, f"{label}'s {key} {problem}",
+                                               "Write a duration with its unit, like 1h or 14d."))
+            if i > 1:
+                previous = versions[i - 2]
+                dropped = _dropped(previous, version)
+                if dropped:
+                    offers = []
+                    for k in dropped:
+                        if k == "claim_window" and calendar:
+                            offers.append(f"or write `claim_window: inherit` to take the "
+                                          f"{cal_name} calendar's")
+                    out.append(ConfigError(
+                        file_name, scope,
+                        f"{label} leaves out " + ", ".join(
+                            f"{k} (the previous version stated {previous[k]!r})"
+                            for k in dropped) + ".",
+                        "Restate each value on this version" + (
+                            " (" + "; ".join(offers) + ")" if offers else "")
+                        + ". Every version reads as complete on its own, so a collection-wide "
+                          "value is never silently dropped from every dataset that takes it."))
+                # CRITERION 8: an inherit that would widen what is owed.
+                if version.get("participates") == _INHERIT and isinstance(
+                        previous.get("participates"), list):
+                    before = _months_owed(previous.get("participates"), calendar)
+                    after = _months_owed(None, calendar)
+                    # Every dataset of the collection whose version in force
+                    # on any date this one governs takes participates from
+                    # above - naming its collection's calendar explicitly
+                    # (F1) and having stated months earlier (F5) included.
+                    affected = []
+                    for ds in members.get(cid, []):
+                        own_cal = entries.get(ds, {}).get("calendar")
+                        if own_cal and own_cal != cal_name:
+                            continue
+                        mine = _raw_versions(entries.get(ds, {}).get("participation"))
+                        windows_ds = _version_windows(mine)
+                        if any(not _gives(v, "participates")
+                               for v, (a, b) in zip(mine, windows_ds)
+                               if (end is None or a < end) and (b is None or start < b)):
+                            affected.append(ds)
+                    if after - before and affected:
+                        out.append(ConfigError(
+                            file_name, scope,
+                            f"{label} writes participates: inherit, which would make "
+                            f"{', '.join(affected)} newly owe {_month_list(after - before)[1:-1]}.",
+                            f"Write the months, or all, explicitly - widening what is owed is "
+                            f"never done by a keyword. To keep them: `participates: "
+                            f"{_month_list(before)}` with `reason: {previous.get('reason')}`; "
+                            f"to owe every period: `participates: all`."))
+        starts = [a for a, _b in windows]
+        for a, b in zip(starts, starts[1:]):
+            if b <= a:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"participation_defaults versions take effect {a} then {b}, which is not "
+                    f"after it.",
+                    "Put the versions in effective_from order, oldest first, with no two "
+                    "sharing a date - otherwise there is no single version in force."))
+    return out
+
+
 def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
     """REQ-PIPE-110's rules about each dataset's participation, checked on
     contract/calendar.yaml as written - every version, not the newest
@@ -1127,10 +1329,18 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 f"agree about what exists."))
 
     own_names: set[str] = set()
+    names = {c.get("id"): c.get("name") or c.get("id") for _d, c in walked}
+    # CRITERION 12: one collection-level value leaving several datasets
+    # without a due time is one root cause, reported once.
+    unresolved: dict = {}
     for dataset, collection in walked:
         ds = dataset.get("id")
         entry = entries.get(ds, {})
         scope = f"dataset {ds!r}"
+        cid = collection.get("id")
+        coll_cal = collections.get(cid, {}).get("calendar")
+        on_own_calendar = bool(entry.get("calendar")) and entry.get("calendar") != coll_cal
+        defaults = _raw_versions(collections.get(cid, {}).get("participation_defaults"))
         for v in (((entry.get("dates") or {}).get("versions")) or []):
             own_names |= {str((d or {}).get("period")) for d in ((v or {}).get("dates") or [])}
         seen_periods: set = set()
@@ -1159,7 +1369,30 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
             continue
         calendar = calendars.get(cal_name, {})
         windows = _version_windows(versions)
+        # A CALENDAR THAT DOES NOT EXIST is already one error, with its fix;
+        # what the dataset would or would not take from above follows from
+        # it and is not a second mistake to report.
+        known = cal_name in calendars
+        # CRITERION 9: a dataset on another calendar states what it would
+        # otherwise take from its collection - months and windows written
+        # for one calendar never land silently on another.
+        if known and on_own_calendar and defaults:
+            taken = [k for k in _RESOLVED
+                     if any(_gives(d, k) for d in defaults)
+                     and any(not _gives(v, k) for v in versions)]
+            if taken:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"names calendar {cal_name!r}, not its collection's {coll_cal!r}, and would "
+                    f"take {', '.join(taken)} from {names.get(cid)}'s participation_defaults, "
+                    f"which were written for {coll_cal!r}.",
+                    f"State {', '.join(taken)} on every one of this dataset's participation "
+                    f"versions."))
         for i, (version, (start, end)) in enumerate(zip(versions, windows), start=1):
+            label = f"participation version {i} (effective {start})"
+            above = None if on_own_calendar else _governing(defaults, start, end)
+            out += [ConfigError(file_name, scope, prob, fix)
+                    for prob, fix in _inherit_misuse(version, label)]
             months = version.get("participates")
             # CRITERION 8: a list of some months needs a reason.
             if isinstance(months, list) and not version.get("reason"):
@@ -1177,42 +1410,104 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                 for e in _month_errors(scope, cal_name, window, months, cal_src):
                     out.append(replace(e, problem=f"participation version {i} (effective "
                                                   f"{start}) " + e.problem))
-            # CRITERION 29: an expected time and grace for every period owed.
-            for key, what in (("expected_time", "expected time"), ("grace", "grace allowance")):
-                if version.get(key) is None:
+            # CRITERION 6 (REQ-PIPE-181): inherit only where an earlier
+            # version of this dataset stated the value.
+            for key in _RESOLVED:
+                if version.get(key) == _INHERIT and not any(key in p for p in versions[:i - 1]):
                     out.append(ConfigError(
                         file_name, scope,
-                        f"participation version {i} (effective {start}) states no {key}, so "
-                        f"the periods it governs have no {what}: "
-                        f"{_governed_periods(calendar, start, end)}. Looked in: the dataset's "
-                        f"participation versions in {file_name} (a collection's defaults "
-                        f"arrive with REQ-PIPE-181).",
-                        f"Add `{key}:` to this version. A period owed with no {what} has no due "
-                        f"instant to judge a supply against."))
-            if version.get("grace") is not None:
+                        f"{label} writes {key}: inherit, and no earlier version of this "
+                        f"dataset stated {key}.",
+                        f"Leave `{key}` out instead - a value no earlier version stated is "
+                        f"already taken from the level above."))
+            # CRITERION 29: an expected time and grace for every period owed
+            # - from this version, or from its collection on every date it
+            # governs (REQ-PIPE-181 criterion 2).
+            for key, what in (("expected_time", "expected time"), ("grace", "grace allowance")):
+                if _gives(version, key) or not known:
+                    continue
+                if above is not None and all(_gives(d, key) for d in above):
+                    continue
+                unresolved.setdefault((cid, key, what), []).append(
+                    (ds, label, start, end, calendar, on_own_calendar))
+            if _gives(version, "grace"):
                 problem = _duration_error(version.get("grace"), f"{scope} grace")
                 if problem:
                     out.append(ConfigError(file_name, scope,
                                            f"participation version {i}'s grace {problem}",
                                            "Write a duration with its unit, like 1h or 2d."))
-            if version.get("claim_window") is not None:
+            if _gives(version, "claim_window"):
                 problem = _duration_error(version.get("claim_window"), f"{scope} claim_window")
                 if problem:
                     out.append(ConfigError(file_name, scope,
                                            f"participation version {i}'s claim_window {problem}",
                                            "Write a duration with its unit, like 14d or 4h."))
-            # CRITERION 33: restate everything the previous version stated.
+            # CRITERION 33: restate everything the previous version stated -
+            # a value written as inherit counts as stated (REQ-PIPE-181
+            # criterion 4), and the refusal offers inherit only where it
+            # would resolve on every date this version governs (criterion 7).
             if i > 1:
                 previous = versions[i - 2]
-                dropped = [k for k in _RESTATED if k in previous and k not in version]
+                dropped = _dropped(previous, version)
                 if dropped:
+                    offers = []
+                    for k in dropped:
+                        if k == "claim_window" and calendar:
+                            # WHAT IT WOULD REALLY TAKE (F4): the collection's
+                            # value where it states one, else the calendar's.
+                            parts = [(f"{d[k]!r} (set for {names.get(cid)}, since "
+                                      f"{_since(str(d.get('effective_from')))})")
+                                     if _gives(d, k) else f"the {cal_name} calendar's"
+                                     for d in (above or [None]) if d is not None] \
+                                or [f"the {cal_name} calendar's"]
+                            offers.append("`claim_window: inherit` would take "
+                                          + " then ".join(dict.fromkeys(parts)))
+                        elif k in _RESOLVED and above is not None and all(
+                                _gives(d, k) for d in above):
+                            if k == "participates" and isinstance(previous.get(k), list) and (
+                                    set().union(*(_months_owed(d.get(k), calendar)
+                                                  for d in above))
+                                    - _months_owed(previous.get(k), calendar)):
+                                continue  # F3: inherit here would widen, and is refused
+                            values = " then ".join(
+                                f"{d[k]!r} (set for {names.get(cid)}, since "
+                                f"{_since(str(d.get('effective_from')))})" for d in above)
+                            offers.append(f"`{k}: inherit` would take {values}")
                     out.append(ConfigError(
                         file_name, scope,
-                        f"participation version {i} (effective {start}) "
+                        f"{label} "
                         f"leaves out " + ", ".join(f"{k} (the previous version stated "
                                                    f"{previous[k]!r})" for k in dropped) + ".",
-                        "Restate each value on this version. Every version reads as complete "
-                        "on its own, so a value is never silently dropped to a default."))
+                        "Restate each value on this version"
+                        + (", or write it as inherit: " + "; ".join(offers) if offers else "")
+                        + ". Every version reads as complete on its own, so a value is never "
+                          "silently dropped to a default."))
+                # CRITERION 8 (REQ-PIPE-181): an inherit that would make the
+                # dataset owe a period its previous version did not.
+                if version.get("participates") == _INHERIT:
+                    prev_value = previous.get("participates")
+                    if not _gives(previous, "participates"):
+                        prev_above = None if on_own_calendar else _governing(
+                            defaults, str(previous.get("effective_from")), start)
+                        prev_value = (prev_above[-1].get("participates")
+                                      if prev_above and _gives(prev_above[-1], "participates")
+                                      else None)
+                    before = _months_owed(prev_value, calendar)
+                    after: set[int] = set()
+                    for d in (above or [None]):
+                        after |= _months_owed(d.get("participates") if _gives(d, "participates")
+                                              else None, calendar)
+                    if after - before:
+                        reason = previous.get("reason")
+                        out.append(ConfigError(
+                            file_name, scope,
+                            f"{label} writes participates: inherit, which would make it newly "
+                            f"owe {_month_list(after - before)[1:-1]}.",
+                            f"Write the months, or all, explicitly - widening what is owed is "
+                            f"never done by a keyword. To keep them: `participates: "
+                            f"{_month_list(before)}`"
+                            + (f" with `reason: {reason}`" if reason else "")
+                            + "; to owe every period: `participates: all`."))
         # CRITERION 34: one date per version, in order.
         starts = [a for a, _b in windows]
         for a, b in zip(starts, starts[1:]):
@@ -1222,6 +1517,34 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
                     f"participation versions take effect {a} then {b}, which is not after it.",
                     "Put the versions in effective_from order, oldest first, with no two "
                     "sharing a date - otherwise there is no single version in force."))
+    for (cid, key, what), gaps in unresolved.items():
+        # ONCE ONLY WHERE THE COLLECTION COULD BE THE FIX (Keith, 2026-10-11,
+        # on the critic's F6): it has defaults, and the datasets take them.
+        has_defaults = bool(_raw_versions(collections.get(cid, {}).get("participation_defaults")))
+        grouped = [g for g in gaps if has_defaults and not g[5]]
+        if len({g[0] for g in grouped}) < 2:
+            grouped = []
+        datasets = sorted({g[0] for g in grouped})
+        if grouped:
+            out.append(ConfigError(
+                file_name, f"collection {cid!r}",
+                f"leaves {', '.join(datasets)} with no {key}: none of them states it on "
+                f"every participation version, and {names.get(cid)}'s participation_defaults "
+                f"do not state it on every date they govern.",
+                f"State `{key}:` on {names.get(cid)}'s participation_defaults (or on each "
+                f"dataset). A period owed with no {what} has no due instant to judge a supply "
+                f"against."))
+        for ds, label, start, end, calendar, _own in [g for g in gaps if g not in grouped]:
+            out.append(ConfigError(
+                file_name, f"dataset {ds!r}",
+                f"{label} states no {key}, so the periods it governs have no {what}: "
+                f"{_governed_periods(calendar, start, end)}. Looked in: the dataset's "
+                f"participation versions and its collection's participation_defaults in "
+                f"{file_name}.",
+                f"Add `{key}:` to this version"
+                + ("" if _own else ", or to the collection's participation_defaults")
+                + f". A period owed with no {what} has no due instant to judge a supply "
+                  f"against."))
     # CRITERION 35: a dataset's own period names are not a calendar's.
     calendar_names = {str((d or {}).get("period")) for c in calendars.values()
                       for v in (c.get("versions") or []) for d in ((v or {}).get("dates") or [])}
@@ -1287,6 +1610,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _calendar_errors(cal_raw, cal_src)
     errors += _dataset_errors(merged, cal_src)
     errors += _participation_errors(cal_raw, raw, src)
+    errors += _defaults_errors(cal_raw, raw, src)
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)

@@ -25019,7 +25019,7 @@ requirements:
     - WHERE a period's date falls before the effective_from of a dataset's first participation version, THE SYSTEM SHALL treat the dataset as not yet owing that period.
     - THE SYSTEM SHALL read the delivery agreement - calendars, participation, not_expected and dataset date overrides - through one loader into one parsed, immutable agreement value, and SHALL pass that value as an argument to every existing consumer (slots, schedule, the overlap gate and the dashboard build), so that two agreement values - before and after a change - can be held side by side in one process; later requirements (REQ-PIPE-111, 112, 169, 170 and 173) add their parts to that same value and take it as an argument.
     - 'THE SYSTEM SHALL decide whether a file in contract/ is a dataset contract from its `kind: DataContract`, and SHALL NOT decide it from the presence of slaProperties.'
-    - IF a dataset's participation version leaves out any value its previous version stated - participates with its reason, expected time, grace, days before or claim-window override - THEN THE SYSTEM SHALL reject the configuration, naming the dataset, the version by its effective_from date, each value left out and the value the previous version stated, and saying to restate it; days before is covered by this rule once REQ-PIPE-167 adds it.
+    - IF a dataset's participation version leaves out any value its previous version stated - participates with its reason, expected time, grace, days before or claim-window override - THEN THE SYSTEM SHALL reject the configuration, naming the dataset, the version by its effective_from date, each value left out and the value the previous version stated, and saying to restate it, or to write inherit where that would resolve to a value; a dataset value written as inherit counts as stated (amended by REQ-PIPE-181); days before is covered by this rule once REQ-PIPE-167 adds it.
     - IF two participation versions of one dataset share an effective_from date or are out of order, THEN THE SYSTEM SHALL reject the configuration.
     - IF a dataset's own authored dates use a period name that any calendar in the file also uses, THEN THE SYSTEM SHALL reject the configuration.
     - WHERE every dataset of the asset declares no calendar, THE SYSTEM SHALL accept an empty list of calendars.
@@ -25266,7 +25266,7 @@ requirements:
     date_written: '2026-10-10'
     story: As the person who looks after a delivery agreement for thirty datasets, I want to state a due time, a grace allowance or the months owed once for a collection and have its datasets take them unless they say otherwise, so that a collection-wide change is one edit and never silently skips a dataset.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-10"
@@ -25318,6 +25318,28 @@ requirements:
     - 'DUE TIME AND GRACE MUST RESOLVE (Keith, 2026-10-10, Q-D): the decision recorded on REQ-PIPE-110 (''A DUE TIME OR GRACE THAT RESOLVES TO NOTHING IS INVALID CONFIGURATION'') governs this requirement''s collection level too - criterion 12 relies on it. ''Carry the reason'' moved here from REQ-PIPE-110 criterion 8 at its sign-off.'
     - 'AMENDMENT WORDING APPROVED (Keith, 2026-10-10, at sign-off): REQ-PIPE-110 c33 - a dataset value written as inherit counts as stated for the restate rule, and the refusal offers restating it, or writing inherit where that would resolve to a value; REQ-PIPE-113 c2 - a slot''s expected time, days before, grace and claim-window override are each the value REQ-PIPE-181 resolves for that period''s date, from the dataset or its collection, rather than ''from its dataset''s participation version''; REQ-PIPE-131 c2 - the next claim-opening instant is computed with each value as REQ-PIPE-181 resolves it on that next period''s date; REQ-PIPE-111 c4 - a collection''s participation_defaults carry a corrections: list of their own, beside the dataset''s and the calendar''s.'
     - 'SIGNED OFF (Keith, 2026-10-10, option A): as for REQ-PIPE-110 the same night, settled by its amendment wording rather than a re-walk of criteria already decided across three review rounds and a boundary check. PROVENANCE, said before signing: drafted by the main session in the split from REQ-PIPE-110''s scoped criteria and decisions; boundary-checked by delivery-scoper and read by all four round-3 reviewers, but never drafted by delivery-scoper as a requirement of its own.'
+    - 'BUILT 2026-10-11 overnight (#3), PROVISIONAL choices for Keith: (1) a dataset that names a calendar other than its collection''s takes NOTHING from the collection at run time, not only at the gate - Agreement.defaults_for returns none for it, so a configuration the gate refuses cannot quietly mis-file in a path that skipped the gate; (2) reason travels with participates from whichever level gave the months, and a reason stated beside an inherited list is ignored rather than mixed; (3) superseded by Keith''s answer below (once only where the collection has defaults); (4) at collection level the restate refusal offers inherit only for the claim window, the one value a calendar states.'
+    - 'MIGRATED (Keith, 2026-10-11 morning, answering the overnight report''s (v)): contract/calendar.yaml states Child Protection''s 09:00 and 8h once under its participation_defaults, and the six datasets no longer state them. Moved by a declared correction under change reference REQ-PIPE-181 on each dataset, approved by Keith, whose preview showed no slot moved and no verdict changed. It reads as pending until the asset manager confirms it (REQ-PIPE-170). REJECTED leaving the per-dataset statement: the feature would then be exercised only against copies of the file.'
+    - 'A reason BESIDE participates: inherit (Keith, 2026-10-11, on the critic''s F2): reason is a standing explanation of why only some periods are owed, so it belongs to the months and comes with them from the level that gives them. It is exempt from the restate rule when participates is inherit, and writing one there is refused as misleading. The why of each version''s change stays in its changelog line, required on every version. REJECTED accepting and ignoring it, and REJECTED letting it override the inherited reason.'
+    - 'ONCE ONLY WHERE THE COLLECTION COULD BE THE FIX (Keith, 2026-10-11, on the critic''s F6): criterion 12''s single report fires only where the collection has participation_defaults and the datasets left without a value take them; otherwise each dataset keeps its own message naming its periods. REJECTED grouping whenever two datasets share the gap, which told datasets on another calendar to fix a collection they cannot take from.'
+    - 'ONE RESOLUTION FUNCTION (second NFR): agreement.resolve, reached through Agreement.participation_on and Agreement.resolved_versions. Every consumer that used to read a dataset''s raw versions - slot instants, claim-opening, the widest window, the largest days before, delivery months, the dashboard cadence, the drift check, the correction preview - now asks it. The gate checks the raw text for the rules about what is WRITTEN (restate, inherit placement, order) and resolves for what is OWED (due time, widening). REQ-PIPE-179 criterion 27''s helper is this function when it is built; criterion 13''s exception for a dataset turned off waits on REQ-PIPE-179, which does not exist yet.'
+    linked_tests:
+    - tests/test_collection_defaults.py
+    implemented_by:
+    - qa_tools/common/agreement.py::resolve
+    - qa_tools/common/agreement.py::Agreement::participation_on
+    - qa_tools/common/agreement.py::Agreement::resolved_versions
+    - qa_tools/common/agreement.py::describe_source
+    - qa_tools/common/validate_schedule.py::_defaults_errors
+    - qa_tools/common/validate_schedule.py::_participation_errors
+    - qa_tools/common/participation_view.py::view
+    - cli/schedule.py::_show_values
+    - qa_tools/common/agreement_freeze.py::flatten
+    - qa_tools/common/agreement_drift.py::_sources
+    evidence:
+    - 'tests/test_collection_defaults.py (49 tests, run 2026-10-11 after the critic''s fixes and the migration) against copies of the real contract: values resolve one at a time from the dataset or the collection on each period''s date and change with the collection''s later version; nothing is taken before the dataset''s first version; inherit goes back to the collection; the reason travels with the months; the gate refuses a collection version dropping a value, an inherit no earlier version stated, a collection inherit of a due time or grace, an inherit that widens what is owed (naming the months and the paste-ready fix, at both levels), a dataset on another calendar taking a collection value, out-of-order collection versions, and reports a collection-wide gap once where defaults exist; the restate refusal offers inherit with what it would really take, or restating only; past collection defaults freeze and take corrections on the collection; schedule show --on and the Calendar entry render each value with its level and date through one renderer. Thirteen of them are the critic''s findings (#150), each failing first. Two pin the migrated real contract: every Child Protection dataset takes 09:00 and 8h from the collection, and no slot moved.'
+    - 'The seventeen affected modules - agreement, slots, slot instants, slot closes, schedule, validate_schedule, freeze, drift, correction trial/apply/revert, cli schedule, schemas, amber setting, verdict record, dashboard corrections and this one - all passed after the last code change, run 2026-10-11.'
+
   - id: REQ-DASH-182
     title: The dashboard shows every period a dataset owes nothing in, with its reason, and the delivery time in force on the date on show
     date_written: '2026-10-10'
@@ -25408,7 +25430,8 @@ requirements:
       it.
     - THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its
       versions - a calendar's on that calendar; a dataset's (its participation, due time, participates,
-      not_expected and own authored dates) on that dataset's entry; the zone's on the timezone - each correction
+      not_expected and own authored dates) on that dataset's entry; a collection's participation_defaults on
+      that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction
       stating change_reference, date, author, approver, reason, and a list of changes each naming the item,
       its old value and its new value; and SHALL refuse a correction missing any of them.
     - IF a declared correction's item, old value or new value does not match the change actually made, THEN
@@ -25809,8 +25832,8 @@ requirements:
       whole number of days before (zero unless stated), at the participation version's expected time of
       day, in the timezone version in force on the day that falls on.
     - THE SYSTEM SHALL take a slot's expected time, days before, grace allowance and claim-window override
-      from its dataset's participation version in force on that period's own date, and its default claim
-      window from the calendar version in force on that date.
+      each as the value REQ-PIPE-181 resolves for that period's own date, from the dataset or its collection,
+      and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181).
     - WHEN a later participation or calendar version changes any of those inputs, THE SYSTEM SHALL leave
       the due instant, grace and claim-opening instant of every slot whose period date precedes that version's
       effective-from unchanged.
@@ -28966,7 +28989,7 @@ requirements:
     source: "Keith, 2026-10-04, group 3 sign-off round of option A, after finding backward filing while checking the since-dropped REQ-PIPE-124 (plans/road-testing.md #16, 'FOUND WHILE CHECKING THAT', 'KEITH'S PROPOSAL', 'PERIOD CLOSING SETTLED', 'SIGN-OFF ROUND, period closing'). Scoped by delivery-scoper 2026-10-04, separately from option A; signed off by Keith 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period - and as CLOSED from then on."
-      - "THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period's date with the dataset's own expected time and claim window, as effective on that period's date."
+      - "THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period's date with each value as REQ-PIPE-181 resolves it on that next period's date (amended by REQ-PIPE-181)."
       - "WHERE a period has no claim window, THE SYSTEM SHALL take its claim-opening instant to be its due instant, so the period before it closes when it is due."
       - "THE SYSTEM SHALL apply this rule to every dataset on every data asset, for authored-date calendars and cadence-rule calendars alike, and SHALL NOT offer it as a setting."
       - "THE SYSTEM SHALL decide which slot is open by a supply's RECEIPT instant, never by when it is processed, so that a file received inside a slot's open interval but processed after the slot has closed is filed to that slot."
