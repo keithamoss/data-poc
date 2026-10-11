@@ -25961,6 +25961,8 @@ requirements:
     - IF a range excuse would excuse nothing, THEN THE SYSTEM SHALL refuse it and say why.
     - WHEN the reason is asked for, THE SYSTEM SHALL say that it is published on the dashboard.
     - THE SYSTEM SHALL NOT count an excuse as a person's decision about the supply, so that an excused supply still waiting may promote itself under the gate; and SHALL amend, in the same change, REQ-PIPE-076 criterion 7 to name excuse beside re-file.
+    - A range excuse SHALL cover the current and rejected supplies filed in its periods, and SHALL skip a superseded one, saying it was superseded and that it may be excused by name.
+    - THE SYSTEM SHALL offer the range form in the terminal's filing-decisions door too, from the period picked through a period the person names, recording exactly what the flag route's range records.
     non_functional_requirements:
     - THIS IS AN ANNOTATION, NOT A HOLDING DECISION. qa.slot_holds must ignore it by construction, as it already ignores acknowledge and mark-not-supplied (REQ-PIPE-132 criterion 8), or an excuse could change what a period holds.
     - 'SURVIVES A CORRECTION ONLY WHILE THE SUPPLY IS STILL LATE (REQ-PIPE-168): a correction that re-judges it on time leaves the excuse lapsed, never deleted.'
@@ -25973,6 +25975,8 @@ requirements:
     - REQ-GHUB-082
     - REQ-PIPE-066
     decisions:
+    - 'WHICH SUPPLIES A RANGE COVERS (Keith, 2026-10-11, answer (a)): current AND rejected, never superseded. A rejected supply was decided on and was still late, so a run of late periods is about it; a superseded one was replaced rather than decided on, so the range skips it and says so. Excusing one by name is still open. REJECTED: covering every supply filed there (what it did until then), and covering current only.'
+    - 'THE RANGE FORM IN THE TERMINAL (Keith, 2026-10-11, answer (c)): after excuse lateness is picked, one question - this supply alone or a range - and for a range the last period is typed; the range starts at the period picked, so it is always a period holding a late supply. The same warning panel lists what it excuses and skips before the one confirmation, so nothing new is shown in the terminal that the flags do not.'
     - FOR SUPPLIER-SIDE LATENESS (Keith, 2026-10-07). It was first scoped that morning as the answer to a calendar authored wrong under a strict no-correction rule; when Keith replaced that rule with a declared correction (REQ-PIPE-111), a wrong calendar became the correction's to fix and this decision stayed for the other case - the agreement was right and the supplier was late for a reason the agency accepts. A person records it with a reason; the log keeps it; the dashboard shows late-but-excused naming the reason.
     - 'A NEW REQUIREMENT RATHER THAN AN AMENDMENT, because no existing decision requirement owns it: REQ-PIPE-132 (mark as not supplied) is about a slot nothing filled, REQ-PIPE-122''s acknowledge is about amber quality, and REQ-GHUB-082 owns the routes rather than any one operation. Same pattern as REQ-PIPE-120, 122 and 132, each of which added operations and amended REQ-GHUB-082 and REQ-PIPE-074 criterion 1 in the same change.'
     - 'THE VERDICT IS NOT REWRITTEN (scoper''s call, 2026-10-07): the supply still classifies as late and reads ''late, excused''. REJECTED reclassifying it as on time, which would make the page say something the agreement as written contradicts, and would make this decision a back door to the very re-judgement the freeze rule forbids.'
@@ -25988,7 +25992,7 @@ requirements:
     - 'A REPEAT EXCUSE IS REFUSED, NOT A NO-OP (criterion 3 says refuse and say why), unlike REQ-GHUB-082 criterion 26''s already-done success for other decisions. Excusing again after a withdrawal is allowed: the withdrawal ended the first.'
     - 'CRITERION 11 HOLDS BY CONSTRUCTION, checked 2026-10-11: no state in REQ-PIPE-083''s needs-action set exists because a filed supply is late (OVERDUE is a slot with nothing arrived; AWAITING_DECISION is a waiting supply, whatever its punctuality), so lateness is never a slot''s only reason to be there and an excuse needs nothing removed.'
     - 'LAPSE IS DERIVED, NOT RECORDED: an excuse whose slot is no longer the supply''s current filing, or whose supply no longer reads late (a correction''s re-judgement, REQ-PIPE-168), reads lapsed with the instant of the re-file decision or the re-judgement - nothing is written or deleted. The GitHub route takes the single-supply form through the same implementation; the range form is the terminal''s and the flags'' (criterion 10), and the GitHub route is disabled.'
-    - 'WHEN AN EXCUSE LAPSES, settled by the post-build critic (post-build-review #145): at the FIRST re-file after it, wherever that went - a supply re-filed away and back has a new filing, so the excuse does not come back (#2); else at the first correction that re-judged the supply not late, and it STAYS lapsed if a later correction judges it late again (#3, PROVISIONAL, a question for Keith); as at a date before the lapse it was in force. A range is written in one transaction, whole or refused.'
+    - 'WHEN AN EXCUSE LAPSES, settled by the post-build critic (post-build-review #145): at the FIRST re-file after it, wherever that went - a supply re-filed away and back has a new filing, so the excuse does not come back (#2); else at the first correction that re-judged the supply not late, and it STAYS lapsed if a later correction judges it late again (#3, confirmed by Keith 2026-10-11, answer (b)); as at a date before the lapse it was in force. A range is written in one transaction, whole or refused.'
     linked_tests:
     - tests/test_excuse.py
     - tests/test_filing_decisions.py
@@ -25999,6 +26003,7 @@ requirements:
     - qa_tools/common/excuse.py::history
     - qa_tools/common/excuse.py::in_force
     - qa_tools/common/excuse.py::range_plan
+    - qa_tools/common/excuse.py::_superseded_why
     - qa_tools/common/decision_log.py::EXCUSE_LATENESS
     - qa_tools/common/filing_decisions.py::_range_consequences
     - qa_tools/common/filing_decisions.py::_apply_one
@@ -26006,7 +26011,9 @@ requirements:
     - qa_tools/common/rejection.py::decided_by_a_person
     - cli/supply.py::decide_command
     - cli/filing_tui.py::apply_decision
+    - cli/filing_tui.py::_decide_on
     evidence:
+    - '2026-10-11 (Keith''s answers (a) and (c)): tests/test_excuse.py and test_cli_filing_tui.py 74 passed - a range over a period holding a rejected, a superseded and a current supply excuses the rejected and the current and skips the superseded one, saying so (c20); the terminal asks this supply alone or a range, and the range form passes the picked period and the typed last one with no supply, the single form unchanged (c21). Each test failed before the change.'
     - '2026-10-11 (overnight #3): tests/test_excuse.py, test_filing_decisions.py and test_cli_filing_tui.py 98 passed against the real cp-clients and cp-carers agreement - one excuse is one person entry naming dataset, period and supply, the filing and verdict unchanged and still late (c2, c4, c5); not late, already excused, the wrong period and no reason are refused with why (c3); a rule is refused (c6); a re-file lapses it and does not carry it (c7); a withdrawal is its own entry after which it reads late and can be excused again (c8); a range shows what it excuses and skips, needs the key, records one entry each, and is refused when it would excuse nothing or runs backwards (c9, c16, c17); offered on a late slot and withdrawal once excused, every operation reachable from a door (c10); the flags route single and range forms, the pair is refused for any other operation (c14, c15); the reason prompt says it is published (c18); neither the excuse nor its withdrawal bars the gate (c19).'
   - id: REQ-DASH-162
     title: The dashboard shows an excused late supply as late and excused, naming the reason

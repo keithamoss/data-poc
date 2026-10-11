@@ -564,9 +564,29 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
         if stands_on is None:
             return
 
+    through_period = None
+    if operation == filing_decisions.EXCUSE_LATENESS:
+        # THE RANGE FORM HERE TOO (Keith, 2026-10-11, answer (c)): from this
+        # period to one the person names, the same range the CLI's
+        # --from-period/--through-period records - the warning panel lists
+        # what it excuses and skips before the one confirmation.
+        form = common.select("Excuse this supply alone, or every late supply from "
+                             f"{state.period} to a later period?",
+                             [_EXCUSE_ONE, _EXCUSE_A_RANGE], flag_hint=_FLAG_HINT)
+        if form is None:
+            return
+        if form == _EXCUSE_A_RANGE:
+            through_period = common.text_prompt(
+                f"Through which period? Every late supply from {state.period} to it, "
+                f"inclusive, is excused with one reason.", flag_hint=_FLAG_HINT)
+            if through_period is None:
+                return
+            supply = None
+
     apply_decision(operation=operation, dataset_id=state.dataset_id,
                     period=state.period, supply=supply,
-                    stands_on=stands_on, to_period=to_period)
+                    stands_on=stands_on, to_period=to_period,
+                    through_period=through_period)
 
 
 def queue_flow(collection_id: str) -> None:
@@ -742,6 +762,8 @@ def filing_menu() -> None:
         console.print()
 
 
+_EXCUSE_ONE = "This supply alone"
+_EXCUSE_A_RANGE = "A range - this period through a later one"
 _MENU_CORRECTIONS = "Calendar corrections awaiting confirmation"
 _KEEP_DONE = "Done - confirm the rest"
 

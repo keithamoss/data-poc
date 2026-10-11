@@ -192,6 +192,27 @@ class TestARange:
         with pytest.raises(dl.DecisionRefused, match="nothing in 2025-Q3 to 2025-Q3"):
             fd.consequences(conn, self._range("2025-Q3", "2025-Q3"))
 
+    def test_a_rejected_supply_is_covered_and_a_superseded_one_skipped(self, conn):
+        """Keith, 2026-10-11 (a): a range excuse covers current AND rejected
+        supplies, never superseded ones - a superseded version was replaced
+        rather than decided on, so the range is not about it."""
+        from qa_tools.common import supersession
+
+        ag, col = "child-protection-family-support", "child-protection"
+        rejected = self._file("2024-Q4", datetime(2024, 12, 1, 9, tzinfo=PERTH))
+        superseded = self._file("2024-Q4", datetime(2024, 12, 2, 9, tzinfo=PERTH))
+        current = self._file("2024-Q4", datetime(2024, 12, 3, 9, tzinfo=PERTH))
+        rejection.reject(conn, agency_id=ag, collection_id=col, dataset_id="cp-carers",
+                         supply=rejected, physical_tables=[], actor=KEITH,
+                         effective_at=AT, reason="bad", from_slot="2024-Q4")
+        supersession.supersede(conn, agency_id=ag, collection_id=col,
+                               dataset_id="cp-carers", supply=superseded, period="2024-Q4",
+                               actor=KEITH, reason="replaced", effective_at=AT)
+        plan = excuse.range_plan(conn, "cp-carers", "2024-Q4", "2024-Q4")
+        assert {s for s, _ in plan.excuse} == {rejected, current}
+        [(skipped, _, why)] = plan.skipped
+        assert skipped == superseded and "superseded" in why
+
     def test_a_backwards_range_is_refused(self, conn):
         with pytest.raises(dl.DecisionRefused, match="runs backwards"):
             fd.consequences(conn, self._range("2025-Q3", "2025-Q1"))
@@ -245,6 +266,38 @@ class TestTheRoutes:
                    "--from-period", "2024-Q1", "--through-period", "2024-Q2",
                    "--reason", "r", "--yes"])
         assert got.exit_code != 0 and "excuse-lateness only" in got.output
+
+    def test_the_terminal_offers_the_range_form_from_this_period(self, monkeypatch):
+        """Keith, 2026-10-11 (c): the range form is in the terminal menu too,
+        starting at the period picked and running to one the person names."""
+        from cli import common, filing_tui
+        from qa_tools.common import slot_state
+
+        state = slot_state.SlotState(dataset_id=DATASET, period=LATE_SLOT,
+                                     state=slot_state.AWAITING_DECISION, supply="s")
+        answers = iter([filing_tui._WHAT_IT_DOES[fd.EXCUSE_LATENESS],
+                        filing_tui._EXCUSE_A_RANGE])
+        monkeypatch.setattr(common, "select", lambda q, options, **k: next(answers))
+        monkeypatch.setattr(common, "text_prompt", lambda q, **k: "2024-Q1")
+        called = {}
+        monkeypatch.setattr(filing_tui, "apply_decision", lambda **kw: called.update(kw))
+        filing_tui._decide_on(state, offer=(fd.EXCUSE_LATENESS,))
+        assert called["period"] == LATE_SLOT and called["through_period"] == "2024-Q1"
+        assert called["supply"] is None
+
+    def test_the_terminal_keeps_the_one_supply_form(self, monkeypatch):
+        from cli import common, filing_tui
+        from qa_tools.common import slot_state
+
+        state = slot_state.SlotState(dataset_id=DATASET, period=LATE_SLOT,
+                                     state=slot_state.AWAITING_DECISION, supply="s")
+        answers = iter([filing_tui._WHAT_IT_DOES[fd.EXCUSE_LATENESS],
+                        filing_tui._EXCUSE_ONE])
+        monkeypatch.setattr(common, "select", lambda q, options, **k: next(answers))
+        called = {}
+        monkeypatch.setattr(filing_tui, "apply_decision", lambda **kw: called.update(kw))
+        filing_tui._decide_on(state, offer=(fd.EXCUSE_LATENESS,))
+        assert called["supply"] == "s" and called.get("through_period") is None
 
     def test_the_terminal_offers_it_on_a_late_supply_and_withdrawal_once_excused(self, conn):
         from qa_tools.common import filing_queue, slot_state

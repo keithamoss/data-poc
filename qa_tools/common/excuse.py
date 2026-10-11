@@ -225,9 +225,26 @@ class RangePlan:
     skipped: tuple[tuple[str, str, str], ...]
 
 
+def _superseded_why(conn, dataset_id: str, supply: str) -> str | None:
+    """Why a range skips a superseded supply (Keith, 2026-10-11, answer
+    (a)): a range covers current AND rejected supplies, never superseded
+    ones - a superseded version was replaced rather than decided on, so a
+    range about a run of late periods is not about it. Excusing one alone,
+    by name, is still open."""
+    from qa_tools.common import supersession
+
+    if not supersession.is_superseded(conn, dataset_id, supply):
+        return None
+    newer = supersession.superseded_by(conn, dataset_id, supply)
+    by = f" by {newer}" if newer else ""
+    return (f"it was superseded{by} - a range excuses current and rejected supplies, not "
+            f"superseded ones; excuse it by name if it needs one")
+
+
 def range_plan(conn, dataset_id: str, first: str, last: str) -> RangePlan:
     """Every supply FILED in the periods `first` to `last` inclusive: late
-    and not yet excused ones are excused, the rest skipped and why.
+    and not yet excused ones are excused, the rest skipped and why -
+    superseded ones always skipped (answer (a)).
 
     Supplies currently filed there, by the slot each is filed to - an
     excuse is about a supply against its slot, never about a period.
@@ -249,7 +266,8 @@ def range_plan(conn, dataset_id: str, first: str, last: str) -> RangePlan:
         when = _date_of(slot, dates)
         if when is None or not lo <= when <= hi:
             continue
-        why = why_not_excusable(conn, dataset_id, supply, slot)
+        why = _superseded_why(conn, dataset_id, supply) or why_not_excusable(
+            conn, dataset_id, supply, slot)
         (skipped.append((supply, slot, why)) if why else excuse.append((supply, slot)))
     key = lambda item: (_date_of(item[1], dates), item[0])  # noqa: E731
     return RangePlan(tuple(sorted(excuse, key=key)), tuple(sorted(skipped, key=key)))
