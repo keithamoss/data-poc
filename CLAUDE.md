@@ -1659,6 +1659,25 @@ Rough layout:
     silence; spread-then-override carries them by default. Same
     reasoning as this file's own "no permissive fallback" stance
     elsewhere.
+- **A test earns its place by exercising real behaviour, and goes when
+  that behaviour goes** (Keith, 2026-10-12, after a review found tests
+  that passed while proving nothing). Four rules: (1) A test drives a
+  real entry point - the function, command or page a person or the
+  pipeline actually uses - and asserts on what it does, not on its source
+  text. Reading source is allowed only for an architecture rule with no
+  behaviour to observe (one writer, never-calls), and says so in its
+  docstring. (2) No test proves an absence for its own sake. When
+  something is removed, its tests are removed in the same change; a
+  reintroduction would be deliberate, and a deleted function fails loudly
+  anyway. Absence is worth a test only where it guards a live rule
+  (supply rows never read by a build, no credential in CI), and then by
+  behaviour where possible. (3) A test must be able to fail. If what it
+  reads can be empty - a folder, a table, a corpus - it asserts it is not
+  empty first, so a deleted source cannot turn it into [] == []. (4) When
+  a test would go red because work SUCCEEDED (a registry legitimately
+  filled, the last blocked sprint unblocked), the test is wrong, not the
+  work. Test helpers live in tests/, never in product code, and product
+  code only tests call is dead code.
 - **Whenever an actual bug is found** (not a design gap, not a missing
   feature - a case where the code produces a genuinely wrong result),
   add a test to `tests/` that reproduces it and fails against the

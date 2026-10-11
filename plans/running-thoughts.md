@@ -4775,8 +4775,9 @@ Belongs with batch 5's check work.
     the two 'retired-check registry is empty' tests), collapse ~75
     validator tests into ~12 tables keeping every case, delete the 11
     proven-twice tests. Being done in three passes (deletions, replacements,
-    the role test). Step 3 of this item - the testing GUIDANCE wording for
-    CLAUDE.md - is still to draft for Keith's word-for-word approval.
+    the role test). Step 3 of this item - the testing GUIDANCE - APPROVED
+    word for word by Keith the same morning and added to CLAUDE.md beside
+    the bug-test rule.
 
 68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
     **No custom code per dataset - everything in configuration, if we can.**
