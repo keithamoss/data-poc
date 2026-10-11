@@ -401,3 +401,28 @@ def _slot_runs(ordered):
     for e in ordered:
         out.setdefault(e["slot_id"], []).append(e)
     return list(out.values())
+
+
+class TestAResendKeepsEveryTwinsSibling:
+    """plans/running-thoughts.md #82 (Keith, 2026-10-11: void singles only):
+    churn() voided 1% of rows at random, and when one was a twin its
+    sibling was left unmatched - a resend drawn clean then failed the three
+    sibling checks, about four seeds in ten on the real tools."""
+
+    @staticmethod
+    def _unmatched(df):
+        twins = df[df["is_multiple_birth"].astype(bool)]
+        keys = ["date_of_birth", "place_of_birth_facility", "registering_parent_1_name"]
+        sizes = twins.fillna({k: "<null>" for k in keys}).groupby(keys)["registration_number"] \
+            .transform("count")
+        return int((sizes < 2).sum())
+
+    @pytest.mark.parametrize("seed", range(12))
+    def test_no_twin_is_left_without_its_sibling(self, seed):
+        from datetime import date as d
+
+        p = generate_runs.BirthRegistrationsProvider()
+        first = p.generate(d(2026, 9, 19), seed=1101, n_rows=2000, id_offset=0)
+        assert self._unmatched(first) == 0, "precondition: the batch itself is whole"
+        resend = p.churn(first, seed=3000 + seed, run_date=d(2026, 9, 19), id_offset=500_000)
+        assert self._unmatched(resend) == 0

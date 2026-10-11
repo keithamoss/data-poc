@@ -147,6 +147,13 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
 
+    RE-CAPTURED 2026-10-11 FOR plans/running-thoughts.md #82 (churn voids
+    single births only). The procedure first: 60 deliveries, zero
+    `handfiled-*`. One Birth Registrations arrival moved and NO VERDICT: the
+    2026-09-04 resend's receipt instant comes from its earliest extract
+    timestamp, and voiding different rows moved it 02:13:03 -> 02:11:03, so
+    its run id moved with it. One run id out, one in, nothing else changed.
+
     RE-CAPTURED 2026-10-05 FOR REQ-GEN-044's QUIET DAYS (sprint 11). The
     procedure first: 60 deliveries, zero `handfiled-*`. What moved is
     Birth Registrations' arrivals only, and NO VERDICT: TS-47 replaces

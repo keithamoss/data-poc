@@ -5000,7 +5000,7 @@ Belongs with batch 5's check work.
     only because the plans test was run by hand. Probably a `plans-index
     --check` gate in `mothman check`'s list.
 
-82. **[todo, 2026-10-11]** **[Data generation]** **A resend drawn clean
+82. **[done, 2026-10-11]** **[Data generation]** **A resend drawn clean
     fails the three sibling checks.** Found re-measuring REQ-GEN-184:
     Birth Registrations' run_015 (slot_010, the 2026-09-02 period's third
     arrival, dirty_severity None, received 2026-09-14) fails
@@ -5013,3 +5013,15 @@ Belongs with batch 5's check work.
     (a resend churned from the first supply). REQ-GEN-184 criterion 5 is
     about TARGETED supplies; churn is the ordinary chain's, so this wants
     its own fix or a line in REQ-GEN-185, which plants TS-46.
+
+    **Fixed the same day (Keith: void singles only).** `churn()` voided 1%
+    of rows at random; voiding one twin left its sibling unmatched. Real
+    tools on ten churn seeds: 4 failed the sibling checks; the regression
+    test failed on 5 of 12 seeds before the fix, none after. `churn()` now
+    voids single-birth rows only, same draw. Measured on a regenerate from
+    empty: Birth Registrations gate verdicts amber 13 / green 9 / red 20
+    became 14 / 13 / 15, page 10 / 4 / 28 became 10 / 7 / 25, gap reds 30
+    became 28, promotions 19 became 21; Child Protection unchanged (its
+    churn only modifies). It also cleared the critic's finding 1 on
+    REQ-GEN-184 part B (post-build-review #155): a targeted resend went
+    through the same churn.

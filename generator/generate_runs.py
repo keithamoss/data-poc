@@ -291,7 +291,13 @@ class BirthRegistrationsProvider:
         rng = np.random.default_rng(seed)
         out = df.copy()
 
-        remove_mask = rng.random(len(out)) < remove_rate
+        # VOIDED REGISTRATIONS ARE SINGLE BIRTHS (Keith, 2026-10-11,
+        # plans/running-thoughts.md #82): voiding one twin left its sibling
+        # unmatched, and a resend drawn clean failed the three sibling
+        # checks about four times in ten. The draw is unchanged, so the
+        # same rows are voided as before wherever none was a twin.
+        remove_mask = (rng.random(len(out)) < remove_rate) & \
+            ~out["is_multiple_birth"].astype(bool).to_numpy()
         out = out.loc[~remove_mask].reset_index(drop=True)
 
         modify_mask = rng.random(len(out)) < modify_rate

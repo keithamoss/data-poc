@@ -117,6 +117,12 @@ releases:
     changes:
       - category: Fixed
         items:
+          - headline: A clean resend keeps its twins
+            components: ["Data generation"]
+            description: >
+              A resupply in the synthetic history could drop one twin of a
+              multiple birth and so fail the sibling checks though nothing
+              else was wrong. Resends now only drop single births.
           - headline: Nothing counted, never green
             components: ["Dashboard UI"]
             description: >
