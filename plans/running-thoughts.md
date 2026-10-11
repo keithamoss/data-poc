@@ -4580,6 +4580,32 @@ Belongs with batch 5's check work.
     parallelism is. QUEUED after the current queue, PAIRED with #67's test
     review.
 
+    **PROFILED AGAIN 2026-10-11 evening, at 10m39s** (bootstrap from empty,
+    REQ-GEN-186 live: Birth Registrations 202s beside Child Protection 593s,
+    so Child Protection sets the length). A Child Protection-only bootstrap
+    under cProfile, tools one after another so each is attributed (1,060s
+    with that overhead), per arrival of 108: dbt (its worker process) 4.6s,
+    datacontract-cli 3.1s (profiler-inflated), Soda 1.4s, Evidently 0.2s,
+    and promotion, re-checks, filing, staging and configuration about 1.6s.
+    In a normal run dbt sits beside the other three, so an arrival costs
+    about max(4.6, ~3.5) + ~1.3 = 5.5s, which is the 593s.
+
+    **THE FINDING THAT MATTERS FOR UNDER 5 MINUTES**: every Child Protection
+    run checks ALL SIX tables, though an arrival brings one. datacontract-cli
+    ran 606 model checks in 101 runs, dbt builds the six models plus three,
+    and 645 result writes in 108 arrivals is six a run. Five of the six are
+    the period's unchanged siblings, checked again. Checking only the
+    arriving table plus the cross-table checks that read it would cut most
+    of dbt's and datacontract-cli's per-run work - plausibly the halving 5
+    minutes needs, where nothing else on the list comes close. But it changes
+    what a run RECORDS (sibling verdicts per run), and the target was
+    identical output, so it is Keith's call and a requirement first. Not
+    built.
+
+    Smaller, noted: `config_yaml.parse` is still called 53,068 times (28s,
+    memoised but deep-copied each call); `_declared_reads` re-collects every
+    check definition 402 times (16s).
+
 66. **[todo, 2026-10-05]** **[Testing & dev tooling]** **Bring a development
     database's schema forward in place.** Keith, 2026-10-05 evening: "happy
     for you to upgrade the database schema in place during development."
@@ -4674,6 +4700,30 @@ Belongs with batch 5's check work.
     guard helper, and the repo-configuration check that every mechanical
     cross-table check declares what it reads kept with its one-liner inlined.
     `mark_by_admin` moved into tests/conftest.py's `mark_test_database`.
+
+    **PASS 2 CENSUS, 2026-10-11 evening** (a read-only agent read every
+    candidate test; nothing edited). The full list, file::test by
+    file::test with a recommendation each, is docs/test-review-pass2.md -
+    working material for walking it with Keith, to be deleted once its
+    items are decided. Totals if every recommendation were taken: about
+    63 test functions deleted (of 4,641 collected), 40 weak tests replaced
+    by behaviour tests, 13 data-boundary greps folded into one behaviour
+    test (the dashboard-build readers run over the publisher role, which is
+    already refused staging), about 75 process-tooling tests collapsed into
+    about 12 tables keeping every case. Mostly strength, not gate time.
+    CHECKED BY THE MAIN SESSION, and the reason to do this first: tests that
+    PASS WHILE PROVING NOTHING. `test_staging_loads.py`'s
+    `test_staging_happens_before_the_tools_fan_out` finds `build_all()` only
+    in two stale docstrings (orchestrate_bdm.py line 25, orchestrate_cp.py
+    line 17); `test_arrivals.py`'s
+    `test_every_committed_dataset_stats_file_is_clean` walks `qa_results/`,
+    which no longer exists, so it compares nothing. The agent names two more
+    of the same kind (the e2e "compared nothing" floor counting qa_results/
+    runs; a trial test satisfied by the word "transaction" in a docstring),
+    both of Keith's named examples (backlog.unprocessed, the old
+    database-settings identity) among about 20 absence tests, and tests that
+    go red when work SUCCEEDS (the retired-check registries asserted
+    empty). Nothing is deleted without Keith's yes per item.
 
 68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
     **No custom code per dataset - everything in configuration, if we can.**
