@@ -7785,3 +7785,49 @@ twice. It deliberately did not re-find the `TypeError`.
       redundant green line's comment corrected.
     - **Edge from criterion 5:** a scenario whose own suppressed day covered
       its own lead-in was accepted and lost the lead-in silently. Refused.
+
+157. **[todo, 2026-10-11]** **[Data generation]** **[Pipeline & publishing]**
+     **The delivery critic on REQ-GEN-186 (8e2bada).** Run after the push. The
+     comparison logic holds: the critic re-ran it read-only over the 26
+     targeted supplies and all agreed, and the gate's reading is what makes
+     2026-08-28's ordinary amber read amber rather than red. Two findings are
+     already checked against the code; the rest are to verify before fixing,
+     each test-first.
+    - **1 (medium-high, checked):** the TUI's bootstrap menu (`cli/app.py`
+      `_bootstrap_menu`) never reads `result.disagreements` and prints
+      "Ready" in green over a history where a supply read wrong. Only the
+      CLI command fails. The failure belongs in one place both callers use.
+    - **2 (medium, Keith's call):** `mothman pipeline run` regenerates
+      (the trial runs) and replays both collections, but never compares
+      after the replay, and can publish. Should it compare, or is it out of
+      scope and the requirement says so?
+    - **3 (medium, checked):** `resume` regenerates, and so runs the trial,
+      BEFORE it switches `MOTHMAN_SUPPLY_DSN` to the resume's own database.
+      A trial writes and then discards a run, schemas and load outcomes in
+      the database the user was pointed at, which resume promises never to
+      write to, and outside any pass lock. Likely fix: resume generates
+      with `trial=False`, since it compares after its own replay anyway.
+    - **4 (Keith's call):** REQ-GEN-043 criterion 7. A QA module
+      (`bootstrap.targets_agree`) now reaches the bookkeeping through
+      cli/ and generator/. The static guard checks names, not the call
+      graph. What c7 protects (filing from a declaration) is untouched -
+      the read only feeds an after-the-fact comparison - but it is a read.
+    - **5 (low-medium):** `after_replay` compares a supply's current run,
+      which excludes `readers` runs, while the knock-on re-gate reads
+      `supply_status.latest_results` across every run. No targeted supply
+      has more than one run today. A third way of answering "a supply's
+      results", which the requirement's own decisions warn against.
+    - **6 (low):** an ordinary amber that warned on nothing, or a quiet
+      verdict, gives a message naming no checks (observability NFR).
+    - **7 (low):** on a trial failure, the scenario placements, the
+      rewritten SCENARIOS.md and a previous generation's Child Protection
+      deliveries stay; a `ValueError` from targets.py escapes as a
+      traceback, and after a replay only once the bootstrap has finished.
+    - **8 (low, note):** the trial skips the row-count-growth check, so it
+      cannot see a volume target. Consistent with "a verdict probe".
+    - **Coverage:** no test feeds recorded results that DISAGREE to
+      `after_replay`; `targets_agree`'s body is stubbed in every bootstrap
+      test; no test completes a resume through `bootstrap.resume`.
+    - **Code quality:** `target_agreement.py` uses private helpers of
+      promotion and qa_results_reader, and `responsible()` repeats
+      `status_of`'s per-record mapping.
