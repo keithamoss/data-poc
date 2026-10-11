@@ -124,6 +124,11 @@ describe("delivery-critic on 172 (post-build-review #149)", () => {
     expect(w.awaitingCorrectionLine("cp-clients")).toContain("could not be worked out");
   });
 
+  it("a parked correction move has a kind label of its own (Keith, 2026-10-11, (p))", () => {
+    const w = loadDashboard().window;
+    expect(w.outstandingKindLabel("parked-correction-move")).toBe("Correction move waiting");
+  });
+
   it("3: an outstanding item that affects datasets links each", () => {
     const w = loadDashboard().window;
     const html = w.outstandingItemHtml({kind: "pending-correction", severity: "needs-action", blocking: false,

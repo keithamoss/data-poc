@@ -125,6 +125,10 @@ AWAITING_DECISION = "awaiting-decision"
 #: filing and verdict meanwhile. From configuration and the applied record
 #: alone; its moves are worked out when it is opened, never here.
 PENDING_CORRECTION = "pending-correction"
+#: A confirmed correction's move another decision blocks (Keith, 2026-10-11,
+#: (p)): parked, one item per supply, needs-action until the blocker clears
+#: and the pass moves it, or the asset manager keeps it where it is.
+PARKED_CORRECTION_MOVE = "parked-correction-move"
 
 
 @dataclass(frozen=True)
@@ -611,6 +615,37 @@ def _from_pending_corrections(conn=None) -> list[Item]:
         for p in found]
 
 
+def _from_parked_corrections(conn=None) -> list[Item]:
+    """Each parked correction move, needing action (Keith, 2026-10-11)."""
+    from qa_tools.common import correction_apply
+
+    try:
+        with delivery_log._db(conn) as db:
+            found = correction_apply.parked(db)
+    except Exception as exc:  # noqa: BLE001 - the queue never fails on one producer
+        print(f"note: could not read parked correction moves ({type(exc).__name__}: {exc}) "
+              f"- the rest of the queue is unaffected.")
+        return []
+    items = []
+    for m in found:
+        agency, collection = _scope_of(m.dataset_id)
+        items.append(Item(
+            kind=PARKED_CORRECTION_MOVE, severity=NEEDS_ACTION, blocking=False,
+            headline=(f"Correction {m.reference} moves {m.supply_id} from "
+                      f"{m.from_period or 'a hold'} to {m.to_period or 'a hold'}, once what "
+                      f"blocks it is cleared"),
+            detail=(f"Confirmed by {m.confirmed_by}; parked because another decision "
+                    f"blocks it. It stays where it is, with its verdict there, until then - "
+                    f"and the next processing pass moves it."),
+            agency_id=agency, collection_id=collection, dataset_id=m.dataset_id,
+            observed_at=m.parked_at,
+            responses=(f"clear what blocks it: {m.blocked.splitlines()[0]}",
+                       f"or the data asset's manager keeps it where it is: mothman supply "
+                       f"confirm-correction --reference {m.reference} --keep {m.supply_id} "
+                       f"--keep-reason '<why>'")))
+    return items
+
+
 def _sort_key(item: Item) -> tuple:
     return (0 if item.blocking else 1,
             SEVERITY_ORDER.index(item.severity) if item.severity in SEVERITY_ORDER else 9,
@@ -634,6 +669,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
               + _from_inheritance_refusals()
               + _from_awaiting_decisions(conn)
               + _from_pending_corrections(conn)
+              + _from_parked_corrections(conn)
               + _from_unfilled_periods(conn)
               + _from_in_flight(observations_dir))
     return Outstanding(items=tuple(sorted(items, key=_sort_key)),

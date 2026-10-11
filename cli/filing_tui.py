@@ -728,16 +728,23 @@ def filing_menu() -> None:
     collections = _collections()
     # PENDING CORRECTIONS ABOVE THE CHOICE OF COLLECTION (REQ-PIPE-170
     # criterion 13): a correction is asset-wide, so it cannot wait inside one.
+    # Its PARKED moves likewise (Keith, 2026-10-11, (p)).
     waiting = _pending_corrections()
-    if waiting:
-        console.print(f"{len(waiting)} calendar correction(s) await the data asset's "
-                      f"manager: {', '.join(p.reference for p in waiting)}.", style="yellow",
-                      markup=False)
-        entry = f"{_MENU_CORRECTIONS} ({len(waiting)})"
-        picked = common.select("Which collection - or the pending corrections?",
-                               [entry] + collections, flag_hint=_FLAG_HINT)
-        if picked == entry:
+    parked = _parked_moves()
+    if waiting or parked:
+        if waiting:
+            console.print(f"{len(waiting)} calendar correction(s) await the data asset's "
+                          f"manager: {', '.join(p.reference for p in waiting)}.",
+                          style="yellow", markup=False)
+        entries = ([f"{_MENU_CORRECTIONS} ({len(waiting)})"] if waiting else []) \
+            + ([f"{_MENU_PARKED} ({len(parked)})"] if parked else [])
+        picked = common.select("Which collection - or the corrections?",
+                               entries + collections, flag_hint=_FLAG_HINT)
+        if picked and picked.startswith(_MENU_CORRECTIONS):
             corrections_flow(waiting)
+            return
+        if picked and picked.startswith(_MENU_PARKED):
+            parked_flow(parked)
             return
         collection_id = picked
     else:
@@ -765,6 +772,7 @@ def filing_menu() -> None:
 _EXCUSE_ONE = "This supply alone"
 _EXCUSE_A_RANGE = "A range - this period through a later one"
 _MENU_CORRECTIONS = "Calendar corrections awaiting confirmation"
+_MENU_PARKED = "Parked correction moves"
 _KEEP_DONE = "Done - confirm the rest"
 
 
@@ -781,6 +789,49 @@ def _pending_corrections() -> list:
         console.print(f"Pending calendar corrections could not be read ({exc}) - "
                       f"`mothman supply corrections` says more.", style="dim", markup=False)
         return []
+
+
+def _parked_moves() -> list:
+    """Parked correction moves, or none where they cannot be read."""
+    from qa_tools.common import correction_apply
+
+    try:
+        with supply_db.connect(read_only=True, label="mothman:parked-corrections") as conn:
+            return correction_apply.parked(conn)
+    except Exception as exc:  # noqa: BLE001 - as _pending_corrections
+        console.print(f"Parked correction moves could not be read ({exc}) - "
+                      f"`mothman supply corrections` says more.", style="dim", markup=False)
+        return []
+
+
+def parked_flow(parked: list) -> None:
+    """The parked moves, and - for the asset manager - keep one where it is
+    instead, with a reason (Keith, 2026-10-11, (p))."""
+    from cli import supply as supply_cli
+
+    supply_cli._show_parked(parked)
+    actor = actor_at_the_keyboard()
+    why = supply_cli.manager_refusal(actor)
+    if why:
+        _show(why, title="You can look; only the asset manager keeps one", style="yellow")
+        return
+    labels = {f"Keep {m.dataset_id} {m.supply_id} in {m.from_period or 'its hold'} "
+              f"({m.reference})": m for m in parked}
+    choice = common.select("Keep one where it is instead of moving it once cleared?",
+                           [_KEEP_DONE_PARKED] + list(labels),
+                           flag_hint="mothman supply confirm-correction --keep")
+    if choice is None or choice == _KEEP_DONE_PARKED:
+        return
+    m = labels[choice]
+    with supply_db.connect(label="mothman:keep-parked") as conn:
+        try:
+            supply_cli.keep_parked_moves(conn, m.reference, (m.supply_id,), None, actor=actor,
+                                         yes=False)
+        except click.ClickException as exc:
+            _show(exc.message, title="Not kept", style="red")
+
+
+_KEEP_DONE_PARKED = "Leave them parked"
 
 
 def corrections_flow(waiting: list) -> None:
@@ -817,7 +868,8 @@ def corrections_flow(waiting: list) -> None:
         keep: set = set()
         moves = {f"Keep {m.dataset_id} {m.supply_id} where it is "
                  f"({m.from_period or 'held'} -> {m.to_period or 'held'})"
-                 + (" - BLOCKED" if m.blocked else ""): (m.dataset_id, m.supply_id)
+                 + (" - BLOCKED, parked unless kept" if m.blocked else ""):
+                 (m.dataset_id, m.supply_id)
                  for m in t.moves}
         while moves:
             choice = common.select("Keep any where they are? Each one you keep is recorded as "

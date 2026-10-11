@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 36
+SCHEMA_VERSION = 37
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -663,6 +663,48 @@ DROP TRIGGER IF EXISTS correction_applied_append_only ON "{SCHEMA}".correction_a
 CREATE TRIGGER correction_applied_append_only
     BEFORE UPDATE OR DELETE ON "{SCHEMA}".correction_applied
     FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".correction_applied_is_append_only();
+
+-- A CONFIRMED CORRECTION'S BLOCKED MOVE, PARKED (Keith, 2026-10-11, (p);
+-- schema 37). Confirming applies what can move; a move another decision
+-- blocks waits here, on the outstanding list, until its blocker clears and
+-- the pass moves it - to the period CONFIRMED - or the asset manager keeps
+-- the supply where it is. Append-only, like the applied record: a parked
+-- move is resolved by a row in correction_parked_resolved, never updated.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".correction_parked (
+    id               bigserial PRIMARY KEY,
+    change_reference text NOT NULL CHECK (change_reference <> ''),
+    dataset_id       text NOT NULL,
+    supply_id        text NOT NULL,
+    from_period      text,
+    to_period        text,
+    blocked          text NOT NULL,
+    confirmed_by     text NOT NULL CHECK (confirmed_by <> ''),
+    parked_at        timestamptz NOT NULL,
+    CHECK (from_period IS NOT NULL OR to_period IS NOT NULL)
+);
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".correction_parked_resolved (
+    parked_id   bigint PRIMARY KEY REFERENCES "{SCHEMA}".correction_parked (id),
+    how         text NOT NULL CHECK (how IN ('moved', 'kept')),
+    actor       text NOT NULL CHECK (actor <> ''),
+    resolved_at timestamptz NOT NULL,
+    decision_id bigint
+);
+CREATE OR REPLACE FUNCTION "{SCHEMA}".correction_parked_is_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+        '%.% is append-only: a % is not permitted. A parked move is resolved by '
+        'a new row, never changed', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP;
+END $$;
+DROP TRIGGER IF EXISTS correction_parked_append_only ON "{SCHEMA}".correction_parked;
+CREATE TRIGGER correction_parked_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".correction_parked
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".correction_parked_is_append_only();
+DROP TRIGGER IF EXISTS correction_parked_resolved_append_only
+    ON "{SCHEMA}".correction_parked_resolved;
+CREATE TRIGGER correction_parked_resolved_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".correction_parked_resolved
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".correction_parked_is_append_only();
 
 -- A SUPPLY'S CURRENT FILING, DEFINED ONCE (REQ-PIPE-141 criterion 2 and
 -- NFR 6): its newest row. Every reader of "the" filing reads this.

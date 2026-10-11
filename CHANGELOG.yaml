@@ -230,6 +230,13 @@ releases:
               says so and why, a dataset with a correction waiting to be
               confirmed says that too, and each confirmed correction appears
               once in Recent activity.
+          - headline: A blocked correction move waits rather than stops
+            components: ["Pipeline & publishing"]
+            description: >
+              Confirming a correction no longer waits on a blocked move. The
+              rest go ahead, and the blocked one waits on the outstanding list
+              until what blocks it is cleared, then moves to the period you
+              confirmed. Meanwhile the asset manager can keep it where it is.
           - headline: Excuse a run of periods from the menu
             components: ["Pipeline & publishing"]
             description: >

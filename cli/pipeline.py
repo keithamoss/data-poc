@@ -226,6 +226,9 @@ def _say_pass(report) -> None:
         console.print(f"{len(report.refiled_cleared)} supply/supplies held while their dataset "
                       f"was refused were filed now that the agreement matches again.",
                       style="green")
+    if report.parked_moved:
+        console.print(f"{len(report.parked_moved)} parked correction move(s) went ahead now "
+                      f"that what blocked them has cleared.", style="green")
     # REQ-PIPE-170 criterion 20: noted, never worked out by the pass.
     if report.pending_corrections:
         console.print(f"{len(report.pending_corrections)} calendar correction(s) await the data "

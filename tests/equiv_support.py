@@ -122,6 +122,9 @@ CLOCK_COLUMNS = {
     "verdict": {"recorded_at"},
     # REQ-PIPE-170's applied record, stamped when the person confirmed.
     "correction_applied": {"applied_at"},
+    # A confirmed correction's parked moves (Keith, 2026-10-11, (p)).
+    "correction_parked": {"parked_at"},
+    "correction_parked_resolved": {"resolved_at"},
 }
 
 #: SURROGATE IDS WITH NO ORDER WORTH KEEPING, dropped outright. Rows that
@@ -132,6 +135,7 @@ SURROGATE_COLUMNS = {
     "owed_run": {"id"},
     "verdict": {"id"},
     "correction_applied": {"id"},
+    "correction_parked": {"id"},
 }
 
 #: SURROGATE KEYS, replaced rather than dropped. A bigserial id differs

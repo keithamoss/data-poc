@@ -1061,8 +1061,12 @@ def corrections_command(reference: str | None) -> None:
             found = correction_apply.pending(conn)
         except correction_trial.Unreadable as exc:
             raise click.ClickException(str(exc)) from exc
+        parked = correction_apply.parked(conn)
+        if reference is None or not found:
+            _show_parked(parked)
         if not found:
-            console.print("No corrections are waiting to be confirmed.", style="green")
+            if not parked:
+                console.print("No corrections are waiting to be confirmed.", style="green")
             return
         if reference is None:
             console.print(f"{len(found)} correction(s) waiting for the data asset's "
@@ -1082,6 +1086,61 @@ def corrections_command(reference: str | None) -> None:
         except decision_log.DecisionRefused as exc:
             raise click.ClickException(str(exc)) from exc
         _show_correction(p, t)
+
+
+def _show_parked(parked: list) -> None:
+    """Each confirmed correction's move that waits on another decision
+    (Keith, 2026-10-11, (p)), and the two ways it ends."""
+    if not parked:
+        return
+    console.print(f"{len(parked)} move(s) from confirmed corrections are parked until what "
+                  f"blocks them is cleared - the next processing pass then moves each to the "
+                  f"period confirmed:", style="bold yellow")
+    for m in parked:
+        console.print(f"  {m.reference}: {m.dataset_id} {m.supply_id}  "
+                      f"{m.from_period or 'held'} -> {m.to_period or 'held'}", markup=False,
+                      highlight=False)
+        console.print(f"      blocked: {m.blocked.splitlines()[0]}", style="dim", markup=False)
+    first = parked[0]
+    console.print(f"Or keep one where it is (the asset manager): mothman supply "
+                  f"confirm-correction --reference {first.reference} --keep {first.supply_id} "
+                  f"--keep-reason '<why>'\n", style="dim", markup=False, soft_wrap=True)
+
+
+def keep_parked_moves(conn, reference: str, keeps, keep_reason: str | None, *, actor: dict,
+                      yes: bool) -> bool:
+    """Keep parked supplies where they are, with one reason - the flag
+    route's and the terminal's one body (Keith, 2026-10-11)."""
+    from qa_tools.common import correction_apply
+
+    by_supply = {m.supply_id: m for m in correction_apply.parked(conn, reference)}
+    unknown = [k for k in keeps if k not in by_supply]
+    if unknown:
+        raise click.ClickException(f"{', '.join(unknown)} is not parked under {reference}, so "
+                                   f"there is nothing to keep. `mothman supply corrections` "
+                                   f"lists what is parked.")
+    if not (keep_reason or "").strip() and not yes:
+        keep_reason = common.text_prompt("Why do the kept supplies stay where they are?",
+                                         flag_hint="--keep-reason")
+    if not (keep_reason or "").strip():
+        raise click.ClickException("keeping a supply needs a reason - why it stays where it "
+                                   "is (--keep-reason).")
+    if not common.confirm_change(
+            f"Keep {len(keeps)} parked supply/supplies of {reference} where they are, as "
+            f"{people.actor_name(actor)}?", yes=yes, default=False, flag_hint="pass --yes"):
+        console.print("Not kept.", style="yellow")
+        return False
+    for supply in keeps:
+        m = by_supply[supply]
+        try:
+            correction_apply.keep_parked(conn, reference, m.dataset_id, supply, actor=actor,
+                                         reason=keep_reason,
+                                         effective_at=asset_time.now().isoformat())
+        except (decision_log.DecisionRefused, people.RoleRefused) as exc:
+            raise click.ClickException(str(exc)) from exc
+        console.print(f"Kept {m.dataset_id} {supply} in {m.from_period or 'its hold'}.",
+                      style="green", markup=False)
+    return True
 
 
 def _show_correction(p, t) -> str:
@@ -1130,8 +1189,11 @@ def confirm_correction_command(reference: str, keeps: tuple[str, ...],
     each moved supply is re-filed (and re-checked by the next pass), one the
     corrected calendar offers no period is held, and every verdict is
     re-judged against the period it ends up in. A kept supply stays where it
-    is, recorded as kept. A blocked move must be cleared or kept first.
-    Prints what was applied, to attach to the change reference.
+    is, recorded as kept. A move another decision blocks is PARKED: it waits
+    on the outstanding list and the processing pass moves it once the
+    blocker clears - or, run again on the confirmed reference with --keep,
+    it is kept where it is. Prints what was applied, to attach to the change
+    reference.
     """
     from cli import filing_tui
     from qa_tools.common import correction_apply, correction_trial
@@ -1143,6 +1205,20 @@ def confirm_correction_command(reference: str, keeps: tuple[str, ...],
     if why:
         raise click.ClickException(why)
     with supply_db.connect(label="mothman:confirm-correction") as conn:
+        # AN APPLIED CORRECTION WITH PARKED MOVES (Keith, 2026-10-11, (p)):
+        # --keep keeps a parked supply where it is instead.
+        if reference in correction_apply.applied_references(conn):
+            if not correction_apply.parked(conn, reference):
+                raise click.ClickException(f"{reference} is already confirmed and has no "
+                                           f"parked moves - there is nothing to confirm.")
+            if not keeps:
+                _show_parked(correction_apply.parked(conn, reference))
+                raise click.ClickException(
+                    f"{reference} is already confirmed; its parked moves go ahead on their "
+                    f"own once what blocks them is cleared. --keep <supply> keeps one where "
+                    f"it is instead.")
+            keep_parked_moves(conn, reference, keeps, keep_reason, actor=actor, yes=yes)
+            return
         try:
             p, t = correction_apply.trial_for(conn, reference)
         except (decision_log.DecisionRefused, correction_trial.Unreadable) as exc:
@@ -1178,8 +1254,13 @@ def apply_correction(conn, p, t, *, actor: dict, keep: set, keep_reason: str | N
     from qa_tools.common import correction_apply, correction_trial
 
     if not common.confirm_change(
-            f"Apply correction {p.reference} - {len(t.moves) - len(keep)} move(s), "
-            f"{len(keep)} kept - as {people.actor_name(actor)}?",
+            f"Apply correction {p.reference} - "
+            f"{sum(1 for m in t.moves if not m.blocked and (m.dataset_id, m.supply_id) not in keep)}"
+            f" move(s), {len(keep)} kept"
+            + (f", {parked} parked until what blocks them clears"
+               if (parked := sum(1 for m in t.moves if m.blocked
+                                 and (m.dataset_id, m.supply_id) not in keep)) else "")
+            + f" - as {people.actor_name(actor)}?",
             yes=yes, default=False, flag_hint=f"pass --yes --acknowledge {acknowledged}"):
         console.print("Not applied.", style="yellow")
         return False

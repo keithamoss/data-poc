@@ -273,11 +273,14 @@ class PassReport:
     #: criterion 20) - noted, never computed: their moves are worked out when
     #: one is opened.
     pending_corrections: list = field(default_factory=list)
+    #: Parked correction moves this pass carried out once their blocker
+    #: cleared (Keith, 2026-10-11, (p)) - (dataset, supply, from, to).
+    parked_moved: list = field(default_factory=list)
 
     @property
     def nothing_to_do(self) -> bool:
         return not (self.processed or self.gated_only or self.left_locked or self.refiled
-                    or self.refiled_cleared or self.refused
+                    or self.refiled_cleared or self.refused or self.parked_moved
                     or self.left_behind_failure or self.left_behind_locked
                     or self.left_for_budget or self.failures or self.owed)
 
@@ -421,6 +424,17 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
             say=say, skip=frozenset(report.refused)))
     except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
         failed("schedule-ended holds", exc)
+    # A PARKED CORRECTION MOVE WHOSE BLOCKER HAS CLEARED (Keith, 2026-10-11,
+    # (p)) moves now, to the period confirmed - never for a refused dataset,
+    # and before arrivals, so a re-check it owes is run this pass.
+    try:
+        from qa_tools.common import correction_apply, supply_db as _db
+
+        with _db.connect(label="mothman:parked-corrections") as conn:
+            report.parked_moved.extend(correction_apply.drain_parked(
+                conn, skip=frozenset(report.refused), say=say))
+    except Exception as exc:  # noqa: BLE001 - parked moves are durable; the next pass retries
+        failed("parked correction moves", exc)
 
     # STAGED FIRST, as the batch stages first: a delivery's later files are
     # candidates the overlay sees when its first is checked. Only what is

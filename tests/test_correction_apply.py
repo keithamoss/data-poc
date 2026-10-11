@@ -34,12 +34,14 @@ def conn(supply_dsn):
         qa_store.ensure_schema(c)
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
+        c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_parked CASCADE')
         _file(SUPPLY, "2023-Q3", RECEIVED)
         yield c
         # LEFT EMPTY FOR THE NEXT MODULE ON THIS WORKER: the activity feed
         # reads every applied correction, so one left behind here appeared in
         # tests/test_embed_dashboard_data.py's feed.
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
+        c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_parked CASCADE')
 
 
 @pytest.fixture
@@ -190,11 +192,9 @@ class TestConfirming:
             correction_apply.confirm(conn, "CAB-1", actor=manager, keep={(DATASET, SUPPLY)},
                                      effective_at=AT, docs=docs)
 
-    def test_a_blocked_move_must_be_cleared_or_kept(self, conn, manager):
+    def test_a_blocked_move_may_still_be_kept_at_confirmation(self, conn, manager):
         _file("apply-c@1#1", "2023-Q3", RECEIVED + timedelta(minutes=1))
         docs = _corrected(_move_q3)
-        with pytest.raises(decision_log.DecisionRefused, match="blocked"):
-            correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         done = correction_apply.confirm(
             conn, "CAB-1", actor=manager, keep={(DATASET, "apply-c@1#1")},
             keep_reason="contested - deciding separately", effective_at=AT, docs=docs)
@@ -497,9 +497,13 @@ class TestScenarioRegister:
         _p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
         [m] = [m for m in t.moves if m.supply_id == "ts61@1#1"]
         assert m.blocked and "contested" in m.blocked
-        with pytest.raises(decision_log.DecisionRefused, match="blocked"):
-            correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
-        assert correction_apply.pending(conn, docs), "still needing action"
+        done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
+                                        docs=docs)
+        # PARKED, NOT REFUSED (Keith, 2026-10-11, (p)): the rest is confirmed
+        # and the blocked move waits on the outstanding list.
+        assert [x[1] for x in done.parked] == ["ts61@1#1"]
+        assert not correction_apply.pending(conn, docs)
+        assert [x.supply_id for x in correction_apply.parked(conn)] == ["ts61@1#1"]
         assert filing.filing_for(DATASET, "ts61@1#1")["slot"] == "2023-Q3", "not moved"
 
     def test_ts62_merged_not_confirmed_refuses_nothing(self, conn):
@@ -684,3 +688,172 @@ class TestKeithsAnswerO:
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         kind, reason = self._decision(conn, "o-hold")
         assert kind == decision_log.RULE and manager["email"] in reason
+
+
+def _reject(conn, supply=SUPPLY):
+    with decision_log.apply_decision(conn, decision_log.Decision(
+            agency_id="child-protection-family-support", collection_id="child-protection",
+            dataset_id=DATASET, action=decision_log.REJECT, supply=supply,
+            actor="somebody", actor_kind=decision_log.PERSON,
+            effective_at="2023-08-02T09:00:00+08:00", to_slot="2023-Q3",
+            reason="bad file")):
+        pass
+
+
+class TestParkedMoves:
+    """Keith, 2026-10-11, (p): confirm what can move, park a blocked move on
+    the outstanding list until its blocker clears, then move it - to the
+    period confirmed - or keep it, with a reason. Each failed before."""
+
+    def test_the_rest_is_confirmed_and_the_blocked_one_parked(self, conn, manager):
+        _file("park-c@1#1", "2023-Q3", RECEIVED + timedelta(minutes=1))
+        docs = _corrected(_move_q3)
+        done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
+                                        docs=docs)
+        assert SUPPLY in {s for _d, s, *_ in done.moved}
+        [(ds, supply, frm, to, why)] = done.parked
+        assert (ds, supply, frm) == (DATASET, "park-c@1#1", "2023-Q3") and "contested" in why
+        [parked] = correction_apply.parked(conn)
+        assert parked.reference == "CAB-1" and parked.to_period == to
+        assert parked.confirmed_by == manager["email"]
+        record = json.loads(conn.execute(
+            f"SELECT summary::text FROM {correction_apply.APPLIED}").fetchall()[0][0])
+        assert record["parked"][0][1] == "park-c@1#1"
+
+    def test_it_moves_to_the_period_confirmed_once_the_blocker_clears(self, conn, manager):
+        _file("park-m", "2023-Q3", RECEIVED + timedelta(minutes=6))
+        _reject(conn, "park-m")
+        docs = _corrected(_move_q3)
+        done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
+                                        docs=docs)
+        [(_ds, _s, _frm, to, why)] = done.parked
+        assert "rejected" in why
+        assert correction_apply.drain_parked(conn, docs=docs, say=lambda _m: None) == []
+        assert _current(conn, "park-m")["slot"] == "2023-Q3", "still blocked, still where it was"
+        _promote(conn, DATASET, "park-m", "2023-Q3")   # the rejection reversed
+        moved = correction_apply.drain_parked(conn, docs=docs, say=lambda _m: None)
+        assert moved == [(DATASET, "park-m", "2023-Q3", to)]
+        assert _current(conn, "park-m")["slot"] == to
+        assert correction_apply.parked(conn) == []
+        reason, actor_kind = conn.execute(
+            f"SELECT reason, actor_kind FROM {decision_log.TABLE} WHERE supply = ? "
+            "AND action = 'refile' ORDER BY id DESC LIMIT 1", ["park-m"]).fetchall()[0]
+        assert "CAB-1" in reason and manager["email"] in reason and actor_kind == "rule"
+
+    def test_a_refused_dataset_is_left_parked(self, conn, manager):
+        # ITS OWN SUPPLY: the decision log is not emptied between tests, so
+        # another test's promotion of SUPPLY would read as this one's
+        # un-rejection.
+        _file("park-f", "2023-Q3", RECEIVED + timedelta(minutes=5))
+        _reject(conn, "park-f")
+        docs = _corrected(_move_q3)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        assert [x.supply_id for x in correction_apply.parked(conn)] == ["park-f"]
+        _promote(conn, DATASET, "park-f", "2023-Q3")
+        assert correction_apply.drain_parked(conn, docs=docs, skip=frozenset({DATASET}),
+                                             say=lambda _m: None) == []
+        assert len(correction_apply.parked(conn)) == 1
+
+    def test_the_manager_may_keep_it_instead_with_a_reason(self, conn, manager):
+        _file("park-k@1#1", "2023-Q3", RECEIVED + timedelta(minutes=2))
+        docs = _corrected(_move_q3)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        with pytest.raises(decision_log.DecisionRefused, match="needs a reason"):
+            correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-k@1#1", actor=manager,
+                                         reason=" ", effective_at=AT)
+        correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-k@1#1", actor=manager,
+                                     reason="deciding the contest separately",
+                                     effective_at=AT)
+        assert correction_apply.parked(conn) == []
+        reason = conn.execute(
+            f"SELECT reason FROM {decision_log.TABLE} WHERE supply = ? AND action = ?",
+            ["park-k@1#1", decision_log.KEEP]).fetchall()[0][0]
+        assert "CAB-1" in reason and "deciding the contest separately" in reason
+        with pytest.raises(decision_log.DecisionRefused, match="no parked move"):
+            correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-k@1#1", actor=manager,
+                                         reason="again", effective_at=AT)
+
+    def test_only_the_asset_manager_keeps_one(self, conn, manager):
+        _file("park-r@1#1", "2023-Q3", RECEIVED + timedelta(minutes=3))
+        docs = _corrected(_move_q3)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        nobody = {"email": "not-a-manager@example.org", "name": "Nobody"}
+        with pytest.raises(people.RoleRefused):
+            correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-r@1#1", actor=nobody,
+                                         reason="r", effective_at=AT)
+
+    def test_each_parked_move_is_an_outstanding_item(self, conn, manager):
+        from qa_tools.common import outstanding
+
+        _file("park-o@1#1", "2023-Q3", RECEIVED + timedelta(minutes=4))
+        docs = _corrected(_move_q3)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        [item] = outstanding._from_parked_corrections(conn)
+        assert item.kind == outstanding.PARKED_CORRECTION_MOVE
+        assert "CAB-1" in item.headline and "park-o@1#1" in item.headline
+        assert any("contested" in r for r in item.responses)
+        assert any("--keep park-o@1#1" in r for r in item.responses)
+
+
+class TestParkedMovesOnEveryRoute:
+    """Keith, 2026-10-11, (p): parked moves are listed by `mothman supply
+    corrections`, kept through confirm-correction --keep on the confirmed
+    reference, and reached from the filing menu. Each failed before."""
+
+    @pytest.fixture
+    def parked_one(self, conn, manager, monkeypatch):
+        from qa_tools.common import correction_trial
+
+        _file("route-p@1#1", "2023-Q3", RECEIVED + timedelta(minutes=7))
+        docs = _corrected(_move_q3)
+        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        return docs
+
+    def _run(self, *args):
+        from click.testing import CliRunner
+
+        from cli import supply as supply_cli
+        return CliRunner().invoke(supply_cli.supply_group, list(args))
+
+    def test_corrections_lists_what_is_parked(self, conn, parked_one):
+        got = self._run("corrections")
+        assert got.exit_code == 0, got.output
+        assert "parked" in got.output and "route-p@1#1" in got.output
+        assert "No corrections are waiting" not in got.output
+
+    def test_the_confirmed_reference_takes_keep(self, conn, parked_one, monkeypatch, manager):
+        from cli import filing_tui
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: manager)
+        got = self._run("confirm-correction", "--reference", "CAB-1", "--keep", "route-p@1#1",
+                        "--keep-reason", "deciding it separately", "--yes")
+        assert got.exit_code == 0, got.output
+        assert correction_apply.parked(conn) == []
+
+    def test_without_keep_it_says_they_go_ahead_on_their_own(
+            self, conn, parked_one, monkeypatch, manager):
+        from cli import filing_tui
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: manager)
+        got = self._run("confirm-correction", "--reference", "CAB-1")
+        assert got.exit_code != 0 and "already confirmed" in got.output
+        assert "--keep" in got.output
+
+    def test_the_filing_menu_offers_them(self, conn, parked_one, monkeypatch, manager):
+        from cli import common, filing_tui
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: manager)
+        asked = []
+        picks = iter([filing_tui._MENU_PARKED, "Keep cp-clients route-p@1#1"])
+
+        def select(message, choices, **k):
+            asked.append(list(choices))
+            want = next(picks)
+            return next(c for c in choices if c.startswith(want))
+        monkeypatch.setattr(common, "select", select)
+        monkeypatch.setattr(common, "text_prompt", lambda *a, **k: "kept from the menu")
+        monkeypatch.setattr(common, "confirm_change", lambda *a, **k: True)
+        filing_tui.filing_menu()
+        assert any(c.startswith(filing_tui._MENU_PARKED) for c in asked[0])
+        assert correction_apply.parked(conn) == []

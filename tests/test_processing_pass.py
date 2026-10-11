@@ -405,6 +405,24 @@ class TestThePassItself:
         pp.run_pass(run_by="me", say=lambda m: None)
         assert world.processed[0] == "held refiled", world.processed
 
+    def test_parked_correction_moves_drain_before_new_arrivals(self, world, monkeypatch):
+        """Keith, 2026-10-11, (p): a parked move whose blocker has cleared is
+        carried out by the pass, before arrivals, never for a refused
+        dataset, and reported."""
+        from qa_tools.common import correction_apply
+
+        seen = {}
+
+        def drain(conn, *, skip, say):
+            seen["skip"] = skip
+            world.processed.append("parked drained")
+            return [("cp-clients", "s", "2023-Q3", "2023-Q4")]
+        monkeypatch.setattr(correction_apply, "drain_parked", drain)
+        report = pp.run_pass(run_by="me", say=lambda m: None)
+        assert world.processed[0] == "parked drained", world.processed
+        assert report.parked_moved == [("cp-clients", "s", "2023-Q3", "2023-Q4")]
+        assert seen["skip"] == frozenset(report.refused)
+
     def test_every_arrival_in_the_order_given(self, world):
         report = pp.run_pass(run_by="me", say=lambda m: None)
         assert world.processed == [a.run_id for a in world.arrivals]

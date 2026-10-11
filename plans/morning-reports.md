@@ -1255,6 +1255,11 @@ one or more component tags, and a date.
         (p) confirm what can move and park a blocked move on the
             outstanding list until its blocker clears, then move it - to
             build;
+            Follow-ups, 2026-10-11 midday: a parked move goes to the
+            period CONFIRMED, never one re-worked out at drain time; and
+            while parked the manager may keep the supply where it is
+            instead, with a reason, recorded as a keep against that
+            correction.
         (q) what is confirmed is the preview's report - confirmed.
         (r) a supply a correction MOVED carries the same "at the time" note
             and counts in the past-date note - to build.

@@ -26883,8 +26883,7 @@ requirements:
     - THE SYSTEM SHALL let any allowlisted person view a correction's proposed moves.
     - IF a person other than the asset manager tries to confirm, THEN THE SYSTEM SHALL refuse before asking
       for any reason, naming the role, its level and who holds it.
-    - THE SYSTEM SHALL keep a correction among the states needing action until every proposed move, blocked
-      ones included, has been moved or kept.
+    - THE SYSTEM SHALL keep a correction among the states needing action until it is confirmed, and each move its confirmation parked among them, one item per supply, until that move has been carried out or kept.
     - WHILE a merged correction awaits confirmation, THE SYSTEM SHALL have the processing pass only note it - marking
       the datasets it affects as awaiting confirmation and listing it among the states needing action - and SHALL
       NOT compute or store its re-judgements or moves; and WHEN the asset manager opens it in the terminal, THE
@@ -26897,6 +26896,11 @@ requirements:
     - WHEN a correction has been applied, THE SYSTEM SHALL print in the terminal a summary of what was actually applied - every re-judged verdict, every supply moved and to which period, every supply held and every supply kept with its reason - laid out in the same order and form as the impact preview (REQ-PIPE-169), SHALL offer to write it as Markdown to a file, and SHALL tell the person to attach it to the correction's change reference and share it with the correction's approver, so that what was applied can be compared by a person against what was approved.
     - THE SYSTEM SHALL generate the calendar-correction scenarios TS-57 to TS-63 in the test scenario register (plans/supply-model.md) into the synthetic history once this requirement is built - a correction made part way through that history, merged, and confirmed with at least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left awaiting confirmation - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64 each a unit test.
     - THE SYSTEM SHALL record a confirmed correction''s moves and holds as the rule''s, naming who confirmed them, so a later correction may move them again (added 2026-10-11, Keith''s answer (o)).
+    - WHEN a correction is confirmed, THE SYSTEM SHALL apply every move that is not blocked or kept and SHALL PARK each blocked move, recording the correction, the supply, the period it would leave, the period confirmed for it, what blocks it and who confirmed it, and SHALL list the parked moves in what was applied.
+    - WHEN a processing pass finds a parked move whose blocker has cleared, THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who confirmed it, before any arrival in that pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173).
+    - IF a parked supply is no longer filed where it was parked from, THEN THE SYSTEM SHALL leave it parked and say so, rather than move it from somewhere nobody confirmed.
+    - WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu.
+    - THE SYSTEM SHALL list parked moves in mothman supply corrections, as their own entry in the filing menu, and as an outstanding item each, naming what blocks it and both ways it ends.
     non_functional_requirements:
     - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
       of moves, and a per-supply step is how a list like this is abandoned half-done.'
@@ -26941,7 +26945,7 @@ requirements:
     - 'OLDEST FIRST (PROVISIONAL): each pending correction is trialled against the configuration with every LATER pending correction reverted, so one confirmation applies that correction''s consequence and nothing else.'
     - 'A MOVE is refiling.apply - REQ-PIPE-141''s person re-file, the asset manager as actor, the correction named in the reason - owing a re-check the next processing pass runs and re-gates (criterion 7, PROVISIONAL that ''automatically'' is the next pass, as for every person''s re-file). A HELD supply the corrected calendar now covers is PLACED by the rule, as REQ-PIPE-154''s drain places one, naming who confirmed it - the decision log lets only the rule re-file a supply with no period to leave. A filed supply the corrected calendar offers NO period is HELD (criterion 8): a person''s re-file naming only the period it leaves (the decision log relaxed for exactly that), its tables back in staging where it was promoted, and a hold whose reason names the correction and reads so in the queue.'
     - 'KEEP is its own decision-log action (criterion 6, 15), person only, naming the period the supply stays in and a mandatory reason; one reason covers several, recorded on each. qa.slot_holds ignores it, as it ignores acknowledge.'
-    - 'A BLOCKED MOVE MUST BE CLEARED OR KEPT BEFORE CONFIRMING (criteria 9 and 19, PROVISIONAL reading): the confirmation is refused while any blocked move is neither, naming each and why - so the correction stays pending, and needing action, until every move is moved or kept, and nothing is dropped silently.'
+    - 'A BLOCKED MOVE IS PARKED, NOT A REFUSAL (Keith, 2026-10-11, answer (p), replacing the PROVISIONAL reading that refused the whole confirmation while any move was blocked - under which a blocked move had to be KEPT to confirm the rest, losing its correct move for good): confirm what can move, park the blocked one on the outstanding list until its blocker clears, then move it. TO THE PERIOD CONFIRMED (Keith, follow-up): what the manager approved is what happens. REJECTED re-working the period out at drain time, which could move a supply somewhere nobody confirmed. WHILE PARKED the manager may keep it where it is instead, with a reason (Keith, follow-up). A supply a person moved while it was parked is left parked and said (PROVISIONAL), never moved again from somewhere else. Stored in qa.correction_parked with its resolution in qa.correction_parked_resolved, both append-only (schema 37).'
     - 'RE-JUDGED IN PLACE AFTER THE MOVES (criterion 20): a moved supply is judged against its new period by its new filing; every other affected supply whose verdict the corrected agreement changes gets a new verdict naming the change reference (REQ-PIPE-168).'
     - 'THE ROLE IS CHECKED IN correction_apply.confirm, not filing_decisions.REQUIRED_ROLE: a confirmation is asset-wide, not a slot operation. The terminal and the command both refuse before any choice or reason, naming the role, its level and who holds it (criterion 18); anyone allowlisted may view (criterion 17).'
     - 'THE CONSEQUENCES'' KEY is a hash of every proposed move and verdict change, so --yes needs --acknowledge KEY and a list that changed since it was shown is refused (criterion 16); the production confirmation is common.confirm_change''s, as for every person''s change. The list itself is the impact preview''s report rather than the filing menu''s warning panel (PROVISIONAL - it is a report of many moves, not one decision''s side effects).'
@@ -26961,6 +26965,7 @@ requirements:
         unowned: true
     linked_tests:
     - tests/test_correction_apply.py
+    - tests/test_processing_pass.py
     - tests/test_correction_revert.py
     implemented_by:
     - qa_tools/common/correction_apply.py::pending
@@ -26972,7 +26977,15 @@ requirements:
     - cli/supply.py::corrections_command
     - cli/supply.py::confirm_correction_command
     - cli/filing_tui.py::corrections_flow
+    - qa_tools/common/correction_apply.py::parked
+    - qa_tools/common/correction_apply.py::drain_parked
+    - qa_tools/common/correction_apply.py::keep_parked
+    - qa_tools/common/outstanding.py::_from_parked_corrections
+    - qa_tools/common/processing_pass.py::run_pass
+    - cli/supply.py::keep_parked_moves
+    - cli/filing_tui.py::parked_flow
     evidence:
+    - '2026-10-11 (Keith''s answer (p)): tests/test_correction_apply.py 52 and test_processing_pass.py 46 passed - a blocked move is parked and the rest confirmed, the correction no longer pending (c25, c19); a rejected supply''s parked move waits while still rejected and moves to the period confirmed, as the rule naming the confirmer, once the rejection is reversed (c26); a refused dataset''s is left parked (c26); the manager keeps one with a reason, refused without one, refused to anyone else, refused twice (c28); it is an outstanding item naming the blocker and the keep command (c29); `mothman supply corrections` lists it, confirm-correction --keep on the confirmed reference keeps it, the filing menu offers it (c28, c29); the pass drains before arrivals and skips refused datasets (c26). tests-js/corrections.test.js gives its kind a label. Each failed before its change.'
     - 'Keith''s answer (o), 2026-10-11: tests/test_correction_apply.py TestKeithsAnswerO (2, each failing first) and the renamed test_a_move_is_the_rules_re_file_naming_the_correction; 42 apply tests passed after the change.'
     - 'tests/test_correction_apply.py (40 tests, run 2026-10-11, ten of them the critic''s findings, each failing first): pending until applied, once; the agreement before rebuilt from its own old values; only the asset manager confirms, refused before anything is worked out; a move is a person''s re-file naming the correction with an owed re-check; kept supplies stay with a KEEP entry and need a reason; a blocked move must be cleared or kept; a supply with no period is held naming the correction; a verdict re-judged in place naming it; a changed list refused; the summary in the preview''s form with what was kept; the two commands (list, one in full summary first, refusal naming who may, --yes needs the key, applied with the key and told to attach it, an unknown keep refused); the filing menu offering corrections above the collections, view-only for anyone else, keep-one-confirm-the-rest; the pass and needs-action noting it; and TS-57 to TS-62 each. tests/test_correction_revert.py (12): revert round-trips every kind of item.'
   - id: REQ-GHUB-171
@@ -29499,8 +29512,7 @@ requirements:
         runs in the rebuilt history. What cannot be planted at all
         is the OUTCOME: a correction going RED on a cross-table check and then
         green, or staying red, needs the generator to aim for a verdict.'
-      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
-        (Keith, 2026-10-05).'
+      owner: 'Unowned since 2026-10-11 - plans/running-thoughts.md #63 was scoped as REQ-GEN-183..186 and Keith left these Child Protection cross-table outcomes out of that scope (they need named red targets and referential closure across six tables).'
       blocked_by:
         unowned: true
     - criterion: Criteria 6 and 7 - amber supplies held and promoted-awaiting-acknowledgement
@@ -29509,10 +29521,9 @@ requirements:
         The ''amber'' preset reads red as a whole, a truncation into the warn
         band still read red, and a churned resend read red against the supply
         it was to replace. Each was tried on a real rebuild.'
-      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
-        (Keith, 2026-10-05).'
+      owner: 'REQ-GEN-184, REQ-GEN-185 and REQ-GEN-186 - generating a supply to a target verdict, scoped from plans/running-thoughts.md #63 and signed by Keith 2026-10-11.'
       blocked_by:
-        unowned: true
+        requirements: [REQ-GEN-184, REQ-GEN-185, REQ-GEN-186]
     - criterion: Criterion 8 - a reader re-checked against the newer version (TS-50).
       why: Waits on TS-48's Child Protection placement and on TS-46's replacement,
         both unplanted.
@@ -29526,8 +29537,7 @@ requirements:
         to aim for a verdict. Corrected 2026-10-05 after the sprint 11 critic
         showed the first wording - 'the generator cannot place a sibling's arrival
         after a promotion' - was wrong.
-      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
-        (Keith, 2026-10-05).'
+      owner: 'Unowned since 2026-10-11 - plans/running-thoughts.md #63 was scoped as REQ-GEN-183..186 and Keith left these Child Protection cross-table outcomes out of that scope (they need named red targets and referential closure across six tables).'
       blocked_by:
         unowned: true
     - criterion: Criterion 11 - Case Workers arriving in a period it does not
@@ -29619,10 +29629,9 @@ requirements:
         acknowledgement (TS-45 beside TS-44).
       why: 'PARKED with TS-43/44 by Keith, 2026-10-05: no amber supply can be
         planted reliably yet.'
-      owner: 'Keith - plans/running-thoughts.md #63 - generate to the check rules
-        (Keith, 2026-10-05).'
+      owner: 'REQ-GEN-184, REQ-GEN-185 and REQ-GEN-186 - generating a supply to a target verdict, scoped from plans/running-thoughts.md #63 and signed by Keith 2026-10-11.'
       blocked_by:
-        unowned: true
+        requirements: [REQ-GEN-184, REQ-GEN-185, REQ-GEN-186]
     - criterion: Criterion 5 - a period substituted onto an earlier promoted supply
         (TS-54).
       why: The script has no field for the period stood on.
@@ -31909,3 +31918,216 @@ requirements:
     open_questions:
     - REQ-TEST-117 (built but not yet flipped) owns the input list; build the shared list here and have
       117 adopt it.
+  - id: REQ-GEN-183
+    title: Every SQL-bodied check declares the columns it reads, and the generator reads every check's bands and columns from the committed check definitions
+    date_written: '2026-10-11'
+    story: As whoever maintains the synthetic history, I want every check that hides its logic in SQL to declare the columns it reads, and the generator to know for each dataset which checks have a warn band, where each check's warn and fail bounds sit, which checks fail on any single violation and which columns those checks depend on - all read from the same committed definitions the four tools run - so that a supply can be generated to a verdict without anyone keeping a second copy of the thresholds or guessing what a SQL check touches.
+    moscow: must
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-11'
+    source: 'Keith, plans/running-thoughts.md #63 ''Generate to the check rules, not by trial and error'' (2026-10-05), sent for scoping 2026-10-11 (''Scope #63 now'') so that TS-43, TS-44, TS-45 and TS-46 can be planted. Scoped by delivery-scoper 2026-10-11, revised the same day on Keith''s answers.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL derive, for each dataset, a catalogue of every check in force from the committed Soda checks files, dbt's schema.yml and singular tests, the ODCS contracts, Evidently's threshold constants in their own module and contract/file-checks.yaml, and SHALL NOT read any threshold from a hand-maintained copy.
+    - THE SYSTEM SHALL record, for each check, its check_id, tool, dataset, the column it names where it names one, the metric it bounds, that metric's unit (row count, percent of rows, or ratio), its warn bound and its fail bound each with its own comparison operator, whether it is single-tier, and the columns it reads.
+    - THE SYSTEM SHALL treat as single-tier every check with no warn bound, including a dbt test with no warn_if (which dbt fails on any violation), every ODCS rule of severity error, and every failed-rows, singular-test, relationship or custom-SQL check.
+    - IF a check's threshold has a shape the catalogue cannot parse, THEN THE SYSTEM SHALL fail naming the check_id and its file, and SHALL NOT assume a bound for it.
+    - THE SYSTEM SHALL exclude retired checks from the catalogue and from the gates below.
+    - THE SYSTEM SHALL group the checks that implement one rule across tools, and SHALL compute, for that rule and a given row count, the range of metric values in which no implementing check fails and at least one warns, honouring each tool's own unit and comparison operator.
+    - WHERE no such range exists for a rule, THE SYSTEM SHALL report the rule as having no amber band, naming the check or checks that close it.
+    - THE SYSTEM SHALL require every SQL-bodied check in force - each Soda failed-rows check, each dbt singular or relationships test, each dbt_utils.expression_is_true test and each ODCS rule of type sql - to declare reads_columns, as a flat list of table.column entries naming every column it reads in every table it reads, in the same metadata block where its tool already carries reads_tables.
+    - IF a SQL-bodied check in force declares no reads_columns, THEN THE SYSTEM SHALL fail the check-definition gate in mothman check and in CI, naming the check_id and its file.
+    - IF a reads_columns entry names a table or column the dataset's contract does not define, THEN THE SYSTEM SHALL fail the same gate, naming the check_id and the entry.
+    - THE SYSTEM SHALL declare reads_columns on every SQL-bodied check in force in the same change that adds the gate.
+    - THE SYSTEM SHALL NOT include reads_columns in any check's config hash, so that declaring it reports no check as changed and requires no changelog entry.
+    - THE SYSTEM SHALL read only committed configuration, and SHALL NOT open a database connection or any file under data/.
+    - THE SYSTEM SHALL expose the catalogue as a mothman subcommand that lists, per dataset, each rule, its bounds per tool, whether it has an amber band, and the single-tier checks that read each column.
+    non_functional_requirements:
+    - 'Configuration, not state: the catalogue is derived on demand from committed files and is never itself committed, so it cannot drift from the definitions it describes. reads_columns is authored configuration, reviewed like any other check metadata.'
+    - 'mothman is the only entry point: the listing is a mothman subcommand and the gate runs inside mothman check, through uv run, with no new third-party dependency.'
+    - 'Fail loudly, never default: plans/qa-pipeline.md item 74 found a missing fail threshold silently defaulted to 0 and turned a check red on almost every run. An unparseable bound is an error, not a zero; a missing reads_columns is a gate failure, not an empty list.'
+    - 'Scale: at roughly 30 datasets on the quarterly asset nobody will hand-check bands or SQL dependencies, so both are derived per dataset from each dataset''s own definitions, with nothing per-dataset written into the generator.'
+    - 'Maintainability, and the ongoing cost said plainly: every new SQL-bodied check now carries one more required field, and the gate makes forgetting it a CI failure rather than a silent gap. A threshold edited in any tool''s definition flows through on the next generation with no generator change.'
+    - 'Auditability: no config-hash churn. dbt and Soda already exclude their whole metadata block from the hash and the ODCS parser drops customProperties before hashing; the one parser that hashes by exclusion list (Evidently) has no SQL-bodied checks.'
+    - 'Cost: reading a few YAML files and one Python module; well under a second, and nothing added to the bootstrap beyond that.'
+    - 'Privacy: reads configuration only and could run unchanged against a real deployment''s contracts, because it never sees a row.'
+    dependencies: []
+    decisions:
+    - 'BANDS ARE READ FROM EACH TOOL''S OWN FILES (Keith, 2026-10-11, question 7, recommended option): Soda YAML, dbt''s warn_if and error_if, ODCS mustBe keys, and Evidently''s constants in qa_tools/common/evidently_common.py, read where they live rather than moved into YAML. REJECTED a hand-kept band table for the generator, which is a second copy of the thresholds and would drift - the problem plans/data-generation.md #6 already names for columns. REJECTED waiting for plans/qa-pipeline.md #85 (the ODCS contract as single source for dbt and Soda), which is a much larger change this does not need.'
+    - 'CHECKS DECLARE THEIR COLUMNS (Keith, 2026-10-11, question 8): every SQL-bodied check gets reads_columns beside dbt''s existing reads_tables, gated in CI. REJECTED having each generator lever state the relationships it preserves on its own, which keeps the knowledge of what a check depends on in the generator rather than in the check. REJECTED parsing the SQL, which is fragile and cannot follow a self-join''s intent.'
+    - 'FOLDED INTO THIS REQUIREMENT, NOT A QAC REQUIREMENT OF ITS OWN (Keith, 2026-10-11): the attribute exists so the generator can follow the checks, so it ships with the reader that uses it. Recorded because docs/components.md would otherwise put check metadata under QAC.'
+    - 'WHY reads_columns IS NEEDED, THE WORKED CASE: the multiple-birth sibling check (Soda failed rows, dbt singular test, ODCS type sql) matches twins on date_of_birth, place_of_birth_facility and registering_parent_1_name, and nothing outside its SQL says so - which is how the ''amber'' preset''s facility nulls failed it in three tools.'
+    - 'WHICH CHECKS COUNT AS SQL-BODIED (Keith, 2026-10-11, recommended option): Soda failed-rows checks, dbt singular and relationships tests, ODCS rules of type sql, and dbt_utils.expression_is_true, whose rule is a SQL expression with no column of its own. REJECTED including Soda reference checks (''values in (x) must exist in y''), whose columns are already structured fields. REJECTED leaving expression_is_true out, which would leave one SQL-bodied rule the generator cannot see into.'
+    - 'THE GATE ALSO CHECKS THE COLUMNS EXIST (delivery-scoper addition): a declared column the contract does not define is a typo the generator would silently trust, which is the same class of failure as an undeclared one.'
+    - THRESHOLDS TODAY ARE RECORDED FROM EACH TOOL'S OUTPUT AT RUN TIME (Soda's diagnostics, dbt's node config), not read from configuration ahead of a run. This catalogue is the first static reader, so it must agree with what each tool reports and is tested against recorded results.
+    - 'THE SAME RULE IS IMPLEMENTED UP TO FOUR TIMES WITH DIFFERENT BOUNDS AND UNITS, so a rule''s amber band is the INTERSECTION across tools, not any one tool''s band. Worked example: place_of_birth_facility nulls are amber in Soda between 15% and 35%, in dbt between 300 and 600 rows, and the ODCS rule fails at 35% or more; sex has a two-tier band in Soda and dbt and none at all in ODCS (mustBe 0, severity error), so sex invalid values can never be amber.'
+    - 'COMPARISON OPERATORS DIFFER AT THE BOUNDARY: ODCS mustBeLessThan 35 fails at exactly 35% where Soda''s fail when > 35% does not. The intersection honours each operator rather than assuming one.'
+    - 'SINGLE-TIER INCLUDES WHAT DBT DEFAULTS: an unconfigured error_if is ''>0'' (dbt_project/models/staging/schema.yml''s own comment, confirmed live when written), so the absence of config is a bound, not an unknown.'
+    - reads_columns IS A FLAT LIST OF table.column (Keith, 2026-10-11, recommended option). It survives ODCS customProperties' scalar values as a JSON string, the way changelog already does, and reads the same in all three tools. REJECTED a map of table to columns, which ODCS customProperties cannot hold natively and which a reader would have to parse differently per tool.
+    - 'GROUPING CHECKS INTO RULES: provisionally by dataset, column and the check''s existing category attribute, both already present in every check''s metadata and check_id. Left open because no file states the grouping today.'
+    - 'GROUPING CHECKS INTO RULES BY DATASET, COLUMN AND CATEGORY (Keith, 2026-10-11, recommended option): derived from what every check already carries in its metadata and check_id, so nothing new is authored. REJECTED an explicit rule_id attribute on every check - unambiguous, but one more field on every check.'
+    - 'THE AUTHORING STANDARD SAYS SO, IN WORDING KEITH APPROVED (2026-10-11, as written): when this is built, docs/check-authoring-rules.md gains this subsection at the end of Mechanics, verbatim - ### A SQL-bodied check declares the columns it reads /  / A check whose rule lives in SQL - a Soda failed-rows check, a dbt singular or relationships test, `dbt_utils.expression_is_true`, an ODCS rule of type `sql` - also lists every column that SQL reads, as `reads_columns`: a flat list of `table.column`, in the same metadata block that already carries `reads_tables`. /  / ```yaml / reads_columns: /   - stg_birth_registrations.date_of_birth /   - stg_birth_registrations.place_of_birth_facility /   - stg_birth_registrations.registering_parent_1_name / ``` /  / Nothing outside the SQL says what it depends on, and the synthetic data generator reads this list so it never breaks a check by accident - the multiple-birth check matches twins on three columns, and blanking one of them on one twin used to fail it in three tools. `mothman check` refuses a SQL-bodied check without the list, or one naming a column the contract does not define. Like the prose fields it is not part of the config hash, so adding or correcting it never reports the check as changed. REJECTED leaving the gate''s own error message as the only statement of the rule.'
+  - id: REQ-GEN-184
+    title: A supply can be generated to a target verdict by construction
+    date_written: '2026-10-11'
+    story: As Keith demonstrating the supply model, I want an injected scenario to say which verdict its supply needs - green, amber, or red on a named rule - and the ordinary history's amber supplies in both collections to be genuinely amber, each built to land there, so that a scenario needing a precise verdict is planted on the first rebuild rather than found out by a 25-minute one, and an 'amber' supply in the history actually reads amber.
+    moscow: must
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-11'
+    source: 'Keith, plans/running-thoughts.md #63 (2026-10-05), sent for scoping 2026-10-11 (''Scope #63 now''); scope widened by Keith the same day to the ordinary amber share of both collections. Scoped by delivery-scoper 2026-10-11, revised twice on Keith''s answers.'
+    acceptance_criteria:
+    - WHERE an injected arrival names a target verdict, THE SYSTEM SHALL generate that arrival's rows to meet it from the rule catalogue (REQ-GEN-183), and SHALL NOT apply the 'amber' or 'red' dirtying presets to it.
+    - THE SYSTEM SHALL accept as an injected arrival's target green, amber or red, with an optional list of the rules that must warn (for amber) or fail (for red).
+    - WHEN generating an amber target, THE SYSTEM SHALL perturb only rules that have an amber band in every tool implementing them, and SHALL place each perturbed metric inside that band with a margin from both bounds.
+    - WHEN generating any target, THE SYSTEM SHALL keep every rule it does not perturb inside its passing range in every tool, including the row-count growth and stale-delivery outcomes an ordinary clean supply can reach by the draw.
+    - THE SYSTEM SHALL NOT change a column that a single-tier check reads, as declared by its reads_columns, except in a way that keeps that check passing, and SHALL in particular remove or blank a value in either every row of a multiple-birth group or none of them, and SHALL NOT remove a row another table's row refers to.
+    - WHERE an ordinary Birth Registrations supply is drawn amber in the run plan, THE SYSTEM SHALL target amber using within-supply rules only, pushing null-rate rules into their amber bands, and SHALL hold its row count and value distribution at clean levels such that its row-count growth and drift checks pass against any supply the ordinary history can produce, with no lead-in.
+    - WHERE an ordinary Child Protection delivery is drawn amber in the run plan, THE SYSTEM SHALL target amber within-supply on cp_clients by writing unrecognised postcodes - between 1 and 15 in roughly 527 clients, the band REQ-QAC-187's tolerance gives with Soda's fail above 3% and dbt's error above 15, kept clear of both ends - using only four-character values no CSV reader treats as null, so the column's declared varchar(4) is not exceeded.
+    - WHERE an ordinary Child Protection delivery is drawn amber, THE SYSTEM SHALL leave every row count, every identifier, every foreign key, every other column and every column a single-tier check reads exactly as a clean delivery has them, so that its row-drop and drift checks pass against any clean delivery.
+    - THE SYSTEM SHALL draw ordinary amber supplies, in both collections, only into periods whose arrival falls outside every version of the amber setting whose value is hold for that dataset, read from contract/data-asset.yaml, and SHALL keep the total number of ordinary ambers per collection unchanged.
+    - THE SYSTEM SHALL generate every ordinary red supply, in both collections, with the 'red' preset as today, and every ordinary clean supply exactly as today.
+    - IF no combination of rules can meet a target, THEN THE SYSTEM SHALL fail generation naming the scenario or ordinary period, the target and why, and SHALL NOT fall back to a preset or emit the history.
+    - THE SYSTEM SHALL record, with each injected placement, the target and the rules it perturbed with their intended metric values, for the scenario map to read, and SHALL NOT record or emit a verdict.
+    - THE SYSTEM SHALL generate a targeted supply deterministically, so that the same seed and configuration produce the same rows.
+    - WHEN this change lands, THE SYSTEM SHALL be measured on a regenerate from empty before and after it, for each collection, recording supplies by recorded verdict, promotions, supplies held and awaiting acknowledgement, gap-red results, resupply chains started and bootstrap time, and SHALL re-capture every golden fixture the change moves in the same change, stating which values moved and why.
+    - THE SYSTEM SHALL prove the mechanism against the real tools in its tests with at least one amber and one green target on Birth Registrations and one ordinary amber on Child Protection.
+    non_functional_requirements:
+    - 'No scenario-only pipeline path (Keith, plans/running-thoughts.md #64): targeting changes only the rows the generator writes. Recognition, filing, the four tools, promotion and the dashboard treat a targeted supply exactly as any other.'
+    - 'Determinism: seeded, so regenerate-and-diff stays a real correctness check (CLAUDE.md).'
+    - 'Fail loudly (REQ-GEN-044 criterion 4): an unreachable target stops generation rather than planting a supply that demonstrates something else.'
+    - 'No scenario label on the dashboard (REQ-GEN-044 criterion 5, REQ-GEN-136 criterion 16): an injected target is recorded with the placement and shown only in the scenario map; an ordinary amber is not recorded anywhere as targeted.'
+    - 'The scenario map stays free of row-level data (REQ-GEN-045 NFR 1): it may carry a rule and an intended rate or count, never a value taken from a row.'
+    - 'THE HISTORY CHANGES, AND IS MEASURED RATHER THAN DISCOVERED: today''s ordinary ''amber'' supplies very probably read red in both collections, so they are not promoted and leave gaps. Once genuinely amber they promote under the promote setting and await acknowledgement inside the promote-and-acknowledge era; none is held, because criterion 9 keeps them out of the hold era. The generator starts a resupply chain only on a supply it drew red, so the chain count should not move. Child Protection''s ambers become amber on cp-clients alone, where today''s preset dirties two or three tables. Criterion 14 measures all of this; every golden the regenerate moves (tests/fixtures/arrival_semantics_golden.json at least) is re-captured in this change, never a later one.'
+    - 'Noise (REQ-GEN-136 NFR 4): count how many ordinary ambers land in each setting era and record it, so the awaiting-acknowledgement queue is known.'
+    - 'Scale: the perturbation levers are per kind of rule (null rate, row count, distribution), not per dataset, so a 30-dataset asset does not need 30 bespoke presets.'
+    - 'Bootstrap cost: generation itself should stay within a few seconds of today; measure a full generation before and after and record both.'
+    dependencies:
+    - REQ-GEN-183
+    - REQ-QAC-187
+    - REQ-GEN-044
+    decisions:
+    - 'NOT BY BRUTE FORCE (Keith, #63: ''I don''t think we can brute force it''). REJECTED rebuild-and-retry, which is what 2026-10-05 was: four ~27-minute rebuilds to learn that TS-43 to TS-46 read red. REJECTED also a generator loop that perturbs, probes and retries until a verdict lands, which is the same trial and error moved into a loop.'
+    - 'NOT THE BLUNT PRESETS for a targeted supply (Keith, #63). The ''amber'' preset deliberately blanks required columns that dbt''s not_null and the ODCS rules fail on any single value (generator/dirty.py''s own comment says so), and puts out-of-range dates against a single-tier rule, so a supply generated ''amber'' reads red as a whole - 36 failing checks on TS-45''s.'
+    - THE TARGET IS PER SUPPLY, WITH AN OPTIONAL NAMED RULE (Keith, 2026-10-11, question 1, recommended option). The name is a rule rather than one tool's check_id because one rule runs in up to four tools and they move together. REJECTED per-supply only, which cannot say which rule is to warn and lets the generator choose a different one every regenerate. REJECTED per-check only, which needs full knowledge of every check a lever moves before anything can be planted.
+    - 'THE ORDINARY AMBER SHARE MOVES ONTO TARGETING (Keith, 2026-10-11, question 4): Birth Registrations'' 20% drawn amber become genuinely amber, built from WITHIN-SUPPLY rules only, null-rate rules into their warn bands, with row count and distribution at clean levels so they trip neither row-count growth nor drift whatever they are compared against, and with NO lead-in - lead-ins are for injected targets only. REJECTED leaving them on the preset, where an ''amber'' day in the history reads red.'
+    - CHILD PROTECTION'S ORDINARY AMBERS ARE IN SCOPE TOO (Keith, 2026-10-11, against the recommendation). REJECTED Birth Registrations only, which was recommended because Keith had named the 20% share and because Child Protection has no within-supply amber band. Child Protection draws about a quarter of its fifteen quarterly deliveries amber (generator/generate_cp_runs.py, four of fifteen).
+    - 'WHY CHILD PROTECTION NEEDS A DIFFERENT LEVER, FROM THE CODE: every ODCS null, invalid-value, duplicate and SQL rule on all six tables is mustBe 0, severity error, so every Soda and dbt two-tier band on a column is closed by the contract; the only two-tier bounds left are each table''s rowCount (severity warning) and the two Evidently checks, PSI on cp_notifications.concern_type and a row drop per table, both cross-supply. Within-supply rules alone cannot make a Child Protection supply amber while the contract stands as it is, which is why REQ-QAC-187 exists.'
+    - THE LOOSENED RULE IS cp_clients.postcode (Keith, 2026-10-11), not the delivery-scoper's recommended cp_notifications.source_type. REJECTED source_type, recommended for the widest band (1 to 29 rows) on the biggest table. REJECTED risk_rating, as wide, but a contract tolerating unknown risk ratings on child-protection notifications is harder to defend. REJECTED placement_type, whose band is only 1 to 7 rows. Postcode's band is 1 to 15 bad values in about 527 clients; no foreign key, SQL-bodied check or Evidently check reads it - only its own invalid-value and missing-value checks in the three tools, and the run statistics in qa_tools/cp/dataset_stats.py.
+    - 'FOUR-CHARACTER INVALID VALUES ONLY (delivery-scoper): the contract declares postcode varchar(4), and generator/dirty.py''s existing invalid-postcode pool includes the five-character ''6000X''. Drawing from ''0000'', ''9999'', ''XXXX'' and ''TBC'' keeps the amber about the value set rather than the column''s declared width, and none is a null sentinel.'
+    - 'CHILD PROTECTION''S LEVER IS ONE LOOSENED CONTRACT RULE (Keith, 2026-10-11), so its ambers are built within-supply like Birth Registrations'', on a tolerance REQ-QAC-187 adds. REJECTED the persisting concern_type mix shift, which was the delivery-scoper''s recommendation because it changed no check: it is cross-supply, so it holds only while each amber is promoted, it moves the concern_type mix of every later delivery for the rest of the history, and it can only ever make cp-notifications amber. Keith''s relayed answer gave no reason of its own; those are the trade-offs that were in front of him. REJECTED also a cp_case_workers row-count spike over a raised base, whose margins were one to four rows on a table due only in February and August, and dropping Child Protection''s ordinary amber share, which reverses his in-scope answer.'
+    - 'ORDINARY AMBERS STAY OUT OF THE HOLD ERA (Keith, 2026-10-11, recommended option): a genuinely amber supply drawn into a hold version would be held, and with no person decision it would leave the permanent gap Keith closed for TS-43 with a scripted promotion. REJECTED scripting a decision for each, which multiplies scripted decisions for supplies nobody is demonstrating. REJECTED accepting the gap reds, under which every later supply''s drift and volume read red on the page. Criterion 9 reads the hold versions from configuration rather than naming dates, so a moved era moves the exclusion with it.'
+    - 'THE ORDINARY RED SHARE KEEPS THE BLUNT ''red'' PRESET (Keith, 2026-10-11): a red supply only has to fail, which the preset reliably does, and it is what drives the resupply chains.'
+    - 'OUT OF SCOPE: Child Protection''s cross-table outcomes TS-48, TS-49 and TS-51 (Keith, 2026-10-11, question 4), though REQ-GEN-136 named #63 as their owner. They need named red targets and referential closure across six tables. Ordinary Child Protection ambers ARE in scope; these injected scenarios are not.'
+    - 'AIMING FOR A VERDICT FITS REQ-GEN-044 CRITERION 6 AS WRITTEN (Keith, 2026-10-11, question 5): a target only says which rows to write, the real tools still decide, and criterion 12 records the target and never a verdict, so the pipeline''s tests still assert agreement with the rule and not with the generator. NO AMENDMENT to REQ-GEN-044 criterion 6 or REQ-GEN-136 criterion 12. REJECTED amending them, and REJECTED reading the criterion as forbidding this work.'
+    - 'TRUNCATION ON ITS OWN IS NOT A LEVER: a plain truncation into the row-count warn band split multiple-birth groups so the three sibling checks failed (REQ-GEN-044''s TS-43 decision). Criterion 5 now covers it through reads_columns, and for Child Protection through referential closure: generate_cp_runs.py''s own churn stays modify-only because removing rows broke escalation completeness on 2026-09-18.'
+    - 'REJECTED relying on a clean supply''s natural warnings, which are amber on some days and green on others by the draw (REQ-GEN-044). The same draw is why criterion 4 also holds a GREEN target clear of them: base row counts are drawn between 1,700 and 2,050, so a clean day can sit up to ~17% below the day before and warn on row-count growth, and one ordinary supply in twenty is made stale and fails freshness. For an ordinary Birth Registrations amber ''whatever it is compared against'' therefore means a row count high enough to stay within the 10% warn bound of the largest base count an ordinary supply can have.'
+    - 'PLANTING TS-43 TO TS-46 STAYS WHERE IT IS SIGNED: REQ-GEN-136 criteria 6 and 7 and REQ-GEN-137 criterion 4 already require it, so this requirement does not restate it. Their unmet_criteria blocked_by entries are repointed to REQ-GEN-184, 185 and 186 when this is signed.'
+  - id: REQ-GEN-185
+    title: A targeted injected supply's row-count and drift checks are measured against a supply the generator controls
+    date_written: '2026-10-11'
+    story: As Keith, I want a scenario whose verdict depends on the supply before it to sit after a run of ordinary green supplies that nothing disturbs, so that its row-count growth and drift checks are measured against something the generator knew when it built it, its own perturbation does not carry into the day after, and a held scenario supply does not leave the rest of the history reading red.
+    moscow: must
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-11'
+    source: 'Keith, plans/running-thoughts.md #63 open question 2 (cross-supply checks when the previous supply is itself a scenario), sent for scoping 2026-10-11. Scoped by delivery-scoper 2026-10-11, revised on Keith''s answers.'
+    acceptance_criteria:
+    - WHERE an injected arrival names a target, THE SYSTEM SHALL generate a configurable number of periods before it, defaulting to two, as green-targeted supplies arriving once each, on time, with no resupply and no other period's arrival landing on them.
+    - THE SYSTEM SHALL compute a targeted injected arrival's row count and value distribution against the last of those lead-in supplies, so that its row-count growth and drift metrics land in the range its target needs.
+    - THE SYSTEM SHALL generate the period after a targeted injected arrival so that its own row-count growth and drift stay passing, and SHALL NOT let a targeted perturbation compound into the following supply.
+    - WHEN a targeted injected arrival is a resend into a period that already holds a supply, THE SYSTEM SHALL compute it against the lead-in supply before that period, which is what the pipeline measures it against (REQ-QAC-108 criterion 3), and SHALL NOT churn it in a way that moves either metric out of its target range.
+    - IF a lead-in or following period is already claimed by another scenario or by a suppressed or quiet day, THEN THE SYSTEM SHALL fail naming both scenarios.
+    - THE SYSTEM SHALL decide what a targeted supply is measured against from the placement alone, and SHALL NOT read the decision log, promotion state or any database to decide it.
+    - THE SYSTEM SHALL script, in contract/scripted_decisions.yaml, a person's promotion of TS-43's held amber supply, played back through REQ-GEN-135's decision path, taking effect after TS-43 has been seen held and before the next Birth Registrations supply arrives, so that the gap TS-43 opens is closed.
+    - WHILE TS-43's supply has not been promoted by that decision, THE SYSTEM SHALL leave it held exactly as the pipeline holds it.
+    non_functional_requirements:
+    - 'No modelling of the pipeline in the generator: the lead-in makes the reference predictable by construction rather than by re-implementing promotion, so there is no second copy of the promotion rules to drift (Keith, #64).'
+    - 'No back door for TS-43: the promotion is a scripted person decision through filing_decisions.apply(), judged and refused exactly as a person''s would be (REQ-GEN-135).'
+    - 'Readable history (REQ-GEN-044 NFR 3): lead-in periods are ordinary green days, and TS-43''s gap is closed, so the bulk of the history still looks like a healthy feed.'
+    - 'Scale: lead-in length is per injection, because a quarterly dataset''s lead-in is quarters, not days, and an extraction-shaped asset with no cadence has no previous supply at all - for which this requirement does not apply.'
+    - 'Bootstrap cost: lead-in periods replace ordinary periods rather than adding arrivals, so the arrival count should not grow; one more scripted decision adds one transaction (REQ-GEN-135 NFR 5). Measure and record both.'
+    dependencies:
+    - REQ-GEN-184
+    - REQ-GEN-135
+    - REQ-QAC-108
+    decisions:
+    - 'A CLEAN LEAD-IN (Keith, 2026-10-11, question 2, recommended option), as REQ-GEN-044 already said planting needs - ''on a day whose previous supply was clean'' - using the quiet-day mechanism TS-47 introduced so no resend lands on it. REJECTED predicting the reference by modelling promotion, the amber and replacement settings and the gap rule in the generator, which is the scenario-only logic Keith ruled out in #64. REJECTED sizing against the generator''s own previous payload, which is today''s behaviour and is what failed for TS-43 to TS-46.'
+    - 'LEAD-INS ARE FOR INJECTED TARGETS ONLY (Keith, 2026-10-11): ordinary ambers get none, and stay within-supply instead (REQ-GEN-184).'
+    - TS-43'S GAP IS CLOSED BY A SCRIPTED PERSON PROMOTION (Keith, 2026-10-11, question 6, recommended option). TS-43 reads held until then. REJECTED accepting the gap, under which every later Birth Registrations supply's drift and volume checks read red on the page for the rest of the history - against REQ-GEN-044 NFR 3. REJECTED deciding only after a rebuild had shown it, since the gap rule's code already says what happens.
+    - 'PROMOTE, NOT REJECT (delivery-scoper, following from Keith''s ''so the gap closes''): only a promotion, a substitution or a mark-not-supplied closes a gap (drift_reference._owed_earlier), and a rejection leaves the slot unfilled, so a scripted rejection would not close it.'
+    - 'BEFORE THE NEXT SUPPLY (delivery-scoper, provisional): the next supply''s drift and volume results are judged when it is run, so a promotion that comes after it leaves that supply''s gap-red recorded unless something re-evaluates it.'
+    - THE REFERENCE IS THE LAST PROMOTED EARLIER PERIOD, NOT THE PREVIOUS ARRIVAL (REQ-QAC-108, qa_tools/common/drift_reference.py), and the generator today sizes a dirty supply against the previous slot's last delivery (generator/generate_runs.py's previous_row_count) - the two diverge whenever that slot was not promoted. A green lead-in is what makes them coincide.
+    - 'COMPOUNDING IS REAL: a truncated day measured against a truncated day failed row count and drift on the 2026-10-05 rebuild, hence criterion 3.'
+    - TS-46'S RECORDED REASON NEEDS CHECKING BEFORE BUILD. REQ-GEN-044's decision says its churned resend read red 'against the supply it was to replace', but drift_reference excludes the current period's own supply from being a reference, so the comparison must have been against an earlier period. Criterion 4 is written to the code; a trial probe should confirm which comparison went red.
+    open_questions:
+    - Is two lead-in periods enough, and does a quarterly scenario need a different default?
+    - 'Verify at build: does a gap-red already recorded on a later supply stay red once the gap is closed, or is it re-evaluated? The answer fixes how soon after TS-43''s receipt the scripted promotion has to take effect.'
+  - id: REQ-GEN-186
+    title: A targeted supply's verdict is confirmed by the real tools before the history is used
+    date_written: '2026-10-11'
+    story: As whoever regenerates the synthetic history, I want each targeted supply's verdict confirmed by the four real tools as soon as it is generated, and checked again against what the pipeline recorded, so that a supply that would land wrong fails in about a minute rather than at the end of a full rebuild, and never ships quietly wrong.
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-11'
+    source: 'Keith, plans/running-thoughts.md #63 open question 3 (self-verification at generation time) and #65 (''is there a way you can regenerate just the failing slices, make sure they work''), sent for scoping 2026-10-11. Scoped by delivery-scoper 2026-10-11, revised on Keith''s answers.'
+    acceptance_criteria:
+    - WHEN the generator has written a targeted injected arrival, THE SYSTEM SHALL run the four real tools against it through the same trial path `mothman bdm qa --trial` uses, with the last lead-in supply as its reference, recording nothing.
+    - IF a trial verdict differs from the arrival's target, THEN THE SYSTEM SHALL fail generation naming the scenario, the target, the verdict and every check whose status the target does not allow, and SHALL NOT emit the history.
+    - WHEN a replay of the synthetic history finishes, THE SYSTEM SHALL compare every targeted supply's verdict as the promotion gate reads it - injected and ordinary amber alike, in both collections - with its target, and IF they differ, THEN THE SYSTEM SHALL fail the bootstrap naming the scenario or period and the checks responsible.
+    - THE SYSTEM SHALL compare only verdicts a real tool produced, and SHALL NOT compute a predicted verdict of its own.
+    - WHERE the generation-time trial is skipped by an explicit flag, THE SYSTEM SHALL say so in its output, and SHALL still run the comparison after replay.
+    - THE SYSTEM SHALL NOT change any filing, promotion, decision or verdict as a result of either comparison.
+    non_functional_requirements:
+    - 'No second implementation of the checks: verification uses the real tools on the human trial path, so the generator is never the judge of its own output (Keith, #64; REQ-GEN-044 criterion 6).'
+    - 'Performance: about a minute per trial, measured on 2026-10-05 (#65), so the four injected targets add roughly four minutes to a generation against a ~8.5-minute bootstrap. That is significant, which is why criterion 5 offers a skip and the post-replay comparison always runs.'
+    - 'Environment: the generation-time trial needs a running PostgreSQL during generation, which generation may not need today; CI''s bootstrap step already has one.'
+    - 'Reliability: a failed comparison fails loudly and early; nothing is retried automatically.'
+    - 'Observability: the failure names scenario or period, target, verdict and checks in one message, so it is diagnosable from a CI log without re-running.'
+    dependencies:
+    - REQ-GEN-184
+    - REQ-GEN-185
+    decisions:
+    - 'BOTH COMPARISONS (Keith, 2026-10-11, question 3, recommended option): a real-tool trial at generation, fast but blind to filing, promotion, the gap rule and scripted decisions; and a comparison of the recorded verdict after replay, complete but slow. REJECTED a generator-side arithmetic prediction against the catalogue, which is a second implementation of every check, cannot evaluate SQL-bodied checks at all, and would make the scenario agree with the generator rather than with the tools. REJECTED the post-replay comparison alone, which only finds a wrong scenario after a full bootstrap. REJECTED no verification.'
+    - 'CHECK AGAINST THE REAL READER, NOT BY REASONING (REQ-GEN-044''s TS-12 lesson: an ''unreadable'' file parsed happily on the first attempt). A targeted supply is confirmed by the tools that will judge it.'
+    - 'THE TRIAL ALREADY EXISTS AND WAS NOT USED, which #65 records as a mistake: `mothman bdm qa --trial --file X --reference-file Y` runs the four tools on one file and records nothing, and would have shown TS-43 to TS-46 reading red before any rebuild. It is a verdict probe, not a full test, which is why criterion 3 checks again after replay.'
+    - 'TRIAL FOR INJECTED TARGETS ONLY, REPLAY COMPARISON FOR ALL (Keith, 2026-10-11, recommended option). REJECTED trialling ordinary ambers too: an ordinary amber has no lead-in, so there is no single reference to trial it against, and about six of them would add about six minutes to every generation. Its within-supply construction is meant to hold against any reference, and the post-replay comparison checks that against what really ran.'
+    - 'THE GATE''S READING, NOT THE PAGE''S (Keith, 2026-10-11, recommended option). REJECTED comparing the status the page shows, which includes gap reds: REQ-QAC-108''s gap rule records a drift or volume check red when the comparison skipped an owed period, keeping the measurement as measured_status, and the promotion gate reads the measurement. An ordinary amber arriving after an unresolved red would otherwise fail the comparison for a gap it did not cause.'
+    - 'THE POST-REPLAY COMPARISON READS RECORDED RESULTS ONLY and changes nothing, so it does not add a scenario-only path to filing, QA or promotion; it is the same kind of loud stop REQ-GEN-135''s scripted-decision refusal already gives. Flagged for Keith''s #64 walkthrough because it is new bootstrap code that knows targets exist.'
+  - id: REQ-QAC-187
+    title: Child Protection client postcodes tolerate a few unrecognised values, matching their Soda and dbt bands
+    date_written: '2026-10-11'
+    story: As whoever maintains the Child Protection contract, I want the client postcode rule, which today fails on a single unrecognised postcode, to tolerate the same few its Soda and dbt copies already tolerate, so that the three tools agree on what a few bad values mean and a supply can read amber on that rule rather than red.
+    moscow: must
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-11'
+    source: 'Keith, 2026-10-11, choosing ''loosen one contract rule'' as the Child Protection amber lever while scoping plans/running-thoughts.md #63. Split out of REQ-GEN-184 by delivery-scoper 2026-10-11. Rule picked by Keith the same day.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL change the ODCS invalidValues rule on cp_clients.postcode from mustBe 0 to unit percent with mustBeLessThan 3, at severity error, matching the fail bound of Soda's invalid_percent(postcode) on the same column.
+    - THE SYSTEM SHALL leave that rule's check_id, metric, validValues and dimension unchanged, so that it is a redefinition of the same check rather than a retirement and a new one.
+    - THE SYSTEM SHALL add to that rule's changelog an entry marked breaking, with its date, its author and a description of the tolerance added and why, in the same change.
+    - THE SYSTEM SHALL rewrite that rule's description, which today says a single unrecognised value fails, so that it describes a tolerance, following docs/check-authoring-rules.md.
+    - THE SYSTEM SHALL leave the Soda and dbt checks on the same column, and the postcode nullValues rule, unchanged.
+    - WHEN a Child Protection delivery carries unrecognised client postcodes above zero and inside every tool's fail bound, THE SYSTEM SHALL record datacontract-cli's check as passing and the Soda and dbt checks as warning, so that the dataset reads amber.
+    - IF the count passes any one tool's own fail bound, THEN THE SYSTEM SHALL record that tool's check as failing, so that the dataset reads red.
+    - THE SYSTEM SHALL record the rule's new fail threshold from its own qualityDefinition, so that the dashboard shows the tolerance rather than zero.
+    non_functional_requirements:
+    - 'Check lifecycle (verified in qa_tools/common/check_lifecycle.py): the ODCS parser drops customProperties and the description before hashing and hashes the rest of the rule, so changing mustBe, mustBeLessThan and unit changes the check''s config hash. find_undocumented_changes then fails the lifecycle gate unless the changelog has grown, which is why criterion 3 is not optional.'
+    - 'A real contract statement, said plainly: tolerating a few unrecognised client postcodes is a data-quality policy, not a test fixture. In a real deployment it would be the data owner''s call, and here it is Keith''s. The tolerance applies to every supply from the change on, not only to synthetic ambers.'
+    - 'Recorded history: the synthetic history is regenerated under the new rule, so no recorded verdict is re-derived. In a real deployment, past verdicts would stay as they were recorded.'
+    - 'Release notes: this changes what a published check accepts, so it gets a CHANGELOG.yaml entry in the same push (CLAUDE.md).'
+    - 'Boundary semantics: mustBeLessThan 3 fails at exactly 3%, where Soda''s fail when > 3% does not. This follows the precedent of place_of_birth_facility in the Birth Registrations contract, and REQ-GEN-183''s intersection honours each tool''s own operator.'
+    dependencies: []
+    decisions:
+    - 'cp_clients.postcode (Keith, 2026-10-11). REJECTED cp_notifications.source_type (the delivery-scoper''s recommendation, widest band), cp_notifications.risk_rating (as wide, harder to defend as policy) and cp_placements.placement_type (band of 1 to 7 rows). At about 527 clients the amber band is 1 to 15 unrecognised postcodes: Soda fails above 3% (16), dbt above 15, and this rule at 3% or more (16). Nothing else reads the column - no foreign key, no SQL-bodied check, no Evidently check.'
+    - LOOSEN ONE CONTRACT RULE (Keith, 2026-10-11), as the Child Protection amber lever. REJECTED the persisting concern_type mix shift (the delivery-scoper's recommendation), a cp_case_workers row-count spike, and dropping Child Protection's ordinary ambers - see REQ-GEN-184's decisions for each.
+    - ITS OWN REQUIREMENT, NOT CRITERIA IN REQ-GEN-184 (delivery-scoper recommendation, 2026-10-11). It changes what a published check accepts for every supply, which is a QA checks decision (docs/components.md) with its own lifecycle consequence, and Keith signs a contract change off separately from a generator change. Unlike reads_columns, which Keith folded into REQ-GEN-183, this changes a verdict rather than adding metadata.
+    - 'SEVERITY STAYS error WITH A NON-ZERO THRESHOLD, not severity warning: ODCS has no two-tier rule, and a warning-severity rule would never fail at all. This is the pattern place_of_birth_facility and both registering-parent rules already use in the Birth Registrations contract.'
+    - UNIT percent, NOT A ROW COUNT, so the ODCS rule tracks the Soda percentage as the table grows. Verified that the installed datacontract-cli accepts unit percent on invalidValues (datacontract/engines/checks/create_checks.py:751).
