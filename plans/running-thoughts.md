@@ -4977,3 +4977,16 @@ Belongs with batch 5's check work.
     The three answers on the table: refuse such a move once the dataset has a
     slot; allow it only as a declared correction (REQ-PIPE-111); or version
     membership like participation.
+
+80. **[todo, 2026-10-11]** **[Testing & dev tooling]** **A timing assertion in
+    tests/test_dbt_worker.py fails under full-suite load.**
+    `TestOneWorkerPerProcess::test_later_runs_reuse_the_parse` asserts that
+    every later dbt run is faster than the first (`max(times[1:]) <
+    times[0]`). In a full parallel `mothman check` on 2026-10-11 it saw
+    7.23s, 4.26s, 7.39s and failed; the module alone passed 11/11, and the
+    same tree minus one unused import had passed the whole suite minutes
+    earlier. The thing it proves - the partial parse is reused - is better
+    asserted directly (the msgpack is read, not rewritten; dbt's own
+    "Unable to do partial parsing" line is absent) than through wall-clock
+    time on a shared four-core sandbox. Not fixed here: noticed during
+    REQ-GEN-183's gate, outside its scope.

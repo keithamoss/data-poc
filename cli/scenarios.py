@@ -99,3 +99,64 @@ def validate_command() -> None:
         raise click.ClickException(
             f"scripted decisions FAILED ({len(found)} problem(s)) - see above.")
     console.print(f"scripted decisions OK - {len(script)} decision(s), zero errors.")
+
+
+@scenarios_group.command("bands")
+@click.option("--dataset", "dataset_id", default=None,
+              help="One dataset's rules (default: every dataset).")
+@click.option("--rows", type=int, default=None,
+              help="The supply's row count a band is worked out at (default: the "
+                   "smallest supply the contract calls ordinary).")
+def bands_command(dataset_id: str | None, rows: int | None) -> None:
+    """Every rule's bands per tool, and whether it can read amber (REQ-GEN-183).
+
+    \b
+    Examples:
+      mothman scenarios bands --dataset birth-registrations --rows 2000
+      mothman scenarios bands
+
+    A rule is the checks that implement it across tools - one dataset, column
+    and category - and its amber band is where no implementing check fails and
+    at least one warns, honouring each tool's own unit and operator. Read from
+    the committed definitions the tools run; opens no database. What the
+    synthetic generator reads to build a supply to a verdict.
+    """
+    from qa_tools.common import check_bands as cb, hierarchy
+
+    try:
+        cat = cb.catalogue()
+    except cb.CatalogueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    datasets = [dataset_id] if dataset_id else sorted({c.dataset_id for c in cat.checks})
+    known = {c.dataset_id for c in cat.checks}
+    for ds in datasets:
+        if ds not in known:
+            raise click.ClickException(f"{ds} has no checks - is it a dataset id?")
+        n = rows or cb.default_rows(ds, cat)
+        console.print(f"\n[bold]{hierarchy.dataset(ds).dataset_name}[/bold] ({ds}) - bands at {n} rows",
+                      highlight=False)
+        for r in sorted((r for r in cat.rules() if r.dataset_id == ds),
+                        key=lambda r: (r.column or "", r.category, r.measure)):
+            where = f"{r.column or '(the table)'} - {r.category}, {r.measure}"
+            amber = r.amber(n)
+            if amber:
+                said = ", ".join(f"{lo}-{hi}" if lo != hi else f"{lo}" for lo, hi in amber)
+                head = f"amber at {said}"
+            else:
+                head = "no amber band - closed by " + ", ".join(
+                    c.rsplit(".", 1)[-1] for c in r.closed_by(n))
+            console.print(f"  {where}: {head}", markup=False, highlight=False)
+            for c in r.checks:
+                bands = ("fails on any" if c.single_tier else
+                         "; ".join(filter(None, [
+                             "warns " + " or ".join(b.text() for b in c.warn) if c.warn else "",
+                             "fails " + " or ".join(b.text() for b in c.fail) if c.fail
+                             else "never fails"])))
+                console.print(f"      {c.tool:<12} {bands}", markup=False, highlight=False,
+                              style="dim")
+        readers = cat.single_tier_readers(ds)
+        if readers:
+            console.print("  Single-tier checks reading each column:", style="bold")
+            for col, ids in readers.items():
+                console.print(f"    {col}: " + ", ".join(i.rsplit(".", 1)[-1] for i in ids),
+                              markup=False, highlight=False, soft_wrap=True)

@@ -230,6 +230,12 @@ releases:
               says so and why, a dataset with a correction waiting to be
               confirmed says that too, and each confirmed correction appears
               once in Recent activity.
+          - headline: Where each rule can read amber
+            components: ["QA checks & contract", "Data generation"]
+            description: >
+              `mothman scenarios bands` lists every rule's warn and fail
+              bounds in each tool and whether it can read amber at a given
+              size. Every check written in SQL now names the columns it reads.
           - headline: A few unrecognised client postcodes are tolerated
             components: ["QA checks & contract"]
             description: >
