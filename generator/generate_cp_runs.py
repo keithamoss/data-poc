@@ -581,6 +581,21 @@ def _plan_injections(periods):
     return resolved, by_period
 
 
+def _ordinary_severities(periods, injected_by_period) -> list:
+    """Each drawn severity, with every ordinary amber that cannot be
+    generated where it was drawn - in a `hold` amber-setting era, or on a
+    period an injected scenario owns, whose chain ignores the drawn
+    severity - moved to a clean period that can take it, so the number
+    generated equals the number drawn (REQ-GEN-184 criterion 9;
+    post-build-review #154). The first period stays clean."""
+    from generator import targeting
+
+    unavailable = frozenset(i for i, p in enumerate(periods) if p.name in injected_by_period)
+    return targeting.outside_hold([sev for _q, sev in RUN_PLAN[:len(periods)]],
+                                  [p.date for p in periods], "cp-clients",
+                                  keep_clean=frozenset({0}), unavailable=unavailable)
+
+
 def main() -> None:
     print(f"Generating base Child Protection collection (population={POPULATION_N:,}, seed={BASE_SEED})...")
     pop = generate_population(POPULATION_N, seed=BASE_SEED)
@@ -610,13 +625,7 @@ def main() -> None:
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
     resolved_injections, injected_by_period = _plan_injections(periods)
 
-    # ORDINARY AMBERS KEPT OUT OF ANY `hold` ERA (REQ-GEN-184 criterion 9),
-    # the count unchanged; the first period stays clean.
-    from generator import targeting
-
-    severities = targeting.outside_hold([sev for _q, sev in RUN_PLAN],
-                                        [p.date for p in periods], "cp-clients",
-                                        keep_clean=frozenset({0}))
+    severities = _ordinary_severities(periods, injected_by_period)
     for i, (severity, period) in enumerate(zip(severities, periods), start=1):
         snapshot_date = period.date
         slot_id = f"cp_slot_{i:02d}"

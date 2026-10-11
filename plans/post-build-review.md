@@ -7666,3 +7666,40 @@ twice. It deliberately did not re-find the `TypeError`.
       and `mothman check` calls that.
     - **Checked, not a finding:** no band the generator aims at moved -
       compared against HEAD's code - so the generated history is unchanged.
+
+154. **[done, 2026-10-11]** **[Data generation]** **The delivery critic on
+     REQ-GEN-184 part A, ordinary ambers built to read amber (1010828).** Run
+     after the push. Every claim was checked against the code before acting,
+     and each fix had a test that failed first (finding 1's on what the
+     generator WROTE: 3 ambers against 6 drawn).
+    - **1 (high):** the ambers moved out of the hold era were moved at
+      import, blind to the injected scenarios - onto TS-2's emptied day and
+      its own injected day, where the generator ignores the drawn severity.
+      Birth Registrations generated 3 ordinary ambers where 6 were drawn
+      (and 5 before this work). The plan now moves an amber off any period
+      that cannot carry one - held, injected or emptied - in `main()`, where
+      the injections are known, in both collections; the count generated
+      equals the count drawn, and an amber drawn onto an injected period is
+      moved rather than lost. The injected periods also got their own drawn
+      sizes back.
+    - **2 (high):** the measurement said "eight ordinary ambers" where six
+      are drawn. Re-measured after this fix and corrected on REQ-GEN-184.
+    - **3 (medium, Keith's call):** building every amber at 2,049 rows made
+      the CLEAN supply after it drop 12-16% and warn - ambers in the history
+      for a reason that is not the rule being shown. Keith chose the size of
+      the supply before it: asked for at that size and trimmed to it
+      exactly, single-birth rows only, so no twin loses its sibling.
+    - **4 (medium):** the module said it kept every column a single-tier
+      check reads passing; it protects twins, which today is the same thing.
+      Reworded to say exactly that, and that the general guard is part B's.
+    - **5 (low):** `outside_hold`'s falsy-setting guard was dead -
+      resolution raises rather than returning nothing. Removed.
+    - **6 (low):** the red-positions test now asserts positions; the two
+      untested refusals are tested; too few postcodes refuses as a target
+      error rather than numpy's; the hold era's comment in
+      contract/data-asset.yaml says no ordinary amber lands there now (a
+      comment beside the dated entries, which are left as written); the
+      rewritten page test's unused value is gone.
+    - **Noted, not a finding:** the critic's first runs used the default
+      test database name and may have dropped another session's scratch
+      database - test data only.

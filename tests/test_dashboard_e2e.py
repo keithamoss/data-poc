@@ -3051,10 +3051,9 @@ class TestCrossTableChecks:
             const {ck, h} = candidates[0];
             const failed = cross.map(c=>({...c, checks: (c.checks||[]).map(k=>k !== ck ? k
                 : {...k, history: k.history.map(e=>e === h ? {...e, status: "red"} : e)})}));
-            const before = datasetStatusByRun({columns: [...own.columns, ...cross]}).get(h.run_id);
             const after = datasetStatusByRun({columns: [...own.columns, ...failed]}).get(h.run_id);
             return {nCross: cross.length, candidates: candidates.length,
-                    own: ownOnly.get(h.run_id) || "green", before, after};
+                    own: ownOnly.get(h.run_id) || "green", after};
         }""")
         assert found["nCross"] > 0, "cp-carers carries no cross-table checks"
         assert found["candidates"], "no run where cp-carers' own checks are not red"

@@ -95,6 +95,19 @@ def _injected_periods() -> tuple[set[str], set[str]]:
             {name for p in placed for name in p.suppressed})
 
 
+def _planned_severities() -> list:
+    """Each slot's severity as the generator plans it - the draw, with
+    ordinary ambers moved off periods that cannot carry one (REQ-GEN-184
+    criterion 9) - resolved the same way main() resolves it."""
+    from generator.anchor_date import get_anchor_date
+    from qa_tools.common import schedule
+
+    periods = schedule.periods_for_dataset(
+        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    _r, by_period, suppressed, _q = generate_runs._plan_injections(periods)
+    return generate_runs._ordinary_severities(periods, by_period, suppressed)
+
+
 def _ordinary_slots(manifest) -> dict[str, list[dict]]:
     """Every slot the ordinary chain produced, injected ones removed."""
     injected, _ = _injected_periods()
@@ -147,8 +160,9 @@ def test_severity_counts_match_run_plan(manifest):
     # two lists stopped being the same length (REQ-GEN-044). `slot_NNN`
     # is 1-indexed over the generated periods, which is the same order
     # RUN_PLAN is in.
+    planned_all = _planned_severities()
     for slot_id, entry in first_by_slot.items():
-        planned = generate_runs.RUN_PLAN[int(slot_id.split("_")[1]) - 1][1]
+        planned = planned_all[int(slot_id.split("_")[1]) - 1]
         assert entry["dirty_severity"] == planned, (
             f"{slot_id}: planned {planned!r}, generated {entry['dirty_severity']!r}")
     assert first_by_slot, "every slot was excluded - the exclusion is too wide"
@@ -352,3 +366,38 @@ def _period_of(si, injection) -> str:
     periods = schedule.periods_for_dataset(
         "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
     return si.resolve(injection, periods).period
+
+
+class TestOrdinaryAmbersAsGenerated:
+    """REQ-GEN-184 criterion 9 and Keith's 2026-10-11 answer on size,
+    asserted on what the generator WROTE rather than on the plan
+    (post-build-review #154: the plan said six ambers and three were
+    generated, because ambers were moved onto days an injected scenario
+    owns or empties)."""
+
+    def test_every_drawn_ordinary_amber_is_generated(self, manifest):
+        drawn = generate_runs._build_run_plan(generate_runs.N_DELIVERIES,
+                                              generate_runs._RUN_PLAN_SEED)
+        first = [entries[0] for entries in _ordinary_slots(manifest).values()]
+        assert sum(e["dirty_severity"] == "amber" for e in first) == \
+            [s for _n, s in drawn].count("amber")
+
+    def test_an_amber_is_the_size_of_the_supply_before_it(self, manifest):
+        """Keith, 2026-10-11: so neither the amber's own row-count check
+        nor the next clean supply's moves because of it."""
+        ordered = sorted(manifest, key=lambda e: e["run_index"])
+        injected, _ = _injected_periods()
+        checked = 0
+        for prev_slot, slot in zip(_slot_runs(ordered), _slot_runs(ordered)[1:]):
+            first = slot[0]
+            if first["dirty_severity"] == "amber" and first["period"] not in injected:
+                assert first["n_rows_generated"] == prev_slot[-1]["n_rows_generated"], first
+                checked += 1
+        assert checked, "no ordinary amber followed a supply"
+
+
+def _slot_runs(ordered):
+    out: dict[str, list] = {}
+    for e in ordered:
+        out.setdefault(e["slot_id"], []).append(e)
+    return list(out.values())

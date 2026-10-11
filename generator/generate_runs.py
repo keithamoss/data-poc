@@ -201,29 +201,23 @@ def _scheduled_dates(n: int) -> list[date]:
 SCHEDULED_DATES = _scheduled_dates(N_DELIVERIES)
 START_DATE = SCHEDULED_DATES[0]
 
-#: The top of the base row-count draw above. An ordinary amber is built at
-#: it (REQ-GEN-184 criterion 6), so its row-count growth check passes against
-#: any supply this history can produce, a churned resupply included.
-AMBER_ROWS = 2_049
-
-
-def _ordinary_ambers(plan, dates):
-    """GENUINELY AMBER (REQ-GEN-184; Keith, 2026-10-11): ordinary ambers are
-    kept out of any `hold` amber-setting era, the count unchanged (criterion
-    9), and built at AMBER_ROWS (criterion 6). Clean and red entries are
-    exactly as drawn (criterion 10)."""
+def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
+    """GENUINELY AMBER (REQ-GEN-184; Keith, 2026-10-11): each drawn severity,
+    with every ordinary amber that cannot be generated where it was drawn -
+    in a `hold` amber-setting era, or on a period an injected scenario owns
+    or empties - moved to a clean period that can take it, so the number
+    GENERATED equals the number drawn (criterion 9). Planned here, against
+    the injections, rather than at import: moved blind, three of six were
+    generated (post-build-review #154). Reds and cleans as drawn (criterion
+    10); the bookends stay clean."""
     from generator import targeting
 
-    severities = targeting.outside_hold([s for _n, s in plan], dates, DATASET_ID,
-                                        keep_clean=frozenset({0, len(plan) - 1}))
-    return [(AMBER_ROWS if sev == "amber" else n, sev)
-            for (n, _old), sev in zip(plan, severities)]
-
-
-RUN_PLAN = _ordinary_ambers(RUN_PLAN, SCHEDULED_DATES)
-#: An ordinary amber is never also made stale: a stale delivery fails the
-#: freshness checks, which would make it red (criterion 4).
-AMBER_DATES = frozenset(d for (_n, sev), d in zip(RUN_PLAN, SCHEDULED_DATES) if sev == "amber")
+    unavailable = frozenset(i for i, p in enumerate(periods)
+                            if p.name in injected_by_period or p.name in suppressed)
+    return targeting.outside_hold([s for _n, s in RUN_PLAN[:len(periods)]],
+                                  [p.date for p in periods], DATASET_ID,
+                                  keep_clean=frozenset({0, len(periods) - 1}),
+                                  unavailable=unavailable)
 
 
 class BirthRegistrationsProvider:
@@ -233,6 +227,12 @@ class BirthRegistrationsProvider:
     docs/synthetic-data-generation-tools-research.md) means writing a new
     class like this one, not touching resupply.py or the chain-walking
     loop in main() below."""
+
+    def __init__(self, amber_dates: frozenset[date] = frozenset()):
+        #: An ordinary amber is never also made stale: a stale delivery
+        #: fails the freshness checks, which would make it red
+        #: (REQ-GEN-184 criterion 4). main() sets it once ambers are planned.
+        self.amber_dates = amber_dates
 
     def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> pd.DataFrame:
         df = generate_daily_batch(run_date, seed=seed, n_rows=n_rows, id_offset=id_offset)
@@ -246,7 +246,7 @@ class BirthRegistrationsProvider:
         # daily_batch.py's own internal +1/+2 draws, so this coin flip
         # never correlates with the row content it's applied on top of.
         is_bookend = run_date in (START_DATE, START_DATE + timedelta(days=N_DELIVERIES - 1))
-        if not is_bookend and run_date not in AMBER_DATES:
+        if not is_bookend and run_date not in self.amber_dates:
             df = inject_stale_delivery(df, seed=seed + 50)
         return df
 
@@ -258,7 +258,7 @@ class BirthRegistrationsProvider:
         if severity == "amber":
             from generator import targeting
 
-            return targeting.bdm_amber(df, seed=seed)
+            return targeting.bdm_amber(df, seed=seed, rows=previous_row_count)
         return apply_birth_registrations_presets(df, severity=severity, seed=seed,
                                                   previous_row_count=previous_row_count)
 
@@ -604,8 +604,20 @@ def main() -> None:
     #: _away_from_suppressed(). Shared across slots, because the
     #: collision it prevents is between them.
     shifted_onto: set[str] = set()
+    severities = _ordinary_severities(periods, injected_by_period, suppressed_periods)
+    provider.amber_dates = frozenset(p.date for p, sev in zip(periods, severities)
+                                     if sev == "amber")
 
-    for i, ((n_rows, severity), period) in enumerate(zip(RUN_PLAN, periods), start=1):
+    for i, ((drawn_rows, _drawn), severity, period) in enumerate(
+            zip(RUN_PLAN, severities, periods), start=1):
+        # AN ORDINARY AMBER IS THE SIZE OF THE SUPPLY BEFORE IT (Keith,
+        # 2026-10-11): its own row-count check reads no change, and the next
+        # supply compares against what it would have anyway. Built at the
+        # top of the draw instead, the clean supply after it dropped 12-16%
+        # and warned (post-build-review #154). Asked for at that size and
+        # trimmed to it exactly in dirty(), since a batch comes out longer.
+        n_rows = previous_row_count if severity == "amber" and previous_row_count \
+            else drawn_rows
         slot_id = f"slot_{i:03d}"
         slot_date = period.date
         seed = 1000 + i
