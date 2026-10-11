@@ -3022,37 +3022,46 @@ class TestCrossTableChecks:
         happens to be red on the same dataset.
         """
         _goto(clean_page, built_dashboard_html)
-        # ASSERTED PER RUN, not over the whole history, and the first
-        # version of this test got that wrong. cp-carers has its own
-        # failing Duplicate rate check in five runs, so "is it ever
-        # red" was true with or without folding and proved nothing.
-        # The real claim is narrower: there is at least one run where
-        # this dataset is green on its own checks and red once the
-        # cross-table section is counted.
+        # ASSERTED PER RUN, not over the whole history: cp-carers has its
+        # own failing checks in some runs, so "is it ever red" would be
+        # true with or without folding and prove nothing.
+        #
+        # AND THE CONDITION IS BUILT, NOT FOUND (REQ-GEN-184, 2026-10-11).
+        # This used to look for a run in the generated history that was
+        # green on its own checks and red through a cross-table check. That
+        # shape came from blunt "amber" supplies dirtying placements as a
+        # side effect; ordinary ambers are now built to touch one rule
+        # only, and the shape went with them. The claim is about the
+        # page's folding, not about the corpus, so the test takes a run
+        # cp-carers' own checks do not hold red, fails one cross-table
+        # result in that run, and asks the page's own function.
         found = clean_page.evaluate("""() => {
             const cp = DATA.agencies.flatMap(a=>a.collections)
                 .find(c=>c.id === "child-protection");
             const ds = cp.datasets.find(d=>d.id === "cp-carers");
-            const scoped = ds.columns.filter(c=>c.scope === "cross-table");
-            // A GAP RED IS READ AT ITS MEASURED VERDICT (REQ-QAC-108): it is
-            // the gap rule's red, not cp-carers' own data, and this test
-            // is about folding cross-table checks in.
-            const measured = c => ({...c, checks: (c.checks||[]).map(ck => ({...ck,
-                history: (ck.history||[]).map(h => h.reference && h.reference.measuredStatus
-                    ? {...h, status: h.reference.measuredStatus} : h)}))});
-            const without = {columns: ds.columns.filter(c=>c.scope !== "cross-table").map(measured)};
-            const withAll = datasetStatusByRun({...ds, columns: ds.columns.map(measured)});
-            const ownOnly = datasetStatusByRun(without);
-            const turned = [];
-            for(const [runId, status] of withAll){
-                if(status === "red" && ownOnly.get(runId) !== "red") turned.push(runId);
-            }
-            return {nCross: scoped.flatMap(c=>c.checks||[]).length, turned};
+            const cross = ds.columns.filter(c=>c.scope === "cross-table");
+            const own = {columns: ds.columns.filter(c=>c.scope !== "cross-table")};
+            const ownOnly = datasetStatusByRun(own);
+            const candidates = cross.flatMap(c=>(c.checks||[]).flatMap(ck=>
+                // A run only enters the map once it is worse than green,
+                // so an absent run is a green one.
+                (ck.history||[]).filter(h=>ownOnly.get(h.run_id) !== "red")
+                    .map(h=>({ck, h}))));
+            if(!candidates.length) return {nCross: cross.length, candidates: 0};
+            const {ck, h} = candidates[0];
+            const failed = cross.map(c=>({...c, checks: (c.checks||[]).map(k=>k !== ck ? k
+                : {...k, history: k.history.map(e=>e === h ? {...e, status: "red"} : e)})}));
+            const before = datasetStatusByRun({columns: [...own.columns, ...cross]}).get(h.run_id);
+            const after = datasetStatusByRun({columns: [...own.columns, ...failed]}).get(h.run_id);
+            return {nCross: cross.length, candidates: candidates.length,
+                    own: ownOnly.get(h.run_id) || "green", before, after};
         }""")
         assert found["nCross"] > 0, "cp-carers carries no cross-table checks"
-        assert found["turned"], (
-            "no run exists where cp-carers is red only because of a cross-table "
-            "check - folding is not reaching this dataset's status")
+        assert found["candidates"], "no run where cp-carers' own checks are not red"
+        assert found["own"] != "red"
+        assert found["after"] == "red", (
+            f"a failing cross-table result left cp-carers {found['after']} in that run "
+            "- folding is not reaching this dataset's status")
 
     def test_a_cross_table_check_is_not_among_the_real_columns(
             self, clean_page, built_dashboard_html):

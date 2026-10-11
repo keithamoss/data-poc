@@ -61,6 +61,8 @@ from typing import Generic, Iterator, Optional, Protocol, TypeVar
 
 import numpy as np
 
+from generator.targeting import TargetError
+
 MAX_ATTEMPTS = 8  # a hard ceiling so a pathological chain can't run forever
 STILL_RED_PROB = 0.45  # per-attempt chance a resupply is ALSO red - a chain
 # needing 5+ attempts to resolve happens ~4% of the time a delivery goes
@@ -232,8 +234,15 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
     injected defects."""
     clean_payload = provider.generate(slot_date, seed, n_rows, id_offset)
     dirty_seed = seed + 500
-    payload = (provider.dirty(clean_payload, first_severity, dirty_seed, previous_row_count)
-               if first_severity else clean_payload)
+    try:
+        payload = (provider.dirty(clean_payload, first_severity, dirty_seed, previous_row_count)
+                   if first_severity else clean_payload)
+    except TargetError as exc:
+        # A target nothing can meet stops generation NAMING THE PERIOD
+        # (REQ-GEN-184 criterion 11): the provider only sees rows, so the
+        # chain, which knows the slot, says which one.
+        raise TargetError(f"the ordinary supply for {slot_date}, target {first_severity}: "
+                          f"{exc}") from exc
 
     # An internal counter, not an emitted field. The chain has to know
     # how many arrivals it has produced to stop at MAX_ATTEMPTS and to

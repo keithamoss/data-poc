@@ -201,6 +201,30 @@ def _scheduled_dates(n: int) -> list[date]:
 SCHEDULED_DATES = _scheduled_dates(N_DELIVERIES)
 START_DATE = SCHEDULED_DATES[0]
 
+#: The top of the base row-count draw above. An ordinary amber is built at
+#: it (REQ-GEN-184 criterion 6), so its row-count growth check passes against
+#: any supply this history can produce, a churned resupply included.
+AMBER_ROWS = 2_049
+
+
+def _ordinary_ambers(plan, dates):
+    """GENUINELY AMBER (REQ-GEN-184; Keith, 2026-10-11): ordinary ambers are
+    kept out of any `hold` amber-setting era, the count unchanged (criterion
+    9), and built at AMBER_ROWS (criterion 6). Clean and red entries are
+    exactly as drawn (criterion 10)."""
+    from generator import targeting
+
+    severities = targeting.outside_hold([s for _n, s in plan], dates, DATASET_ID,
+                                        keep_clean=frozenset({0, len(plan) - 1}))
+    return [(AMBER_ROWS if sev == "amber" else n, sev)
+            for (n, _old), sev in zip(plan, severities)]
+
+
+RUN_PLAN = _ordinary_ambers(RUN_PLAN, SCHEDULED_DATES)
+#: An ordinary amber is never also made stale: a stale delivery fails the
+#: freshness checks, which would make it red (criterion 4).
+AMBER_DATES = frozenset(d for (_n, sev), d in zip(RUN_PLAN, SCHEDULED_DATES) if sev == "amber")
+
 
 class BirthRegistrationsProvider:
     """The DatasetProvider for Birth Registrations - the only piece of
@@ -222,12 +246,19 @@ class BirthRegistrationsProvider:
         # daily_batch.py's own internal +1/+2 draws, so this coin flip
         # never correlates with the row content it's applied on top of.
         is_bookend = run_date in (START_DATE, START_DATE + timedelta(days=N_DELIVERIES - 1))
-        if not is_bookend:
+        if not is_bookend and run_date not in AMBER_DATES:
             df = inject_stale_delivery(df, seed=seed + 50)
         return df
 
     def dirty(self, df: pd.DataFrame, severity: str, seed: int,
               previous_row_count: Optional[int]) -> pd.DataFrame:
+        # AMBER BY CONSTRUCTION (REQ-GEN-184 criterion 6), never the preset,
+        # which trips single-tier checks and reads red. Red keeps the preset
+        # (criterion 10).
+        if severity == "amber":
+            from generator import targeting
+
+            return targeting.bdm_amber(df, seed=seed)
         return apply_birth_registrations_presets(df, severity=severity, seed=seed,
                                                   previous_row_count=previous_row_count)
 

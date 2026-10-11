@@ -328,6 +328,13 @@ class ChildProtectionProvider:
 
     def dirty(self, payload: dict[str, pd.DataFrame], severity: str, seed: int,
               previous_row_count: int | None) -> dict[str, pd.DataFrame]:
+        # AMBER BY CONSTRUCTION, on client postcodes alone (REQ-GEN-184
+        # criteria 7 and 8): the preset dirtied two or three tables at rates
+        # that read red. Red keeps the preset (criterion 10).
+        if severity == "amber" and "cp_clients" in payload:
+            from generator import targeting
+
+            return targeting.cp_amber(payload, seed=seed)
         # Scoped to what this delivery actually CONTAINS - a partial
         # resupply has only the tables being resent (REQ-GEN-040).
         present = [t for t in TABLES if t in payload]
@@ -603,7 +610,14 @@ def main() -> None:
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
     resolved_injections, injected_by_period = _plan_injections(periods)
 
-    for i, ((_, severity), period) in enumerate(zip(RUN_PLAN, periods), start=1):
+    # ORDINARY AMBERS KEPT OUT OF ANY `hold` ERA (REQ-GEN-184 criterion 9),
+    # the count unchanged; the first period stays clean.
+    from generator import targeting
+
+    severities = targeting.outside_hold([sev for _q, sev in RUN_PLAN],
+                                        [p.date for p in periods], "cp-clients",
+                                        keep_clean=frozenset({0}))
+    for i, (severity, period) in enumerate(zip(severities, periods), start=1):
         snapshot_date = period.date
         slot_id = f"cp_slot_{i:02d}"
         seed = BASE_SEED + i

@@ -242,6 +242,13 @@ releases:
               The Child Protection contract now fails on unrecognised client
               postcodes only at 3% or more, matching its Soda and dbt checks. A
               supply with just a few now reads amber rather than red.
+          - headline: Amber supplies in the history read amber
+            components: ["Data generation"]
+            description: >
+              The synthetic history's amber supplies used to read red, because
+              they broke rules that allow no exceptions. Each is now built to
+              land inside a rule's warning band, so more supplies are promoted
+              and fewer periods are left with a gap.
           - headline: Rebuilt history replays corrections as they happened
             components: ["Pipeline & publishing", "Data generation"]
             description: >

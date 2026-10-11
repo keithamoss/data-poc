@@ -69,3 +69,26 @@ def test_past_the_bound_the_contract_fails(clients):
 def test_the_tolerance_is_recorded_rather_than_zero(clients):
     """Criterion 8: the dashboard shows the rule's own bound."""
     assert _datacontract()["fail_threshold"] == 3
+
+
+def test_an_ordinary_child_protection_amber_reads_amber(clients):
+    """REQ-GEN-184 criterion 15: the generator's own Child Protection amber,
+    applied to this fixture delivery's clients, passes the contract and
+    warns in Soda - amber, by construction."""
+    import pandas as pd
+
+    from generator import targeting
+
+    conn, table, _n = clients
+    rows = conn.execute(f"SELECT cp_client_id, postcode FROM {table}").fetchall()
+    frame = pd.DataFrame(rows, columns=["cp_client_id", "postcode"]).astype({"postcode": str})
+    out = targeting.cp_amber({"cp_clients": frame}, seed=5)["cp_clients"]
+    changed = out[out["postcode"].isin(targeting.UNRECOGNISED_POSTCODES)]
+    assert len(changed)
+    for client_id, postcode in zip(changed["cp_client_id"], changed["postcode"]):
+        conn.execute(f"UPDATE {table} SET postcode = ? WHERE cp_client_id = ?",
+                     [int(postcode), client_id])
+    assert _datacontract()["status"] == "pass"
+    soda = [r for r in run_soda_cp.evaluate_soda_cp(CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
+            if r["check_id"] == SODA]
+    assert [r["status"] for r in soda] == ["warn"]
