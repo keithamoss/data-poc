@@ -384,10 +384,11 @@ def _check_shape(decision: Decision) -> None:
     # held supply by promoting it.
     # AND A FILED SUPPLY IS HELD by a re-file that names only the period it
     # leaves - a confirmed correction whose calendar offers it no period
-    # (REQ-PIPE-170 criterion 8), a person's confirmation with a reason.
+    # (REQ-PIPE-170 criterion 8), recorded as the rule's since Keith's answer
+    # (o), 2026-10-11, naming who confirmed it.
     if decision.action == REFILE and not (
             (decision.to_slot and (decision.from_slot or decision.actor_kind == RULE))
-            or (decision.from_slot and decision.actor_kind == PERSON)):
+            or decision.from_slot):
         raise DecisionRefused(
             "a re-file names both slots: the one the supply is in and the one it "
             "is moving to. One entry, not a demotion followed by a promotion.")

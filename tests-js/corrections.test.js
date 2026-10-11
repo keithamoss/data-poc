@@ -132,3 +132,16 @@ describe("delivery-critic on 172 (post-build-review #149)", () => {
     expect(html).toContain("Clients");
   });
 });
+
+describe("a supply a correction moved (Keith, 2026-10-11, (r))", () => {
+  it("carries the same note, naming where it was and where it went", () => {
+    const w = loadDashboard().window;
+    w.rawRealDatasetById = () => ({corrections: {rejudged: {"run-1": [{
+      original: "late", new: "on_time", reference: "CAB-1", approver: "Keith",
+      appliedAt: "2026-10-11T09:00:00+08:00", movedFrom: "2023-Q3", movedTo: "2023-Q2"}]}}});
+    const html = w.correctionNote("cp-clients", "run-1");
+    expect(html).toContain("at the time in");
+    expect(html).toContain("moved to");
+    expect(html).toContain("by correction CAB-1, approved by Keith");
+  });
+});

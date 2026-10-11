@@ -366,6 +366,15 @@ def _when(value: datetime | None) -> str:
     return f"{local:%-d %b %Y %H:%M} ({local.tzname()})"
 
 
+def _when_own(value: datetime | None) -> str:
+    """An instant in ITS OWN zone (Keith, 2026-10-11, morning-report (k)):
+    a timezone correction reads '09:00 (AWST) -> 09:00 (AEDT)', which says
+    what changed, where one zone for both would show a bare shift."""
+    if value is None or not hasattr(value.tzinfo, "key"):
+        return _when(value)
+    return f"{value:%-d %b %Y %H:%M} ({value.tzname()})"
+
+
 def _said(classification: str | None) -> str:
     return (classification or "not judged").replace("_", " ").capitalize()
 
@@ -446,9 +455,20 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
                   f"{'now owes a supply' if o.gained else 'no longer owes a supply'}"
                   for o in t.obligations]
     if t.slot_moves:
+        # UP TO THE PREVIEW'S INSTANT IN FULL, LATER ONES COUNTED (Keith,
+        # 2026-10-11, (j)): a daily feed's due-time change moved ~1,800 slots
+        # a year ahead, and only the past carries verdicts to re-judge.
         lines += ["", "## Slots whose times move", ""]
-        lines += [f"- {s.dataset_id} {s.slot}, {s.what}: {_when(s.old)} -> {_when(s.new)}"
-                  for s in t.slot_moves]
+        later: dict[str, int] = {}
+        for s in t.slot_moves:
+            first = min(x for x in (s.old, s.new) if x is not None) if (s.old or s.new) else None
+            if first is not None and first > as_at:
+                later[s.dataset_id] = later.get(s.dataset_id, 0) + 1
+                continue
+            lines.append(f"- {s.dataset_id} {s.slot}, {s.what}: {_when_own(s.old)} -> "
+                         f"{_when_own(s.new)}")
+        lines += [f"- and {n} later slot{'s' if n != 1 else ''} of {ds} "
+                  f"move{'s' if n == 1 else ''} too" for ds, n in later.items()]
     if t.not_proposed:
         lines += ["", "## Not proposed - a person put these where they are", ""]
         lines += [f"- {n.dataset_id} `{n.supply_id}` in {n.period or 'no period'}: the "

@@ -493,3 +493,21 @@ class TestCriticFindingsOn111:
             _entry(doc, "cp-carers")["dates"]["versions"][0]["dates"][0]["date"] = "2024-03-09"
         found = _check((old_cal, old_asset, people_doc), mutate)
         assert any("own-2024" in (f.scope or "") for f in found), _text(found)
+
+
+class TestOneEntryPerOwner:
+    """Keith, 2026-10-11 (morning-report (l)): the gate's refusal gives one
+    correction per owner, listing each changed item - as draft-correction
+    does - never one per item."""
+
+    def test_two_changes_to_one_owner_are_one_finding_with_one_entry(self, state):
+        def mutate(doc):
+            versions = _entry(doc, "cp-case-workers")["participation"]["versions"]
+            versions[0]["participates"] = ["February"]
+            _entry(doc, "cp-case-workers")["not_expected"] = [
+                {"period": "2023-Q3", "reason": "declared after the fact"}]
+        found = _check(state, mutate)
+        mine = [f for f in found if "cp-case-workers" in (f.scope or "")]
+        assert len(mine) == 1, _text(found)
+        assert mine[0].fix.count("change_reference") == 1
+        assert "participation 2023-01-01" in mine[0].fix and "not_expected 2023-Q3" in mine[0].fix

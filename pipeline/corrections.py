@@ -64,7 +64,7 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     import json
 
     declared = _declared() if declared is None else declared
-    applied, kept_under = {}, {}
+    applied, kept_under, moved = {}, {}, []
     for reference, applied_at, actor, summary in conn.execute(
             f"SELECT change_reference, applied_at, actor, summary FROM "
             f"{correction_apply.APPLIED}").fetchall():
@@ -77,6 +77,10 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
         for ds, _supply, _period, why, *rest in done.get("kept") or []:
             if rest:
                 kept_under[rest[0]] = (reference, why)
+        # A MOVED SUPPLY CARRIES THE SAME NOTE (Keith, 2026-10-11, (r)).
+        for ds, supply, frm, to, old, new in done.get("moved_verdicts") or []:
+            if ds == dataset_id:
+                moved.append((reference, applied_at, actor, supply, frm, to, old, new))
     runs: dict[str, str | None] = {}
 
     def run_of(supply: str) -> str | None:
@@ -99,6 +103,16 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
             "original": original, "new": new, "reference": reference,
             "approver": _name((declared.get(reference) or {}).get("approver")),
             "appliedAt": _iso(when), "confirmedBy": _name(actor)})
+
+    for reference, when, actor, supply, frm, to, old, new in moved:
+        run_id = run_of(supply)
+        if not run_id:
+            continue
+        rejudged.setdefault(run_id, []).append({
+            "original": old, "new": new, "reference": reference,
+            "approver": _name((declared.get(reference) or {}).get("approver")),
+            "appliedAt": _iso(when), "confirmedBy": _name(actor),
+            "movedFrom": frm, "movedTo": to})
 
     kept: dict[str, list[dict]] = {}
     kept_held: list[dict] = []

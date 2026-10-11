@@ -146,7 +146,9 @@ class TestConfirming:
             correction_apply.confirm(conn, "CAB-1", actor={"email": "nobody@example.com"},
                                      effective_at=AT, docs=docs)
 
-    def test_a_move_is_a_persons_re_file_naming_the_correction(self, conn, manager):
+    def test_a_move_is_the_rules_re_file_naming_the_correction(self, conn, manager):
+        """The rule's since Keith's answer (o), 2026-10-11 - naming who
+        confirmed it."""
         docs = _corrected(_move_q3)
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
@@ -155,7 +157,7 @@ class TestConfirming:
         [(actor, kind, reason)] = conn.execute(
             f"SELECT actor, actor_kind, reason FROM {decision_log.TABLE} WHERE supply = ? "
             "AND action = 'refile' ORDER BY id DESC LIMIT 1", [SUPPLY]).fetchall()
-        assert actor == manager["email"] and kind == "person" and "CAB-1" in reason
+        assert kind == "rule" and "CAB-1" in reason and manager["email"] in reason
         assert done.owed_rechecks, "it re-runs QA and re-gates through an owed re-check"
 
     def test_it_is_applied_once_and_is_no_longer_pending(self, conn, manager):
@@ -657,3 +659,28 @@ def correction_trial_report(t):
     from qa_tools.common import correction_trial
 
     return correction_trial.report(t, as_at=datetime.now(PERTH), database="d", against="r")
+
+
+class TestKeithsAnswerO:
+    """Keith, 2026-10-11 (morning-report (o)): a confirmed correction's moves
+    and holds are the RULE's, naming who confirmed them - so a later
+    correction may move them again; the rule never overrides a person."""
+
+    def _decision(self, conn, supply):
+        return conn.execute(
+            f"SELECT actor_kind, reason FROM {decision_log.TABLE} WHERE supply = ? "
+            "AND action = 'refile' ORDER BY id DESC LIMIT 1", [supply]).fetchall()[0]
+
+    def test_a_move_is_the_rules_and_names_the_confirmer(self, conn, manager):
+        _file("o-move", "2023-Q2", datetime(2023, 7, 10, 12, tzinfo=PERTH))
+        docs = _corrected(_claim_window(28))
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        kind, reason = self._decision(conn, "o-move")
+        assert kind == decision_log.RULE and manager["email"] in reason and "CAB-1" in reason
+
+    def test_a_hold_is_the_rules_and_names_the_confirmer(self, conn, manager):
+        _workers_file("o-hold", "2023-Q3", datetime(2023, 7, 25, 12, tzinfo=PERTH))
+        docs = _corrected(_claim_window(1))
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        kind, reason = self._decision(conn, "o-hold")
+        assert kind == decision_log.RULE and manager["email"] in reason

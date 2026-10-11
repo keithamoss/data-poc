@@ -5406,7 +5406,9 @@ function correctionNote(datasetId, runId){
     // THE DATE STRAIGHT AFTER "re-judged" (criterion 7's own shape; delivery-
     // critic on 172, #9): "re-judged on time Sunday" read as a time of day.
     // The new verdict is the pill's, beside it.
-    `<div class="changed-by" data-rejudged style="color:var(--ink-muted); font-size:12px;">${escHtml(said(r.original))} at the time · re-judged ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))} by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}</div>`);
+    // A MOVED SUPPLY says where it was and where it went (Keith, 2026-10-11,
+    // (r)); one re-judged in place, only when.
+    `<div class="changed-by" data-rejudged style="color:var(--ink-muted); font-size:12px;">${escHtml(said(r.original))} at the time${r.movedTo ? ` in ${escHtml(fmtPeriodName(r.movedFrom))} · moved to ${escHtml(fmtPeriodName(r.movedTo))} ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))}` : ` · re-judged ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))}`} by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}</div>`);
   ((c.kept || {})[runId] || []).forEach(k => lines.push(
     `<div class="changed-by" data-kept style="color:var(--ink-muted); font-size:12px;">Kept ${k.period ? `in ${escHtml(fmtPeriodName(k.period))}` : "held"} against correction ${escHtml(k.reference || "")}${k.actor ? ` by ${escHtml(k.actor)}` : ""}: ${escHtml(k.reason)}</div>`));
   return lines.join("");

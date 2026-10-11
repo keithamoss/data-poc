@@ -494,3 +494,31 @@ class TestCriticFindingsOn169:
         monkeypatch.setattr(common, "text_prompt", asked)
         monkeypatch.setattr(common, "select", asked)
         schedule_cli._draft("HEAD", interactive=True)
+
+
+class TestKeithsAnswersOnThePreview:
+    """Keith, 2026-10-11 (morning-report (j) and (k))."""
+
+    def _report(self, moves, as_at=datetime(2026, 10, 11, 9, tzinfo=PERTH)):
+        t = correction_trial.Trial(changes=(correction_trial.FrozenChange(
+            "k", ("dataset", "birth-registrations"), 1, 2),), slot_moves=tuple(moves))
+        return correction_trial.report(t, as_at=as_at, database="d", against="r")
+
+    def test_j_slots_up_to_today_in_full_later_ones_summarised(self):
+        def mv(day):
+            at = datetime(2026, 10, day, 14, tzinfo=PERTH)
+            return correction_trial.SlotMove("birth-registrations", f"2026-10-{day:02d}",
+                                             "due", at, at + timedelta(hours=1))
+        text = self._report([mv(9), mv(10), mv(12), mv(13), mv(14)])
+        assert "2026-10-09" in text and "2026-10-10" in text
+        assert "2026-10-12" not in text and "2026-10-14" not in text
+        assert "3 later slots of birth-registrations move too" in text
+
+    def test_k_each_instant_in_its_own_zone(self):
+        from zoneinfo import ZoneInfo
+
+        old = datetime(2024, 2, 1, 9, tzinfo=ZoneInfo("Australia/Perth"))
+        new = datetime(2024, 2, 1, 9, tzinfo=ZoneInfo("Australia/Sydney"))
+        text = self._report([correction_trial.SlotMove("cp-clients", "2024-Q1", "due", old, new)])
+        line = next(x for x in text.splitlines() if "2024-Q1" in x)
+        assert "09:00 (AWST)" in line and "09:00 (AEDT)" in line, line

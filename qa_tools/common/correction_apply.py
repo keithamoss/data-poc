@@ -191,12 +191,16 @@ class Applied:
     kept: tuple = ()
     rejudged: tuple = ()
     owed_rechecks: tuple = field(default_factory=tuple)
+    #: (dataset, supply, from, to, verdict at the time, verdict now) for each
+    #: supply moved - what its dashboard note says (Keith, 2026-10-11, (r)).
+    moved_verdicts: tuple = ()
 
     def as_record(self) -> dict:
         return {"reference": self.reference, "actor": self.actor,
                 "moved": [list(x) for x in self.moved], "placed": [list(x) for x in self.placed],
                 "held": [list(x) for x in self.held], "kept": [list(x) for x in self.kept],
-                "rejudged": [list(x) for x in self.rejudged]}
+                "rejudged": [list(x) for x in self.rejudged],
+                "moved_verdicts": [list(x) for x in self.moved_verdicts]}
 
 
 def why_not_confirmable(t, keep: set[tuple[str, str]], keep_reason: str | None) -> str | None:
@@ -241,6 +245,7 @@ def confirm(conn, reference: str, *, actor: dict, keep: set[tuple[str, str]] = f
     email = actor.get("email") or str(actor)
     _base, work = states(p, pending(conn, docs), docs)
     moved, placed, held, kept, rejudged, owed = [], [], [], [], [], []
+    moved_verdicts: list = []
     # ONE TRANSACTION, the decision log's own, so the knock-on re-evaluation
     # of every period this moved is owed once, at the end (REQ-PIPE-121) -
     # and UNDER THIS CORRECTION'S OWN AGREEMENT (delivery-critic on 170, D9):
@@ -275,10 +280,16 @@ def confirm(conn, reference: str, *, actor: dict, keep: set[tuple[str, str]] = f
             else:
                 plan = refiling.plan(conn, dataset_id=m.dataset_id, supply=m.supply_id,
                                      to_period=m.to_period)
+                # THE RULE'S MOVE, naming who confirmed it (Keith, 2026-10-11,
+                # (o)): the manager approved the correction, not this filing,
+                # so a later correction may move it again.
                 owed.append(refiling.apply(
                     conn, plan, agency_id=entry.agency_id, collection_id=entry.collection_id,
-                    actor=email, reason=why_text, effective_at=effective_at))
+                    actor=RULE_ACTOR, reason=f"{why_text}, confirmed by {email}",
+                    effective_at=effective_at, actor_kind=decision_log.RULE))
                 moved.append((m.dataset_id, m.supply_id, m.from_period, m.to_period))
+                moved_verdicts.append((m.dataset_id, m.supply_id, m.from_period, m.to_period,
+                                       m.old_verdict, m.verdict))
         # RE-JUDGED IN PLACE, after the moves (criterion 20: each supply judged
         # against the period it ends up in - a moved one already was, by its
         # new filing).
@@ -294,7 +305,8 @@ def confirm(conn, reference: str, *, actor: dict, keep: set[tuple[str, str]] = f
                 rejudged.append((ds, r.supply_id, r.slot, r.old.get("classification"),
                                  r.new.classification))
         done = Applied(reference, email, tuple(moved), tuple(placed), tuple(held), tuple(kept),
-                       tuple(rejudged), tuple(x for x in owed if x is not None))
+                       tuple(rejudged), tuple(x for x in owed if x is not None),
+                       tuple(moved_verdicts))
         conn.execute(
             f"INSERT INTO {APPLIED} (change_reference, owner, actor, applied_at, summary) "
             "VALUES (?, ?, ?, ?, ?)",
@@ -335,10 +347,10 @@ def _hold(conn, m, entry, email: str, reference: str, why: str, effective_at: st
     with decision_log.apply_decision(conn, decision_log.Decision(
             agency_id=entry.agency_id, collection_id=entry.collection_id,
             dataset_id=m.dataset_id, action=decision_log.REFILE, supply=m.supply_id,
-            actor=email, actor_kind=decision_log.PERSON, effective_at=effective_at,
+            actor=RULE_ACTOR, actor_kind=decision_log.RULE, effective_at=effective_at,
             from_slot=m.from_period, to_slot=None,
-            reason=f"Correction {reference} ({why}): the corrected calendar offers it no "
-                   f"period, so it is held.")) as entry_id:
+            reason=f"Correction {reference} ({why}), confirmed by {email}: the corrected "
+                   f"calendar offers it no period, so it is held.")) as entry_id:
         if promoted and period_tables.take_out(
                 conn, period=m.from_period, logical=entry.table, supply=m.supply_id,
                 to_schema=supply_db.STAGING_SCHEMA) is None:

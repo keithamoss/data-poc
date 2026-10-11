@@ -743,19 +743,26 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         owners = code_owners(base_codeowners, ASSET_REL if owner[0] == "timezone"
                              else CALENDAR_REL)
         may = [p for p in allowed if str(p.get("github", "")).lower() in owners]
+        # ONE ENTRY PER OWNER (Keith, 2026-10-11, morning-report (l)): every
+        # changed item of one owner in one correction, as draft-correction
+        # gives it - one approval each, and the two never disagree.
+        said = []
         for item, old, new, frozen_at in rows:
             verb = "added" if old is None else ("removed" if new is None else "changed")
-            fix = _paste_ready(owner, [(item.key, old, new)], may, today)
-            if item.kind == "not_expected":
-                fix += ("\nIf the period simply was not supplied, record that after the fact "
-                        f"instead: `{MARK_NOT_SUPPLIED}`.")
-            out.append(Finding(
-                file, item.key,
-                f"{item.key} was {verb} ({_value_text(old)} -> {_value_text(new)}) after it froze "
-                f"at {asset_time.localise(frozen_at).isoformat(timespec='minutes')}, the first "
-                f"instant it could govern a filing. Only a declared correction may change it. "
-                f"Nothing was committed.",
-                fix))
+            said.append(f"{item.key} was {verb} ({_value_text(old)} -> {_value_text(new)}) "
+                        f"after it froze at "
+                        f"{asset_time.localise(frozen_at).isoformat(timespec='minutes')}, the "
+                        f"first instant it could govern a filing")
+        fix = _paste_ready(owner, [(item.key, old, new) for item, old, new, _f in rows],
+                           may, today)
+        if any(item.kind == "not_expected" for item, *_ in rows):
+            fix += ("\nIf a period simply was not supplied, record that after the fact "
+                    f"instead: `{MARK_NOT_SUPPLIED}`.")
+        out.append(Finding(
+            file, ", ".join(item.key for item, *_ in rows),
+            "; ".join(said) + ". Only a declared correction may change "
+            + ("it" if len(rows) == 1 else "them") + ". Nothing was committed.",
+            fix))
     return out
 
 

@@ -144,3 +144,17 @@ class TestCriticFindingsOn172:
         assert record["affects"][0]["agencyId"] and record["affects"][0]["collectionId"]
         assert "verdict, and the moves" in record["detail"], \
             "the datasets are named by link, not listed as bare ids in the text"
+
+
+def test_r_a_moved_supply_carries_the_same_note(conn, manager, by_supply, monkeypatch):
+    """Keith, 2026-10-11 (morning-report (r)): a supply a correction MOVED
+    shows its verdict at the time and where it was moved, as one re-judged in
+    place does - and counts in the past-date note."""
+    docs = T._corrected(T._move_q3)
+    _declared(monkeypatch, docs)
+    correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=T.AT, docs=docs)
+    got = corrections.for_dataset(T.DATASET, conn)
+    [entry] = [e for e in got["rejudged"].get(T.SUPPLY, []) if e.get("movedTo")]
+    assert (entry["movedFrom"], entry["movedTo"], entry["reference"]) == \
+        ("2023-Q3", "2023-Q2", "CAB-1")
+    assert entry["original"] and entry["approver"] and entry["appliedAt"]

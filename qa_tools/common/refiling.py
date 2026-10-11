@@ -125,8 +125,10 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
 
 
 def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reason: str,
-          effective_at: str) -> int:
-    """Carry a plan out, in one transaction. Returns the owed re-check's id."""
+          effective_at: str, actor_kind: str = decision_log.PERSON) -> int:
+    """Carry a plan out, in one transaction. Returns the owed re-check's id.
+    `actor_kind` is a person's unless a confirmed calendar correction moves
+    the supply, which is the rule's (Keith, 2026-10-11, morning-report (o))."""
     from qa_tools.common import filing, period_tables, recheck, supersession
 
     with decision_log.decision_transaction(conn):
@@ -146,7 +148,7 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
         with decision_log.apply_decision(conn, decision_log.Decision(
                 agency_id=agency_id, collection_id=collection_id, dataset_id=p.dataset_id,
                 action=decision_log.REFILE, supply=p.supply, actor=actor,
-                actor_kind=decision_log.PERSON, effective_at=effective_at,
+                actor_kind=actor_kind, effective_at=effective_at,
                 from_slot=p.from_period, to_slot=p.to_period, reason=reason)) as entry_id:
             if p.promoted:
                 # THE ONE MOVE-OUT PATH (criterion 3, NFR 4).

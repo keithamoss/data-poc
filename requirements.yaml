@@ -26753,6 +26753,9 @@ requirements:
       runs this impact preview against the working copy, offering to write it to a file; and SHALL NOT edit
       contract/calendar.yaml or any other configuration from the terminal.
     - 'THE SYSTEM SHALL offer, from the terminal''s Calendar entry and as `mothman schedule draft-correction`, the usual way to declare a correction: comparing the working copy against the same base REQ-PIPE-111''s gate uses, it SHALL print, grouped by owning item, the correction entry for every change to a frozen item - the same entry, by the same implementation, that REQ-PIPE-111''s refusal prints - asking in the terminal for the change reference, reason and approver (offering the people allowed to approve) and leaving any not given as placeholders, ready to paste into contract/calendar.yaml; and SHALL NOT edit that file itself.'
+    - THE SYSTEM SHALL list in full the slots whose times move up to the instant the preview is made, and SHALL count each dataset''s later ones in one line (added 2026-10-11, Keith''s answer (j)).
+    - THE SYSTEM SHALL show each moved instant in its own zone, so a timezone correction reads as the change of zone it is (added 2026-10-11, Keith''s answer (k)).
+    - THE SYSTEM SHALL give one correction entry per owner, listing every changed item of that owner, in both `mothman schedule draft-correction` and the schedule gate''s refusal (added 2026-10-11, Keith''s answer (l)).
     non_functional_requirements:
     - THE REPORT IS FOR PEOPLE WHO DO NOT KNOW THE FILE CONTENTS. Summary first - counts by dataset - then
       the detail, in the language of the dashboard, not of the configuration.
@@ -26790,6 +26793,9 @@ requirements:
     - 'BLOCKED ALSO COVERS A REJECTED SUPPLY, and a HELD supply is shown as PLACED rather than re-filed (F3) - both are refusals refiling.plan makes, so REQ-PIPE-170''s one-step apply would otherwise stop part-way. _blocked still mirrors refiling''s rules rather than calling refiling.plan, whose own calendar check reads the agreement on disk; REQ-PIPE-170 should make the two share one function.'
     - 'AN UNREADABLE STATE IS REFUSED IN WORDS (F4): working() and at_ref() load each state through agreement.from_doc and the timezone parser, so a working copy part-way through an edit gives ''cannot be read, so nothing was compared'' from the preview, the draft (never ''nothing to declare'') and the Calendar entry, which stays open. Recorded facts that cannot be read propagate and refuse (F8, criterion 9); only a dataset whose schedule cannot be built is footnoted.'
     - 'MEASURED 2026-10-11 against the sandbox: moving 2024-Q1''s date previews in 0.2s across all seven datasets - six supplies pulled back into 2023-Q4 and one dataset (Case Workers, whose owed months follow the period''s date) no longer owing 2024-Q1.'
+    - 'PAST IN FULL, FUTURE COUNTED (Keith, 2026-10-11, (j)): a due-time change on Birth Registrations listed ~1,800 slots a year ahead; only the past carries verdicts. REJECTED dropping future slots altogether (a reader would not know they move) and keeping the full list.'
+    - 'EACH INSTANT IN ITS OWN ZONE (Keith, 2026-10-11, (k)): ''09:00 (AWST) -> 09:00 (AEDT)'' says what changed; one zone for both shows a bare shift.'
+    - 'ONE ENTRY PER OWNER, IN THE GATE TOO (Keith, 2026-10-11, (l)): one correction per thing changed, one approval each, and the gate''s refusal and the draft never disagree. The gate now gives one finding per owner naming each item.'
     linked_tests:
     - tests/test_correction_trial.py
     - tests/test_agreement_freeze.py
@@ -26806,6 +26812,7 @@ requirements:
     - cli/schedule.py::draft_correction_command
     - cli/schedule.py::calendar_menu
     evidence:
+    - 'Keith''s answers (j)-(l), 2026-10-11: tests/test_correction_trial.py TestKeithsAnswersOnThePreview (2) and tests/test_agreement_freeze.py TestOneEntryPerOwner, the latter confirmed failing on the old code first; the trial, apply, freeze, collection-defaults and validate-schedule modules passed after the change.'
     - 'tests/test_correction_trial.py (36 tests, run 2026-10-11, 13 of them the critic''s findings, each failing first): nothing frozen changed says so in one line; a shorter grace flips a verdict and moves late-after only; a moved date files the supply elsewhere with its new verdict; a removed period is an obligation lost; a timezone change moves every instant and restores the file''s zones; a contested pair is blocked naming the remedy; a person''s filing is listed not proposed; summary first with as-at and database; the database named without its connection string; the same facts give the same report; nothing is recorded; no supply rows are read; the commands'' help, Markdown output, refusal when the facts cannot be read, one entry per owner that parses back; the Calendar entry on the main menu showing the agreement and corrections; applied once a verdict names the reference; TS-64''s entry equal to the gate''s. Mutation-checked: removing the timezone swap and the person''s-filing rule each turns its test red.'
     - 'Driven for real 2026-10-11 against the sandbox with contract/calendar.yaml''s 2024-Q1 date moved (then restored from git): preview-correction listed six supplies moving to 2023-Q4 and Case Workers no longer owing 2024-Q1, and wrote the Markdown; draft-correction printed the quarterly calendar''s entry with the reference and reason given and placeholders otherwise; an unknown ref exits 2 naming it.'
   - id: REQ-PIPE-170
@@ -26882,6 +26889,7 @@ requirements:
       unapplied correction as accounting for the difference, so that a pending correction refuses no dataset.
     - WHEN a correction has been applied, THE SYSTEM SHALL print in the terminal a summary of what was actually applied - every re-judged verdict, every supply moved and to which period, every supply held and every supply kept with its reason - laid out in the same order and form as the impact preview (REQ-PIPE-169), SHALL offer to write it as Markdown to a file, and SHALL tell the person to attach it to the correction's change reference and share it with the correction's approver, so that what was applied can be compared by a person against what was approved.
     - THE SYSTEM SHALL generate the calendar-correction scenarios TS-57 to TS-63 in the test scenario register (plans/supply-model.md) into the synthetic history once this requirement is built - a correction made part way through that history, merged, and confirmed with at least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left awaiting confirmation - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64 each a unit test.
+    - THE SYSTEM SHALL record a confirmed correction''s moves and holds as the rule''s, naming who confirmed them, so a later correction may move them again (added 2026-10-11, Keith''s answer (o)).
     non_functional_requirements:
     - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
       of moves, and a per-supply step is how a list like this is abandoned half-done.'
@@ -26937,6 +26945,7 @@ requirements:
     - 'WHAT A KEPT SUPPLY BECOMES IS SHOWN BEFORE ANYONE KEEPS IT (D6): each proposed move carries its verdict if kept, shown beside it and in the consequences'' key.'
     - 'APPLIED UNDER THIS CORRECTION''S OWN AGREEMENT (D9): correction_trial.configured() stands the given agreement in for agreement.current() as well as the timezone, and the whole confirmation runs inside it - a re-file, its plan and every verdict otherwise resolved slots from the files on disk, which hold every merged correction, a later pending one included.'
     - 'THE APPLIED SUMMARY SAYS WHAT WAS DONE (D8): report(applied=True) words the preview''s own layout in the past tense.'
+    - 'A CORRECTION''S MOVES ARE THE RULE''S (Keith, 2026-10-11, (o)): the manager approved the correction, not that one filing. Before, a later correction treated each as a person''s and would never propose moving it again. The decision log now accepts a rule re-file that only leaves a period (a hold).'
     unmet_criteria:
     - criterion: 'Criterion 23, first half - TS-57 to TS-63 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), except TS-63, which needs REQ-PIPE-179 (unsigned).'
       why: 'Generating a correction part way through a history needs the pipeline, during playback, to file arrivals before the correction''s merge instant against the agreement WITHOUT it - a time-versioned agreement during replay, which nothing has yet. revert() is the piece that makes it possible; wiring it into playback touches agreement loading everywhere and is a design choice for Keith, not a night''s PROVISIONAL.'
@@ -26957,6 +26966,7 @@ requirements:
     - cli/supply.py::confirm_correction_command
     - cli/filing_tui.py::corrections_flow
     evidence:
+    - 'Keith''s answer (o), 2026-10-11: tests/test_correction_apply.py TestKeithsAnswerO (2, each failing first) and the renamed test_a_move_is_the_rules_re_file_naming_the_correction; 42 apply tests passed after the change.'
     - 'tests/test_correction_apply.py (40 tests, run 2026-10-11, ten of them the critic''s findings, each failing first): pending until applied, once; the agreement before rebuilt from its own old values; only the asset manager confirms, refused before anything is worked out; a move is a person''s re-file naming the correction with an owed re-check; kept supplies stay with a KEEP entry and need a reason; a blocked move must be cleared or kept; a supply with no period is held naming the correction; a verdict re-judged in place naming it; a changed list refused; the summary in the preview''s form with what was kept; the two commands (list, one in full summary first, refusal naming who may, --yes needs the key, applied with the key and told to attach it, an unknown keep refused); the filing menu offering corrections above the collections, view-only for anyone else, keep-one-confirm-the-rest; the pass and needs-action noting it; and TS-57 to TS-62 each. tests/test_correction_revert.py (12): revert round-trips every kind of item.'
   - id: REQ-GHUB-171
     title: The people configuration names the data asset's manager, and a decision can require that role
@@ -27063,6 +27073,7 @@ requirements:
     - THE SYSTEM SHALL give every action this batch adds a completed-action wording in the page's existing
       decision-wording table.
     - WHERE an asset-level notice names datasets, THE SYSTEM SHALL make each a link to that dataset.
+    - WHERE a correction moved a supply, THE SYSTEM SHALL show on its history row its verdict at the time, the period it was in, the period it moved to, the correction and its approver - and SHALL count it in the past-date note as one re-judged in place is (added 2026-10-11, Keith''s answer (r)).
     non_functional_requirements:
     - The data team leader sees one answer; the history is for the data owner and the auditor. Keep the
       correction out of the glance and one interaction away.
@@ -27088,6 +27099,7 @@ requirements:
     - 'DECISION_DONE gains keep, excuse-lateness, withdraw-excuse and acknowledge (criterion 10). Criterion 11 needed nothing new: the only asset-level notices naming datasets (the refusal notice and the exhausted-calendar notice) already link each.'
     - 'FIXED BEFORE THE FIRST COMMIT (delivery-critic on 172, post-build-review #149): a supply kept HELD has no run and so no history row - it is now listed on its dataset (keptHeld); a keep is mapped to its correction by the keep''s own decision id, which correction_apply now records in the applied summary, never parsed back out of the reason (a reference with a colon was misread, one with a space lost, and one supply kept against two corrections was mis-mapped); an awaiting state that cannot be worked out is said on the page and in the build''s output, never an empty all-clear; applied corrections sit OUTSIDE the activity panel''s 30-entry cap; the asset-wide pending-correction item carries the datasets it affects as links (outstanding.Item.affects); the row reads ''re-judged <date> by correction <ref>, approved by <person>'', the date straight after, as criterion 7 has it - the new verdict is the pill''s beside it.'
     - 'OPEN FOR KEITH (#149): a supply a correction MOVED gets its new verdict from its new filing, which names no correction, so its row carries no ''at the time'' note and the past-date note does not count it. Whether ''re-judged'' in criteria 2, 3 and 9 includes moved is not settled by the requirement.'
+    - 'A MOVED SUPPLY CARRIES THE SAME NOTE (Keith, 2026-10-11, (r)): ''Late at the time in 2023-Q3 · moved to 2023-Q2 ... by correction CAB-1, approved by ...''. Its verdicts before and after travel in the applied record (moved_verdicts), so nothing is re-derived.'
     linked_tests:
     - tests/test_dashboard_corrections.py
     - tests-js/corrections.test.js
@@ -27098,6 +27110,7 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::awaitingCorrectionLine
     - dashboard/qa-reporting-dashboard.template.html::decisionsChangingDate
     evidence:
+    - 'Keith''s answer (r), 2026-10-11: tests/test_dashboard_corrections.py test_r_a_moved_supply_carries_the_same_note and tests-js/corrections.test.js (1 new), each failing first; 54 Python and 14 JS tests passed after the change.'
     - 'tests/test_dashboard_corrections.py (11 tests, run 2026-10-11, six of them the critic''s findings, each failing first) against real confirmations on the test database: a re-judged supply carries original, new, reference, approver and applied instant; a kept supply its correction and reason; a pending correction is awaiting only on the datasets it affects; each applied correction is one activity entry; no supply rows are read. tests-js/corrections.test.js (13, six of them the critic''s findings): the history row''s ''Late at the time - re-judged on time ... by correction CAB-1, approved by'' note, nothing on an untouched row, the kept note, the awaiting line present and absent, a completed-action word for every new action, and one past-date item per correction per dataset. `mothman dashboard rebuild` against the sandbox passes its own render check with the new data embedded.'
   - id: REQ-PIPE-173
     title: The pipeline refuses a dataset whose judged past changed without a declared correction
