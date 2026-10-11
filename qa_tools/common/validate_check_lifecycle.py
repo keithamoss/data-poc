@@ -61,6 +61,28 @@ _EVIDENTLY_SOURCES = [
 ]
 
 
+def sources_fingerprint() -> str:
+    """A digest of every file the working tree's checks are collected from,
+    and of contract/ as a whole (a parser may consult the asset file or the
+    hierarchy) - what REQ-PIPE-192's declarations are keyed on, so an edit
+    to any of them is seen however small. Read, never parsed."""
+    import hashlib
+
+    digest = hashlib.sha256(str(ROOT).encode())
+    paths = [ROOT / rel for rel, _parser in _YAML_SOURCES]
+    paths += [ROOT / rel for rel in _EVIDENTLY_SOURCES]
+    contract = ROOT / "contract"
+    if contract.is_dir():
+        paths += sorted(contract.rglob("*.y*ml"))
+    for path in dict.fromkeys(paths):
+        digest.update(str(path).encode())
+        try:
+            digest.update(path.read_bytes())
+        except FileNotFoundError:
+            digest.update(b"\0missing")
+    return digest.hexdigest()
+
+
 def _old_file_content(rel_path: str, ref: str) -> str | None:
     """The file's content at `ref`, or None if it didn't exist there yet."""
     result = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=ROOT,

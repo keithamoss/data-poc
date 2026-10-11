@@ -29,6 +29,8 @@ per-dataset independence this requirement's own story is about.
 """
 from __future__ import annotations
 
+import threading
+
 import re
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
@@ -88,6 +90,49 @@ RESERVED_SCOPE_PREFIX = "_"
 def is_reserved_scope(name: str) -> bool:
     """Whether this name belongs to the tool rather than to a dataset."""
     return bool(name) and name.startswith(RESERVED_SCOPE_PREFIX)
+
+
+#: The declarations, keyed on the content of every check source
+#: (REQ-PIPE-192). A few entries: a process sees one tree, a test a handful.
+_declared: "dict[str, dict[str, list[str]]]" = {}
+_declared_lock = threading.Lock()
+_DECLARED_KEEP = 4
+
+
+def declared_reads() -> dict[str, list[str]]:
+    """`check_id` -> the tables that check declares it reads, for the whole
+    working tree - THE ONE ANSWER every caller uses (REQ-PIPE-192 criterion
+    1): the promotion gate, the knock-on, the results writer and the tool
+    runners alike.
+
+    WORKED OUT ONCE while no check source changes (criteria 2 and 3), keyed
+    on the bytes of every file the checks are collected from - never on
+    modification time or size, which an edit inside one clock tick keeps.
+    Hashing them is well under a millisecond; collecting the checks is
+    8-10ms, and was paid 402 times in one Child Protection bootstrap.
+
+    EVERY CALLER GETS ITS OWN COPY (criterion 5). RAISES when the checks
+    cannot be collected, and nothing is remembered (criterion 4) - what to
+    do then is the caller's: promotion's fail-safe is an empty mapping that
+    can refuse a promotion but never grant one."""
+    from qa_tools.common import validate_check_lifecycle as vcl
+
+    key = vcl.sources_fingerprint()
+    with _declared_lock:
+        hit = _declared.get(key)
+    if hit is None:
+        hit = declared_by_check_id(vcl.collect_checks(None))
+        with _declared_lock:
+            _declared[key] = hit
+            while len(_declared) > _DECLARED_KEEP:
+                _declared.pop(next(iter(_declared)))
+    return {check: list(tables) for check, tables in hit.items()}
+
+
+def forget_declared_reads() -> None:
+    """Forget the worked-out declarations - for a test that counts work."""
+    with _declared_lock:
+        _declared.clear()
 
 
 def declared_by_check_id(checks: Iterable) -> dict[str, list[str]]:

@@ -104,7 +104,6 @@ somebody maintained by hand.
 """
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
@@ -153,21 +152,14 @@ def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
     return tables_read_mod.attach(verified, resolved, declared)
 
 
-@lru_cache(maxsize=1)
 def _declared_reads_tables() -> dict[str, list[str]]:
-    """`check_id` -> the tables that check declares it reads.
+    """`check_id` -> the tables that check declares it reads - the ONE
+    answer the promotion gate uses too (REQ-PIPE-192 criterion 1), with its
+    fail-safe. It used to be a second implementation here, cached on
+    nothing, so an edited check source was never seen again in a process."""
+    from qa_tools.common import promotion
 
-    Cached because it parses every check source and the answer cannot
-    change within one process - a check definition is a file on disk,
-    and a run that edited one mid-flight would have bigger problems.
-    """
-    from qa_tools.common import tables_read as tables_read_mod
-    from qa_tools.common.validate_check_lifecycle import collect_checks
-
-    try:
-        return tables_read_mod.declared_by_check_id(collect_checks(None))
-    except Exception:  # noqa: BLE001 - a malformed source is the lifecycle gate's to report
-        return {}
+    return promotion._declared_reads()
 
 
 def run_owner(run_id: str) -> tuple[str, str] | None:

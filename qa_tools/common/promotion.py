@@ -1184,14 +1184,13 @@ def _declared_reads() -> dict[str, list[str]]:
     ever cost a promotion, never grant one.
     """
     from qa_tools.common import tables_read
-    from qa_tools.common.validate_check_lifecycle import collect_checks
 
     try:
-        # `None` is the working tree's own checks, which is what a live
-        # run is checking against - the same call
-        # pipeline/build_cp_dashboard_data.py makes. Configuration, not
-        # state, so this is a legitimate read from anywhere.
-        return tables_read.declared_by_check_id(collect_checks(None))
+        # The working tree's own checks, which is what a live run is
+        # checking against - worked out once while they are unchanged
+        # (REQ-PIPE-192). Configuration, not state, so a legitimate read
+        # from anywhere.
+        return tables_read.declared_reads()
     except Exception as exc:  # noqa: BLE001 - see the docstring
         print(f"note: could not read the cross-table declarations "
               f"({type(exc).__name__}: {exc}) - the promotion gate will see only "

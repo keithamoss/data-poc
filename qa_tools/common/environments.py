@@ -65,11 +65,27 @@ class Environment:
     ticketing: bool = False
 
 
+#: The declared environments, keyed on the file's content (REQ-PIPE-192):
+#: read on every connection, 15,000 times in one bootstrap.
+_loaded: "dict[str, tuple[Environment, ...]]" = {}
+
+
 def _load(path: Path | str | None = None) -> list[Environment]:
     path = Path(path or ENVIRONMENTS_PATH)
     if not path.exists():
         raise EnvironmentError_(f"no environments declared - {path} does not exist")
-    raw = config_yaml.parse(path.read_text()) or {}
+    text = path.read_text()
+    hit = _loaded.get(text)
+    if hit is None:
+        hit = tuple(_parse_environments(path, text))
+        if len(_loaded) > 16:
+            _loaded.clear()
+        _loaded[text] = hit
+    return list(hit)
+
+
+def _parse_environments(path: Path, text: str) -> list[Environment]:
+    raw = config_yaml.parse(text) or {}
     declared = raw.get("environments")
     if not declared:
         raise EnvironmentError_(f"{path} declares no environments")

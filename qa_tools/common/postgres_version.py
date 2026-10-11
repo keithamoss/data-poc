@@ -33,19 +33,30 @@ class VersionMismatch(RuntimeError):
     """The server is on a different major from the one this asset declares."""
 
 
-def _data_asset_doc(path=None) -> dict:
+#: What this module needs from the asset file - only its declared major -
+#: keyed on the file's content (REQ-PIPE-192): read on every connection,
+#: 14,246 times in one bootstrap. A missing key is kept as the sentinel.
+_MISSING = object()
+_majors: dict = {}
+
+
+def _declared_value(path=None):
     from qa_tools.common.hierarchy import DATA_ASSET_YAML
 
-    return config_yaml.parse(Path(path or DATA_ASSET_YAML).read_text()) or {}
+    text = Path(path or DATA_ASSET_YAML).read_text()
+    if text not in _majors:
+        if len(_majors) > 16:
+            _majors.clear()
+        _majors[text] = (config_yaml.parse(text) or {}).get(KEY, _MISSING)
+    return _majors[text]
 
 
 def declaration_errors(path=None) -> list[str]:
     """Criterion 6: missing, or not a whole-number major, is a gate failure."""
-    doc = _data_asset_doc(path)
-    if KEY not in doc:
+    value = _declared_value(path)
+    if value is _MISSING:
         return [f"contract/data-asset.yaml: `{KEY}` is missing - declare the PostgreSQL "
                 f"major this data asset targets (REQ-PIPE-146)"]
-    value = doc[KEY]
     # bool is an int in Python, and `true` is not a version.
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         return [f"contract/data-asset.yaml: `{KEY}` is {value!r}, which is not a whole-number "
@@ -57,7 +68,7 @@ def declared_major(path=None) -> int:
     errors = declaration_errors(path)
     if errors:
         raise VersionMismatch(errors[0])
-    return int(_data_asset_doc(path)[KEY])
+    return int(_declared_value(path))
 
 
 def major_of(server_version_num: int | str) -> int:

@@ -11,6 +11,8 @@ everywhere) - shared for that reason, not because they're subprocess/API
 plumbing like the rest of this module. See plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
+
+import functools
 import copy
 
 import yaml
@@ -146,11 +148,29 @@ def check_id_from_quality_definition(quality_definition: str | None) -> str | No
     `_QUALITY_CHECK_TYPES` guard before this ever gets called on one."""
     if not quality_definition:
         return None
+    return _derived(quality_definition)[0]
+
+
+@functools.lru_cache(maxsize=4096)
+def _derived(quality_definition: str) -> tuple:
+    """(check_id, the first of mustBe/mustBeLessThan/mustBeLessOrEqualTo or
+    None) from one rule's qualityDefinition, parsed once per distinct text
+    (REQ-PIPE-192): the two readers below parsed every rule's YAML again on
+    every run - 17,687 parses in one bootstrap. Immutable, so shared."""
     doc = config_yaml.parse(quality_definition) or {}
+    check_id = None
     for prop in doc.get("customProperties") or []:
         if prop.get("property") == "check_id":
-            return prop.get("value")
-    return None
+            check_id = prop.get("value")
+            break
+    threshold = next((doc[k] for k in ("mustBe", "mustBeLessThan", "mustBeLessOrEqualTo")
+                      if k in doc), _NO_THRESHOLD)
+    return check_id, threshold
+
+
+#: No threshold key at all - distinct from a key present with a null value,
+#: which is returned as it always was.
+_NO_THRESHOLD = object()
 
 
 # Item 74 (plans/qa-pipeline.md, found 2026-09-18) - Bug B. Both
@@ -191,11 +211,8 @@ def fail_threshold_from_quality_definition(quality_definition: str | None, sever
         return None
     if not quality_definition:
         return 0
-    doc = config_yaml.parse(quality_definition) or {}
-    for key in ("mustBe", "mustBeLessThan", "mustBeLessOrEqualTo"):
-        if key in doc:
-            return doc[key]
-    return 0
+    threshold = _derived(quality_definition)[1]
+    return 0 if threshold is _NO_THRESHOLD else threshold
 
 
 def failing_sample_keys(check, pk_column: str) -> list[str]:
