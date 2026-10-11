@@ -4603,6 +4603,26 @@ Belongs with batch 5's check work.
     said it would change what a run records, inferred from call counts; the
     database said otherwise.) A requirement first, then build. Not built.
 
+    **SCOPED 2026-10-11 (delivery-scoper), NOT SIGNED.** "Evaluate only the
+    arriving table" drafted as REQ-PIPE-188 (one scope for every tool, a
+    guard against a check going missing, the target and the equivalence
+    proof) plus one per tool: 189 dbt, 190 datacontract-cli, 191 Soda. The
+    draft is docs/draft-req-pipe-188-191.yaml (validated with `mothman
+    dashboard validate-requirements --draft`; re-check the ids are still
+    free before applying). Premise confirmed in code - about a fifth of each
+    run's evaluation is kept - but the estimate is ~6 minutes, not under 5:
+    fixed per-run costs and our own ~1.3s do not shrink, and dbt runs beside
+    the other three, so both halves must shrink. FOUR QUESTIONS FOR KEITH:
+    (1) the target - keep under 5 and widen to the small costs
+    (config_yaml.parse 53,068 calls, _declared_reads 402), set it at what
+    scoping reaches (~6-6.5 min), or no number until measured; (2)
+    datacontract-cli's mechanism - its own schema_name/quality_ids options
+    (needs an ODCS id on every quality rule), a pruned copy of the contract
+    (the declined REQ-PIPE-161's seam), or leave it unscoped; (3) an
+    in-scope check with no result - refuse the run and stop the batch, or
+    record it red and carry on; (4) raw tool output covers only what was
+    asked - accept, or also record which check ids each tool was asked for.
+
     Smaller, noted: `config_yaml.parse` is still called 53,068 times (28s,
     memoised but deep-copied each call); `_declared_reads` re-collects every
     check definition 402 times (16s).
