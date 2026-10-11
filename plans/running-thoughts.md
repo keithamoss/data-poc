@@ -4591,16 +4591,17 @@ Belongs with batch 5's check work.
     about max(4.6, ~3.5) + ~1.3 = 5.5s, which is the 593s.
 
     **THE FINDING THAT MATTERS FOR UNDER 5 MINUTES**: every Child Protection
-    run checks ALL SIX tables, though an arrival brings one. datacontract-cli
-    ran 606 model checks in 101 runs, dbt builds the six models plus three,
-    and 645 result writes in 108 arrivals is six a run. Five of the six are
-    the period's unchanged siblings, checked again. Checking only the
-    arriving table plus the cross-table checks that read it would cut most
-    of dbt's and datacontract-cli's per-run work - plausibly the halving 5
-    minutes needs, where nothing else on the list comes close. But it changes
-    what a run RECORDS (sibling verdicts per run), and the target was
-    identical output, so it is Keith's call and a requirement first. Not
-    built.
+    run EVALUATES all six tables, though an arrival brings one -
+    datacontract-cli ran 606 model checks in 101 runs, and dbt builds the
+    six models plus three. But a run RECORDS only its own table's results
+    (checked in the database: one dataset per run, every run), so five
+    tables' worth of evaluation is thrown away. Evaluating only the arriving
+    table plus the cross-table checks that read it would cut most of dbt's
+    and datacontract-cli's per-run work - plausibly the halving 5 minutes
+    needs - WITHOUT changing anything recorded, which is what the
+    identical-output target asks. (Corrected the same evening: this first
+    said it would change what a run records, inferred from call counts; the
+    database said otherwise.) A requirement first, then build. Not built.
 
     Smaller, noted: `config_yaml.parse` is still called 53,068 times (28s,
     memoised but deep-copied each call); `_declared_reads` re-collects every
