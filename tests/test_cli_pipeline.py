@@ -26,6 +26,33 @@ def _no_history_yet(monkeypatch):
     run as though on an empty database; the refusal has its own tests."""
     import qa_tools.common.bootstrap as boot
     monkeypatch.setattr(boot, "holds_history", lambda conn: False)
+    # The corrections step after a full replay is its own subject below.
+    monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
+
+
+class TestCorrectionsAfterAFullRun:
+    """Keith, 2026-10-11, (n): `pipeline run` over both collections confirms
+    each due correction once both are replayed, as a bootstrap does."""
+
+    def _run(self, monkeypatch, *args):
+        import qa_tools.common.bootstrap as boot
+        calls = []
+        monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+        monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+        monkeypatch.setattr(boot, "_confirm_corrections", lambda say: calls.append("confirm"))
+        _patch_dashboard_build_embed(monkeypatch, calls)
+        _patch_snapshot(monkeypatch, calls)
+        result = _runner.invoke(pipeline_cli.pipeline_group, ["run", *args])
+        assert result.exit_code == 0, result.output
+        return calls
+
+    def test_after_both(self, monkeypatch):
+        calls = self._run(monkeypatch)
+        assert calls.index("confirm") > max(calls.index("bdm"), calls.index("cp"))
+        assert calls.index("confirm") < calls.index("build-data")
+
+    def test_not_for_one_collection(self, monkeypatch):
+        assert "confirm" not in self._run(monkeypatch, "--collection", "bdm")
 
 
 class TestARunOverRecordedHistoryIsRefused:

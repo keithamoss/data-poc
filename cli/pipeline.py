@@ -107,6 +107,11 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
                 _run_bdm(sequential)
             if collection in ("cp", "all"):
                 _run_cp(sequential)
+            if collection == "all":
+                # EACH DUE CORRECTION CONFIRMED once both are replayed (Keith,
+                # 2026-10-11, (n)), as a bootstrap does.
+                bootstrap_mod._confirm_corrections(
+                    lambda m: console.print(m, style="dim", markup=False))
     except processing_pass.PassLockHeld as exc:
         raise click.ClickException(str(exc)) from None
 

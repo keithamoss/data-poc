@@ -142,8 +142,11 @@ class TestFilingIsInterleavedRatherThanDoneUpFront:
         """It used to be pinned as run_manifest's before/after hooks, which
         force sequential execution; process_all() is a plain loop calling
         process() once per arrival, with no pool to fan out into."""
-        source = inspect.getsource(arrival_lifecycle.process_all)
-        assert "process(arrival" in source
+        # The loop body is _one_of_many since the replay stages corrections
+        # around each arrival (REQ-PIPE-170 criterion 30).
+        source = (inspect.getsource(arrival_lifecycle.process_all)
+                  + inspect.getsource(arrival_lifecycle._one_of_many))
+        assert "_one_of_many(arrival" in source and "process(arrival" in source
         assert "Executor" not in source and "Pool" not in source
 
     def test_bdm_does_not_file_the_whole_batch_at_once(self):

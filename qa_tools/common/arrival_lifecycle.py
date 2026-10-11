@@ -125,36 +125,58 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
         # `start_at` are already in the checkpoint it was copied from.
         if position < start_at:
             continue
-        # STAGED AND RECORDED AS IT ARRIVES (REQ-TEST-159, Keith's signing
-        # answer): `prepare` stages this arrival and records its delivery -
-        # with every arrival sharing its receipt instant, which are filed
-        # together - so the database never holds an arrival from its future.
-        if prepare is not None:
-            prepare(arrival, arrivals)
-        # SCRIPTED DECISIONS BETWEEN ARRIVALS (REQ-GEN-135 criterion 3): every
-        # one that takes effect before this arrival was received is played
-        # first - only by the batch replay of a synthetic history, which is
-        # the one caller that passes a player.
-        if player is not None:
-            player.before(arrival)
-        # A REPLAY PROCESSES EACH ARRIVAL AS IT IS RECEIVED (REQ-PIPE-081
-        # criteria 27-31): its run is stamped then, not with one instant for
-        # the whole pass - which was the wall clock, the day of the replay.
-        if replay_clock.active():
-            replay_clock.anchor(arrival.received_at)
-            stamp = replay_clock.now().isoformat()
-        else:
-            stamp = run_timestamp or asset_time.now().isoformat()
-        results.extend(process(arrival, steps=steps, among=arrivals,
-                               run_timestamp=stamp, run_by=run_by,
-                               on_step=on_step))
-        # A CHECKPOINT IS TAKEN HERE (REQ-TEST-159 criterion 1): once this
-        # arrival is fully processed and before the next is touched.
-        if after_each is not None:
-            after_each(position, arrival, player)
+        with _as_it_stood(arrival):
+            _one_of_many(arrival, arrivals, position, steps=steps, run_by=run_by,
+                         run_timestamp=run_timestamp, on_step=on_step, player=player,
+                         prepare=prepare, after_each=after_each, results=results)
     if player is not None:
         player.finish()
     return results
+
+
+def _as_it_stood(arrival):
+    """THE AGREEMENT AS IT STOOD AT THIS ARRIVAL'S RECEIPT, during a replay
+    (REQ-PIPE-170 criterion 23; Keith, 2026-10-11, (n)): a correction merged
+    after it is reverted, so the arrival is filed and judged as it was then.
+    Outside a replay, the agreement on disk - nothing is re-staged."""
+    import contextlib
+
+    if not replay_clock.active():
+        return contextlib.nullcontext()
+    from qa_tools.common import correction_replay
+
+    return correction_replay.for_arrival(arrival)
+
+
+def _one_of_many(arrival, arrivals, position, *, steps, run_by, run_timestamp, on_step,
+                 player, prepare, after_each, results) -> None:
+    # STAGED AND RECORDED AS IT ARRIVES (REQ-TEST-159, Keith's signing
+    # answer): `prepare` stages this arrival and records its delivery -
+    # with every arrival sharing its receipt instant, which are filed
+    # together - so the database never holds an arrival from its future.
+    if prepare is not None:
+        prepare(arrival, arrivals)
+    # SCRIPTED DECISIONS BETWEEN ARRIVALS (REQ-GEN-135 criterion 3): every
+    # one that takes effect before this arrival was received is played
+    # first - only by the batch replay of a synthetic history, which is
+    # the one caller that passes a player.
+    if player is not None:
+        player.before(arrival)
+    # A REPLAY PROCESSES EACH ARRIVAL AS IT IS RECEIVED (REQ-PIPE-081
+    # criteria 27-31): its run is stamped then, not with one instant for
+    # the whole pass - which was the wall clock, the day of the replay.
+    if replay_clock.active():
+        replay_clock.anchor(arrival.received_at)
+        stamp = replay_clock.now().isoformat()
+    else:
+        stamp = run_timestamp or asset_time.now().isoformat()
+    results.extend(process(arrival, steps=steps, among=arrivals,
+                           run_timestamp=stamp, run_by=run_by,
+                           on_step=on_step))
+    # A CHECKPOINT IS TAKEN HERE (REQ-TEST-159 criterion 1): once this
+    # arrival is fully processed and before the next is touched.
+    if after_each is not None:
+        after_each(position, arrival, player)
 
 
 def arriving_with(arrival, among) -> list:

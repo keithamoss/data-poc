@@ -1250,6 +1250,12 @@ one or more component tags, and a date.
         Also approved: the commit-cadence rule, now in CLAUDE.md.
         (n) replay stages a correction by reverting it until its merge date,
             then confirming it as the manager would - to build;
+            Follow-ups, 2026-10-11 afternoon: the two collections replay
+            side by side, so the bootstrap confirms each due correction
+            ONCE BOTH REPLAYS FINISH, as the manager, stamped at the end of
+            the replay (rejected: sequential replays, one merged stream);
+            and a correction dated D is merged from the START of D on the
+            asset's clock.
         (o) a confirmed correction's moves are recorded as the rule's, so a
             later correction may move them again - to build;
         (p) confirm what can move and park a blocked move on the

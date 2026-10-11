@@ -107,6 +107,9 @@ class TestWhatItRuns:
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
                             lambda **k: called.append("cp"))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
+        # The corrections step is its own subject (test_correction_replay.py).
+        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
+                            lambda **k: [])
         _in_process(monkeypatch, called)
         return called
 
@@ -170,6 +173,9 @@ class TestCollectionsRunSideBySide:
         monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
                             lambda **k: called.append(("cp", k)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
+        # The corrections step is its own subject (test_correction_replay.py).
+        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
+                            lambda **k: [])
         dispatched = []
 
         def run(names, sequential):
@@ -177,6 +183,30 @@ class TestCollectionsRunSideBySide:
             return {n: boot._run_collection(n, sequential) for n in names}
         monkeypatch.setattr(boot, "_run_concurrently", run)
         return called, dispatched
+
+    def test_corrections_are_confirmed_once_both_replays_finish(self, spy, monkeypatch):
+        """Keith, 2026-10-11, (n): a correction is asset-wide, so the
+        bootstrap confirms each due one after BOTH collections replay."""
+        from qa_tools.common import correction_replay
+
+        called, _ = spy
+        monkeypatch.setattr(correction_replay, "confirm_due",
+                            lambda **k: called.append("confirm") or [])
+        boot.bootstrap(collection="all")
+        assert called.count("confirm") == 1
+        assert called.index("confirm") > max(
+            i for i, c in enumerate(called) if isinstance(c, tuple))
+
+    def test_one_collection_alone_leaves_them_pending(self, spy, monkeypatch):
+        """PROVISIONAL: a correction can move the other collection's supplies,
+        which a one-collection bootstrap has not replayed."""
+        from qa_tools.common import correction_replay
+
+        called, _ = spy
+        monkeypatch.setattr(correction_replay, "confirm_due",
+                            lambda **k: called.append("confirm") or [])
+        boot.bootstrap(collection="bdm")
+        assert "confirm" not in called
 
     def test_both_collections_are_dispatched_together(self, spy):
         _called, dispatched = spy

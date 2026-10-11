@@ -230,6 +230,12 @@ def bootstrap(collection: str = "all", force: bool = False,
                 + " and ".join(_LABEL[n] for n in names) + " side by side")
             timings = _run_concurrently(names, sequential)
             _record_deliveries()
+        if collection == "all":
+            # EACH DUE CORRECTION CONFIRMED ONCE BOTH COLLECTIONS ARE REPLAYED
+            # (Keith, 2026-10-11, (n)): asset-wide, so after both - and only
+            # then, as a one-collection bootstrap has not replayed the other's
+            # supplies a correction can move (PROVISIONAL).
+            _confirm_corrections(say)
         timings["total"] = time.monotonic() - started
         say("Took " + ", ".join(f"{_LABEL.get(k, k)} {v:.0f}s" for k, v in timings.items()))
     finally:
@@ -242,6 +248,16 @@ def bootstrap(collection: str = "all", force: bool = False,
 
 
 _LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in total"}
+
+
+def _confirm_corrections(say) -> None:
+    from qa_tools.common import correction_replay, replay_clock
+
+    with replay_clock.replaying():
+        done = correction_replay.confirm_due(say=say)
+    if done:
+        for short in ("bdm", "cp"):
+            _rebuild_results(short)
 
 
 def _record_deliveries() -> None:

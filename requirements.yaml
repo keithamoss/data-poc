@@ -26901,6 +26901,8 @@ requirements:
     - IF a parked supply is no longer filed where it was parked from, THEN THE SYSTEM SHALL leave it parked and say so, rather than move it from somewhere nobody confirmed.
     - WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu.
     - THE SYSTEM SHALL list parked moves in mothman supply corrections, as their own entry in the filing menu, and as an outstanding item each, naming what blocks it and both ways it ends.
+    - WHILE a synthetic history is replayed, THE SYSTEM SHALL file and judge each arrival against the agreement as it stood at that arrival's receipt, reverting every declared correction whose date is after it, a correction counting from the start of its date on the asset's clock; and SHALL NOT revert anything outside a replay.
+    - WHEN a replay of both collections finishes - a bootstrap, or `mothman pipeline run` over both - THE SYSTEM SHALL confirm every pending correction dated up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager role during playback, and SHALL rebuild both collections' results if any was confirmed; a replay of one collection SHALL leave them pending.
     non_functional_requirements:
     - 'ONE CONFIRMATION, NOT ONE PER FILE: a correction to a daily feed''s due time can propose hundreds
       of moves, and a per-supply step is how a list like this is abandoned half-done.'
@@ -26914,6 +26916,7 @@ requirements:
     - REQ-PIPE-141
     - REQ-GHUB-171
     decisions:
+    - 'REPLAY STAGES A CORRECTION (Keith, 2026-10-11, answer (n)): reverted until its merge date, then confirmed as the asset manager would, so a generated history shows a correction happening part way through rather than an agreement that was always right. Its follow-ups the same day: MERGED FROM THE START OF ITS DATE on the asset''s clock (rejected: the end of that day); CONFIRMED ONCE BOTH COLLECTIONS'' REPLAYS FINISH, stamped at the end of the replay rather than on the merge date, because the two replay side by side in processes of their own and a correction is asset-wide - one confirmation, moving supplies in both (rejected: replaying the collections one after the other, or as one merged stream, either of which costs the parallel bootstrap). A ONE-COLLECTION replay leaves them pending (PROVISIONAL): it has not replayed the other collection''s supplies a correction can move. Corrections due before an arrival are not confirmed mid-replay at all - only staged - so a correction dated inside the history moves, at the end, every supply filed before its date. Built in qa_tools/common/correction_replay.py, entered per arrival by arrival_lifecycle.process_all only while the replay clock runs.'
     - TRIAL, REPORT, THEN APPLY ON A PERSON'S CONFIRMATION (Keith, 2026-10-07, his own proposal).
     - 'REJECTED AUTOMATIC RE-FILE WITHOUT CONFIRMATION: it would move genuinely-early data with nobody deciding
       - the worked case is genuine Q3 data sent early, which a corrected date would otherwise pull into
@@ -26959,13 +26962,16 @@ requirements:
     - 'A CORRECTION''S MOVES ARE THE RULE''S (Keith, 2026-10-11, (o)): the manager approved the correction, not that one filing. Before, a later correction treated each as a person''s and would never propose moving it again. The decision log now accepts a rule re-file that only leaves a period (a hold).'
     unmet_criteria:
     - criterion: 'Criterion 23, first half - TS-57 to TS-63 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), except TS-63, which needs REQ-PIPE-179 (unsigned).'
-      why: 'Generating a correction part way through a history needs the pipeline, during playback, to file arrivals before the correction''s merge instant against the agreement WITHOUT it - a time-versioned agreement during replay, which nothing has yet. revert() is the piece that makes it possible; wiring it into playback touches agreement loading everywhere and is a design choice for Keith, not a night''s PROVISIONAL.'
-      owner: 'a follow-up sprint, after Keith decides how playback stages the merge'
+      why: 'THE MECHANISM IS BUILT (Keith, 2026-10-11, (n); criteria 30 and 31): a replay files each arrival against the agreement as it stood at its receipt and confirms each due correction once both collections are replayed. What remains is the scenarios themselves - corrections declared in the committed configuration, dated inside the synthetic history, whose shapes give a kept, a moved, a held, a blocked and a re-judged supply. That puts fictional past corrections into the asset''s real calendar file, which is a configuration choice for Keith rather than a builder''s.'
+      owner: 'a follow-up, once Keith decides how the scenario corrections are declared'
       blocked_by:
         unowned: true
     linked_tests:
     - tests/test_correction_apply.py
     - tests/test_processing_pass.py
+    - tests/test_correction_replay.py
+    - tests/test_bootstrap.py
+    - tests/test_cli_pipeline.py
     - tests/test_correction_revert.py
     implemented_by:
     - qa_tools/common/correction_apply.py::pending
@@ -26978,6 +26984,10 @@ requirements:
     - cli/supply.py::confirm_correction_command
     - cli/filing_tui.py::corrections_flow
     - qa_tools/common/correction_apply.py::parked
+    - qa_tools/common/correction_replay.py::docs_at
+    - qa_tools/common/correction_replay.py::confirm_due
+    - qa_tools/common/arrival_lifecycle.py::process_all
+    - qa_tools/common/bootstrap.py::bootstrap
     - qa_tools/common/correction_apply.py::drain_parked
     - qa_tools/common/correction_apply.py::keep_parked
     - qa_tools/common/outstanding.py::_from_parked_corrections
