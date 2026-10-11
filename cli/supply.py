@@ -1062,7 +1062,21 @@ def corrections_command(reference: str | None) -> None:
         except correction_trial.Unreadable as exc:
             raise click.ClickException(str(exc)) from exc
         parked = correction_apply.parked(conn)
-        if reference is None or not found:
+        # A CONFIRMED REFERENCE shows its parked moves (delivery-critic #152,
+        # 5); an unknown one is refused whatever else is pending.
+        if reference is not None and reference not in {p.reference for p in found}:
+            mine = [m for m in parked if m.reference == reference]
+            if mine:
+                _show_parked(mine)
+                return
+            if reference in correction_apply.applied_references(conn):
+                console.print(f"{reference} is confirmed and has no parked moves.",
+                              style="green", markup=False)
+                return
+            raise click.ClickException(f"{reference} is not a correction awaiting "
+                                       f"confirmation or one with parked moves - `mothman "
+                                       f"supply corrections` lists both.")
+        if reference is None:
             _show_parked(parked)
         if not found:
             if not parked:
@@ -1130,15 +1144,18 @@ def keep_parked_moves(conn, reference: str, keeps, keep_reason: str | None, *, a
             f"{people.actor_name(actor)}?", yes=yes, default=False, flag_hint="pass --yes"):
         console.print("Not kept.", style="yellow")
         return False
+    # ALL OR NOTHING (delivery-critic #152, 10), as a confirmation is.
+    try:
+        with decision_log.decision_transaction(conn):
+            for supply in keeps:
+                m = by_supply[supply]
+                correction_apply.keep_parked(conn, reference, m.dataset_id, supply,
+                                             actor=actor, reason=keep_reason,
+                                             effective_at=asset_time.now().isoformat())
+    except (decision_log.DecisionRefused, people.RoleRefused) as exc:
+        raise click.ClickException(f"{exc} Nothing was kept.") from exc
     for supply in keeps:
-        m = by_supply[supply]
-        try:
-            correction_apply.keep_parked(conn, reference, m.dataset_id, supply, actor=actor,
-                                         reason=keep_reason,
-                                         effective_at=asset_time.now().isoformat())
-        except (decision_log.DecisionRefused, people.RoleRefused) as exc:
-            raise click.ClickException(str(exc)) from exc
-        console.print(f"Kept {m.dataset_id} {supply} in {m.from_period or 'its hold'}.",
+        console.print(f"Kept {by_supply[supply].dataset_id} {supply} where it is.",
                       style="green", markup=False)
     return True
 
@@ -1211,6 +1228,10 @@ def confirm_correction_command(reference: str, keeps: tuple[str, ...],
             if not correction_apply.parked(conn, reference):
                 raise click.ClickException(f"{reference} is already confirmed and has no "
                                            f"parked moves - there is nothing to confirm.")
+            if acknowledged or output:
+                console.print("--acknowledge and --output apply to confirming a correction, "
+                              "not to keeping a parked move - ignored.", style="yellow",
+                              markup=False)
             if not keeps:
                 _show_parked(correction_apply.parked(conn, reference))
                 raise click.ClickException(

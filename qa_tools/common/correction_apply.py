@@ -386,12 +386,20 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
     clears it by hand."""
     from qa_tools.common import filing, replay_clock
 
+    from qa_tools.common import refiling
+
     found = [p for p in parked(conn) if p.dataset_id not in skip]
     done: list[tuple] = []
     if not found:
         return done
     at = effective_at or replay_clock.now().isoformat()
+    # AS AT ITS CONFIRMATION (Keith, 2026-10-11; delivery-critic #152, 7):
+    # a drained move is the deferred tail of a confirmation, so every later
+    # correction not yet confirmed is reverted, as confirm() reverts them -
+    # and that correction's own confirmation then moves or re-judges it.
     docs = docs or correction_trial.working()
+    for later in reversed(pending(conn, docs)):
+        docs = agreement_freeze_revert(docs, later)
     with correction_trial.configured(*docs):
         for item in found:
             if correction_trial._blocked(conn, item.dataset_id, item.supply_id,
@@ -404,14 +412,34 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
                     f"{(now or {}).get('slot') or 'no period'} - left parked for the asset "
                     f"manager to keep or move by hand.")
                 continue
-            entry = _entry(item.dataset_id)
-            with decision_log.decision_transaction(conn):
-                decision_id = _carry_out(conn, item, entry, at)
-                _resolve(conn, item, "moved", RULE_ACTOR, at, decision_id)
+            # THE CONFIRMED PERIOD MUST STILL EXIST (#152, 2): a later
+            # correction can take it away, and a placement never asked.
+            if item.to_period and not refiling._on_calendar(item.dataset_id, item.to_period):
+                say(f"{item.supply_id}: parked under {item.reference} for {item.to_period}, "
+                    f"which is no longer a period {item.dataset_id} is delivered in - left "
+                    f"parked for the asset manager to keep where it is.")
+                continue
+            # ONE THAT CANNOT GO AHEAD HOLDS BACK NO OTHER (#152, 1): said,
+            # left parked, and the next is tried.
+            try:
+                entry = _entry(item.dataset_id)
+                with decision_log.decision_transaction(conn):
+                    decision_id = _carry_out(conn, item, entry, at)
+                    _resolve(conn, item, "moved", RULE_ACTOR, at, decision_id)
+            except decision_log.DecisionRefused as exc:
+                say(f"{item.supply_id}: parked under {item.reference}, and moving it to "
+                    f"{item.to_period or 'a hold'} was refused - {exc} It stays parked.")
+                continue
             say(f"{item.supply_id}: what blocked it under correction {item.reference} has "
                 f"cleared, so it moves to {item.to_period or 'a hold'} as confirmed")
             done.append((item.dataset_id, item.supply_id, item.from_period, item.to_period))
     return done
+
+
+def agreement_freeze_revert(docs: tuple[dict, dict], p: Pending) -> tuple[dict, dict]:
+    from qa_tools.common import agreement_freeze
+
+    return agreement_freeze.revert(docs[0], docs[1], list(p.changes))
 
 
 def _carry_out(conn, item: Parked, entry, at: str):
@@ -421,19 +449,20 @@ def _carry_out(conn, item: Parked, entry, at: str):
 
     why = (f"Correction {item.reference}, confirmed by {item.confirmed_by}, parked until "
            f"what blocked it cleared")
+    # THE MOVE'S OWN DECISION, handed back by whatever wrote it (#152, 9) -
+    # never the newest row for the supply, which another session could own.
+    ids: list[int] = []
     if item.placing:
-        _place(conn, item, entry, item.confirmed_by, item.reference, at)
+        _place(conn, item, entry, item.confirmed_by, item.reference, at, ids=ids)
     elif item.held:
-        _hold(conn, item, entry, item.confirmed_by, item.reference, why, at)
+        _hold(conn, item, entry, item.confirmed_by, item.reference, why, at, ids=ids)
     else:
         plan = refiling.plan(conn, dataset_id=item.dataset_id, supply=item.supply_id,
                              to_period=item.to_period)
         refiling.apply(conn, plan, agency_id=entry.agency_id,
                        collection_id=entry.collection_id, actor=RULE_ACTOR, reason=why,
-                       effective_at=at, actor_kind=decision_log.RULE)
-    rows = conn.execute(f"SELECT max(id) FROM {decision_log.TABLE} WHERE dataset_id = ? "
-                        "AND supply = ?", [item.dataset_id, item.supply_id]).fetchall()
-    return rows[0][0] if rows else None
+                       effective_at=at, actor_kind=decision_log.RULE, entry_out=ids)
+    return ids[0] if ids else None
 
 
 def keep_parked(conn, reference: str, dataset_id: str, supply: str, *, actor: dict,
@@ -453,16 +482,21 @@ def keep_parked(conn, reference: str, dataset_id: str, supply: str, *, actor: di
         raise decision_log.DecisionRefused(
             f"{reference} has no parked move for {dataset_id} {supply} - `mothman supply "
             f"corrections` lists what is parked.")
+    from qa_tools.common import filing
+
     item = found[0]
     email = actor.get("email") or str(actor)
     entry = _entry(dataset_id)
+    # KEPT WHERE IT IS NOW (#152, 4): a person may have moved it since it
+    # was parked, and the keep names the period it actually stays in.
+    where = (filing.filing_for(dataset_id, supply) or {}).get("slot")
     with decision_log.decision_transaction(conn):
         with decision_log.apply_decision(conn, decision_log.Decision(
                 agency_id=entry.agency_id, collection_id=entry.collection_id,
                 dataset_id=dataset_id, action=decision_log.KEEP, supply=supply,
                 actor=email, actor_kind=decision_log.PERSON, effective_at=effective_at,
-                to_slot=item.from_period,
-                from_slot=None if item.from_period else item.to_period,
+                to_slot=where,
+                from_slot=None if where else (item.to_period or item.from_period),
                 reason=f"Kept where it is under correction {reference}: {reason}")) as keep_id:
             pass
         _resolve(conn, item, "kept", email, effective_at, keep_id)
@@ -475,7 +509,7 @@ def _entry(dataset_id: str):
     return hierarchy.dataset(dataset_id)
 
 
-def _place(conn, m, entry, email: str, reference: str, effective_at: str):
+def _place(conn, m, entry, email: str, reference: str, effective_at: str, ids=None):
     """A held supply the corrected calendar now covers is filed by the rule,
     as REQ-PIPE-154's drain files one, naming who confirmed it."""
     from qa_tools.common import filing, recheck
@@ -488,11 +522,14 @@ def _place(conn, m, entry, email: str, reference: str, effective_at: str):
             reason=f"Correction {reference}, confirmed by {email}: the corrected calendar "
                    f"files it to {m.to_period}.")) as entry_id:
         filing.refile(conn, m.dataset_id, m.supply_id, m.to_period, decision_id=entry_id)
+        if ids is not None:
+            ids.append(entry_id)
         return recheck.owe(conn, dataset_id=m.dataset_id, supply_id=m.supply_id,
                            decision_id=entry_id)
 
 
-def _hold(conn, m, entry, email: str, reference: str, why: str, effective_at: str) -> None:
+def _hold(conn, m, entry, email: str, reference: str, why: str, effective_at: str,
+          ids=None) -> None:
     """A filed supply the corrected calendar offers no period is HELD on
     confirmation (criterion 8, REQ-PIPE-064), naming the correction - out of
     its period, its tables back in staging where it was promoted."""
@@ -514,6 +551,8 @@ def _hold(conn, m, entry, email: str, reference: str, why: str, effective_at: st
                 f"{m.from_period} has no {entry.table} for {m.supply_id}, which the decision "
                 f"log says it holds - nothing was done.")
         filing.refile(conn, m.dataset_id, m.supply_id, None, decision_id=entry_id)
+        if ids is not None:
+            ids.append(entry_id)
     # AGAIN WHERE IT WAS HELD BEFORE (D4): a hold is one row per supply.
     supply_holds.raise_again(
         conn, dataset_id=m.dataset_id, supply_id=m.supply_id,

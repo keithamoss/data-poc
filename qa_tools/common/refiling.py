@@ -125,7 +125,8 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
 
 
 def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reason: str,
-          effective_at: str, actor_kind: str = decision_log.PERSON) -> int:
+          effective_at: str, actor_kind: str = decision_log.PERSON,
+          entry_out: list | None = None) -> int:
     """Carry a plan out, in one transaction. Returns the owed re-check's id.
     `actor_kind` is a person's unless a confirmed calendar correction moves
     the supply, which is the rule's (Keith, 2026-10-11, morning-report (o))."""
@@ -150,6 +151,8 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
                 action=decision_log.REFILE, supply=p.supply, actor=actor,
                 actor_kind=actor_kind, effective_at=effective_at,
                 from_slot=p.from_period, to_slot=p.to_period, reason=reason)) as entry_id:
+            if entry_out is not None:
+                entry_out.append(entry_id)
             if p.promoted:
                 # THE ONE MOVE-OUT PATH (criterion 3, NFR 4).
                 if period_tables.take_out(conn, period=p.from_period, logical=p.table,

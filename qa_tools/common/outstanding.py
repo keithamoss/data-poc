@@ -626,23 +626,38 @@ def _from_parked_corrections(conn=None) -> list[Item]:
         print(f"note: could not read parked correction moves ({type(exc).__name__}: {exc}) "
               f"- the rest of the queue is unaffected.")
         return []
+    from qa_tools.common import filing
+
     items = []
     for m in found:
         agency, collection = _scope_of(m.dataset_id)
+        keep = (f"the data asset's manager keeps it where it is: mothman supply "
+                f"confirm-correction --reference {m.reference} --keep {m.supply_id} "
+                f"--keep-reason '<why>'")
+        now = (filing.filing_for(m.dataset_id, m.supply_id) or {}).get("slot")
+        if now != m.from_period:
+            # MOVED BY A PERSON SINCE IT WAS PARKED (delivery-critic #152, 4):
+            # the pass will not move it from somewhere nobody confirmed.
+            headline = (f"Correction {m.reference} was to move {m.supply_id} from "
+                        f"{m.from_period or 'a hold'} to {m.to_period or 'a hold'}, but it "
+                        f"has since been filed to {now or 'no period'}")
+            detail = (f"Confirmed by {m.confirmed_by} and parked; someone moved it while "
+                      f"it waited, so the pass leaves it alone. Keep it where it is now, or "
+                      f"move it by hand.")
+            responses = (keep,)
+        else:
+            headline = (f"Correction {m.reference} moves {m.supply_id} from "
+                        f"{m.from_period or 'a hold'} to {m.to_period or 'a hold'}, once what "
+                        f"blocks it is cleared")
+            detail = (f"Confirmed by {m.confirmed_by}; parked because another decision "
+                      f"blocks it. It stays where it is, with its verdict there, until then - "
+                      f"and the next processing pass moves it.")
+            responses = (f"clear what blocks it: {m.blocked.splitlines()[0]}", f"or {keep}")
         items.append(Item(
             kind=PARKED_CORRECTION_MOVE, severity=NEEDS_ACTION, blocking=False,
-            headline=(f"Correction {m.reference} moves {m.supply_id} from "
-                      f"{m.from_period or 'a hold'} to {m.to_period or 'a hold'}, once what "
-                      f"blocks it is cleared"),
-            detail=(f"Confirmed by {m.confirmed_by}; parked because another decision "
-                    f"blocks it. It stays where it is, with its verdict there, until then - "
-                    f"and the next processing pass moves it."),
+            headline=headline, detail=detail,
             agency_id=agency, collection_id=collection, dataset_id=m.dataset_id,
-            observed_at=m.parked_at,
-            responses=(f"clear what blocks it: {m.blocked.splitlines()[0]}",
-                       f"or the data asset's manager keeps it where it is: mothman supply "
-                       f"confirm-correction --reference {m.reference} --keep {m.supply_id} "
-                       f"--keep-reason '<why>'")))
+            observed_at=m.parked_at, responses=responses))
     return items
 
 

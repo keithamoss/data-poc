@@ -213,6 +213,22 @@ class TestARange:
         [(skipped, _, why)] = plan.skipped
         assert skipped == superseded and "superseded" in why
 
+    def test_a_superseded_supply_can_still_be_excused_by_name(self, conn):
+        """What the range's skip message tells a person to do works
+        (delivery-critic #152, on REQ-PIPE-161's decision)."""
+        from qa_tools.common import supersession
+
+        old = self._file("2025-Q2", datetime(2025, 6, 1, 9, tzinfo=PERTH))
+        self._file("2025-Q2", datetime(2025, 6, 2, 9, tzinfo=PERTH))
+        supersession.supersede(conn, agency_id="child-protection-family-support",
+                               collection_id="child-protection", dataset_id="cp-carers",
+                               supply=old, period="2025-Q2", actor=KEITH, reason="replaced",
+                               effective_at=AT)
+        _apply(conn, fd.Request(operation=fd.EXCUSE_LATENESS, dataset_id="cp-carers",
+                                actor=people.person_by_email(KEITH), reason="outage",
+                                period="2025-Q2", supply=old))
+        assert excuse.in_force(conn, "cp-carers", old) is not None
+
     def test_a_backwards_range_is_refused(self, conn):
         with pytest.raises(dl.DecisionRefused, match="runs backwards"):
             fd.consequences(conn, self._range("2025-Q3", "2025-Q1"))

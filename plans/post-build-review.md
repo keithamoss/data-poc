@@ -7566,3 +7566,51 @@ twice. It deliberately did not re-find the `TypeError`.
       files. Keith also confirmed two PROVISIONALS the same morning: a
       person's own promotion of a refused dataset stands, and the exit
       order is failure (2) > refused (3) > red (1).
+
+152. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery critic on
+     the parked correction moves (1af4eff, REQ-PIPE-170 criteria 19, 25-29)
+     and the range excuse (7c511e5, REQ-PIPE-161 criteria 20-21).** Run after
+     the push; every claim was checked against the code, most by the critic's
+     own runs, and each fix below had a test that failed first (finding 9's
+     passed already and stays as a guard on the replacement).
+    - **1 (high):** one parked move that could not be carried out - its
+      confirmed period gone - raised out of the drain, failing every pass and
+      stranding every later parked move. Each is now tried on its own; a
+      refusal is said and leaves it parked.
+    - **2 (high):** a parked PLACEMENT never asked whether its confirmed
+      period still exists, and filed a held supply into 2023-Q9. The drain
+      now checks the period first, for every shape.
+    - **3 (medium):** a move carried out from parked got no "moved by
+      correction" note on its history row - the note read only the applied
+      record, written at confirmation. pipeline/corrections.py now reads the
+      resolved parked moves too, the verdicts either side from the filings
+      around the move's own decision; the activity feed counts parked moves.
+    - **4 (medium):** a supply a person moved while it was parked still read
+      "the next processing pass moves it" on the outstanding list, and a keep
+      recorded the period it was parked FROM. The item now says where it is
+      and offers only the keep; the keep records where it is now.
+    - **5 (medium):** `corrections --reference` on a confirmed correction
+      with parked moves refused as "already applied" when something else was
+      pending, and any reference - even an unknown one - listed every parked
+      move when nothing was. A confirmed reference now shows its own parked
+      moves, and an unknown one is refused either way.
+    - **6 (low-medium):** a keep made while parked was not in the applied
+      record, so its reference came back through the prose regex and a
+      reference with a space was lost. The resolution's decision id now maps
+      it, as a keep at confirmation is mapped.
+    - **7 (Keith's call, 2026-10-11): AS AT ITS CONFIRMATION.** The drain
+      reverts every later correction not yet confirmed, as confirm() does,
+      rather than using the agreement on disk.
+    - **8 (low):** the agreement backstop failing open let the drain go ahead
+      for a dataset nobody had checked. The drain now waits for a pass that
+      read the backstop, and skips a dataset it could not check.
+    - **9 (low):** the move's decision id came from max(id) for the supply.
+      It is now handed back by whatever wrote the decision.
+    - **10 (low):** keeping several parked supplies is one transaction, all
+      or nothing; --acknowledge/--output on that route are said to be
+      ignored. NOT FIXED, said here: a supply parked under two corrections
+      is moved by the first drain and the second then reads it as moved by a
+      person - left parked and said, which is safe.
+    - **On REQ-PIPE-161:** criteria 20 and 21 met, verified end to end by the
+      critic. Its decision's "excusing one by name is still open" read as
+      "not yet possible"; it is possible, and now says so, with a test.

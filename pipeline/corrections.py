@@ -81,6 +81,33 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
         for ds, supply, frm, to, old, new in done.get("moved_verdicts") or []:
             if ds == dataset_id:
                 moved.append((reference, applied_at, actor, supply, frm, to, old, new))
+    # WHAT A PARKED MOVE BECAME (delivery-critic #152, 3 and 6): a keep made
+    # while parked names its correction by its decision id, as one made at
+    # confirmation does; a move carried out later carries the same moved
+    # note, its verdicts read from the filings either side of its decision.
+    from qa_tools.common import filing as filing_mod
+
+    for decision_id, how, reference, supply, frm, to, confirmer, at in conn.execute(
+            f"SELECT r.decision_id, r.how, p.change_reference, p.supply_id, p.from_period, "
+            f"p.to_period, p.confirmed_by, r.resolved_at FROM {correction_apply.RESOLVED} r "
+            f"JOIN {correction_apply.PARKED} p ON p.id = r.parked_id WHERE p.dataset_id = ?",
+            [dataset_id]).fetchall():
+        if decision_id is None:
+            continue
+        if how == "kept":
+            kept_under[decision_id] = (reference, None)
+            continue
+        rows = conn.execute(
+            f"SELECT v.id, v.classification FROM {verdict.TABLE} v JOIN {filing_mod.TABLE} f "
+            f"ON f.id = v.filing_id WHERE f.refiled_by = ? ORDER BY v.id LIMIT 1",
+            [decision_id]).fetchall()
+        new = rows[0][1] if rows else None
+        before = conn.execute(
+            f"SELECT classification FROM {verdict.TABLE} WHERE dataset_id = ? AND "
+            f"supply_id = ? AND id < ? ORDER BY id DESC LIMIT 1",
+            [dataset_id, supply, rows[0][0] if rows else 2**62]).fetchall()
+        moved.append((reference, at, confirmer, supply, frm, to,
+                      before[0][0] if before else None, new))
     runs: dict[str, str | None] = {}
 
     def run_of(supply: str) -> str | None:
@@ -121,6 +148,10 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
             f"{decision_log.TABLE} WHERE dataset_id = ? AND action = ? ORDER BY id",
             [dataset_id, decision_log.KEEP]).fetchall():
         reference, why = kept_under.get(decision_id, (None, None))
+        if reference is not None and why is None:
+            prefix = f"Kept where it is under correction {reference}: "
+            why = (reason or "")[len(prefix):] if (reason or "").startswith(prefix) \
+                else (reason or "")
         if reference is None:
             found = _KEPT_UNDER.search(reason or "")
             reference, why = ((found.group(1), found.group(2).strip()) if found
@@ -180,5 +211,6 @@ def applied_feed(conn: supply_db.SupplyConnection | None = None) -> list[dict]:
             "reason": (declared.get(reference) or {}).get("reason"),
             "moved": len(done.get("moved") or []) + len(done.get("placed") or []),
             "held": len(done.get("held") or []), "kept": len(done.get("kept") or []),
-            "rejudged": len(done.get("rejudged") or [])})
+            "rejudged": len(done.get("rejudged") or []),
+            "parked": len(done.get("parked") or [])})
     return out

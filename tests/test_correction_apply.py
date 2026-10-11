@@ -857,3 +857,138 @@ class TestParkedMovesOnEveryRoute:
         filing_tui.filing_menu()
         assert any(c.startswith(filing_tui._MENU_PARKED) for c in asked[0])
         assert correction_apply.parked(conn) == []
+
+
+def _park(conn, supply, frm, to, reference="CAB-1", blocked="it was rejected"):
+    conn.execute(
+        f"INSERT INTO {correction_apply.PARKED} (change_reference, dataset_id, supply_id, "
+        "from_period, to_period, blocked, confirmed_by, parked_at) VALUES "
+        "(?, ?, ?, ?, ?, ?, ?, ?)",
+        [reference, DATASET, supply, frm, to, blocked, "fpycnkgvmt@privaterelay.appleid.com",
+         AT])
+
+
+class TestCriticFindingsOn152:
+    """delivery-critic on the parked moves (post-build-review #152). Each
+    failed before its fix."""
+
+    def test_1_one_move_that_cannot_go_ahead_holds_back_no_other(self, conn):
+        _file("c1-a", "2023-Q3", RECEIVED + timedelta(minutes=11))
+        _file("c1-b", "2023-Q3", RECEIVED + timedelta(minutes=12))
+        _park(conn, "c1-a", "2023-Q3", "2023-Q9")
+        _park(conn, "c1-b", "2023-Q3", "2023-Q2")
+        said = []
+        moved = correction_apply.drain_parked(conn, docs=_docs(), say=said.append)
+        assert moved == [(DATASET, "c1-b", "2023-Q3", "2023-Q2")]
+        assert [p.supply_id for p in correction_apply.parked(conn)] == ["c1-a"]
+        assert any("c1-a" in s and "2023-Q9" in s for s in said)
+
+    def test_2_a_held_supply_is_never_placed_into_a_period_that_does_not_exist(self, conn):
+        filing_support.file(assignment.Assignment(
+            dataset_id=DATASET, supply_id="c2-h", slot=None, branch=assignment.HELD,
+            considered=(), received_at=RECEIVED + timedelta(minutes=13)))
+        _park(conn, "c2-h", None, "2023-Q9")
+        correction_apply.drain_parked(conn, docs=_docs(), say=lambda _m: None)
+        assert _current(conn, "c2-h")["slot"] is None
+        assert [p.supply_id for p in correction_apply.parked(conn)] == ["c2-h"]
+
+    def test_7_a_parked_move_is_carried_out_under_the_agreement_as_at_confirmation(
+            self, conn, monkeypatch):
+        """Keith, 2026-10-11: as confirm() does, every later correction not
+        yet confirmed is reverted - here CAB-2, which shortens the grace."""
+        from qa_tools.common import correction_trial
+        from test_correction_replay import _declare
+
+        docs = _declare(_docs(), _grace, "CAB-2", "2026-01-01")
+        _file("c7", "2023-Q3", RECEIVED + timedelta(minutes=14))
+        _park(conn, "c7", "2023-Q3", "2023-Q2")
+        seen = []
+        real = correction_trial.configured
+
+        def configured(cal, asset):
+            seen.append(_clients(copy.deepcopy(cal))["participation"]["versions"][0]
+                        .get("grace"))
+            return real(cal, asset)
+        monkeypatch.setattr(correction_trial, "configured", configured)
+        correction_apply.drain_parked(conn, docs=docs, say=lambda _m: None)
+        assert seen and seen[0] != "1h", "CAB-2 is reverted while it waits"
+
+    def test_4_one_a_person_moved_meanwhile_says_so_and_is_kept_where_it_is(
+            self, conn, manager):
+        from qa_tools.common import outstanding
+
+        _file("c4", "2023-Q3", RECEIVED + timedelta(minutes=15))
+        _park(conn, "c4", "2023-Q3", "2023-Q2")
+        filing.refile(conn, DATASET, "c4", "2023-Q4", decision_id=1)
+        [item] = [i for i in outstanding._from_parked_corrections(conn) if "c4" in i.headline]
+        assert "2023-Q4" in item.headline and "the next processing pass" not in item.detail
+        correction_apply.keep_parked(conn, "CAB-1", DATASET, "c4", actor=manager,
+                                     reason="leave it", effective_at=AT)
+        to_slot = conn.execute(
+            f"SELECT to_slot FROM {decision_log.TABLE} WHERE supply = 'c4' AND action = ?",
+            [decision_log.KEEP]).fetchall()[0][0]
+        assert to_slot == "2023-Q4"
+
+    def test_9_the_move_resolves_with_its_own_decision(self, conn):
+        _file("c9", "2023-Q3", RECEIVED + timedelta(minutes=16))
+        _park(conn, "c9", "2023-Q3", "2023-Q2")
+        correction_apply.drain_parked(conn, docs=_docs(), say=lambda _m: None)
+        resolved = conn.execute(
+            f"SELECT decision_id FROM {correction_apply.RESOLVED}").fetchall()[0][0]
+        action, supply = conn.execute(
+            f"SELECT action, supply FROM {decision_log.TABLE} WHERE id = ?",
+            [resolved]).fetchall()[0]
+        assert (action, supply) == (decision_log.REFILE, "c9")
+
+    def test_10_keeping_several_is_all_or_nothing(self, conn, manager, monkeypatch):
+        from cli import supply as supply_cli
+
+        _file("c10-a", "2023-Q3", RECEIVED + timedelta(minutes=17))
+        _file("c10-b", "2023-Q3", RECEIVED + timedelta(minutes=18))
+        _park(conn, "c10-a", "2023-Q3", "2023-Q2")
+        _park(conn, "c10-b", "2023-Q3", "2023-Q2")
+        real = correction_apply.keep_parked
+
+        def keep(conn_, reference, ds, supply, **kw):
+            if supply == "c10-b":
+                raise decision_log.DecisionRefused("no")
+            return real(conn_, reference, ds, supply, **kw)
+        monkeypatch.setattr(correction_apply, "keep_parked", keep)
+        import click
+        with pytest.raises(click.ClickException):
+            supply_cli.keep_parked_moves(conn, "CAB-1", ("c10-a", "c10-b"), "r",
+                                         actor=manager, yes=True)
+        assert {p.supply_id for p in correction_apply.parked(conn)} == {"c10-a", "c10-b"}
+
+
+class TestCriticFindingsOn152TheCommand:
+    def _run(self, *args):
+        from click.testing import CliRunner
+
+        from cli import supply as supply_cli
+        return CliRunner().invoke(supply_cli.supply_group, list(args))
+
+    def test_5_an_applied_reference_shows_its_parked_moves(self, conn, manager, monkeypatch):
+        from qa_tools.common import correction_trial
+        from test_correction_replay import _declare
+
+        _file("c5@1#1", "2023-Q3", RECEIVED + timedelta(minutes=19))
+        docs = _corrected(_move_q3)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        later = _declare(docs, _grace, "CAB-2", asset_time.local_date(
+            asset_time.now()).isoformat())
+        monkeypatch.setattr(correction_trial, "working", lambda: later)
+        got = self._run("corrections", "--reference", "CAB-1")
+        assert got.exit_code == 0, got.output
+        assert "c5@1#1" in got.output
+
+    def test_5_an_unknown_reference_is_refused_even_with_nothing_pending(
+            self, conn, manager, monkeypatch):
+        from qa_tools.common import correction_trial
+
+        _file("c5b@1#1", "2023-Q3", RECEIVED + timedelta(minutes=20))
+        docs = _corrected(_move_q3)
+        correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
+        monkeypatch.setattr(correction_trial, "working", lambda: docs)
+        got = self._run("corrections", "--reference", "BOGUS")
+        assert got.exit_code != 0 and "BOGUS" in got.output

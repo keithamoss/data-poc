@@ -382,6 +382,10 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     # judgements no longer match the agreement, with nothing declared to
     # account for it, is refused - said here, held at filing - and one
     # cleared since the last pass has its held supplies filed by the rule.
+    # WHAT THE BACKSTOP COULD NOT CHECK (delivery-critic #152, 8): the parked
+    # correction drain must not treat "not checked" as "not refused".
+    unchecked: set[str] = set()
+    backstop_read = False
     try:
         from qa_tools.common import agreement_drift
         report.refiled_cleared.extend(agreement_drift.refile_cleared(say=say))
@@ -392,6 +396,8 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         # never a silent pass (delivery-critic on 173, #9).
         for ds, exc in errors:
             failed(f"agreement backstop for {ds}", exc)
+            unchecked.add(ds)
+        backstop_read = True
         # RED on the dashboard (criterion 4), and its own exit status, 3
         # (Keith, 2026-10-11, (h)) - through exit_status, never `red`, which
         # says a recorded RESULT is red (#10).
@@ -430,9 +436,13 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
     try:
         from qa_tools.common import correction_apply, supply_db as _db
 
-        with _db.connect(label="mothman:parked-corrections") as conn:
-            report.parked_moved.extend(correction_apply.drain_parked(
-                conn, skip=frozenset(report.refused), say=say))
+        if backstop_read:
+            with _db.connect(label="mothman:parked-corrections") as conn:
+                report.parked_moved.extend(correction_apply.drain_parked(
+                    conn, skip=frozenset(report.refused) | unchecked, say=say))
+        else:
+            say("Parked correction moves wait for a pass that can read the agreement "
+                "backstop.")
     except Exception as exc:  # noqa: BLE001 - parked moves are durable; the next pass retries
         failed("parked correction moves", exc)
 

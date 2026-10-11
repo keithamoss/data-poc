@@ -423,6 +423,37 @@ class TestThePassItself:
         assert report.parked_moved == [("cp-clients", "s", "2023-Q3", "2023-Q4")]
         assert seen["skip"] == frozenset(report.refused)
 
+    def test_152_8_no_parked_move_drains_when_the_backstop_could_not_be_read(
+            self, world, monkeypatch):
+        """delivery-critic #152, finding 8: the backstop failing open let the
+        drain go ahead for a dataset nobody had checked."""
+        from qa_tools.common import agreement_drift, correction_apply
+
+        drained = []
+        monkeypatch.setattr(correction_apply, "drain_parked",
+                            lambda conn, **k: drained.append(k) or [])
+
+        def broken(**_k):
+            raise RuntimeError("unreadable")
+        monkeypatch.setattr(agreement_drift, "refusals", broken)
+        pp.run_pass(run_by="me", say=lambda m: None)
+        assert drained == []
+
+    def test_152_8_a_dataset_the_backstop_could_not_check_is_skipped(
+            self, world, monkeypatch):
+        from qa_tools.common import agreement_drift, correction_apply
+
+        seen = {}
+        monkeypatch.setattr(correction_apply, "drain_parked",
+                            lambda conn, *, skip, say: seen.update(skip=skip) or [])
+
+        def partly(errors, **_k):
+            errors.append(("cp-clients", RuntimeError("could not")))
+            return {}
+        monkeypatch.setattr(agreement_drift, "refusals", partly)
+        pp.run_pass(run_by="me", say=lambda m: None)
+        assert "cp-clients" in seen["skip"]
+
     def test_every_arrival_in_the_order_given(self, world):
         report = pp.run_pass(run_by="me", say=lambda m: None)
         assert world.processed == [a.run_id for a in world.arrivals]
