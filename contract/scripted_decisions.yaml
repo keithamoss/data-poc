@@ -16,14 +16,16 @@ decisions:
     period_from: placement
     reason: "The supplier's file for this day arrived the next morning and filled that day instead; this day was not supplied."
   # REQ-GEN-185 criterion 7: TS-43's held amber is promoted by a person, so the
-  # gap it opens is closed before the next day's supply is measured. FIVE
-  # HOURS, so it comes after the rule has held it: a replayed rule decision
-  # lands within the 4-hour claim window (promotion.effective_at_for).
+  # gap it opens is closed before the next day's supply is measured. TWENTY
+  # HOURS - ten the next morning, before that day's 14:30 supply - so it comes
+  # after the rule has held it (a replayed rule decision lands within the
+  # 4-hour claim window, promotion.effective_at_for) and the hold is still
+  # what the page shows at the end of its own day (post-build-review #156).
   - scenario: TS-43
     operation: promote
     dataset: birth-registrations
     supply: 0
-    after_hours: 5
+    after_hours: 20
     reason: "Facility details missing on more registrations than usual, explained by the supplier; accepted for this day."
   # REQ-GEN-137 criterion 4: TS-45's promoted amber is acknowledged by a person,
   # five hours after it arrived - after the rule has promoted it.

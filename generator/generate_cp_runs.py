@@ -590,6 +590,14 @@ def _plan_injections(periods):
     from generator import targeting
 
     for injection in mine:
+        # NOT YET FOR CHILD PROTECTION (post-build-review #156): its main()
+        # builds no green lead-in or following delivery and sizes nothing to
+        # one, so REQ-GEN-185's criteria 1-3 would not hold. Refused rather
+        # than half-built; no Child Protection scenario needs it yet.
+        if injection.is_targeted:
+            raise targeting.TargetError(
+                f"{injection.scenario_id}: a targeted Child Protection injection needs "
+                f"lead-in deliveries, which are built for Birth Registrations only")
         for extra in injection.arrivals:
             if extra.target is not None:
                 targeting.check_target(extra.target, injection.dataset_id,

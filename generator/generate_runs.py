@@ -66,7 +66,7 @@ import pandas as pd
 from generator.anchor_date import get_anchor_date
 from generator.daily_batch import generate_daily_batch
 from generator.dirty import apply_birth_registrations_presets, inject_stale_delivery
-from generator import delivery_names, scenario_injection
+from generator import delivery_names, scenario_injection, targeting
 from generator.resupply import MAX_ATTEMPTS, Delivery, DatasetProvider, run_slot_chain
 from qa_tools.common import arrivals, asset_time, delivery, hierarchy, schedule
 
@@ -212,20 +212,22 @@ def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
     or empties - moved to a clean period that can take it, so the number
     GENERATED equals the number drawn (criterion 9). Planned here, against
     the injections, rather than at import: moved blind, three of six were
-    generated (post-build-review #154). Reds and cleans as drawn (criterion
-    10); the bookends stay clean."""
-    from generator import targeting
+    generated (post-build-review #154). Reds as drawn, except one a scenario
+    needs the period of, which moves before the scenarios (criterion 10, as
+    amended 2026-10-11); cleans as drawn; the bookends stay clean."""
 
     green = _built_green(injected_by_period)
     unavailable = frozenset(i for i, p in enumerate(periods)
                             if p.name in injected_by_period or p.name in suppressed
                             or p.name in green)
-    drawn = _reds_clear_of_scenarios([s for _n, s in RUN_PLAN[:len(periods)]], unavailable)
+    drawn = _reds_clear_of_scenarios([s for _n, s in RUN_PLAN[:len(periods)]], unavailable,
+                                     names=[p.name for p in periods])
     out = targeting.outside_hold(drawn, [p.date for p in periods], DATASET_ID,
                                  keep_clean=frozenset({0, len(periods) - 1}),
                                  unavailable=unavailable)
-    # A LEAD-IN OR FOLLOWING PERIOD IS GREEN, whatever was drawn there
-    # (REQ-GEN-185: it replaces an ordinary period rather than adding one).
+    # A LEAD-IN OR FOLLOWING PERIOD IS GREEN (REQ-GEN-185). Belt and braces:
+    # the red and amber drawn there have already been MOVED, not dropped,
+    # since both treat it as unavailable.
     return [None if p.name in green else sev for p, sev in zip(periods, out)]
 
 
@@ -235,7 +237,8 @@ def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
 RED_CLEARANCE = 3
 
 
-def _reds_clear_of_scenarios(severities: list, unavailable: frozenset[int]) -> list:
+def _reds_clear_of_scenarios(severities: list, unavailable: frozenset[int],
+                             names: Optional[list] = None) -> list:
     """Every ordinary red moved before the stretch the scenarios claim
     (REQ-GEN-185; Keith, 2026-10-11, lengthening the history to make room):
     a red's resends land on the next free weekdays, and inside that stretch
@@ -252,10 +255,10 @@ def _reds_clear_of_scenarios(severities: list, unavailable: frozenset[int]) -> l
             continue
         swap = next((j for j in range(start - 1, 0, -1) if out[j] is None), None)
         if swap is None:
-            from generator.targeting import TargetError
-            raise TargetError(f"{DATASET_ID}: an ordinary red falls among the scenarios and "
-                              f"no clean period before them is left to take it - lengthen "
-                              f"the history")
+            raise targeting.TargetError(
+                f"{DATASET_ID}: the ordinary red drawn for {names[i] if names else i} falls among the "
+                f"scenarios and no clean period before them is left to take it - "
+                f"lengthen the history")
         out[i], out[swap] = None, "red"
     return out
 
@@ -303,7 +306,6 @@ class BirthRegistrationsProvider:
         # which trips single-tier checks and reads red. Red keeps the preset
         # (criterion 10).
         if severity == "amber":
-            from generator import targeting
 
             return targeting.bdm_amber(df, seed=seed, rows=previous_row_count)
         return apply_birth_registrations_presets(df, severity=severity, seed=seed,
@@ -526,7 +528,6 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
             # the size of the supply before it (criterion 4), and what was
             # moved recorded on the placement for the scenario map
             # (criterion 12).
-            from generator import targeting
 
             this, moved = targeting.bdm_target(
                 payload, extra.target, seed=seed + 800 + n,
@@ -635,7 +636,6 @@ def _plan_injections(periods):
     resolved = [(injection, scenario_injection.resolve(injection, periods))
                 for injection in mine]
     # EVERY TARGET CHECKED BEFORE THE FIRST WRITE (REQ-GEN-184 criterion 11).
-    from generator import targeting
 
     for injection in mine:
         for extra in injection.arrivals:
@@ -737,7 +737,6 @@ def main() -> None:
             # 3): once, on its own day, no resupply, built to green at the
             # size of the supply before it - so the targeted supply's row
             # count and drift are measured against what was built here.
-            from generator import targeting
 
             if previous_row_count:
                 n_rows = previous_row_count
@@ -790,6 +789,15 @@ def main() -> None:
                 entry["received_at"] = asset_time.isoformat(
                     asset_time.wall_clock(delivery_obj.received_date, extra.at))
                 injected[1].arrivals[n - 1]["delivery"] = None  # set below, with the name
+            elif period.name in green_periods:
+                # ON TIME (REQ-GEN-185 criterion 1; post-build-review #156): a
+                # lead-in or following supply arrives inside its due time and
+                # grace, at the midpoint - from the rows, 09-16's came at 16:55
+                # and was recorded late.
+                from qa_tools.common import slots
+
+                due = slots.slot_instants(DATASET_ID, period.date)
+                entry["received_at"] = asset_time.isoformat(due.due_at + due.grace / 2)
             else:
                 entry["received_at"] = _received_at(
                     delivery_obj.payload, delivery_obj.received_date,

@@ -73,28 +73,35 @@ class TestTheNextReceiptIsKnownInAReplay:
         assert promotion.next_receipt(second) is None
 
 
-class TestNoLaterThanTheClaimWindow:
-    """A replayed rule decision takes effect no later than the dataset's
-    claim window after receipt, as a scheduled pass would (Keith,
-    2026-10-11, REQ-GEN-185): with the old 1-hour-to-3-day lag a daily
-    supply's promotion landed the next day, under the NEXT day's amber
-    setting, and after a person's decision about it that same evening."""
+class TestWithinTheClaimWindowInAReplay:
+    """A replayed rule decision takes effect within the dataset's claim
+    window after receipt, as a scheduled pass would reach it (Keith,
+    2026-10-11, REQ-GEN-185) - SPREAD across it, not piled on its edge
+    (post-build-review #156: capping a 1-hour-to-3-day lag put 25 of 33
+    promotions at exactly 4:00; Keith: spread 1h-4h). ON EVERY ROUTE, not
+    only in a replay: the terminal and Lambda routes invent the same seeded
+    lag for a past-dated receipt, and REQ-PIPE-086 criterion 11 needs the
+    three to record the same decision (tests/test_kept_routes_agree.py)."""
 
-    def test_the_cap_holds_whatever_the_lag(self):
+    def test_the_lag_spreads_across_the_window(self):
         received = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
-        for n in range(50):
-            at = promotion.effective_at_for(received, seed=f"run_{n}",
-                                            within=timedelta(hours=4))
-            assert received <= at <= received + timedelta(hours=4)
+        window = timedelta(hours=4)
+        lags = [promotion.effective_at_for(received, seed=f"run_{n}", within=window) - received
+                for n in range(60)]
+        assert all(timedelta(hours=1) <= lag <= window for lag in lags)
+        assert len(set(lags)) > 50, "the lag must spread, not sit on one value"
+        assert sum(lag == window for lag in lags) <= 2
 
-    def test_without_a_cap_the_lag_is_as_it_was(self):
+    def test_without_a_window_the_lag_is_as_it_was(self):
         received = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
         assert promotion.effective_at_for(received, seed="run_lag_probe") == \
             promotion.effective_at_for(received, seed="run_lag_probe", within=None)
 
     @pytest.mark.parametrize("module", [orchestrate_bdm, orchestrate_cp], ids=["bdm", "cp"])
-    def test_both_orchestrators_pass_the_claim_window(self, module, monkeypatch):
-        from qa_tools.common import schedule
+    @pytest.mark.parametrize("replaying", [True, False], ids=["replay", "live"])
+    def test_both_orchestrators_pass_it_on_every_route(self, module, replaying,
+                                                        monkeypatch):
+        from qa_tools.common import replay_clock, schedule
 
         seen = {}
         real = promotion.effective_at_for
@@ -102,6 +109,7 @@ class TestNoLaterThanTheClaimWindow:
         def spy(received_at, **kw):
             seen.update(kw)
             return real(received_at, **kw)
+        monkeypatch.setattr(replay_clock, "active", lambda: replaying)
         monkeypatch.setattr(promotion, "effective_at_for", spy)
         monkeypatch.setattr(promotion, "next_receipt", lambda arrival: None)
         monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: None)
@@ -111,4 +119,5 @@ class TestNoLaterThanTheClaimWindow:
                                   files_by_dataset={"cp-clients": "x"})
         module.promote_after(arrival, [], "t@example.com")
         dataset = "birth-registrations" if module is orchestrate_bdm else "cp-clients"
-        assert seen["within"] == schedule.claim_window(dataset, on=RECEIVED.date())
+        expected = schedule.claim_window(dataset, on=RECEIVED.date())
+        assert seen["within"] == expected

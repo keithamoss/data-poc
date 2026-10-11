@@ -403,6 +403,15 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
         # A LEAD-IN OR FOLLOWING PERIOD IS CLAIMED like the anchor itself
         # (REQ-GEN-185 criterion 5): another scenario's anchor, emptied or
         # quiet day landing on one fails here naming both.
+        # A SCENARIO MAY NOT EMPTY ITS OWN LEAD-IN OR FOLLOWING PERIOD
+        # (post-build-review #156): the check below skips a scenario's own
+        # keys, and the period would silently go missing.
+        own = set(placement.suppressed) & set(placement.built_green)
+        if own:
+            raise CannotPlace(
+                f"{injection.scenario_id} suppresses {', '.join(sorted(own))}, which is "
+                f"its own lead-in or following period - a targeted supply needs that "
+                f"day generated green")
         for name in dict.fromkeys((placement.period, *placement.suppressed,
                                    *placement.quiet, *placement.built_green)):
             key = (injection.dataset_id, name)
@@ -663,8 +672,8 @@ INJECTIONS: tuple[Injection, ...] = (
         dataset_id="birth-registrations",
         anchor=-18,
         config="daily; the amber setting is HOLD from 2026-09-01. A scripted person "
-               "promotes the held supply five hours after it arrives, before the next "
-               "day's supply (REQ-GEN-185 criterion 7).",
+               "promotes the held supply the next morning, twenty hours after it arrives "
+               "and before that day's supply (REQ-GEN-185 criterion 7).",
         arrivals=(
             ExtraArrival(0, "14:00", None, "built to amber on facility nulls",
                          target=Target("amber", ("place_of_birth_facility.completeness",))),

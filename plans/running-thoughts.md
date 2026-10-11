@@ -5025,3 +5025,23 @@ Belongs with batch 5's check work.
     churn only modifies). It also cleared the critic's finding 1 on
     REQ-GEN-184 part B (post-build-review #155): a targeted resend went
     through the same churn.
+
+83. **[investigate, 2026-10-11]** **[Pipeline & publishing]** **For Keith: a
+    late live pass stamps its promotion before its own gate ran.** Raised by
+    the critic on REQ-GEN-185 (post-build-review #156 finding 4) and not
+    settled. `promotion.effective_at_for` invents a lag after receipt - one
+    hour to the claim window, spread, since #156 - and takes the earlier of
+    that and now. On every route, not only a replay: the terminal and Lambda
+    routes do the same for a past-dated receipt, and REQ-PIPE-086 criterion
+    11 needs the three to record the same decision (a "replay only" version
+    of the window was built, broke tests/test_kept_routes_agree.py, and was
+    taken back the same evening). So a LIVE pass that reaches a supply more
+    than the claim window after receipt - a backlog, the ungated retry -
+    records a decision effective before the gate ran. That was true before
+    the window too, for any lag past three days. When Keith picked "Spread
+    1h-4h" the option said "only in a replay; a live pass keeps its real
+    instant" - the second half described the code wrongly, which is why it
+    is back with him. The question: should a live pass's decision take
+    effect when it is made (and the routes agree some other way), or is the
+    invented instant right for a synthetic past-dated keep and wrong only
+    for a real late pass?

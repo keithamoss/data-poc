@@ -231,7 +231,15 @@ def _apply(t: Timed) -> None:
     uses (criterion 4), as the synthetic person (criterion 5)."""
     from qa_tools.common import filing_decisions as fd, people
 
+    from qa_tools.common import replay_clock
+
     s = t.script
+    # RECORDED WHEN IT TOOK EFFECT (REQ-PIPE-081 criterion 28; post-build-
+    # review #156): the replay has already anchored its clock at the NEXT
+    # arrival, so a person's evening decision was recorded as made the next
+    # day, and the page said so.
+    if replay_clock.active():
+        replay_clock.anchor(t.at)
     with people.playback():
         actor = people.synthetic_actor()
 

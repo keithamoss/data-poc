@@ -3543,8 +3543,10 @@ REQ-PIPE-105 criterion 6).
 PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
 to amber on facility nulls from the checks' own bands (REQ-GEN-184), after
 two green lead-in days and before a green one (REQ-GEN-185); a scripted
-person promotes it five hours after it arrives, once the rule has held it.
-*Config: daily; the amber setting is HOLD from 2026-09-01.*
+person promotes it the next morning, twenty hours after it arrives - once
+the rule has held it, and after the hold has stood for the rest of its day.
+*Config: daily; the amber setting is HOLD from 2026-09-01; a scripted promotion
+at 10:00 the next morning.*
 **Expect**: the amber supply is not promoted; the rule records a
 promotion-withheld note naming the setting, and the slot reads amber,
 waiting for a person (REQ-PIPE-122).

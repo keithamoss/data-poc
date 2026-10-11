@@ -434,7 +434,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 **What it would look like if the rule were wrong.** It promotes itself, as it would under promote.
 
-*Config: daily; the amber setting is HOLD from 2026-09-01.*
+*Config: daily; the amber setting is HOLD from 2026-09-01; a scripted promotion at 10:00 the next morning.*
 
 | Where to look | |
 |---|---|
@@ -1345,7 +1345,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
    "demonstrates": "The amber supply is not promoted; the rule records a promotion-withheld note naming the setting, and the slot reads amber, waiting for a person (REQ-PIPE-122).",
    "breaksAs": "It promotes itself, as it would under promote.",
-   "config": "Config: daily; the amber setting is HOLD from 2026-09-01.",
+   "config": "Config: daily; the amber setting is HOLD from 2026-09-01; a scripted promotion at 10:00 the next morning.",
    "requirements": [
     "REQ-PIPE-122",
     "REQ-GEN-184",

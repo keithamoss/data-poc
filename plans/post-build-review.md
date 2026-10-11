@@ -7733,3 +7733,55 @@ twice. It deliberately did not re-find the `TypeError`.
       reads gap-red whatever its rows - REQ-GEN-185's lead-in is the answer.
     - **Not fixed, noted:** several refusal branches stay untested by line
       (the critic listed them); each raises a TargetError naming why.
+
+156. **[done, 2026-10-11]** **[Data generation]** **The delivery critic on
+     REQ-GEN-185, lead-ins (19735c6).** Run after the push; every claim
+     checked against the code or the database before acting. Five of eight
+     criteria met outright; the findings, and what happened to each:
+    - **1 (medium-high, Keith's ground):** TS-43's hold could not be seen.
+      The scripted promotion came five hours after receipt, the hold lasted
+      an hour, and in-place-on chooses by day - so SCENARIOS.md said to look
+      at 09-05 and the page showed it promoted. The promotion now comes at
+      10:00 the next morning, before that day's 14:30 supply; checked on the
+      real page, 09-05 shows TS-43 waiting for a decision and 09-06 shows it
+      promoted. The register's config line says so.
+    - **2 (medium):** a lead-in was not on time - its receipt came from the
+      rows' earliest extract, so 09-16 arrived 16:55 and was recorded late,
+      and three more were early or late. Every lead-in and following supply
+      now arrives halfway through its grace; the test that only compared
+      dates now checks the window, and failed first. The arrival golden
+      moved by exactly those four.
+    - **3 (medium):** a scripted decision was recorded at the next arrival's
+      receipt, not when it took effect (REQ-PIPE-081 criterion 28), so the
+      page said a person decided TS-43 the next afternoon. The replay clock
+      is now anchored at the decision's own instant.
+    - **4 (medium, Keith's call - "Spread 1h-4h"):** capping the old lag at
+      the claim window put 25 of 33 promotions at exactly four hours. The
+      lag now spreads across the window: 32 rule promotions at 31 different
+      lags. Built "in a replay only" first, as the option Keith picked said,
+      and taken back: the terminal and Lambda routes invent the same lag for
+      a past-dated receipt and REQ-PIPE-086 criterion 11 needs the three to
+      agree, which tests/test_kept_routes_agree.py caught. The critic's
+      live-path point - a late live pass stamps its decision before its gate
+      ran - predates the window and is with Keith (running-thoughts #83).
+    - **5 (requirement claims):** REQ-GEN-184 criterion 10 amended in
+      wording Keith approved (a red may move, the count kept); its stale
+      amber-landing decision superseded; REQ-GEN-185's decisions corrected
+      - reds are moved, not gone; eight ambers, seven in August and one on
+      09-19; TS-44's lead-in follows a promoted supply, not a green one.
+    - **6 (low):** three refusal paths had no test. Each has one now, and
+      the ordinary-red refusal names its period.
+    - **7 (low):** nothing tied TS-43 to TS-46 to their setting eras. A test
+      now does, and checks every scripted decision on a planted scenario
+      comes after the claim window.
+    - **8 (low):** Child Protection half-supported lead-ins. A targeted
+      Child Protection injection is now refused up front, naming why.
+    - **9 (low):** the calendar-move pin's allowance for earlier days is
+      scoped to Birth Registrations.
+    - **10 (low, not a defect):** "gap reds 28 became 21" and the critic's
+      26 count different things - 26 results carry a gap note, five of
+      which measured red anyway. The evidence now says both.
+    - **11 (low):** `targeting` imported once at module level; the
+      redundant green line's comment corrected.
+    - **Edge from criterion 5:** a scenario whose own suppressed day covered
+      its own lead-in was accepted and lost the lead-in silently. Refused.

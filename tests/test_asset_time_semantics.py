@@ -352,6 +352,15 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         green days on time, and the reds' resends no longer filing early into
         the later periods they used to land on.
 
+        AND TO 126 / 4 / 20 / 9 over 159 FOR POST-BUILD-REVIEW #156 (2026-10-11):
+        a lead-in or following supply arrives on time, halfway through its
+        grace, rather than at its rows' earliest extract timestamp. Procedure
+        first: 69 deliveries, zero `handfiled-*`, the dashboard rebuilt before
+        the capture. Birth Registrations alone went 39 / 6 / 6 to 43 / 4 / 4 -
+        exactly the four the critic named (09-16 and 09-18 late, 09-06 and
+        09-22 early, now on time) - and every Child Protection entry is
+        identical.
+
         AND BACK TO 105 / 15 / 21 / 9 over 150 WHEN TS-56 MOVED (sprint 13,
         2026-10-05). Procedure first: 60 deliveries, zero `handfiled-*`.
         2024-Q3 was the only quarter whose late siblings re-evaluated a
@@ -365,7 +374,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 122, "early": 6, "late": 22, "unfiled": 9}
+        assert counts == {"on_time": 126, "early": 4, "late": 20, "unfiled": 9}
         assert sum(counts.values()) == 159
 
 

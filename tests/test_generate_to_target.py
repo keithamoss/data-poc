@@ -526,7 +526,7 @@ class TestRefusedBeforeAnythingIsWritten:
         try:
             periods = schedule.periods_for_dataset(cp.DATASET_ID,
                                                    until=get_anchor_date())[-len(cp.RUN_PLAN):]
-            with pytest.raises(targeting.TargetError, match="TS-CPRED.*no lever"):
+            with pytest.raises(targeting.TargetError, match="TS-CPRED.*lead-in"):
                 cp._plan_injections(periods)
         finally:
             si.INJECTIONS = original
@@ -743,7 +743,12 @@ class TestLeadInsEndToEnd:
         for name in (*record["lead_in"], *record["follow"]):
             mine = [e for e in book if e["period"] == name]
             assert len(mine) == 1 and mine[0]["dirty_severity"] is None, name
-            assert mine[0]["received_at"][:10] <= name, "it arrives on its own day"
+            # ON TIME, which the old assertion never checked (post-build-
+            # review #156: 09-16 arrived 16:55 and was recorded late).
+            from qa_tools.common import asset_time, slots
+            due = slots.slot_instants(BDM_ID, date.fromisoformat(name))
+            got = asset_time.parse_instant(mine[0]["received_at"], "received_at")
+            assert due.due_at <= got <= due.due_at + due.grace, (name, got)
             assert _unmatched_twins(self._rows(deliveries, mine[0])) == 0
 
     def test_the_targeted_supplies_are_the_size_of_the_last_lead_in(self, generated):
@@ -766,3 +771,101 @@ class TestLeadInsEndToEnd:
         for name in record["lead_in"]:
             landed = [e for e in book if e["received_at"][:10] == name and e["period"] != name]
             assert not landed, name
+
+
+
+# ---- post-build-review #156: REQ-GEN-185's untested refusals and eras ----
+
+class TestRefusals156:
+    def test_a_red_with_nowhere_before_the_scenarios_is_refused(self):
+        from generator import generate_runs as g
+        with pytest.raises(targeting.TargetError, match="ordinary red"):
+            g._reds_clear_of_scenarios([None, "red", "red", None, None],
+                                       frozenset({4}))
+
+    def test_with_nothing_claimed_reds_stay_where_drawn(self):
+        from generator import generate_runs as g
+        drawn = [None, "red", None, "red", None]
+        assert g._reds_clear_of_scenarios(drawn, frozenset()) == drawn
+
+    def test_a_resend_pushed_past_the_history_is_refused(self):
+        from datetime import timedelta
+
+        from generator import generate_runs as g
+        from generator import scenario_injection as si
+        from generator.resupply import Delivery
+        last = date(2026, 9, 22)
+        d = Delivery(received_date=last, severity=None, payload=None)
+        with pytest.raises(si.CannotPlace, match="after the history ends"):
+            g._away_from_suppressed([d], {last.isoformat(),
+                                          (last + timedelta(days=1)).isoformat()},
+                                    set(), last_day=last)
+
+    def test_a_targeted_anchor_at_the_history_end_is_refused(self):
+        from generator import scenario_injection as si
+        periods = TestLeadIns()._periods(6)
+        with pytest.raises(si.CannotPlace, match="history ends there"):
+            si.resolve(TestLeadIns()._inj(anchor=5), periods)
+
+    def test_a_scenario_suppressing_its_own_lead_in_is_refused(self):
+        """Edge the critic found: the shared-period check skips a scenario's
+        own keys, so the lead-in would silently go missing."""
+        from generator import scenario_injection as si
+        inj = si.Injection(scenario_id="TS-X", dataset_id=BDM_ID, anchor=5, config="t",
+                           suppress=(-1,), arrivals=(si.ExtraArrival(
+                               0, "14:00", target=targeting.Target("amber")),))
+        with pytest.raises(si.CannotPlace, match="its own lead-in"):
+            si.no_two_scenarios_share_a_period([inj], {BDM_ID: TestLeadIns()._periods()})
+
+    def test_a_child_protection_targeted_injection_is_refused_up_front(self):
+        """Lead-ins are built for Birth Registrations only (finding 8)."""
+        from generator import generate_cp_runs as cp
+        from generator import scenario_injection as si
+        from generator.anchor_date import get_anchor_date
+        from qa_tools.common import schedule
+        bad = si.Injection(scenario_id="TS-CPAMB", dataset_id="cp-clients", anchor=-10,
+                           config="t", arrivals=(si.ExtraArrival(
+                               0, "09:00", target=targeting.Target("amber")),))
+        original = si.INJECTIONS
+        si.INJECTIONS = (*original, bad)
+        try:
+            periods = schedule.periods_for_dataset(cp.DATASET_ID,
+                                                   until=get_anchor_date())[-len(cp.RUN_PLAN):]
+            with pytest.raises(targeting.TargetError, match="TS-CPAMB.*lead-in"):
+                cp._plan_injections(periods)
+        finally:
+            si.INJECTIONS = original
+
+
+class TestEachPlantedScenarioSitsInItsEra:
+    """Finding 7: the anchors are relative to ANCHOR_DATE and the setting eras
+    are fixed dates, so a re-anchor would slide a scenario out of the era it
+    demonstrates - silently for TS-44 and TS-46."""
+
+    ERAS = {"TS-43": ("amber", "hold"), "TS-44": ("amber", "promote-and-acknowledge"),
+            "TS-45": ("amber", "promote-and-acknowledge"), "TS-46": ("replacement", "green")}
+
+    def test_each_anchor_falls_under_the_setting_it_needs(self):
+        from generator import generate_runs as g
+        from generator import scenario_injection as si
+        from generator.anchor_date import get_anchor_date
+        from qa_tools.common import amber_setting, asset_time, replacement_setting, schedule
+        periods = schedule.periods_for_dataset(g.DATASET_ID,
+                                               until=get_anchor_date())[-g.N_DELIVERIES:]
+        for inj in si.for_dataset(g.DATASET_ID):
+            if inj.scenario_id not in self.ERAS:
+                continue
+            kind, want = self.ERAS[inj.scenario_id]
+            at = asset_time.start_of_day(si.resolve(inj, periods).period_date)
+            got = (amber_setting if kind == "amber" else replacement_setting).resolve(
+                g.DATASET_ID, at).value
+            assert got == want, (inj.scenario_id, got)
+
+    def test_every_scripted_decision_comes_after_the_rule_has_decided(self):
+        """Finding 11: the scripted promotion and acknowledgement only follow
+        the rule because the rule decides within the claim window."""
+        from qa_tools.common import schedule, scripted_decisions
+        window = schedule.claim_window(BDM_ID).total_seconds() / 3600
+        for s in scripted_decisions.load():
+            if s.dataset_id == BDM_ID and s.operation in ("promote", "acknowledge"):
+                assert s.after_hours > window, (s.scenario, s.after_hours, window)

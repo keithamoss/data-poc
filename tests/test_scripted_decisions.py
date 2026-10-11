@@ -201,3 +201,29 @@ class TestThePageShowsAName:
 
         shown = acknowledgements._acknowledged((SYNTHETIC, "looked", None))
         assert shown["actor"] != SYNTHETIC and "synthetic" not in shown["actor"]
+
+
+class TestRecordedAtItsOwnInstant:
+    """post-build-review #156, finding 3: in a replay the clock is anchored
+    at the NEXT arrival before scripted decisions are played, so a person's
+    decision was recorded as made the next day and the page said so.
+    REQ-PIPE-081 criterion 28: recorded at the instant it takes effect."""
+
+    def test_a_played_decision_is_recorded_when_it_took_effect(self, conn, period):
+        from qa_tools.common import replay_clock
+
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        player = TestPlayback()._player([_script(after_hours=3)], a_table)
+        later = datetime.fromisoformat("2026-05-02T05:17:00+00:00")
+        replay_clock._active = True
+        try:
+            replay_clock.anchor(later)
+            assert player.before(SimpleNamespace(received_at=later)) == 1
+        finally:
+            replay_clock.stop()
+        effective, recorded = conn.execute(
+            f"SELECT effective_at, recorded_at FROM {dl.TABLE} "
+            "WHERE supply = ? AND action = 'promote'", [a]).fetchall()[0]
+        # The replay clock runs on from its anchor at real speed, so a few
+        # milliseconds pass; before the fix this was a day.
+        assert timedelta(0) <= recorded - effective < timedelta(seconds=5)

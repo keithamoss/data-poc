@@ -426,3 +426,26 @@ class TestAResendKeepsEveryTwinsSibling:
         assert self._unmatched(first) == 0, "precondition: the batch itself is whole"
         resend = p.churn(first, seed=3000 + seed, run_date=d(2026, 9, 19), id_offset=500_000)
         assert self._unmatched(resend) == 0
+
+
+def test_every_lead_in_and_following_supply_arrives_on_time(manifest):
+    """REQ-GEN-185 criterion 1, on the real history (post-build-review #156:
+    TS-45's lead-in 09-16 arrived 16:55, after due plus grace, and was
+    recorded late - its arrival instant came from the rows)."""
+    from datetime import date as d
+
+    from generator import scenario_injection as si
+    from qa_tools.common import asset_time, slots
+
+    placements = json.loads(Path(si.PLACEMENTS_PATH).read_text())
+    if isinstance(placements, dict):
+        placements = placements.get("placements", placements)
+    if isinstance(placements, dict):
+        placements = list(placements.values())
+    green = {p for rec in placements for p in (*rec.get("lead_in", []), *rec.get("follow", []))}
+    assert green, "precondition: the planted scenarios have lead-ins"
+    for entry in manifest:
+        if entry["period"] in green:
+            due = slots.slot_instants("birth-registrations", d.fromisoformat(entry["period"]))
+            got = asset_time.parse_instant(entry["received_at"], "received_at")
+            assert due.due_at <= got <= due.due_at + due.grace, (entry["period"], got)
