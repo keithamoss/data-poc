@@ -216,6 +216,9 @@ def main(require_explanations: bool = False) -> int:
     old_checks = collect_checks(diff_base())
     new_checks = collect_checks(None)
     errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
+    # REQ-GEN-183 criteria 9 and 10: every SQL-bodied check names the
+    # columns its SQL reads, in the contract's own table names.
+    errors += cl.reads_columns_errors(new_checks, cl.contract_columns())
 
     # Always counted, only sometimes fatal. The counting half was what
     # made REQ-QAC-024's authoring pass tractable - "257 checks to

@@ -98,6 +98,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.multiple_birth_sibling_dbt
+        reads_columns: ["birth_registrations.registration_number", "birth_registrations.is_multiple_birth", "birth_registrations.date_of_birth", "birth_registrations.place_of_birth_facility", "birth_registrations.registering_parent_1_name"]
         name: Multiple-birth sibling match
         category: consistency
         introduced_date: "2026-01-15"
@@ -110,6 +111,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.recency_dbt
+        reads_columns: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
         name: Recent births present
         category: timeliness
         introduced_date: "2026-09-15"
@@ -126,6 +128,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_dbt
+        reads_columns: ["cp_notifications.notification_id", "cp_notifications.outcome", "cp_investigations.notification_id", "cp_investigations.investigation_id"]
         reads_tables: [cp_investigations]
         name: Escalation completeness
         category: completeness
@@ -139,6 +142,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_investigation_hygiene_dbt
+        reads_columns: ["cp_investigations.investigation_id", "cp_investigations.cp_client_id", "cp_investigations.end_date", "cp_clients.cp_client_id", "cp_clients.case_status"]
         reads_tables: [cp_clients]
         name: Closed-case hygiene
         category: consistency
@@ -152,6 +156,7 @@ tests:
     config:
       meta:
         check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.placement_carer_approval_dbt
+        reads_columns: ["cp_placements.placement_id", "cp_placements.carer_id", "cp_carers.carer_id", "cp_carers.approval_status"]
         reads_tables: [cp_carers]
         name: Carer approval compliance
         category: consistency
@@ -179,6 +184,7 @@ models:
       - dbt_utils.expression_is_true:
           meta:
             check_id: data-asset-1.registry-services.civil-registration.birth-registrations.expression_is_true_dbt
+            reads_columns: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
             name: Registered on or after birth
             category: consistency
             introduced_date: "2026-09-15"
@@ -819,6 +825,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_dbt
+                reads_columns: ["cp_notifications.cp_client_id", "cp_clients.cp_client_id"]
                 reads_tables: [cp_clients]
                 name: Client reference
                 category: consistency
@@ -914,6 +921,7 @@ models:
               field: worker_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_dbt
+                reads_columns: ["cp_notifications.assigned_worker_id", "cp_case_workers.worker_id"]
                 reads_tables: [cp_case_workers]
                 name: Assigned worker reference
                 category: consistency
@@ -983,6 +991,7 @@ models:
               field: notification_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_dbt
+                reads_columns: ["cp_investigations.notification_id", "cp_notifications.notification_id"]
                 reads_tables: [cp_notifications]
                 name: Notification reference
                 category: consistency
@@ -1009,6 +1018,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_dbt
+                reads_columns: ["cp_investigations.cp_client_id", "cp_clients.cp_client_id"]
                 reads_tables: [cp_clients]
                 name: Client reference
                 category: consistency
@@ -1064,6 +1074,7 @@ models:
               field: worker_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_dbt
+                reads_columns: ["cp_investigations.lead_worker_id", "cp_case_workers.worker_id"]
                 reads_tables: [cp_case_workers]
                 name: Lead worker reference
                 category: consistency
@@ -1116,6 +1127,7 @@ models:
               field: cp_client_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_dbt
+                reads_columns: ["cp_placements.cp_client_id", "cp_clients.cp_client_id"]
                 reads_tables: [cp_clients]
                 name: Client reference
                 category: consistency
@@ -1159,6 +1171,7 @@ models:
               field: carer_id
               meta:
                 check_id: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_dbt
+                reads_columns: ["cp_placements.carer_id", "cp_carers.carer_id"]
                 reads_tables: [cp_carers]
                 name: Carer reference
                 category: consistency

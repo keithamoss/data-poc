@@ -513,3 +513,16 @@ Evidently's parser excludes config-hash fields by an explicit name list
 rather than by excluding the whole metadata block the way dbt's and
 Soda's do. A new field that is not added to that list changes every
 Evidently check's hash.
+
+### A SQL-bodied check declares the columns it reads
+
+A check whose rule lives in SQL - a Soda failed-rows check, a dbt singular or relationships test, `dbt_utils.expression_is_true`, an ODCS rule of type `sql` - also lists every column that SQL reads, as `reads_columns`: a flat list of `table.column`, in the same metadata block that already carries `reads_tables`.
+
+```yaml
+reads_columns:
+  - birth_registrations.date_of_birth
+  - birth_registrations.place_of_birth_facility
+  - birth_registrations.registering_parent_1_name
+```
+
+Nothing outside the SQL says what it depends on, and the synthetic data generator reads this list so it never breaks a check by accident - the multiple-birth check matches twins on three columns, and blanking one of them on one twin used to fail it in three tools. `mothman check` refuses a SQL-bodied check without the list, or one naming a column the contract does not define. Like the prose fields it is not part of the config hash, so adding or correcting it never reports the check as changed.

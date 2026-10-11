@@ -311,6 +311,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.range_check_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.date_of_birth"]
               - property: name
                 value: Date of birth in a plausible range
               - property: introduced_date
@@ -345,6 +347,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.freshness_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
               - property: name
                 value: Recent births present
               - property: introduced_date
@@ -503,6 +507,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.date_ordering_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
               - property: name
                 value: Registered on or after birth
               - property: introduced_date
@@ -665,6 +671,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.sibling_match_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.registration_number", "birth_registrations.is_multiple_birth", "birth_registrations.date_of_birth", "birth_registrations.place_of_birth_facility", "birth_registrations.registering_parent_1_name"]
               - property: name
                 value: Multiple-birth sibling match
               - property: introduced_date
@@ -749,6 +757,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.timestamp_ordering_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.extract_timestamp", "birth_registrations.date_registered"]
               - property: name
                 value: Supply timestamp ordering
               - property: introduced_date

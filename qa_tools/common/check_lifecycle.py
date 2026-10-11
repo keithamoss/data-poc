@@ -191,6 +191,20 @@ class CheckMetadata:
     # config hash for the same reason every field above it is: naming
     # what a check already read is not a change to what it does.
     reads_tables: list[str] = field(default_factory=list)
+    # THE COLUMNS A SQL-BODIED CHECK READS (REQ-GEN-183 criterion 8; Keith,
+    # 2026-10-11): `table.column` entries in the contract's own table names,
+    # declared beside `reads_tables` because nothing outside the SQL says
+    # what it depends on - and the synthetic generator reads this so it never
+    # breaks a check by accident. Outside the config hash (criterion 12).
+    reads_columns: list[str] = field(default_factory=list)
+    # Whether the check's rule lives in SQL (criterion 8): a Soda failed-rows
+    # check, a dbt singular, relationships or dbt_utils.expression_is_true
+    # test, an ODCS rule of type sql. Derived by each parser, never authored.
+    sql_bodied: bool = False
+
+
+#: dbt generic tests whose rule is SQL rather than one column's property.
+_SQL_BODIED_DBT = ("relationships", "dbt_utils.expression_is_true")
 
 
 def _config_hash(config: dict) -> str:
@@ -266,6 +280,7 @@ def _lifecycle_fields(meta: dict) -> dict:
         "failure_indicates": _authored(meta, "failure_indicates"),
         "technical_note": _authored(meta, "technical_note"),
         "reads_tables": _table_list(meta, "reads_tables"),
+        "reads_columns": _table_list(meta, "reads_columns"),
     }
 
 
@@ -303,7 +318,7 @@ def _parse_dbt_test(test: Any, source: str, location: str) -> list[CheckMetadata
     category = _require_category(meta, f"{source}: {location}: dbt test {test_type!r} (check_id={check_id!r})")
     return [CheckMetadata(
         check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(test_config),
-        source_file=source, **_lifecycle_fields(meta),
+        source_file=source, sql_bodied=test_type in _SQL_BODIED_DBT, **_lifecycle_fields(meta),
     )]
 
 
@@ -324,7 +339,7 @@ def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
     category = _require_category(meta, f"{source}: singular test {name!r} (check_id={check_id!r})")
     return [CheckMetadata(
         check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(config),
-        source_file=source, **_lifecycle_fields(meta),
+        source_file=source, sql_bodied=True, **_lifecycle_fields(meta),
     )]
 
 
@@ -454,7 +469,8 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
     check_config.pop("samples limit", None)
     return [CheckMetadata(
         check_id=check_id, category=category, tool="soda", config_hash=_config_hash(check_config),
-        source_file=source, **_lifecycle_fields(attributes),
+        source_file=source, sql_bodied=str(check_expr).startswith("failed rows"),
+        **_lifecycle_fields(attributes),
     )]
 
 
@@ -533,7 +549,7 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     fields["changelog"] = changelog or []
     return [CheckMetadata(
         check_id=check_id, category=category, tool="datacontract", config_hash=_config_hash(rule),
-        source_file=source, **fields,
+        source_file=source, sql_bodied=rule.get("type") == "sql", **fields,
     )]
 
 
@@ -799,4 +815,46 @@ def validate(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -
             f"check_id disappeared entirely - a check_id must never be deleted or renamed, "
             f"only retired (moved to its own tool's -retired sibling file): {check_id!r}"
         )
+    return errors
+
+
+# ---- reads_columns (REQ-GEN-183 criteria 8-11) ------------------------
+
+#: The ODCS contracts that define each dataset's tables and columns.
+CONTRACTS = ("contract/bdm-birth-registrations-contract.yaml",
+             "contract/child-protection-contract.yaml")
+
+
+def contract_columns(paths=CONTRACTS) -> dict[str, set[str]]:
+    """{table: {column, ...}} from the contracts' own schema - the one
+    spelling a reads_columns entry may use (Keith, 2026-10-11)."""
+    root = Path(__file__).resolve().parent.parent.parent
+    out: dict[str, set[str]] = {}
+    for rel in paths:
+        doc = config_yaml.parse((root / rel).read_text()) or {}
+        for table in doc.get("schema") or []:
+            out.setdefault(str(table.get("name")), set()).update(
+                str(p.get("name")) for p in table.get("properties") or [])
+    return out
+
+
+def reads_columns_errors(checks: list[CheckMetadata],
+                         defined: dict[str, set[str]]) -> list[str]:
+    """Every SQL-bodied check in force that declares no reads_columns
+    (criterion 9), and every entry naming a table or column the contract
+    does not define (criterion 10), each naming the check and its file.
+    A retired check is held to neither (criterion 5)."""
+    errors: list[str] = []
+    for c in checks:
+        if c.retired_as_of:
+            continue
+        if c.sql_bodied and not c.reads_columns:
+            errors.append(f"{c.check_id} ({c.source_file}): a check whose rule is SQL must "
+                          f"declare reads_columns - every table.column its SQL reads, in the "
+                          f"contract's table names (docs/check-authoring-rules.md)")
+        for entry in c.reads_columns:
+            table, _, column = entry.partition(".")
+            if not column or column not in defined.get(table, ()):
+                errors.append(f"{c.check_id} ({c.source_file}): reads_columns entry "
+                              f"{entry!r} is not a table.column the contract defines")
     return errors

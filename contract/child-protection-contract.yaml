@@ -241,6 +241,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.range_check_datacontract
+              - property: reads_columns
+                value: ["cp_clients.date_of_birth"]
               - property: name
                 value: Date of birth in a plausible range
               - property: introduced_date
@@ -476,6 +478,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_datacontract
+              - property: reads_columns
+                value: ["cp_notifications.notification_id", "cp_notifications.outcome", "cp_investigations.notification_id", "cp_investigations.investigation_id"]
               - property: reads_tables
                 value: ["cp_investigations"]
               - property: name
@@ -519,6 +523,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_notifications.cp_client_id", "cp_clients.cp_client_id"]
               - property: reads_tables
                 value: ["cp_clients"]
               - property: name
@@ -660,6 +666,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_notifications.assigned_worker_id", "cp_case_workers.worker_id"]
               - property: reads_tables
                 value: ["cp_case_workers"]
               - property: name
@@ -777,6 +785,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.investigation_id", "cp_investigations.cp_client_id", "cp_investigations.end_date", "cp_clients.cp_client_id", "cp_clients.case_status"]
               - property: reads_tables
                 value: ["cp_clients"]
               - property: name
@@ -820,6 +830,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.notification_id", "cp_notifications.notification_id"]
               - property: reads_tables
                 value: ["cp_notifications"]
               - property: name
@@ -863,6 +875,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.cp_client_id", "cp_clients.cp_client_id"]
               - property: reads_tables
                 value: ["cp_clients"]
               - property: name
@@ -957,6 +971,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.lead_worker_id", "cp_case_workers.worker_id"]
               - property: reads_tables
                 value: ["cp_case_workers"]
               - property: name
@@ -1069,6 +1085,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_placements.cp_client_id", "cp_clients.cp_client_id"]
               - property: reads_tables
                 value: ["cp_clients"]
               - property: name
@@ -1136,6 +1154,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_placements.carer_id", "cp_carers.carer_id"]
               - property: reads_tables
                 value: ["cp_carers"]
               - property: name
@@ -1160,6 +1180,8 @@ schema:
             customProperties:
               - property: check_id
                 value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_datacontract
+              - property: reads_columns
+                value: ["cp_placements.placement_id", "cp_placements.carer_id", "cp_carers.carer_id", "cp_carers.approval_status"]
               - property: reads_tables
                 value: ["cp_carers"]
               - property: name

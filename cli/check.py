@@ -89,6 +89,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # project cannot run is refused here, before a run reports it red.
     ("soda", ["uv", "run", "mothman", "dashboard", "validate-soda"],
      "every Soda check parses and can run without Soda Cloud", False),
+    # REQ-GEN-183 criterion 9: the synthetic generator reads these lists to
+    # avoid breaking a check, so a SQL check that names none is refused here.
+    ("columns", ["uv", "run", "python3", "-m", "qa_tools.common.validate_reads_columns"],
+     "every SQL-bodied check names the columns it reads", False),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists", False),
     # REQ-DOCS-072. The delivery plan and the register are two records

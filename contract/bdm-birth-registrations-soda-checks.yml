@@ -407,6 +407,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.range_check_soda
+        reads_columns: ["birth_registrations.registration_number", "birth_registrations.date_of_birth"]
         name: Date of birth in a plausible range
         category: conformity
         introduced_date: "2026-09-13"
@@ -427,6 +428,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.date_ordering_soda
+        reads_columns: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
         name: Registered on or after birth
         category: consistency
         introduced_date: "2026-01-15"
@@ -448,6 +450,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.timestamp_ordering_soda
+        reads_columns: ["birth_registrations.extract_timestamp", "birth_registrations.date_registered"]
         name: Supply timestamp ordering
         category: consistency
         introduced_date: "2026-01-15"
@@ -481,6 +484,7 @@ checks for birth_registrations:
       samples limit: 100000
       attributes:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.sibling_match_soda
+        reads_columns: ["birth_registrations.registration_number", "birth_registrations.is_multiple_birth", "birth_registrations.date_of_birth", "birth_registrations.place_of_birth_facility", "birth_registrations.registering_parent_1_name"]
         name: Multiple-birth sibling match
         category: consistency
         introduced_date: "2026-01-15"
@@ -523,6 +527,7 @@ checks for birth_registrations:
       name: recent birth dates present (freshness)
       attributes:
         check_id: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.freshness_soda
+        reads_columns: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
         name: Recent births present
         category: timeliness
         introduced_date: "2026-01-15"
