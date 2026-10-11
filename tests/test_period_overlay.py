@@ -302,6 +302,3 @@ class TestARunReadsExactlyOnePeriod:
                 run_id="x", received_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
                 files_by_dataset={"cp-clients": ["a.csv"], "cp-carers": ["b.csv"]}),
                 tables=["cp_clients"])
-
-    def test_nothing_fans_out_any_more(self):
-        assert not hasattr(period_schema, "fan_out")

@@ -294,22 +294,6 @@ class TestOnlyOneCodePathMovesAPeriodTable:
                         offenders.append(f"{path.name}: {line.strip()}")
         assert offenders == []
 
-    def test_no_other_move_takes_a_period_schema(self):
-        import ast
-
-        offenders = []
-        for path in self._sources():
-            if path.name in ("period_tables.py", "supply_db.py"):
-                continue
-            tree = ast.parse(path.read_text())
-            for node in ast.walk(tree):
-                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                        and node.func.attr == "move_table"):
-                    args = " ".join(ast.unparse(a) for a in node.args[1:])
-                    if "period_schema" in args or "period" == args.split()[0]:
-                        offenders.append(f"{path.name}:{node.lineno} {args}")
-        assert offenders == []
-
     def test_and_a_bare_move_into_a_period_is_refused_at_run_time(self, conn, period):
         supply, table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         schema = period_schema.ensure_period_schema(conn, period)

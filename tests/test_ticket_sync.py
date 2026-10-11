@@ -388,13 +388,3 @@ def test_an_unreadable_thread_posts_rather_than_staying_silent(monkeypatch, scop
     monkeypatch.setattr(ticket_sync, "_run_gh", fake)
 
     assert "still red, commented" in sync_dataset("o", "r", scope, _red_dataset())
-
-
-def test_no_code_or_comment_still_asserts_the_retired_rule(monkeypatch, scope):
-    """Criterion 2's second half - "SHALL leave no code or test
-    asserting it" - held against the module's own source."""
-    import inspect
-    source = inspect.getsource(ticket_sync)
-    assert "posts it even when it is word-for-word" not in source, \
-        "the retired rule is still described as current"
-    assert "RETIRED" in source, "the retirement is not recorded where it happened"

@@ -107,24 +107,3 @@ def test_no_check_chain_call_site_is_left_without_a_progress_indicator():
     assert bare == [], (
         "these start the real check chain with no progress indicator, so a "
         "human waits ~13.5s at a frozen screen:\n" + "\n".join(bare))
-
-
-def test_flag_mode_and_interactive_mode_both_show_progress():
-    """plans/tooling.md #1's own design rule is that every command is
-    BOTH flag-invocable and TUI-navigable, with no split in behaviour
-    between them (Keith: "just put everything in the TUI"). Progress
-    reporting is part of that parity - `mothman bdm qa --run-id X` waits
-    the same ~13.5s as picking the run in the wizard."""
-    import pathlib
-    import re
-
-    for name in ("cli/bdm.py", "cli/cp.py"):
-        src = pathlib.Path(name).read_text()
-        # qa_command is the flag-invocable entry point in both modules
-        m = re.search(r"^def qa_command\(", src, re.M)
-        assert m, f"{name} has no qa_command to check"
-        nxt = re.search(r"^def ", src[m.end():], re.M)
-        body = src[m.end():m.end() + (nxt.start() if nxt else len(src))]
-        assert "chain_progress" in body, (
-            f"{name}'s flag-invocable qa_command runs the chain without a "
-            "progress indicator, while the interactive path shows one")

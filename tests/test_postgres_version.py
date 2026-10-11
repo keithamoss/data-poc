@@ -2,8 +2,6 @@
 on a different one (REQ-PIPE-146)."""
 from __future__ import annotations
 
-import inspect
-
 import pytest
 
 from qa_tools.common import postgres_version as pv
@@ -65,13 +63,11 @@ class TestTheServerIsAsserted:
         conn = _Conn("160013")
         pv.check_server(conn, declared=16)
         assert conn.sql == ["SELECT current_setting('server_version_num')"]
-        assert "SELECT aurora_version" not in inspect.getsource(pv)
         # THE REAL PATH (#119 D7): supply_db.connect runs db_identity.PROBE.
         from qa_tools.common import db_identity
 
         assert "current_setting('server_version_num')" in db_identity.PROBE
         assert "aurora_version" not in db_identity.PROBE
-        assert "aurora_version" not in inspect.getsource(supply_db)
 
     def test_a_real_connection_is_refused_when_the_majors_differ(self, supply_dsn, monkeypatch):
         """Through supply_db.connect itself, against the real server."""

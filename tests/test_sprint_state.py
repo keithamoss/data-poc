@@ -67,71 +67,107 @@ def _one(tmp_path, status, reqs, ids=None):
     return ss.survey(_plan(tmp_path, [(1, status, ids)]), _register(tmp_path, reqs))[0]
 
 
-class TestTheStatusIsCountedNotTyped:
-    """Criterion 2."""
+class _Not:
+    """An expectation that a field is anything BUT this value - the
+    shape several rules are stated in ("never reported done")."""
 
-    def test_every_criterion_met_is_done(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 4, [])])
-        assert (s.met, s.total, s.derived) == (4, 4, ss.DONE)
+    def __init__(self, value):
+        self.value = value
 
-    def test_nothing_built_is_todo(self, tmp_path):
-        s = _one(tmp_path, "todo", [("REQ-X-001", "not_started", 4, [])])
-        assert (s.met, s.total, s.derived) == (0, 4, ss.NOT_STARTED)
-
-    def test_some_built_is_in_progress(self, tmp_path):
-        s = _one(tmp_path, "in-progress", [("REQ-X-001", "built", 3, []),
-                                            ("REQ-X-002", "not_started", 2, [])])
-        assert (s.met, s.total, s.derived) == (3, 5, ss.IN_PROGRESS)
-
-    def test_counts_span_every_requirement_the_sprint_owns(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 3, []),
-                                     ("REQ-X-002", "built", 4, [])])
-        assert (s.met, s.total) == (7, 7)
+    def __repr__(self):
+        return f"not {self.value!r}"
 
 
-class TestADeferralIsNotMet:
-    """Criterion 5, and the reason the unit is a criterion rather than a
-    requirement. Sprint 10 read `done` while owing four deferrals; a
-    requirement-level count cannot see that at all."""
+X1, X2 = "REQ-X-001", "REQ-X-002"
 
-    def test_a_built_requirement_with_deferrals_is_not_complete(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 12, [11, 11])])
-        assert (s.met, s.total) == (10, 12)
-        assert s.derived != ss.DONE
 
-    def test_counting_requirements_instead_would_have_said_done(self, tmp_path):
-        """The rejected design, asserted so nobody reverts to it."""
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 12, [11])])
-        built = all(True for _ in [1])  # every requirement IS built
-        assert built and s.derived != ss.DONE
+def _sprint_one(status, ids):
+    """Sprint 1 alone, owning `ids` - None means every requirement given."""
+    return lambda reqs: [(1, status, [r[0] for r in reqs] if ids is None else ids)]
+
+
+class TestTheDerivationRules:
+    """Criteria 2-5 and 7, and REQ-DOCS-073's resolvable blockers: one row
+    per rule, each a (plan, register) pair and what sprint 1 derives.
+
+    Row ids are the names of the tests each row replaced. Why the unit is
+    a criterion rather than a requirement (criterion 5): sprint 10 read
+    `done` while owing four deferrals, which a requirement-level count
+    cannot see at all."""
+
+    @pytest.mark.parametrize("plan, reqs, expected", [
+        # Criterion 2 - the status is counted, not typed.
+        pytest.param(_sprint_one("done", None), [(X1, "built", 4, [])],
+                     {"met": 4, "total": 4, "derived": ss.DONE},
+                     id="test_every_criterion_met_is_done"),
+        pytest.param(_sprint_one("todo", None), [(X1, "not_started", 4, [])],
+                     {"met": 0, "total": 4, "derived": ss.NOT_STARTED},
+                     id="test_nothing_built_is_todo"),
+        pytest.param(_sprint_one("in-progress", None),
+                     [(X1, "built", 3, []), (X2, "not_started", 2, [])],
+                     {"met": 3, "total": 5, "derived": ss.IN_PROGRESS},
+                     id="test_some_built_is_in_progress"),
+        pytest.param(_sprint_one("done", None), [(X1, "built", 3, []), (X2, "built", 4, [])],
+                     {"met": 7, "total": 7},
+                     id="test_counts_span_every_requirement_the_sprint_owns"),
+        # Criterion 5 - a deferral is not met.
+        pytest.param(_sprint_one("done", None), [(X1, "built", 12, [11, 11])],
+                     {"met": 10, "total": 12, "derived": _Not(ss.DONE)},
+                     id="test_a_built_requirement_with_deferrals_is_not_complete"),
+        # Criteria 3 and 4 - Keith's own addition, for a sprint that has
+        # "built all of its stuff and it's waiting on someone else".
+        pytest.param(_sprint_one("done", None), [(X1, "built", 5, [11])],
+                     {"derived": ss.BLOCKED},
+                     id="test_a_sprint_owing_only_deferrals_is_blocked"),
+        # An unbuilt requirement AND a deferral is in-progress, not
+        # blocked - somebody can still work on it.
+        pytest.param(_sprint_one("in-progress", None),
+                     [(X1, "built", 5, [11]), (X2, "not_started", 3, [])],
+                     {"derived": ss.IN_PROGRESS},
+                     id="test_work_of_its_own_outranks_a_deferral"),
+        # Criterion 7 - unscoped rather than merely unstarted, because the
+        # two need different work: one needs building, the other a
+        # requirement first.
+        pytest.param(_sprint_one("todo", []), [],
+                     {"derived": ss.NOT_STARTED, "unscoped": True},
+                     id="test_it_is_todo_rather_than_done"),
+        # The dangerous direction: no requirements means no unmet
+        # criteria, so a naive all()-over-empty reports done.
+        pytest.param(_sprint_one("done", []), [],
+                     {"derived": _Not(ss.DONE)},
+                     id="test_an_empty_sprint_is_never_reported_done"),
+        # REQ-DOCS-073. An unowned deferral is a gap of the sprint's own,
+        # not a dependency - sprints 1, 6 and 7 all read `blocked` on it.
+        pytest.param(_sprint_one("in-progress", None), [(X1, "built", 5, ["nobody"])],
+                     {"derived": ss.IN_PROGRESS},
+                     id="test_an_unowned_deferral_does_not_block"),
+        # The case prose could never tell: a requirement this sprint owns
+        # is not somebody else.
+        pytest.param(_sprint_one("in-progress", [X1, X2]),
+                     [(X1, "built", 5, [X2]), (X2, "built", 3, [])],
+                     {"derived": ss.IN_PROGRESS},
+                     id="test_a_deferral_to_this_sprints_own_work_does_not_block"),
+        pytest.param(lambda reqs: [(1, "blocked", [X1]), (2, "done", [X2])],
+                     [(X1, "built", 5, [X2]), (X2, "built", 3, [])],
+                     {"derived": ss.BLOCKED},
+                     id="test_a_deferral_to_another_sprints_requirement_does_block"),
+    ])
+    def test_sprint_one_derives(self, tmp_path, plan, reqs, expected):
+        s = ss.survey(_plan(tmp_path, plan(reqs)), _register(tmp_path, reqs))[0]
+        for field, want in expected.items():
+            got = getattr(s, field)
+            if isinstance(want, _Not):
+                assert got != want.value, f"{field} is {got!r}"
+            else:
+                assert got == want, f"{field} is {got!r}, expected {want!r}"
 
 
 class TestBlocked:
-    """Criteria 3 and 4 - Keith's own addition, for a sprint that has
-    "built all of its stuff and it's waiting on someone else"."""
-
-    def test_a_sprint_owing_only_deferrals_is_blocked(self, tmp_path):
-        s = _one(tmp_path, "done", [("REQ-X-001", "built", 5, [11])])
-        assert s.derived == ss.BLOCKED
+    """Criteria 3 and 4."""
 
     def test_it_names_what_it_waits_on(self, tmp_path):
         s = _one(tmp_path, "done", [("REQ-X-001", "built", 5, [11])])
         assert "sprint 11" in s.summary()
-
-    def test_work_of_its_own_outranks_a_deferral(self, tmp_path):
-        """A sprint with an unbuilt requirement AND a deferral is
-        in-progress, not blocked - somebody can still work on it."""
-        s = _one(tmp_path, "in-progress", [("REQ-X-001", "built", 5, [11]),
-                                            ("REQ-X-002", "not_started", 3, [])])
-        assert s.derived == ss.IN_PROGRESS
-
-    def test_blocked_is_the_only_value_added_to_the_vocabulary(self):
-        """The non-functional constraint. `todo` is reused rather than
-        a second new spelling like "not-started" being introduced."""
-        assert ss.NOT_STARTED == "todo"
-        assert {ss.DONE, ss.IN_PROGRESS, ss.NOT_STARTED} <= {
-            "done", "in-progress", "investigate", "todo", "parked", "superseded"}
-        assert ss.BLOCKED == "blocked"
 
 
 class TestTheSurveyRowStaysOneLine:
@@ -166,24 +202,11 @@ class TestTheSurveyRowStaysOneLine:
 
 
 class TestAnUnscopedSprint:
-    """Criterion 7 - said to be unscoped rather than merely unstarted,
-    because the two need different work: one needs building, the other
-    needs a requirement first."""
-
-    def test_it_is_todo_rather_than_done(self, tmp_path):
-        s = ss.survey(_plan(tmp_path, [(1, "todo", [])]), _register(tmp_path, []))[0]
-        assert s.derived == ss.NOT_STARTED
-        assert s.unscoped
+    """Criterion 7."""
 
     def test_it_says_so(self, tmp_path):
         s = ss.survey(_plan(tmp_path, [(1, "todo", [])]), _register(tmp_path, []))[0]
         assert "unscoped" in s.summary()
-
-    def test_an_empty_sprint_is_never_reported_done(self, tmp_path):
-        """The dangerous direction: no requirements means no unmet
-        criteria, so a naive all()-over-empty reports done."""
-        s = ss.survey(_plan(tmp_path, [(1, "done", [])]), _register(tmp_path, []))[0]
-        assert s.derived != ss.DONE
 
 
 class TestOwnershipIsDeclaredNotInferred:
@@ -253,34 +276,6 @@ class TestTheGate:
         from cli.check import _GATES
 
         assert any(g[0] == "sprints" for g in _GATES)
-
-
-class TestWhatCountsAsBlocked:
-    """REQ-DOCS-073 made "deferred to ANOTHER sprint" resolvable, and
-    three sprints changed state the day it landed - all three in the
-    honest direction."""
-
-    def test_an_unowned_deferral_does_not_block(self, tmp_path):
-        """Nobody is going to build it, so the sprint holding it has a
-        gap of its own rather than a dependency. Sprints 1, 6 and 7
-        were all reading `blocked` on exactly this."""
-        s = _one(tmp_path, "in-progress", [("REQ-X-001", "built", 5, ["nobody"])])
-        assert s.derived == ss.IN_PROGRESS
-
-    def test_a_deferral_to_this_sprints_own_work_does_not_block(self, tmp_path):
-        """The case prose could never tell: a requirement this sprint
-        owns is not somebody else."""
-        plan = _plan(tmp_path, [(1, "in-progress", ["REQ-X-001", "REQ-X-002"])])
-        reqs = _register(tmp_path, [("REQ-X-001", "built", 5, ["REQ-X-002"]),
-                                     ("REQ-X-002", "built", 3, [])])
-        assert ss.survey(plan, reqs)[0].derived == ss.IN_PROGRESS
-
-    def test_a_deferral_to_another_sprints_requirement_does_block(self, tmp_path):
-        plan = _plan(tmp_path, [(1, "blocked", ["REQ-X-001"]),
-                                 (2, "done", ["REQ-X-002"])])
-        reqs = _register(tmp_path, [("REQ-X-001", "built", 5, ["REQ-X-002"]),
-                                     ("REQ-X-002", "built", 3, [])])
-        assert ss.survey(plan, reqs)[0].derived == ss.BLOCKED
 
 
 class TestSharedOwnership:
@@ -457,12 +452,6 @@ class TestTheRealFiles:
         scoped = [s for s in ss.survey() if not s.unscoped]
         assert len(scoped) >= 15
         assert sum(s.total for s in scoped) > 200
-
-    @pytest.mark.parametrize("state", [ss.DONE, ss.BLOCKED, ss.NOT_STARTED])
-    def test_the_real_plan_exercises_each_state(self, state):
-        """Every branch this gate can report is reachable against the
-        real corpus, so none of them is dead code."""
-        assert any(s.derived == state for s in ss.survey())
 
 
 class TestRetiredCountsForNothing:

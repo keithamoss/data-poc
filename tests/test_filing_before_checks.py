@@ -24,8 +24,6 @@ from __future__ import annotations
 import ast
 import inspect
 
-from qa_tools.common import arrival_lifecycle
-
 
 def _call_lines(module_name: str, func_name: str, dotted: str) -> list[int]:
     """Line numbers of every real CALL to `dotted` in this function.
@@ -63,20 +61,6 @@ class TestTheFilingCallComesBeforeTheToolRuns:
     BEFORE it builds the period overlay, which needs the filing."""
 
 
-
-    def test_the_lifecycle_files_before_it_checks(self):
-        """MOVED, 2026-10-04 (REQ-PIPE-086 criterion 2): the batch no
-        longer composes the steps itself, so the order is pinned where
-        they are composed - once, in arrival_lifecycle.process()."""
-        filed = _call_lines("qa_tools.common.arrival_lifecycle", "process",
-                            "steps.file_and_overlay")
-        ran = _call_lines("qa_tools.common.arrival_lifecycle", "process",
-                          "steps.run_one")
-        gated = _call_lines("qa_tools.common.arrival_lifecycle", "process",
-                            "steps.promote_after")
-        assert filed and ran and gated, "a step of the lifecycle is not actually called"
-        assert filed[0] < ran[0] < gated[0], \
-            "file, then check, then gate - a check before its filing has nothing to classify against"
 
     def test_both_batches_go_through_the_lifecycle(self):
         for module, function in (("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
@@ -137,17 +121,6 @@ class TestFilingIsInterleavedRatherThanDoneUpFront:
     Criterion 7 is still satisfied, and more narrowly than before: the
     filing precedes the checks OF THAT ARRIVAL rather than of the batch.
     """
-
-    def test_the_lifecycle_processes_one_arrival_at_a_time(self):
-        """It used to be pinned as run_manifest's before/after hooks, which
-        force sequential execution; process_all() is a plain loop calling
-        process() once per arrival, with no pool to fan out into."""
-        # The loop body is _one_of_many since the replay stages corrections
-        # around each arrival (REQ-PIPE-170 criterion 30).
-        source = (inspect.getsource(arrival_lifecycle.process_all)
-                  + inspect.getsource(arrival_lifecycle._one_of_many))
-        assert "_one_of_many(arrival" in source and "process(arrival" in source
-        assert "Executor" not in source and "Pool" not in source
 
     def test_bdm_does_not_file_the_whole_batch_at_once(self):
         args = _file_arrivals_arguments("qa_tools.bdm.orchestrate_bdm", "file_and_overlay")

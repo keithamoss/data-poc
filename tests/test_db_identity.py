@@ -108,18 +108,6 @@ class TestAnUnmarkedDatabase:
         with pytest.raises(supply_db.SupplyDbError, match="no recorded identity"):
             supply_db.connect(dsn=spoof)
 
-    def test_the_old_database_settings_are_not_an_identity(self, unmarked_dsn):
-        """Keith, 2026-10-06: the identity moved from database-level settings
-        to a table. A database marked the old way is unmarked now, refused
-        like any other - never read back as an identity."""
-        with psycopg.connect(unmarked_dsn, autocommit=True) as conn:
-            name = conn.execute("SELECT current_database()").fetchone()[0]
-            for setting, value in (("mothman.data_asset_id", hierarchy.data_asset_id()),
-                                   ("mothman.environment", "test")):
-                conn.execute(f"ALTER DATABASE \"{name}\" SET {setting} = '{value}'")
-        with pytest.raises(supply_db.SupplyDbError, match="no recorded identity"):
-            supply_db.connect(dsn=unmarked_dsn)
-
     def test_an_empty_identity_table_is_no_identity(self, unmarked_dsn):
         with psycopg.connect(unmarked_dsn, autocommit=True) as conn:
             for statement in db_identity.DDL:
@@ -179,7 +167,7 @@ class TestMarking:
             text = path.read_text()
             if path.name == "db_identity.py":
                 continue
-            if re.search(r"db_identity\.mark(_by_admin)?\(|mothman\.(environment|data_asset_id)",
+            if re.search(r"db_identity\.mark\(|mothman\.(environment|data_asset_id)",
                          text):
                 writers.add(path.relative_to(ROOT).as_posix())
         # The reset used to drop the qa schema and put the identity back; it

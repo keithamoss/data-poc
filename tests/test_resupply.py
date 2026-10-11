@@ -48,12 +48,6 @@ def test_clean_delivery_yields_exactly_one_attempt():
     assert len(attempts) == 1
     assert attempts[0].severity is None
     assert attempts[0].received_date == date(2026, 9, 1)
-    # A Delivery carries no attempt_number and no is_resupply: they were
-    # RETIRED by REQ-GEN-042, not renamed. Whether an arrival is a
-    # resupply is observed from its position in the slot, which is what
-    # the chain order below already expresses.
-    assert not hasattr(attempts[0], "attempt_number")
-    assert not hasattr(attempts[0], "is_resupply")
 
 
 def test_red_delivery_chain_terminates_and_dates_advance_on_business_days():
@@ -270,22 +264,6 @@ def test_run_ids_carry_no_date_and_no_resupply_marker():
         assert "resupply" not in entry["run_id"]
         assert not re.search(r"\d{4}-\d{2}-\d{2}", entry["run_id"]), \
             f"{entry['run_id']} still carries a date"
-
-
-def test_no_manifest_entry_carries_a_retired_field():
-    """The NFR stated directly: nothing in the repo should be able to
-    use the retired sense of "delivery" after this, and a grep for the
-    old field names should come back empty. Asserted here on real
-    output rather than trusted to a grep somebody remembers to run."""
-    entries = _manifest_entries_for_slot(
-        [_fake_delivery(date(2026, 9, 1), None)], slot_id="slot_001", period="2026-09-01",
-        run_index_start=0, id_offset=0, seed=1,
-    )
-    for retired in ("delivery_id", "delivery_date", "attempt_number",
-                    "is_resupply", "supersedes_run_id", "arrived_date"):
-        assert retired not in entries[0], f"{retired} came back"
-    for retired in ("slot_delivery_id", "slot_attempt_number", "slot_is_resupply"):
-        assert retired not in entries[0], f"{retired} - retired fields must not return under a slot_ prefix"
 
 
 # ---- Arrival timing and partial resupplies (REQ-GEN-040) -------------

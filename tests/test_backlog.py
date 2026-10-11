@@ -355,18 +355,3 @@ class TestHowFarProcessingGotIsDerived:
         calls = self._done(monkeypatch)
         self._owed([self._arrival(n) for n in range(20)])
         assert calls["n"] == 1
-
-    def test_backlog_no_longer_answers_it(self):
-        """Keith, 2026-10-06: one definition of processed, not two."""
-        assert not hasattr(backlog, "unprocessed")
-
-
-class TestTheStoredMarkerIsGone:
-    """Criterion 18, asserted rather than assumed: a mechanism removed
-    in one place and left in another is worse than either."""
-
-    def test_nothing_reads_or_writes_a_marker(self):
-        source = open(backlog.__file__).read()
-        for name in ("MARKER_PATH", "read_marker", "advance_through",
-                     "advance_past_staged", "processing_log"):
-            assert name not in source, f"{name} survived the marker's removal"

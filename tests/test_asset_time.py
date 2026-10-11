@@ -183,10 +183,6 @@ class TestTheTimezoneIsVersioned:
         with pytest.raises(ValueError, match="fixed UTC offset"):
             asset_time.zone_now()
 
-    def test_there_is_no_bare_lookup(self):
-        """Criterion 6 and NFR 2: removed, not deprecated."""
-        assert not hasattr(asset_time, "asset_timezone")
-
     def test_each_date_reads_its_own_version(self, tmp_path, monkeypatch):
         _repoint(tmp_path, monkeypatch, _versions(("2020-01-01", "Australia/Perth"),
                                                   ("2027-01-01", "Australia/Sydney")))

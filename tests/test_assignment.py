@@ -160,33 +160,11 @@ class TestTheRecordSaysWhy:
     def test_the_vocabulary_is_exactly_three_branches(self):
         assert {assignment.OPEN_UNFILLED, assignment.RESUPPLY, assignment.HELD} == {
             "open-slot-unfilled", "resupply-of-open-slot", "held-no-open-slot"}
-        for gone in ("ON_TIME", "OLDEST_CLAIMABLE", "UNASSIGNABLE"):
-            assert not hasattr(assignment, gone), f"{gone} is a retired branch"
-
-    def test_there_is_no_ambiguity_left_to_mark(self):
-        """REQ-PIPE-065 criteria 1-2 are retired, not replaced: a file can
-        never fit two open periods."""
-        record = assignment.assign("d", "s", _at(2, 20), _days(1, 2, 3),
-                                   frozenset()).as_record()
-        assert "ambiguous" not in record and "ambiguity" not in record
 
     def test_it_records_the_slot_it_considered(self):
         got = assignment.assign("d", "s", _at(1, 13), _days(1, 2), frozenset({"01"}))
         assert got.considered == ("01",)
         assert got.resupply_of == "01" and "resupply_of" not in got.as_record()
-
-
-class TestTheRetiredRulesAreGone:
-    """Every reader of the retired rules is removed, not left as a
-    second rule (NFR 4)."""
-
-    def test_the_retired_helpers_no_longer_exist(self):
-        from qa_tools.common import slots
-        for name in ("closed_by_monotonic_filling", "oldest_claimable_unfilled",
-                     "most_recently_filled"):
-            assert not hasattr(assignment, name), name
-        for name in ("next_unfilled_claimable", "is_claimable"):
-            assert not hasattr(slots, name), name
 
 
 class TestItReadsNoData:

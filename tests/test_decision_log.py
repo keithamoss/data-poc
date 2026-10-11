@@ -407,16 +407,6 @@ class TestNoDatabaseMeansNoDecision:
         assert {p for p in tmp_path.rglob("*")} == before, \
             f"a refused decision left something behind: {os.listdir(tmp_path)}"
 
-    def test_the_module_has_no_spool_path_at_all(self):
-        """Structural, because the absence is the requirement. A queue would
-        arrive as a path constant or an open() - and the reason to assert it
-        is that adding one later would look like a helpful robustness fix."""
-        import inspect
-
-        source = inspect.getsource(dl)
-        assert "open(" not in source
-        assert "Path(" not in source
-
 
 class TestWhatAPeriodResolvedTo:
     """Criterion 9, and REQ-PIPE-074 criterion 12 - both answered from

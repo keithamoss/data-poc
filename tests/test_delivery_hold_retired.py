@@ -25,13 +25,6 @@ def _two_files_one_arrival():
         files_by_dataset=files, contested=frozenset(files))
 
 
-def test_no_delivery_level_kind_remains():
-    """REJECTED leaving the kind defined and unable to fire - the shape
-    this project otherwise flags as a defect (REQ-PIPE-105's decision)."""
-    assert supply_holds.KINDS == (supply_holds.ASSIGNMENT_RULE,)
-    assert not hasattr(supply_holds, "DELIVERY_LEVEL")
-
-
 def _recorded(arrival):
     """The delivery record a filing links to (REQ-PIPE-144 criterion 10)."""
     import filing_support

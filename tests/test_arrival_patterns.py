@@ -281,19 +281,6 @@ class TestTheConfigurationGate:
 
 
 class TestTheTransportMatcherIsADifferentThing:
-    def test_the_filename_matcher_no_longer_lives_in_delivery(self):
-        """Criterion 4, as a real check rather than a note: the
-        keyPattern-as-filename matcher is retired. file_arrival.py's S3 key
-        matcher survived it until REQ-PIPE-152 (2026-10-06), when the
-        handlers stopped matching whole keys: a handler now takes every
-        object under its prefix and recognition decides the dataset, as
-        everywhere else - so the second matcher went too, rather than
-        living on for its own test."""
-        import importlib.util
-
-        assert not hasattr(delivery, "_filename_pattern_to_regex")
-        assert importlib.util.find_spec("qa_tools.common.file_arrival") is None
-
     def test_the_contract_keypattern_is_not_what_attributes_a_file(self):
         """The contract still declares `bdm/birth_registrations_{date}.csv`
         for the transport, and a file named after that whole key must

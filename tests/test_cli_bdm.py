@@ -72,7 +72,6 @@ def test_the_cli_reports_where_the_generator_actually_wrote(monkeypatch):
     one copy of a supply - the delivery - so that is what the command
     reports having written.
     """
-    assert not hasattr(bdm, "raw_dir"), "cli/bdm.py still exposes a raw_dir()"
     assert "deliveries" in bdm.generated_output_dir()
 
 

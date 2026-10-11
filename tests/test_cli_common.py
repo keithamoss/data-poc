@@ -128,21 +128,6 @@ def test_report_recorded_states_the_real_count_and_says_nothing_is_published(
     assert "run_042" in out
 
 
-def test_report_recorded_no_longer_tells_anyone_to_commit_and_push(capsys, monkeypatch):
-    """The sentence it used to end with - "commit and push qa_results/
-    yourself to publish. That push is what triggers the real CI rebuild"
-    - is false twice over now: there is nothing to commit, and a git
-    push is not what publishes (REQ-PIPE-092). Asserted rather than
-    assumed, because a stale instruction in a success panel is exactly
-    the kind of thing that survives a refactor and misleads someone
-    months later."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    common.report_recorded("run_042", 1)
-    out = capsys.readouterr().out
-    assert "commit" not in out.lower()
-    assert "push" not in out.lower()
-
-
 def test_report_recorded_waits_for_a_keypress_in_a_real_terminal(monkeypatch):
     pressed = []
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)

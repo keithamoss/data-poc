@@ -523,9 +523,3 @@ class TestNothingIsComputedFromAHolidayCalendar:
         loaded = [(p.name, p.date.isoformat())
                   for p in schedule.calendar("quarterly").current.periods]
         assert loaded == authored
-
-    def test_no_holiday_library_is_imported_by_this_module(self):
-        source = hierarchy.DATA_ASSET_YAML.parent.parent / "qa_tools" / "common" / "schedule.py"
-        text = source.read_text()
-        for banned in ("import holidays", "from holidays", "workalendar", "business_calendar"):
-            assert banned not in text, f"{banned} would make evaluation depend on a holiday library"

@@ -167,24 +167,3 @@ def test_it_writes_no_files_at_all(clean_qa_history, finish_runs, tmp_path, monk
 
     assert list(tmp_path.rglob("*.json")) == []
     assert not (tmp_path / "qa_results").exists()
-
-
-def test_the_writer_imports_no_filesystem_machinery():
-    """Asserted through the import list rather than by grepping the
-    source, so a docstring explaining what it no longer does cannot
-    satisfy it."""
-    import ast
-    import inspect
-
-    from qa_tools.common import qa_results_writer
-
-    tree = ast.parse(inspect.getsource(qa_results_writer))
-    imported = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            imported.add(node.module or "")
-    assert "json" not in imported
-    assert "pathlib" not in imported
-    assert "shutil" not in imported

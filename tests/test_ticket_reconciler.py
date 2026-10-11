@@ -181,11 +181,6 @@ class TestItNeverCloses:
     """Criterion 10. Closing is a person saying "I am done with this",
     and a rule saying it for them is how somebody's work disappears."""
 
-    def test_the_service_is_never_asked_to_close(self):
-        import inspect
-        assert "def close" not in inspect.getsource(tr), \
-            "the reconciler has no way to close a ticket, and that is the design"
-
     def test_a_finished_slot_gets_its_outcome_recorded(self):
         body = tr.body_for(a_slot(slot_state.PROMOTED, supply="cp-carers@1"))
         assert "Nothing is waiting on a person" in body

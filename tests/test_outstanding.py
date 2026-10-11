@@ -415,26 +415,6 @@ class TestTheRecordTheDashboardReads:
         assert json.loads(json.dumps(record)) == record
 
 
-class TestTheRetiredProducersAreGone:
-    """REQ-PIPE-131 retired the rules three producers here read: the
-    uncertain assignment (REQ-PIPE-065 criteria 1-2), the slot closed by
-    monotonic filling (REQ-PIPE-063) and the off-cycle withheld
-    promotion (REQ-PIPE-077). Each is removed rather than left as a
-    second rule (NFR 4)."""
-
-    def test_none_of_them_remains(self):
-        from qa_tools.common import outstanding as out_mod
-        for gone in ("_from_filings", "_from_closed_slots", "_from_withheld_promotions",
-                     "UNCERTAIN_ASSIGNMENT", "WITHHELD_PROMOTION"):
-            assert not hasattr(out_mod, gone), gone
-
-    def test_an_item_carries_no_ambiguity_field(self):
-        from qa_tools.common import outstanding as out_mod
-        item = out_mod.Item(kind="k", severity=out_mod.WARNING, blocking=False,
-                            headline="h", detail="d")
-        assert "ambiguity" not in item.as_record()
-
-
 class TestAHoldLeavesTheQueueWhenItIsResolved:
     """REQ-PIPE-078 criterion 2, and the defect it exists to fix.
 

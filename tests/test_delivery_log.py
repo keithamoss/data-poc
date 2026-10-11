@@ -217,9 +217,6 @@ class TestARecordOutlivesItsFiles:
     which is why prune() is GONE rather than unused, and the only thing
     that clears the log is `mothman env reset-synthetic`."""
 
-    def test_there_is_no_prune(self):
-        assert not hasattr(delivery_log, "prune")
-
     def test_a_delivery_a_filing_names_cannot_be_deleted(self, log):
         import psycopg
         import filing_support

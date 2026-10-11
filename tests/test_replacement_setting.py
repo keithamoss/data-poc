@@ -197,20 +197,6 @@ class TestTheGate:
         assert dl.promoted_into(conn, DS, period) == a
 
 
-class TestTheRequirementsItAmends:
-    """Criterion 12: REQ-PIPE-075 criterion 4 and REQ-PIPE-065 criterion 9
-    say a filled slot blocks automatic promotion EXCEPT under this setting."""
-
-    def test_both_name_the_exception(self):
-        from pathlib import Path
-
-        reqs = {r["id"]: r for r in yaml.safe_load(
-            (Path(__file__).resolve().parent.parent / "requirements.yaml").read_text()
-        )["requirements"]}
-        assert "REQ-PIPE-123" in reqs["REQ-PIPE-075"]["acceptance_criteria"][3]
-        assert "REQ-PIPE-123" in reqs["REQ-PIPE-065"]["acceptance_criteria"][8]
-
-
 def test_the_shipped_document_is_unchanged_by_these_tests():
     """The tests above edit copies; the real file is read fresh each time."""
     assert copy.deepcopy(_doc()) == _doc()

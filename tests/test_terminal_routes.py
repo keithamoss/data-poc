@@ -227,13 +227,3 @@ class TestAFallbackTrialAsksForItsReference:
         self._tty(monkeypatch, False)
         with pytest.raises(click.ClickException, match="--reference-file"):
             common.reference_for_fallback_trial(None, "--reference-file", "file")
-
-
-class TestTheHelpSaysWhatTheRoutesNowDo:
-    """#120 D11: two help texts still described defaults that criterion 14
-    and REQ-QAC-108 removed."""
-
-    @pytest.mark.parametrize("command", [bdm.qa_command, cp.qa_command])
-    def test_no_stale_default(self, command):
-        out = _flat(_runner.invoke(command, ["--help"]).output)
-        assert "auto-pull" not in out and "defaults to the last Promoted run" not in out

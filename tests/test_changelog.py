@@ -122,23 +122,6 @@ def test_an_unfinished_run_is_not_on_the_feed():
     assert changelog.build_changelog("agency-a", "dataset-a") == []
 
 
-def test_the_commit_walk_is_gone():
-    """RETIRED MECHANISM, asserted rather than assumed.
-
-    The walk was a real performance hazard, documented at length in
-    CLAUDE.md: one `git show` per commit touching the subtree, diffing
-    each commit's entire changed tree - 225 MB and 5.3 M lines of diff
-    output for one dataset's twelve commits, growing with both commit
-    count and diff size. Two fixes got it to 0.7s. A column needs none,
-    and this is here so nobody reintroduces the walk without noticing
-    they are undoing that.
-    """
-    source = open(changelog.__file__).read()
-    for name in ("git log", "git show", "subprocess", "commit_sha"):
-        assert name not in source.split('"""', 2)[2], \
-            f"{name!r} is back in changelog.py's code"
-
-
 class TestNoCommitSurvivesInTheFEED:
     """REQ-PIPE-090 criteria 5 and 6. The git walk went with REQ-PIPE-089;
     what remained was its VOCABULARY, and a field named for a mechanism

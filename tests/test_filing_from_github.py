@@ -107,11 +107,6 @@ class TestWhoIsAsking:
         request = gh.read(_comment("/promote supply: s\nbecause"))
         assert request.actor_name == "fpycnkgvmt@privaterelay.appleid.com"
 
-    def test_there_is_nowhere_to_claim_one(self):
-        """The rule made structural rather than checked: `Comment` has
-        no field for an actor, so a body cannot supply one."""
-        assert not hasattr(gh.Comment(body="", author="a", slot_key=SLOT), "actor")
-
     def test_a_name_typed_in_the_body_is_not_read_as_one(self):
         request = gh.read(_comment(
             "/promote supply: s\nactor: somebody-else\nRaising on their behalf."))

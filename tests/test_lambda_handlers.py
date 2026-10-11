@@ -25,7 +25,6 @@ import pytest
 
 sys.path.insert(0, "aws/lambda_handlers")
 import bdm_ingest_handler  # noqa: E402
-import cp_ingest_handler  # noqa: E402
 
 from qa_tools.common import processing_pass, qa_store, s3_arrival, supply_db  # noqa: E402
 
@@ -127,11 +126,6 @@ class TestTheHandlerOnlyRecordsThenRunsThePass:
                                 _client(), prefix="bdm/")
         [call] = no_pass
         assert call["deadline"] is not None and call["s3_client"] is not None
-
-    def test_neither_handler_calls_the_single_run_entry_point(self):
-        for module in (bdm_ingest_handler, cp_ingest_handler, s3_arrival):
-            assert "run_single" not in Path(module.__file__).read_text().replace(
-                "never calls run_single", "")
 
     def test_the_bdm_handler_does_not_raise_on_its_first_object(self, supply_dsn, no_pass,
                                                                 monkeypatch):

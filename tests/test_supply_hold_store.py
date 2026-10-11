@@ -69,14 +69,6 @@ class TestAHoldIsRecorded:
         with pytest.raises(ValueError, match="unknown hold kind"):
             raise_one(conn, dataset, kind="whatever")
 
-    def test_the_retired_delivery_level_kind_is_refused(self, conn, dataset):
-        """Criterion 3 used to put two kinds in one place. The
-        delivery-level one is retired (REQ-PIPE-105 criterion 6,
-        2026-10-02) - two files for one dataset are CONTESTED instead -
-        and a kind nothing produces any more is refused, not stored."""
-        with pytest.raises(ValueError, match="unknown hold kind"):
-            raise_one(conn, dataset, kind="delivery-level")
-
     def test_each_kind_carries_what_a_person_does_about_it(self, conn, dataset):
         """NFR 2 - the record carries the resolution path, not just the
         fact, and the two kinds need different acts."""

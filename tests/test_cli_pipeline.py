@@ -73,11 +73,6 @@ class TestARunOverRecordedHistoryIsRefused:
         flat = " ".join(result.output.split())
         assert "already holds QA history" in flat and "reset-synthetic" in flat
 
-    def test_regenerate_history_is_retired(self):
-        """REQ-PIPE-144 criterion 43: its job is reset-synthetic plus a
-        bootstrap, so it is not kept beside them as a second way to delete."""
-        assert "regenerate-history" not in pipeline_cli.pipeline_group.commands
-
 
 def _patch_dashboard_build_embed(monkeypatch, calls):
     from cli import dashboard as dashboard_cli

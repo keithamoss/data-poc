@@ -14,6 +14,8 @@ negation markers mean most of them would pass anyway.
 """
 from __future__ import annotations
 
+import pytest
+
 from qa_tools.common import validate_premise as vp
 
 
@@ -65,35 +67,39 @@ class TestItDoesNotFireOnHistory:
 
     def _scan(self, tmp_path, monkeypatch, body: str, name: str = "draft.md"):
         monkeypatch.setattr(vp, "ROOT", tmp_path)
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_text(body)
         return vp.findings()
 
-    def test_a_line_marked_AMENDED_passes(self, tmp_path, monkeypatch):
-        assert self._scan(tmp_path, monkeypatch,
-                           "AMENDED 2026-09-28: it read qa_results/ is committed.\n") == []
-
-    def test_a_line_saying_it_used_to_passes(self, tmp_path, monkeypatch):
-        assert self._scan(tmp_path, monkeypatch,
-                           "This used to say CI is the only publish path.\n") == []
-
-    def test_a_line_that_FORBIDS_the_premise_passes(self, tmp_path, monkeypatch):
-        """REQ-DOCS-101's own criterion 1 is the case: it has to name the
-        premise in order to forbid it, and the first draft of this gate
-        reported the requirement that asked for the gate."""
-        assert self._scan(tmp_path, monkeypatch,
-                           "THE SYSTEM SHALL leave no requirement asserting that "
-                           "qa_results/ is committed.\n") == []
-
-    def test_a_negation_wrapped_onto_the_LINE_BEFORE_still_passes(
-            self, tmp_path, monkeypatch):
-        """YAML wraps a block scalar, so the negation and the phrase land on
-        different lines - which is exactly what the one-line version of
-        this gate got wrong, on three real criteria."""
-        assert self._scan(tmp_path, monkeypatch,
-                           "      - >\n"
-                           "        THE SYSTEM SHALL NOT embed any\n"
-                           "        part of it into committed QA results.\n",
-                           name="draft.yaml") == []
+    @pytest.mark.parametrize("name, body", [
+        pytest.param("draft.md", "AMENDED 2026-09-28: it read qa_results/ is committed.\n",
+                     id="test_a_line_marked_AMENDED_passes"),
+        pytest.param("draft.md", "This used to say CI is the only publish path.\n",
+                     id="test_a_line_saying_it_used_to_passes"),
+        # REQ-DOCS-101's own criterion 1 is the case: it has to name the
+        # premise in order to forbid it, and the first draft of this gate
+        # reported the requirement that asked for the gate.
+        pytest.param("draft.md",
+                     "THE SYSTEM SHALL leave no requirement asserting that "
+                     "qa_results/ is committed.\n",
+                     id="test_a_line_that_FORBIDS_the_premise_passes"),
+        # YAML wraps a block scalar, so the negation and the phrase land on
+        # different lines - which is exactly what the one-line version of
+        # this gate got wrong, on three real criteria.
+        pytest.param("draft.yaml",
+                     "      - >\n"
+                     "        THE SYSTEM SHALL NOT embed any\n"
+                     "        part of it into committed QA results.\n",
+                     id="test_a_negation_wrapped_onto_the_LINE_BEFORE_still_passes"),
+        # A real decision rather than laziness: plans/*.md records what was
+        # believed when written, and CLAUDE.md's rule is that it gets DELETED
+        # as its requirements land rather than rewritten. A gate forcing it
+        # into line would force history to be falsified.
+        pytest.param("plans/old.md", "CI is the only publish path.\n",
+                     id="test_the_plans_directory_is_allowed_wholesale"),
+    ])
+    def test_history_is_not_reported(self, tmp_path, monkeypatch, name, body):
+        assert self._scan(tmp_path, monkeypatch, body, name=name) == []
 
     def test_a_decisions_field_is_never_read(self, tmp_path, monkeypatch):
         """Criterion 8. A decision records what was known when it was taken,
@@ -130,16 +136,6 @@ class TestItDoesNotFireOnHistory:
                             "        git, not gitignored.\n",
                             name="requirements.yaml")
         assert len(found) == 1
-
-    def test_the_plans_directory_is_allowed_wholesale(self, tmp_path, monkeypatch):
-        """A real decision rather than laziness: plans/*.md records what was
-        believed when written, and CLAUDE.md's rule is that it gets DELETED
-        as its requirements land rather than rewritten. A gate forcing it
-        into line would force history to be falsified."""
-        monkeypatch.setattr(vp, "ROOT", tmp_path)
-        (tmp_path / "plans").mkdir()
-        (tmp_path / "plans" / "old.md").write_text("CI is the only publish path.\n")
-        assert vp.findings() == []
 
     def test_a_build_output_is_not_scanned(self, tmp_path, monkeypatch):
         """It carries whatever the template said and is gitignored, so

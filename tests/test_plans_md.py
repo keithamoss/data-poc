@@ -4,6 +4,8 @@ test), not the real committed plans/*.md files - those change over time
 and aren't what this module's own correctness depends on."""
 from __future__ import annotations
 
+import pytest
+
 from dashboard.plans_md import _parse_numbered_items, _parse_threads, parse_plans
 
 
@@ -23,63 +25,49 @@ def test_parses_multiple_components_on_one_item(tmp_path):
     assert items[0]["components"] == ["QA checks & contract", "Pipeline & publishing"]
 
 
-def test_joins_a_wrapped_paragraph_across_multiple_lines(tmp_path):
-    text = """1. **[investigate, 2026-09-18]** **[Docs & process]** A long item that wraps
-   across multiple lines in the markdown
-   source, same paragraph.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == "A long item that wraps across multiple lines in the markdown source, same paragraph."
+_ITEM = "1. **[done, 2026-09-18]** **[Dashboard UI]** "
 
 
-def test_preserves_paragraph_breaks_within_one_item(tmp_path):
-    text = """1. **[done, 2026-09-18]** **[Dashboard UI]** First paragraph.
-
-   Second paragraph, a separate thought.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == "First paragraph.\n\nSecond paragraph, a separate thought."
-
-
-def test_preserves_a_bullet_list_within_one_item_as_its_own_lines(tmp_path):
-    text = """1. **[done, 2026-09-18]** **[Dashboard UI]** Built:
-   - first thing done
-   - second thing done, wrapped
-     across two lines
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == (
-        "Built:\n\n- first thing done\n- second thing done, wrapped across two lines"
-    )
-
-
-def test_preserves_a_numbered_list_within_one_item_as_its_own_lines(tmp_path):
-    """Real bug, found via Keith's own dashboard report (2026-09-19): a
-    numbered/ordered sub-list inside an item's body (e.g. plans/
-    tooling.md #1's own "Build order" phase list) was silently word-
-    joined into one flowing, illegible paragraph - only "- "/"* " bullet
-    markers were recognised as list-item boundaries, not "1. "/"2. "
-    ones."""
-    text = """1. **[done, 2026-09-18]** **[Testing & dev tooling]** Build order:
-   1. Phase one does the first thing.
-   2. Phase two does the second thing.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == (
-        "Build order:\n\n1. Phase one does the first thing.\n2. Phase two does the second thing."
-    )
-
-
-def test_a_numbered_list_item_that_wraps_across_lines_stays_one_list_item(tmp_path):
-    text = """1. **[done, 2026-09-18]** **[Testing & dev tooling]** Build order:
-   1. Phase one does the first thing,
-      wrapped across two lines.
-   2. Phase two.
-"""
-    items = _parse_numbered_items(text, "wider")
-    assert items[0]["text"] == (
-        "Build order:\n\n1. Phase one does the first thing, wrapped across two lines.\n2. Phase two."
-    )
+@pytest.mark.parametrize("body, expected", [
+    pytest.param("A long item that wraps\n   across multiple lines in the markdown\n"
+                 "   source, same paragraph.\n",
+                 "A long item that wraps across multiple lines in the markdown source, same paragraph.",
+                 id="test_joins_a_wrapped_paragraph_across_multiple_lines"),
+    pytest.param("First paragraph.\n\n   Second paragraph, a separate thought.\n",
+                 "First paragraph.\n\nSecond paragraph, a separate thought.",
+                 id="test_preserves_paragraph_breaks_within_one_item"),
+    pytest.param("Built:\n   - first thing done\n   - second thing done, wrapped\n"
+                 "     across two lines\n",
+                 "Built:\n\n- first thing done\n- second thing done, wrapped across two lines",
+                 id="test_preserves_a_bullet_list_within_one_item_as_its_own_lines"),
+    # Real bug, found via Keith's own dashboard report (2026-09-19): a
+    # numbered sub-list inside an item's body (plans/tooling.md #1's "Build
+    # order" phase list) was word-joined into one illegible paragraph -
+    # only "- "/"* " were recognised as list-item boundaries, not "1. ".
+    pytest.param("Build order:\n   1. Phase one does the first thing.\n"
+                 "   2. Phase two does the second thing.\n",
+                 "Build order:\n\n1. Phase one does the first thing.\n2. Phase two does the second thing.",
+                 id="test_preserves_a_numbered_list_within_one_item_as_its_own_lines"),
+    pytest.param("Build order:\n   1. Phase one does the first thing,\n"
+                 "      wrapped across two lines.\n   2. Phase two.\n",
+                 "Build order:\n\n1. Phase one does the first thing, wrapped across two lines.\n2. Phase two.",
+                 id="test_a_numbered_list_item_that_wraps_across_lines_stays_one_list_item"),
+    # Real bug, found 2026-09-20: wrapped lines were joined with " ".join,
+    # so a hyphenated word split across two source lines came back as
+    # "requirements- analysis" in the live Plans tab (195 occurrences
+    # across 74 of 137 items at the time).
+    pytest.param("A requirements-\n   analysis subagent.\n",
+                 "A requirements-analysis subagent.",
+                 id="test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space"),
+    # The other half of the same fix, and why it cannot strip every
+    # trailing hyphen: ' - ' is a dash this project uses constantly. A line
+    # ending in a standalone hyphen is punctuation and keeps its space.
+    pytest.param("a real bug -\n   not a design gap\n",
+                 "a real bug - not a design gap",
+                 id="test_a_real_dash_between_words_keeps_its_spaces"),
+])
+def test_an_items_wrapped_body_is_joined(body, expected):
+    assert _parse_numbered_items(_ITEM + body, "wider")[0]["text"] == expected
 
 
 def test_parses_multiple_items_in_file_order(tmp_path):
@@ -195,31 +183,6 @@ def test_parse_plans_reads_all_files_and_returns_the_combined_shape(tmp_path):
         "wider", "qa-pipeline", "dashboard", "data-generation", "tooling", "performance"}
     assert len(result["threads"]) == 2
     assert {t["file"] for t in result["threads"]} == {"publishing-and-history", "conceptual-design"}
-
-
-def test_a_hyphenated_word_wrapped_across_lines_is_rejoined_without_a_space():
-    """Real bug, found 2026-09-20 while checking whether a generated index
-    line would be legible: plans_md.py joins wrapped lines with " ".join,
-    so a hyphenated word split across two source lines ("requirements-\n
-    analysis") comes back as "requirements- analysis". It renders that way
-    in the live dashboard's Plans tab. 195 occurrences across 74 of 137
-    items when this test was written."""
-    import re
-    items = parse_plans("plans")["items"]
-    bad = [(i["file"], i["number"], m.group(0))
-           for i in items for m in re.finditer(r"\w+- \w+", i["text"])]
-    assert not bad, f"{len(bad)} hyphen-wrap artifacts, e.g. {bad[:5]}"
-
-
-def test_a_real_dash_between_words_keeps_its_spaces():
-    """The other half of the same fix, and the reason it can't just strip
-    every trailing hyphen: this project uses ' - ' as a dash constantly
-    ("a real bug - not a design gap"). A line ending in a standalone
-    hyphen is punctuation, not a wrapped word, and must keep its space."""
-    from dashboard.markdown_text import join_wrapped
-    assert join_wrapped(["a real bug -", "not a design gap"]) == "a real bug - not a design gap"
-    assert join_wrapped(["requirements-", "analysis subagent"]) == "requirements-analysis subagent"
-    assert join_wrapped(["plain", "words"]) == "plain words"
 
 
 def test_every_numbered_item_in_every_plans_file_is_parsed():
