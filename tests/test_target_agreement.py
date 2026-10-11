@@ -407,3 +407,45 @@ class TestARecordThatDoesNotAddUp:
         with pytest.raises(bdm.TargetTrialFailed):
             bdm.generate_synthetic_data()
         assert wrote == [], "the committed SCENARIOS.md is not rewritten for a history not emitted"
+
+
+class TestAPipelineRunComparesToo:
+    """Post-build-review #157 finding 2 (Keith, 2026-10-11: compare there
+    too): `mothman pipeline run` replays the synthetic history and could
+    publish it without comparing."""
+
+    def _stub(self, monkeypatch, disagreements):
+        from cli import dashboard as dashboard_cli
+        from cli import pipeline
+        from dashboard import snapshot_dashboard
+        from qa_tools.common import bootstrap as boot
+
+        calls = {"compared": [], "published": []}
+        monkeypatch.setattr(boot, "holds_history", lambda conn: False)
+        monkeypatch.setattr(pipeline, "_run_bdm", lambda s: None)
+        monkeypatch.setattr(pipeline, "_run_cp", lambda s: None)
+        monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
+        monkeypatch.setattr(boot, "targets_agree",
+                            lambda names: calls["compared"].append(list(names)) or disagreements)
+        monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
+        monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
+        monkeypatch.setattr(dashboard_cli, "publish", lambda: calls["published"].append(True))
+        monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
+        return calls
+
+    def test_a_disagreement_fails_the_run_and_publishes_nothing(self, monkeypatch):
+        from cli import pipeline
+
+        calls = self._stub(monkeypatch, ("TS-43's arrival was built to amber and read red",))
+        out = CliRunner().invoke(pipeline.run_command, ["--publish"], env={"COLUMNS": "400"})
+        said = " ".join(out.output.split())
+        assert out.exit_code != 0 and "TS-43" in said and "did not read as built" in said
+        assert calls["compared"] == [["bdm", "cp"]] and calls["published"] == []
+
+    def test_agreement_lets_it_publish(self, monkeypatch):
+        from cli import pipeline
+
+        calls = self._stub(monkeypatch, ())
+        out = CliRunner().invoke(pipeline.run_command, ["--collection", "bdm", "--publish"])
+        assert out.exit_code == 0, out.output
+        assert calls["compared"] == [["bdm"]] and calls["published"] == [True]

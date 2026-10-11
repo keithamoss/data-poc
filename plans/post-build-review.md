@@ -7786,14 +7786,14 @@ twice. It deliberately did not re-find the `TypeError`.
     - **Edge from criterion 5:** a scenario whose own suppressed day covered
       its own lead-in was accepted and lost the lead-in silently. Refused.
 
-157. **[in-progress, 2026-10-11]** **[Data generation]** **[Pipeline & publishing]**
+157. **[done, 2026-10-11]** **[Data generation]** **[Pipeline & publishing]**
      **The delivery critic on REQ-GEN-186 (8e2bada).** Run after the push. The
      comparison logic holds: the critic re-ran it read-only over the 26
      targeted supplies and all agreed, and the gate's reading is what makes
      2026-08-28's ordinary amber read amber rather than red. FIXED the same
-     evening, each with a test that failed first: 1, 3, 6, 7 and the
-     coverage gap. Left with Keith: 2 and 4. Noted, not changed: 5, 8 and
-     the code-quality points.
+     evening, each with a test that failed first: 1, 2, 3, 6, 7 and the
+     coverage gap; 4 answered by Keith and recorded. Noted, not changed:
+     5, 8 and the code-quality points.
     - **1 (medium-high, checked):** the TUI's bootstrap menu (`cli/app.py`
       `_bootstrap_menu`) never reads `result.disagreements` and prints
       "Ready" in green over a history where a supply read wrong. Only the
@@ -7802,8 +7802,10 @@ twice. It deliberately did not re-find the `TypeError`.
       instead of "Ready".
     - **2 (medium, Keith's call):** `mothman pipeline run` regenerates
       (the trial runs) and replays both collections, but never compares
-      after the replay, and can publish. Should it compare, or is it out of
-      scope and the requirement says so?
+      after the replay, and can publish. Keith: compare there too. FIXED:
+      it compares after the replay, still builds the local dashboard so the
+      disagreement can be looked at, and fails before any snapshot or
+      publish.
     - **3 (medium, checked):** `resume` regenerates, and so runs the trial,
       BEFORE it switches `MOTHMAN_SUPPLY_DSN` to the resume's own database.
       A trial writes and then discards a run, schemas and load outcomes in
@@ -7815,6 +7817,9 @@ twice. It deliberately did not re-find the `TypeError`.
       cli/ and generator/. The static guard checks names, not the call
       graph. What c7 protects (filing from a declaration) is untouched -
       the read only feeds an after-the-fact comparison - but it is a read.
+      Keith: acceptable, record why. Recorded on REQ-GEN-043, and
+      tests/test_arrivals.py now names the three modules allowed to reach
+      it and fails on any other.
     - **5 (low-medium):** `after_replay` compares a supply's current run,
       which excludes `readers` runs, while the knock-on re-gate reads
       `supply_status.latest_results` across every run. No targeted supply

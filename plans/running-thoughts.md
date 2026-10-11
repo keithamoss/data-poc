@@ -4950,7 +4950,7 @@ Belongs with batch 5's check work.
     REQ-GEN-184 part B (post-build-review #155): a targeted resend went
     through the same churn.
 
-83. **[investigate, 2026-10-11]** **[Pipeline & publishing]** **For Keith: a
+83. **[parked, 2026-10-11]** **[Pipeline & publishing]** **For Keith: a
     late live pass stamps its promotion before its own gate ran.** Raised by
     the critic on REQ-GEN-185 (post-build-review #156 finding 4) and not
     settled. `promotion.effective_at_for` invents a lag after receipt - one
@@ -4969,3 +4969,7 @@ Belongs with batch 5's check work.
     effect when it is made (and the routes agree some other way), or is the
     invented instant right for a synthetic past-dated keep and wrong only
     for a real late pass?
+
+    **Keith, 2026-10-11 evening: leave it for now.** Only synthetic,
+    past-dated deliveries meet it today; no real live pass exists yet.
+    Scope it with the live (AWS) work rather than on its own.

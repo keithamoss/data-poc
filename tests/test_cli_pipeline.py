@@ -28,6 +28,10 @@ def _no_history_yet(monkeypatch):
     monkeypatch.setattr(boot, "holds_history", lambda conn: False)
     # The corrections step after a full replay is its own subject below.
     monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
+    # Nothing was replayed, so there is no recorded verdict to compare a
+    # target with; REQ-GEN-186's comparison has tests of its own
+    # (tests/test_target_agreement.py).
+    monkeypatch.setattr(boot, "targets_agree", lambda names: ())
 
 
 class TestCorrectionsAfterAFullRun:

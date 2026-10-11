@@ -115,10 +115,20 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
     except processing_pass.PassLockHeld as exc:
         raise click.ClickException(str(exc)) from None
 
+    # A REPLAY LIKE A BOOTSTRAP'S, SO COMPARED LIKE ONE (REQ-GEN-186
+    # criterion 3; Keith, 2026-10-11, post-build-review #157). The local
+    # dashboard is still built, so the disagreement can be looked at; the
+    # run fails before anything is snapshotted or published.
+    console.print("Comparing every targeted supply's recorded verdict with what it was "
+                  "built to...", style="dim")
+    disagreements = bootstrap_mod.targets_agree(
+        [n for n in ("bdm", "cp") if collection in ("all", n)])
+
     console.print("Reshaping into dashboard JSON...", style="dim")
     dashboard_cli._build_data()
     console.print("Embedding real data into the dashboard...", style="dim")
     dashboard_cli._embed()
+    _fail_on_disagreements(disagreements)
 
     if snapshot:
         os.environ["SNAPSHOT_DASHBOARD"] = "1"

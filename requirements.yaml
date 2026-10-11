@@ -6386,6 +6386,7 @@ requirements:
         staged data rather than bookkeeping, so no criterion here covers
         it, and fixing it properly is filing work. Logged as
         plans/running-thoughts.md #32 rather than left unwritten."
+      - 'ONE SANCTIONED READER OF WHAT THE GENERATOR BUILT (Keith, 2026-10-11, post-build-review #157): REQ-GEN-186''s comparison after a replay reaches the bookkeeping through cli.pipeline.generated_targets and generator/targets.py, from qa_tools/common/bootstrap.py. Acceptable because it feeds an after-the-fact check that changes nothing - never a filing, which is what criterion 7 protects. tests/test_arrivals.py names the three modules allowed to reach it and fails on any other, since the name-only guard cannot see a read one call away. REJECTED moving the comparison into cli/ and REJECTED a second ''built to'' file beside the bookkeeping.'
     linked_tests:
       - tests/test_delivery.py
       - tests/test_arrivals.py
@@ -32199,6 +32200,8 @@ requirements:
     linked_tests:
     - tests/test_target_agreement.py
     - tests/test_bootstrap.py
+    - tests/test_arrivals.py
+    - tests/test_cli_pipeline.py
     implemented_by:
     - generator/targets.py::written
     - generator/targets.py::just_written
@@ -32208,6 +32211,7 @@ requirements:
     - cli/bdm.py::generate_synthetic_data
     - cli/pipeline.py::generated_targets
     - cli/pipeline.py::disagreement_message
+    - cli/pipeline.py::run_command
     - cli/app.py::_bootstrap_menu
     - qa_tools/common/bootstrap.py::targets_agree
     - qa_tools/common/bootstrap.py::bootstrap
@@ -32228,7 +32232,7 @@ requirements:
     - 'RESULTS ARE READ AS THE GATE READ THEM, extras merged: a first read-only prototype took raw rows and called the 2026-08-28 ordinary amber red, because a gap red''s measured status lives in the record''s extras. With them merged, all 26 agreed.'
     - 'A DISAGREEMENT AT GENERATION REMOVES EVERY BIRTH REGISTRATIONS DELIVERY JUST WRITTEN (criterion 2, ''SHALL NOT emit the history''), leaving the bookkeeping so the next generation tidies as usual. Child Protection has nothing to trial: a targeted Child Protection injection is refused at planning (REQ-GEN-185), and its ordinary ambers are compared after replay only.'
     - 'A RESUME IS A REPLAY TOO: `mothman pipeline resume` compares in the resume''s own database and fails the same way. Its regeneration runs NO trial (post-build-review #157): it happens before the resume has a database of its own.'
-    - 'POST-BUILD-REVIEW #157, FIXED, each with a test that failed first: the TUI''s bootstrap menu printed Ready over a disagreement, and now gives the CLI''s own message (cli.pipeline.disagreement_message); a resume generated with the trial on BEFORE switching to its own database, so the trial wrote and discarded a run in the caller''s database - it now generates with trial=False and compares after its replay; a quiet verdict names its quiet checks and a supply better than built with no rule named says no check warned (observability NFR); the trial runs before the scenario map is written, so a refused history leaves SCENARIOS.md alone; a generator record that does not add up is a one-line disagreement, not a traceback. OPEN WITH KEITH: whether `mothman pipeline run` should compare after its replay, and whether reading the bookkeeping through cli/ and generator/ sits within REQ-GEN-043 criterion 7.'
+    - 'POST-BUILD-REVIEW #157, FIXED, each with a test that failed first: the TUI''s bootstrap menu printed Ready over a disagreement, and now gives the CLI''s own message (cli.pipeline.disagreement_message); a resume generated with the trial on BEFORE switching to its own database, so the trial wrote and discarded a run in the caller''s database - it now generates with trial=False and compares after its replay; a quiet verdict names its quiet checks and a supply better than built with no rule named says no check warned (observability NFR); the trial runs before the scenario map is written, so a refused history leaves SCENARIOS.md alone; a generator record that does not add up is a one-line disagreement, not a traceback. Keith''s answers the same evening: `mothman pipeline run` compares after its replay too, building the local dashboard and failing before any snapshot or publish; and the read through cli/ and generator/ is acceptable under REQ-GEN-043 criterion 7, recorded there with a test naming the three modules allowed to reach it.'
     - 'THE COMPARISON SET: injected targets, the green lead-in and following days around them, and every ordinary amber in both collections - the generator''s built-to list, nothing inferred. Ordinary cleans and reds are not targeted (a clean supply warns by the draw, REQ-GEN-184), so they are not compared.'
   - id: REQ-QAC-187
     title: Child Protection client postcodes tolerate a few unrecognised values, matching their Soda and dbt bands

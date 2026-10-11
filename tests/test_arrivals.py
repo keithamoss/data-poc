@@ -363,6 +363,36 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
             "filing a supply from a declaration is exactly what criterion 7 forbids:\n  "
             + "\n  ".join(offenders))
 
+    #: THE ONE SANCTIONED PATH to what the generator says it built (Keith,
+    #: 2026-10-11, post-build-review #157): REQ-GEN-186's comparison after a
+    #: replay reads it through cli.pipeline.generated_targets ->
+    #: generator.targets, and the generation-time trial through
+    #: generator.targets.just_written. It feeds an after-the-fact check that
+    #: changes nothing - never a filing, which is what criterion 7 protects.
+    #: Any OTHER walled module reaching it fails below, so the exception
+    #: cannot grow by accident.
+    SANCTIONED_TARGET_READERS = {"qa_tools/common/bootstrap.py", "cli/pipeline.py",
+                                 "cli/bdm.py"}
+
+    def test_only_the_sanctioned_modules_reach_what_the_generator_built(self):
+        reached = []
+        for path in self._modules():
+            rel = str(path.relative_to(self.ROOT))
+            for node in ast.walk(ast.parse(path.read_text())):
+                named = (isinstance(node, ast.Attribute) and node.attr == "generated_targets") \
+                    or (isinstance(node, ast.Name) and node.id == "generated_targets") \
+                    or (isinstance(node, ast.ImportFrom) and (
+                        node.module == "generator.targets"
+                        or (node.module == "generator"
+                            and any(a.name == "targets" for a in node.names))
+                        or any(a.name == "generated_targets" for a in node.names)))
+                if named:
+                    reached.append(rel)
+        assert set(reached) <= self.SANCTIONED_TARGET_READERS, sorted(set(reached))
+        assert set(reached) == self.SANCTIONED_TARGET_READERS, (
+            "a sanctioned reader no longer reaches it - narrow the set rather than leave "
+            f"an exception nobody uses: {sorted(set(reached))}")
+
     def test_the_bookkeeping_rule_is_checked_against_real_code(self):
         """The test above passes trivially if _modules() finds nothing,
         and a walled package getting renamed is exactly how that would
