@@ -4607,7 +4607,7 @@ Belongs with batch 5's check work.
     arriving table" drafted as REQ-PIPE-188 (one scope for every tool, a
     guard against a check going missing, the target and the equivalence
     proof) plus one per tool: 189 dbt, 190 datacontract-cli, 191 Soda. The
-    draft is docs/draft-req-pipe-188-192.yaml (validated with `mothman
+    draft (since signed - see below) was docs/draft-req-pipe-188-192.yaml (validated with `mothman
     dashboard validate-requirements --draft`; re-check the ids are still
     free before applying). Premise confirmed in code - about a fifth of each
     run's evaluation is kept - but the estimate is ~6 minutes, not under 5:
@@ -4624,7 +4624,7 @@ Belongs with batch 5's check work.
     asked - accept, or also record which check ids each tool was asked for.
 
     **KEITH'S ANSWERS, 2026-10-12 morning, and the revised draft**
-    (docs/draft-req-pipe-188-192.yaml, delivery-scoper, still NOT SIGNED):
+    (delivery-scoper; SIGNED OFF by Keith 2026-10-12 morning, all five, and now in requirements.yaml as REQ-PIPE-188 to 192):
     (1) keep UNDER 5 and widen - the small repeated costs became REQ-PIPE-192
     (config parse deep-copied on every hit; the cross-table declarations
     re-read uncached by promotion at 8-10ms a call - #65's 16s was ~4x

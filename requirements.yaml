@@ -32273,3 +32273,186 @@ requirements:
     - contract/child-protection-contract.yaml
     evidence:
     - '2026-10-11: tests/test_postcode_tolerance.py 3 passed against the real datacontract-cli and Soda Core over this worker''s staged fixture delivery - with 1% of client postcodes unrecognised the contract''s rule passes and Soda''s warns (c6), at 5% the contract''s fails (c7), and the recorded fail threshold is 3, not 0 (c8). The first and third failed before the change. `mothman dashboard validate-check-lifecycle` OK over 307 checks with the breaking changelog entry (c3); check_id, validValues and dimension unchanged (c2); the Soda and dbt checks and the postcode null rule untouched (c5); the description rewritten to the tolerance form docs/check-authoring-rules.md asks for, the same words the Soda copy already uses (c4).'
+  - id: REQ-PIPE-188
+    title: A run asks its tools only for the checks it records, records what it asked for, and refuses if one goes missing
+    date_written: "2026-10-12"
+    story: "As someone regenerating or processing QA history, I want each run to ask its QA tools only for the checks it will actually record, to keep a record of what each tool was asked for, and to be refused if a check it should record goes missing. That way a Child Protection run stops paying to evaluate five sibling tables' checks it throws away, without one recorded verdict changing."
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-12'
+    source: "Keith, plans/running-thoughts.md #65 (scoped 2026-10-06 morning: a full bootstrap under 5 minutes, output identical, proven by an equivalence test; the finding profiled 2026-10-11 evening). Drafted by delivery-scoper 2026-10-11 and revised 2026-10-12 with Keith's answers to four questions."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL decide which checks a run asks each tool to evaluate from the same rule the results writer uses to decide which results it records (qa_results_writer.scope_of_run), and SHALL NOT hold a second implementation of that rule in any tool runner."
+      - "WHERE a run's id names a table, THE SYSTEM SHALL ask each scoped tool for that run's own dataset's checks (none where its own table is contested, REQ-PIPE-079 criterion 13) plus every cross-table check that declares it reads that table."
+      - "WHERE a run is a readers-only run (REQ-PIPE-121 criterion 2), THE SYSTEM SHALL ask each scoped tool for only that dataset's checks that read a moved table."
+      - "WHERE a run's id names no table, such as a trial (`mothman cp qa --trial`), THE SYSTEM SHALL ask each tool for the whole collection's checks, as today."
+      - "THE SYSTEM SHALL leave every sibling table a scoped cross-table check reads readable to it, so that the check reads the same rows it reads today."
+      - "IF a check inside a run's scope has neither a recorded result nor a not-evaluated record once the run's tools have finished, THEN THE SYSTEM SHALL refuse the run and stop the batch, naming the check and the tool, as the left-out reconciliation does for a disagreement (REQ-PIPE-115 criterion 17)."
+      - "THE SYSTEM SHALL keep the results writer's own filter to the run's scope (_scope_to_run), so that a tool asked for more than the scope still records only the scope."
+      - "WHEN a run invokes a QA tool, THE SYSTEM SHALL record in the qa schema, for that run and tool, every check id the tool was asked to evaluate, including for a tool that is not scoped, so that a run and tool with no such record means it was not recorded rather than that nothing was asked for."
+      - "THE SYSTEM SHALL record the asked-for check ids in a table of their own, one row per run, tool and check id, keyed to qa.run and removed with it, under a new qa schema version."
+      - "THE SYSTEM SHALL take Birth Registrations through the same scoped path, where the scope is every check on its one table, and SHALL record for it exactly what it records today, plus the asked-for record."
+      - "THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap from empty, once REQ-PIPE-189 to 192 are built, as the commit before the first of them, compared by tests/equiv_support.snapshot with only the columns it already excludes allowed to differ, and the new asked-for table allowed to be present on one side only. THE SYSTEM SHALL state in the evidence how many arrival runs, re-check runs and readers-only runs the comparison covered."
+      - "THE SYSTEM SHALL report a full bootstrap's wall-clock time from empty, and each collection's, before the first of REQ-PIPE-189 to 192 and after the last, on the same machine on the same day with nothing else running, using REQ-TEST-116 criterion 6's timing output."
+      - "THE SYSTEM SHALL complete a full bootstrap from empty in under 5 minutes, on the machine that measured 10m39s on 2026-10-11."
+    non_functional_requirements:
+      - "IDENTICAL OUTPUT IS THE BAR, not close output (Keith, #65, 2026-10-06). This is a speed change, and a speed change that moves any verdict is a defect."
+      - "ONE ANSWER TO 'WHICH CHECKS TOUCH THIS TABLE' (REQ-PIPE-121 NFR 1, REQ-PIPE-140 NFR 1). The scope comes from reevaluation.plan() and the reads declarations through scope_of_run, never from a per-tool list of what each table needs."
+      - "NO SCENARIO-ONLY CODE PATH. The scoped path is the only path for every real run, synthetic or not. Nothing in it knows about the generator or a planted test scenario."
+      - "A READER YEARS LATER can answer 'what was this tool asked to check on this run, and why is its raw output narrower than the collection' from the qa schema alone. They need neither the code of the day nor a re-run, because the asked-for record sits beside the raw output and qa.run already states the run's scope and cause."
+      - "THE ASKED-FOR RECORD IS STATE, so it lives in the database and never in a committed file (CLAUDE.md, the repository holds configuration, not state). It holds check ids only, never supply values."
+      - "SCHEMA VERSION. A new qa schema version is refused over an older database by design (qa_store.SchemaVersionError), so every existing database, including the sandbox's supply and any CI cache, is rebuilt from empty once. Expected and harmless on synthetic data. Say so in the changelog entry."
+      - "SCALE (CLAUDE.md, ~30 datasets on the quarterly asset). Today every run evaluates every table, so a collection's per-run cost grows with its table count and its total cost with the square of it. Scoped, a run costs roughly its own table plus its readers. The asked-for table grows with the scope, roughly 10 to 40 rows per tool per run, not with the collection."
+      - "FAILS LOUDLY. A check in scope that went missing refuses the run, because an absent check reads like a pass."
+      - "NO NEW DEPENDENCY and no version pin. dbt's node selection, Soda's handed checks text and datacontract-cli 1.2.0's own `quality_ids`/`schema_name` options are all in the installed versions (checked 2026-10-11)."
+      - "SUPPLY ROWS stay where they are. The tools read the run's view schema exactly as today, and nothing on a read-committed-history path gains any access."
+      - "COST. Less compute per arrival, which carries over to the per-arrival Lambda shape in plans/wider.md's AWS MVP."
+      - "CI. Changes qa_tools/, so REQ-TEST-117's cache key misses once, as intended."
+    dependencies:
+      - REQ-PIPE-192
+    decisions:
+      - "PREMISE VERIFIED AGAINST THE CODE, 2026-10-11. dbt: run_dbt_cp selects all six stg_cp_* models plus the three singular tests, so every Child Protection test runs (61 nodes, as REQ-PIPE-157's spike counted). Soda: run_soda_cp hands the whole checks file, less only unreadable tables (readable_checks_yaml). datacontract-cli: run_against_warehouse tests the whole contract. The results writer then cuts every tool's results down to the run's own dataset plus the cross-table checks that read its table (_scope_to_run, REQ-PIPE-105 criterion 11). A reader's result lands in the _cross-table scope, which is why the database shows one dataset per run in scope 'dataset'."
+      - "WHAT A RUN'S SCOPE HOLDS, counted from the check declarations 2026-10-11. Of Child Protection's 55 dbt checks, a run records its own plus the readers of its table. That is 11+4 for clients, 12+1 for notifications, 11+1 for investigations, 10+0 for placements, 6+2 for carers and 5+2 for case workers. Soda (60 checks) and datacontract-cli (62) are in the same proportion. So roughly a fifth of the evaluation is kept."
+      - "TARGET KEPT AT UNDER 5 MINUTES, SCOPE WIDENED (Keith, 2026-10-12, 'Under 5, widen the scope'). The small repeated per-arrival costs are now in, as REQ-PIPE-192, which this requirement's target depends on. REJECTED: setting this requirement's target at what scoping alone reaches, with under 5 staying #65's overall goal. REJECTED: no number until measured."
+      - "UNDER 5 DOES NOT YET LOOK REACHABLE ON THESE ESTIMATES, said plainly (2026-10-12). Child Protection sets the length (593s for 108 arrivals, 5.5s each). Under 5 minutes needs about 2.75s an arrival. Scoping all three tools is estimated at 3.1-3.8s an arrival: dbt about 1.5-2s beside about 2-2.5s for the rest, plus our own steps at about 1.1-1.3s. REQ-PIPE-192 is measured at about 0.2s an arrival. That gives about 2.9-3.6s, or 5m10s to 6m30s. Reaching under 5 needs the optimistic end of every estimate. Otherwise the remaining own-step time (promotion, re-checks, filing, staging, the census) has to shrink too, and #65 has not yet broken that down. Per the 2026-10-06 rule, the number goes back to Keith if the measurement misses."
+      - "MISSING CHECK REFUSES AND STOPS (Keith, 2026-10-12, 'Refuse and stop'), matching his 2026-10-04 choice for the left-out reconciliation. A check gone missing after scoping is a defect in the scope or the selection, not a data condition. REJECTED: recording it red and not evaluated and carrying on, the way Soda's unreported checks are handled, because that makes a code fault look like a data problem on the dashboard."
+      - "WHAT EACH TOOL WAS ASKED FOR IS RECORDED (Keith, 2026-10-12, 'Also record what was asked'). It goes in a new qa table, one row per run, tool and check id, and a new qa schema version. It is a table rather than a column on qa.tool_output, because 'which runs were asked for check X' is then one indexed query rather than an array scan across every raw output. REJECTED: a text-array column on qa.tool_output. REJECTED: relying on qa.run's scope alone, which states the rule but not its answer on the day, and a rule can change."
+      - "BOTH HALVES OF beside() HAVE TO SHRINK. Scoping dbt alone moves the critical path onto Soda + datacontract-cli + Evidently (~3.5s), which saves only about a second an arrival. That is why the tools are separate requirements, each worth little alone, and the target sits here."
+      - "'THE TOOLS CANNOT BE ASKED FOR A SUBSET' IS WRONG for the installed versions. REQ-PIPE-121's decision on readers-only runs says so, and so does the comment in run_datacontract_cp.py. But dbt takes an explicit selection, Soda is already handed an edited checks text, and datacontract-cli 1.2.0 takes quality_ids and schema_name. When this is built, mark that REQ-PIPE-121 decision superseded."
+      - "READERS-ONLY RUNS GAIN MOST. Today a knock-on re-evaluation runs all four tools over the whole collection to keep a handful of checks. Under criterion 3 it asks for only those checks."
+      - "THE WRITER'S FILTER STAYS (criterion 7). REJECTED: removing it once the tools are scoped. If a tool is asked for too much, the result is extra work with the same records. Without the filter, it would change the records."
+      - "THE MISSING-CHECK GUARD EXISTS BECAUSE OF THIS CHANGE (criterion 6). Today every check is asked for, so a check is lost only when a tool leaves it out, which the left-out reconciliation covers. A computed subset that is wrong would be a new way to lose one, and dbt would simply produce no result."
+      - "REJECTED: a hand-kept list per table of which checks its run needs. That would be a second implementation of 'which checks touch this table'."
+      - "REJECTED: dropping sibling views from the run schema so the tools skip the siblings' checks. Cross-table checks read those views, and a missing view is how a held table is signalled today."
+      - "OUT OF SCOPE: our own dataset_stats step. It reads all six tables, but what it reads is recorded in qa.dataset_stats, which the equivalence snapshot compares, and it is cheap. Also out: Evidently (~0.2s a run), which is not scoped but whose asked-for set is still recorded (criterion 8)."
+      - "NOT A RE-PROPOSAL OF REQ-PIPE-161, which Keith declined on 2026-10-06 as too risky. That draft reused a contract resolved once per process. This changes what each run asks for, and its datacontract-cli half uses the tool's own options, not a modified contract (REQ-PIPE-190)."
+      - "NOT the other lever #65 names, running different datasets' chains side by side. That changes the order work happens in. This changes how much work there is. Keep them separate so each can be proven identical on its own."
+      - "IF THE MEASURED BOOTSTRAP MISSES UNDER 5 MINUTES (Keith, 2026-10-12): the target stays, criterion 13 is recorded as unmet, and the next step is a profile of our own per-arrival steps (promotion, re-checks, filing, staging, the census - about 1.1-1.3s an arrival) toward a further requirement. REJECTED accepting the measured figure as the target, and REJECTED leaving it to a later conversation with no rule."
+    open_questions: []
+
+  - id: REQ-PIPE-189
+    title: dbt builds only the tests inside a run's scope, and the models they read
+    date_written: "2026-10-12"
+    story: "As someone regenerating or processing QA history, I want dbt to run only the tests a run will record, building just the staging models those tests read, so that dbt stops spending most of each Child Protection run on tests whose results are thrown away."
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-12'
+    source: "Keith, plans/running-thoughts.md #65 (scoped 2026-10-06; the finding profiled 2026-10-11 evening). Drafted by delivery-scoper 2026-10-11, split out of REQ-PIPE-188 per tool, revised 2026-10-12."
+    acceptance_criteria:
+      - "WHEN a run evaluates dbt, THE SYSTEM SHALL run only the tests inside the run's scope (REQ-PIPE-188 criterion 1), and build the staging model of every table those tests read."
+      - "THE SYSTEM SHALL NOT run a test outside the run's scope because a model it depends on was built for a test inside it."
+      - "IF a table a scoped test reads has no view, whether held, contested with nothing promoted or absent, THEN THE SYSTEM SHALL leave out every scoped test that depends on it, as exclude_unreadable does today, and report those tests to the left-out reconciliation (REQ-PIPE-115 criterion 17)."
+      - "THE SYSTEM SHALL apply the audit-table re-count (_AUDIT_AGGREGATE_SQL) and the failing-sample capture to every scoped test exactly as today."
+      - "THE SYSTEM SHALL keep using the long-lived dbt worker and its partial parse (REQ-PIPE-157), and SHALL NOT bring back a full parse per run by varying anything parse-relevant per run."
+      - "THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the columns it already excludes allowed to differ."
+      - "THE SYSTEM SHALL report dbt's mean time per Child Protection run over a full bootstrap from empty, before and after, on the same machine on the same day."
+    non_functional_requirements:
+      - "The selection is computed from check ids through the existing node-to-check-id lookup (_check_id_for), never from a list of node names kept by hand."
+      - "dbt's own DAG still decides what an unreadable model takes with it (dbt_common.exclude_unreadable's docstring), because this project does not keep a copy of the DAG."
+    dependencies:
+      - REQ-PIPE-188
+    decisions:
+      - "WHY dbt: it is the larger half of beside() at 4.6s an arrival, measured in its own worker process, so that figure is not inflated by the profiler. Of the node phase (~3.0-3.8s for 61 nodes, REQ-PIPE-157's measurements), the 55 tests are most of it. The six models are views (dbt_project.yml), so building a sibling model costs little."
+      - "HOW dbt IS TOLD, deliberately left for the build. The candidates are an explicit list of test nodes plus the models they read with indirect selection turned off, and model selection with dbt's own indirect-selection modes. Which one dbt 1.12 honours under the worker's partial parse without re-parsing is a fact to establish against the installed package, as REQ-PIPE-157's spike did, not to assume."
+      - "REJECTED: leaving a sibling's tests in so the node count stays stable for dbt. Under the worker, the selection is an invocation argument, not a parse input. If it turns out to invalidate the partial parse, that is a measurement to bring back, not a reason to keep the waste."
+    open_questions: []
+
+  - id: REQ-PIPE-190
+    title: datacontract-cli tests only the rules inside a run's scope, selected through its own options
+    date_written: "2026-10-12"
+    story: "As someone regenerating or processing QA history, I want datacontract-cli asked, through its own options, for only the rules a run will record, so that the second half of each run stops testing sibling tables' rules whose results are thrown away, and the contract the tool reads stays the committed one."
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-12'
+    source: "Keith, plans/running-thoughts.md #65 (scoped 2026-10-06; the finding profiled 2026-10-11 evening). Drafted by delivery-scoper 2026-10-11, split out of REQ-PIPE-188 per tool, revised 2026-10-12 with Keith's choice of mechanism."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL give every quality rule in contract/child-protection-contract.yaml and contract/bdm-birth-registrations-contract.yaml an ODCS `id` equal to its customProperties check_id."
+      - "IF a quality rule in either contract has no ODCS `id`, or an `id` that differs from its check_id, THEN THE SYSTEM SHALL fail the check-lifecycle gate, naming the rule."
+      - "WHEN a run evaluates datacontract-cli, THE SYSTEM SHALL select the rules inside the run's scope (REQ-PIPE-188 criterion 1) through datacontract-cli's own `quality_ids` option, narrowed further with its `schema_name` option wherever every selected rule sits on one model."
+      - "WHERE a run's scope spans rules the tool cannot select in one invocation, THE SYSTEM SHALL invoke datacontract-cli once per such part and record the union of their results, each result exactly once."
+      - "WHERE a run's id names no table, THE SYSTEM SHALL invoke datacontract-cli over the whole contract with neither option, as today."
+      - "THE SYSTEM SHALL hand datacontract-cli the committed contract unchanged except for the warehouse server it appends today, and SHALL NOT remove, reorder or alter any model or rule to scope a run."
+      - "IF datacontract-cli reports a selected rule id it cannot find, THEN THE SYSTEM SHALL refuse the run, and SHALL NOT fall back to testing the whole contract."
+      - "IF a scoped rule reads a table the run cannot read, THEN THE SYSTEM SHALL leave it out and report it to the left-out reconciliation, as today."
+      - "THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the columns it already excludes allowed to differ."
+      - "THE SYSTEM SHALL report datacontract-cli's mean time per Child Protection run over a full bootstrap from empty, before and after, on the same machine on the same day, measured without a profiler."
+    non_functional_requirements:
+      - "datacontract-cli stays in-process and in the same thread as Soda and Evidently (REQ-TEST-116's decision on running dbt beside the other three)."
+      - "Credentials still reach the tool only through its `config=` argument, never in the contract text (datacontract_common.run_against_warehouse)."
+      - "MAINTENANCE. Every new quality rule now needs an `id` as well as a check_id. The gate (criterion 2) makes forgetting one a red CI run rather than a rule silently never selected. docs/check-authoring-rules.md governs only the three prose fields, so it needs no change, and none is proposed."
+      - "VERSION. quality_ids is a datacontract-cli 1.2.0 option. If a later upgrade drops or renames it, criterion 7's refusal stops the run rather than quietly widening it."
+    dependencies:
+      - REQ-PIPE-188
+    decisions:
+      - "ITS OWN OPTIONS (Keith, 2026-10-12): quality_ids and schema_name, with an ODCS `id` added to every quality rule in both contracts. REJECTED: handing it a copy of the contract pruned to the run's models and rules, because that is the same seam the declined REQ-PIPE-161 touched (a contract text altered before the tool reads it). REJECTED: leaving datacontract-cli unscoped, which would leave the non-dbt half of beside() as the critical path and lose most of REQ-PIPE-189's gain."
+      - "VERIFIED IN THE INSTALLED SOURCE (datacontract-cli 1.2.0, engines/data_contract_test.py, 2026-10-11/12). schema_name limits a test to one model. quality_ids keeps only quality rules whose ODCS `id` matches, drops every built-in schema check, and raises on an id it cannot find (check_that_quality_ids_exist). ODCS's quality `id` is a free string (open_data_contract_standard DataQuality.id), so the check id itself can be used, and no second name has to be invented."
+      - "THE TWO-CALLS CASE PROBABLY DOES NOT ARISE, found 2026-10-12 and flagged rather than assumed. Every one of the 62 datacontract checks Child Protection records is a quality rule carrying a check id. The built-in schema checks are not recorded at all, because the runner keeps only quality types. So quality_ids alone, with schema_name left at 'all', selects own rules and reader rules on other models in ONE invocation. schema_name narrows further only when every selected rule is on one model, for example a placements arrival with no readers. Criterion 4 stays as the rule if a run ever needs two invocations, so Keith's two-calls case is covered without being built speculatively."
+      - "DROPPING THE BUILT-IN SCHEMA CHECKS CHANGES NOTHING RECORDED. run_datacontract_cp discards every check type outside _QUALITY_CHECK_TYPES today, so their only trace is in raw_output, which is not compared, and which REQ-PIPE-188's asked-for record now explains."
+      - "WHY THIS IS WORTH DOING: datacontract-cli is the largest part of the beside() half that is not dbt. #65's 3.1s an arrival was inflated by the profiler. The checks themselves are ~1.5s of it, and resolution is 0.21-0.46s that does not shrink."
+      - "ONE INVOCATION WHERE ONE SUFFICES (Keith, 2026-10-12, confirming): quality_ids alone selects a run's own rules and its cross-table readers in one call, since every recorded datacontract check is a quality rule with an id. Criterion 4's two-invocation rule stays for a future rule that needs it, and is not built speculatively. REJECTED building and testing the two-call path now, with nothing to exercise it."
+    open_questions: []
+
+  - id: REQ-PIPE-191
+    title: Soda scans only the checks inside a run's scope
+    date_written: "2026-10-12"
+    story: "As someone regenerating or processing QA history, I want Soda Core handed only the checks a run will record, so that the second half of each run stops scanning sibling tables whose results are thrown away."
+    moscow: could
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-12'
+    source: "Keith, plans/running-thoughts.md #65 (scoped 2026-10-06; the finding profiled 2026-10-11 evening). Drafted by delivery-scoper 2026-10-11, split out of REQ-PIPE-188 per tool."
+    acceptance_criteria:
+      - "WHEN a run evaluates Soda Core, THE SYSTEM SHALL hand the scan only the checks inside the run's scope (REQ-PIPE-188 criterion 1), removing the others from the checks text by check id, as readable_checks_yaml already removes checks over unreadable tables."
+      - "THE SYSTEM SHALL keep recording as red and not evaluated every handed check the scan did not report (unreported_checks), and SHALL NOT count a check outside the run's scope as unreported."
+      - "THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the columns it already excludes allowed to differ."
+      - "THE SYSTEM SHALL report Soda's mean time per Child Protection run over a full bootstrap from empty, before and after, on the same machine on the same day, measured without a profiler."
+    non_functional_requirements:
+      - "Soda keeps its own `.env` reload behaviour contained, as today (plans/tooling.md #26). Nothing here changes how the scan is configured, only which checks it is handed."
+    dependencies:
+      - REQ-PIPE-188
+    decisions:
+      - "THE SMALLEST OF THE THREE, hence could rather than should. Soda is ~1.4s an arrival under the profiler, of which parsing the checks (0.17-0.25s without a profiler, REQ-PIPE-161's re-measure) and dumping check definitions do not shrink. The queries (~0.46s) and much of the result handling do. It is on the non-dbt half of beside(), so under REQ-PIPE-188's target it probably matters. Kept separate so Keith can take or leave it."
+      - "THE MECHANISM EXISTS: readable_checks_yaml already edits the SodaCL text per run, and unreported_checks already compares against what was handed rather than against the whole file."
+    open_questions: []
+
+  - id: REQ-PIPE-192
+    title: The cross-table declarations and hot configuration lookups are worked out once per process, not on every call
+    date_written: "2026-10-12"
+    story: "As someone regenerating or processing QA history, I want answers that cannot change during a run, such as which tables each check reads and the values read out of unchanged configuration, worked out once per process and reused. That way each arrival stops paying for hundreds of copies and re-collections of the same thing."
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-12'
+    source: "Keith, 2026-10-12 morning, answering REQ-PIPE-188's target question ('Under 5, widen the scope'): the small repeated costs plans/running-thoughts.md #65 names, profiled 2026-10-11 evening. Drafted by delivery-scoper 2026-10-12."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL answer 'which tables does each check declare it reads' from one function used by the promotion gate, the knock-on and target-agreement code, the results writer and the Soda and datacontract-cli runners, and SHALL NOT keep promotion._declared_reads and qa_results_writer._declared_reads_tables as two implementations."
+      - "WHILE no check source file's content has changed in a process, THE SYSTEM SHALL return that answer without collecting the check definitions again."
+      - "IF any check source file's content changes, THEN THE SYSTEM SHALL collect the declarations afresh, whether or not its size or modification time changed."
+      - "IF the declarations cannot be read, THEN THE SYSTEM SHALL keep promotion's existing fail-safe (an empty mapping and a printed note, which can refuse a promotion but never grant one), and SHALL NOT cache the failure."
+      - "THE SYSTEM SHALL give every caller of that answer its own copy, or a read-only one."
+      - "THE SYSTEM SHALL reduce config_yaml.parse calls per Child Protection arrival from the ~490 measured 2026-10-11 (53,068 across 108 arrivals) to no more than 50, by caching each hot caller's derived values on the content of the file they came from, and SHALL report the before and after counts."
+      - "THE SYSTEM SHALL keep giving every direct caller of config_yaml.parse its own copy of the parsed document (REQ-PIPE-156 criterion 4)."
+      - "THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap from empty as the commit before this change, compared by tests/equiv_support.snapshot with only the columns it already excludes allowed to differ."
+      - "THE SYSTEM SHALL report a full bootstrap's wall-clock time from empty before and after, on the same machine on the same day with nothing else running."
+    non_functional_requirements:
+      - "STALENESS. Tests copy contract directories, monkeypatch paths and edit check files in place, and every one must pass unchanged. That is why every cache here is keyed on content, as REQ-PIPE-156's is, never unkeyed."
+      - "No new dependency. Configuration only, never supply data."
+      - "MEMORY. Bounded, as config_yaml's own cache is. The declarations are one small mapping of about 300 checks."
+    dependencies: []
+    decisions:
+      - "VERIFIED IN THE CODE, 2026-10-12. config_yaml.parse deep-copies the cached document on every call, including every cache hit (copy.deepcopy in parse()). Unprofiled, a hit costs 1.37ms for the Child Protection contract, 0.95ms for its Soda checks, 0.15ms for data-asset.yaml and 0.04ms for environments.yaml. promotion._declared_reads is uncached and re-runs collect_checks(None) over every check source each call. qa_results_writer._declared_reads_tables computes the SAME answer behind an unkeyed lru_cache, so today there are two implementations of one answer, one cached and one not."
+      - "THE SAVING IS SMALL, and measured, not profiled. promotion._declared_reads costs 8-10ms a call unprofiled (#65's 16s over 402 calls was profiler-inflated about 4x), so about 3-4s a bootstrap, ~0.03s an arrival. config_yaml.parse at ~490 calls an arrival is estimated at ~0.15s an arrival unprofiled, from the per-file hit costs above. Together that is ~0.2s of Child Protection's ~5.5s, about 20s off a bootstrap. Worth doing for REQ-PIPE-188's target, but on its own it does not decide that target."
+      - "OTHER REPEATED PER-ARRIVAL COSTS OF THE SAME SHAPE, looked for 2026-10-12. The results writer repeats lookups per tool per run (supply_db.resolution_for twice, _period_of_run, _readers_scope, _decision_behind), and the tool runners each ask what is readable again. Timed warm against the real supply database, these are 0-5ms each (resolution_for with connect 1.9ms, _period_of_run 2.9ms, scope_of_run 4.6ms), so together under ~0.1s a run. Not worth a criterion, and recorded here so nobody re-measures them. Cold first calls were 36-74ms, but each process pays that once."
+      - "WHY THE HOT CALLERS ARE CACHED, NOT THE COPY REMOVED. REQ-PIPE-156 decided 'a copy per caller' (callers mutate what they read), and that decision stands. Caching each hot caller's derived value (a contract's cadence and claim window, a hierarchy lookup) on the file's content removes the parse call without handing anyone a shared mutable document. REJECTED: config_yaml returning a shared or frozen document to every caller, which reverses a signed decision for every caller to save time at a few. REJECTED: another unkeyed lru_cache, for REQ-PIPE-156's own reason (tests call cache_clear() dozens of times)."
+      - "WHICH CALLERS ARE HOT is not known from the 2026-10-11 profile, which recorded the total, not the callers. The build counts callers on the 12-arrival replay first. Criterion 6 is the outcome that has to hold, not a list of modules to change."
+      - "INDEPENDENT OF THE SCOPING (REQ-PIPE-188 to 191). It changes no tool's work, so it is proven identical on its own and can land first. REQ-PIPE-188's target depends on it."
+      - "REQ-PIPE-156's open question (re-keying the unkeyed lru_caches in schedule, hierarchy, asset_time and arrival_patterns on content) is touched only where one of them turns out to be a hot caller under criterion 6. It is otherwise left as it is."
+    open_questions: []
