@@ -20,12 +20,13 @@ parallel_orchestrate.run_manifest's docstring, which the batch used to
 call. Results come back in arrival order, so output stays byte-for-byte
 reproducible.
 
-Assumes data/raw/ (generator output) exists - run_pipeline() below builds
-its own data/duckdb_runs/*.duckdb per-run real warehouses itself (via
-build_per_run_warehouses.build_all()), so nothing needs pre-building
-first. `mothman pipeline run` (cli/pipeline.py, Phase 4) wraps this
-function end to end - generates synthetic data, then calls run_pipeline()
-- as the real replacement for the retired ./run_pipeline.sh.
+Reads the arrivals recognised in the delivery tree (data/deliveries/,
+the generator's output) and STAGES EACH ONE AS IT ARRIVES, into the
+PostgreSQL supply database's staging schema
+(build_per_run_warehouses.stage_arrival, REQ-PIPE-068) - nothing is staged
+up front. `mothman pipeline run` and `mothman pipeline bootstrap`
+(cli/pipeline.py) generate the synthetic data and then call
+run_pipeline().
 
 Run via `mothman pipeline run` or `mothman debug run-dbt`/etc. (single-
 tool debugging) - never invoke this module bare (plans/tooling.md #1

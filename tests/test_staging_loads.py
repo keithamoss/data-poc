@@ -219,62 +219,6 @@ class TestOnlyLoadedTablesAreReadable:
             "catalogue's, which is the distinction the whole mechanism rests on")
 
 
-class TestStagingIsSequential:
-    """Criterion 9, and the NFR it comes from."""
-
-    def test_build_all_stages_without_fanning_out(self):
-        """One DuckDB file takes one writer, so a staging fan-out would
-        have workers of a single invocation collide on its lock. This
-        asserts the source rather than a timing, because the failure is
-        a lock error under load rather than a slow test."""
-        import inspect
-        for module in (bdm, __import__("qa_tools.cp.build_cp_warehouses",
-                                        fromlist=["build_all"])):
-            source = inspect.getsource(module)
-            for banned in ("ProcessPoolExecutor", "ThreadPoolExecutor", "multiprocessing"):
-                assert banned not in source, (
-                    f"{module.__name__} stages in parallel via {banned} - one DuckDB file "
-                    f"takes one writer, and staging must be serial")
-
-
-    def test_staging_happens_before_the_tools_fan_out(self):
-        """Criterion 1, and criterion 9's second half. The tools run
-        over a process pool; staging must be finished before the first
-        worker starts, because building a view is a write and DuckDB
-        gives a writer an exclusive lock."""
-        import inspect
-
-        from qa_tools.bdm import orchestrate_bdm
-        from qa_tools.cp import orchestrate_cp
-
-        for module, first in ((orchestrate_bdm, "build_per_run_warehouses.build_all()"),
-                               (orchestrate_cp, "build_cp_warehouses.build_all()")):
-            source = inspect.getsource(module)
-            assert first in source, f"{module.__name__} no longer stages at all"
-            fanout = source.find("ProcessPoolExecutor")
-            if fanout == -1:
-                continue
-            assert source.find(first) < fanout, (
-                f"{module.__name__} stages AFTER it fans out - two workers would then "
-                f"collide on the one supply database's writer lock")
-
-    def test_one_collection_is_staged_at_a_time(self):
-        """Both orchestrators stage into the same file, so the command
-        that runs both must not run them at once."""
-        import inspect
-
-        from cli import pipeline
-        # run_command is wrapped by click, so read the module rather
-        # than the command object.
-        source = inspect.getsource(pipeline)
-        source = source[source.index("def run_command("):]
-        assert source.index("_run_bdm(sequential)") < source.index("_run_cp(sequential)")
-        for banned in ("ProcessPoolExecutor", "ThreadPoolExecutor"):
-            assert banned not in source, (
-                f"mothman pipeline run drives both collections via {banned} - they stage "
-                f"into ONE database file, which takes one writer")
-
-
 class TestNothingIsWrittenIntoTheDelivery:
     """A delivery is a supplier-owned tree this pipeline treats as
     immutable, and the loader used to write its staging CSV beside the

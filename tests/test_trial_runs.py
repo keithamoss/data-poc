@@ -141,12 +141,38 @@ class TestATrialLeavesNothingBehind:
         """PostgreSQL has transactional DDL, which is what makes this a
         real guarantee rather than a walk that can stop halfway: either
         every schema the trial used goes, or none does and the next
-        `mothman supply tidy` finds them all together."""
-        import inspect
+        `mothman supply tidy` finds them all together.
 
-        source = inspect.getsource(trial.discard)
-        assert "BEGIN" in source or "transaction" in source.lower(), \
-            "the tidy-up drops schemas one statement at a time"
+        BY BEHAVIOUR (Keith, 2026-10-12, docs/test-review-pass2.md): this
+        used to grep discard()'s source for the word "transaction", which
+        its own docstring satisfied. Now the last statement of the tidy-up
+        fails, after every schema has been dropped - and they must all
+        still be there."""
+        import pytest
+
+        run_id = trial.trial_run_id()
+        with supply_db.connect(label="test-trial") as conn:
+            supply_db.ensure_schemas(conn)
+            for schema in (supply_db.staging_schema_for(run_id),
+                           supply_db.run_schema(run_id),
+                           supply_db.dbt_schema(run_id)):
+                conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+            made = set(trial.schemas_of(conn, run_id))
+            real = conn.execute
+
+            def fail_late(sql, *args, **kwargs):
+                if ".run WHERE run_key" in sql and sql.startswith("DELETE"):
+                    raise RuntimeError("the tidy-up fails after dropping every schema")
+                return real(sql, *args, **kwargs)
+            conn.execute = fail_late
+            try:
+                with pytest.raises(RuntimeError):
+                    trial.discard(conn, run_id)
+            finally:
+                conn.execute = real
+            assert set(trial.schemas_of(conn, run_id)) == made, \
+                "a failed tidy-up left some schemas dropped and some not"
+            trial.discard(conn, run_id)
 
     def test_discarding_a_trial_that_staged_nothing_is_harmless(self, supply_dsn):
         """A trial that failed before staging still reaches its own

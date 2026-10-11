@@ -861,7 +861,8 @@ class TestStatusMatchesEachToolsOwnVerdict:
             "on a past date the page disagrees with the run it shows:\n"
             + "\n".join(str(d) for d in result["disagreements"]))
 
-    def test_every_rendered_status_matches_the_tool_that_produced_it(self, clean_page, built_dashboard_html):
+    def test_every_rendered_status_matches_the_tool_that_produced_it(self, clean_page, built_dashboard_html,
+                                                                       deployment_history):
         _goto(clean_page, built_dashboard_html)
         result = clean_page.evaluate(self._COMPARE_JS)
 
@@ -872,17 +873,21 @@ class TestStatusMatchesEachToolsOwnVerdict:
         # the disagreement check below - so the test reported a failure
         # while the statuses it exists to police were in fact perfect.
         #
-        # The floor is now derived from the data the page was built
-        # from: every committed run contributes statuses, so comparing
-        # fewer than one per run means the traversal, not the history.
-        committed_runs = sum(
-            len(list(d.iterdir()))
-            for d in (Path(__file__).resolve().parent.parent / "qa_results").glob("*/*")
-            if d.is_dir()
-        )
-        assert result["compared"] > committed_runs, (
-            f"only {result['compared']} statuses compared across {committed_runs} "
-            "committed runs - the embedded data or the traversal is wrong, "
+        # The floor is derived from the data the page was built from:
+        # every recorded run contributes statuses, so comparing fewer than
+        # one per run means the traversal, not the history. COUNTED IN THE
+        # DATABASE (Keith, 2026-10-12, docs/test-review-pass2.md): it used
+        # to count the deleted qa_results/ tree, so the floor had silently
+        # become zero.
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="test-e2e") as conn:
+            recorded_runs = conn.execute(
+                f'SELECT count(*) FROM "{qa_store.SCHEMA}".run').fetchall()[0][0]
+        assert recorded_runs > 0, "no recorded runs - the floor would be vacuous"
+        assert result["compared"] > recorded_runs, (
+            f"only {result['compared']} statuses compared across {recorded_runs} "
+            "recorded runs - the embedded data or the traversal is wrong, "
             "rather than the statuses being right"
         )
         assert result["disagreements"] == [], (

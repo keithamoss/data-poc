@@ -12,12 +12,14 @@ qa_tools/common/arrival_lifecycle.py (REQ-PIPE-086) - see
 orchestrate_bdm.py's docstring for why it stopped running in parallel.
 --sequential now only stops a run's tools overlapping.
 
-Assumes data/cp_raw/ (generator/generate_cp_runs.py's output) already
-exists - run that first if it doesn't. Builds data/cp_duckdb_runs/ itself
-via build_cp_warehouses.build_all().
+Reads the arrivals recognised in the delivery tree (data/deliveries/,
+generator/generate_cp_runs.py's output) and stages each table as it
+arrives, into the PostgreSQL supply database's staging schema
+(build_cp_warehouses.stage_arrival, REQ-PIPE-068) - nothing is staged up
+front.
 
-Run as `python3 -m qa_tools.cp.orchestrate_cp` (this is a package
-now, not a flat script directory - see plans/qa-pipeline.md #84).
+Run through `mothman pipeline run`/`bootstrap` or `mothman cp qa`, never
+bare (mothman is the only programmatic access point).
 """
 from __future__ import annotations
 import shutil
@@ -388,9 +390,8 @@ def run_single(entry: dict, reference_run_id: str | None = None, run_by: str | N
     where a supply waits silently on a marker nobody sends.
 
     `entry` is a manifest-entry-shaped dict for this one delivery
-    (run_id/received_at/dirty_severity at minimum - see data/cp_raw/
-    manifest.json's own real shape for the full convention; row_counts
-    isn't required, dataset_stats.compute_dataset_stats() derives its own
+    (run_id/received_at/dirty_severity at minimum; row_counts isn't
+    required, dataset_stats.compute_dataset_stats() derives its own
     counts from the live warehouse instead of trusting a passed-in one)."""
     trial.require_trial(entry["run_id"], "orchestrate_cp.run_single")
     run_timestamp = asset_time.now().isoformat()

@@ -4759,6 +4759,13 @@ Belongs with batch 5's check work.
     go red when work SUCCEEDS (the retired-check registries asserted
     empty). Nothing is deleted without Keith's yes per item.
 
+    **WALKED WITH KEITH, 2026-10-12 morning - the false greens, DONE:** the
+    three staging-order tests deleted, the other three rewritten as real
+    checks (qa.dataset_stats in the deployment; the e2e floor from qa.run;
+    the trial tidy-up by making its last delete fail), and the stale
+    orchestrator docstrings rewritten. The rest of docs/test-review-pass2.md
+    is still to walk.
+
 68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
     **No custom code per dataset - everything in configuration, if we can.**
     Keith, 2026-10-06 13:47, prompted by the REQ-QAC-039 survey (hierarchy

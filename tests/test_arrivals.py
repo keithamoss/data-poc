@@ -418,21 +418,28 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
             "a pipeline/QA/dashboard module imports the generator:\n  " + "\n  ".join(offenders))
 
 
-class TestNoCommittedResultCarriesBookkeeping:
+class TestNoRecordedResultCarriesBookkeeping:
     """The observational half, kept because the static rule above
-    cannot see history that was written before it existed."""
+    cannot see history that was written before it existed.
 
-    ROOT = Path(__file__).resolve().parent.parent
+    AGAINST THE DATABASE (Keith, 2026-10-12, docs/test-review-pass2.md):
+    this used to walk the committed qa_results/ tree, which REQ-PIPE-089
+    deleted - so it compared nothing and passed. The recorded statistics
+    are rows in qa.dataset_stats now."""
+
     FORBIDDEN = ("dirty_severity", "seed", "id_offset", "slot_id", "period",
                  "n_rows_generated", "manifest_entry", "attempt_number", "is_resupply",
                  "supersedes_run_id")
 
-    def test_every_committed_dataset_stats_file_is_clean(self):
-        found = []
-        for path in sorted((self.ROOT / "qa_results").rglob("dataset_stats.json")):
-            raw = path.read_text()
-            for key in self.FORBIDDEN:
-                if f'"{key}"' in raw:
-                    found.append(f"{path.relative_to(self.ROOT)}: {key}")
+    def test_every_recorded_dataset_stats_payload_is_clean(self, deployment_history):
+        from qa_tools.common import qa_store, supply_db
+
+        with supply_db.connect(label="test-arrivals") as conn:
+            rows = conn.execute(
+                f'SELECT run_key, dataset_id, stats::text FROM "{qa_store.SCHEMA}".dataset_stats'
+            ).fetchall()
+        assert rows, "no recorded dataset statistics to check - the deployment is empty"
+        found = [f"{run}/{ds}: {key}" for run, ds, raw in rows
+                 for key in self.FORBIDDEN if f'"{key}"' in raw]
         assert found == [], (
             "recorded QA history carries the generator's own bookkeeping:\n  " + "\n  ".join(found))

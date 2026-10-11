@@ -11,6 +11,8 @@ Many hits are false positives: reading YAML, JSON or workflow configuration is n
 
 ## Headline: tests that are green for the wrong reason
 
+**DONE 2026-10-12 (Keith: take all four recommendations; rewrite the stale orchestrator docstrings).** The three staging-order tests are deleted; the bookkeeping test reads qa.dataset_stats in the deployment; the e2e floor counts qa.run; the trial tidy-up test breaks the last delete and checks every schema came back (confirmed failing without the transaction).
+
 Fix these first. Each one passes today while proving nothing, which is the false-green shape CLAUDE.md warns about.
 
 | Test | Why it is vacuous |
