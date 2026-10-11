@@ -7786,17 +7786,20 @@ twice. It deliberately did not re-find the `TypeError`.
     - **Edge from criterion 5:** a scenario whose own suppressed day covered
       its own lead-in was accepted and lost the lead-in silently. Refused.
 
-157. **[todo, 2026-10-11]** **[Data generation]** **[Pipeline & publishing]**
+157. **[in-progress, 2026-10-11]** **[Data generation]** **[Pipeline & publishing]**
      **The delivery critic on REQ-GEN-186 (8e2bada).** Run after the push. The
      comparison logic holds: the critic re-ran it read-only over the 26
      targeted supplies and all agreed, and the gate's reading is what makes
-     2026-08-28's ordinary amber read amber rather than red. Two findings are
-     already checked against the code; the rest are to verify before fixing,
-     each test-first.
+     2026-08-28's ordinary amber read amber rather than red. FIXED the same
+     evening, each with a test that failed first: 1, 3, 6, 7 and the
+     coverage gap. Left with Keith: 2 and 4. Noted, not changed: 5, 8 and
+     the code-quality points.
     - **1 (medium-high, checked):** the TUI's bootstrap menu (`cli/app.py`
       `_bootstrap_menu`) never reads `result.disagreements` and prints
       "Ready" in green over a history where a supply read wrong. Only the
-      CLI command fails. The failure belongs in one place both callers use.
+      CLI command fails. FIXED: one message (`cli.pipeline.
+      disagreement_message`) both callers give; the TUI prints it in red
+      instead of "Ready".
     - **2 (medium, Keith's call):** `mothman pipeline run` regenerates
       (the trial runs) and replays both collections, but never compares
       after the replay, and can publish. Should it compare, or is it out of
@@ -7805,8 +7808,8 @@ twice. It deliberately did not re-find the `TypeError`.
       BEFORE it switches `MOTHMAN_SUPPLY_DSN` to the resume's own database.
       A trial writes and then discards a run, schemas and load outcomes in
       the database the user was pointed at, which resume promises never to
-      write to, and outside any pass lock. Likely fix: resume generates
-      with `trial=False`, since it compares after its own replay anyway.
+      write to, and outside any pass lock. FIXED: resume generates with
+      `trial=False` - it compares after its own replay anyway.
     - **4 (Keith's call):** REQ-GEN-043 criterion 7. A QA module
       (`bootstrap.targets_agree`) now reaches the bookkeeping through
       cli/ and generator/. The static guard checks names, not the call
@@ -7818,16 +7821,24 @@ twice. It deliberately did not re-find the `TypeError`.
       has more than one run today. A third way of answering "a supply's
       results", which the requirement's own decisions warn against.
     - **6 (low):** an ordinary amber that warned on nothing, or a quiet
-      verdict, gives a message naming no checks (observability NFR).
+      verdict, gives a message naming no checks (observability NFR). FIXED:
+      a quiet verdict names its quiet checks, and a supply better than built
+      with no rule named says "no check warned".
     - **7 (low):** on a trial failure, the scenario placements, the
       rewritten SCENARIOS.md and a previous generation's Child Protection
       deliveries stay; a `ValueError` from targets.py escapes as a
       traceback, and after a replay only once the bootstrap has finished.
+      FIXED: the trial now runs before the scenario map is written, so a
+      refused history leaves SCENARIOS.md alone; a record that does not add
+      up is a disagreement in one line on both paths. The placements and a
+      previous generation's Child Protection deliveries still stay - the
+      generator rewrites both on its next run.
     - **8 (low, note):** the trial skips the row-count-growth check, so it
       cannot see a volume target. Consistent with "a verdict probe".
-    - **Coverage:** no test feeds recorded results that DISAGREE to
-      `after_replay`; `targets_agree`'s body is stubbed in every bootstrap
-      test; no test completes a resume through `bootstrap.resume`.
+    - **Coverage:** no test fed recorded results that DISAGREE to
+      `after_replay` - one does now. `targets_agree`'s body is stubbed in
+      every bootstrap test, and no test completes a resume through
+      `bootstrap.resume`; still true.
     - **Code quality:** `target_agreement.py` uses private helpers of
       promotion and qa_results_reader, and `responsible()` repeats
       `status_of`'s per-record mapping.

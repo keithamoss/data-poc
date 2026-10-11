@@ -336,15 +336,23 @@ def bootstrap_command(collection: str, force: bool, sequential: bool,
     _fail_on_disagreements(result.disagreements)
 
 
+def disagreement_message(disagreements) -> str | None:
+    """The one wording every bootstrap caller gives (REQ-GEN-186 criterion
+    3) - the CLI and the TUI alike (post-build-review #157 finding 1)."""
+    if not disagreements:
+        return None
+    return (f"{len(disagreements)} targeted supply/supplies did not read as built once "
+            f"replayed - nothing recorded was changed:\n"
+            + "\n".join(f"  - {d}" for d in disagreements))
+
+
 def _fail_on_disagreements(disagreements) -> None:
     """FAILS, BUT CHANGES NOTHING (REQ-GEN-186 criteria 3 and 6): the history
     stands as recorded, and the failure names each supply the real tools read
     differently from how it was built, with the checks responsible."""
-    if disagreements:
-        raise click.ClickException(
-            f"{len(disagreements)} targeted supply/supplies did not read as built once "
-            f"replayed - nothing recorded was changed:\n"
-            + "\n".join(f"  - {d}" for d in disagreements))
+    message = disagreement_message(disagreements)
+    if message:
+        raise click.ClickException(message)
 
 
 def _step(msg: str) -> None:

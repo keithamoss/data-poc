@@ -760,7 +760,7 @@ one when this line suggests it matters.
 - **#155** `done` 2026-10-11 - The delivery critic on REQ-GEN-184 part B, injected targets (796b537). Run after the push; every claim checked against...
 - **#156** `done` 2026-10-11 - The delivery critic on REQ-GEN-185, lead-ins (19735c6). Run after the push; every claim checked against the code or the...
   - *touches:* `tests/test_kept_routes_agree.py`
-- **#157** `todo` 2026-10-11 - The delivery critic on REQ-GEN-186 (8e2bada). Run after the push.
+- **#157** `in-progress` 2026-10-11 - The delivery critic on REQ-GEN-186 (8e2bada). Run after the push.
   - *touches:* `cli/app.py`
 
 ## plans/road-testing.md

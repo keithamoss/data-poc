@@ -273,7 +273,12 @@ def targets_agree(names) -> tuple[str, ...]:
     from qa_tools.common import target_agreement
 
     wanted = {d for n in names for d in _TARGET_DATASETS[n]}
-    built = [b for b in generated_targets() if b.dataset_id in wanted]
+    try:
+        built = [b for b in generated_targets() if b.dataset_id in wanted]
+    except ValueError as exc:
+        # A RECORD THAT DOES NOT ADD UP is a disagreement, said in one line,
+        # not a traceback (post-build-review #157 finding 7).
+        return (f"what the generator built could not be read: {exc}",)
     with supply_db.connect(label="mothman:bootstrap") as conn:
         return tuple(str(d) for d in target_agreement.after_replay(conn, built))
 
@@ -397,8 +402,12 @@ def resume(name: str, sequential: bool = False,
 
     short = next(k for k, v in checkpoints.COLLECTIONS.items() if v == cp.collection_id)
     say("Generating the synthetic data the replay reads")
-    bdm.generate_synthetic_data()
-    cp_cli.generate_synthetic_data()
+    # NO TRIAL HERE (post-build-review #157 finding 3): this runs before the
+    # resume has a database of its own, so a trial would write - and discard -
+    # a run in the database the person was pointed at, which a resume never
+    # writes to. The comparison after the replay below still runs.
+    bdm.generate_synthetic_data(trial=False)
+    cp_cli.generate_synthetic_data(trial=False)
     total = len(dict.fromkeys(a.run_id for a in cp.recorded.arrivals))
     # SAID BEFORE THE COPY, so a wrong resume can be stopped early (#133 B9).
     say(f"{first.reason}. Replaying arrivals {cp.before} to {total} of {_LABEL[short]} into "

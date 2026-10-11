@@ -181,6 +181,14 @@ def _bootstrap_menu() -> None:
     if not result.populated:
         console.print(result.reason, style="yellow")
         return
+    # NOT "READY" OVER A HISTORY THAT READ WRONG (REQ-GEN-186 criterion 3;
+    # post-build-review #157): the same message the CLI fails with.
+    from cli.pipeline import disagreement_message
+
+    wrong = disagreement_message(result.disagreements)
+    if wrong:
+        console.print(wrong, style="red")
+        return
     console.print(f"Ready - {result.staged_after} staged table(s) in this "
                    f"environment.", style="green")
 

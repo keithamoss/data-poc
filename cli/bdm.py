@@ -90,14 +90,18 @@ def generate_synthetic_data(trial: bool = True) -> None:
     # history the first time somebody regenerates one and not the
     # other - and it disagrees silently, because both files look
     # fine on their own.
-    from qa_tools.common import scenario_map
-    scenario_map.write_map()
+    # THE TRIAL FIRST, THE MAP ONCE IT AGREES (post-build-review #157
+    # finding 7): the map is committed, and a history the trial refused to
+    # emit should not leave it rewritten. The trial reads the placements,
+    # never the map.
     if trial:
         try_targets()
     else:
-        console.print("Target trial skipped (--skip-target-trial): no injected target was "
-                      "tried against the real tools. The comparison after a replay still "
-                      "runs.", style="yellow")
+        console.print("Target trial skipped: no injected target was tried against the "
+                      "real tools. The comparison after a replay still runs.",
+                      style="yellow")
+    from qa_tools.common import scenario_map
+    scenario_map.write_map()
 
 
 class TargetTrialFailed(click.ClickException):
@@ -129,7 +133,15 @@ def try_targets(say=None) -> int:
     say = say or (lambda msg: console.print(msg, style="dim"))
     # WHERE THE GENERATOR JUST WROTE (targets.just_written) - never the
     # pipeline's view of data/.
-    built, written_to = targets.just_written()
+    try:
+        built, written_to = targets.just_written()
+    except ValueError as exc:
+        # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not as a
+        # traceback (post-build-review #157 finding 7).
+        delivery.remove_deliveries(generate_runs._previous_delivery_names(),
+                                   generate_runs.DELIVERIES_DIR, generate_runs.RECEIPTS_DIR)
+        raise TargetTrialFailed(f"what the generator built could not be read, so the "
+                                f"deliveries just written were removed: {exc}") from exc
     tried = [b for b in built
              if b.injected and b.dataset_id == build_per_run_warehouses.DATASET_ID]
     found = []

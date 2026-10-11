@@ -278,3 +278,132 @@ class TestAfterAReplay:
         assert before == after
         assert {b.dataset_id for b in built} == {DS, "cp-clients"}
         assert any(b.injected for b in built) and any(b.target == "green" for b in built)
+
+
+class TestEveryBootstrapCallerFailsOnADisagreement:
+    """Post-build-review #157 finding 1: the TUI's bootstrap menu printed
+    "Ready" in green over a history where a supply read wrong."""
+
+    def test_the_tui_menu_says_so_rather_than_ready(self, monkeypatch, capsys):
+        from cli import app, common
+        from qa_tools.common import bootstrap as boot
+
+        result = boot.BootstrapResult(populated=True, staged_before=0, staged_after=3,
+                                      disagreements=("TS-43's 2026-09-05 14:00 arrival "
+                                                     "(birth-registrations) was built to "
+                                                     "amber and the real tools read red",))
+        monkeypatch.setattr(boot, "bootstrap", lambda **k: result)
+        monkeypatch.setattr(common, "confirm", lambda *a, **k: True)
+        app.console.width = 400
+        app._bootstrap_menu()
+        said = " ".join(capsys.readouterr().out.split())
+        assert "Ready" not in said
+        assert "did not read as built" in said and "TS-43" in said
+
+
+class TestAResumeLeavesTheCallersDatabaseAlone:
+    """Post-build-review #157 finding 3: a resume regenerated - running the
+    trial - before switching to its own database, so the trial wrote (and
+    discarded) a run in the database the person was pointed at, which a
+    resume promises never to write to. It compares after its own replay,
+    so it needs no trial."""
+
+    def test_its_regeneration_runs_no_trial(self, monkeypatch):
+        import types
+
+        from qa_tools.common import bootstrap as boot
+        from qa_tools.common import checkpoints, replay_inputs
+
+        cp = types.SimpleNamespace(recorded=types.SimpleNamespace(readable=True, arrivals=[]),
+                                   collection_id="civil-registration", before=3, name="ckpt")
+        monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
+        monkeypatch.setattr(checkpoints, "find", lambda name: cp)
+        monkeypatch.setattr(replay_inputs, "first_affected",
+                            lambda recorded: types.SimpleNamespace(arrival=5, reason="changed"))
+        seen = []
+
+        class Stop(Exception):
+            pass
+
+        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **k: seen.append(k))
+        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **k: seen.append(k))
+        monkeypatch.setattr(checkpoints, "copy_for_resume",
+                            lambda c: (_ for _ in ()).throw(Stop()))
+        with pytest.raises(Stop):
+            boot.resume("ckpt")
+        assert seen == [{"trial": False}, {"trial": False}]
+
+
+class TestEveryFailureNamesWhatToLookAt:
+    """Post-build-review #157 finding 6 (observability NFR): an ordinary
+    amber that warned on nothing, or a quiet verdict, named no checks."""
+
+    def test_an_amber_with_no_named_rule_that_warned_on_nothing_says_so(self):
+        found = target_agreement.compare(DS, [_r("a.not_null_dbt", "pass")], "amber",
+                                         "the ordinary amber for 2026-08-28", reads={})
+        assert found.checks and "no check warned" in found.checks[0]
+
+    def test_a_quiet_verdict_names_the_quiet_checks(self):
+        # QUIET ONLY WHEN EVERY CONTRIBUTING CHECK IS (rollup_statuses); a
+        # pass beside one quiet check reads green.
+        results = [_r("sex.drift_psi_evidently", "nodata"),
+                   _r("row_count_growth_evidently", "nodata")]
+        found = target_agreement.compare(DS, results, "green", "lead-in", reads={})
+        assert found is not None and any("drift_psi" in c for c in found.checks), found
+
+
+class TestAfterAReplayWithADisagreement:
+    """Coverage the critic found missing: recorded results that DISAGREE."""
+
+    def test_it_is_reported_with_its_checks(self, monkeypatch):
+        from qa_tools.common import delivery_log, promotion, qa_store
+
+        built = targets.Built("the ordinary amber for 2026-08-28", DS, "upload-6018", "amber")
+        monkeypatch.setattr(delivery_log, "supply_ids", lambda d, c: {("upload-6018", DS): "s"})
+        monkeypatch.setattr(qa_store, "current_run", lambda c, d, s: "run_x")
+        monkeypatch.setattr(promotion, "_declared_reads", lambda: {})
+        monkeypatch.setattr(target_agreement, "recorded_results",
+                            lambda c, r: [_r("sex.not_null_dbt", "fail")])
+        [found] = target_agreement.after_replay(None, [built])
+        assert found.verdict == "red" and found.checks == ("sex.not_null_dbt red",)
+
+
+class TestARecordThatDoesNotAddUp:
+    """Post-build-review #157 finding 7: a ValueError from targets.py escaped
+    as a traceback - and after a replay, only once the bootstrap was done."""
+
+    def test_after_a_replay_it_is_a_disagreement(self, monkeypatch):
+        from qa_tools.common import bootstrap as boot
+
+        def broken():
+            raise ValueError("TS-43: the generator's record holds 0 supplies for 2026-09-04")
+        monkeypatch.setattr("cli.pipeline.generated_targets", broken)
+        [said] = boot.targets_agree(["bdm"])
+        assert "TS-43" in said and "2026-09-04" in said
+
+    def test_at_generation_it_fails_the_trial_cleanly(self, monkeypatch):
+        from cli import bdm
+        from generator import generate_runs
+
+        def broken():
+            raise ValueError("TS-43: no supply arriving 2026-09-05 14:00")
+        monkeypatch.setattr(targets, "just_written", broken)
+        monkeypatch.setattr(generate_runs, "_previous_delivery_names", lambda: [])
+        with pytest.raises(bdm.TargetTrialFailed, match="TS-43"):
+            bdm.try_targets(say=lambda _m: None)
+
+    def test_the_scenario_map_is_written_only_once_the_trial_agrees(self, monkeypatch):
+        from cli import bdm
+        from generator import generate_runs
+        from qa_tools.common import scenario_map
+
+        wrote = []
+        monkeypatch.setattr(generate_runs, "main", lambda: None)
+        monkeypatch.setattr(scenario_map, "write_map", lambda: wrote.append(True))
+
+        def disagree(**k):
+            raise bdm.TargetTrialFailed("TS-43 did not read as built")
+        monkeypatch.setattr(bdm, "try_targets", disagree)
+        with pytest.raises(bdm.TargetTrialFailed):
+            bdm.generate_synthetic_data()
+        assert wrote == [], "the committed SCENARIOS.md is not rewritten for a history not emitted"
