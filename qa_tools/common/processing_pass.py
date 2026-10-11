@@ -265,6 +265,10 @@ class PassReport:
     refused: list = field(default_factory=list)
     #: What it re-filed once a dataset was no longer refused.
     refiled_cleared: list = field(default_factory=list)
+    #: Arrivals left ungated because their dataset is refused (Keith,
+    #: 2026-10-11, (f); delivery-critic finding 4) - waiting, not failed, and
+    #: holding back nothing else in their collection.
+    left_frozen: list = field(default_factory=list)
     #: Declared calendar corrections awaiting the asset manager (REQ-PIPE-170
     #: criterion 20) - noted, never computed: their moves are worked out when
     #: one is opened.
@@ -385,9 +389,9 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         # never a silent pass (delivery-critic on 173, #9).
         for ds, exc in errors:
             failed(f"agreement backstop for {ds}", exc)
-        # RED, as the dashboard shows it (criterion 4; PROVISIONAL: the
-        # exit status a scheduler reads says so too) - through exit_status,
-        # not `red`, which says a recorded RESULT is red (#10).
+        # RED on the dashboard (criterion 4), and its own exit status, 3
+        # (Keith, 2026-10-11, (h)) - through exit_status, never `red`, which
+        # says a recorded RESULT is red (#10).
         line = agreement_drift.pass_line(found)
         if line:
             say(line)
@@ -560,5 +564,21 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
     with supply_db.connect(read_only=True, label="mothman:process") as conn:
         after = state_of(arrival, recorded(conn))
     if after != PROCESSED:
+        # LEFT UNGATED BY THE FREEZE is waiting, not failing (delivery-critic
+        # on (f)-(i), finding 4): the first pass after the refusal clears
+        # gates it, and nothing else in its collection is held back for it.
+        from qa_tools.common import agreement_drift
+
+        try:
+            refused = agreement_drift.refusals(
+                dataset_ids=sorted(getattr(arrival, "files_by_dataset", {}) or {}))
+        except Exception:  # noqa: BLE001 - an unevaluable backstop refuses nothing
+            refused = {}
+        if refused:
+            report.left_frozen.append(arrival.run_id)
+            say(f"{arrival.run_id}: not gated - {', '.join(sorted(refused))} "
+                f"{'is' if len(refused) == 1 else 'are'} refused by the agreement backstop; "
+                f"it is gated once that is cleared")
+            return
         raise RuntimeError(f"its gate outcome was not recorded (it is {after}), so it is "
                            f"still owed - see the promotion step's report above")

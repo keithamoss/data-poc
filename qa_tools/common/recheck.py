@@ -267,7 +267,10 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
             refused = agreement_drift.refusals(conn, [item.dataset_id])
         except Exception:  # noqa: BLE001 - an unevaluable backstop refuses nothing
             refused = {}
-        if item.dataset_id in refused:
+        # A RE-EVALUATION IS OWED UNDER ITS WRITER but runs its readers, so
+        # each reader is checked in knock_on.complete instead (delivery-critic
+        # on (f)-(i), findings 2 and 3).
+        if item.kind != REEVALUATE and item.dataset_id in refused:
             return Outcome(item.id, item.run_key or "", False,
                            f"{item.dataset_id} is refused by the agreement backstop, so this "
                            f"waits until the change is restored or declared - still owed.",

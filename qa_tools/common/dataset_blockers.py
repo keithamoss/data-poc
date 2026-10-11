@@ -59,6 +59,10 @@ class Blocker:
     #: Held because the dataset's schedule ended (REQ-PIPE-154): fixed by
     #: adding dates, never by a person filing or rejecting it (#132 A3).
     schedule_ended: bool = False
+    #: Held because its dataset is refused by the agreement backstop
+    #: (REQ-PIPE-173) - the refusal's own hold, never "another blocker"
+    #: beside it (delivery-critic on (f)-(i), finding 1).
+    agreement_refused: bool = False
 
     @property
     def is_open(self) -> bool:
@@ -78,7 +82,8 @@ class Blocker:
                 "reason": self.reason, "files": list(self.files),
                 "loadFailures": [{"file": f, "why": w} for f, w in self.load_failures],
                 "delivery": self.delivery, "rejected": self.rejected,
-                "scheduleEnded": self.schedule_ended}
+                "scheduleEnded": self.schedule_ended,
+                "agreementRefused": self.agreement_refused}
 
 
 def _iso(value) -> str | None:
@@ -110,7 +115,7 @@ def _holds(db) -> list[Blocker]:
             resolved_at=(_iso(effective_at or held.resolved_at)
                          if held.resolved_by is not None else None),
             reason=held.describe(), delivery=held.delivery,
-            schedule_ended=held.schedule_ended))
+            schedule_ended=held.schedule_ended, agreement_refused=held.agreement_refused))
     return out
 
 

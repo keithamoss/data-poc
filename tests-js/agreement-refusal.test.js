@@ -118,3 +118,49 @@ describe("when and where a refusal shows", () => {
     expect(banner).toContain("data-agreement-refused-beside");
   });
 });
+
+// delivery-critic on (f)-(i), finding 1: beside another blocker the last
+// verdict was still shown as current, and the refusal's OWN hold counted as
+// "another blocker", giving two banners for one cause.
+describe("a refusal beside another blocker (critic finding 1)", () => {
+  it("still blanks every check - the last verdict is never current", () => {
+    const w = withRefusal({});
+    const held = {kind: "held", count: 1, openedAt: "2024-03-01T00:00:00Z", reason: "two files"};
+    const ds = {id: "cp-clients", columns: [{status: "green", checks: [{status: "green"}]}]};
+    w.applyRefusal(ds, REFUSAL, held);
+    expect(ds.columns[0].status).toBe("nodata");
+    expect(ds.columns[0].checks[0].blockedThisPeriod).toBe(true);
+  });
+
+  it("does not count the refusal's own hold as another blocker", () => {
+    const w = withRefusal({});
+    w.blockersOpenInPlaceOn = () => [
+      {kind: "held", openedAt: "2024-03-01", agreementRefused: true},
+      {kind: "contested", openedAt: "2024-04-01"}];
+    expect(w.otherBlockerThan("cp-clients", "2024-06-01").kind).toBe("contested");
+    w.blockersOpenInPlaceOn = () => [{kind: "held", openedAt: "2024-03-01", agreementRefused: true}];
+    expect(w.otherBlockerThan("cp-clients", "2024-06-01")).toBe(null);
+  });
+});
+
+// Keith, 2026-10-11 (on the critic's finding 7): an exhausted schedule and an
+// unmarked no-supply gap stay visible beside a refusal - each is a separate
+// thing someone must fix.
+describe("other states beside a refusal", () => {
+  it("an exhausted schedule is still marked and counted", () => {
+    const w = withRefusal({});
+    const ds = {id: "cp-clients", status: "red"}, col = {exhaustedCount: 0}, ag = {exhaustedCount: 0};
+    w.markBesideRefusal(ds, {lastDate: "2027-11-01"}, col, ag);
+    expect(ds.scheduleExhausted).toEqual({lastDate: "2027-11-01"});
+    expect(ds.status).toBe("red");
+    expect([col.exhaustedCount, ag.exhaustedCount]).toEqual([1, 1]);
+  });
+
+  it("a no-supply gap's banner shows under a refusal, never under another blocker", () => {
+    const w = withRefusal({});
+    expect(w.noSupplyShown({noSupply: [1], blocked: {kind: "agreement-refused"}})).toBe(true);
+    expect(w.noSupplyShown({noSupply: [1], blocked: {kind: "held"}})).toBe(false);
+    expect(w.noSupplyShown({noSupply: [1]})).toBe(true);
+    expect(w.noSupplyShown({noSupply: null})).toBe(false);
+  });
+});

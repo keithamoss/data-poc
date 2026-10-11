@@ -3068,7 +3068,11 @@ function buildData(inPlaceOnDateStr){
         if(refusal){
           col.refusedCount = (col.refusedCount||0) + 1;
           ag.refusedCount = (ag.refusedCount||0) + 1;
-          if(applyRefusal(ds, refusal, blocked || null)) return;
+          // THE OTHER STATES STAY IN VIEW BESIDE IT (Keith, 2026-10-11, on the
+          // critic's finding 7): an exhausted schedule is marked and counted,
+          // and an unmarked gap keeps its banner (noSupplyShown).
+          if(ended) markBesideRefusal(ds, ended, col, ag);
+          if(applyRefusal(ds, refusal, otherBlockerThan(ds.id, inPlaceOnDateStr))) return;
         }
         if(blocked && !blanking){
           // RED, BUT THE PERIOD'S OWN RESULTS STAND (REQ-PIPE-115
@@ -4681,17 +4685,42 @@ function refusalInPlaceOn(datasetId, inPlaceOnDateStr){
 // True where the caller has nothing more to do for this dataset.
 function applyRefusal(ds, refusal, other){
   ds.status = "red";
+  // EVERY CHECK READS NOT RUN either way (REQ-PIPE-173 criterion 4): the last
+  // verdict is never shown as current while the agreement does not match it
+  // (delivery-critic on (f)-(i), finding 1).
+  (ds.columns||[]).forEach(c=>{
+    c.status = "nodata";
+    c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
+  });
   if(other){
     ds.alsoRefused = refusal;
     return false;
   }
   ds.blocked = {kind:"agreement-refused", count:1, openedAt:null,
                 reason:refusalReasonText(refusal), refusal};
-  (ds.columns||[]).forEach(c=>{
-    c.status = "nodata";
-    c.checks = (c.checks||[]).map(ck=> ({...ck, blockedThisPeriod:true}));
-  });
   return true;
+}
+// AN EXHAUSTED SCHEDULE BESIDE A REFUSAL: marked and counted, the dataset
+// staying red (Keith, 2026-10-11, critic finding 7).
+function markBesideRefusal(ds, ended, col, ag){
+  ds.scheduleExhausted = ended;
+  col.exhaustedCount = (col.exhaustedCount||0) + 1;
+  ag.exhaustedCount = (ag.exhaustedCount||0) + 1;
+}
+// An unmarked no-supply gap is said unless another blocker stands in front of
+// it - a refusal is not one (the same answer).
+function noSupplyShown(ds){
+  return !!ds.noSupply && (!ds.blocked || ds.blocked.kind === "agreement-refused");
+}
+// THE OTHER BLOCKER a refusal sits beside, or null - never the refusal's own
+// hold, which is the same cause said once (critic finding 1).
+function otherBlockerThan(datasetId, inPlaceOnDateStr){
+  const open = blockersOpenInPlaceOn(datasetId, inPlaceOnDateStr)
+    .filter(b=> !b.agreementRefused)
+    .sort((a,b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
+  if(!open.length) return null;
+  const same = open.filter(b=> b.kind === open[0].kind);
+  return {...open[0], count: same.length, newestAt: same[same.length-1].openedAt};
 }
 function refusedBesideBanner(ds){
   if(!ds.alsoRefused) return "";
@@ -5864,7 +5893,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   // CLOSED WITH NO SUPPLY, and accepted gaps (REQ-DASH-133 criteria 1,
   // 2, 7 and 11): in words, red for an unmarked gap, quiet for one a
   // person accepted - each naming its periods as grouped runs.
-  const noSupplyBanner = ds.noSupply && !ds.blocked ? `
+  const noSupplyBanner = noSupplyShown(ds) ? `
       <div class="notice-exhausted" role="status" data-no-supply="${ds.noSupply.length}">
         <b>No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.</b>
         <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
@@ -5882,7 +5911,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${escHtml(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}</div>`).join("")}
       </div>` : "";
   if(ds.noDataInPlaceOn && !ds.columns.length){
-    if(ds.noSupply && !ds.blocked){
+    if(noSupplyShown(ds)){
       view.innerHTML = `
       <div class="view-head">
         <div>

@@ -7526,3 +7526,43 @@ twice. It deliberately did not re-find the `TypeError`.
       earlier module on the same worker had created it; reproduced by running
       the module alone. The tests stub that read now, and one more asserts an
       applied correction is listed outside the thirty-entry cap.
+
+151. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery critic on
+     Keith's backstop answers (f)-(i) (commit 01a7a53, REQ-PIPE-173).** Run
+     after the push, as the new commit cadence has it; every fix below is
+     its own commit, each with a test that failed first.
+    - **1 (high):** beside another blocker a refusal left the last verdict
+      showing as current, and the refusal's OWN hold counted as "another
+      blocker" - two banners for one cause. Holds now carry
+      `agreementRefused` in the blocker export, the rollup ignores those
+      when looking for another blocker, and a refusal blanks the checks
+      either way.
+    - **2 and 3 (high, medium):** a re-evaluation is owed under its WRITER
+      but runs its READERS, and the freeze checked the writer. A refused
+      reader ran and its item was cleared, so nothing re-gated it later; a
+      refused writer froze readers that were not refused. Now each reader
+      is checked in knock_on.complete: refused readers wait, the rest run,
+      and the item stays owed while any waits.
+    - **4 (medium):** an arrival left ungated by the freeze made the pass
+      raise "its gate outcome was not recorded" - exit 2, and its whole
+      collection held back. It is now `left_frozen`, said in the summary,
+      and holds back nothing.
+    - **5:** check-agreement exited 3 when one dataset could not be checked
+      and another was refused; it is 2 now, as the pass ranks them.
+    - **6:** the pass summary counted waiting owed items as run; it says
+      what waits on a refused dataset now.
+    - **7 (Keith's call, 2026-10-11):** under a refusal alone, an exhausted
+      schedule and an unmarked no-supply gap disappeared. Both stay in view
+      beside it now.
+    - **8:** `from` used only the recorded date, so a period a change moved
+      EARLIER showed without its refusal for the dates between. It is the
+      earlier of the recorded and current dates.
+    - **9:** three older decisions on REQ-PIPE-173 and a pass comment still
+      described the old behaviour; marked superseded or settled.
+    - **Not done, noted:** the "not expected" wording is chosen by searching
+      a message's text (a structured flag would be safer); the backstop's
+      "an unevaluable check refuses nothing" fails open in three places, as
+      filing's documented choice does; each rule gate re-reads both YAML
+      files. Keith also confirmed two PROVISIONALS the same morning: a
+      person's own promotion of a refused dataset stands, and the exit
+      order is failure (2) > refused (3) > red (1).

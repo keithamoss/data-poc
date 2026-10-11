@@ -354,3 +354,16 @@ class TestARetroactiveNotExpectedIsCaught:
             "changes": [{"item": f"dataset {DATASET} not_expected 2023-Q3", "old": None,
                          "new": "declared after the fact"}]}]
         assert _refusal(conn, cal, asset) is None
+
+
+class TestFromIsTheEarlierDate:
+    """delivery-critic on (f)-(i), finding 8: a correction moving a period
+    EARLIER left the dates between showing the period with no refusal."""
+
+    def test_a_period_moved_earlier_refuses_from_its_new_date(self, conn):
+        cal, asset = _docs()
+        q = next(c for c in cal["calendars"] if c["name"] == "quarterly")
+        for d in q["versions"][-1]["dates"]:
+            if d["period"] == "2023-Q3":
+                d["date"] = "2023-07-25"
+        assert _refusal(conn, cal, asset).as_record()["from"] == "2023-07-25"

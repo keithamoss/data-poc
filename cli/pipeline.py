@@ -190,9 +190,16 @@ def _say_pass(report) -> None:
     if report.nothing_to_do:
         console.print("Nothing to process and nothing owed.", style="green")
     else:
+        waited = [o for o in report.owed if getattr(o, "frozen", False)]
         console.print(f"Processed {len(report.processed)} arrival(s); applied the gate to "
-                      f"{len(report.gated_only)} already checked; ran {len(report.owed)} owed "
-                      f"item(s).", style="green")
+                      f"{len(report.gated_only)} already checked; ran "
+                      f"{len(report.owed) - len(waited)} owed item(s).", style="green")
+        # WAITING ON A REFUSAL is said, never counted as run (delivery-critic
+        # on (f)-(i), finding 6).
+        if waited or report.left_frozen:
+            console.print(f"{len(waited)} owed item(s) and {len(report.left_frozen)} "
+                          f"arrival(s) wait on a refused dataset - they go ahead once the "
+                          f"agreement is restored or the change is declared.", style="yellow")
     for what in report.left_locked:
         console.print(f"{what}: being processed elsewhere - left for the next pass.",
                       style="yellow")

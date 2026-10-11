@@ -129,3 +129,116 @@ class TestTheRecordSaysFromWhen:
     def test_no_period_dates_means_no_from(self):
         r = agreement_drift.Refusal("cp-clients", (agreement_drift.Drift("cp-clients", "x", ()),))
         assert r.as_record()["from"] is None
+
+
+class TestTheRefusalsOwnHoldIsSaidAsSuch:
+    """delivery-critic on (f)-(i), finding 1: the dashboard has to tell the
+    refusal's own hold from another blocker."""
+
+    def test_the_blocker_record_carries_it(self):
+        from qa_tools.common.dataset_blockers import Blocker
+
+        b = Blocker(kind="held", dataset_id="cp-clients", supply="s", opened_at="x",
+                    resolved_at=None, reason="r", agreement_refused=True)
+        assert b.as_record()["agreementRefused"] is True
+
+
+class TestAReEvaluationWaitsOnlyForItsRefusedReaders:
+    """delivery-critic on (f)-(i), findings 2 and 3: a re-evaluation is owed
+    under the WRITER, but runs its READERS' checks - so the freeze belongs to
+    each reader, not to the item."""
+
+    def _run(self, monkeypatch, refused, writer="cp-placements"):
+        from types import SimpleNamespace
+
+        from qa_tools.common import knock_on
+
+        ran, cleared = [], []
+        monkeypatch.setattr(knock_on, "readers", lambda conn, period, tables, reads: [
+            knock_on.Reader("cp-clients", "c@1", waiting=False, tables={"placements"},
+                            stale=True),
+            knock_on.Reader("cp-carers", "k@1", waiting=False, tables={"placements"},
+                            stale=True)])
+        monkeypatch.setattr(promotion, "_declared_reads", lambda: {})
+        monkeypatch.setattr(recheck, "mint_run_id", lambda conn, ds, s: f"key-{ds}")
+        monkeypatch.setattr(recheck, "execute", lambda **k: ran.append(k["dataset_id"]))
+        monkeypatch.setattr(recheck, "clear", lambda owed_id, key: cleared.append(owed_id))
+        monkeypatch.setattr(dl, "follows", lambda conn, d: "2099-01-01T00:00:00+00:00")
+        _refuse(monkeypatch, *refused)
+        item = SimpleNamespace(id=99, kind=recheck.REEVALUATE, dataset_id=writer,
+                               period="2024-Q1", tables=["placements"], caused_by_decision=1)
+        return knock_on.complete(item), ran, cleared
+
+    def test_2_a_refused_reader_is_not_run_and_the_item_stays_owed(self, supply_dsn,
+                                                                   monkeypatch):
+        got, ran, cleared = self._run(monkeypatch, ["cp-clients"])
+        assert ran == ["cp-carers"], "the other reader still re-evaluates"
+        assert not cleared and got.frozen and not got.completed
+
+    def test_3_a_refused_writer_does_not_freeze_its_readers(self, supply_dsn, monkeypatch):
+        got, ran, cleared = self._run(monkeypatch, ["cp-placements"])
+        assert sorted(ran) == ["cp-carers", "cp-clients"] and cleared and got.completed
+
+
+class TestAFrozenArrivalIsNotAFailure:
+    """delivery-critic on (f)-(i), finding 4: an arrival checked but left
+    ungated because its dataset is refused raised 'its gate outcome was not
+    recorded' - a failure (exit 2) holding back its whole collection."""
+
+    def _one(self, monkeypatch, refused):
+        from types import SimpleNamespace
+
+        from qa_tools.common import processing_pass as pp
+
+        with supply_db.connect(label="test-refused-freezes") as conn:
+            qa_store.ensure_schema(conn)
+        arrival = SimpleNamespace(run_id="cp_run_frozen", collection_id="child-protection",
+                                  files_by_dataset={"cp-clients": ("cp_clients.csv",)})
+        monkeypatch.setattr(pp, "recorded", lambda conn: None)
+        monkeypatch.setattr(pp, "state_of", lambda a, rec: pp.UNGATED)
+        steps = SimpleNamespace(promote_after=lambda *a, **k: None)
+        monkeypatch.setattr(pp, "_modules", lambda c: (SimpleNamespace(STEPS=steps), None))
+        _refuse(monkeypatch, *refused)
+        report = pp.PassReport()
+        pp._one(arrival, [arrival], "ts", "me", report, say=lambda m: None)
+        return report
+
+    def test_a_refused_datasets_ungated_arrival_is_left_frozen(self, supply_dsn, monkeypatch):
+        report = self._one(monkeypatch, ["cp-clients"])
+        assert report.left_frozen == ["cp_run_frozen"] and not report.failures
+
+    def test_any_other_unrecorded_gate_is_still_a_failure(self, supply_dsn, monkeypatch):
+        with pytest.raises(RuntimeError, match="gate outcome was not recorded"):
+            self._one(monkeypatch, [])
+
+
+class TestTheCriticsSmallerFindings:
+    """delivery-critic on (f)-(i), findings 5 and 6."""
+
+    def test_5_a_dataset_that_could_not_be_checked_outranks_a_refusal(self, monkeypatch):
+        """As the pass ranks them: something to retry comes first."""
+        from click.testing import CliRunner
+
+        from cli import schedule as schedule_cli
+
+        def refusals(conn=None, dataset_ids=None, *, errors=None):
+            if errors is not None:
+                errors.append(("cp-carers", RuntimeError("unreadable")))
+            return {"cp-clients": agreement_drift.Refusal("cp-clients", ())}
+        monkeypatch.setattr(agreement_drift, "refusals", refusals)
+        got = CliRunner().invoke(schedule_cli.schedule_group, ["check-agreement"])
+        assert got.exit_code == 2, got.output
+        assert "cp-clients" in got.output, "the refusal is still said"
+
+    def test_6_the_summary_says_what_waited_rather_than_counting_it_as_run(self, capsys):
+        from cli import pipeline as pipeline_cli
+        from qa_tools.common import processing_pass as pp
+
+        report = pp.PassReport(
+            owed=[recheck.Outcome(1, "k", True, "ran"),
+                  recheck.Outcome(2, "k", False, "waits", frozen=True)],
+            left_frozen=["cp_run_x"], refused=["cp-clients"])
+        pipeline_cli._say_pass(report)
+        out = " ".join(capsys.readouterr().out.split())
+        assert "ran 1 owed item(s)" in out
+        assert "1 owed item(s) and 1 arrival(s) wait on a refused dataset" in out

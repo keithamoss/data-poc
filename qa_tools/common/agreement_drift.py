@@ -292,8 +292,13 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
             by_slot[c.slot] = Drift(d.dataset_id, d.slot, d.changes, d.supplies + 1,
                                     d.period_date)
             continue
+        # THE EARLIER OF ITS RECORDED AND CURRENT DATES (delivery-critic on
+        # (f)-(i), finding 8): a period moved earlier shows under its new
+        # date, and the refusal has to be on show there too.
+        dates = [x for x in (c.inputs.get("period_date"),
+                             c.now[3].isoformat() if c.now else None) if x]
         by_slot[c.slot] = Drift(dataset_id, c.slot, changes,
-                                period_date=c.inputs.get("period_date"))
+                                period_date=min(dates) if dates else None)
     if not by_slot:
         return None
     return Refusal(dataset_id, tuple(by_slot[s] for s in sorted(by_slot)),

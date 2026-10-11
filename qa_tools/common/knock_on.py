@@ -163,6 +163,17 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     reads = promotion._declared_reads()
     with supply_db.connect(label="mothman:knock-on") as conn:
         touched = readers(conn, period, tables, reads)
+        # A REFUSED READER WAITS (Keith, 2026-10-11, (f); delivery-critic on
+        # (f)-(i), findings 2 and 3): its checks are not run and it is not
+        # gated, and the item stays owed for it - every other reader goes on.
+        from qa_tools.common import agreement_drift
+
+        try:
+            refused = agreement_drift.refusals(conn, sorted({r.dataset_id for r in touched}))
+        except Exception:  # noqa: BLE001 - an unevaluable backstop refuses nothing
+            refused = {}
+    waiting_on = sorted({r.dataset_id for r in touched if r.dataset_id in refused})
+    touched = [r for r in touched if r.dataset_id not in refused]
     last_key = ""
     try:
         for reader in touched:
@@ -214,6 +225,11 @@ def complete(item, *, run_by: str | None = None, on_step=None):
                 failing.append((reader.dataset_id, reader.supply, why))
         if failing:
             _shout(conn, item, period, failing, effective_at=now)
+    if waiting_on:
+        return recheck.Outcome(
+            item.id, last_key, False,
+            f"{period}: {len(touched)} reader(s) re-evaluated; still owed for "
+            f"{', '.join(waiting_on)}, refused by the agreement backstop", frozen=True)
     recheck.clear(item.id, last_key or f"knock-on/{item.id}")
     names = ", ".join(f"{d}" for d, _s, _w in failing)
     return recheck.Outcome(

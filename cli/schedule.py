@@ -483,7 +483,8 @@ def check_agreement_command(dataset_id: str | None) -> None:
     difference no declared correction accounts for refuses the dataset -
     its new supplies are held until the agreement is restored or the change
     is declared. Exits 3 where any dataset is refused - its own status, never
-    the 1 that red data gives - and 2 where any could not be checked at all.
+    the 1 that red data gives - and 2 where any could not be checked, which
+    outranks a refusal as it does in the processing pass.
     """
     # REQ-PIPE-173: the backstop's own report, the same computation the
     # pass and the dashboard build make.
@@ -507,16 +508,16 @@ def check_agreement_command(dataset_id: str | None) -> None:
     for ds, exc in errors:
         console.print(f"{ds} could not be checked, so it is neither refused nor cleared: "
                       f"{exc}", style="red", markup=False)
-    if errors and not found:
-        raise SystemExit(2)
-    if not found:
+    if not found and not errors:
         console.print("Every recorded judgement matches the delivery agreement, or a "
                       "declared correction accounts for the difference. Nothing is refused.",
                       style="green")
         return
     for refusal in found.values():
         console.print(refusal.message(), style="red")
-    raise SystemExit(3)
+    # A DATASET THAT COULD NOT BE CHECKED OUTRANKS A REFUSAL, as the pass ranks
+    # them (delivery-critic on (f)-(i), finding 5): something to retry first.
+    raise SystemExit(2 if errors else 3)
 
 
 @schedule_group.command("preview-correction")
