@@ -32115,7 +32115,7 @@ requirements:
     date_written: '2026-10-11'
     story: As whoever maintains the Child Protection contract, I want the client postcode rule, which today fails on a single unrecognised postcode, to tolerate the same few its Soda and dbt copies already tolerate, so that the three tools agree on what a few bad values mean and a supply can read amber on that rule rather than red.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-11'
@@ -32137,8 +32137,15 @@ requirements:
     - 'Boundary semantics: mustBeLessThan 3 fails at exactly 3%, where Soda''s fail when > 3% does not. This follows the precedent of place_of_birth_facility in the Birth Registrations contract, and REQ-GEN-183''s intersection honours each tool''s own operator.'
     dependencies: []
     decisions:
+    - 'A STAGED POSTCODE IS A NUMBER (found building it, 2026-10-11): the loader infers cp_clients.postcode as bigint, so an unrecognised value that is not numeric (the generator''s "XXXX", "TBC", "6000X") turns the column to text for that supply. Either reads as invalid here; REQ-GEN-184''s Child Protection ambers should use numeric unrecognised postcodes such as 9999 or 0000 so a clean column''s type is not changed by the lever.'
     - 'cp_clients.postcode (Keith, 2026-10-11). REJECTED cp_notifications.source_type (the delivery-scoper''s recommendation, widest band), cp_notifications.risk_rating (as wide, harder to defend as policy) and cp_placements.placement_type (band of 1 to 7 rows). At about 527 clients the amber band is 1 to 15 unrecognised postcodes: Soda fails above 3% (16), dbt above 15, and this rule at 3% or more (16). Nothing else reads the column - no foreign key, no SQL-bodied check, no Evidently check.'
     - LOOSEN ONE CONTRACT RULE (Keith, 2026-10-11), as the Child Protection amber lever. REJECTED the persisting concern_type mix shift (the delivery-scoper's recommendation), a cp_case_workers row-count spike, and dropping Child Protection's ordinary ambers - see REQ-GEN-184's decisions for each.
     - ITS OWN REQUIREMENT, NOT CRITERIA IN REQ-GEN-184 (delivery-scoper recommendation, 2026-10-11). It changes what a published check accepts for every supply, which is a QA checks decision (docs/components.md) with its own lifecycle consequence, and Keith signs a contract change off separately from a generator change. Unlike reads_columns, which Keith folded into REQ-GEN-183, this changes a verdict rather than adding metadata.
     - 'SEVERITY STAYS error WITH A NON-ZERO THRESHOLD, not severity warning: ODCS has no two-tier rule, and a warning-severity rule would never fail at all. This is the pattern place_of_birth_facility and both registering-parent rules already use in the Birth Registrations contract.'
     - UNIT percent, NOT A ROW COUNT, so the ODCS rule tracks the Soda percentage as the table grows. Verified that the installed datacontract-cli accepts unit percent on invalidValues (datacontract/engines/checks/create_checks.py:751).
+    linked_tests:
+    - tests/test_postcode_tolerance.py
+    implemented_by:
+    - contract/child-protection-contract.yaml
+    evidence:
+    - '2026-10-11: tests/test_postcode_tolerance.py 3 passed against the real datacontract-cli and Soda Core over this worker''s staged fixture delivery - with 1% of client postcodes unrecognised the contract''s rule passes and Soda''s warns (c6), at 5% the contract''s fails (c7), and the recorded fail threshold is 3, not 0 (c8). The first and third failed before the change. `mothman dashboard validate-check-lifecycle` OK over 307 checks with the breaking changelog entry (c3); check_id, validValues and dimension unchanged (c2); the Soda and dbt checks and the postcode null rule untouched (c5); the description rewritten to the tolerance form docs/check-authoring-rules.md asks for, the same words the Soda copy already uses (c4).'

@@ -230,6 +230,12 @@ releases:
               says so and why, a dataset with a correction waiting to be
               confirmed says that too, and each confirmed correction appears
               once in Recent activity.
+          - headline: A few unrecognised client postcodes are tolerated
+            components: ["QA checks & contract"]
+            description: >
+              The Child Protection contract now fails on unrecognised client
+              postcodes only at 3% or more, matching its Soda and dbt checks. A
+              supply with just a few now reads amber rather than red.
           - headline: Rebuilt history replays corrections as they happened
             components: ["Pipeline & publishing", "Data generation"]
             description: >
