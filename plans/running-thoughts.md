@@ -4607,7 +4607,7 @@ Belongs with batch 5's check work.
     arriving table" drafted as REQ-PIPE-188 (one scope for every tool, a
     guard against a check going missing, the target and the equivalence
     proof) plus one per tool: 189 dbt, 190 datacontract-cli, 191 Soda. The
-    draft is docs/draft-req-pipe-188-191.yaml (validated with `mothman
+    draft is docs/draft-req-pipe-188-192.yaml (validated with `mothman
     dashboard validate-requirements --draft`; re-check the ids are still
     free before applying). Premise confirmed in code - about a fifth of each
     run's evaluation is kept - but the estimate is ~6 minutes, not under 5:
@@ -4622,6 +4622,19 @@ Belongs with batch 5's check work.
     in-scope check with no result - refuse the run and stop the batch, or
     record it red and carry on; (4) raw tool output covers only what was
     asked - accept, or also record which check ids each tool was asked for.
+
+    **KEITH'S ANSWERS, 2026-10-12 morning, and the revised draft**
+    (docs/draft-req-pipe-188-192.yaml, delivery-scoper, still NOT SIGNED):
+    (1) keep UNDER 5 and widen - the small repeated costs became REQ-PIPE-192
+    (config parse deep-copied on every hit; the cross-table declarations
+    re-read uncached by promotion at 8-10ms a call - #65's 16s was ~4x
+    profiler-inflated); (2) datacontract-cli's own options, an ODCS id on
+    every quality rule (REQ-PIPE-190); (3) a missing in-scope check refuses
+    the run and stops the batch; (4) record which check ids each tool was
+    asked for - a new qa table, schema 37 -> 38, so every database including
+    CI's cache rebuilds from empty once. The scoper's honest arithmetic:
+    2.9-3.6s an arrival, about 5m10s-6m30s - under 5 needs every estimate at
+    its best, or our own per-arrival steps shrinking too.
 
     Smaller, noted: `config_yaml.parse` is still called 53,068 times (28s,
     memoised but deep-copied each call); `_declared_reads` re-collects every
