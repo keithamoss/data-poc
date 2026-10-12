@@ -7924,3 +7924,18 @@ twice. It deliberately did not re-find the `TypeError`.
       stopwatch, which also closes F5's "NOT DONE". Not measured: whether
       the bootstrap was paying this in practice - its per-run targets are
       removed after each run, so only a re-run over a leftover target would.
+    - **And CI was red on 26f1f8f, which this session did not check before
+      moving on** (CLAUDE.md's rule, broken: a push is not done until its
+      run is read). Two failures. (1) A REAL DEFECT of REQ-PIPE-190's: the
+      check-lifecycle gate parses the PREVIOUS commit's contract too, and
+      the new "every rule carries its ODCS id" rule refused it - so the
+      push that added the ids failed for the commit before it, and any
+      comparison reaching back past it (a merge to main) would again. The
+      old side is now read as it was (`past=True`); failing test first
+      (`test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side`),
+      and the real gate against b8424c9 fails without the fix and passes
+      with it. (2) `test_supersession`'s
+      `test_the_gate_refuses_naming_the_newer_one`, a KeyError on
+      `cp-carers` in the fast half - not reproduced; a leftover filing is
+      the likely cause, and 49a70df's isolation fixes may cover it, which
+      that push's own CI run is what settles.

@@ -505,7 +505,8 @@ def odcs_quality_id(check_id: str) -> str:
     return check_id.replace(".", ":")
 
 
-def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list[CheckMetadata]:
+def _parse_contract_quality_rule(rule: dict, source: str, location: str, *,
+                                 past: bool = False) -> list[CheckMetadata]:
     rule = dict(rule)
     custom_properties = rule.pop("customProperties", None) or []
     meta = _custom_properties_to_dict(custom_properties)
@@ -519,8 +520,11 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     # without it, or with a different one, could never be selected and would
     # be reported missing by the run rather than here. A copy of the check
     # id, so - like the check id - outside the config hash.
+    # A PAST COMMIT'S CONTRACT (`past`) is read as it was: the id rule is
+    # about what is committed now, and holding the old side of a diff to it
+    # refused the push that added the ids (2026-10-12).
     odcs_id = rule.pop("id", None)
-    if odcs_id != odcs_quality_id(check_id):
+    if odcs_id != odcs_quality_id(check_id) and not (past and odcs_id is None):
         why = ("has no ODCS `id`" if odcs_id is None
                else f"has the ODCS `id` {odcs_id!r}, which is not its check_id")
         raise MissingCheckIdError(
@@ -621,7 +625,8 @@ def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str,
     return out
 
 
-def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckMetadata]:
+def parse_contract_check_metadata(contract_yaml_path: Path | str, *,
+                                  past: bool = False) -> list[CheckMetadata]:
     with open(contract_yaml_path) as f:
         doc = config_yaml.parse(f) or {}
     out: list[CheckMetadata] = []
@@ -631,13 +636,15 @@ def parse_contract_check_metadata(contract_yaml_path: Path | str) -> list[CheckM
         table_name = table.get("name")
         for rule in table.get("quality", []) or []:  # table-level quality rules
             try:
-                out.extend(_parse_contract_quality_rule(rule, source, f"table {table_name!r}"))
+                out.extend(_parse_contract_quality_rule(rule, source, f"table {table_name!r}",
+                                                        past=past))
             except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                 errors.append(str(e))
         for prop in table.get("properties", []) or []:
             for rule in prop.get("quality", []) or []:
                 try:
-                    out.extend(_parse_contract_quality_rule(rule, source, f"table {table_name!r} column {prop.get('name')!r}"))
+                    out.extend(_parse_contract_quality_rule(
+                        rule, source, f"table {table_name!r} column {prop.get('name')!r}", past=past))
                 except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                     errors.append(str(e))
     if errors:

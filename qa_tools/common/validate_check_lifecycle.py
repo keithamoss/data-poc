@@ -125,7 +125,9 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
         with tempfile.NamedTemporaryFile("w", suffix=".yml", delete=False) as f:
             f.write(content)
             tmp_path = f.name
-        checks.extend(parser(tmp_path))
+        # THE OLD SIDE AS IT WAS: a rule added since applies to the tree now.
+        past = {"past": True} if parser is cl.parse_contract_check_metadata else {}
+        checks.extend(parser(tmp_path, **past))
 
     for rel_path in _EVIDENTLY_SOURCES:
         if ref is None:

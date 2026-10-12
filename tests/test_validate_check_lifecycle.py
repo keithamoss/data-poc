@@ -396,3 +396,30 @@ def test_the_gate_is_off_by_default_and_fatal_only_when_asked(tmp_path, monkeypa
 
     assert vcl.main(require_explanations=True) == 1
     assert "no failure_indicates" in capsys.readouterr().err
+
+
+def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path, monkeypatch, capsys):
+    """A defect, 2026-10-12: REQ-PIPE-190 made an ODCS `id` mandatory on
+    every quality rule, and the gate held the PREVIOUS commit's contract to
+    that rule too - so the push that added the ids was refused for the
+    commit before it, and so would any comparison reaching back past it.
+    The rule is about what is committed now; the old side is read as it was."""
+    import re
+    from pathlib import Path
+
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(vcl, "_YAML_SOURCES",
+                        [("contract.yaml", vcl.cl.parse_contract_check_metadata)])
+    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD")
+
+    today = (Path(__file__).resolve().parent.parent / "contract" / "child-protection-contract.yaml").read_text()
+    before = re.sub(r"(?m)^(\s*)- id: \S+\n\1  ", r"\1- ", today)
+    assert before != today and "- id:" not in before
+    (repo / "contract.yaml").write_text(before)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "before the ids")
+    (repo / "contract.yaml").write_text(today)
+
+    assert vcl.main() == 0, capsys.readouterr().out
