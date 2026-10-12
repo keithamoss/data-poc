@@ -58,13 +58,14 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   AND a small labelled one kept in the dataset list beside the count
   (Keith, 2026-10-13). First because at 30 datasets every red looking the
   same is what stops triage.
-- **Sprint 2 - "don't mislead me" (#18; S).** A past date never
-  shows today's "not the latest file" panel (#18 - `promotionSplit()`
-  renders the build-time state on every as-of date). Questions: hide the
-  panel in a past view, or compute it as at that date from REQ-PIPE-081's
-  filing events (fits his 2026-10-04 "shows it as it was", but changes
-  REQ-DASH-056's built behaviour)? #17 (same trial, two verdicts) CLOSED
-  as not reproduced, Keith 2026-10-13: "close it now" - deleted.
+- **Sprint 2 - "don't mislead me" (#18; S).** SCOPED 2026-10-13 by
+  delivery-scoper as REQ-DASH-197 (the "not the latest file" panel as at the
+  date on show, from change points worked out at build time, with the date
+  in its wording) and REQ-DASH-198 (the substituted/inherited label has the
+  same leak - live today for cp-case-workers). Keith answered the four
+  scoping questions the same morning; both unsigned, architect and
+  dashboard UX review next. #17 (same trial, two verdicts) CLOSED as not
+  reproduced, Keith 2026-10-13: "close it now" - deleted.
 - **Sprint 3 - "what actually changed?" (#9, #10; L).** One distribution
   component in the drill-down: this supply against the last promoted one
   (REQ-QAC-108's reference), the invalid values for any check that has
@@ -1784,3 +1785,17 @@ Still to settle by driving the page: #8 and #17 - both since closed
     past date or labelling it "as of today". That amends REQ-DASH-056
     (built: computed at build time), so it goes through the scoper and
     sign-off as sprint 2's requirement.
+    SCOPED 2026-10-13 as REQ-DASH-197 (+ REQ-DASH-198 for the same leak in
+    the substituted/inherited label). Delete this entry when 197 is built,
+    once its decisions are confirmed carried.
+
+19. **[todo, 2026-10-13]** **[Dashboard UI]** **On a past date, the supply
+    history lists supplies that arrived after it.** Found by delivery-scoper
+    while scoping #18 (post-build-review #110's M4 logged it alongside the
+    panel as "not clipped"). The supply-history section deliberately reads
+    the raw, unclipped dataset to show the whole refresh period
+    (renderDataset's own comment; REQ-PIPE-115 criterion 25 says "whatever
+    the period on show"), so on 5 August 2023 it still shows 2026's
+    supplies. Keith, 2026-10-13: log it as its own sighting rather than
+    settle it as by design inside REQ-DASH-197. A sighting, not a decision -
+    whether it should clip, mark later rows, or stay as is is still open.

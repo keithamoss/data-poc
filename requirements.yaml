@@ -32664,3 +32664,80 @@ requirements:
     - 'PROPOSED, NOT KEITH''S: the duplicate send is BYTE-IDENTICAL, because that is what a duplicate send is; a re-export with different rows would be a resupply, which is a different scenario.'
     open_questions:
     - THIRD PAIR OR NOT? Neither planted pair exercises REQ-PIPE-193 criteria 10 and 11 - the chosen file's own receipt changing the period or classification (Keith's 11:58pm/12:03am example), or raising a hold - because in both the file chosen is the earlier one. (a) unit-proven only; (b) a third pair in which the later file is chosen and its receipt falls after the due time plus grace.
+
+  - id: REQ-DASH-197
+    title: The "not the latest file" panel says what was promoted and what had arrived as at the date on show, never as at the build
+    date_written: '2026-10-13'
+    story: As a data team leader looking at a dataset on a past "in place on" date, I want the panel that compares what is promoted with the latest arrival to describe that date, so that a past view never warns me about files that had not arrived yet, or gives a reason for a decision that had not yet been taken.
+    moscow: should
+    status: not_started
+    source: 'Keith, road-testing #18 (sighted by the dashboard UX critic, post-build-review #132, 2026-10-07; diagnosed and answered 2026-10-13: SHOW IT AS IT WAS THEN). Scoped by delivery-scoper 2026-10-13 as road-testing sprint 2 (drafted as REQ-DASH-196, renumbered: ids are global and REQ-GEN-196 was taken the same morning).'
+    acceptance_criteria:
+    - WHILE a date is on show, THE SYSTEM SHALL take the panel's promoted supply to be the newest supply of that dataset that a slot held by promotion at the end of that date on the asset's clock, and SHALL NOT take it from the build instant.
+    - WHILE a date is on show, THE SYSTEM SHALL take the panel's latest arrival to be the newest supply of that dataset filed on or before the end of that date, and SHALL NOT name any supply filed after it.
+    - WHILE a date is on show, THE SYSTEM SHALL state why that latest arrival was not promoted as the reason stood at the end of that date - awaiting a decision, returned by a person, rejected, no slot, or superseded - and SHALL NOT give a reason arising from a decision that took effect after that date.
+    - WHERE, at the end of the date on show, the dataset's latest arrival is the promoted supply, or the dataset had no arrival yet, THE SYSTEM SHALL NOT render the panel.
+    - WHERE, at the end of the date on show, the dataset had an arrival and nothing promoted, THE SYSTEM SHALL render the panel saying nothing had been promoted yet, as REQ-DASH-056 does for the current date.
+    - 'WHILE a past date is on show, THE SYSTEM SHALL put that date in the panel''s own wording - its heading naming the date (e.g. ''On 5 August 2023 the warehouse did not hold the latest file'') and its arrival cell reading ''Latest arrival by 5 August 2023'' - and WHEN the date on show is the current date SHALL keep REQ-DASH-056''s present-tense wording. DECIDED Keith, 2026-10-13: put the date in it, over keeping present tense under the page''s past-date notice.'
+    - THE SYSTEM SHALL answer each date from decisions as they took effect, using every decision recorded up to the build (REQ-PIPE-081 criterion 5's as-corrected view), and WHERE a decision recorded after the date on show changed what the panel shows for it, THE SYSTEM SHALL include that change in REQ-PIPE-081 criterion 6's existing notice rather than in a notice of its own.
+    - THE SYSTEM SHALL work out each answer in Python from recorded filing and decision events at build time and embed the answers per dataset as change points, and the page SHALL show the newest change point on or before the end of the date on show, and SHALL NOT restate the why-not rule in the page's own JavaScript.
+    - THE SYSTEM SHALL embed a change point only where the answer differs from the one before it, so that the embedded size grows with a dataset's filings and decisions and SHALL NOT grow with the number of dates a reader can pick.
+    - THE SYSTEM SHALL compute these answers from recorded history alone, and SHALL NOT read supply rows (REQ-DASH-056 criterion 5, unchanged).
+    - WHERE the panel and the verdict line (REQ-PIPE-081 criterion 1) both name the supply in place for the same dataset and date, THE SYSTEM SHALL name the same supply in both.
+    - WHEN the date on show is the current date, THE SYSTEM SHALL render the same panel REQ-DASH-056 renders today for every dataset.
+    - IF a dataset carries no change points for the panel, THEN THE SYSTEM SHALL render no panel on any date, and SHALL NOT fall back to a single build-time answer.
+    - THE SYSTEM SHALL have a real-browser test against the built dashboard, taking its past date from the embedded data rather than from the clock, that asserts no supply filed after that date appears in the panel, and that an arrival awaiting a decision on that date but rejected or superseded later reads as awaiting a decision.
+    - THE SYSTEM SHALL amend, in the same change, REQ-DASH-056 criteria 1 and 3 to read "as at the date on show" in place of "most recent" and "currently", and SHALL record on REQ-DASH-056 that its as-at behaviour is delivered by this requirement.
+    - THE SYSTEM SHALL render with zero console errors in a real browser.
+    non_functional_requirements:
+    - 'Read recorded QA metadata only - the filing and decision records - over the build''s existing least-privilege grant. No supply rows, no new grant (CLAUDE.md: a build may read recorded QA results, never actual data, and never anything else).'
+    - 'Proportionate at about thirty datasets per asset and years of history: change points per dataset, never a snapshot per date. Today''s comparable per-dataset embed, runStates, is 2-10KB; this should be of the same order.'
+    - Build cost should grow with the number of change points, not with change points times the full history. Measure it on a full bootstrap and record the figure in evidence.
+    - This is a SHAPE CHANGE to promotionState, and standingIn (REQ-DASH-085/100) is also read from that record by standingInMarker, standingInDetail, standingInDrill and arrivalBanner. Enumerate every consumer before the change and verify it at the render layer (CLAUDE.md's shape-change rule).
+    - No new dependency and no network fetch; the page keeps working from a plain file:// open, and old snapshots under dashboard/snapshots are untouched.
+    - 'Quiet when nothing differs, on every date, as REQ-DASH-056''s own non-functional requirement already asks: at thirty datasets most dates show no panel at all.'
+    - 'Release-note-worthy: a fix to a visible, misleading display. It gets a CHANGELOG.yaml entry in the push that ships it.'
+    - Verify at the render layer in a real browser, with both toolchains (Vitest for the lookup, Playwright for the built page).
+    dependencies:
+    - REQ-DASH-056
+    - REQ-PIPE-081
+    decisions:
+    - 'SHOW IT AS IT WAS THEN (Keith, 2026-10-13). REJECTED: hiding the panel on a past date, which drops true information a reader of that date needs; and labelling it "as of today", which keeps a future fact in a past view with a caption on it, the leak the in-place-on control exists to prevent. Fits his 2026-10-04 "shows it as it was".'
+    - A NEW REQUIREMENT THAT AMENDS REQ-DASH-056, rather than a new criterion on 056 itself (scoper's recommendation, CONFIRMED by Keith, 2026-10-13). 056 is built and signed with its own tests and evidence; adding an unmet criterion would move it out of built, and the sprint gate counts criteria, so this would show up as unfinished. A new requirement keeps 056's record true and gives this work its own tests and decisions. The precedent is REQ-PIPE-115 criteria 21 and 22, which amend REQ-PIPE-078 and 079 "in the same change".
+    - 'THE ANSWERS TRAVEL, NOT THE RULE (pipeline/slot_timeline.py''s standing decision). The page looks answers up and never works out the why-not reasons itself. REJECTED: shipping the raw filings and decisions and porting promotion_state._why_not to JavaScript. That would be a second implementation of a rule with five ordered reasons, free to drift, which is the failure REQ-DASH-054 and the four-status-implementations incident were about.'
+    - 'CHANGE POINTS, NOT SNAPSHOTS (Keith''s scale constraint). REJECTED: one answer per calendar date, which grows with every daily dataset''s age and makes most entries duplicates.'
+    - AS-CORRECTED, NOT AS-KNOWN. The page shows what took effect by the date, using everything recorded since, because that is what the in-place-on control means (REQ-PIPE-081 criteria 5, 20 and 21). What the page itself said on a past date is the snapshot archive's job. The brief's phrase "what a reader saw then" is read in that sense, and criterion 6 routes later corrections through 081's existing notice.
+    - NO FALLBACK TO THE BUILD-TIME ANSWER. Falling back to the single build-time state when a timeline is missing would reproduce the very defect this requirement fixes, so a missing timeline means no panel.
+    - THE DATE IS ON THE ASSET'S CLOCK, at the end of the day on show - the same boundary runStateInPlaceOn, censusInPlaceOn and blockersOpenInPlaceOn already use. No new boundary rule.
+    - 'OUT OF SCOPE: the supply-history section. It deliberately reads the raw, unclipped dataset to show the whole refresh period (renderDataset''s own comment; REQ-PIPE-115 criterion 25 says "whatever the period on show"). post-build-review #110''s M4 logged it alongside this panel as not clipped; that half is design, not this defect. Keith, 2026-10-13: log it as a road-testing sighting (#19) rather than settle it here as by design.'
+    - 'THE DATE GOES IN THE PANEL (Keith, 2026-10-13), over the scoper''s recommendation of present-tense headings under the page-wide past-date notice: the panel should read correctly on its own.'
+    open_questions: []
+
+  - id: REQ-DASH-198
+    title: The substituted and inherited qualifier names the period that stood in as at the date on show, never the newest one at the build
+    date_written: '2026-10-13'
+    story: As a data team leader looking at a dataset on a past "in place on" date, I want the substituted or inherited qualifier to describe the period I am looking at on that date, so that a past view does not tell me that its data comes from a period that had not happened yet.
+    moscow: should
+    status: not_started
+    source: 'Delivery-scoper, 2026-10-13, found while scoping road-testing #18 (REQ-DASH-197; drafted as REQ-DASH-197, renumbered to 198). Keith, 2026-10-13: its own requirement, in sprint 2 alongside REQ-DASH-197.'
+    acceptance_criteria:
+    - WHILE a date is on show, THE SYSTEM SHALL render the substituted or inherited qualifier only where the period on show, at the end of that date on the asset's clock, held an earlier period's supply by substitution or inheritance, and SHALL NOT render it from the newest such period as at the build.
+    - WHILE a date is on show, THE SYSTEM SHALL name, in the qualifier, its tooltip and its drill-down, the period on show and the period it stood on as at that date, and SHALL NOT name a period that began after it.
+    - WHERE a substitution or inheritance that applied at the end of the date on show was later removed or replaced, THE SYSTEM SHALL still render it for that date, and SHALL include the later change in REQ-PIPE-081 criterion 6's existing notice.
+    - THE SYSTEM SHALL take these answers from change points worked out in Python from the decision log and slot holds at build time, sharing REQ-DASH-197's lookup, and SHALL NOT restate the rule in the page.
+    - WHEN the date on show is the current date, THE SYSTEM SHALL render the same qualifier REQ-DASH-085 and REQ-DASH-100 render today.
+    - THE SYSTEM SHALL have a real-browser test against the built dashboard, taking its past date from the embedded data rather than from the clock, that asserts a dataset standing in on a later period shows no qualifier on an earlier date.
+    - THE SYSTEM SHALL amend, in the same change, REQ-DASH-085 and REQ-DASH-100 to record that their as-at behaviour is delivered by this requirement.
+    non_functional_requirements:
+    - Recorded decisions and slot holds only, never supply rows, the same constraint as REQ-DASH-085 criterion 6 and REQ-DASH-100.
+    - Change points per dataset, not per date, as on REQ-DASH-197.
+    - 'Live in the current build, not hypothetical: cp-case-workers carries an inherited standingIn for 2026-Q2, so on every past date its page shows that qualifier, labels 2026-Q2 as the period being viewed, and offers a drill to the period that earned the results.'
+    dependencies:
+    - REQ-DASH-197
+    - REQ-DASH-085
+    - REQ-DASH-100
+    decisions:
+    - SAME DEFECT CLASS AS REQ-DASH-197, SEPARATE REQUIREMENT, because the qualifier has its own criteria, its own two parent requirements and its own drill and arrival-banner behaviour. Folding it into 196 would make one requirement sprawl across three built parents.
+    - promotion_state.standing_in's docstring chose NEWEST RATHER THAN ALL deliberately, because the qualifier answers "is what I am looking at this period's own data" for the current state. That still holds for the current date (criterion 5). What it did not consider was a past date, where "what I am looking at" is a different period.
+    - 'ITS OWN REQUIREMENT, IN SPRINT 2 (Keith, 2026-10-13), over folding it into REQ-DASH-197 or logging it for later: both change the same embedded promotionState record.'
+    open_questions: []
