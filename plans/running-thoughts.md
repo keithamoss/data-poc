@@ -1208,11 +1208,13 @@ to the exact right file/line/folder with zero console errors.
       a queue. It's just a case of picking up the next thing that can be
       processed" - so the loop chooses the next processable thing at the
       moment it picks it up, rather than holding a queue that can go stale.
-    Worth carrying into it: the pass already takes an advisory lock per run
-    (REQ-PIPE-151/152) and the decision path already refuses when the
-    consequences changed since confirmation (REQ-PIPE-128 criterion 9) -
-    whether "actively processing" can be a lock a decision checks is the
-    first question. Related: #61 (a concurrency pass once the supply model
+    Worth carrying into it, checked in the code 2026-10-13: the pass
+    already takes a PostgreSQL advisory lock PER ARRIVAL, from before it is
+    filed until its gate outcome is recorded (processing_pass.py, REQ-PIPE-151
+    criteria 6 and 16) - but nothing in the decision path checks that lock
+    today. And a decision already refuses when its consequences changed
+    since confirmation (REQ-PIPE-128 criterion 9). So the first question is
+    whether a decision should take or test the same arrival lock. Related: #61 (a concurrency pass once the supply model
     settles), #71 (where QA runs). Priority: this week, worked together
     with Keith.
 
