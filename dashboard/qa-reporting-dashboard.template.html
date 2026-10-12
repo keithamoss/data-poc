@@ -6183,7 +6183,9 @@ function openColumnDrawer(ag, col, ds, column, opts){
     // always passes pushHistory:false) is a complete state on its own -
     // built from scratch rather than spread from the old STATE, so a
     // stale checkKey from whatever was open before can't leak through.
-    STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:columnKey(column)};
+    // drawerPushed: THIS entry is ours, so Close may step back to the
+    // one beneath it (road-testing #8 - see closeDrawer()).
+    STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:columnKey(column), drawerPushed:true};
     history.pushState(STATE, "", stateToHash(STATE));
   }
   document.getElementById("drawer-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name}</span>`;
@@ -6376,9 +6378,22 @@ function hideDrawer(){
 // forward/back symmetric instead of accumulating extra entries. Falls back
 // to a plain hide if there's nothing to go back to (drawer state reached
 // some other way).
+//
+// ONLY WHEN THE APP PUSHED THAT ENTRY (road-testing #8, Keith 2026-09-24):
+// a drawer or panel reached by its URL - pasted, edited, or a link from
+// elsewhere - has the PREVIOUS PAGE underneath, so Back landed on the
+// agency view, two levels up; in a fresh tab there is nothing underneath
+// and Back left the dashboard. There it steps to the parent view in place.
 function closeDrawer(){
-  if(STATE && STATE.columnName) history.back();
-  else hideDrawer();
+  if(!(STATE && STATE.columnName)) return hideDrawer();
+  if(STATE.drawerPushed) return history.back();
+  stepUpInPlace({columnName:undefined, checkKey:undefined, compareIdx:undefined,
+                 drawerPushed:undefined, panelPushed:undefined});
+}
+function stepUpInPlace(cleared){
+  STATE = {...STATE, ...cleared};
+  history.replaceState(STATE, "", navUrl({dropArrival:false}));
+  renderFromState();
 }
 
 /* =========================================================================
@@ -6479,7 +6494,7 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     // URL (REQ-DASH-026). check.key is unique within
     // a column by a real CI gate - validate_tail_uniqueness(), which
     // REQ-QAC-023 wrote for exactly this use and left unwired.
-    STATE = {...STATE, checkKey:check.key, compareIdx:undefined};
+    STATE = {...STATE, checkKey:check.key, compareIdx:undefined, panelPushed:true};
     history.pushState(STATE, "", stateToHash(STATE));
   }
   document.getElementById("check-panel-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name} / ${column.name}</span>`;
@@ -6836,8 +6851,10 @@ function hideCheckPanel(){
   setDrawerHidden("check-panel", true);
 }
 function closeCheckPanel(){
-  if(STATE && STATE.checkKey) history.back();
-  else hideCheckPanel();
+  if(!(STATE && STATE.checkKey)) return hideCheckPanel();
+  if(STATE.panelPushed) return history.back();
+  // Reached by its URL: its parent is the column it belongs to.
+  stepUpInPlace({checkKey:undefined, compareIdx:undefined, panelPushed:undefined});
 }
 document.getElementById("check-backdrop").addEventListener("click", closeCheckPanel);
 document.getElementById("check-panel-close").addEventListener("click", closeCheckPanel);

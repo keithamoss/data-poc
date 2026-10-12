@@ -25,6 +25,21 @@ status (`todo` / `investigate` / `in-progress` / `parked` / `done` /
 anything here that turns into real build work becomes a requirement in
 `requirements.yaml`, and the entry comes out when it lands.
 
+**SECOND SWEEP, 2026-10-12** (the same method). DELETED as fixed:
+#3, datasets supplied for the FOLLOWING period (REQ-PIPE-167, built:
+`days_before` on a participation); #11, supply-history columns out of
+line (5c5a616's shared colgroup, asserted in tests-js/supply-history);
+#14, "Client reference" three times with nothing to tell them apart
+(REQ-QAC-037: a cross-table row names its table, column and tool); and
+#8, closing a check panel landing on the agency view - FIXED the same
+day: Close stepped back through history even when the entry beneath was
+not the app's (a check reached by its URL had the previous page there,
+and a fresh tab had nothing), so it now steps to the parent view in place
+unless the app itself pushed that entry (tests/test_dashboard_e2e.py
+TestClosingAPanelReachedByItsUrl, three failing first). #16's
+resupply pile-up is built too (REQ-PIPE-118 onward) and stays until its
+remaining decisions are checked into the requirements that own the rest.
+
 **STALENESS SWEEP, 2026-10-06** (a read-only agent checked every open
 entry against the code; the claims below were verified before being
 written here). DELETED as fixed by later work: "Arrived at" was the
@@ -145,75 +160,6 @@ two levels) and #17.
    trend column beside it (item 1) - adding a second number to that row
    without fixing the first risks two unexplained figures instead of
    one.
-
-3. **[todo, 2026-09-24]** **[Pipeline & publishing]** **A
-   regularly scheduled dataset whose supplies are FOR THE FOLLOWING
-   PERIOD.** Keith's own worked example, 2026-09-24: data arriving in
-   January does not fill Q1 - it fills **Q2**. Operational reality is
-   that some datasets deliver for the current period and some for the
-   next, and this is a per-dataset property.
-
-   **The DESIGN QUESTION is settled; the WORK is not, and is
-   deliberately not in these sprints.** Corrected 2026-09-24 after this
-   entry was briefly marked done at `REQ-PIPE-062`'s sign-off - the
-   sign-off resolved how it fits the model, which is not the same as
-   building it. Keith's own placement: "that can go into the future log
-   in the road testing plan file".
-
-   **What is settled** (recorded on `REQ-PIPE-062`): it is NOT an
-   exception to criterion 5, which stays absolute. The SCHEDULE
-   expresses it, not the rule - that dataset's slot for the following
-   period carries a due instant and claim window already open when the
-   supply arrives, so nothing claims forward. Slots are already
-   per-dataset, so no new configuration axis is needed. Same mechanism
-   as the daily-cutoff and arrives-a-week-early cases that requirement
-   deleted.
-
-   **What is NOT built**: nothing declares, per dataset, that its
-   supplies are for the following period, and nothing generates its
-   slot calendar accordingly. Today a dataset's slots are derived on
-   the assumption that a period's supply arrives within that period.
-
-   **NAME COLLISION - do not merge this with `plans/supply-model.md`
-   sprint 25.** Keith used "carry forward" for both on 2026-09-24, and
-   they share a phrase and nothing else. Sprint 25 is a HUMAN DECISION
-   that a supply is never coming, pointing a period's view at the last
-   green supply so downstream consumers have something to query. THIS
-   is a SCHEDULING PROPERTY of a healthy, punctual dataset. Sprint 25
-   is being renamed for exactly this reason (backfill or patch are his
-   candidates); this entry should not inherit whichever name it loses. Keith's own ask, 2026-09-24. Some
-   datasets' supplies are for the period they arrive in; others' are
-   for the following one. His own framing: "does it appear in a slot in
-   this period, or does it need to go into a slot in the next period?"
-   - and it is configured at DATASET level, which he chose over
-   collection level so that one rule applies consistently even where a
-   whole collection happens to share it.
-
-   **Logged here because he raised it here, but it is NOT a road-testing
-   sighting** - it is a supply-model design question, and it collides
-   directly with a requirement that is drafted and not yet signed.
-   `REQ-PIPE-062` criterion 5 says the system SHALL NOT assign a supply
-   to a slot whose claim window has not opened, "under any rule or any
-   circumstance". A dataset whose deliveries are FOR the next period is
-   doing exactly that, under the current wording.
-
-   **The distinction that probably resolves it, and it is not yet
-   settled.** Criterion 5 exists to stop a LATE supply being
-   misattributed forward to a slot that has not come due, which would
-   silently mark a future obligation as met. A per-dataset "supplies
-   are for the following period" offset is a different thing: it moves
-   where the dataset's period BOUNDARY sits relative to arrival, rather
-   than letting an arbitrary arrival claim ahead. If that reading
-   holds, this is a property of the slot calendar rather than an
-   exception to the assignment rule - and criterion 5 stays absolute,
-   which is worth preserving, because an absolute rule with one
-   exception is how forward-claiming comes back.
-
-   **Not yet checked**: whether this is the same idea as
-   `contract/data-asset.yaml`'s existing `as_of_offset_days`, which is a
-   VIEWING offset and data-asset-level rather than per-dataset, or a
-   genuinely separate concept that merely rhymes with it. They must not
-   be conflated by accident.
 
 4. **[todo, 2026-09-24]** **[QA checks & contract]** **Cardinality
    drift - watch how many distinct values a column has, not which ones
@@ -358,43 +304,6 @@ two levels) and #17.
    agreed carry a known-bad date" is a different message from "a date we
    do not recognise appeared".
 
-8. **[investigate, 2026-09-24]** **[Dashboard UI]** **Closing a check
-   panel navigates back TWO levels, landing on the agency view instead
-   of the dataset.** Keith's own sighting, 2026-09-24, and this one is a
-   real bug rather than a design gap - closing a panel should return you
-   to what you were looking at, and instead it throws away a level of
-   drill-down.
-
-   **What the code says, read but NOT yet reproduced** - recorded this
-   way on purpose, because the reading and the symptom disagree and that
-   disagreement is the lead:
-
-   - `openCheckPanel()` sets `STATE = {...STATE, checkKey:check.key,
-     compareIdx:undefined}` and does ONE `history.pushState`.
-   - `closeCheckPanel()` does ONE `history.back()` when
-     `STATE.checkKey` is set.
-   - `renderFromState()` then re-renders and reopens the drawer if the
-     restored state still carries `columnName`.
-
-   One push, one back - so on this reading it should land exactly one
-   level down, on the dataset view with the drawer open. It does not.
-   **So the wrong assumption is about what sits UNDERNEATH the pushed
-   entry**, not about the count of history steps, and that is what to
-   check first: whether the entry the check panel was pushed on top of
-   was a dataset-tier entry at all. Two candidates worth testing before
-   anything else - a check panel opened from somewhere that never
-   pushed its own dataset-tier entry, and a `navigate()` call
-   (`hideCheckPanel(); hideDrawer(); hideAllPanelsDom(); render();
-   pushState`) collapsing two conceptual levels into one entry.
-
-   **Reproduce in a real browser before touching anything.** Per
-   `CLAUDE.md` this gets a test that fails against the current code
-   first, then the fix - and `tests-js/navigation.test.js` already
-   covers drill-down navigation in a real jsdom window, so there is an
-   obvious home for it. `tests/test_dashboard_e2e.py` is the heavier
-   option if the bug turns out to need real history semantics jsdom
-   does not model.
-
 9. **[todo, 2026-09-24]** **[Dashboard UI]** **A value-distribution
    histogram in the drill-down, this supply beside the previous one.**
    Keith's own ask, 2026-09-24, for categorical columns where it makes
@@ -508,54 +417,6 @@ two levels) and #17.
     breakdown should also show the compared run, which is item 9's
     question arriving from the other direction.
 
-11. **[todo, 2026-09-24]** **[Dashboard UI]** **Supply history: columns
-    do not line up across cycles, and the dates are raw.** Keith's own
-    sighting, 2026-09-24. Two small things in one place, both in
-    `renderSupplyHistorySection()` / `renderSupplyCycleRows()`.
-
-   **NARROWED 2026-10-06 (staleness sweep): the dates half is FIXED** -
-   REQ-DASH-071 (065deaa) formats Arrived and Timing. What remains is the
-   ALIGNMENT: each cycle is still its own table with no shared column
-   widths, and the blocker and gap sub-tables add different column sets.
-
-    **The alignment.** Every row emits the same five `<td>`s, so the
-    cell COUNT is not the problem. The problem is that **each supply
-    cycle renders its own `<table class="dataset-table">`**, stacked
-    vertically down the section. Table layout is auto, so every table
-    sizes its columns independently from its own content - and a cycle
-    containing a resupply sizes differently in two columns at once: the
-    trailing column has to fit a "Resupply, attempt N" chip instead of
-    being empty, and the Timing column holds "N days since previous"
-    text rather than an arrival pill plus a timestamp. So two cycles
-    stacked one above the other put their column edges in different
-    places, which is exactly what Keith is seeing. Read from the code
-    rather than reproduced in a browser, but independent auto-layout
-    tables genuinely cannot align, so the mechanism is not in much
-    doubt. Likely fixes: one shared `<colgroup>` with `table-layout:
-    fixed`, or one table for the whole section with cycle header rows
-    instead of a table per cycle.
-
-    **The dates, and there are two different raw values, not one.**
-    - The **Arrived** column renders `e.run_date` straight into a
-      `mono` cell - a bare `2026-07-01`, where the rest of this
-      dashboard uses `fmtDate()` and reads "Jul 1, 2026".
-    - The **Timing** column renders `e.arrivedAt` raw, and in supply
-      history that is a **full ISO timestamp** - `arrival
-      ["earliest_extract"]` straight out of
-      `pipeline/build_dashboard_data.py`. Note this is a DIFFERENT
-      value from the `arrivedAt` the dataset header shows, which
-      `buildRealDataset()` slices to `HH:MM` and labels " UTC". Same
-      field name, two shapes, one of them unformatted.
-
-    **Do this with item 5, not before it.** That raw timestamp is UTC,
-    so making it readable is the same edit as making it Perth - format
-    it through `ASSET_TIMEZONE` rather than just prettifying a UTC
-    reading into a nicer-looking wrong answer.
-
-    `tests-js/supply-history.test.js` already covers this section's
-    grouping logic and is the obvious home for anything asserting the
-    rendered output.
-
 12. **[todo, 2026-09-24]** **[QA checks & contract]** **A completeness
     check for a TALL dataset: every event must have exactly one row per
     expected category.** Keith's own ask, 2026-09-24, with his own
@@ -646,26 +507,6 @@ two levels) and #17.
     There is no geocoding or census data in the repo today - checked -
     so something has to be generated either way, and `plans/
     data-generation.md` is where that lands rather than here.
-
-14. **[todo, 2026-09-26]** **[Dashboard UI]** **"Client reference" three times in a row, with nothing to tell
-    them apart.** Noticed 2026-09-26 while driving the new cross-table
-    section (REQ-QAC-037) on the Child Protection collection page. The
-    section lists 21 checks and only 9 distinct labels: "Client
-    reference" appears three times, "Carer reference" three times, and
-    so on. They are genuinely different checks - the dbt, Soda and
-    datacontract-cli versions of the same relationship, and the same
-    relationship on different tables - so de-duping them would hide
-    real results. But a reader cannot tell which is which from the row.
-
-    Not new to this section: the dataset pages have shown the same
-    repetition all along, and the collection page has simply gathered
-    it into one place where it is finally obvious. Worth saying because
-    that is the point of road-testing - the section did not create the
-    problem, it revealed it.
-
-    A row probably needs to name its participants and its tool, but
-    that is a guess and this entry is a sighting rather than a
-    diagnosis.
 
 16. **[investigate, 2026-10-03]** **[Pipeline & publishing]** **A clean
     resupply cannot get through once a quarter has two undecided

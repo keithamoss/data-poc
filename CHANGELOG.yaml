@@ -140,6 +140,13 @@ releases:
               your decision and may turn red.
       - category: Fixed
         items:
+          - headline: Closing a check returns you to its column
+            components: ["Dashboard UI"]
+            description: >
+              If you reached a check from a link or a pasted address,
+              closing it could take you all the way back to the agency
+              view, or off the dashboard in a new tab. Closing now always
+              returns you to the column the check belongs to.
           - headline: Rejecting both files of a pair clears them
             components: ["Pipeline & publishing"]
             description: >

@@ -3841,3 +3841,57 @@ class TestSampleFinePrint:
           return fp ? fp.textContent : null;
         }""")
         assert text and "Soda returns up to 100 of the failing rows" in text
+
+
+class TestClosingAPanelReachedByItsUrl:
+    """road-testing #8 (Keith, 2026-09-24): closing a check panel landed
+    on the AGENCY view. Reproduced 2026-10-12: Close was always
+    history.back(), which is right only when the app itself pushed the
+    entry underneath. A check reached by its URL - pasted, edited, or a
+    link from elsewhere - has the previous page underneath (here the
+    agency view), and in a fresh tab nothing at all, so Close left the
+    dashboard. Close now steps to the parent view in place there."""
+
+    _CHECK = {**_BDM, "columnName": "registration_number", "checkKey": "not_null_dbt"}
+
+    def _state(self, page):
+        return page.evaluate("() => [STATE.tier, STATE.columnName || null, STATE.checkKey || null,"
+                             " document.getElementById('check-panel').getAttribute('aria-hidden')]")
+
+    def test_reached_from_the_agency_view_it_closes_to_its_column(self, clean_page,
+                                                                  built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "agency",
+                                                 "agencyId": "registry-services"})
+        _goto(clean_page, built_dashboard_html, self._CHECK)
+        assert self._state(clean_page)[2] == "not_null_dbt"
+        clean_page.locator("#check-panel-close").click()
+        clean_page.wait_for_function("() => !STATE.checkKey")
+        assert self._state(clean_page) == ["dataset", "registration_number", None, "true"]
+
+    def test_in_a_fresh_tab_it_closes_and_stays_on_the_dashboard(self, clean_page,
+                                                                 built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CHECK)
+        clean_page.locator("#check-panel-close").click()
+        clean_page.wait_for_timeout(500)
+        assert clean_page.url.startswith("file://") and "qa-reporting-dashboard" in clean_page.url
+        assert self._state(clean_page) == ["dataset", "registration_number", None, "true"]
+
+    def test_a_column_drawer_reached_by_its_url_closes_to_its_dataset(self, clean_page,
+                                                                    built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "agency",
+                                                 "agencyId": "registry-services"})
+        _goto(clean_page, built_dashboard_html, {**_BDM, "columnName": "registration_number"})
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_function("() => !STATE.columnName")
+        assert clean_page.evaluate("() => STATE.tier") == "dataset"
+
+    def test_opened_in_the_app_close_is_still_one_step_back(self, clean_page,
+                                                          built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        _open_first_column(clean_page)
+        clean_page.locator(".check-card").first.click()
+        clean_page.wait_for_function("() => !!STATE.checkKey")
+        length = clean_page.evaluate("() => history.length")
+        clean_page.locator("#check-panel-close").click()
+        clean_page.wait_for_function("() => !STATE.checkKey")
+        assert clean_page.evaluate("() => [!!STATE.columnName, history.length]") == [True, length]

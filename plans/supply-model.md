@@ -2166,7 +2166,7 @@ comparisons against the expected-supply sequence.
     them. The other - a regularly scheduled dataset whose supplies are
     FOR THE FOLLOWING PERIOD, so data arriving in January fills Q2 and
     not Q1 - is a scheduling property, is not in these sprints, and
-    lives at `plans/road-testing.md` item 3. They share a phrase and
+    is REQ-PIPE-167 (built; it was `plans/road-testing.md` item 3). They share a phrase and
     nothing else. His own alternative names for THIS one are
     **backfill** or **patch**; the real name is still his to pick, and
     picking one that the other concept cannot also claim is part of the
