@@ -31577,6 +31577,7 @@ requirements:
       level, so a refusal still quotes what dbt said, as the subprocess's captured
       output did.
     - 'WORKER SCHEMAS ARE DISTINCT ACROSS MACHINES (post-build-review #131 D4, 2026-10-07): a PID repeats across containers and Lambda sandboxes, so the name carries a random token drawn once per process. A worker that died idle is stopped - its connection and parse directory released - before another starts, and a failed start removes its process and directory.'
+    - 'ONLY A PARSE THE INVOKE WROTE IS KEPT (post-build-review #158, 2026-10-12): the run target''s partial_parse.msgpack is removed before each invoke, because dbt writes none when it skips parsing and the worker used to keep whatever an earlier process had left there - another worker''s profile, so the next run parsed in full. Criterion 1''s test observes the kept parse (unchanged when reused, rewritten by a forced full parse) rather than timing runs, which failed only under a full gate''s load.'
     open_questions:
     - Which mechanism, A or B - to be chosen by Keith on the spike's measurements.
   - id: REQ-PIPE-158

@@ -7895,3 +7895,32 @@ twice. It deliberately did not re-find the `TypeError`.
     - **Noted, not changed:** `contract_rule_models` re-parses the contract
       each run (~23ms) - small against the saving; and the debug runners get
       the asked-for record but no guard, since they are not runs.
+    - **Found by the gate on the fixes, both test isolation:** (a) the Child
+      Protection fixture promotes into 2026-Q1 once per module, and a module
+      that empties qa (test_qa_store) forgot the promotion but not the period
+      table, so the next module's promotion hit `cp_carers already exists` -
+      45 setup errors in this gate, and the 24 errors the baseline gate on
+      b8424c9 showed. Reproduced by running a fixture module, test_qa_store,
+      then another fixture module (6 errors); FIXED by the fixture emptying
+      its own two periods first. (b) test_not_supplied asked about cp-clients
+      2026-Q1, which that same fixture promotes into; reproduced failing after
+      a fixture module, FIXED by asking about 2025-Q1. Both pre-dated this
+      work and were made likelier by four new modules using the fixture.
+    - **And a real defect behind the one remaining gate failure**
+      (`test_later_runs_reuse_the_parse`, 4.12s / 1.59s / 4.42s: red only
+      in a full gate, never alone). dbt's own debug log
+      (`dbt_project/logs/dbt.log`, which `--quiet` does not touch) showed
+      the third run saying "Unable to do partial parsing because profile
+      has changed" with an identical environment. Cause: after every invoke
+      the worker copied the run target's `partial_parse.msgpack` over its
+      kept parse, but dbt writes none when it skips parsing, so a file an
+      EARLIER process had left in that run's target (another worker's
+      schema in its profile) was kept, and the next run parsed in full.
+      Reproduced deterministically by planting a stale file
+      (`test_a_stale_parse_left_in_a_runs_target_is_never_kept`, failing
+      first); FIXED by removing the target's file before each invoke. The
+      reuse test now observes the kept parse itself (unchanged across runs
+      that reuse it, rewritten by a forced full parse) rather than a
+      stopwatch, which also closes F5's "NOT DONE". Not measured: whether
+      the bootstrap was paying this in practice - its per-run targets are
+      removed after each run, so only a re-run over a leftover target would.

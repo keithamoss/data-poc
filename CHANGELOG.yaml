@@ -139,6 +139,12 @@ releases:
               Some failing Soda checks in Child Protection listed no example
               rows because another table had a check with the same name. Each
               check now shows rows from its own table.
+          - headline: dbt reuses its parse as intended
+            components: ["Pipeline & publishing"]
+            description: >
+              A dbt run could pick up a parse file left behind by an earlier
+              process and then re-read the whole project. Each run now keeps
+              only the parse it wrote itself.
   - date: "2026-10-11"
     summary: >
       A collection with nothing counted no longer reads green, one re-check

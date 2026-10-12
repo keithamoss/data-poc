@@ -62,6 +62,16 @@ def _serve(conn, root: str, pp_dir: str) -> None:
         if os.path.exists(pp):
             args = [*args, "--partial-parse-file-path", pp]
         os.makedirs(target_path, exist_ok=True)
+        # ONLY A PARSE THIS INVOKE WROTE IS KEPT. dbt writes none when it
+        # skips parsing, so one an earlier process left in this run's target
+        # would otherwise be copied over the kept parse below - and, with no
+        # kept parse yet, read in its place (2026-10-12: another worker's
+        # schema, so "profile has changed" and a full parse every run).
+        fresh = os.path.join(target_path, "partial_parse.msgpack")
+        try:
+            os.remove(fresh)
+        except FileNotFoundError:
+            pass
         log_path = os.path.join(target_path, "dbt_worker.log")
         # WHAT dbt SAID, kept for the refusal message as a subprocess's
         # captured output was - written at the file-descriptor level, which
@@ -87,7 +97,6 @@ def _serve(conn, root: str, pp_dir: str) -> None:
                 os.close(saved[1])
         # THE PARTIAL PARSE CARRIES TO THE NEXT RUN: dbt writes it into the
         # target path, and this keeps a copy where the next invoke reads it.
-        fresh = os.path.join(target_path, "partial_parse.msgpack")
         if os.path.exists(fresh):
             shutil.copyfile(fresh, pp)
         with open(log_path) as f:

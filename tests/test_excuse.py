@@ -32,6 +32,21 @@ def conn(supply_dsn):
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _forget_our_filings(supply_dsn):
+    """Each test's filings go with it (2026-10-12): a supply this module filed
+    into cp-carers 2024-Q2 and left there read, to test_not_supplied on the
+    same worker, as a supply waiting for a decision - and its marking tests
+    were refused."""
+    yield
+    import filing_support
+
+    with supply_db.connect(label="test-excuse") as c:
+        filing_support.forget(c, "supply_id LIKE ANY(?)", [[
+            "cp-carers@crit-%", "cp-carers@cli-%", "cp-carers@range-%",
+            "cp-clients@excuse-%"]])
+
+
 def _late(slot=LATE_SLOT, received=RECEIVED):
     supply = f"cp-clients@excuse-{uuid.uuid4().hex[:10]}"
     filing_support.file(assignment.Assignment(

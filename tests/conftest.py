@@ -797,6 +797,21 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
 
     found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries_dir, receipts_dir)
     first = min(a.received_at for a in found)
+    # THE FIXTURE'S OWN PERIODS START EMPTY (2026-10-12). This runs once per
+    # MODULE, and the promotion below moves a table into 2026-Q1's schema,
+    # which outlives the module. A module that empties qa (test_qa_store
+    # truncates qa.run) forgets the promotion but not the table, so the next
+    # module's promotion found `period_2026_q1.cp_carers` already there -
+    # 24 to 45 setup errors a full run, by which modules shared a worker.
+    # Dropping a period's own schema is what the period guard allows - the
+    # LATER one first, since 2026-Q2's views can resolve through 2026-Q1's
+    # tables and the guard refuses a drop that would take another period's
+    # view with it.
+    from qa_tools.common import period_schema
+
+    with supply_db.connect(label="pytest:fixture-periods") as conn:
+        for period in ("2026-Q2", "2026-Q1"):
+            conn.execute(f'DROP SCHEMA IF EXISTS "{period_schema.period_schema(period)}" CASCADE')
     # A FILING LINKS TO ITS DELIVERY RECORD (REQ-PIPE-144 criterion 10),
     # so the deliveries are recorded first, as the batch does.
     for d in delivery_mod.list_deliveries(deliveries_dir, receipts_dir):

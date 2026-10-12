@@ -2,8 +2,8 @@
 full once and partially after (REQ-PIPE-157, Keith 2026-10-06)."""
 from __future__ import annotations
 
+import hashlib
 import os
-import time
 
 import pytest
 
@@ -27,6 +27,12 @@ def _built(run_id: str) -> set[str]:
             [supply_db.dbt_schema(run_id)]).fetchall()}
 
 
+def _kept_parse() -> tuple[bytes, int]:
+    path = os.path.join(dbt_worker._worker[2], "partial_parse.msgpack")
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).digest(), os.stat(path).st_mtime_ns
+
+
 class TestOneWorkerPerProcess:
 
     def test_dbt_never_runs_in_this_interpreter(self, fresh_worker):
@@ -38,15 +44,22 @@ class TestOneWorkerPerProcess:
                              if m.startswith("dbt.cli")}, "dbt was imported here"
 
     def test_later_runs_reuse_the_parse(self, fresh_worker):
-        """Criterion 1: the first run parses in full; later ones are partial
-        and markedly faster (measured 6.0s -> 3.8s on the full project)."""
-        times = []
+        """Criterion 1: the first run parses in full; later ones reuse it.
+
+        Observed through the kept parse itself, not a stopwatch: dbt
+        rewrites it on any full parse (different bytes - forcing one is the
+        second half of this test) and leaves it alone when it reuses it.
+        It was timed until 2026-10-12, which failed only under a full
+        gate's load (4.12s, 1.59s, 4.42s) and never alone."""
+        kept = None
         for run_id in (CP_REF_RUN_ID, CP_DIRTY_RUN_ID, CP_REF_RUN_ID):
-            s = time.monotonic()
             run_dbt_cp.evaluate_dbt_cp(run_id, "2026-01-01T09:00:00Z")
-            times.append(time.monotonic() - s)
-        assert os.path.exists(os.path.join(dbt_worker._worker[2], "partial_parse.msgpack"))
-        assert max(times[1:]) < times[0], times
+            now = _kept_parse()
+            assert kept is None or now == kept, "a later run parsed the project again"
+            kept = now
+        os.remove(os.path.join(dbt_worker._worker[2], "partial_parse.msgpack"))
+        run_dbt_cp.evaluate_dbt_cp(CP_DIRTY_RUN_ID, "2026-01-01T09:00:00Z")
+        assert _kept_parse() != kept, "a full parse would not have shown"
 
     def test_the_parse_survives_a_runs_tidy_up(self, fresh_worker):
         """NFR DISK: per-run target directories go with a run's schemas; the
@@ -84,6 +97,23 @@ class TestTheKeptParse:
         password = supply_db.connection_fields()["password"]
         blob = open(os.path.join(dbt_worker._worker[2], "partial_parse.msgpack"), "rb").read()
         assert password and password.encode() not in blob
+
+
+    def test_a_stale_parse_left_in_a_runs_target_is_never_kept(self, fresh_worker):
+        """A defect, 2026-10-12: after every invoke the worker copied the
+        target path's partial_parse.msgpack over the kept one - but dbt
+        writes none when it skips parsing, so a file an EARLIER process left
+        in that run's target was kept instead, and the next run parsed the
+        project in full ("profile has changed": another worker's schema)."""
+        os.makedirs(supply_db.dbt_target_path(CP_DIRTY_RUN_ID), exist_ok=True)
+        stale = os.path.join(str(supply_db.dbt_target_path(CP_DIRTY_RUN_ID)),
+                             "partial_parse.msgpack")
+        run_dbt_cp.evaluate_dbt_cp(CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
+        kept = _kept_parse()
+        with open(stale, "wb") as f:
+            f.write(b"left by another process")
+        run_dbt_cp.evaluate_dbt_cp(CP_DIRTY_RUN_ID, "2026-01-01T09:00:00Z")
+        assert _kept_parse() == kept
 
 
 class TestALostWorker:

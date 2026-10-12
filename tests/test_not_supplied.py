@@ -54,8 +54,12 @@ class TestClosedIsDerived:
         assert got.responses == slot_state.CLOSED_RESPONSES
 
     def test_an_overdue_slot_still_open_is_not_closed(self, conn):
-        at = datetime(2026, 3, 1, 9, tzinfo=PERTH)      # Q1 due 1 Feb, closes mid-April
-        got = _state(conn, "cp-clients", "2026-Q1", at=at)
+        # 2025-Q1, which no fixture promotes into: the Child Protection
+        # fixture promotes cp-clients into 2026-Q1, and the decision log
+        # outlives the module that wrote it, so on a shared worker 2026-Q1
+        # read "promoted" (2026-10-12).
+        at = datetime(2025, 3, 1, 9, tzinfo=PERTH)      # Q1 due 1 Feb, closes mid-April
+        got = _state(conn, "cp-clients", "2025-Q1", at=at)
         assert got.state == slot_state.OVERDUE and not got.closed
 
     def test_a_closed_slot_with_a_supply_waiting_reads_awaiting(self, conn):
@@ -363,5 +367,10 @@ class TestALateDayStillOpenIsNamed:
         import filing_support
 
         filing_support.place(conn, "cp-carers", "cp-carers@ontime", "2025-Q1", delivery)
-        got = {s["period"] for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
-        assert "2025-Q1" not in got
+        try:
+            got = {s["period"] for s in closed_slots.late_slots("cp-carers", conn, now=LATER)}
+            assert "2025-Q1" not in got
+        finally:
+            # ITS FILING GOES WITH IT (2026-10-12): left behind, its sibling
+            # above read 2025-Q1 as filed whenever this ran first.
+            filing_support.forget(conn, "supply_id = 'cp-carers@ontime'")
