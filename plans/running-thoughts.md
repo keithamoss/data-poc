@@ -1750,7 +1750,7 @@ authoring rule of its own, since "record the kinds of issues found" is
 exactly the loose invitation that produced the prose this whole
 requirement is rewriting.
 
-22. **[parked, 2026-09-20]** **[QA checks & contract]** `dataset` and `table` are the same thing in every check_id, and only one of them should exist.
+22. **[done, 2026-10-12]** **[QA checks & contract]** `dataset` and `table` are the same thing in every check_id, and only one of them should exist.
 
 Keith's question while reviewing the new `/check/` URL shape: "where is
 dataset different to table?" Checked against the real ids rather than
@@ -1804,6 +1804,7 @@ maps to exactly one table, and nothing enforces that"). It is not dead
 weight - the `/check/` URL now really does key on the tail, so the
 guarantee is load-bearing the moment a dataset ever gains a second
 table.
+    **DONE 2026-10-12 (open-items audit):** the `table` segment was removed from check_id's `_SEGMENTS` (qa_tools/common/check_id.py says so), under REQ-QAC-039.
 
 23. **[todo, 2026-09-20]** **[Pipeline & publishing]** Adding two more datasets is the trigger for resolving the file-per-dataset shape.
 
@@ -1939,7 +1940,7 @@ or an automation triggers it, and QA then runs against the latest
 version available of each table, whether that came from this supply or
 an earlier one.
 
-26. **[todo, 2026-09-21]** **[Data generation]** Regenerating on a different day DOUBLES the committed history instead of replacing it.
+26. **[done, 2026-10-12]** **[Data generation]** Regenerating on a different day DOUBLES the committed history instead of replacing it.
 
 Found 2026-09-21 while answering Keith's question about how far Birth
 Registrations' history goes back. The answer turned out not to be a
@@ -1980,8 +1981,9 @@ regeneration clear the dataset's directory first, which the
 delete-and-regenerate decision already permits; or stop encoding a date
 in the directory name so a re-run overwrites rather than accumulates.
 The third is the only one that also fixes it for a partial regeneration.
+    **DONE 2026-10-12 (open-items audit):** the anchor date is pinned and run ids are dateless (REQ-GEN-042), and qa_results/ - the committed history it doubled - is gone (REQ-PIPE-089).
 
-27. **[todo, 2026-09-21]** **[Data generation]** A small number of supplies should arrive EARLY.
+27. **[done, 2026-10-12]** **[Data generation]** A small number of supplies should arrive EARLY.
 
 Keith, 2026-09-21, while describing how the real operational database
 organises supplies - "if data arrived 10 days before the designated
@@ -2007,6 +2009,7 @@ belongs to is not the same axis as when it turned up.** Every "as at"
 question has to pick one. A supply that belongs to Q1 but landed in
 March, and a correction to Q1 that landed in April, both belong to Q1 -
 so a resolution rule keyed only on arrival time gets them wrong.
+    **DONE 2026-10-12 (open-items audit):** REQ-GEN-040 (built): the generator can deliver early.
 
 29. **[todo, 2026-09-23]** **[Data generation]** Build a few small, genuinely-real datasets across several agencies, once all the sprints are done.
 
@@ -2113,7 +2116,7 @@ different pages. `mothman schedule show` already does the first for
 calendars on the CLI, which argues the dashboard's version should be
 the second - but that is his call, not an assumption to build on.
 
-32. **[investigate, 2026-09-23]** **[QA pipeline]** Child Protection's
+32. **[done, 2026-10-12]** **[QA pipeline]** Child Protection's
     two real-tool modules still resolve their CSVs from
     `data/cp_raw/<run_id>/`, which couples them to a run_id the
     GENERATOR wrote down.
@@ -2158,8 +2161,9 @@ fixture has to name its `data/cp_raw/<run_id>/` directories after the
 run_ids RECOGNITION will assign, because those two modules read them
 back by that name. A fixture that has to predict an id it does not
 control is the coupling showing through.
+    **DONE 2026-10-12 (open-items audit):** REQ-PIPE-102 (built) retired data/cp_raw/; only comments still mention it.
 
-33. **[todo, 2026-09-23]** **[Pipeline & publishing]** Does the
+33. **[superseded, 2026-10-12]** **[Pipeline & publishing]** Does the
 warehouse stay ephemeral, or become a permanent thing?
 
 Keith, 2026-09-23, raised in passing while settling the delivery log's
@@ -2191,8 +2195,9 @@ argument on its own.
 item, and `REQ-PIPE-018`'s AWS MVP, which is unsigned. This one is
 narrower - not which engine, but whether the thing persists between
 runs, and what that does to the committed-versus-queryable split.
+    **SUPERSEDED 2026-10-12 (open-items audit):** REQ-PIPE-087/089 made PostgreSQL the system of record, so the ephemeral-or-permanent question went with DuckDB.
 
-34. **[todo, 2026-09-23]** **[Testing & dev tooling]** Run the
+34. **[done, 2026-10-12]** **[Testing & dev tooling]** Run the
 POST-BUILD subagents over the supply-model build work - the batch-3
 build when it happens, AND the twelve requirements already built in
 sprints 1-6, which never had a critic pass at all.
@@ -2249,8 +2254,9 @@ sprint 8's filing layer. It will flag them as unmet, correctly. That is
 expected rather than a finding - the requirement's own `[BUILD]`
 decision says so - but a session reading the report cold will not know
 that.
+    **DONE 2026-10-12 (open-items audit):** the first post-build critic pass covered sprints 1-6 (plans/post-build-review.md, its opening entries).
 
-35. **[todo, 2026-09-23]** **[Testing & dev tooling]** Batch 3 goes to
+35. **[superseded, 2026-10-12]** **[Testing & dev tooling]** Batch 3 goes to
 `delivery-architect` and the UX agents next - CONDITIONALLY
 pre-authorised by Keith.
 
@@ -2294,6 +2300,7 @@ happens in the main session - no agent does the building. Build order is
 near-linear on the dependencies: `034` -> `035` -> `036` -> `037` ->
 `038` -> `041`. `034` is unblocked now and does NOT need the architect's
 placement answer, so it could start while the architect works.
+    **SUPERSEDED 2026-10-12 (open-items audit):** batch 3 (REQ-PIPE-034..038, QAC-037, DASH-041) is all built.
 
 36. **[todo, 2026-09-23]** **[Data generation]** Keith wants one last
 review of the ON-DISK STRUCTURE for storing deliveries, once sprints
@@ -2359,7 +2366,7 @@ Not needed for the PoC, where one generator writes everything. Logged
 because the cost of adding it later is paid by the records that already
 exist.
 
-38. **[todo, 2026-09-24]** **[Pipeline & publishing]** Design WHEN a
+38. **[superseded, 2026-10-12]** **[Pipeline & publishing]** Design WHEN a
 delivery receipt gets written, as part of moving to AWS.
 
 Keith's own ask, 2026-09-24. Not designed anywhere today:
@@ -2395,6 +2402,7 @@ delivery with files and no receipt means the boundary has not closed
 yet, so it is the NORMAL state of every delivery until it does - which
 is why that requirement skips it as in-flight and reports it
 informationally rather than treating it as an anomaly.
+    **SUPERSEDED 2026-10-12 (open-items audit):** REQ-PIPE-105 (each file its own arrival, stamped by storage) and REQ-PIPE-152 are built; REQ-PIPE-018's open question on it is stale.
 
 39. **[todo, 2026-09-24]** **[Pipeline & publishing]** A supplier splits
 one table across several files, and we stitch them back together on
@@ -2713,7 +2721,7 @@ because it never knew when we received anything.
 
 Belongs with batch 5's check work.
 
-45. **[todo, 2026-09-26]** **[Pipeline & publishing]** Add PostgreSQL to this PoC, so the warehouse can be tested like for like with production.
+45. **[done, 2026-10-12]** **[Pipeline & publishing]** Add PostgreSQL to this PoC, so the warehouse can be tested like for like with production.
 
     **Keith's own ask, 2026-09-26**, raised while settling how demotion
     moves a table out of a period schema (`REQ-PIPE-081`). The design
@@ -3954,6 +3962,7 @@ Belongs with batch 5's check work.
       from the table directly, by `decision_log.promoted_into(...,
       as_at=...)`, which reads the instant a decision TOOK EFFECT rather
       than when it was recorded.
+    **DONE 2026-10-12 (open-items audit):** REQ-PIPE-087 (built): PostgreSQL is the one warehouse engine; REQ-PIPE-146 and REQ-TEST-095 too.
 
 46. **[done, 2026-09-27]** **[Pipeline & publishing]** Keith: stop encoding schema names - normalise them instead, and refuse a collision where the names are defined.
 
@@ -4286,7 +4295,7 @@ Belongs with batch 5's check work.
     Sits naturally alongside #50's environment work and after
     REQ-PIPE-089; not started.
 
-57. **[investigate, 2026-09-28]** **[QA checks & contract]** The drift
+57. **[done, 2026-10-12]** **[QA checks & contract]** The drift
     reference is the FIRST arrival ever, not the previous period - so
     the check measures distance from the beginning of history rather
     than change.
@@ -4320,6 +4329,7 @@ Belongs with batch 5's check work.
     explicitly NOT a promotion-safety measure - see the reasoning in
     this item's own opening paragraph for why I stopped claiming it
     was one.
+    **DONE 2026-10-12 (open-items audit):** REQ-QAC-108 (built): drift and volume measure against the last PROMOTED supply.
 
 60. **[todo, 2026-10-04]** **[Pipeline & publishing]** **Retention for
     superseded supplies (and probably the original delivery files).**
@@ -4360,7 +4370,7 @@ Belongs with batch 5's check work.
     (REQ-PIPE-120/121/140) being picked up by two runs at once. Worth a
     delivery-architect pass of its own when it comes up.
 
-62. **[todo, 2026-10-04]** **[Pipeline & publishing]** **A wider
+62. **[done, 2026-10-12]** **[Pipeline & publishing]** **A wider
     "did anything slip through" check after every run - maybe later.**
     Keith, 2026-10-04, choosing the NARROW reconciliation for the
     rewritten REQ-PIPE-115 ("let's do A and flag B in running thoughts
@@ -4375,6 +4385,7 @@ Belongs with batch 5's check work.
     against real runs and could refuse good runs on day one for reasons
     nobody has met yet; worth doing once a clean run's real output has
     been measured.
+    **DONE 2026-10-12 (open-items audit):** REQ-PIPE-188 (built): a run whose in-scope check has neither a result nor a not-evaluated record is refused.
 
 64. **[todo, 2026-10-05]** **[Data generation]** **Walk through scenario injection
     with Keith - no scenario-only code paths.** Keith, after the TS-47
@@ -4426,7 +4437,7 @@ Belongs with batch 5's check work.
     stays refused for a reshape (anything below RESHAPED_AT) and for any
     non-synthetic asset. Pairs with the bootstrap speed work (REQ-PIPE-156 to 160, 188 to 192).
 
-67. **[todo, 2026-10-06]** **[Testing & dev tooling]** **Review every test:
+67. **[done, 2026-10-12]** **[Testing & dev tooling]** **Review every test:
     is it still needed, and is our testing guidance any good?** Keith,
     2026-10-06 morning, while a gate ran: "do a review of all of our tests
     and identify if they're still all required, because the gate is taking
@@ -4551,6 +4562,7 @@ Belongs with batch 5's check work.
     the role test). Step 3 of this item - the testing GUIDANCE - APPROVED
     word for word by Keith the same morning and added to CLAUDE.md beside
     the bug-test rule.
+    **DONE 2026-10-12 (open-items audit):** test review passes 1-3 (59860de, 45ca8cb, 03b62ef) and CLAUDE.md's 'A test earns its place' rules; a further pruning pass is parked as #86.
 
 68. **[todo, 2026-10-06]** **[Pipeline & publishing, QA checks & contract]**
     **No custom code per dataset - everything in configuration, if we can.**
@@ -4570,7 +4582,7 @@ Belongs with batch 5's check work.
     larger question REQ-QAC-039 is a symptom of.
 
 
-69. **[todo, 2026-10-08]** **[Pipeline & publishing, Data generation]**
+69. **[done, 2026-10-12]** **[Pipeline & publishing, Data generation]**
     **Revisit REQ-PIPE-170 once the calendar groups are signed off, and slot
     its scenarios into the build.** Keith, 2026-10-08: "look at requirement
     170 once we've done with these groups, and have that slotted in as part
@@ -4582,8 +4594,9 @@ Belongs with batch 5's check work.
     tools, REQ-PIPE-161..166) is signed off, before the calendar batch's
     sprints are planned - so the scenario generation is a planned sprint
     step, not an afterthought at the end.
+    **DONE 2026-10-12 (open-items audit):** REQ-PIPE-170 (built) with its scenarios, and the replay stages corrections (03cea18).
 
-70. **[todo, 2026-10-08]** **[Pipeline & publishing, Calendar]**
+70. **[done, 2026-10-12]** **[Pipeline & publishing, Calendar]**
     **Three ways a period can be judged, and which one to reach for.**
     Keith, 2026-10-08, asking how REQ-PIPE-161 (excuse a late supply)
     differs from `not_expected` in the calendar - and whether an excuse
@@ -4621,6 +4634,7 @@ Belongs with batch 5's check work.
     can see which one a verdict leaned on. Worth checking against the
     scenarios when the calendar build is planned (plans/supply-model.md's
     "Calendar corrections").
+    **DONE 2026-10-12 (open-items audit):** a reference rule, now carried by REQ-PIPE-111, 161 and 170 (all built).
 
 71. **[todo, 2026-10-08]** **[Pipeline & publishing, Security]**
     **Letting someone use a GUI client locally when their code can differ from
@@ -4757,7 +4771,7 @@ Belongs with batch 5's check work.
     (check lifecycle's retirement already exists for checks); and whether a
     removed dataset can ever come back.
 
-78. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Does excusing a late
+78. **[done, 2026-10-12]** **[Pipeline & publishing]** **Does excusing a late
     supply stop the gate promoting it?** Found by delivery-architect in review
     round 3, outside that round's remit. `rejection.decided_by_a_person()`
     bars the gate from promoting any supply a person has decided, exempting
@@ -4768,6 +4782,7 @@ Belongs with batch 5's check work.
     them beside re-file in REQ-PIPE-076 criterion 7. REQ-PIPE-161 is signed
     and not built, so this needs Keith before it is built: should an excuse
     also be exempt?
+    **DONE 2026-10-12 (open-items audit):** REQ-PIPE-161 criterion 19: an excuse does not bar the gate (rejection.py exempts EXCUSE_LATENESS).
 
 79. **[todo, 2026-10-10]** **[Pipeline & publishing]** **Which calendar a dataset
     or collection is on, and which collection a dataset belongs to, are not
