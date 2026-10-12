@@ -1174,6 +1174,19 @@ to the exact right file/line/folder with zero console errors.
     2026-10-13: "we'll make a note to come back to that this week. Maybe
     after this next line of things we've got lined up").
 
+89. **[todo, 2026-10-13]** **[Pipeline & publishing]** **A schema change
+    has no production path: "wipe and rebuild" only works on a synthetic
+    asset.** Found answering Keith's question on REQ-PIPE-193 ("is that
+    just for now, or ... in production, this would cause a rewipe and
+    rebuild?"). The standing rule (Keith, 2026-10-05, recorded on
+    REQ-PIPE-144) is that any SCHEMA_VERSION bump refuses an older database
+    and the remedy is `mothman env reset-synthetic` then `bootstrap` - and
+    reset-synthetic deliberately REFUSES an asset that does not declare
+    `synthetic: true`. So against a real asset a schema change leaves the
+    database refused with no way forward. Fine for the PoC; before any real
+    deployment, schema changes need real migrations (or an equivalent
+    route). Nothing records that today. Not scoped.
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
