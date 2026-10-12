@@ -54,8 +54,10 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   labelled sparklines on dataset and column pages, "N of M checks not
   green" on cards, a failing-COLUMNS count where Trend sits now (Keith's
   2026-10-06 answers). Tier 1 ROLLS THE COUNT UP onto agency cards (Keith,
-  2026-10-13). Still open: where Trend goes. First because at 30 datasets
-  every red looking the same is what stops triage.
+  2026-10-13). TREND: labelled sparklines on the dataset and column pages,
+  AND a small labelled one kept in the dataset list beside the count
+  (Keith, 2026-10-13). First because at 30 datasets every red looking the
+  same is what stops triage.
 - **Sprint 2 - "don't mislead me" (#18; S).** A past date never
   shows today's "not the latest file" panel (#18 - `promotionSplit()`
   renders the build-time state on every as-of date). Questions: hide the

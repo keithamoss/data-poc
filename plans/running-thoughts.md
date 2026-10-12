@@ -4871,6 +4871,15 @@ could never have computed it), and it belongs with batch 5's check work.
     The three answers on the table: refuse such a move once the dataset has a
     slot; allow it only as a declared correction (REQ-PIPE-111); or version
     membership like participation.
+    **ANSWERED 2026-10-13 (Keith): BOTH, FOR DIFFERENT CASES.** A real change
+    of arrangement from a date - cp-carers going annual from 2027 - is
+    VERSIONED MEMBERSHIP: dated entries like participation, history before
+    the date stays as it was judged, nothing is re-judged, and past entries
+    freeze like every other dated entry. Fixing a MISTAKE in membership is
+    a DECLARED CORRECTION (REQ-PIPE-111, built), which re-judges all of
+    history as if it had always been so. Applies to calendar membership and
+    collection membership alike. Versioning is new work: scope it as its
+    own requirement.
 
 80. **[done, 2026-10-11]** **[Testing & dev tooling]** **A timing assertion in
     tests/test_dbt_worker.py fails under full-suite load.**
@@ -4963,6 +4972,14 @@ could never have computed it), and it belongs with batch 5's check work.
     there. The tolerance test now breaks only the first ask, and would fail
     rather than pass quietly if the order changed. Small; whether a build
     without git is a supported case at all is the question to settle first.
+    **ANSWERED 2026-10-13 (Keith): THE COMMIT COMES FROM AN ENVIRONMENT
+    VARIABLE FIRST.** Why it matters: the build moved out of GitHub Actions
+    (REQ-PIPE-092) to wherever the database is reachable - in a real
+    deployment, a container image that usually has no .git. So the image is
+    stamped with its commit at build time (as GITHUB_SHA already is in
+    Actions), that is preferred over git, and with neither the page omits
+    the commit stamp and the pinned GitHub links rather than failing - both
+    asks of the commit, not only the first. Not built yet.
 
 85. **[investigate, 2026-10-12]** **[Pipeline & publishing]** **For Keith: a
     delivery file's receipt_sequence differs between two bootstraps of the
@@ -4980,6 +4997,13 @@ could never have computed it), and it belongs with batch 5's check work.
     in which case tests/equiv_support.py should exclude it like the other
     surrogate ids. REQ-PIPE-188's equivalence criterion will meet the same
     thing.
+    **ANSWERED 2026-10-13 (Keith): DETERMINISTIC PER DELIVERY.** Checked in
+    the code first: it IS an ordering tie-break, not a surrogate - REQ-PIPE-061,
+    qa_store.py's own comment, and three ORDER BYs in dataset_blockers.py and
+    outstanding.py - and it is numbered across the whole database
+    (s3_arrival.py takes MAX+1), which is why the two bootstraps disagreed.
+    So: number files within their own delivery in a stable order (filename),
+    so the same history always gets the same numbers. Not built yet.
 
 86. **[parked, 2026-10-12]** **[Testing & dev tooling]** **A pruning pass on
     the test suite, criterion by criterion - in the pocket for later.**
