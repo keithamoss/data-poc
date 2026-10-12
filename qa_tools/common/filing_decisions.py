@@ -220,9 +220,9 @@ def consequences(conn, request: Request) -> Consequences:
     how it is undone and what the affected period reads until then
     (REQ-PIPE-128 criteria 6 and 7). Empty where it does nothing more.
 
-    Which OTHER supplies' checks read a moved table and will be re-checked
-    (criterion 8) is not said yet: the re-check itself is REQ-PIPE-151's
-    processing pass, unbuilt, and a warning promising one would be false.
+    Which OTHER supplies' checks read a table it moves and will be
+    re-checked (criterion 8) is said too - from knock_on.readers(), the
+    same answer the re-evaluation it owes will act on.
     """
     lines: list[str] = []
     done: list[str] = []
@@ -267,7 +267,46 @@ def consequences(conn, request: Request) -> Consequences:
         lines, done = _refile_consequences(conn, request)
     if request.operation == EXCUSE_LATENESS and request.through_period:
         lines, done = _range_consequences(conn, request)
+    lines += _readers_rechecked(conn, request)
     return Consequences(lines=tuple(lines), done=tuple(done))
+
+
+#: What a period holds changes under these whatever the supply's state.
+_ALWAYS_MOVES = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT)
+#: These move a table only where the supply named is the one the period holds.
+_MOVES_IF_HELD = (DEMOTE, REJECT, REFILE)
+
+
+def _readers_rechecked(conn, request: Request) -> list[str]:
+    """REQ-PIPE-128 criterion 8: the OTHER supplies whose checks read the
+    table this decision moves, which the re-evaluation it owes
+    (REQ-PIPE-121) will re-check - said only where the decision really
+    changes what the period holds, since a promise of a re-check that does
+    not happen would be false."""
+    from qa_tools.common import hierarchy, knock_on, promotion
+
+    period, ds, op = request.period, request.dataset_id, request.operation
+    if not period:
+        return []
+    held = decision_log.held(conn, ds, period)
+    holder = held.holder if held else None
+    if op == PROMOTE:
+        moves = bool(request.supply) and request.supply != holder
+    elif op in _MOVES_IF_HELD:
+        moves = bool(request.supply) and request.supply == holder
+    else:
+        moves = op in _ALWAYS_MOVES
+    if not moves:
+        return []
+    table = hierarchy.dataset(ds).table
+    found = [r for r in knock_on.readers(conn, period, [table], promotion._declared_reads())
+             if r.dataset_id != ds]
+    if not found:
+        return []
+    return [f"These supplies' checks read {table} in {period}; each will be re-checked "
+            f"after this decision and may go red:"] + [
+        f"  {r.supply} ({r.dataset_id}, {'waiting' if r.waiting else 'promoted'})"
+        for r in found]
 
 
 def _range_consequences(conn, request: Request) -> tuple[list[str], list[str]]:

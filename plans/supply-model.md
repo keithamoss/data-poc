@@ -2144,7 +2144,7 @@ comparisons against the expected-supply sequence.
     (sprint 12) and the as-of work (sprint 19), and nothing depends on
     it.
 
-25. **[blocked, 2026-09-29]** **[Pipeline & publishing]** **CARRY-FORWARD:
+25. **[done, 2026-10-12]** **[Pipeline & publishing]** **CARRY-FORWARD:
     a period whose supply never arrives, and a human decides to point it
     at the previous period.** Keith, 2026-09-24. A genuinely new
     concept, adjacent to promotion and rejection (sprint 11) rather than
@@ -2152,13 +2152,12 @@ comparisons against the expected-supply sequence.
 
     **Owns:** `REQ-PIPE-083`, `REQ-PIPE-084`, `REQ-DASH-085`
 
-    **`blocked` SINCE 2026-09-29, at 51 of 52 criteria.** It went there
-    when `REQ-PIPE-083` flipped to `built` and took its last unmet
-    criteria with it - what remains is `REQ-PIPE-084`'s deferral, which
-    waits on `REQ-PIPE-079`'s unbuilt wiring, and a sprint whose every
-    remaining criterion is deferred to another one is `blocked` rather
-    than `in-progress`. The `sprints` gate counted this before I did,
-    which is what it is for.
+    **`done` 2026-10-12, at 52 of 52 criteria.** It sat `blocked` from
+    2026-09-29 on `REQ-PIPE-084`'s one deferral - re-evaluating the
+    cross-table checks that read a dataset when a period's view is
+    created or removed. REQ-PIPE-121's knock-on handler turned out to
+    cover it once built (it sees any change to what a period holds), and
+    a test now drives a substitution and its removal through it.
 
     **NAME COLLISION, FLAGGED FIRST because this file has been bitten
     by exactly this before** (see "The collision: delivery already means

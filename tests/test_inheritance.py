@@ -409,6 +409,59 @@ class TestAnOperatorAsksForOneInheritance:
         assert entry["actor_kind"] == dl.PERSON, (
             "an inheritance an operator asked for is not the rule's")
 
+    def test_creating_or_removing_the_view_owes_its_readers_a_re_evaluation(
+            self, conn, annual, periods, owes_nothing):
+        """REQ-PIPE-099 criterion 11 and REQ-PIPE-084 criteria 6 and 14: an
+        operator's view in a period is a table arriving there, so the
+        cross-table checks reading it are owed a re-evaluation in that
+        period - REQ-PIPE-121's one mechanism, caused by the decision."""
+        from qa_tools.common import recheck
+
+        def owed():
+            return [o for o in recheck.owed(conn)
+                    if o.kind == recheck.REEVALUATE and o.period == second]
+
+        first, second = periods
+        _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        before = len(owed())
+        inheritance.inherit_one(conn, dataset_id=annual.dataset_id, period=second,
+                                 actor="Keith", reason="r", effective_at=WHEN)
+        after_inherit = owed()
+        assert len(after_inherit) == before + 1
+        assert after_inherit[-1].tables == [annual.table]
+        inheritance.un_inherit(conn, dataset_id=annual.dataset_id, period=second,
+                               actor="Keith", reason="r", effective_at=WHEN, confirmed=True)
+        assert len(owed()) == before + 2, "removing the view owes one too"
+
+    def test_a_substitution_and_its_removal_owe_one_too(
+            self, conn, annual, periods, owes_nothing):
+        """REQ-PIPE-084 criteria 6 and 14: the same for a substitution."""
+        from qa_tools.common import recheck, substitution
+
+        def owed():
+            return [o for o in recheck.owed(conn)
+                    if o.kind == recheck.REEVALUATE and o.period == second]
+
+        first, second = periods
+        supply = _promote_into(conn, annual, first)
+        period_schema.ensure_period_schema(conn, second)
+        def latest(action):
+            return [e["id"] for e in dl.decisions_for(conn, annual.dataset_id)
+                    if second in (e["to_slot"], e["from_slot"]) and e["action"] == action][-1]
+
+        # Opening the period lets the rule inherit into it first - its own
+        # decision and its own re-evaluation - so each is matched by cause.
+        where = dict(agency_id=annual.agency_id, collection_id=annual.collection_id,
+                     dataset_id=annual.dataset_id, logical_table=annual.table,
+                     period=second, actor="Keith", reason="r", effective_at=WHEN)
+        substitution.substitute(conn, stands_on=first, supply=supply, **where)
+        caused = {o.caused_by_decision: o.tables for o in owed()}
+        assert caused.get(latest(dl.SUBSTITUTE)) == [annual.table]
+        substitution.de_substitute(conn, confirmed=True, **where)
+        caused = {o.caused_by_decision: o.tables for o in owed()}
+        assert caused.get(latest(dl.DE_SUBSTITUTE)) == [annual.table]
+
     def test_the_view_really_resolves_to_the_earlier_supply(
             self, conn, annual, periods, owes_nothing):
         first, second = periods

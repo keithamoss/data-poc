@@ -157,6 +157,21 @@ class TestReJudgement:
         assert found.new.classification == classify_mod.LATE
         assert found.new.inputs["grace_seconds"] == 3600
 
+    def test_a_timezone_correction_rejudges_the_supply(self, clean, monkeypatch):
+        """REQ-PIPE-112 criterion 13: a timezone correction is re-judged like
+        any other. Under UTC+14, 2023-Q3's 09:00 due is 03:00 Perth and its
+        8h grace ends 11:00 Perth, so the 12:00 supply becomes LATE."""
+        from qa_tools.common import asset_time
+
+        _file()
+        corrected = asset_time.parse_timezone_versions({"timezone": {"versions": [
+            {"effective_from": "1970-01-01", "zone": "Pacific/Kiritimati"}]}})
+        monkeypatch.setattr(asset_time, "timezone_versions", lambda: corrected)
+        [found] = verdict.rejudged(clean, DATASET)
+        assert found.old["classification"] == classify_mod.ON_TIME
+        assert found.new.classification == classify_mod.LATE
+        assert found.new.inputs["timezone"] == "Pacific/Kiritimati"
+
     def test_it_is_computed_not_recorded(self, clean):
         _file()
         verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))

@@ -131,6 +131,13 @@ releases:
               the run is refused and names the check, rather than the gap
               reading as a pass. Each run also records what every tool was
               asked to check.
+          - headline: A decision says who it will re-check
+            components: ["Pipeline & publishing"]
+            description: >
+              Before you confirm a promotion, demotion, substitution or
+              inheritance, its warning now lists the other supplies whose
+              checks read the table it moves. Each one is re-checked after
+              your decision and may turn red.
       - category: Fixed
         items:
           - headline: Example rows no longer go missing

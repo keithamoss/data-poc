@@ -17194,6 +17194,7 @@ requirements:
       - tests/test_substitution.py::TestDeSubstituting
       - tests/test_substitution.py::TestASupplySomethingStandsOnCannotMove
       - tests/test_substitution.py::TestOnePeriodsDecisionLeavesOthersAlone
+      - tests/test_inheritance.py::TestAnOperatorAsksForOneInheritance
     evidence:
       - >
         Built 2026-09-28, overnight. `qa_tools/common/substitution.py`,
@@ -17227,6 +17228,7 @@ requirements:
         action was enough. That is the earlier delegation paying for
         itself, and worth recording as evidence that the split was the
         right one.
+      - '2026-10-12 (deferrals re-tested once their blockers shipped): criteria 6 and 14 - a substitution, and its removal, each owe the period''s cross-table readers a re-evaluation caused by that decision (tests/test_inheritance.py test_a_substitution_and_its_removal_owe_one_too, added today, passed on first run). The mechanism is REQ-PIPE-121''s one knock-on handler, which sees any change to what a period holds; REQ-PIPE-140''s run does the work. Only the dataset''s cross-table readers are re-evaluated, never its own table and column checks (knock_on''s own scope).'
     signed_off:
       by: Keith
       date: "2026-09-28"
@@ -17352,27 +17354,6 @@ requirements:
         that supply can be withdrawn. Four quarters standing on one
         February is real work for one person on one afternoon.
     dependencies: [REQ-PIPE-074, REQ-PIPE-075, REQ-PIPE-079, REQ-PIPE-083, REQ-PIPE-035]
-    unmet_criteria:
-      - criterion: >
-          Criteria 6 and 14 - re-evaluating every CROSS-TABLE check that
-          reads the dataset when a period's view is created or removed,
-          without re-running the dataset's own table-level and
-          column-level checks.
-        why: >
-          reevaluation.plan() decides WHICH checks a change sets off and
-          is built and tested; what is missing is the thing that runs
-          them. A check is evaluated today against a run's own view
-          schema assembled from staging, not against the period, so
-          there is no period-scoped evaluation to re-trigger. That is
-          REQ-PIPE-079's wiring, which is its own unfinished half.
-        owner: >
-          REQ-PIPE-121's one knock-on handler for every table or view
-          arriving in or leaving a period schema, run through REQ-PIPE-140's
-          decision-triggered QA run. Pointed at REQ-PIPE-079 until 079 was
-          built on 2026-10-04; re-tested then, 079 wired arrival-time
-          re-evaluation only.
-        blocked_by:
-          requirements: [REQ-PIPE-121, REQ-PIPE-140]
     decisions:
       - >
         [MET 2026-09-29] CRITERIA 9, 10, 13 AND 17 CAME OFF THE DEFERRED
@@ -21478,24 +21459,7 @@ requirements:
         and the period left unfilled. A sibling test drives the
         substituted case and checks the refusal names de-substitute
         instead of un-inherit.
-    unmet_criteria:
-      - criterion: >
-          Criterion 11 - re-evaluating every cross-table check that
-          reads a dataset whose period view an operator just created or
-          removed.
-        why: >
-          It needs the RE-RUN that REQ-PIPE-079's unbuilt half owns.
-          `reevaluation.plan()` already answers WHICH checks those are;
-          nothing executes a plan yet. Guessing an execution path here
-          would build the same wiring twice, in two places, from two
-          designs - and the second one would be the one nobody
-          maintained.
-        owner: >
-          REQ-PIPE-121's one knock-on handler, run through REQ-PIPE-140.
-          Pointed at REQ-PIPE-079 until 079 was built on 2026-10-04;
-          re-tested then, 079 wired arrival-time re-evaluation only.
-        blocked_by:
-          requirements: [REQ-PIPE-121, REQ-PIPE-140]
+      - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 11 - an operator''s inherit and un-inherit each owe the period''s cross-table readers a re-evaluation naming the inherited table (tests/test_inheritance.py test_creating_or_removing_the_view_owes_its_readers_a_re_evaluation, added today, passed on first run) - REQ-PIPE-121''s knock-on handler, which REQ-PIPE-140''s run completes.'
     decisions:
       - >
         RE-INHERITING IS NOT A SEPARATE OPERATION (Keith, 2026-09-28,
@@ -25379,6 +25343,7 @@ requirements:
     evidence:
     - '2026-10-11 (overnight #3): tests/test_agreement_freeze.py 30 passed, against the real committed calendar.yaml, data-asset.yaml and people.yaml with the commit instant fixed - unchanged, reordered and missing-previous states pass (criteria 14, 18); a future date edits freely (10); a past date moved or removed is refused with the item named in correction syntax, ''Nothing was committed'', a paste-ready entry, who may approve and the impact preview named (3, 15); a changelog line licenses nothing (6); a matching correction allows it, a mismatched one says ''you declared ... the file had ...'', a declared change the file does not make and one on the wrong owner are refused (3-5); a placeholder, a non-manager and an approver absent from the base people.yaml are refused (22, people half); editing a committed correction is refused (21); dates appended after the last are allowed late unless one would move a filed supply (8); a not_expected added for an open period is refused naming mark-not-supplied, ahead of it is free (decision 13); past participation versions and the daily calendar''s version are frozen, a synthetic asset may add a past-dated version and a non-synthetic one may not (6, 9, 17); a timezone version is corrected on the timezone in data-asset.yaml; nothing under data/ is opened (16); the settings guard dates by the committer instant floored at the base (28, failing first against the author-date code). tests/test_agreement.py: a correction missing any of its six fields is refused (4).'
     - '2026-10-11: the schedule gate including the freeze check runs in 2.9s against the hierarchy gate''s 2.5s (criterion 19). The real configuration passes against its base. Inside the pre-commit hook diff_base() returns HEAD, read from pre-commit''s own PRE_COMMIT=1, so the staged file is compared against HEAD (criterion 13, tested); CI already passes the push''s base.'
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 15''s naming of the impact preview - a refusal''s fix names `mothman schedule preview-correction` (tests/test_agreement_freeze.py, asserted). Criterion 2''s collection default participation - a changed past collection default is refused on the collection, a correction allows and reverts it (tests/test_collection_defaults.py, the REQ-PIPE-111 c4 section). Both met by REQ-PIPE-169 and REQ-PIPE-181''s builds; nothing built today.'
     implemented_by:
     - qa_tools/common/agreement_freeze.py::check
     - qa_tools/common/agreement_freeze.py::flatten
@@ -25394,19 +25359,7 @@ requirements:
     - tests/test_agreement_freeze.py
     - tests/test_agreement.py
     - tests/test_validate_schedule.py
-    unmet_criteria:
-    - criterion: 'Criterion 15''s naming of the impact preview command.'
-      owner: REQ-PIPE-169
-      why: 'The preview is REQ-PIPE-169''s and does not exist; the refusal names it by requirement and says it is not built yet rather than naming a command that does not run.'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-169
-    - criterion: 'Criterion 2''s collection default participation.'
-      owner: REQ-PIPE-181
-      why: 'Collection participation_defaults arrive with REQ-PIPE-181 (signed, not built); there is nothing of that shape to freeze until then, and the flattening will need it as an item.'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-181
+    - tests/test_collection_defaults.py
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -25621,6 +25574,7 @@ requirements:
     - '2026-10-11 (overnight #3): pinned first - tests/test_asset_time_semantics.py (tests/fixtures/arrival_semantics_golden.json) passed before any change (43 tests with test_cli_cp.py), and was confirmed to bite by switching the zone to Australia/Sydney: the expected-moment boundary test failed and was restored. The golden comparison itself reads the RECORDED history, so it proves criterion 10 only after a rebuild: `mothman env reset-synthetic` then `mothman pipeline bootstrap` under the versioned clock (9m51s, 47 staged tables, the count before), `mothman dashboard rebuild`, then the golden''s 10 tests passed - no arrival changed its verdict or its instant.'
     - '2026-10-11: tests/test_asset_time.py 43 passed (versions in Perth then Sydney, the start-of-own-day boundary at 2026-12-31T13:00Z, the loud failure before the first version, a fixed offset and the old single value refused, no bare lookup, daylight-saving gap and overlap on Sydney''s 2026 transition days, a 23-hour day measured in UTC); tests/test_timezone_versions.py 9 passed (the gate refuses 02:30 on 2026-10-04 and 2027-04-04 in Sydney, passes 09:00 and the real configuration; a plain-string settings changelog refused; the conversion reads as no change to the past; an edit to a past entry refused as append-only; an appended entry accepted); tests-js/display-time.test.js 33 passed (each instant in its own version, each date in its own, the refusal before the first version, a receipt rendered in its due time''s version).'
     - '2026-10-11: full Python suite 4003 passed with 2 failures, both this change''s and both fixed (a guard keeping Intl.DateTimeFormat to two callers - the offset arithmetic now goes through assetParts; an e2e test reading the old ASSET_TIMEZONE constant), each rerun green; `npm test` 581 passed - the implementation commit 7328977 said 582, a number added up rather than run, corrected here; the dashboard e2e test of today''s zone 5 passed.'
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 13''s second half - a timezone correction is re-judged (tests/test_verdict_record.py test_a_timezone_correction_rejudges_the_supply, added today: UTC+14 makes the 12:00 supply late), previewed (tests/test_correction_trial.py test_a_changed_timezone_moves_every_instant) and backstopped (tests/test_agreement_drift.py test_a_changed_timezone_is_refused_too). The re-judgement test passed on first run - the behaviour came with REQ-PIPE-168, only the test was missing.'
     implemented_by:
     - qa_tools/common/asset_time.py::parse_timezone_versions
     - qa_tools/common/asset_time.py::timezone_versions
@@ -25646,15 +25600,9 @@ requirements:
     - tests/test_display_time.py
     - tests-js/display-time.test.js
     - tests/test_dashboard_e2e.py::TestTodayIsTheAssetsToday
-    unmet_criteria:
-    - criterion: Criterion 13's second half - re-judging, previewing and backstopping a timezone correction. The first half, the freeze and the declared-correction route including the synthetic exception, is met since REQ-PIPE-111 was built (2026-10-11, tests/test_agreement_freeze.py TestTheTimezone).
-      owner: REQ-PIPE-168, REQ-PIPE-169, REQ-PIPE-173
-      why: 'A timezone correction is re-judged, previewed and backstopped exactly as any other correction, and none of those three requirements is built yet.'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-168
-        - REQ-PIPE-169
-        - REQ-PIPE-173
+    - tests/test_verdict_record.py
+    - tests/test_correction_trial.py
+    - tests/test_agreement_drift.py
     signed_off:
       by: Keith
       date: "2026-10-07"
@@ -26693,6 +26641,7 @@ requirements:
     - tests/test_verdict_record.py
     - tests/test_recorded_arrival_classification.py
     - tests/test_refiling.py
+    - tests/test_correction_apply.py
     implemented_by:
     - qa_tools/common/verdict.py::resolved
     - qa_tools/common/verdict.py::judge
@@ -26707,19 +26656,7 @@ requirements:
     - qa_tools/common/qa_store.py::SCHEMA_VERSION
     evidence:
     - '2026-10-11 (overnight #3): tests/test_verdict_record.py, test_recorded_arrival_classification.py and test_refiling.py 47 passed against real cp-clients configuration - a filing records its verdict with the exact resolved inputs and derived instants and no closing instant or calendar dates (c1); appending a future date leaves the fingerprint alone, a grace change moves it; UPDATE and DELETE on qa.verdict refused (c2); a re-file brings its own verdict and keeps the old (c6); re-judgement is computed not recorded, recording it names the correction, its changelog line and the verdict superseded, moves nothing and leaves one filing row (c4, c7); a half-named or stale re-judgement is refused; configuration resolved once per period for five supplies (NFR 2); reads qa metadata only (c8). The sandbox database bootstrapped from empty at schema 34 in 573s and recorded 150 verdicts, 141 with inputs (the other 9 unfiled), under 3 fingerprints.'
-    unmet_criteria:
-    - criterion: Criterion 3 - a merged correction applies nothing until the asset manager confirms it in the terminal, then re-judgements and moves together.
-      owner: REQ-PIPE-170
-      why: The confirmation is REQ-PIPE-170's door and does not exist. Built here are the computation it will call (verdict.rejudged, from configuration and receipt instants only) and the record it will write (verdict.record_rejudgement). Nothing outside the tests calls the record, so nothing is applied without a person - criterion 3's safe side.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-170
-    - criterion: Criterion 5 - each declared correction applied exactly once, with a record that it has been applied.
-      owner: REQ-PIPE-170
-      why: Applying is REQ-PIPE-170's act, so the applied record belongs with it. record_rejudgement already refuses a re-judgement computed against a verdict since replaced, so a second pass cannot silently stack on the first.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-170
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criteria 3 and 5, met by REQ-PIPE-170''s build - nothing is applied until the asset manager confirms, then re-judgements and moves together (tests/test_correction_apply.py test_a_verdict_is_re_judged_in_place_naming_the_correction, test_ts62_merged_not_confirmed_refuses_nothing); each correction applied exactly once with a record, a second confirm refused as already applied (test_it_is_applied_once_and_is_no_longer_pending).'
   - id: REQ-PIPE-169
     title: A calendar correction's impact can be previewed before anyone approves it
     date_written: '2026-10-07'
@@ -28071,17 +28008,6 @@ requirements:
     story: "As the person working a period's supplies, I want a waiting supply whose cross-table checks went red only because its partner was not yet accepted to be re-checked when that partner is promoted, so that a first correction arriving before its partner still gets through without me."
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 16's second half - completing an owed re-evaluation
-        on the next run of the processing pass.
-      owner: REQ-PIPE-151
-      why: 'Owed re-evaluations are completed right after the decision that owed
-        them (the batch''s own promotions, a person''s decision in the terminal)
-        and are shown as owed in `mothman supply queue` while they are; the pass that finishes what
-        a failure left owed is REQ-PIPE-151 (Keith, 2026-10-05: no interim command).'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-151
     evidence:
     - '2026-10-05 (sprint 10): tests/test_knock_on.py: 12 tests - owing (one per
       period per transaction, caused by the latest decision; a departure owes;
@@ -28091,6 +28017,7 @@ requirements:
       run stays owed), the shout against the real log, the writer''s readers-only
       scope, and end to end on the real Child Protection fixture (promoting carers
       re-gates the waiting placements without re-running its tools).'
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 16''s second half - the processing pass (REQ-PIPE-151) completes owed re-evaluations, asking recheck.run_all_owed for that kind by name, and a failure stays owed (tests/test_processing_pass.py test_an_owed_re_evaluation_is_completed_by_the_pass, added today, and test_owed_work_is_run_and_a_failure_stays_owed).'
     implemented_by:
     - qa_tools/common/knock_on.py::owe
     - qa_tools/common/knock_on.py::readers
@@ -28107,6 +28034,7 @@ requirements:
     linked_tests:
     - tests/test_knock_on.py
     - tests/test_recheck.py
+    - tests/test_processing_pass.py
     source: "Keith, 2026-10-03, option A item 7, confirmed in the 'OPTION A CONFIRMED' paragraph (plans/road-testing.md #16). Scoped by delivery-scoper 2026-10-03."
     acceptance_criteria:
       - "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved table, whether it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that does not read a moved table."
@@ -28541,24 +28469,6 @@ requirements:
     story: As a person or an external tool querying a period, I want each table in it to exist exactly once, so that I never have to work out which of several versions is the real one.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 8 - saying in the warning which other supplies' checks
-        read a moved table and will be re-checked.
-      owner: REQ-PIPE-151
-      why: The re-check itself is REQ-PIPE-151's processing pass, not built; a
-        warning promising a re-check that does not happen would be false, so it
-        is not said yet.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-151
-    - criterion: Criterion 6's typed-id half - in an environment requiring typed
-        confirmation, the single confirmation is the typed id.
-      owner: REQ-PIPE-093
-      why: Typed confirmation per environment is REQ-PIPE-093 criterion 4, not
-        built; the single confirmation and the warning panel above it are.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-093
     evidence:
     - '2026-10-05: tests/test_one_version_per_period.py green against a real database
       (10 tests): a person''s promotion over a promoted supply supersedes it into
@@ -28581,6 +28491,7 @@ requirements:
       its own line; a refusal that is certain is raised before the prompt (no
       confirm was asked, asserted); a version waiting in a promoted period is
       in the queue offering promote. 22 tests in the module, green on a run after the last change.'
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 8 BUILT - a person''s decision that changes what a period holds (promote, or demote/reject/re-file of the holder, or substitute/inherit and their undoing) lists in its warning the OTHER supplies whose cross-table checks read the moved table, says each will be re-checked after the decision and may go red, waiting or promoted (filing_decisions._readers_rechecked, from knock_on.readers - the same answer the owed re-evaluation acts on). tests/test_knock_on.py TestThePersonIsToldWhoWillBeReChecked on the real Child Protection fixture failed first (empty warning), then passed; 22 decision-warning modules 679 passed. Criterion 6''s typed-id half - met by REQ-PIPE-093: in production the single confirmation is the typed id, even with --yes (tests/test_cli_filing_tui.py test_a_decision_in_production_needs_the_typed_id_even_with_yes).'
     implemented_by:
     - qa_tools/common/promotion.py::promote
     - qa_tools/common/promotion.py::_refuse_what_the_slot_forbids
@@ -28608,6 +28519,8 @@ requirements:
     - tests/test_one_version_per_period.py::TestRefusedBeforeTheConfirmation
     - tests/test_one_version_per_period.py::TestTheTerminalSaysItBeforeAsking
     - tests/test_one_version_per_period.py::TestPromoteOverIsReachableInTheWizard
+    - tests/test_knock_on.py::TestThePersonIsToldWhoWillBeReChecked
+    - tests/test_cli_filing_tui.py
     source: 'Keith, group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - ''REPLACED ACCEPTED FILES GO TO SUPERSEDED'' point (1), ''newest() FIX DROPPED''). Drafted by delivery-scoper 2026-10-04.'
     acceptance_criteria:
     - THE SYSTEM SHALL hold exactly one object for each dataset's table in each period schema, at every instant.
@@ -28725,6 +28638,7 @@ requirements:
       the supply waits like any other version - what the warning''s undo text
       promises. The substitution undo names the supply stood on (--supply); without
       it, the pasted command took the just-demoted supply and was refused.'
+    - 'THE RE-CHECK WARNING IS SAID ONLY WHERE THE DECISION MOVES A TABLE (criterion 8, 2026-10-12): promoting the supply the period already holds, or demoting one it does not hold, changes nothing and owes no re-evaluation, so promising a re-check there would be false. The list comes from knock_on.readers() - the same function the owed re-evaluation uses - so what a person is told is what happens; a reader not yet run is left out for the same reason the knock-on skips it (its own first run reads the period as it stands).'
     open_questions: []
 
   - id: REQ-PIPE-129
@@ -28737,16 +28651,6 @@ requirements:
     moscow: must
     status: built
     unmet_criteria:
-    - criterion: Criterion 3's re-file route - restoring the stamped name when
-        a supply is re-filed out of a period.
-      owner: REQ-PIPE-141
-      why: Re-file is not built (filing_decisions refuses it as unbuilt). When
-        it is, it moves a table out of a period through period_tables.take_out
-        like every other route, which the NFR 6 source test and move_table's run-time
-        refusal enforce.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-141
     - criterion: NFR 7 - verifying the target platform's support for the event-trigger
         guard before relying on it in production.
       owner: unowned - a production deployment question
@@ -28778,6 +28682,7 @@ requirements:
       restores a dropped guard; the census is one snapshot (a promotion committing
       between its two reads is not a discrepancy) and the mothman build path prints
       its warning.'
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 3''s re-file route - met by REQ-PIPE-141: a re-filed supply leaves its period through period_tables.take_out with its stamped name restored and the slot left unfilled (tests/test_refile_decision.py test_it_leaves_with_its_stamped_name_and_the_slot_unfilled).'
     implemented_by:
     - qa_tools/common/period_tables.py::bring_in
     - qa_tools/common/period_tables.py::take_out
@@ -28814,6 +28719,7 @@ requirements:
     - tests/test_inheritance.py::TestADatasetThatOwesNothingInheritsWhatIsCurrent
     - tests/test_period_overlay.py::TestAnInheritedTableIsRead
     - tests/test_promotion.py::TestPromotionMovesRatherThanCopies
+    - tests/test_refile_decision.py
     source: "Keith, group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - 'PERIOD SCHEMA TABLES TAKE PLAIN BASE NAMES', revising his earlier 'KEEP STAMPED NAMES, PUBLISH THE RULE'). Drafted by delivery-scoper 2026-10-04."
     acceptance_criteria:
       - "THE SYSTEM SHALL name every object in a period schema with the plain base name of its dataset's table (for example cp_clients), whether it is a promoted table, an inherited view or a substituted view."
@@ -30195,12 +30101,13 @@ requirements:
         decision offers it, on either route. The receipt view already reads per-file
         receipts from qa.delivery_file, so the choice has what it needs to read
         once it exists; the decision itself is not this requirement''s to invent.'
-      owner: 'REQ-PIPE-141 (sprint 9''s re-filing) - Keith, 2026-10-05: the choice
-        is a new filing decision on both routes, writing the new filing in 141''s
-        append-only shape.'
+      owner: 'UNOWNED since REQ-PIPE-141 shipped (re-tested 2026-10-12). Keith, 2026-10-05:
+        the choice is a new filing decision on both routes, writing the new filing in 141''s
+        append-only shape - but 141 as built only REFUSES a re-file of one file of a
+        contested pair (its criterion 11), naming resolving the contest as the step that
+        must come first, and no decision resolves one. Needs a requirement of its own.'
       blocked_by:
-        requirements:
-        - REQ-PIPE-141
+        unowned: true
     evidence:
     - '2026-10-04 (overnight sprint 4): the criterion 30 comparison. Two bootstraps
       from EMPTY databases, the same Perth day, the same server - `equiv144_before`
@@ -30732,17 +30639,6 @@ requirements:
     story: As whoever runs this asset - a data engineer at a terminal today, a scheduler later - I want one command that processes every arrival not yet processed, finishes any re-check or re-evaluation a decision left owed, and brings the GitHub tickets up to date, without generating or regenerating anything, so that the work signed requirements defer to 'the next pipeline run' actually has a next run in a real deployment, and so that its cost depends on what is new rather than on all history.
     moscow: must
     status: built
-    unmet_criteria:
-    - criterion: Criterion 1's second half - an arrival built from a recorded
-        delivery (qa.delivery / qa.delivery_file rows) whose files exist only
-        in storage.
-      why: Reading a delivery that exists only as database rows needs read access
-        to the arriving S3 bucket and REQ-PIPE-152's handlers; the pass today
-        recognises arrivals from the delivery tree on disk only.
-      owner: REQ-PIPE-152.
-      blocked_by:
-        requirements:
-        - REQ-PIPE-152
     evidence:
     - '2026-10-06 overnight (sprint 14): tests/test_processing_pass.py 22 passed,
       tests/test_backlog.py 22, tests/test_promotion_step.py 13. Every gate outcome
@@ -30760,6 +30656,7 @@ requirements:
       - 51s, no promotion added, 63 refusals each with its reason, the 9 open
       holds untouched; a second pass said ''Nothing to process and nothing owed.''
       and exited 0.'
+    - '2026-10-12 (deferrals re-tested once their blockers shipped): criterion 1''s second half - met by REQ-PIPE-152: the pass builds every arrival from qa.delivery / qa.delivery_file (processing_pass.all_arrivals -> arrivals.arrivals_from_records), and an object recorded straight from S3 with no directory is offered with its storage URI and fetched to stage (tests/test_arrivals_from_records.py TestAnObjectRecordedFromS3IsAnArrival).'
     implemented_by:
     - qa_tools/common/processing_pass.py::run_pass
     - qa_tools/common/processing_pass.py::recorded
@@ -30788,6 +30685,7 @@ requirements:
     - tests/test_processing_pass.py::TestATypedIdWhereTheEnvironmentAsksForIt
     - tests/test_backlog.py::TestHowFarProcessingGotIsDerived
     - tests/test_promotion_step.py::TestRunningTheStepTwiceIsSafe
+    - tests/test_arrivals_from_records.py
     source: 'Keith, 2026-10-04, answering delivery-scoper''s Q3 on the REQ-PIPE-086 refresh: scope plans/supply-model.md Thread L (incremental processing, his own ask 2026-09-25) now, as a command that processes new arrivals, finishes owed work (REQ-PIPE-121 criterion 16, REQ-PIPE-140 criterion 8, REQ-PIPE-120) and reconciles tickets (REQ-GHUB-082), never generates data, is reachable from the TUI, and is what an automated scheduler would call. Drafted by delivery-scoper the same day from Thread L in full.'
     acceptance_criteria:
     - THE SYSTEM SHALL provide one command, `mothman pipeline process`, that processes, in receipt order across every collection, every arrival not yet processed - recognised from the delivery tree or built from a recorded delivery (REQ-PIPE-144's qa.delivery and qa.delivery_file rows) whose files exist only in storage - each through REQ-PIPE-086's per-arrival function.

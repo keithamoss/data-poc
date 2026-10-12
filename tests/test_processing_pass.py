@@ -497,6 +497,17 @@ class TestThePassItself:
         assert report.exit_status == pp.EXIT_FAILED
         assert any("it broke" in why for _, why in report.failures)
 
+    def test_an_owed_re_evaluation_is_completed_by_the_pass(self, world, monkeypatch):
+        """REQ-PIPE-121 criterion 16: a re-evaluation owed by a decision is
+        finished by the next pass - it asks for that kind by name."""
+        from qa_tools.common import recheck
+
+        asked = []
+        monkeypatch.setattr(recheck, "run_all_owed",
+                            lambda **k: asked.append(k.get("kinds")) or [])
+        pp.run_pass(run_by="me", say=lambda m: None)
+        assert asked and recheck.REEVALUATE in asked[0]
+
     def test_owed_work_is_run_and_a_failure_stays_owed(self, world):
         world.owed = [SimpleNamespace(owed_id=7, completed=False, message="no", status=None),
                       SimpleNamespace(owed_id=8, completed=True, message="", status="red")]

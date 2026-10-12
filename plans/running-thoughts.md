@@ -4903,3 +4903,21 @@ Belongs with batch 5's check work.
     gets in the way. Alternatives offered and not chosen: a numeric target
     (cut to N, weakest first), and a speed-only pass on the browser tests,
     which are ~85% of the suite's wall clock.
+
+87. **[investigate, 2026-10-12]** **[Pipeline & publishing]** **For Keith:
+    nothing lets a person say which file of a contested pair is the
+    supply - and three places tell them to.** Found re-testing
+    REQ-PIPE-144's deferred criteria 14 and 42 once REQ-PIPE-141 shipped.
+    Keith said on 2026-10-05 that the choice is a new filing decision on
+    both routes, writing a new filing in 141's append-only shape - but 141
+    as built only REFUSES a re-file of one file of a contested pair (its
+    criterion 11) and names "resolve the contest first, by saying which
+    file is the supply" as the step to take. No decision does that
+    (`filing_decisions.OPERATIONS` has none), and the dashboard's
+    "Two files, choose one" item (REQ-PIPE-115) points at the same missing
+    step. So a contested dataset is a dead end today: the refusal and the
+    item name a remedy that does not exist. 144's two criteria are
+    re-pointed as UNOWNED. Needs a requirement of its own - through the
+    scoper and sign-off - before anything is built. The data side is ready:
+    the receipt view already reads each file's own receipt from
+    qa.delivery_file.

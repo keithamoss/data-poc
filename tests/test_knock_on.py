@@ -251,3 +251,46 @@ class TestAnInheritedPeriodHoldsItsSupply:
             held_as, holder = dl.INHERITED, "cp-carers@1"
         monkeypatch.setattr(dl, "held", lambda c, d, p: Held())
         assert knock_on._now_holds(None, "cp_carers", "P") == "cp-carers@1"
+
+
+class TestThePersonIsToldWhoWillBeReChecked:
+    """REQ-PIPE-128 criterion 8: the warning for a person's decision names
+    the other supplies whose checks read a table it moves, says they will
+    be re-checked, and that they may go red - before they confirm."""
+
+    def test_moving_carers_names_the_placements_supply_that_reads_it(
+            self, cp_duckdb_dir, monkeypatch):
+        from fixture_ids import CP_DIRTY_RUN_ID
+        from qa_tools.common import filing
+        from qa_tools.common import filing_decisions as fd
+
+        monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
+        key = CP_DIRTY_RUN_ID.split("__")[1]
+        placements = f"cp-placements@{key}"
+        carers = f"cp-carers@{key}"
+        with supply_db.connect(label="test-knock-on") as c:
+            qa_store.ensure_schema(c)
+            with c.raw.transaction():
+                cause = dl.record_automatic(c, dl.Decision(
+                    agency_id=AG, collection_id=COL, dataset_id="cp-placements",
+                    action=dl.PROMOTION_WITHHELD, supply=placements, actor="pytest",
+                    actor_kind=dl.RULE, effective_at=WHEN, to_slot="2026-Q2", reason="r"))
+                owed_id = recheck.owe(c, dataset_id="cp-placements", supply_id=placements,
+                                      decision_id=cause)
+        assert recheck.run(owed_id, run_by="pytest@example.org").completed
+        period = filing.period_of("cp-carers", filing.received_at_of("cp-carers", carers))
+        with supply_db.connect(label="test-knock-on") as c:
+            # WHICHEVER DECISION REALLY MOVES THE TABLE: another test in this
+            # module promotes carers, and promoting the holder again moves
+            # nothing - so says nothing - while demoting it moves it out.
+            holds = dl.held(c, "cp-carers", period)
+            op = fd.DEMOTE if holds and holds.holder == carers else fd.PROMOTE
+            said = fd.consequences(c, fd.Request(
+                operation=op, dataset_id="cp-carers", actor={}, reason="r",
+                period=period, supply=carers))
+        text = "\n".join(said.lines)
+        assert placements in text, text
+        assert "re-checked" in text and "may go red" in text
+        assert carers not in text.split("re-checked")[0].splitlines()[-1], \
+            "the supply decided on is not its own reader"
+
