@@ -7952,3 +7952,12 @@ twice. It deliberately did not re-find the `TypeError`.
       made. The sweep is the method worth keeping for this class: a leftover
       row survives its module, so probing each module alone finds it without
       needing CI's worker order.
+    - **The suite's size, settled (Keith, 2026-10-12: "Leave it").** Asked
+      why there are ~4,600 Python tests: 4,269 distinct test functions (800
+      parametrized cases) over 351 modules; ~69k lines of test code against
+      ~68k of product Python, about 1:1; ~2.3 tests per acceptance criterion
+      on the 167 built requirements (1,833 criteria). Offered a
+      criterion-by-criterion pruning pass, a numeric target, or a speed-only
+      pass; he chose none. Do not re-propose a pruning pass on size alone -
+      the rules in CLAUDE.md ("A test earns its place...") still govern each
+      new or touched test.
