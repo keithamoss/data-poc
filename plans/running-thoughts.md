@@ -1170,6 +1170,9 @@ to the exact right file/line/folder with zero console errors.
       `test_cli_cp.py` 68s/10, `test_cli_plans.py` **60s for 4 tests**.
     The top six files are 55% of all test time. Next: a proposal for Keith
     per file - share a fixture, split the pole - before changing any test.
+    Priority: this week, after the line of work already queued (Keith,
+    2026-10-13: "we'll make a note to come back to that this week. Maybe
+    after this next line of things we've got lined up").
 
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
