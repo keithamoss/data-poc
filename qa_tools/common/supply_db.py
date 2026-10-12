@@ -465,7 +465,7 @@ def connect(read_only: bool = False, dsn: str | None = None,
 #
 # WHY. A profiled 12-arrival Child Protection replay opened 716 connections -
 # about sixty an arrival - each a TCP and authentication round trip plus the
-# environment, version and identity checks (plans/running-thoughts.md #65).
+# environment, version and identity checks (REQ-PIPE-158).
 #
 # ONE SMALL CACHE PER PROCESS, keyed by the database it reaches, with
 # EXCLUSIVE CHECKOUT: a connection is either held by exactly one caller or

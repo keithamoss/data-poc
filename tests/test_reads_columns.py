@@ -104,6 +104,7 @@ class TestWhichChecksAreSqlBodied:
                       - metric: nullValues
                         dimension: completeness
                         mustBe: 0
+                        id: a:b:c:d:sex:null_datacontract
                         customProperties:
                           - {property: check_id, value: a.b.c.d.sex.null_datacontract}
                 quality:
@@ -111,6 +112,7 @@ class TestWhichChecksAreSqlBodied:
                     dimension: consistency
                     query: SELECT COUNT(*) FROM {model} WHERE sex IS NULL
                     mustBe: 0
+                    id: a:b:c:d:x:sql_datacontract
                     customProperties:
                       - {property: check_id, value: a.b.c.d.x.sql_datacontract}
             """))
@@ -230,6 +232,7 @@ class TestAJsonStringValue:
                     dimension: consistency
                     query: SELECT COUNT(*) FROM {model} WHERE sex IS NULL
                     mustBe: 0
+                    id: a:b:c:d:x:sql_datacontract
                     customProperties:
                       - {property: check_id, value: a.b.c.d.x.sql_datacontract}
                       - property: reads_columns

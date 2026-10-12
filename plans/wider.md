@@ -1543,7 +1543,8 @@ check_lifecycle.py`'s own `check_id` convention.
        criterion 6 (BUILT, with a simulated clock for synthetic replays) - all
        done 2026-10-06. Was:       then REQ-PIPE-081 criterion 6 with REQ-DASH-126 criterion 3.
     8. Bootstrap speed and the test review together
-       (plans/running-thoughts.md #65 and #67).
+       (REQ-PIPE-188 to 192, built 2026-10-12, and
+       plans/running-thoughts.md #67).
     9. The calendar group (REQ-PIPE-110 to 113, with road-testing #3) -
        AND, with it, the talk Keith asked for on REQ-QAC-039 and "no custom
        code per dataset" (plans/running-thoughts.md #68).

@@ -8,6 +8,10 @@ from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_
 
 
 def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp):
+    # THE WHOLE COLLECTION, said outright: these are about the tool's own checks,
+    # and a fixture run is scoped to one table since REQ-PIPE-188 to 191.
+    from qa_tools.common import asked_for
+    monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     # The environment already points at this worker's database
     # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_soda_cp, "write_qa_result", lambda *a, **k: None)

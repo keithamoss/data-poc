@@ -11,6 +11,10 @@ from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_
 
 
 def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp):
+    # THE WHOLE COLLECTION, said outright: these are about the tool's own checks,
+    # and a fixture run is scoped to one table since REQ-PIPE-188 to 191.
+    from qa_tools.common import asked_for
+    monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     # NOTHING ON DISK TO REDIRECT (REQ-PIPE-102) - this reads the
     # warehouse, and cp_duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_datacontract_cp, "write_qa_result", lambda *a, **k: None)

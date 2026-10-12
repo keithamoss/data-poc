@@ -111,9 +111,26 @@ intro: >
 releases:
   - date: "2026-10-12"
     summary: >
-      Failing Child Protection checks now show their example rows where
-      some showed none.
+      Rebuilding the whole history takes half as long, and failing Child
+      Protection checks now show their example rows where some showed none.
     changes:
+      - category: Improved
+        items:
+          - headline: Each run checks only what it records
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              A Child Protection run used to check all six tables and keep one.
+              Each run now asks dbt, Soda and datacontract-cli only for the
+              checks it records, so rebuilding the history from empty takes
+              about four and a half minutes rather than nine, with the same
+              results. Every existing database needs rebuilding once.
+          - headline: A missing check stops the run
+            components: ["Pipeline & publishing"]
+            description: >
+              If a check a run should record comes back with no result at all,
+              the run is refused and names the check, rather than the gap
+              reading as a pass. Each run also records what every tool was
+              asked to check.
       - category: Fixed
         items:
           - headline: Example rows no longer go missing

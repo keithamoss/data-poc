@@ -24,6 +24,10 @@ SODA = ("data-asset-1.child-protection-family-support.child-protection.cp-client
 @pytest.fixture
 def clients(cp_duckdb_dir, monkeypatch):
     """(connection, schema-qualified staged clients table, its row count)."""
+    # THE WHOLE COLLECTION, said outright: these are about the tool's own checks,
+    # and a fixture run is scoped to one table since REQ-PIPE-188 to 191.
+    from qa_tools.common import asked_for
+    monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     monkeypatch.setattr(run_datacontract_cp, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda_cp, "write_qa_result", lambda *a, **k: None, raising=False)
     with supply_db.connect(label="test-postcode-tolerance") as conn:

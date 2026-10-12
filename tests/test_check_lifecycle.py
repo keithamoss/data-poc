@@ -364,6 +364,7 @@ def test_parse_contract_check_metadata_extracts_check_id_from_custom_properties(
                   - metric: nullValues
                     dimension: completeness
                     mustBe: 0
+                    id: data-asset-1:bdm:birth_registrations:stg_birth_registrations:registration_number:nullValues
                     customProperties:
                       - property: check_id
                         value: data-asset-1.bdm.birth_registrations.stg_birth_registrations.registration_number.nullValues
@@ -389,6 +390,7 @@ def test_parse_contract_check_metadata_reuses_native_description(tmp_path):
                     dimension: completeness
                     mustBe: 0
                     description: "A native ODCS description, not duplicated into customProperties."
+                    id: x:y:t:tbl:c:nullValues
                     customProperties:
                       - property: check_id
                         value: x.y.t.tbl.c.nullValues
@@ -426,6 +428,7 @@ def test_parse_contract_check_metadata_reads_failure_indicates_and_technical_not
                     dimension: conformity
                     mustBe: 0
                     description: "A single unrecognised value fails."
+                    id: x:y:t:tbl:c:invalidValues
                     customProperties:
                       - property: check_id
                         value: x.y.t.tbl.c.invalidValues
@@ -451,6 +454,7 @@ def test_parse_contract_check_metadata_covers_table_level_quality(tmp_path):
               - metric: rowCount
                 dimension: completeness
                 mustBeGreaterThan: 0
+                id: x:y:birth_registrations:stg_birth_registrations:rowCount
                 customProperties:
                   - property: check_id
                     value: x.y.birth_registrations.stg_birth_registrations.rowCount

@@ -869,7 +869,8 @@ Rough layout:
   "GitHub is much faster" impression was this table going out of date
   as the history grew (one arrival at a time, 150 arrivals, knock-on
   re-runs, a census per run, file checks). See
-  plans/running-thoughts.md #65.
+  REQ-PIPE-188 to 192, which took a bootstrap from empty to 4m24s here
+  on 2026-10-12.
 
   So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
   than nineteen - 2,622 of 2,898 tests are in the fast half. The whole

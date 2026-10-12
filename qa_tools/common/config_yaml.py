@@ -6,7 +6,7 @@ WHY. A profile of a real 12-arrival Child Protection replay found 5,911
 not change during a run: the ODCS contract on every slot lookup, the asset
 file on every connection, the environments file, the check metadata. Content
 -memoised, the same replay took 95s instead of 178s
-(plans/running-thoughts.md #65).
+(REQ-PIPE-156).
 
 KEYED ON THE BYTES, NOT ON MODIFICATION TIME OR SIZE. A test that changes
 '14d' to '21d' inside one filesystem clock tick changes neither, and a cache

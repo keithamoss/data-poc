@@ -32280,7 +32280,7 @@ requirements:
     date_written: "2026-10-12"
     story: "As someone regenerating or processing QA history, I want each run to ask its QA tools only for the checks it will actually record, to keep a record of what each tool was asked for, and to be refused if a check it should record goes missing. That way a Child Protection run stops paying to evaluate five sibling tables' checks it throws away, without one recorded verdict changing."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-12'
@@ -32314,6 +32314,20 @@ requirements:
       - "CI. Changes qa_tools/, so REQ-TEST-117's cache key misses once, as intended."
     dependencies:
       - REQ-PIPE-192
+    linked_tests:
+      - tests/test_asked_for.py
+      - tests/test_orchestrate_reference_run.py
+    implemented_by:
+      - qa_tools/common/asked_for.py::ask
+      - qa_tools/common/asked_for.py::check_nothing_missing
+      - qa_tools/common/qa_store.py::record_asked
+      - qa_tools/cp/orchestrate_cp.py::_run_one_inner
+      - qa_tools/bdm/orchestrate_bdm.py::_run_one_inner
+    evidence:
+      - "2026-10-12: tests/test_asked_for.py - the asked-for set comes from scope_of_run (c1), the whole collection for a run naming no table (c4), a missing in-scope check refuses naming check and tool (c6), one row per run, tool and check in qa.asked_check at schema 38, removed with its run (c8, c9), and Birth Registrations through all four real tools records what it was asked and refuses a dropped check (c10)."
+      - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c11)"
+      - "Wall clock of the same two bootstraps: 9m05s before (Birth Registrations 181s, Child Protection 531s), 4m24s after (172s and 251s). (c12)"
+      - "4m24s is under 5 minutes on this sandbox (c13)."
     decisions:
       - "PREMISE VERIFIED AGAINST THE CODE, 2026-10-11. dbt: run_dbt_cp selects all six stg_cp_* models plus the three singular tests, so every Child Protection test runs (61 nodes, as REQ-PIPE-157's spike counted). Soda: run_soda_cp hands the whole checks file, less only unreadable tables (readable_checks_yaml). datacontract-cli: run_against_warehouse tests the whole contract. The results writer then cuts every tool's results down to the run's own dataset plus the cross-table checks that read its table (_scope_to_run, REQ-PIPE-105 criterion 11). A reader's result lands in the _cross-table scope, which is why the database shows one dataset per run in scope 'dataset'."
       - "WHAT A RUN'S SCOPE HOLDS, counted from the check declarations 2026-10-11. Of Child Protection's 55 dbt checks, a run records its own plus the readers of its table. That is 11+4 for clients, 12+1 for notifications, 11+1 for investigations, 10+0 for placements, 6+2 for carers and 5+2 for case workers. Soda (60 checks) and datacontract-cli (62) are in the same proportion. So roughly a fifth of the evaluation is kept."
@@ -32332,6 +32346,11 @@ requirements:
       - "NOT A RE-PROPOSAL OF REQ-PIPE-161, which Keith declined on 2026-10-06 as too risky. That draft reused a contract resolved once per process. This changes what each run asks for, and its datacontract-cli half uses the tool's own options, not a modified contract (REQ-PIPE-190)."
       - "NOT the other lever #65 names, running different datasets' chains side by side. That changes the order work happens in. This changes how much work there is. Keep them separate so each can be proven identical on its own."
       - "IF THE MEASURED BOOTSTRAP MISSES UNDER 5 MINUTES (Keith, 2026-10-12): the target stays, criterion 13 is recorded as unmet, and the next step is a profile of our own per-arrival steps (promotion, re-checks, filing, staging, the census - about 1.1-1.3s an arrival) toward a further requirement. REJECTED accepting the measured figure as the target, and REJECTED leaving it to a later conversation with no rule."
+      - "RECORDED WHERE THE TOOL IS INVOKED (2026-10-12): every evaluate_* function calls asked_for.ask before its tool runs, so the debug runners and the Lambda path record what they asked for as well as the orchestrators. A run whose own table is unreadable invokes no tool and records nothing, which is what criterion 8's WHEN means. REJECTED computing it once in the orchestrator and passing it down: two of the eight callers are not the orchestrator."
+      - "THE GUARD RUNS WHERE THE LEFT-OUT RECONCILIATION DOES, and only where the tools ran: a run with no period records no not-evaluated rows, so demanding a verdict for every in-scope check there would refuse ordinary fixture runs."
+      - "NOTHING ASKED RUNS NOTHING: an empty ask (possible for a readers-only run) records the tool's raw output as {asked: []} and invokes nothing, because dbt with no --select builds the whole project."
+      - "FOUND BY THE GUARD'S OWN PREMISE (2026-10-12): an invalid contract made datacontract-cli return zero checks without raising, so the runner recorded nothing. Before this guard that read as a pass; now it refuses the run."
+      - "DECISION IDS ARE NOT DETERMINISTIC between two bootstraps, found proving c11: the two collections run in parallel processes and qa.decision's serial follows their interleaving. Recorded with plans/running-thoughts.md #85's receipt_sequence as the same class; the comparison reads an id as the decision it names."
     open_questions: []
 
   - id: REQ-PIPE-189
@@ -32339,7 +32358,7 @@ requirements:
     date_written: "2026-10-12"
     story: "As someone regenerating or processing QA history, I want dbt to run only the tests a run will record, building just the staging models those tests read, so that dbt stops spending most of each Child Protection run on tests whose results are thrown away."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-12'
@@ -32357,10 +32376,26 @@ requirements:
       - "dbt's own DAG still decides what an unreadable model takes with it (dbt_common.exclude_unreadable's docstring), because this project does not keep a copy of the DAG."
     dependencies:
       - REQ-PIPE-188
+    linked_tests:
+      - tests/test_dbt_scoped.py
+      - tests/test_run_dbt_cp.py
+    implemented_by:
+      - qa_tools/common/dbt_common.py::parsed_test_nodes
+      - qa_tools/common/dbt_common.py::selection
+      - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
+      - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
+      - qa_tools/bdm/run_dbt_bdm.py::_check_id_for
+    evidence:
+      - "2026-10-12: tests/test_dbt_scoped.py - real dbt over the dirty fixture, whole collection then scoped, for notifications, placements, carers and Birth Registrations: every in-scope record identical field for field, failing samples and audit re-counts included, and no test outside the scope ran (c1, c2, c4); a test reading an unreadable table is left out and reported (c3); the project is parsed once while unchanged (c5)."
+      - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c6)"
+      - "dbt's mean time per Child Protection run over the same two bootstraps (101 runs whose tools ran, timed around the runner's evaluate function, no profiler): 4.70s before, 1.92s after. (c7)"
     decisions:
       - "WHY dbt: it is the larger half of beside() at 4.6s an arrival, measured in its own worker process, so that figure is not inflated by the profiler. Of the node phase (~3.0-3.8s for 61 nodes, REQ-PIPE-157's measurements), the 55 tests are most of it. The six models are views (dbt_project.yml), so building a sibling model costs little."
       - "HOW dbt IS TOLD, deliberately left for the build. The candidates are an explicit list of test nodes plus the models they read with indirect selection turned off, and model selection with dbt's own indirect-selection modes. Which one dbt 1.12 honours under the worker's partial parse without re-parsing is a fact to establish against the installed package, as REQ-PIPE-157's spike did, not to assume."
       - "REJECTED: leaving a sibling's tests in so the node count stays stable for dbt. Under the worker, the selection is an invocation argument, not a parse input. If it turns out to invalidate the partial parse, that is a measurement to bring back, not a reason to keep the waste."
+      - "SELECTED BY TEST NODE NAME, from a parsed manifest through _check_id_for (NFR 1): `+<test>` lets dbt's graph pick the models, and --indirect-selection empty stops it running every other test on them (c2). REJECTED selecting by `config.meta.check_id`, which works for generic tests but not for the singular tests, whose meta lives only in this project's own lookup."
+      - "PARSED ONCE PER PROCESS, keyed on the content of every file dbt reads, through the long-lived worker and the same environment as every build - so the build after it reuses that partial parse (c5)."
+      - "BIRTH REGISTRATIONS GAINED ITS OWN _check_id_for: its results loop assumed every generic test sat on its one model, which a whole-project manifest breaks."
     open_questions: []
 
   - id: REQ-PIPE-190
@@ -32368,7 +32403,7 @@ requirements:
     date_written: "2026-10-12"
     story: "As someone regenerating or processing QA history, I want datacontract-cli asked, through its own options, for only the rules a run will record, so that the second half of each run stops testing sibling tables' rules whose results are thrown away, and the contract the tool reads stays the committed one."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-12'
@@ -32391,6 +32426,18 @@ requirements:
       - "VERSION. quality_ids is a datacontract-cli 1.2.0 option. If a later upgrade drops or renames it, criterion 7's refusal stops the run rather than quietly widening it."
     dependencies:
       - REQ-PIPE-188
+    linked_tests:
+      - tests/test_datacontract_scoped.py
+    implemented_by:
+      - qa_tools/common/datacontract_common.py::selection_for
+      - qa_tools/common/datacontract_common.py::run_against_warehouse
+      - qa_tools/common/check_lifecycle.py::odcs_quality_id
+      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
+      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
+    evidence:
+      - "2026-10-12: tests/test_datacontract_scoped.py - all 89 quality rules carry their id (c1); a missing or different id fails the lifecycle parse naming the rule (c2); scoped by quality_ids, narrowed by schema_name where every rule sits on one model, with identical records to the whole contract for three Child Protection tables and Birth Registrations (c3); neither option for a run naming no table (c5); the contract handed is the committed one plus the server (c6); an unknown id refuses (c7); a rule over an unreadable table is left out and reported (c8)."
+      - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c9)"
+      - "datacontract-cli's mean time per Child Protection run over the same two bootstraps (101 runs whose tools ran, timed around the runner's evaluate function, no profiler): 1.28s before, 0.76s after. (c10)"
     decisions:
       - "ITS OWN OPTIONS (Keith, 2026-10-12): quality_ids and schema_name, with an ODCS `id` added to every quality rule in both contracts. REJECTED: handing it a copy of the contract pruned to the run's models and rules, because that is the same seam the declined REQ-PIPE-161 touched (a contract text altered before the tool reads it). REJECTED: leaving datacontract-cli unscoped, which would leave the non-dbt half of beside() as the critical path and lose most of REQ-PIPE-189's gain."
       - "VERIFIED IN THE INSTALLED SOURCE (datacontract-cli 1.2.0, engines/data_contract_test.py, 2026-10-11/12). schema_name limits a test to one model. quality_ids keeps only quality rules whose ODCS `id` matches, drops every built-in schema check, and raises on an id it cannot find (check_that_quality_ids_exist). ODCS's quality `id` is a free string (open_data_contract_standard DataQuality.id), so the check id itself can be used, and no second name has to be invented."
@@ -32398,6 +32445,9 @@ requirements:
       - "DROPPING THE BUILT-IN SCHEMA CHECKS CHANGES NOTHING RECORDED. run_datacontract_cp discards every check type outside _QUALITY_CHECK_TYPES today, so their only trace is in raw_output, which is not compared, and which REQ-PIPE-188's asked-for record now explains."
       - "WHY THIS IS WORTH DOING: datacontract-cli is the largest part of the beside() half that is not dbt. #65's 3.1s an arrival was inflated by the profiler. The checks themselves are ~1.5s of it, and resolution is 0.21-0.46s that does not shrink."
       - "ONE INVOCATION WHERE ONE SUFFICES (Keith, 2026-10-12, confirming): quality_ids alone selects a run's own rules and its cross-table readers in one call, since every recorded datacontract check is a quality rule with an id. Criterion 4's two-invocation rule stays for a future rule that needs it, and is not built speculatively. REJECTED building and testing the two-call path now, with nothing to exercise it."
+      - "':' FOR '.' IN THE ODCS ID (Keith, 2026-10-12): datacontract-cli's schema check rejects an id containing a dot, so the signed 'equal to its check_id' could not be built. REJECTED '~', and REJECTED leaving datacontract-cli unscoped."
+      - "THE ID IS OUTSIDE THE CONFIG HASH, like the check id it copies, so adding it changed no check's definition and needed no changelog entry per check."
+      - "A REFUSED SELECTION IS REPORTED, NOT RAISED, by the tool: it adds a failed 'Check that quality rule id exists' check. run_against_warehouse turns that into SelectionRefused (c7)."
     open_questions: []
 
   - id: REQ-PIPE-191
@@ -32405,7 +32455,7 @@ requirements:
     date_written: "2026-10-12"
     story: "As someone regenerating or processing QA history, I want Soda Core handed only the checks a run will record, so that the second half of each run stops scanning sibling tables whose results are thrown away."
     moscow: could
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-12'
@@ -32419,9 +32469,21 @@ requirements:
       - "Soda keeps its own `.env` reload behaviour contained, as today (plans/tooling.md #26). Nothing here changes how the scan is configured, only which checks it is handed."
     dependencies:
       - REQ-PIPE-188
+    linked_tests:
+      - tests/test_soda_scoped.py
+      - tests/test_run_soda_cp.py
+    implemented_by:
+      - qa_tools/common/soda_common.py::readable_checks_yaml
+      - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
+      - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
+    evidence:
+      - "2026-10-12: tests/test_soda_scoped.py - only the asked checks are handed, removed by check id, and a section left empty is dropped (c1); identical in-scope records scoped and whole for three Child Protection tables and Birth Registrations; an unreported handed check is recorded red and nothing outside the scope is counted (c2)."
+      - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c3)"
+      - "Soda's mean time per Child Protection run over the same two bootstraps (101 runs whose tools ran, timed around the runner's evaluate function, no profiler): 0.46s before, 0.19s after. (c4)"
     decisions:
       - "THE SMALLEST OF THE THREE, hence could rather than should. Soda is ~1.4s an arrival under the profiler, of which parsing the checks (0.17-0.25s without a profiler, REQ-PIPE-161's re-measure) and dumping check definitions do not shrink. The queries (~0.46s) and much of the result handling do. It is on the non-dbt half of beside(), so under REQ-PIPE-188's target it probably matters. Kept separate so Keith can take or leave it."
       - "THE MECHANISM EXISTS: readable_checks_yaml already edits the SodaCL text per run, and unreported_checks already compares against what was handed rather than against the whole file."
+      - "A SAMPLE BUG FOUND BY SCOPING, FIXED FIRST (Keith, 2026-10-12): Soda's samples were captured by check name alone, and seven Child Protection names exist on more than one table, so a whole scan lost some failing checks' samples. Fixed test-first on its own commit (f92d26c), and the equivalence baseline taken from that commit. REJECTED fixing it inside this requirement with a carve-out in the proof."
     open_questions: []
 
   - id: REQ-PIPE-192

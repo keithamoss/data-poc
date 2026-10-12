@@ -71,6 +71,10 @@ def test_a_check_soda_cannot_evaluate_is_recorded_as_an_error(monkeypatch, bdm_d
     checks = tmp_path / "checks.yml"
     checks.write_text(yaml.safe_dump(doc, sort_keys=False))
     monkeypatch.setattr(run_soda_bdm, "SODA_CHECKS_PATH", str(checks))
+    # The injected check is in no register, so a scoped run would never ask
+    # for it (REQ-PIPE-191): the whole file is handed, as before.
+    from qa_tools.common import asked_for
+    monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     results = _run(monkeypatch, bdm_duckdb_dir, _REF_RUN_ID, "2026-01-01T06:30:00Z")
     mine = [r for r in results
             if r["check_id"] == "test.civil-registration.birth-registrations.change_rowcount_soda"]
