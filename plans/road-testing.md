@@ -44,8 +44,8 @@ remaining decisions are checked into the requirements that own the rest.
 #3 was deleted in this sweep as fixed by REQ-PIPE-167 and REOPENED the
 same evening by Keith - it is a different concept, not yet scoped.
 
-**PROPOSED SPRINTS FOR WHAT IS LEFT, 2026-10-12** - a proposal for Keith,
-not a commitment: none of sprints 1, 3 or 4 has a requirement yet, so
+**PROPOSED SPRINTS FOR WHAT IS LEFT, 2026-10-12** - ORDER 1-2-3-4
+CONFIRMED by Keith 2026-10-13. Still none of sprints 1, 3 or 4 has a requirement yet, so
 each goes through delivery-scoper and his sign-off before anything is
 built. Ordered by value to a busy data-team leader at the dashboard.
 
@@ -53,23 +53,23 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   dataset list say how big each problem is and what each trend measures:
   labelled sparklines on dataset and column pages, "N of M checks not
   green" on cards, a failing-COLUMNS count where Trend sits now (Keith's
-  2026-10-06 answers). Questions: does Tier 1 roll the count up to agency
-  cards, and where does Trend go? First because at 30 datasets every red
-  looking the same is what stops triage.
-- **Sprint 2 - "don't mislead me" (#18, #17; S-M).** A past date never
+  2026-10-06 answers). Tier 1 ROLLS THE COUNT UP onto agency cards (Keith,
+  2026-10-13). Still open: where Trend goes. First because at 30 datasets
+  every red looking the same is what stops triage.
+- **Sprint 2 - "don't mislead me" (#18; S).** A past date never
   shows today's "not the latest file" panel (#18 - `promotionSplit()`
   renders the build-time state on every as-of date). Questions: hide the
   panel in a past view, or compute it as at that date from REQ-PIPE-081's
   filing events (fits his 2026-10-04 "shows it as it was", but changes
-  REQ-DASH-056's built behaviour)? And close #17 (same trial, two verdicts)
-  as not reproduced after one more attempt?
+  REQ-DASH-056's built behaviour)? #17 (same trial, two verdicts) CLOSED
+  as not reproduced, Keith 2026-10-13: "close it now" - deleted.
 - **Sprint 3 - "what actually changed?" (#9, #10; L).** One distribution
   component in the drill-down: this supply against the last promoted one
   (REQ-QAC-108's reference), the invalid values for any check that has
   them, and an honest "no breakdown for this check" where it does not.
-  Questions: derive the breakdown from each check's declared rule (one
-  copy, retiring the hand-kept lists in both dataset_stats.py) or keep the
-  allowlist; a top-N cap for wide columns; sensitive columns.
+  The breakdown is DERIVED FROM EACH CHECK'S DECLARED RULE, retiring the
+  hand-kept lists in both dataset_stats.py (Keith, 2026-10-13). Still open:
+  a top-N cap for wide columns; sensitive columns.
 - **Sprint 4 - new check kinds (#4, #6; M-L).** Cardinality drift (gains
   and losses separately, against the last promoted supply) and declared
   known-bad dates with percentage bands (the Soda user-defined-metric
@@ -112,8 +112,8 @@ requirements:
   promoted one, and a check without a breakdown SAYS so.
 - #12 tall-dataset completeness: parked until the 30-dataset asset is
   closer.
-Still to settle by driving the page: #8 (closing a check panel goes back
-two levels) and #17.
+Still to settle by driving the page: #8 and #17 - both since closed
+(2026-10-12 and 2026-10-13).
 
 1. **[investigate, 2026-09-24]** **[Dashboard UI]** **A trend is drawn
    in two different places, measuring two different things, and neither
@@ -1764,21 +1764,6 @@ two levels) and #17.
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.
 
-17. **[investigate, 2026-10-05]** **[Pipeline & publishing]** **The same
-    trial gave different verdicts once.** `mothman cp qa --trial --table
-    cp_clients --file "data/deliveries/Data Extract 01 Feb 2023/cp_clients.csv"`
-    against `supply8` reported **153 pass / 5 warn / 19 fail-or-error** (184
-    checks) the first time, and **177 pass / 0 / 0** on each of four runs
-    after it. The only code change between the first and second was the
-    trial reconciliation (REQ-PIPE-115 c17), which cannot change a verdict.
-    NOT REPRODUCED. One candidate, unconfirmed: the first run was the first
-    connection to `supply8` since the schema went from 22 to 23, so it
-    migrated the schema in place on that connection. Another: some
-    leftover state from an earlier session that the first run consumed.
-    The first run's per-check output was not kept, so which 19 failed is
-    unknown. Next step if it recurs: keep the full output (COLUMNS=250) and
-    compare the failing check ids against a stable run.
-
 18. **[investigate, 2026-10-07]** **[Dashboard UI]** **A past date shows
     a warning about files from years later.** Seen by the dashboard UX
     critic (post-build-review #132, out of its scope): Client Register with
@@ -1787,3 +1772,13 @@ two levels) and #17.
     received after the date on show, it is leaking the future into a past
     view, which is what the as-of picker exists to prevent. A sighting, not
     a diagnosis - not looked into yet.
+
+    **DIAGNOSED AND ANSWERED 2026-10-13.** It does leak: `promotionSplit()`
+    renders `ds.promotionState`, which the build computes once, as at the
+    build, so every past date shows today's promoted supply and today's
+    latest arrival. Keith chose to SHOW IT AS IT WAS THEN - work out, as at
+    the date on show, what was promoted and what had arrived unpromoted,
+    from the recorded filing and decision events - over hiding it on a
+    past date or labelling it "as of today". That amends REQ-DASH-056
+    (built: computed at build time), so it goes through the scoper and
+    sign-off as sprint 2's requirement.

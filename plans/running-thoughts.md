@@ -4937,6 +4937,8 @@ could never have computed it), and it belongs with batch 5's check work.
     **Scoped 2026-10-12 by delivery-scoper** as REQ-PIPE-193 (the choice
     decision, carrying 144's criteria 14 and 42) and REQ-PIPE-194 (every
     message that asks for a choice names the command; a contest resolves
-    only on a choice, a rejection or a supersession). Unsigned, eight
-    questions with Keith in their open_questions. Delete this entry once
-    both are built.
+    only on a choice, a rejection or a supersession). All eight questions
+    ANSWERED by Keith 2026-10-13 and written into both requirements (the
+    person chooses the unchosen file's fate - reject, keep and supersede,
+    or re-file; the TUI offers discrete choices). Still unsigned: next is
+    sign-off. Delete this entry once both are built.
