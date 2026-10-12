@@ -1137,6 +1137,24 @@ to the exact right file/line/folder with zero console errors.
     yet.
 
 
+88. **[todo, 2026-10-12]** **[Testing]** **Run tests more selectively,
+    so failures turn up earlier - and the full gate is too long.** Keith,
+    2026-10-12, after REQ-GEN-195 went through two full `mothman check`
+    runs: "You need to get better at running the test suite more
+    selectively so we don't have to go through the full [gate] all the
+    time. And so we can pick up tests earlier. I'm also concerned that
+    full gate takes 10 minutes now, it's a long time to run tests for."
+    Two separate asks. (1) PRACTICE: run the affected modules as each edit
+    lands, and anything that reads the generated corpus (the asset-time
+    golden, the scenario tests, the e2e module's data-dependent classes)
+    straight after a bootstrap - in REQ-GEN-195's case the golden and two
+    e2e failures were all predictable from "the corpus changed" and turned
+    up only in the full gate. CLAUDE.md's commit-cadence rule C already
+    says this; it was not followed. (2) THE GATE ITSELF: measure where the
+    ten minutes go now (CLAUDE.md's last recorded figure is 6m42s) and
+    propose cuts - the e2e module is the long pole, and #86's parked
+    test-pruning pass is the related item. Not scoped yet.
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 

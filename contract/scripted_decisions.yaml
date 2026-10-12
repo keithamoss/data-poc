@@ -35,3 +35,52 @@ decisions:
     supply: 0
     after_hours: 5
     reason: "Second-parent names missing on more registrations than usual; checked with the supplier, expected for this day."
+  # REQ-GEN-195 (Keith, 2026-10-12: "have it refiled to Q4 by a synthetic
+  # human making a decision"): TS-67's supply arrived before 2023-Q4's claim
+  # window opened, so the rule filed it as a resupply of 2023-Q3 and refused to
+  # promote it over Q3's accepted supply. A person re-files it to 2023-Q4 at
+  # 10:00 on 21 October, nine days after it arrived - once Q4's window is open
+  # and after the rule's refusal - so 2023-Q4 is not left with no supply.
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-clients
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-notifications
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-investigations
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-placements
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  - scenario: TS-67
+    operation: refile
+    dataset: cp-carers
+    supply: 0
+    after_hours: 216
+    to_period: 2023-Q4
+    reason: "This is the supplier's 2023-Q4 extract, sent before the quarter's window opened; it belongs to 2023-Q4, not 2023-Q3."
+  # cp-case-workers is not delivered in 2023-Q4 (its participation), so its
+  # table has no Q4 to go to - the same person rejects it instead.
+  - scenario: TS-67
+    operation: reject
+    dataset: cp-case-workers
+    supply: 0
+    after_hours: 216
+    reason: "Part of the supplier's 2023-Q4 extract, sent early; case workers are not delivered for 2023-Q4, so this table is not a supply for any period."

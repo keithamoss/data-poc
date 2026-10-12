@@ -32536,3 +32536,40 @@ requirements:
       - "FOUND WHILE DRAFTING, READ NOT RUN: dataset_blockers._decided_keys treats ANY non-refusal decision about the pair's arrival as ending the contest - which would include an acknowledgement or an excused lateness. Criterion 5 narrows it to the three decisions that genuinely end a contest. To be confirmed with a failing test before it is called a defect."
     open_questions:
       - "1. SHOULD THE ITEM OFFER 'NEITHER' AS A COMMAND TOO? Recommended: yes - rejecting the pair, as a third command beside the two choices, since a supplier sending two wrong files is a real case. Depends on REQ-PIPE-193 open question 4."
+  - id: REQ-GEN-195
+    title: Child Protection's generated history has supplies that arrive early, and one too early
+    date_written: '2026-10-12'
+    story: As someone showing the claim window working, I want a few Child Protection supplies in the synthetic history to arrive before their quarter's date - inside the window, and one before it - so that early arrival can be seen on a real page rather than only in a test.
+    moscow: should
+    status: built
+    signed_off:
+      by: Keith
+      date: '2026-10-12'
+    source: 'Keith, 2026-10-12, on finding that Child Protection''s quarterly calendar allows a supply up to 14 days early (claim_window 14d) while its generated history held no early supply at all (0 of 108 verdicts early): "Yes, 3 or 4 plus one too early, go ahead". Signed in those words against the proposal put to him: a handful across different quarters, plus one before the window opens.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL generate three Child Protection deliveries that arrive before their quarter's date and inside its claim window, in three different quarters, at different distances from the date (two, nine and thirteen days).
+    - THE SYSTEM SHALL generate one Child Protection delivery that arrives before its quarter's claim window opens, placed after an ordinary quarter so that what it lands in is not another scenario.
+    - 'THE SYSTEM SHALL have that too-early delivery moved to its own quarter by a scripted person''s re-file (REQ-GEN-135), once the quarter''s window is open, for each dataset delivered in that quarter, and SHALL have a dataset NOT delivered in it rejected by the same person - so the quarter is not left without a supply. ADDED 2026-10-12, Keith: "Have it refiled to Q4 by a synthetic human making a decision".'
+    - THE SYSTEM SHALL place each as a registered scenario (TS-9, TS-65, TS-66, TS-67 in plans/supply-model.md's register) through REQ-GEN-044's injection mechanism, so that it is listed in the scenario map with its coordinates.
+    - THE SYSTEM SHALL state each arrival's instant relative to its quarter's date, and SHALL be checked against the real calendar's own slot instants, so the scenarios and the configuration cannot drift apart unnoticed.
+    - THE SYSTEM SHALL leave the verdicts to the pipeline - the generator places arrival instants only (REQ-GEN-044 criterion 6).
+    non_functional_requirements:
+    - Deterministic - fixed anchors, no random draw, as every other injection.
+    - Each early delivery replaces its quarter's ordinary chain, so the number of deliveries a quarter receives is unchanged.
+    dependencies: [REQ-GEN-040, REQ-GEN-044, REQ-PIPE-131, REQ-PIPE-062]
+    linked_tests:
+    - tests/test_scenario_injection.py::TestTheEarlyChildProtectionSupplies
+    implemented_by:
+    - generator/scenario_injection.py::INJECTIONS
+    - contract/scripted_decisions.yaml
+    evidence:
+    - '2026-10-12: reset and bootstrapped from empty (3m51s) with the scripted re-files in place. TS-9 filed 2024-Q2 early, TS-65 2025-Q3 early, TS-66 2025-Q4 early. TS-67 was filed by the rule to 2023-Q3 as a late resupply, its promotion there refused, then re-filed by the synthetic person to 2023-Q4 at 02:00 UTC on 21 October and judged early, for five datasets; cp-case-workers rejected by the same person. Arrival golden re-captured: exactly 24 run ids swapped and five verdicts late -> early, nothing else moved. tests/test_scenario_injection.py TestTheEarlyChildProtectionSupplies 9 passed.'
+    decisions:
+    - 'THE CLAIM WINDOW WAS ALREADY THERE; THE DATA WAS NOT (2026-10-12). Child Protection''s quarterly calendar has claim_window 14d and REQ-GEN-040 built the generator''s ability to deliver early, but deliberately left the generated history for later, so no Child Protection supply had ever arrived early (Birth Registrations had four). Nothing in the rules changed.'
+    - 'NOT ROAD-TESTING #3 (Keith, 2026-10-12). That sighting - data arriving now that belongs in the NEXT period''s schema - is a different concept, reopened and still to be scoped. This is the ordinary early window of the period the supply is for.'
+    - 'TS-9 REUSED rather than a new id: the register already held it, marked for injection and never placed, with the same shape on dates the calendar no longer has; its config line was updated to the real calendar.'
+    - 'A WHOLE COLLECTION DELIVERY, not one dataset''s: Child Protection''s six tables arrive together, so "different datasets" is not a shape this collection can have - three quarters instead.'
+    - 'A PERSON MOVES THE TOO-EARLY ONE, NOT THE RULE (Keith, 2026-10-12). Left alone it filed as a late resupply of 2023-Q3, the rule refused to promote it over Q3''s accepted supply, and 2023-Q4 had no supply - so every Child Protection dataset showed Red on the front page for a three-year-old gap. Offered: the real Q4 supply following on time, keeping the gap, or moving the scenario later; Keith chose a synthetic person re-filing it. The rule still never claims forward (REQ-PIPE-062 criterion 5) - the move is a recorded person decision.'
+    - 'CP-CASE-WORKERS IS REJECTED, NOT RE-FILED: it is not delivered in 2023-Q4, so a re-file there is refused (and a refused scripted decision stops the replay, REQ-GEN-135 criterion 6 - found the first time this ran). Its table is part of an early Q4 extract and a supply for no period, so the same person rejects it, matching what an on-time delivery of that quarter does with it (left unfiled).'
+    - 'TIMED 10:00 PERTH ON 21 OCTOBER 2023, nine days after arrival: after Q4''s window opened (18 October) and after the rule''s refusal (19 October), so the decision acts on what a person would have seen.'
+    open_questions: []

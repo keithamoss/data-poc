@@ -529,3 +529,92 @@ class TestEveryChildProtectionInjectionIsPlanned:
         monkeypatch.setattr(si, "INJECTIONS", both)
         with pytest.raises(si.CannotPlace):
             cp._plan_injections(_daily(30))
+
+
+class TestTheEarlyChildProtectionSupplies:
+    """REQ-GEN-195 (Keith, 2026-10-12): three supplies inside their quarter's
+    claim window and one before it - measured against the real calendar's
+    own slot instants, so the scenarios and the configuration cannot drift
+    apart unnoticed."""
+
+    @staticmethod
+    def _where(scenario_id):
+        from datetime import timedelta
+
+        from generator import generate_cp_runs as g
+        from generator import scenario_injection
+        from generator.anchor_date import get_anchor_date
+        from qa_tools.common import asset_time, schedule, slots
+
+        injection = next(i for i in scenario_injection.INJECTIONS
+                         if i.scenario_id == scenario_id)
+        periods = schedule.periods_for_dataset(g.DATASET_ID,
+                                               until=get_anchor_date())[-len(g.RUN_PLAN):]
+        period = scenario_injection.resolve(injection, periods)
+        (extra,) = injection.arrivals
+        arrives = asset_time.wall_clock(period.period_date + timedelta(days=extra.day_offset),
+                                        extra.at)
+        return arrives, slots.slot_instants(injection.dataset_id, period.period_date)
+
+    @pytest.mark.parametrize("scenario_id", ["TS-9", "TS-65", "TS-66"])
+    def test_an_early_one_arrives_inside_its_window(self, scenario_id):
+        arrives, slot = self._where(scenario_id)
+        assert slot.claim_opens_at <= arrives < slot.due_at, (scenario_id, arrives, slot)
+
+    def test_the_too_early_one_arrives_before_its_window_opens(self):
+        arrives, slot = self._where("TS-67")
+        assert arrives < slot.claim_opens_at, (arrives, slot)
+
+    @pytest.mark.parametrize("scenario_id,period,classification", [
+        ("TS-9", "2024-Q2", "early"), ("TS-65", "2025-Q3", "early"),
+        ("TS-66", "2025-Q4", "early"),
+        # TOO EARLY: its own quarter's window is not open, so the RULE files it
+        # as a late resupply of 2023-Q3; a scripted person then re-files it to
+        # 2023-Q4, where it is judged early (the next test).
+        ("TS-67", "2023-Q4", "early"),
+    ])
+    def test_the_pipeline_files_and_judges_each_as_the_register_expects(
+            self, deployment_history, scenario_id, period, classification):
+        """On the bootstrapped history: what the assignment rule and the
+        verdict made of each planted arrival."""
+        from qa_tools.common import scenario_map, supply_db
+
+        placement = scenario_map.read_placements().get(scenario_id)
+        if placement is None or not placement.supplies:
+            pytest.skip(f"{scenario_id} is not placed in this history")
+        (run,) = placement.supplies
+        key = run.split("__", 1)[1]
+        with supply_db.connect(read_only=True, label="test-early-cp") as conn:
+            rows = conn.execute(
+                "SELECT f.slot, v.classification FROM qa.filing_current f "
+                "JOIN LATERAL (SELECT classification FROM qa.verdict w "
+                "              WHERE w.filing_id = f.id ORDER BY w.id DESC LIMIT 1) v ON true "
+                "WHERE f.dataset_id = 'cp-clients' AND f.supply_id = ?",
+                [f"cp-clients@{key}"]).fetchall()
+        assert rows == [(period, classification)], rows
+
+    def test_the_too_early_one_is_moved_by_a_person_not_the_rule(self, deployment_history):
+        """Keith, 2026-10-12: "have it refiled to Q4 by a synthetic human".
+        The rule's filing stays 2023-Q3 and its promotion there is refused; the
+        move to 2023-Q4 is a person's decision. cp-case-workers, not delivered
+        in 2023-Q4, is rejected by the same person instead."""
+        from qa_tools.common import scenario_map, supply_db
+
+        placement = scenario_map.read_placements().get("TS-67")
+        assert placement is not None and placement.supplies, "TS-67 is not placed"
+        key = placement.supplies[0].split("__", 1)[1]
+        with supply_db.connect(read_only=True, label="test-early-cp") as conn:
+            rows = conn.execute(
+                "SELECT dataset_id, action, from_slot, to_slot, actor_kind FROM qa.decision "
+                "WHERE supply LIKE ? AND action IN ('promotion-refused', 'refile', 'reject') "
+                "ORDER BY dataset_id, effective_at", [f"%@{key}"]).fetchall()
+        assert rows, "no decisions about TS-67's supply"
+        by = {}
+        for ds, action, frm, to, kind in rows:
+            by.setdefault(ds, []).append((action, frm, to, kind))
+        assert len(by) == 6, sorted(by)
+        for ds, acts in by.items():
+            if ds == "cp-case-workers":
+                assert acts[-1][0] == "reject" and acts[-1][3] == "person", acts
+            else:
+                assert ("refile", "2023-Q3", "2023-Q4", "person") in acts, (ds, acts)

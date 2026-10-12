@@ -147,6 +147,15 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
 
+    RE-CAPTURED 2026-10-12 FOR REQ-GEN-195 (Child Protection arrives early:
+    TS-9, TS-65, TS-66, and TS-67 too early). The procedure first: 69
+    deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
+    capture. Four quarters' on-time arrivals out and their early ones in,
+    across all six Child Protection datasets - 24 run ids each way - and NO
+    other arrival changed its instant or its verdict.
+    Re-captured again the same day once a scripted person re-files TS-67 to
+    2023-Q4: exactly five verdicts moved, late -> early, nothing else.
+
     RE-CAPTURED 2026-10-11 AGAIN FOR REQ-GEN-185 (TS-43 to TS-46 planted, the
     history 40 days). The procedure first: 69 deliveries, zero `handfiled-*`,
     and `mothman dashboard rebuild` BEFORE the capture - the golden reads
@@ -368,13 +377,28 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         2024-Q4, a quarter with no resend. 2024-Q3's six-table resend of 13
         August is back - six late arrivals - and 2024-Q4's six ordinary first
         arrivals are six injected ones of the same status.
+
+        THEN 105 / 20 / 26 / 8 over 159 FOR REQ-GEN-195 (2026-10-12), Child
+        Protection arriving early. Procedure first: 69 deliveries, zero
+        `handfiled-*`. Four quarters change, six datasets each. Three are
+        early (TS-9, TS-65, TS-66): +16 early, not +18, because cp-case-
+        workers does not participate in 2024-Q2 or 2025-Q4 and stays
+        unfiled. The fourth is too early (TS-67) and files as a late
+        resupply of 2023-Q3: +6 late, and the one unfiled to go is
+        cp-case-workers' 2023-Q4, which it skips but 2023-Q3 does not.
+
+        THEN 105 / 25 / 21 / 8 THE SAME DAY, once a scripted person re-files
+        TS-67 to 2023-Q4 (Keith: "have it refiled to Q4 by a synthetic
+        human"). Five of its six move late -> early, judged against the
+        quarter they now belong to; cp-case-workers, not delivered in
+        2023-Q4, is rejected instead and keeps its late verdict.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 126, "early": 4, "late": 20, "unfiled": 9}
+        assert counts == {"on_time": 105, "early": 25, "late": 21, "unfiled": 8}
         assert sum(counts.values()) == 159
 
 

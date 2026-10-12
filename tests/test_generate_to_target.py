@@ -522,7 +522,8 @@ class TestRefusedBeforeAnythingIsWritten:
             scenario_id="TS-CPRED", dataset_id="cp-clients", anchor=-10, config="test",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target("red")),))
         original = si.INJECTIONS
-        si.INJECTIONS = (*original, bad)
+        # ALONE: the refusal is the point, not where the planted ones sit.
+        si.INJECTIONS = (bad,)
         try:
             periods = schedule.periods_for_dataset(cp.DATASET_ID,
                                                    until=get_anchor_date())[-len(cp.RUN_PLAN):]
@@ -827,7 +828,8 @@ class TestRefusals156:
                            config="t", arrivals=(si.ExtraArrival(
                                0, "09:00", target=targeting.Target("amber")),))
         original = si.INJECTIONS
-        si.INJECTIONS = (*original, bad)
+        # ALONE: the refusal is the point, not where the planted ones sit.
+        si.INJECTIONS = (bad,)
         try:
             periods = schedule.periods_for_dataset(cp.DATASET_ID,
                                                    until=get_anchor_date())[-len(cp.RUN_PLAN):]

@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**12 of 37 scenarios marked for injection have data behind them today.** 75 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**16 of 40 scenarios marked for injection have data behind them today.** 78 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -159,7 +159,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** `cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202404221000000800` |
+| Period | 2024-Q2 |
+| Set the in-place-on date to | 2024-05-01 |
 
 ### TS-10 - Evening-before daily arrival - two variants
 
@@ -174,6 +179,51 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 **What it demonstrates.** The verdict **recomputes** - it now reads on time. A supply reported late only because it was misfiled was never actually late. The re-filed supply returns to staging under a NEW filing (the old one kept), is checked again as a run of its own, and the gate decides (REQ-PIPE-140, REQ-PIPE-141). *Used to expect* the supply to move between slots and stay promoted - REQ-PIPE-141 made a re-file never fill its target directly.
 
 *unit test - no generated data, nothing to navigate to*
+
+### TS-65 - Early, at the edge of the window
+
+**What it demonstrates.** Assigned **2025-Q3** and classified **early by 13 days**, exactly as TS-9 - the window is a boundary, and a supply inside it by a day is as early-and-fine as one inside it by a week (REQ-PIPE-131).
+
+**What it would look like if the rule were wrong.** Treated as a resupply of 2025-Q2, as if the window counted from somewhere else.
+
+*Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202507191000000800` |
+| Period | 2025-Q3 |
+| Set the in-place-on date to | 2025-08-01 |
+
+### TS-66 - A couple of days early - the everyday case
+
+**What it demonstrates.** Assigned **2025-Q4**, classified **early by 2 days**, and otherwise unremarkable - it fills and promotes like an on-time supply.
+
+**What it would look like if the rule were wrong.** Shown as anything more alarming than early.
+
+*Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202510301000000800` |
+| Period | 2025-Q4 |
+| Set the in-place-on date to | 2025-11-01 |
+
+### TS-67 - A quarterly supply sent too early
+
+**What it demonstrates.** It cannot claim 2023-Q4, whose window has not opened - nothing claims forward (REQ-PIPE-062 criterion 5). The open period when it arrives is 2023-Q3, so it files there as a **resupply of 2023-Q3** (REQ-PIPE-131), and the rule refuses to promote it over 2023-Q3's accepted supply. Then a PERSON re-files it to 2023-Q4 (a scripted decision, REQ-GEN-135, at 10:00 on 21 October, once Q4's window is open), so 2023-Q4 is not left with no supply. Keith, 2026-10-12: "plus one too early" - the case people will ask about - and "have it refiled to Q4 by a synthetic human making a decision".
+
+**What it would look like if the rule were wrong.** Assigned 2023-Q4 by the RULE because it was obviously meant for it; or 2023-Q4 left empty once the person has re-filed it.
+
+*Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202310121000000800` |
+| Period | 2023-Q4 |
+| Set the in-place-on date to | 2023-11-01 |
 
 ## Delivery and multi-table
 
@@ -859,9 +909,17 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "breaksAs": "`cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.",
    "config": null,
    "requirements": [
-    "REQ-PIPE-131"
+    "REQ-PIPE-131",
+    "REQ-GEN-195"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202404221000000800"
+    ],
+    "period": "2024-Q2",
+    "inPlaceOn": "2024-05-01"
+   }
   },
   {
    "id": "TS-10",
@@ -1784,6 +1842,66 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
     "REQ-PIPE-169"
    ],
    "coordinates": null
+  },
+  {
+   "id": "TS-65",
+   "mode": "INJECT",
+   "title": "Early, at the edge of the window",
+   "section": "Arrival classification",
+   "demonstrates": "Assigned **2025-Q3** and classified **early by 13 days**, exactly as TS-9 - the window is a boundary, and a supply inside it by a day is as early-and-fine as one inside it by a week (REQ-PIPE-131).",
+   "breaksAs": "Treated as a resupply of 2025-Q2, as if the window counted from somewhere else.",
+   "config": "Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.",
+   "requirements": [
+    "REQ-PIPE-131"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202507191000000800"
+    ],
+    "period": "2025-Q3",
+    "inPlaceOn": "2025-08-01"
+   }
+  },
+  {
+   "id": "TS-66",
+   "mode": "INJECT",
+   "title": "A couple of days early - the everyday case",
+   "section": "Arrival classification",
+   "demonstrates": "Assigned **2025-Q4**, classified **early by 2 days**, and otherwise unremarkable - it fills and promotes like an on-time supply.",
+   "breaksAs": "Shown as anything more alarming than early.",
+   "config": "Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.",
+   "requirements": [],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202510301000000800"
+    ],
+    "period": "2025-Q4",
+    "inPlaceOn": "2025-11-01"
+   }
+  },
+  {
+   "id": "TS-67",
+   "mode": "INJECT",
+   "title": "A quarterly supply sent too early",
+   "section": "Arrival classification",
+   "demonstrates": "It cannot claim 2023-Q4, whose window has not opened - nothing claims forward (REQ-PIPE-062 criterion 5). The open period when it arrives is 2023-Q3, so it files there as a **resupply of 2023-Q3** (REQ-PIPE-131), and the rule refuses to promote it over 2023-Q3's accepted supply. Then a PERSON re-files it to 2023-Q4 (a scripted decision, REQ-GEN-135, at 10:00 on 21 October, once Q4's window is open), so 2023-Q4 is not left with no supply. Keith, 2026-10-12: \"plus one too early\" - the case people will ask about - and \"have it refiled to Q4 by a synthetic human making a decision\".",
+   "breaksAs": "Assigned 2023-Q4 by the RULE because it was obviously meant for it; or 2023-Q4 left empty once the person has re-filed it.",
+   "config": "Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.",
+   "requirements": [
+    "REQ-PIPE-062",
+    "REQ-PIPE-131",
+    "REQ-GEN-135"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202310121000000800"
+    ],
+    "period": "2023-Q4",
+    "inPlaceOn": "2023-11-01"
+   }
   }
  ]
 }
