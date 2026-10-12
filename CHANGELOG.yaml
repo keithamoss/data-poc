@@ -140,6 +140,12 @@ releases:
               your decision and may turn red.
       - category: Fixed
         items:
+          - headline: Rejecting both files of a pair clears them
+            components: ["Pipeline & publishing"]
+            description: >
+              When two files arrived for one dataset and you rejected the
+              pair, both files stayed waiting in staging. Rejecting the pair
+              now moves both of them out.
           - headline: Example rows no longer go missing
             components: ["QA checks & contract"]
             description: >

@@ -235,6 +235,27 @@ class TestSevenOfTheEightReallyWork:
             arrival=supply.rsplit("@", 1)[1]).get(dataset.table) or []
         assert physical not in staged, "a rejected supply stays in staging"
 
+    def test_rejecting_a_contested_pair_moves_both_files_out_of_staging(
+            self, conn, dataset, actor, periods):
+        """A defect, 2026-10-12 (found scoping REQ-PIPE-193): a contested
+        pair's supply id carries `#1`, and the staged-table lookup kept it in
+        the arrival key, so it matched neither file - rejecting "neither"
+        recorded the decision and left both files waiting in staging."""
+        first, _ = periods
+        key = uuid.uuid4().hex[:10]
+        one = f"{dataset.table}__{key}"
+        two = f"{one}__2"
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
+        for physical in (one, two):
+            conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+
+        fd.apply(_request(dataset, actor, fd.REJECT, period=first,
+                          supply=f"{dataset.dataset_id}@{key}#1"), effective_at=WHEN, conn=conn)
+
+        staged = supply_db.candidates_in(
+            conn, supply_db.STAGING_SCHEMA, [dataset.table], arrival=key).get(dataset.table)
+        assert staged == [], "both files of the rejected pair are still in staging"
+
     def test_substitute_then_de_substitute(self, conn, dataset, actor, periods):
         first, second = periods
         supply, _ = _stage(conn, dataset)

@@ -670,8 +670,11 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
 
 
 def _staged(conn, logical: str, supply: str) -> list[str]:
-    """The physical tables this supply has in staging."""
-    arrival = (supply or "").rsplit("@", 1)[-1]
+    """The physical tables this supply has in staging - BOTH files of a
+    contested pair, whose supply id carries `#1` while its staged names do
+    not (2026-10-12: the suffix kept in the key matched neither, so
+    rejecting the pair left both waiting)."""
+    arrival = (supply or "").rsplit("@", 1)[-1].split("#", 1)[0]
     found = supply_db.candidates_in(
         conn, supply_db.STAGING_SCHEMA, [logical], arrival=arrival).get(logical) or []
     return list(found)

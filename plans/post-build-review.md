@@ -8007,4 +8007,12 @@ twice. It deliberately did not re-find the `TypeError`.
       `filing_decisions._staged` may build the arrival key for a `#1`
       supply with the `#1` kept, so rejecting a contested pair would move
       nothing.
+      **The second was REAL, and is fixed**: rejecting `cp-carers@<key>#1`
+      left both files in staging (test_filing_decisions
+      test_rejecting_a_contested_pair_moves_both_files_out_of_staging failed
+      first, both tables still there); `_staged` now drops the `#n` suffix.
+      **The first is real in the code too** - `_decided_keys` counts any
+      person's decision naming the supply, an acknowledgement included - but
+      WHAT ends a contest is draft REQ-PIPE-194 criterion 5 (unsigned), so it
+      waits for Keith's sign-off rather than being decided here.
 
