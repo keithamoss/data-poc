@@ -8050,3 +8050,25 @@ twice. It deliberately did not re-find the `TypeError`.
     rather than its filed `ds@key#1`; slot_state's HELD branch and its
     "which file is the supply?" text are unreachable; the GitHub decision
     handler has no caller outside tests.
+
+161. **[todo, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
+    **TS-67's scripted re-files left their QA re-checks owed - the bootstrap
+    never runs a scripted decision's re-check.** Found by delivery-architect
+    reviewing REQ-GEN-196, then CONFIRMED against the bootstrapped database
+    (2026-10-13): after REQ-GEN-195's bootstrap, `qa.owed_run` held exactly
+    five open items - all `recheck`, all TS-67's re-filed
+    `cp-*@202310121000000800` supplies, caused by the five scripted re-file
+    decisions - and every one of the 113 `reevaluate` items was cleared. So
+    the five 2023-Q4 supplies are filed there and judged early, but were
+    never QA'd against 2023-Q4 nor gated; a real processing pass would
+    have run them. Cause: scripted playback raises the decision through
+    filing_decisions.apply, which OWES the re-check (recheck.owe), but
+    nothing in the replay drains RECHECK - only processing_pass.run_all_owed
+    does, and the bootstrap's own follow-up handles REEVALUATE only.
+    REQ-GEN-195's evidence did not catch it: it checked filing and verdict,
+    not the QA run that should have followed.
+    **Keith, 2026-10-13: playback runs the owed re-checks at the decision's
+    own instant, for EVERY scripted decision** (over choose-file only, or
+    leaving them owed). This changes TS-67's history - the five supplies
+    get checked and gated - so the golden is re-captured. To be fixed
+    test-first; REQ-GEN-196 depends on it.
