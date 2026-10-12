@@ -32427,7 +32427,7 @@ requirements:
     date_written: "2026-10-12"
     story: "As someone regenerating or processing QA history, I want answers that cannot change during a run, such as which tables each check reads and the values read out of unchanged configuration, worked out once per process and reused. That way each arrival stops paying for hundreds of copies and re-collections of the same thing."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-12'
@@ -32447,6 +32447,22 @@ requirements:
       - "No new dependency. Configuration only, never supply data."
       - "MEMORY. Bounded, as config_yaml's own cache is. The declarations are one small mapping of about 300 checks."
     dependencies: []
+    linked_tests:
+      - tests/test_declared_reads_once.py
+      - tests/test_tables_read.py
+      - tests/test_cross_table_scope.py
+    implemented_by:
+      - qa_tools/common/tables_read.py::declared_reads
+      - qa_tools/common/validate_check_lifecycle.py::sources_fingerprint
+      - qa_tools/common/promotion.py::_declared_reads
+      - qa_tools/common/qa_results_writer.py::_declared_reads_tables
+      - qa_tools/common/environments.py::_load
+      - qa_tools/common/postgres_version.py::_declared_value
+      - qa_tools/common/datacontract_common.py::_derived
+    evidence:
+      - '2026-10-12: tests/test_declared_reads_once.py - the promotion gate, the results writer and tables_read return one answer from one collection of the checks (c1); twenty calls collect once (c2); an edit that keeps the file''s length is seen (c3); a failure gives promotion''s empty mapping and printed note and is not remembered (c4); a caller''s edit to its answer does not reach the next caller (c5); the environments file, the declared PostgreSQL major and datacontract-cli''s per-rule readers parse nothing more once warm, and an edited file is read again (c6, c7).'
+      - '2026-10-12, a Child Protection-only bootstrap under cProfile, before and after: configuration parses 53,068 -> 1,832 (491 -> 17 an arrival, against criterion 6''s 50); check collections 402 -> 5 (c6).'
+      - '2026-10-12, two bootstraps from empty into fresh databases on this machine with nothing else running, the commit before (b8424c9) and after: identical filings, decisions, verdicts and supply tables by tests/equiv_support.snapshot, 162 runs each, every column equal except qa.delivery_file.receipt_sequence - which differs between any two side-by-side bootstraps, recorded as plans/running-thoughts.md #85 (c8). Wall clock 8m59s before, 9m04s after (c9): no change.'
     decisions:
       - "VERIFIED IN THE CODE, 2026-10-12. config_yaml.parse deep-copies the cached document on every call, including every cache hit (copy.deepcopy in parse()). Unprofiled, a hit costs 1.37ms for the Child Protection contract, 0.95ms for its Soda checks, 0.15ms for data-asset.yaml and 0.04ms for environments.yaml. promotion._declared_reads is uncached and re-runs collect_checks(None) over every check source each call. qa_results_writer._declared_reads_tables computes the SAME answer behind an unkeyed lru_cache, so today there are two implementations of one answer, one cached and one not."
       - "THE SAVING IS SMALL, and measured, not profiled. promotion._declared_reads costs 8-10ms a call unprofiled (#65's 16s over 402 calls was profiler-inflated about 4x), so about 3-4s a bootstrap, ~0.03s an arrival. config_yaml.parse at ~490 calls an arrival is estimated at ~0.15s an arrival unprofiled, from the per-file hit costs above. Together that is ~0.2s of Child Protection's ~5.5s, about 20s off a bootstrap. Worth doing for REQ-PIPE-188's target, but on its own it does not decide that target."
@@ -32455,4 +32471,7 @@ requirements:
       - "WHICH CALLERS ARE HOT is not known from the 2026-10-11 profile, which recorded the total, not the callers. The build counts callers on the 12-arrival replay first. Criterion 6 is the outcome that has to hold, not a list of modules to change."
       - "INDEPENDENT OF THE SCOPING (REQ-PIPE-188 to 191). It changes no tool's work, so it is proven identical on its own and can land first. REQ-PIPE-188's target depends on it."
       - "REQ-PIPE-156's open question (re-keying the unkeyed lru_caches in schedule, hierarchy, asset_time and arrival_patterns on content) is touched only where one of them turns out to be a hot caller under criterion 6. It is otherwise left as it is."
+      - 'NO WALL-CLOCK SAVING ON ITS OWN, AND THAT IS WHAT WAS MEASURED (2026-10-12): parses fell 491 -> 17 an arrival and the bootstrap took 8m59s before and 9m04s after. The configuration work runs in the half of each run that sits beside dbt, and dbt is the longer half, so taking it out shortens nothing until REQ-PIPE-189 to 191 shrink both halves. The scoper''s estimate of about 20s was not met; REQ-PIPE-188''s under-5 target still counts this requirement as one of its parts.'
+      - 'THE DECLARATIONS ARE KEYED ON EVERY CHECK SOURCE AND ALL OF contract/, read and hashed on every call (well under a millisecond), never on modification time or size. promotion._declared_reads and qa_results_writer._declared_reads_tables both delegate to tables_read.declared_reads; the writer''s old lru_cache was keyed on nothing, so an edited check file was never seen again in a process - a latent defect as well as a duplicate. A failure is not cached, and the writer now prints promotion''s note too rather than failing quietly.'
+      - 'THE HOT CALLERS CACHE WHAT THEY DERIVE, not the parsed document (REQ-PIPE-156 criterion 4 keeps every direct parse caller''s own copy): environments keeps its validated tuple by file text, postgres_version only the declared major, datacontract-cli''s two per-rule readers one (check_id, threshold) pair per rule text. A threshold key present with a null value still returns None, as it always did.'
     open_questions: []

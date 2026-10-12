@@ -5077,3 +5077,31 @@ Belongs with batch 5's check work.
     **Keith, 2026-10-11 evening: leave it for now.** Only synthetic,
     past-dated deliveries meet it today; no real live pass exists yet.
     Scope it with the live (AWS) work rather than on its own.
+
+84. **[todo, 2026-10-12]** **[Dashboard]** **A dashboard build with no git
+    still fails, despite the provenance stamp tolerating it.** Found by the
+    test review's pass 2 while rewriting the provenance tests:
+    `dashboard/embed_dashboard_data.py` stamps the build with the commit and
+    tolerates its absence (`except Exception: commit = None`), but `embed()`
+    asks for the commit again later, for the GitHub links, with no
+    tolerance - so a build from a tarball or any checkout without git fails
+    there. The tolerance test now breaks only the first ask, and would fail
+    rather than pass quietly if the order changed. Small; whether a build
+    without git is a supported case at all is the question to settle first.
+
+85. **[investigate, 2026-10-12]** **[Pipeline & publishing]** **For Keith: a
+    delivery file's receipt_sequence differs between two bootstraps of the
+    same history.** Found proving REQ-PIPE-192 identical: two bootstraps
+    from empty into fresh databases, same deliveries, recorded the same
+    161 delivery files with every column equal EXCEPT `receipt_sequence`
+    (one run numbered Child Protection's first file 5, the other 1).
+    Birth Registrations and Child Protection record their deliveries side
+    by side (REQ-TEST-116), so the order the sequence is handed out in
+    depends on which process reaches the database first. Everything else -
+    filings, decisions, verdicts, supply tables - was identical. The
+    question: is receipt_sequence used to ORDER anything (a tie-break
+    between two files received at the same instant), in which case it
+    should come from something deterministic; or is it a surrogate,
+    in which case tests/equiv_support.py should exclude it like the other
+    surrogate ids. REQ-PIPE-188's equivalence criterion will meet the same
+    thing.
