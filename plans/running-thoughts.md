@@ -1195,6 +1195,27 @@ to the exact right file/line/folder with zero console errors.
     whose decisions say "regenerate, never migrate" (REQ-PIPE-144 and
     others) is touched by the answer.
 
+90. **[todo, 2026-10-13]** **[Pipeline & publishing]** **Protect the
+    processing loop from a decision made while it is working on the same
+    supply.** Keith, 2026-10-13, alongside #71's "QA runs only in the
+    processing loop": "what if it picks up a file and it's running on it,
+    or it's in its little queue, and someone changes the decision locally?
+    I kind of think that shouldn't be able to happen if it's actually
+    actively running in the queue." His shape, not settled:
+    - WHILE THE LOOP IS ACTIVELY PROCESSING a supply, a person's decision
+      about it is refused (or waits) - it must not change underneath a run;
+    - WHILE MERELY WAITING, probably allowed - "but then there isn't really
+      a queue. It's just a case of picking up the next thing that can be
+      processed" - so the loop chooses the next processable thing at the
+      moment it picks it up, rather than holding a queue that can go stale.
+    Worth carrying into it: the pass already takes an advisory lock per run
+    (REQ-PIPE-151/152) and the decision path already refuses when the
+    consequences changed since confirmation (REQ-PIPE-128 criterion 9) -
+    whether "actively processing" can be a lock a decision checks is the
+    first question. Related: #61 (a concurrency pass once the supply model
+    settles), #71 (where QA runs). Priority: this week, worked together
+    with Keith.
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
@@ -4685,6 +4706,27 @@ could never have computed it), and it belongs with batch 5's check work.
     route but the orchestrator (CLAUDE.md, the "build may read recorded QA
     results, never actual data" rule). Related: plans/aws.md #4 (where the
     connection string lives).
+
+    **WIDENED 2026-10-13 - where does QA RUN at all?** Priority: this week,
+    worked together (Keith, 2026-10-13). REQ-PIPE-193 exposed it: a
+    terminal decision runs QA "while the person waits", on that person's
+    machine, with that person's code. Keith: "people can make code changes
+    locally that would not have been accepted but could change production."
+    Options he named:
+    - the TUI cannot be run from a checkout at all - only from somewhere
+      tied to production code;
+    - or, run locally, protections make sure the code is unchanged - the
+      latest production code checked out, nothing modified;
+    - his lean for HOW people get it: "letting them run it ... as a
+      standalone executable, so they can't change the code. So I guess that
+      means sort of packaging it in Python."
+    And for WHERE QA runs, his lean right now: "only in the processing
+    loop" - a person's decision is recorded from the terminal, and the QA
+    run and the gate that follow it happen in the processing pass, never on
+    the person's machine. Not for REQ-PIPE-193, which keeps going as signed
+    (its criterion 15 runs QA while the person waits); if this lands as he
+    leans, that criterion moves to the pass. See #90 for the other half -
+    protecting the loop while it runs.
 
 72. **[superseded, 2026-10-08]** **[Pipeline & publishing, QA checks & contract]**
     **A trial run that records nothing - one mechanism for previewing a
