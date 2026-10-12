@@ -32456,6 +32456,9 @@ requirements:
     story: As the person working a period's supplies, I want to say what each of two files that arrived together for one dataset actually is, so that a contested dataset stops being a dead end and every file that turns out to be a supply is checked and judged like any other.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-13'
     source: 'Keith, 2026-10-05 (REQ-PIPE-144 decision ''THE CONTESTED-PAIR CHOICE GOES TO SPRINT 9'': a new filing decision on both routes, writing a new filing in REQ-PIPE-141''s append-only shape); gap logged 2026-10-12 as plans/running-thoughts.md #87 after re-testing REQ-PIPE-144 criteria 14 and 42 once REQ-PIPE-141 shipped. Drafted by delivery-scoper 2026-10-12; not yet signed off.'
     acceptance_criteria:
     - THE SYSTEM SHALL offer settling a contested pair as a supply-scoped filing decision on the TERMINAL route only - the TUI and its flag form - through filing_decisions, the one implementation every route shares (REQ-GHUB-082 criteria 3 and 13), and SHALL NOT offer it on the GitHub route (REQ-PIPE-194 criterion 2 says what GitHub shows instead). DECIDED Keith, 2026-10-13.
@@ -32520,6 +32523,7 @@ requirements:
     - 'NO RECORDED SWAP (Keith, 2026-10-13): going back is a TUI affordance before confirmation, nothing more. Supersedes the 2026-10-13-morning answer ''re-choose until promoted'', which Keith revisited once it was clear that meant a later visit.'
     - 'SCHEMA WIPE IS THE POC''S RULE, NOT PRODUCTION''S (Keith, 2026-10-13, asking whether a schema bump means a production rewipe): reset-synthetic refuses a real asset, so a real deployment needs migrations - logged as plans/running-thoughts.md #89.'
     - 'THE PLANTED PAIRS ARE BIRTH REGISTRATIONS'' (2026-10-13): Child Protection''s arrival patterns are exact filenames and cannot admit two files for one table (TS-42 and TS-34 record why), while birth_registrations_[^/]+\.csv admits two today.'
+    - 'SIGNED 2026-10-13 (Keith, "That was it, sign off") after two rounds of changes the same morning. PLACEMENT: ''sprint 9'' in the 2026-10-05 note is the overnight run''s sprint 9 - the re-file group REQ-PIPE-140 to 142 - not the delivery plan''s sprint 9 (slot assignment) in plans/supply-model.md, and neither 140 nor 141 is on any Owns line there, so these are not added to one.'
     open_questions: []
   - id: REQ-PIPE-194
     title: Every place that tells a person to settle a contested pair says where and how, and the contest reads as resolved only once a person has settled it or it has been set aside
@@ -32527,6 +32531,9 @@ requirements:
     story: As someone looking at a dataset that reads 'Two files, choose one', I want every message about it to tell me exactly where to settle it, and the dataset to stop reading contested only when the contest has really ended, so that nothing points me at a remedy that does not exist.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-13'
     source: 'plans/running-thoughts.md #87 (2026-10-12): REQ-PIPE-141''s re-file refusal, the correction trial''s refusal and REQ-PIPE-115''s ''Two files, choose one'' item each name a step no decision performs. Drafted by delivery-scoper 2026-10-12 as the follow-through half of REQ-PIPE-193; not yet signed off.'
     acceptance_criteria:
     - WHILE a contested-table outstanding item is open, THE SYSTEM SHALL word it on the terminal to name both files and give the command that opens the settlement in the TUI (REQ-PIPE-193) for that pair, to paste.
@@ -32556,6 +32563,7 @@ requirements:
     - 'FOUND WHILE DRAFTING, READ NOT RUN: dataset_blockers._decided_keys treats ANY non-refusal decision about the pair''s arrival as ending the contest - which would include an acknowledgement or an excused lateness. Criterion 5 narrows it to the three decisions that genuinely end a contest. To be confirmed with a failing test before it is called a defect.'
     - '''NEITHER'' IS OFFERED, AND THE TUI PICKS RATHER THAN PASTES (Keith, 2026-10-13). Recommended was a third paste-able command; Keith asked for discrete choices in the TUI. Paste-able commands stay wherever there is no picker - plain terminal messages and the GitHub ticket.'
     - 'GITHUB POINTS AT THE TERMINAL (Keith, 2026-10-13), following REQ-PIPE-193 going terminal-only: a comment on the ticket, never a command. Supersedes the paste-able ''/choose-file'' commands drafted 2026-10-12 for the ticket.'
+    - SIGNED 2026-10-13 (Keith) with REQ-PIPE-193, as one piece of work.
     open_questions: []
   - id: REQ-GEN-195
     title: Child Protection's generated history has supplies that arrive early, and one too early
