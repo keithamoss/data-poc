@@ -109,6 +109,24 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-13"
+    summary: >
+      Two fixes for a dataset where two files arrived for one table.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Two files for one table can no longer both be promoted
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting a dataset where two files claim the same table used to
+              move both into the period. It is now refused, and tells you to
+              reject the pair and ask the supplier to resend.
+          - headline: Only settling the two files ends "Two files, choose one"
+            components: ["Pipeline & publishing"]
+            description: >
+              Excusing a late supply no longer stops a dataset showing "Two
+              files, choose one". Only rejecting the pair, or a later supply
+              replacing it, ends that now.
   - date: "2026-10-12"
     summary: >
       Rebuilding the whole history takes half as long, and failing Child

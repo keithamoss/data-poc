@@ -256,6 +256,26 @@ class TestSevenOfTheEightReallyWork:
             conn, supply_db.STAGING_SCHEMA, [dataset.table], arrival=key).get(dataset.table)
         assert staged == [], "both files of the rejected pair are still in staging"
 
+    def test_promoting_a_contested_pair_is_refused_naming_choose_file(
+            self, conn, dataset, actor, periods):
+        """A defect, 2026-10-13 (found surveying REQ-PIPE-193): promote is
+        offered on a contested pair's `#1`, and the staged-table lookup
+        returns BOTH files, so a person's promote put two versions of one
+        table into the period (REQ-PIPE-128: exactly one version, always).
+        Until the pair is settled, promoting it is refused, naming what can
+        be done today."""
+        first, _ = periods
+        key = uuid.uuid4().hex[:10]
+        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
+        for physical in (f"{dataset.table}__{key}__1", f"{dataset.table}__{key}__2"):
+            conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+
+        with pytest.raises(dl.DecisionRefused, match="contested pair.*Reject the pair"):
+            fd.apply(_request(dataset, actor, fd.PROMOTE, period=first,
+                              supply=f"{dataset.dataset_id}@{key}#1"),
+                     effective_at=WHEN, conn=conn)
+        assert dl.promoted_into(conn, dataset.dataset_id, first) is None
+
     def test_substitute_then_de_substitute(self, conn, dataset, actor, periods):
         first, second = periods
         supply, _ = _stage(conn, dataset)

@@ -719,6 +719,29 @@ def _refuse_promoting_what_never_loaded(conn, request: Request) -> None:
                 f"Nothing was recorded.")
 
 
+def _refuse_promoting_a_contested_pair(conn, request: Request) -> None:
+    """REQ-PIPE-128 (exactly one version of each table in a period): a
+    supply whose table still has two staged versions - a contested pair -
+    is not promoted on any route, because promotion would move both and the
+    period would hold two versions of one table (2026-10-13: it did, and
+    the second collided on the base name). Refused before anything is
+    written, naming what can be done today."""
+    if request.operation != PROMOTE or "@" not in (request.supply or ""):
+        return
+    try:
+        table = hierarchy.dataset(request.dataset_id).table
+    except hierarchy.UnknownDatasetError:
+        return
+    staged = _staged(conn, table, request.supply)
+    if len(staged) > 1:
+        raise decision_log.DecisionRefused(
+            f"{request.supply} is a contested pair: two files claim {table} "
+            f"({', '.join(staged)}) and nothing says which is the supply, so promoting "
+            f"it would put two versions of one table into {request.period}. Reject the "
+            f"pair and ask the supplier to resend; choosing one file is not built yet "
+            f"(REQ-PIPE-193). Nothing was recorded.")
+
+
 def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     """Raise one filing decision, from whichever route.
 
@@ -775,6 +798,7 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         _confirmation(request)
 
     _refuse_promoting_what_never_loaded(conn, request)
+    _refuse_promoting_a_contested_pair(conn, request)
     already = _already(conn, request)
     if already is not None:
         return Outcome(operation=request.operation, dataset_id=request.dataset_id,

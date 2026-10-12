@@ -134,6 +134,32 @@ class TestOpenFromTheReceiptInstant:
         assert not [i for i in outstanding.survey(clean).items
                     if i.kind == outstanding.CONTESTED_TABLE]
 
+    def test_a_decision_that_settles_nothing_leaves_the_contest_open(self, clean):
+        """A defect, 2026-10-13 (REQ-PIPE-194 criterion 7, found scoping it):
+        ANY person decision about the arrival closed the contest - so an
+        excused lateness, which says nothing about which file is the
+        supply, made the dataset stop reading contested. Only a settlement,
+        a rejection of the pair or a supersession ends it.
+
+        The row is written as the log holds it, not through apply_decision:
+        what is under test is how the blocker READS the log, and the
+        decision's own preconditions (a late verdict to excuse) are another
+        requirement's and would only hide the reading behind setup."""
+        from qa_tools.common import decision_log
+
+        _pair()
+        decided = RECEIVED + timedelta(days=2)
+        clean.execute(
+            "INSERT INTO qa.decision (agency_id, collection_id, dataset_id, action, supply, "
+            "to_slot, actor, actor_kind, reason, effective_at) "
+            "VALUES ('a', 'c', ?, ?, ?, '2030-Q1', 'person@example.com', ?, "
+            "'not about which file', ?)",
+            [DATASET, decision_log.EXCUSE_LATENESS, f"{DATASET}@{_key()}#1",
+             decision_log.PERSON, decided.isoformat()])
+        (blocker,) = dataset_blockers.all_blockers(clean)
+        assert blocker.open_at(decided + timedelta(days=1)), (
+            "an excused lateness closed the contest")
+
     def test_the_whole_life_reaches_the_built_record(self, clean):
         _pair()
         record = outstanding.survey(clean).as_record()

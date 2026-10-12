@@ -8016,3 +8016,37 @@ twice. It deliberately did not re-find the `TypeError`.
       WHAT ends a contest is draft REQ-PIPE-194 criterion 5 (unsigned), so it
       waits for Keith's sign-off rather than being decided here.
 
+
+160. **[done, 2026-10-13]** **[Pipeline & publishing]** **Two defects in
+    built contested-pair handling, found surveying the code for
+    REQ-PIPE-193 before it went back to the architect and UX reviewers.**
+    Not a critic's finding - a read-only survey of every contested-pair
+    path - but written up here because both are defects in shipped code,
+    each fixed with a failing test first. Minor under the 2026-09-25 rule:
+    each restores behaviour a signed requirement already states.
+    - **A person could promote a contested pair, putting two versions of
+      one table into a period.** Promote was offered on a pair's `#1`, and
+      the staged-table lookup returns BOTH files, so promotion moved both;
+      the second collided on the base name ("relation already exists").
+      REQ-PIPE-128 says a period holds exactly one version of each table.
+      Fixed: `filing_decisions._refuse_promoting_a_contested_pair` refuses
+      on any route while two versions are staged, naming what can be done
+      today (reject the pair; choosing one file is REQ-PIPE-193, not
+      built). Test: tests/test_filing_decisions.py
+      `test_promoting_a_contested_pair_is_refused_naming_choose_file`.
+      STILL OPEN, deliberately: the TUI still OFFERS promote on a contested
+      pair (filing_queue.operations_for) and the refusal then explains -
+      left for REQ-PIPE-193/194's UX review rather than patched now.
+    - **Any person decision closed a contest** - an excused lateness made a
+      dataset stop reading "Two files, choose one" though nothing about the
+      files had been settled (REQ-PIPE-194 criterion 7's suspicion,
+      confirmed). Fixed: `dataset_blockers._decided_keys` counts only a
+      rejection of the pair or its supersession; choosing a file joins them
+      when REQ-PIPE-193 is built. Test: tests/test_dataset_blockers.py
+      `test_a_decision_that_settles_nothing_leaves_the_contest_open`.
+    Also found, NOT fixed (each belongs to 193/194's scope, so it goes to
+    the reviewers with them): knock_on treats any `#` supply as contested
+    forever; scripted decisions resolve a contested pair to `ds@key`
+    rather than its filed `ds@key#1`; slot_state's HELD branch and its
+    "which file is the supply?" text are unreachable; the GitHub decision
+    handler has no caller outside tests.

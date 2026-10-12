@@ -136,10 +136,16 @@ def _arrival_of(supply: str) -> str:
     return supply_holds.arrival_key_of(supply)
 
 
+#: The decisions that end a contest. Choosing one file joins them when
+#: REQ-PIPE-193 is built.
+_SETTLES_A_CONTEST = frozenset({"reject", "supersede"})
+
+
 def _decided_keys(db) -> dict[tuple[str, str], str]:
-    """(dataset, arrival key) -> the earliest instant a person's decision
-    about that arrival's supply took effect. A refusal the rule recorded
-    is not a choice between files, so it does not count."""
+    """(dataset, arrival key) -> the earliest instant a decision that
+    settles which file is the supply took effect - a rejection of the pair
+    or its supersession. A refusal the rule recorded, an acknowledgement or
+    an excused lateness says nothing about the files, so none counts."""
     from qa_tools.common import decision_log
 
     out: dict[tuple[str, str], str] = {}
@@ -150,6 +156,11 @@ def _decided_keys(db) -> dict[tuple[str, str], str]:
         # mark that a period was not supplied (REQ-PIPE-132) - so it
         # decides nothing about any arrival's files.
         if action in decision_log.RECORDS_A_REFUSAL or not supply:
+            continue
+        # ONLY A DECISION THAT SETTLES WHICH FILE IS THE SUPPLY ends a
+        # contest (REQ-PIPE-194 criterion 7; 2026-10-13 - an excused
+        # lateness closed it): rejecting the pair, or its supersession.
+        if action not in _SETTLES_A_CONTEST:
             continue
         out.setdefault((dataset_id, _arrival_of(supply)), _iso(effective_at))
     return out
