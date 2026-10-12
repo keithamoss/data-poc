@@ -239,6 +239,11 @@ def _check_id_for(node: dict) -> str | None:
     results loop below makes."""
     meta = node.get("test_metadata")
     table = _table_for_test(node)
+    # ONLY THIS COLLECTION'S NODES (critic F4, 2026-10-12): a singular test
+    # outside Child Protection's own business rules is another collection's,
+    # and its (None, None, name) key would otherwise find its check id.
+    if table is None:
+        return None
     return _CHECK_ID_LOOKUP.get((f"stg_{table}" if meta else None,
                                  node["column_name"] if meta else None,
                                  meta["name"] if meta else node["name"]))

@@ -299,6 +299,12 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     except Exception as exc:  # noqa: BLE001 - criterion 8: reported, left owed
         message = f"{type(exc).__name__}: {exc}"
         fail(item.id, message)
+        # A MISSING CHECK STOPS EVERYTHING, as in an arrival's run (REQ-PIPE-188
+        # criterion 6; Keith, 2026-10-12) - left owed AND raised.
+        from qa_tools.common import asked_for
+
+        if isinstance(exc, asked_for.MissingCheck):
+            raise
         return Outcome(item.id, run_key, False,
                        f"the re-check of {item.supply_id} did not complete ({message}); its "
                        f"earlier verdict stands and the re-check is still owed")

@@ -187,8 +187,10 @@ def _scope_to_run(verified: list[dict], run_id: str) -> None:
     11; Keith's call 2026-10-02, "own + readers").
 
     One file is one arrival, and its run reads the whole period through
-    the overlay - so the tools evaluate every sibling's checks too. Those
-    are about supplies other runs already checked, and recording them
+    the overlay - so a tool asked for the whole collection evaluates every
+    sibling's checks too (since REQ-PIPE-188 to 191 the scoped tools are
+    asked only for this run's scope, and this filter stays as the backstop,
+    criterion 7). Those are about supplies other runs already checked, and recording them
     here would QA each supply once per sibling: six copies per Child
     Protection delivery, under six run ids. What a run records is:
 

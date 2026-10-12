@@ -32317,12 +32317,18 @@ requirements:
     linked_tests:
       - tests/test_asked_for.py
       - tests/test_orchestrate_reference_run.py
+      - tests/test_knock_on.py
+      - tests/test_recheck.py
     implemented_by:
       - qa_tools/common/asked_for.py::ask
       - qa_tools/common/asked_for.py::check_nothing_missing
       - qa_tools/common/qa_store.py::record_asked
       - qa_tools/cp/orchestrate_cp.py::_run_one_inner
       - qa_tools/bdm/orchestrate_bdm.py::_run_one_inner
+      - qa_tools/common/knock_on.py::complete
+      - qa_tools/common/recheck.py::_run_claimed
+      - qa_tools/cp/orchestrate_cp.py::_excusing_unreadable
+      - qa_tools/common/qa_store.py::asked_for_run
     evidence:
       - "2026-10-12: tests/test_asked_for.py - the asked-for set comes from scope_of_run (c1), the whole collection for a run naming no table (c4), a missing in-scope check refuses naming check and tool (c6), one row per run, tool and check in qa.asked_check at schema 38, removed with its run (c8, c9), and Birth Registrations through all four real tools records what it was asked and refuses a dropped check (c10)."
       - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c11)"
@@ -32351,6 +32357,9 @@ requirements:
       - "NOTHING ASKED RUNS NOTHING: an empty ask (possible for a readers-only run) records the tool's raw output as {asked: []} and invokes nothing, because dbt with no --select builds the whole project."
       - "FOUND BY THE GUARD'S OWN PREMISE (2026-10-12): an invalid contract made datacontract-cli return zero checks without raising, so the runner recorded nothing. Before this guard that read as a pass; now it refuses the run."
       - "DECISION IDS ARE NOT DETERMINISTIC between two bootstraps, found proving c11: the two collections run in parallel processes and qa.decision's serial follows their interleaving. Recorded with plans/running-thoughts.md #85's receipt_sequence as the same class; the comparison reads an id as the decision it names."
+      - "A MISSING CHECK STOPS EVERYTHING IN A RE-CHECK TOO (Keith, 2026-10-12, 'stop everything'; post-build-review #158 F1): knock_on.complete and recheck._run_claimed used to catch it with every other failure, leave the item owed and carry on. Now it is left owed AND re-raised, so a batch stops. The processing pass still catches per stage by design (REQ-PIPE-152), where it fails the owed-work stage exactly as an arrival's own refusal fails its stage. REJECTED keeping it as a re-check left owed while the batch carried on."
+      - "A RUN WITH NO PERIOD IS GUARDED TOO (Keith, 2026-10-12, #158 F2). It records no not-evaluated rows, so there the guard excuses a check that reads a table the run cannot read, or one a tool said it left out. REJECTED accepting the gap and writing it into criterion 6."
+      - "AN EMPTY ASK IS ON RECORD (Keith, 2026-10-12, a marker row; #158 F3): qa.asked_tool holds one row per run and tool invoked, and qa.asked_check hangs off it - schema 39, so every database rebuilds once more. REJECTED leaving qa.tool_output's {asked: []} as the only record, which made 'no rows' mean two things."
     open_questions: []
 
   - id: REQ-PIPE-189
@@ -32396,6 +32405,7 @@ requirements:
       - "SELECTED BY TEST NODE NAME, from a parsed manifest through _check_id_for (NFR 1): `+<test>` lets dbt's graph pick the models, and --indirect-selection empty stops it running every other test on them (c2). REJECTED selecting by `config.meta.check_id`, which works for generic tests but not for the singular tests, whose meta lives only in this project's own lookup."
       - "PARSED ONCE PER PROCESS, keyed on the content of every file dbt reads, through the long-lived worker and the same environment as every build - so the build after it reuses that partial parse (c5)."
       - "BIRTH REGISTRATIONS GAINED ITS OWN _check_id_for: its results loop assumed every generic test sat on its one model, which a whole-project manifest breaks."
+      - "EACH COLLECTION CLAIMS ONLY ITS OWN NODES (#158 F4): Child Protection's _check_id_for looked singular tests up by name alone and claimed two of Birth Registrations'. A node with no Child Protection table is now not Child Protection's."
     open_questions: []
 
   - id: REQ-PIPE-190

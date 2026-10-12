@@ -192,6 +192,15 @@ def complete(item, *, run_by: str | None = None, on_step=None):
     except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
         message = f"{type(exc).__name__}: {exc}"
         recheck.fail(item.id, message)
+        # A MISSING CHECK STOPS EVERYTHING, here as in an arrival's run
+        # (REQ-PIPE-188 criterion 6; Keith, 2026-10-12, "stop everything"): it
+        # is a defect in what the tools were asked for, not a run that broke,
+        # so it is left owed AND it stops the batch rather than waiting for
+        # the next pass to fail the same way.
+        from qa_tools.common import asked_for
+
+        if isinstance(exc, asked_for.MissingCheck):
+            raise
         return recheck.Outcome(item.id, last_key, False,
                                f"the re-evaluation of {period}'s readers did not complete "
                                f"({message}); waiting supplies keep their earlier verdicts "

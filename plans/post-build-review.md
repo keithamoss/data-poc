@@ -7847,3 +7847,51 @@ twice. It deliberately did not re-find the `TypeError`.
     - **Code quality:** `target_agreement.py` uses private helpers of
       promotion and qa_results_reader, and `responsible()` repeats
       `status_of`'s per-record mapping.
+
+158. **[done, 2026-10-12]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **The delivery critic on REQ-PIPE-188 to 191 (26f1f8f).** Run after the
+     push. No defect changed a recorded verdict: the critic cross-checked every
+     declared check against what each tool can select (0 mismatches across both
+     collections and all three scoped tools) and read the real database
+     read-only (readers-only runs asked for 1-2 checks a tool). Three findings
+     were Keith's, the rest fixed without sign-off; each defect fix has a test
+     that failed first.
+    - **F1 (medium, Keith's call):** a missing check inside a knock-on
+      (readers-only) re-evaluation was caught by `knock_on.complete`'s
+      catch-all, left owed and retried while the batch carried on - against
+      criterion 6's "refuse the run and stop the batch". Keith: stop
+      everything. FIXED in `knock_on.complete` AND, found checking the
+      callers, in `recheck._run_claimed`'s full re-check, which had the same
+      catch-all: left owed, then `MissingCheck` re-raised. The processing
+      pass still catches per stage by design (REQ-PIPE-152, "reported, left
+      owed"), so there it fails the owed-work stage, as an arrival's own
+      refusal already did. Criterion 6's wording stands as signed.
+    - **F2 (low-medium, Keith's call):** a Child Protection run whose supply
+      has no period was asked for a scoped subset but never guarded. Latent:
+      all 9 such runs had an unreadable own table. Keith: guard them too.
+      FIXED: guarded wherever the tools ran; with no period there are no
+      not-evaluated rows, so a check reading an unreadable table, or one a
+      tool said it left out, is excused (`orchestrate_cp._excusing_unreadable`).
+    - **F3 (low, Keith's call):** an empty ask left no row in
+      `qa.asked_check`, so "no rows" could mean either "not invoked" or "asked
+      for nothing", against criterion 8. Keith: a marker row. FIXED:
+      `qa.asked_tool`, one row per run and tool invoked, with `asked_check`
+      hanging off it; schema 39, so every database rebuilds once more.
+    - **F4 (low):** Child Protection's `_check_id_for` claimed two Birth
+      Registrations singular tests, against `names_by_check_id`'s contract.
+      Harmless today (selection only looks up Child Protection ids). FIXED: a
+      node with no Child Protection table is not Child Protection's.
+    - **F5 (low, test quality):** a test asserting `SCHEMA_VERSION == 38`
+      (red the moment work succeeds, CLAUDE.md's rule 4) - removed with the
+      bump; two constant-only tests and one that could not fail on its own -
+      deleted; a leftover debug print loop - removed; the scoped path end to
+      end through the orchestrator - now asserted (the no-period test drives
+      a table-named run and checks each scoped tool was asked for a strict
+      part of the collection); Birth Registrations' three empty-ask branches
+      - now tested. NOT DONE: proving dbt's own builds reuse the partial
+      parse, which `--quiet` hides; the timing evidence stands for it.
+    - **Also fixed:** three stale comments (asked_for's SCOPED note,
+      run_datacontract_cp's "cannot be asked", `_scope_to_run`'s docstring).
+    - **Noted, not changed:** `contract_rule_models` re-parses the contract
+      each run (~23ms) - small against the saving; and the debug runners get
+      the asked-for record but no guard, since they are not runs.

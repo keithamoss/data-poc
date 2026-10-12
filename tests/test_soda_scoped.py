@@ -103,11 +103,7 @@ class TestTheSameVerdicts:
         in_scope = qa_results_writer.scope_of_run(run_id)
         want = {r["check_id"]: r for r in whole if in_scope(r["check_id"])}
         assert want
-        got = {r["check_id"]: r for r in scoped}
-        for k in want:
-            if got.get(k) != want[k]:
-                print("DIFF", k, {f: (want[k].get(f), got.get(k, {}).get(f)) for f in set(want[k]) | set(got.get(k, {})) if want[k].get(f) != got.get(k, {}).get(f)})
-        assert got == want
+        assert {r["check_id"]: r for r in scoped} == want
 
     def test_birth_registrations(self, _quiet, monkeypatch):
         import qa_tools.bdm.run_soda_bdm as bdm

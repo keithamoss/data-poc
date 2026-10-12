@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 38
+SCHEMA_VERSION = 39
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -333,11 +333,21 @@ CREATE INDEX IF NOT EXISTS tables_read_logical
 -- means it was not recorded rather than that nothing was asked for.
 -- ROWS rather than an array on tool_output, so "which runs were asked for
 -- check X" is one indexed query. Check ids only - never a supply value.
-CREATE TABLE IF NOT EXISTS "{SCHEMA}".asked_check (
+-- ONE ROW PER TOOL INVOKED, even when it was asked for nothing (critic F3,
+-- Keith 2026-10-12): an empty ask is then on record as an ask, and a run and
+-- tool with no row here always means it was not recorded.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".asked_tool (
     run_key  text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
     tool     text NOT NULL,
+    PRIMARY KEY (run_key, tool)
+);
+
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".asked_check (
+    run_key  text NOT NULL,
+    tool     text NOT NULL,
     check_id text NOT NULL,
-    PRIMARY KEY (run_key, tool, check_id)
+    PRIMARY KEY (run_key, tool, check_id),
+    FOREIGN KEY (run_key, tool) REFERENCES "{SCHEMA}".asked_tool ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS asked_check_by_check
@@ -1910,9 +1920,12 @@ def tables_read_for_run(conn: supply_db.SupplyConnection, run_key: str) -> dict[
 def record_asked(conn: supply_db.SupplyConnection, run_key: str, tool: str,
                  check_ids: Iterable[str]) -> None:
     """Record what `tool` was asked to evaluate on `run_key`, replacing what
-    was recorded for that run and tool before (REQ-PIPE-188)."""
+    was recorded for that run and tool before (REQ-PIPE-188). The tool's own
+    row is written even for an empty ask."""
     conn.execute(f'DELETE FROM "{SCHEMA}".asked_check WHERE run_key = ? AND tool = ?',
                  [run_key, tool])
+    conn.execute(f'INSERT INTO "{SCHEMA}".asked_tool (run_key, tool) VALUES (?, ?) '
+                 "ON CONFLICT DO NOTHING", [run_key, tool])
     ids = sorted(set(check_ids))
     if ids:
         conn.execute(
@@ -1921,12 +1934,16 @@ def record_asked(conn: supply_db.SupplyConnection, run_key: str, tool: str,
 
 
 def asked_for_run(conn: supply_db.SupplyConnection, run_key: str) -> dict[str, list[str]]:
-    """tool -> the sorted check ids it was asked for on `run_key`."""
+    """tool -> the sorted check ids it was asked for on `run_key`, an empty
+    list for a tool asked for nothing."""
     out: dict[str, list[str]] = {}
     for tool, check in conn.execute(
-            f'SELECT tool, check_id FROM "{SCHEMA}".asked_check WHERE run_key = ? '
-            "ORDER BY tool, check_id", [run_key]).fetchall():
-        out.setdefault(tool, []).append(check)
+            f'SELECT t.tool, c.check_id FROM "{SCHEMA}".asked_tool t '
+            f'LEFT JOIN "{SCHEMA}".asked_check c USING (run_key, tool) '
+            "WHERE t.run_key = ? ORDER BY t.tool, c.check_id", [run_key]).fetchall():
+        out.setdefault(tool, [])
+        if check is not None:
+            out[tool].append(check)
     return out
 
 

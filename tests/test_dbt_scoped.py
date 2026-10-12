@@ -67,6 +67,18 @@ class TestTheSelection:
         names = mod.test_names_by_check_id()
         assert set(asked_for.collection_checks(collection, "dbt")) <= set(names)
 
+    def test_each_collection_claims_only_its_own_tests(self):
+        """Critic F4: Child Protection's lookup claimed two Birth Registrations
+        singular tests, which names_by_check_id's contract says it must not."""
+        import qa_tools.bdm.run_dbt_bdm as bdm
+
+        cp = run_dbt_cp.test_names_by_check_id()
+        br = bdm.test_names_by_check_id()
+        assert cp and br
+        assert all(".child-protection." in c for c in cp), sorted(
+            c for c in cp if ".child-protection." not in c)
+        assert all(".civil-registration." in c for c in br)
+
     def test_the_project_is_parsed_once_while_it_is_unchanged(self, monkeypatch):
         """Criterion 5: the worker's partial parse is kept, and the lookup
         is not paid per run."""

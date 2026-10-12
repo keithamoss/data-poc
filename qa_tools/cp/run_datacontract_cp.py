@@ -121,12 +121,13 @@ def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
             continue
         # A RULE OVER A TABLE THIS RUN CANNOT READ WAS NOT RUN, and is
         # left out rather than recorded (2026-10-02). datacontract-cli
-        # runs the whole contract whatever the schema holds, so such a
-        # rule comes back `failed` - a FALSE RED, about our own timing
-        # rather than the data, now that one file is one arrival and a
-        # sibling can be absent (REQ-PIPE-105). dbt and Soda leave the
-        # same checks out before running; this tool cannot be asked to,
-        # so it is done here, against the same declaration they use.
+        # runs every rule it is asked for whatever the schema holds, so
+        # such a rule comes back `failed` - a FALSE RED, about our own
+        # timing rather than the data, now that one file is one arrival
+        # and a sibling can be absent (REQ-PIPE-105). dbt and Soda leave
+        # the same checks out before running; here it is done after,
+        # against the same declaration they use, because the rules a run
+        # asks for (REQ-PIPE-190) are its scope, not what it can read.
         if table in unreadable or unreadable & set(
                 declared.get(check_id_from_quality_definition(c.qualityDefinition), ())):
             # SAID, so the run can reconcile it (REQ-PIPE-115 criterion 17).

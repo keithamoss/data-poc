@@ -132,6 +132,22 @@ class TestWhatIsOwed:
             (still,) = [o for o in recheck.owed(conn, DATASET) if o.id == owed_id]
             assert still.last_failure and "fell over" in still.last_failure
 
+    def test_a_check_gone_missing_stops_everything(self, owed_one, monkeypatch):
+        """REQ-PIPE-188 criterion 6 for a re-check too (Keith, 2026-10-12, 'stop
+        everything'): left owed, AND raised so the batch stops."""
+        from qa_tools.common import asked_for
+        from qa_tools.cp import orchestrate_cp
+
+        def missing(*a, **k):
+            raise asked_for.MissingCheck("a check went missing")
+        monkeypatch.setattr(orchestrate_cp, "_run_one", missing)
+        owed_id, _ = owed_one
+        with pytest.raises(asked_for.MissingCheck):
+            recheck.run(owed_id, run_by="pytest@example.org")
+        with supply_db.connect(label="test-recheck") as conn:
+            (still,) = [o for o in recheck.owed(conn, DATASET) if o.id == owed_id]
+            assert still.last_failure and "went missing" in still.last_failure
+
 
 class TestOnlyFromTheOrchestratorPath:
     """Criterion 6: nothing on a read-committed-history path imports it."""

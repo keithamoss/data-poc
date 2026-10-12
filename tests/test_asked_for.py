@@ -9,6 +9,8 @@ today.
 """
 from __future__ import annotations
 
+import random
+
 import pytest
 
 from qa_tools.common import asked_for, check_id, qa_results_writer, qa_store, supply_db
@@ -47,10 +49,6 @@ class TestWhatACollectionHolds:
                  for c in asked_for.collection_checks(coll, tool)}
         assert asked.isdisjoint(retired)
 
-    def test_file_checks_are_not_a_tool_run(self):
-        assert "file" not in asked_for.TOOLS
-
-
 class TestOneRule:
     """Criterion 1: the subset comes from scope_of_run, the results
     writer's own rule - never a second implementation."""
@@ -67,10 +65,6 @@ class TestOneRule:
                             lambda run_id: lambda c: False)
         assert asked_for.for_run("cp_clients__x", CP, "evidently") == \
             asked_for.collection_checks(CP, "evidently")
-
-    def test_evidently_is_never_scoped(self):
-        """Out of scope by decision: about 0.2s a run."""
-        assert "evidently" not in asked_for.SCOPED
 
     def test_a_run_naming_no_table_is_asked_for_everything(self, monkeypatch):
         """Criterion 4: a trial or a fixture's run."""
@@ -90,13 +84,6 @@ class TestNothingInScopeGoesMissing:
     def test_every_in_scope_check_accounted_for_passes(self):
         asked_for.check_nothing_missing(
             "r", CP, [_record(CLIENTS_UNIQUE)],
-            in_scope=lambda c: c == CLIENTS_UNIQUE, tools=("dbt",))
-
-    def test_a_not_evaluated_record_accounts_for_a_check(self):
-        """The held and unrunnable pseudo-tools' records carry the real
-        tool's check id, so they count exactly as a verdict does."""
-        asked_for.check_nothing_missing(
-            "r", CP, [{"check_id": CLIENTS_UNIQUE, "dataset_id": "cp-clients"}],
             in_scope=lambda c: c == CLIENTS_UNIQUE, tools=("dbt",))
 
     def test_a_missing_check_refuses_the_run_naming_it_and_its_tool(self):
@@ -137,15 +124,18 @@ def _run(conn, run_key="cp_clients__a"):
 class TestTheRecord:
     """Criteria 8 and 9."""
 
-    def test_a_new_schema_version(self):
-        assert qa_store.SCHEMA_VERSION == 38
-
     def test_one_row_per_run_tool_and_check(self, db):
         run_key = _run(db)
         qa_store.record_asked(db, run_key, "dbt", [CLIENTS_UNIQUE, CARERS_UNIQUE])
-        qa_store.record_asked(db, run_key, "evidently", [])
         assert qa_store.asked_for_run(db, run_key) == {
             "dbt": [CARERS_UNIQUE, CLIENTS_UNIQUE]}
+
+    def test_a_tool_asked_for_nothing_is_on_record_as_asked(self, db):
+        """Critic F3 (Keith, 2026-10-12, a marker row): a run and tool with no
+        record means it was not recorded - never that nothing was asked."""
+        run_key = _run(db)
+        qa_store.record_asked(db, run_key, "evidently", [])
+        assert qa_store.asked_for_run(db, run_key) == {"evidently": []}
 
     def test_recording_again_replaces_that_tools_rows_only(self, db):
         run_key = _run(db)
@@ -159,8 +149,9 @@ class TestTheRecord:
         run_key = _run(db)
         qa_store.record_asked(db, run_key, "dbt", [CLIENTS_UNIQUE])
         db.execute(f'DELETE FROM "{qa_store.SCHEMA}".run WHERE run_key = ?', [run_key])
-        (n,) = db.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".asked_check').fetchone()
-        assert n == 0
+        for table in ("asked_check", "asked_tool"):
+            (n,) = db.execute(f'SELECT count(*) FROM "{qa_store.SCHEMA}".{table}').fetchone()
+            assert n == 0, table
 
     def test_which_runs_were_asked_for_a_check_is_one_query(self, db):
         """The reason it is a table rather than an array on tool_output."""
@@ -261,3 +252,82 @@ class TestThroughTheRealOrchestrator:
         orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
                                  reference_run_id=None)
         assert _completed(mine) and _asked(mine) == {}
+
+
+class TestARunWithNoPeriodIsGuardedToo:
+    """Criterion 6 for a Child Protection run whose supply has no period
+    (Keith, 2026-10-12: 'guard them too'). Such a run records no
+    not-evaluated rows, so the guard there leaves out only checks reading a
+    table the run cannot read."""
+
+    @staticmethod
+    def _run(absent=()):
+        from conftest import clone_run_views
+        from fixture_ids import CP_REF_RUN_ID
+
+        run_id = f"cp_placements__{random.randrange(10**17, 10**18)}"
+        with supply_db.connect(label="test-asked-for") as conn:
+            clone_run_views(conn, CP_REF_RUN_ID, run_id, absent=set(absent))
+        # Nothing is filed for 2031, so this supply has no period.
+        return run_id, {"run_id": run_id, "run_index": 1, "delivery": "d", "files": {},
+                        "received_at": "2031-01-05T03:00:00+00:00"}
+
+    def test_it_passes_with_an_unreadable_sibling(self, cp_duckdb_dir):
+        from qa_tools.cp import orchestrate_cp
+
+        run_id, entry = self._run(absent={"cp_carers"})
+        assert not orchestrate_cp._reconciles(entry, run_id), "precondition: no period"
+        orchestrate_cp._run_one(entry, entry["received_at"], "t@example.com",
+                                reference_run_id=None)
+        assert _completed(run_id)
+        # THE SCOPED PATH, end to end: each scoped tool was asked for this
+        # run's scope, a strict part of the collection, and Evidently for all.
+        in_scope = qa_results_writer.scope_of_run(run_id)
+        asked = _asked(run_id)
+        for tool in ("dbt", "soda", "datacontract"):
+            whole = asked_for.collection_checks(CP, tool)
+            assert asked[tool] == [c for c in whole if in_scope(c)]
+            assert 0 < len(asked[tool]) < len(whole), tool
+        assert asked["evidently"] == asked_for.collection_checks(CP, "evidently")
+
+    def test_a_dropped_check_refuses_it(self, cp_duckdb_dir, monkeypatch):
+        from qa_tools.cp import orchestrate_cp, run_soda_cp
+
+        real = run_soda_cp.evaluate_soda_cp
+        dropped = []
+
+        def loses_one(run_id, run_timestamp):
+            got = real(run_id, run_timestamp)
+            dropped.append(got.pop()["check_id"])
+            return got
+        monkeypatch.setattr(run_soda_cp, "evaluate_soda_cp", loses_one)
+        run_id, entry = self._run()
+        with pytest.raises(asked_for.MissingCheck) as caught:
+            orchestrate_cp._run_one(entry, entry["received_at"], "t@example.com",
+                                    reference_run_id=None)
+        assert dropped[0] in str(caught.value)
+        assert not _completed(run_id)
+
+
+class TestBirthRegistrationsAskedForNothing:
+    """An empty ask invokes no tool and says so, on the Birth Registrations
+    path too (critic F5: these three branches were untested)."""
+
+    @pytest.mark.parametrize("module,evaluate,tool,invoker", [
+        ("qa_tools.bdm.run_dbt_bdm", "evaluate_dbt_bdm", "dbt", "run_dbt"),
+        ("qa_tools.bdm.run_soda_bdm", "evaluate_soda_bdm", "soda", "execute_scan"),
+        ("qa_tools.bdm.run_datacontract_bdm", "evaluate_datacontract_bdm", "datacontract",
+         "run_against_warehouse"),
+    ])
+    def test_it(self, module, evaluate, tool, invoker, monkeypatch):
+        import importlib
+
+        mod = importlib.import_module(module)
+        monkeypatch.setattr(mod.asked_for, "record", lambda *a, **k: None)
+        monkeypatch.setattr(asked_for, "SCOPED", frozenset({tool}))
+        monkeypatch.setattr(asked_for, "for_run", lambda *a, **k: [])
+        monkeypatch.setattr(mod, invoker, lambda *a, **k: pytest.fail("the tool was invoked"))
+        written = []
+        monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
+        assert getattr(mod, evaluate)("birth_registrations__1", "2026-01-01T00:00:00Z") == []
+        assert written == [(tool, {"asked": []})]

@@ -92,6 +92,8 @@ class TestTheRun:
         monkeypatch.setattr(recheck, "mint_run_id", lambda *a, **k: "r__1")
 
         def execute(**kw):
+            if isinstance(boom, Exception):
+                raise boom
             if boom:
                 raise RuntimeError("tools fell over")
             ran.append(kw)
@@ -148,6 +150,21 @@ class TestTheRun:
         out = knock_on.complete(FakeItem())
         assert not out.completed and failed and cleared == [] and gated == []
         assert "still owed" in out.message
+
+    def test_a_check_gone_missing_stops_everything(self, monkeypatch, conn):
+        """REQ-PIPE-188 criterion 6 as signed, for a readers-only run too (Keith,
+        2026-10-12, 'stop everything'): a missing check is a defect in what the
+        tools were asked for, so it is never just another re-check left owed
+        while the batch carries on. It stays owed AND it stops the batch."""
+        from qa_tools.common import asked_for
+
+        rs = [knock_on.Reader("cp-placements", "cp-placements@1", True, {"cp_carers"}, True)]
+        missing = asked_for.MissingCheck("r__1: soda: a.b.c.d.x_soda")
+        _r, gated, cleared, failed, _s = self._wire(monkeypatch, rs, boom=missing)
+        with pytest.raises(asked_for.MissingCheck):
+            knock_on.complete(FakeItem())
+        assert failed and "MissingCheck" in failed[0], "it must still be recorded as owed"
+        assert cleared == [] and gated == []
 
 
 class TestTheShoutIsOneRecordNamingTheCause:

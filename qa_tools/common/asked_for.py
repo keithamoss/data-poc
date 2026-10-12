@@ -38,8 +38,8 @@ from collections.abc import Callable, Iterable
 TOOLS = ("dbt", "soda", "datacontract", "evidently")
 
 #: The tools whose runner asks for the run's scope rather than the whole
-#: collection: dbt since REQ-PIPE-189; datacontract-cli (190) and Soda
-#: (191) join as they are built. Evidently stays out by decision.
+#: collection: dbt (REQ-PIPE-189), datacontract-cli (190) and Soda (191).
+#: Evidently stays out by decision.
 SCOPED: frozenset[str] = frozenset({"dbt", "datacontract", "soda"})
 
 

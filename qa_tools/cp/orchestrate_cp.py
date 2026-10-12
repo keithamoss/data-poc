@@ -291,20 +291,23 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # output, so a later reader can see what was compared rather than
     # only that it agreed. Nothing is written where nothing was left out.
     noted = left_out.take(run_id)
-    if _reconciles(entry, run_id):
-        in_scope = scope_of_run(run_id)
+    in_scope = scope_of_run(run_id)
+    reconciles = _reconciles(entry, run_id)
+    if reconciles:
         compared = left_out.reconcile(run_id, noted, [*blast, *missing], in_scope)
         if compared:
             write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
                              run_timestamp, left_out.TOOL, {"left_out": compared})
-        # AND NOTHING IN SCOPE WENT MISSING ALTOGETHER (REQ-PIPE-188
-        # criterion 6) - see asked_for.py. The reconciliation above
-        # compares what a tool SAID it left out; a tool asked for the wrong
-        # subset says nothing, so every in-scope check must have a verdict
-        # or a not-evaluated record. Only where the tools ran.
-        if readable:
-            asked_for.check_nothing_missing(run_id, cp_common.COLLECTION_ID,
-                                            results, in_scope)
+    # AND NOTHING IN SCOPE WENT MISSING ALTOGETHER (REQ-PIPE-188 criterion
+    # 6) - see asked_for.py. The reconciliation above compares what a tool
+    # SAID it left out; a tool asked for the wrong subset says nothing, so
+    # every in-scope check must have a verdict or a not-evaluated record.
+    # Wherever the tools ran - a run with no period too (Keith, 2026-10-12),
+    # which records no not-evaluated rows, so there a check reading a table
+    # the run cannot read, or one a tool said it left out, is excused.
+    if readable:
+        guarded = in_scope if reconciles else _excusing_unreadable(in_scope, resolution, noted)
+        asked_for.check_nothing_missing(run_id, cp_common.COLLECTION_ID, results, guarded)
     # run_by stamped only on this write - see orchestrate_bdm.py's
     # identical comment.
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,
@@ -326,6 +329,21 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # finished one.
     finish_run(run_id)
     return results
+
+
+def _excusing_unreadable(in_scope, resolution, noted: dict[str, set[str]]):
+    """`in_scope`, less the checks a run with no period has no record for:
+    those reading a table it cannot read, and those a tool said it left out."""
+    from qa_tools.common import tables_read
+
+    gone = set(resolution.absent) | set(resolution.ambiguous) | set(resolution.held)
+    reads = tables_read.declared_reads()
+    left = set().union(*noted.values()) if noted else set()
+
+    def guarded(check: str) -> bool:
+        return (in_scope(check) and check not in left
+                and not gone & set(reads.get(check, ())))
+    return guarded
 
 
 def _reconciles(entry: dict, run_id: str) -> bool:
