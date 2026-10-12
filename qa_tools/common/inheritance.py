@@ -352,6 +352,33 @@ class InheritanceRefused(Exception):
     """
 
 
+def inherit_one_refusal(conn: supply_db.SupplyConnection, dataset_id: str,
+                        period: str) -> InheritanceRefused | None:
+    """Why inherit_one() would refuse this dataset and period, or None -
+    ONE place, so the decision's warning (REQ-PIPE-128 criterion 8) never
+    promises a re-check for an inheritance the operation then refuses."""
+    entry = hierarchy.dataset(dataset_id)
+    skipped, _ = _does_not_participate(dataset_id, period)
+    if not skipped:
+        return InheritanceRefused(
+            f"{dataset_id} DOES participate in {period}, so a supply is owed "
+            f"for it. Inheriting would stand this period on an earlier supply "
+            f"and hide a gap somebody should see. If the supply is genuinely "
+            f"not coming, that is a substitution - a person deciding what to "
+            f"stand on - rather than an inheritance.")
+    already = period_schema.promoted_in(conn, period, [entry.table]).get(entry.table)
+    if already:
+        return InheritanceRefused(
+            f"{period} already resolves to a real supply for {dataset_id} "
+            f"({', '.join(already)}). There is nothing to inherit into.")
+    if _most_recent_promoted(conn, dataset_id, period) is None:
+        return InheritanceRefused(
+            f"there is no earlier promoted supply for {dataset_id} to stand "
+            f"{period} on. The table is genuinely absent, and an empty one "
+            f"would be a lie with a schema on it.")
+    return None
+
+
 def inherit_one(conn: supply_db.SupplyConnection, *, dataset_id: str,
                 period: str, actor: str, reason: str,
                 effective_at: str) -> Inherited:
@@ -385,29 +412,11 @@ def inherit_one(conn: supply_db.SupplyConnection, *, dataset_id: str,
             "terms as every other filing decision a person makes.")
 
     entry = hierarchy.dataset(dataset_id)
-    skipped, schedule_reason = _does_not_participate(dataset_id, period)
-    if not skipped:
-        raise InheritanceRefused(
-            f"{dataset_id} DOES participate in {period}, so a supply is owed "
-            f"for it. Inheriting would stand this period on an earlier supply "
-            f"and hide a gap somebody should see. If the supply is genuinely "
-            f"not coming, that is a substitution - a person deciding what to "
-            f"stand on - rather than an inheritance.")
-
-    already = period_schema.promoted_in(conn, period, [entry.table]).get(entry.table)
-    if already:
-        raise InheritanceRefused(
-            f"{period} already resolves to a real supply for {dataset_id} "
-            f"({', '.join(already)}). There is nothing to inherit into.")
-
-    source = _most_recent_promoted(conn, dataset_id, period)
-    if source is None:
-        raise InheritanceRefused(
-            f"there is no earlier promoted supply for {dataset_id} to stand "
-            f"{period} on. The table is genuinely absent, and an empty one "
-            f"would be a lie with a schema on it.")
-
-    stands_on, supply = source
+    refused = inherit_one_refusal(conn, dataset_id, period)
+    if refused is not None:
+        raise refused
+    _skipped, schedule_reason = _does_not_participate(dataset_id, period)
+    stands_on, supply = _most_recent_promoted(conn, dataset_id, period)
     # RESOLVED BEFORE THE TRANSACTION OPENS, so a period whose table has
     # gone missing is a refusal rather than a rolled-back decision - the
     # same ordering substitution.substitute() uses.

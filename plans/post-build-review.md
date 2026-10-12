@@ -7960,3 +7960,51 @@ twice. It deliberately did not re-find the `TypeError`.
       criterion-by-criterion pruning pass, a numeric target, or a speed-only
       pass; he parked it - "leave it in the pocket for later" - and is happy
       for it to be proposed again. Parked as `plans/running-thoughts.md` #86.
+
+159. **[done, 2026-10-12]** **[Pipeline & publishing]** **delivery-critic on
+    REQ-PIPE-128 criterion 8 (fe59334) - the re-check warning.** Five
+    findings, each checked against the code before acting; all fixed the
+    same day, test-first where a test could show it.
+    - **M1 - pasted undo commands now refused.** Demote, substitute,
+      de-substitute and un-inherit commands carried `--yes`, but each can
+      now have consequences (the readers it owes), and `--yes` without the
+      key is refused (criterion 9). FIXED: `--yes` dropped from those five
+      commands (filing_decisions, promotion, refiling, decision_log's
+      unblock list); the pasted command now asks, showing the warning.
+      `un-supersede` keeps `--yes` - it never changes what a period holds.
+      tests/test_one_version_per_period.py's pinned command updated (failed
+      first).
+    - **M2 - a re-check promised for a decision about to be refused.**
+      INHERIT, SUBSTITUTE and their undoing were always treated as moving a
+      table, though inherit_one and substitute refuse several cases only
+      after the key check - so a person confirmed a re-check that never
+      happened. Reproduced (an INHERIT into a period the dataset
+      participates in named readers); FIXED by asking each operation's own
+      refusal: `inheritance.inherit_one_refusal()` (now the one place
+      inherit_one's three refusals live), substitution's
+      `_refuse_unless_substitutable`, and for the two undos whether the
+      period is held that way.
+    - **M3 - an assertion that could never fail.** It looked for the
+      supply id in a header that names the table. Rewritten: one test on
+      the real fixture asserts the moving decision names Placements in
+      plain terms with NO supply id, a demote of a non-holder names nothing,
+      and a refused inherit names nothing - each failed against the code
+      before its fix.
+    - **L4 - "each will be re-checked" can be untrue**: only stale readers
+      re-run, a backstop-frozen one waits. FIXED in wording: "owed a
+      re-check by this decision", which is exactly what knock_on records.
+    - **L5 - ids, not plain terms; one bullet per reader.** FIXED: datasets
+      by name and supplies by the day they arrived (REQ-GHUB-142 NFR 2's
+      rule), as ONE entry with its readers indented, and a matching line in
+      the success message. NOT CHANGED: a demote's panel saying how to undo
+      it - criterion 7's reach there is Keith's call, unchanged by c8.
+    - **Not measured**: the cost of `knock_on.readers()` per decision in
+      the TUI (two or three calls). Noted, not acted on.
+    - Also from the contested-pair scoping the same evening, **two possible
+      defects read but not yet run** (each needs a failing test before it is
+      called one): `dataset_blockers._decided_keys` may end a contest on any
+      non-refusal decision (an acknowledgement, an excuse); and
+      `filing_decisions._staged` may build the arrival key for a `#1`
+      supply with the `#1` kept, so rejecting a contested pair would move
+      nothing.
+

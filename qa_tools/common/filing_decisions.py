@@ -181,8 +181,8 @@ class Consequences:
     criteria 6, 7 and 9). No lines means no panel."""
 
     lines: tuple[str, ...]
-    #: What the success message confirms was done, one per line above -
-    #: the thing the person was warned about, said back at the end.
+    #: What the success message confirms was done - the things the person
+    #: was warned about, said back at the end.
     done: tuple[str, ...] = ()
 
     @property
@@ -255,24 +255,26 @@ def consequences(conn, request: Request) -> Consequences:
                 f"removed. {period} reads {supply} from this decision on. To restore the "
                 f"substitution, demote {supply}, then substitute again:\n"
                 f"  mothman supply decide --operation demote --dataset {ds} "
-                f"--period {period} --supply {supply} --reason '<why>' --yes\n"
+                f"--period {period} --supply {supply} --reason '<why>'\n"
                 # THE SUPPLY STOOD ON, NAMED (#112 re-check): left out, the
                 # command took the slot's own supply - the one just demoted -
                 # and the substitution was refused.
                 f"  mothman supply decide --operation substitute --dataset {ds} "
                 f"--period {period} --stands-on {h.stands_on} --supply {h.holder} "
-                f"--reason '<why>' --yes")
+                f"--reason '<why>'")
             done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
     if request.operation == REFILE and request.supply and request.to_period:
         lines, done = _refile_consequences(conn, request)
     if request.operation == EXCUSE_LATENESS and request.through_period:
         lines, done = _range_consequences(conn, request)
-    lines += _readers_rechecked(conn, request)
+    readers = _readers_rechecked(conn, request)
+    if readers:
+        lines += readers
+        count = readers[0].count("\n")
+        done.append(f"{count} supply/supplies reading it owed a re-check.")
     return Consequences(lines=tuple(lines), done=tuple(done))
 
 
-#: What a period holds changes under these whatever the supply's state.
-_ALWAYS_MOVES = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT)
 #: These move a table only where the supply named is the one the period holds.
 _MOVES_IF_HELD = (DEMOTE, REJECT, REFILE)
 
@@ -290,12 +292,31 @@ def _readers_rechecked(conn, request: Request) -> list[str]:
         return []
     held = decision_log.held(conn, ds, period)
     holder = held.holder if held else None
+    held_as = held.held_as if held else None
     if op == PROMOTE:
         moves = bool(request.supply) and request.supply != holder
     elif op in _MOVES_IF_HELD:
         moves = bool(request.supply) and request.supply == holder
+    elif op == UN_INHERIT:
+        moves = held_as == decision_log.INHERITED
+    elif op == DE_SUBSTITUTE:
+        moves = held_as == decision_log.SUBSTITUTED
+    elif op == INHERIT:
+        # THE OPERATION'S OWN REFUSALS, so a re-check is never promised for
+        # an inheritance about to be refused (delivery-critic on 128 c8).
+        from qa_tools.common import inheritance
+        moves = inheritance.inherit_one_refusal(conn, ds, period) is None
+    elif op == SUBSTITUTE and request.stands_on and request.supply:
+        from qa_tools.common import substitution
+        try:
+            substitution._refuse_unless_substitutable(
+                conn, dataset_id=ds, period=period, stands_on=request.stands_on,
+                supply=request.supply, participates=True)
+            moves = True
+        except substitution.SubstitutionRefused:
+            moves = False
     else:
-        moves = op in _ALWAYS_MOVES
+        moves = False
     if not moves:
         return []
     table = hierarchy.dataset(ds).table
@@ -303,10 +324,24 @@ def _readers_rechecked(conn, request: Request) -> list[str]:
              if r.dataset_id != ds]
     if not found:
         return []
-    return [f"These supplies' checks read {table} in {period}; each will be re-checked "
-            f"after this decision and may go red:"] + [
-        f"  {r.supply} ({r.dataset_id}, {'waiting' if r.waiting else 'promoted'})"
-        for r in found]
+    # IN PLAIN TERMS (REQ-GHUB-142 NFR 2, as the re-file warning): datasets
+    # by name, supplies by the day they arrived - ids are for commands only.
+    # ONE ENTRY, its readers indented inside it, so a route that bullets
+    # each entry shows one bullet with its list rather than a bullet each.
+    from qa_tools.common import asset_time, filing
+
+    def described(r) -> str:
+        received = filing.received_at_of(r.dataset_id, r.supply)
+        day = (asset_time.local_date(received.isoformat()).strftime("%-d %B %Y")
+               if received else "an unknown date")
+        state = "waiting" if r.waiting else "accepted"
+        return f"    {hierarchy.dataset(r.dataset_id).dataset_name}, received {day} ({state})"
+
+    name = hierarchy.dataset(ds).dataset_name
+    return ["\n".join(
+        [f"Checks in other datasets read {name} in {period}. Each of these supplies is "
+         f"owed a re-check by this decision, and may go red:"]
+        + [described(r) for r in found])]
 
 
 def _range_consequences(conn, request: Request) -> tuple[list[str], list[str]]:

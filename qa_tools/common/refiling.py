@@ -107,7 +107,7 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
             f"Nothing was expected from {dataset_id} for {to_period}: it is inherited. "
             f"Un-inherit it first, then re-file:\n"
             f"  mothman supply decide --operation un-inherit --dataset {dataset_id} "
-            f"--period {to_period} --reason '<why>' --yes")
+            f"--period {to_period} --reason '<why>'")
     promoted = bool(from_period) and decision_log.promoted_into(
         conn, dataset_id, from_period) == supply
     if promoted:

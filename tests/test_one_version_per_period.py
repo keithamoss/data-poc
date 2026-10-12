@@ -416,9 +416,12 @@ class TestTheTerminalSaysItBeforeAsking:
                                         supply=b, reason="better")
         assert out is None and asked == []
         printed = capsys.readouterr().out
+        # NO --yes (delivery-critic on 128 c8): a de-substitution can carry
+        # consequences now - the readers it owes a re-check - so a pasted
+        # `--yes` without the key would be refused.
         command = (f"mothman supply decide --operation de-substitute --dataset {DS} "
-                   f"--period {later} --reason '<why>' --yes")
-        assert command in printed.splitlines()
+                   f"--period {later} --reason '<why>'")
+        assert command in [line.strip() for line in printed.splitlines()]
 
     def test_refused_before_the_reason_is_asked_for(self, conn, period, later,
                                                     monkeypatch, capsys):

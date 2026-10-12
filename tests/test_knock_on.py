@@ -255,10 +255,12 @@ class TestAnInheritedPeriodHoldsItsSupply:
 
 class TestThePersonIsToldWhoWillBeReChecked:
     """REQ-PIPE-128 criterion 8: the warning for a person's decision names
-    the other supplies whose checks read a table it moves, says they will
-    be re-checked, and that they may go red - before they confirm."""
+    the other supplies whose checks read a table it moves, says each is
+    owed a re-check and may go red - before they confirm - and says
+    nothing where the decision moves nothing (delivery-critic on 128 c8,
+    post-build-review #159: one assertion here could never fail)."""
 
-    def test_moving_carers_names_the_placements_supply_that_reads_it(
+    def test_only_a_decision_that_moves_the_table_names_its_readers(
             self, cp_duckdb_dir, monkeypatch):
         from fixture_ids import CP_DIRTY_RUN_ID
         from qa_tools.common import filing
@@ -279,18 +281,26 @@ class TestThePersonIsToldWhoWillBeReChecked:
                                       decision_id=cause)
         assert recheck.run(owed_id, run_by="pytest@example.org").completed
         period = filing.period_of("cp-carers", filing.received_at_of("cp-carers", carers))
+
+        def said(operation, supply):
+            with supply_db.connect(label="test-knock-on") as c:
+                return "\n".join(fd.consequences(c, fd.Request(
+                    operation=operation, dataset_id="cp-carers", actor={}, reason="r",
+                    period=period, supply=supply)).lines)
+
         with supply_db.connect(label="test-knock-on") as c:
-            # WHICHEVER DECISION REALLY MOVES THE TABLE: another test in this
-            # module promotes carers, and promoting the holder again moves
-            # nothing - so says nothing - while demoting it moves it out.
             holds = dl.held(c, "cp-carers", period)
-            op = fd.DEMOTE if holds and holds.holder == carers else fd.PROMOTE
-            said = fd.consequences(c, fd.Request(
-                operation=op, dataset_id="cp-carers", actor={}, reason="r",
-                period=period, supply=carers))
-        text = "\n".join(said.lines)
-        assert placements in text, text
-        assert "re-checked" in text and "may go red" in text
-        assert carers not in text.split("re-checked")[0].splitlines()[-1], \
-            "the supply decided on is not its own reader"
+        # Another test in this module promotes carers; demoting the holder
+        # moves the table out, promoting a non-holder moves one in.
+        moving = fd.DEMOTE if holds and holds.holder == carers else fd.PROMOTE
+        text = said(moving, carers)
+        assert "Placements" in text and "owed a re-check" in text and "may go red" in text
+        assert placements not in text and carers not in text, \
+            "plain terms: supply ids only in commands to paste (REQ-GHUB-142 NFR 2)"
+
+        # A DEMOTE of a supply the period does not hold moves nothing.
+        assert "re-check" not in said(fd.DEMOTE, "cp-carers@not-the-holder")
+        # An INHERIT into a period the dataset participates in is refused
+        # when applied, so no re-check is promised (finding 2).
+        assert "re-check" not in said(fd.INHERIT, None)
 

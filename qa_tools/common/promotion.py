@@ -219,7 +219,7 @@ def _refuse_what_the_slot_forbids(conn, dataset_id: str, supply: str, period: st
             f"standing on an earlier period because the schedule owes nothing then. "
             f"Un-inherit it first, as its own decision:\n"
             f"  mothman supply decide --operation un-inherit --dataset {dataset_id} "
-            f"--period {period} --reason '<why>' --yes")
+            f"--period {period} --reason '<why>'")
     if (actor_kind == decision_log.RULE and h and h.held_as == decision_log.PROMOTED
             and h.holder != supply and replacing is None):
         # (REQ-PIPE-123: unless the replacement setting the gate resolved

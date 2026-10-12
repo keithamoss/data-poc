@@ -4908,7 +4908,7 @@ Belongs with batch 5's check work.
     (cut to N, weakest first), and a speed-only pass on the browser tests,
     which are ~85% of the suite's wall clock.
 
-87. **[investigate, 2026-10-12]** **[Pipeline & publishing]** **For Keith:
+87. **[in-progress, 2026-10-12]** **[Pipeline & publishing]** **For Keith:
     nothing lets a person say which file of a contested pair is the
     supply - and three places tell them to.** Found re-testing
     REQ-PIPE-144's deferred criteria 14 and 42 once REQ-PIPE-141 shipped.
@@ -4925,3 +4925,9 @@ Belongs with batch 5's check work.
     scoper and sign-off - before anything is built. The data side is ready:
     the receipt view already reads each file's own receipt from
     qa.delivery_file.
+    **Scoped 2026-10-12 by delivery-scoper** as REQ-PIPE-193 (the choice
+    decision, carrying 144's criteria 14 and 42) and REQ-PIPE-194 (every
+    message that asks for a choice names the command; a contest resolves
+    only on a choice, a rejection or a supersession). Unsigned, eight
+    questions with Keith in their open_questions. Delete this entry once
+    both are built.

@@ -718,7 +718,7 @@ def refuse_if_stood_on(conn: supply_db.SupplyConnection, dataset_id: str, supply
         # blocking period and one per line, so each can be copied whole.
         commands = "".join(
             f"\n  mothman supply decide --operation {UNBLOCKED_BY[by]} --dataset "
-            f"{dataset_id} --period {slot} --reason '<why>' --yes"
+            f"{dataset_id} --period {slot} --reason '<why>'"
             for slot, by in standing)
         raise DecisionRefused(
             f"{supply!r} cannot be {action}d while "
