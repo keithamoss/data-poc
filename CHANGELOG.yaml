@@ -109,6 +109,19 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-12"
+    summary: >
+      Failing Child Protection checks now show their example rows where
+      some showed none.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Example rows no longer go missing
+            components: ["QA checks & contract"]
+            description: >
+              Some failing Soda checks in Child Protection listed no example
+              rows because another table had a check with the same name. Each
+              check now shows rows from its own table.
   - date: "2026-10-11"
     summary: >
       A collection with nothing counted no longer reads green, one re-check

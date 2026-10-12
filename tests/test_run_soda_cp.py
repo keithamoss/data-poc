@@ -90,3 +90,43 @@ class TestAPartitionedCheckIsNotDropped:
             yaml_text, {"checks": []}, SimpleNamespace(get_error_logs=lambda: []))
         assert missing["table"] == "cp_clients"
         assert missing["column"] == "given_name"
+
+
+class TestSamplesAreNotLostToANameAnotherTableShares:
+    """A failing check's sample keys come from its OWN table's sample.
+
+    Soda's samples were captured by check NAME alone, and Child Protection
+    has seven names on more than one table - `missing_count(cp_client_id)`
+    on four. In one scan the last table sampled overwrote the others, and a
+    check whose sample had been overwritten looked its key column up in
+    another table's rows, found none, and recorded no samples at all.
+    Found 2026-10-12 scoping Soda (REQ-PIPE-191), where a narrower scan
+    stopped colliding and the samples reappeared.
+    """
+
+    def test_notifications_missing_client_id_records_its_own_samples(self, monkeypatch,
+                                                                       cp_duckdb_dir):
+        results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+        check = ("data-asset-1.child-protection-family-support.child-protection."
+                 "cp-notifications.cp_client_id.missing_count_soda")
+        (record,) = [r for r in results if r["check_id"] == check]
+        assert record["status"] != "pass", "the dirty fixture should fail this check"
+        assert record["failing_sample_keys"], "its samples were lost to a shared name"
+        assert all(k.startswith("NOTIF-") for k in record["failing_sample_keys"])
+
+    def test_every_sampled_failure_names_rows_of_its_own_table(self, monkeypatch,
+                                                                cp_duckdb_dir):
+        from qa_tools.common import hierarchy, supply_db
+
+        results = _run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+        sampled = [r for r in results if r["failing_sample_keys"]]
+        assert sampled
+        with supply_db.connect(read_only=True, label="test-soda-samples") as conn:
+            schema = supply_db.run_schema(_DIRTY_RUN_ID)
+            for r in sampled:
+                table = hierarchy.dataset(r["dataset_id"]).table
+                pk = run_soda_cp.cp_common.TABLE_PK[table]
+                keys = {str(row[0]) for row in conn.execute(
+                    f'SELECT {pk} FROM "{schema}".{table}').fetchall()}
+                assert set(r["failing_sample_keys"]) <= keys, \
+                    (r["check_id"], r["failing_sample_keys"])

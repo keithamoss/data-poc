@@ -30,8 +30,8 @@ def test_dbt_samples_are_the_lowest_keys_in_order(supply_dsn):
 
 
 def test_soda_samples_are_the_lowest_keys_in_order():
-    captured = {"c": [{"pk": k, "other": 1} for k in KEYS]}
-    assert soda_common.failing_sample_keys(captured, "c", "pk") == WANT
+    captured = {("t", "c"): [{"pk": k, "other": 1} for k in KEYS]}
+    assert soda_common.failing_sample_keys(captured, "c", "pk", "t") == WANT
 
 
 def test_datacontract_samples_are_in_key_order():
@@ -80,8 +80,9 @@ def test_soda_is_asked_for_enough_rows_to_pick_the_lowest(supply_dsn):
         scan.sampler = sampler
         scan.disable_telemetry()
         soda_common.execute_scan(scan)
-        (name,) = sampler.captured
-        assert soda_common.failing_sample_keys(sampler.captured, name, "pk") == WANT
+        ((table, name),) = sampler.captured
+        assert table == "t"
+        assert soda_common.failing_sample_keys(sampler.captured, name, "pk", table) == WANT
     finally:
         with supply_db.connect(label="test-samples-soda") as conn:
             conn.execute("DROP SCHEMA sample_probe_soda CASCADE")

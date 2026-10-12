@@ -166,7 +166,7 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
                 "on_fail_action": "flag",
                 "row_count_total": n_total_by_table[table],
                 "row_count_invalid": row_count_invalid,
-                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table]),
+                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], cp_common.TABLE_PK[table], table),
                 "engine": ENGINE_TAG,
             })
 

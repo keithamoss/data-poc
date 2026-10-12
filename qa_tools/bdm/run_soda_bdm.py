@@ -222,7 +222,8 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
                 "on_fail_action": "flag",
                 "row_count_total": n_total,
                 "row_count_invalid": row_count_invalid,
-                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], "registration_number"),
+                "failing_sample_keys": failing_sample_keys(sampler.captured, c["name"], "registration_number",
+                                                           c.get("table")),
                 "engine": ENGINE_TAG,
             })
 

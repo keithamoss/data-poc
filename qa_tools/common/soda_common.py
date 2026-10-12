@@ -91,10 +91,17 @@ class CaptureSampler(Sampler):
     and opt-in via `samples limit:` in the checks YAML for ordinary
     metric checks (missing_count/invalid_percent/etc.) - one sampler
     instance handles both uniformly, replacing DefaultSampler either way.
+
+    KEYED BY TABLE AND CHECK NAME, never the name alone (2026-10-12). Child
+    Protection has seven check names on more than one table -
+    `missing_count(cp_client_id)` on four - and keyed by name the last
+    table sampled overwrote the rest, so a check whose sample was
+    overwritten looked its key column up in another table's rows and
+    recorded no samples at all.
     """
 
     def __init__(self):
-        self.captured: dict[str, list[dict]] = {}
+        self.captured: dict[tuple[str | None, str], list[dict]] = {}
 
     def store_sample(self, sample_context) -> SampleRef:
         columns = [c.name for c in sample_context.sample.get_schema().columns]
@@ -103,7 +110,9 @@ class CaptureSampler(Sampler):
         # sorts before it keeps FAILING_SAMPLE_LIMIT, so the same data records
         # the same sample (post-build-review #129). Bounded by Soda's own
         # sample limit, and only the key column ever leaves this module.
-        self.captured[sample_context.check_name] = [dict(zip(columns, row)) for row in rows]
+        table = sample_context.partition.table.table_name if sample_context.partition else None
+        self.captured[(table, sample_context.check_name)] = [
+            dict(zip(columns, row)) for row in rows]
         return SampleRef(
             name=sample_context.sample_name,
             schema=sample_context.sample.get_schema(),
@@ -114,14 +123,15 @@ class CaptureSampler(Sampler):
         )
 
 
-def failing_sample_keys(captured: dict[str, list[dict]], check_name: str, pk_column: str) -> list[str]:
+def failing_sample_keys(captured: dict[tuple[str | None, str], list[dict]], check_name: str,
+                        pk_column: str, table: str | None) -> list[str]:
     """Pulls just pk_column's value out of whatever CaptureSampler captured
     for this check - a metric check's sample carries every table column
     (Soda doesn't pre-restrict the way datacontract-cli does), a "failed
     rows" check's sample usually already carries only the identifier
     column its own fail query selected. Either way, only pk_column's
     value ever leaves this function - never other row content."""
-    rows = captured.get(check_name, [])
+    rows = captured.get((table, check_name), [])
     keys = sorted(str(row[pk_column]) for row in rows if row.get(pk_column) is not None)
     return keys[:FAILING_SAMPLE_LIMIT]
 
