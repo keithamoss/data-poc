@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 
 
+from qa_tools.common import asked_for
 from qa_tools.common import left_out, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.soda_common import (
@@ -56,6 +57,17 @@ _CUSTOM_CHECK_COLUMN = {
 
 
 def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked = asked_for.ask(run_id, run_timestamp, cp_common.AGENCY_ID,
+                          cp_common.COLLECTION_ID, "soda")
+    # ONLY THE ASKED-FOR CHECKS ARE HANDED (REQ-PIPE-191), removed by check
+    # id exactly as an unreadable table's are.
+    keep = set(asked) if "soda" in asked_for.SCOPED else None
+    if keep is not None and not keep:
+        # NOTHING ASKED RUNS NOTHING - see run_dbt_cp.evaluate_dbt_cp().
+        write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
+                         "soda", {"asked": []}, verified=[])
+        return []
     from soda.scan import Scan
 
     # Read-only, and the run's own view schema on the search path - see
@@ -84,9 +96,9 @@ def evaluate_soda_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # what the SET search_path above was doing for the shared connection.
         scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
             "cp_collection", supply_db.run_schema(run_id)))
-        handed = readable_checks_yaml(SODA_CHECKS_PATH, unreadable)
+        handed = readable_checks_yaml(SODA_CHECKS_PATH, unreadable, keep=keep)
         scan.add_sodacl_yaml_str(handed)
-        left_out.note(run_id, "soda", left_out_checks(SODA_CHECKS_PATH, unreadable))
+        left_out.note(run_id, "soda", left_out_checks(SODA_CHECKS_PATH, unreadable, keep=keep))
         sampler = CaptureSampler()
         scan.sampler = sampler
         scan.disable_telemetry()

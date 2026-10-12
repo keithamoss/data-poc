@@ -28,17 +28,20 @@ covered by datacontract-cli's include_failed_samples at all.
 from __future__ import annotations
 import os
 
+from qa_tools.common import asked_for
 from qa_tools.common import left_out, supply_db
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_warehouse, failing_sample_keys, check_id_from_quality_definition,
+    run_against_warehouse, selection_for, failing_sample_keys,
+    check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
 )
 from qa_tools.common.check_lifecycle import (
     name_by_check_id, parse_contract_check_metadata,
 )
 from qa_tools.common import hierarchy
-from qa_tools.common.qa_results_writer import _declared_reads_tables, write_qa_result
+from qa_tools.common.qa_results_writer import (
+    _declared_reads_tables, run_owner, write_qa_result)
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -89,9 +92,22 @@ def _unreadable_in(run_id: str) -> frozenset[str]:
 
 
 def evaluate_datacontract_cp(run_id: str, run_timestamp: str) -> list[dict]:
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked = asked_for.ask(run_id, run_timestamp, cp_common.AGENCY_ID, cp_common.COLLECTION_ID, "datacontract")
+    scoped = "datacontract" in asked_for.SCOPED
+    if scoped and not asked:
+        # NOTHING ASKED RUNS NOTHING - see run_dbt_cp.evaluate_dbt_cp().
+        write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
+                         "datacontract", {"asked": []}, verified=[])
+        return []
+    # ITS OWN OPTIONS, NEVER A PRUNED CONTRACT (REQ-PIPE-190): the run's
+    # rules by id, and their model where they all sit on one. Neither for a
+    # run whose id names no table, which asks for the whole contract.
+    options = (selection_for(CONTRACT_PATH, asked)
+               if scoped and run_owner(run_id) is not None else {})
     # The warehouse, not the six CSVs - see the BDM counterpart
     # (REQ-QAC-088).
-    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
+    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id), **options)
     unreadable = _unreadable_in(run_id)
     declared = _declared_reads_tables()
 

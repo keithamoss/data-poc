@@ -28163,7 +28163,9 @@ requirements:
       - A READERS-ONLY RUN RUNS THE COLLECTION'S TOOLS AND RECORDS ONLY the reading
         checks of the moved tables (the writer's scope, from qa.run.scope 'readers'
         and reads_table) - the tools cannot be asked for a subset, so the cost is
-        the tools' and the recorded result is criterion 2's.
+        the tools' and the recorded result is criterion 2's. SUPERSEDED 2026-10-12
+        by REQ-PIPE-188 to 191 - dbt, Soda and datacontract-cli can be, and are
+        now asked for only the run's scope; the recorded result is unchanged.
       - 'RE-GATED AT THE CAUSE''S INSTANT: a knock-on''s promotions take effect
         when the decision that caused them did, so a bootstrap replaying four years
         does not stamp them with today (REQ-PIPE-081).'
@@ -32372,8 +32374,8 @@ requirements:
       date: '2026-10-12'
     source: "Keith, plans/running-thoughts.md #65 (scoped 2026-10-06; the finding profiled 2026-10-11 evening). Drafted by delivery-scoper 2026-10-11, split out of REQ-PIPE-188 per tool, revised 2026-10-12 with Keith's choice of mechanism."
     acceptance_criteria:
-      - "THE SYSTEM SHALL give every quality rule in contract/child-protection-contract.yaml and contract/bdm-birth-registrations-contract.yaml an ODCS `id` equal to its customProperties check_id."
-      - "IF a quality rule in either contract has no ODCS `id`, or an `id` that differs from its check_id, THEN THE SYSTEM SHALL fail the check-lifecycle gate, naming the rule."
+      - "THE SYSTEM SHALL give every quality rule in contract/child-protection-contract.yaml and contract/bdm-birth-registrations-contract.yaml an ODCS `id` equal to its customProperties check_id with each '.' replaced by ':' (ODCS does not allow a '.' in an id; Keith, 2026-10-12)."
+      - "IF a quality rule in either contract has no ODCS `id`, or an `id` that differs from its check_id with each '.' replaced by ':', THEN THE SYSTEM SHALL fail the check-lifecycle gate, naming the rule."
       - "WHEN a run evaluates datacontract-cli, THE SYSTEM SHALL select the rules inside the run's scope (REQ-PIPE-188 criterion 1) through datacontract-cli's own `quality_ids` option, narrowed further with its `schema_name` option wherever every selected rule sits on one model."
       - "WHERE a run's scope spans rules the tool cannot select in one invocation, THE SYSTEM SHALL invoke datacontract-cli once per such part and record the union of their results, each result exactly once."
       - "WHERE a run's id names no table, THE SYSTEM SHALL invoke datacontract-cli over the whole contract with neither option, as today."

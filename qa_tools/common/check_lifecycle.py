@@ -499,6 +499,12 @@ def _custom_properties_to_dict(custom_properties: list[dict]) -> dict:
     return {cp["property"]: cp["value"] for cp in custom_properties if "property" in cp}
 
 
+def odcs_quality_id(check_id: str) -> str:
+    """The ODCS `id` a quality rule carries: its check id, with ':' for
+    each '.', which ODCS does not allow in an id (REQ-PIPE-190)."""
+    return check_id.replace(".", ":")
+
+
 def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list[CheckMetadata]:
     rule = dict(rule)
     custom_properties = rule.pop("customProperties", None) or []
@@ -507,6 +513,21 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
     if not check_id:
         rule_label = rule.get("rule") or rule.get("type") or rule.get("metric")
         raise MissingCheckIdError(f"{source}: {location}: quality rule {rule_label!r} has no check_id customProperty")
+    # THE ODCS `id` IS THE CHECK ID WITH ':' FOR '.' (REQ-PIPE-190 criteria 1
+    # and 2): it is what a run selects the rule by (datacontract-cli's
+    # quality_ids), and ODCS forbids a dot in it (Keith, 2026-10-12). A rule
+    # without it, or with a different one, could never be selected and would
+    # be reported missing by the run rather than here. A copy of the check
+    # id, so - like the check id - outside the config hash.
+    odcs_id = rule.pop("id", None)
+    if odcs_id != odcs_quality_id(check_id):
+        why = ("has no ODCS `id`" if odcs_id is None
+               else f"has the ODCS `id` {odcs_id!r}, which is not its check_id")
+        raise MissingCheckIdError(
+            f"{source}: {location}: quality rule {check_id!r} {why}. Every quality rule's "
+            f"`id` must be its check_id with each '.' as ':' "
+            f"({odcs_quality_id(check_id)!r}), because that is how a run asks "
+            f"datacontract-cli for it.")
     # category comes from the rule's own NATIVE `dimension:` field, not a
     # new customProperties entry - every real quality rule here already
     # carries a real, human-authored ODCS dimension (completeness/
@@ -555,6 +576,23 @@ def _parse_contract_quality_rule(rule: dict, source: str, location: str) -> list
         check_id=check_id, category=category, tool="datacontract", config_hash=_config_hash(rule),
         source_file=source, sql_bodied=rule.get("type") == "sql", **fields,
     )]
+
+
+def contract_rule_models(contract_yaml_path: Path | str) -> dict[str, str]:
+    """check_id -> the contract model (table) its quality rule sits on -
+    what datacontract-cli's `schema_name` narrows by (REQ-PIPE-190)."""
+    with open(contract_yaml_path) as f:
+        doc = config_yaml.parse(f) or {}
+    out: dict[str, str] = {}
+    for table in doc.get("schema", []) or []:
+        rules = list(table.get("quality", []) or [])
+        for prop in table.get("properties", []) or []:
+            rules += prop.get("quality", []) or []
+        for rule in rules:
+            meta = _custom_properties_to_dict(rule.get("customProperties") or [])
+            if meta.get("check_id"):
+                out[meta["check_id"]] = table.get("name")
+    return out
 
 
 def contract_rule_attachments(contract_yaml_path: Path | str) -> list[tuple[str, str | None]]:

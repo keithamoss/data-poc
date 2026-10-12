@@ -36,11 +36,12 @@ import os
 
 
 from . import bdm_common
+from qa_tools.common import asked_for
 from qa_tools.common import supply_db
 from qa_tools.common.soda_common import (
     ENGINE_TAG, threshold, CaptureSampler, failing_sample_keys, check_id_from_resource_attributes,
     execute_scan,
-    not_evaluated_record,
+    not_evaluated_record, readable_checks_yaml,
     unreported_checks,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -110,6 +111,14 @@ _CUSTOM_CHECK_DIMENSION = {
 
 
 def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked = asked_for.ask(run_id, run_timestamp, AGENCY_ID, COLLECTION_ID, "soda")
+    # The same scoped path as Child Protection's (REQ-PIPE-188 criterion 10).
+    keep = set(asked) if "soda" in asked_for.SCOPED else None
+    if keep is not None and not keep:
+        write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "soda",
+                         {"asked": []}, verified=[])
+        return []
     from soda.scan import Scan
 
     # READ-ONLY, and it now means what it says rather than protecting
@@ -138,7 +147,8 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         # what the SET search_path above was doing for the shared connection.
         scan.add_configuration_yaml_str(supply_db.soda_config_yaml(
             "birth_registrations", supply_db.run_schema(run_id)))
-        scan.add_sodacl_yaml_file(SODA_CHECKS_PATH)
+        handed = readable_checks_yaml(SODA_CHECKS_PATH, set(), keep=keep)
+        scan.add_sodacl_yaml_str(handed)
         sampler = CaptureSampler()
         scan.sampler = sampler
         scan.disable_telemetry()
@@ -230,8 +240,6 @@ def evaluate_soda_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         # EVERY DECLARED CHECK SODA DID NOT REPORT IS RED, never absent
         # (the road-testing sweep's #7, Keith 2026-10-06): Soda leaves a
         # check it cannot evaluate out of its results entirely.
-        with open(SODA_CHECKS_PATH) as f:
-            handed = f.read()
         for missing in unreported_checks(handed, scan_results, scan):
             results.append(not_evaluated_record(
                 missing, agency_id=AGENCY_ID, collection_id=COLLECTION_ID,

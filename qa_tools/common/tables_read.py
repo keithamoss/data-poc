@@ -92,9 +92,11 @@ def is_reserved_scope(name: str) -> bool:
     return bool(name) and name.startswith(RESERVED_SCOPE_PREFIX)
 
 
-#: The declarations, keyed on the content of every check source
-#: (REQ-PIPE-192). A few entries: a process sees one tree, a test a handful.
-_declared: "dict[str, dict[str, list[str]]]" = {}
+#: What the check sources declare, keyed on the content of every one of
+#: them (REQ-PIPE-192): the reads by check id, and the active check ids by
+#: (collection, tool) that REQ-PIPE-188 asks each tool for. One collection
+#: answers both. A few entries: a process sees one tree, a test a handful.
+_declared: "dict[str, tuple[dict[str, list[str]], dict[tuple[str, str], list[str]]]]" = {}
 _declared_lock = threading.Lock()
 _DECLARED_KEEP = 4
 
@@ -115,18 +117,44 @@ def declared_reads() -> dict[str, list[str]]:
     cannot be collected, and nothing is remembered (criterion 4) - what to
     do then is the caller's: promotion's fail-safe is an empty mapping that
     can refuse a promotion but never grant one."""
+    reads, _active = _collected()
+    return {check: list(tables) for check, tables in reads.items()}
+
+
+def active_checks(collection_id: str, tool: str) -> list[str]:
+    """Every active (unretired) check id of `tool`'s segment in
+    `collection_id`, sorted - from the same once-per-tree collection as
+    `declared_reads()`, and a copy the caller may keep (REQ-PIPE-188)."""
+    _reads, active = _collected()
+    return list(active.get((collection_id, tool), ()))
+
+
+def _collected():
     from qa_tools.common import validate_check_lifecycle as vcl
 
     key = vcl.sources_fingerprint()
     with _declared_lock:
         hit = _declared.get(key)
     if hit is None:
-        hit = declared_by_check_id(vcl.collect_checks(None))
+        checks = vcl.collect_checks(None)
+        hit = (declared_by_check_id(checks), _active_by_collection_and_tool(checks))
         with _declared_lock:
             _declared[key] = hit
             while len(_declared) > _DECLARED_KEEP:
                 _declared.pop(next(iter(_declared)))
-    return {check: list(tables) for check, tables in hit.items()}
+    return hit
+
+
+def _active_by_collection_and_tool(checks: Iterable) -> dict[tuple[str, str], list[str]]:
+    from qa_tools.common import check_id as check_id_mod
+
+    out: dict[tuple[str, str], set[str]] = {}
+    for c in checks:
+        parsed = check_id_mod.try_parse(c.check_id)
+        if parsed is None or c.retired_as_of:
+            continue
+        out.setdefault((parsed.collection, parsed.tool), set()).add(c.check_id)
+    return {key: sorted(ids) for key, ids in out.items()}
 
 
 def forget_declared_reads() -> None:

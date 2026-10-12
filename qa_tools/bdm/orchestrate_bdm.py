@@ -51,7 +51,7 @@ from qa_tools.common import drift_reference
 from qa_tools.common import held_blast_radius
 from qa_tools.common import filing
 from qa_tools.common import parallel_orchestrate
-from qa_tools.common import left_out, own_table
+from qa_tools.common import asked_for, left_out, own_table
 from qa_tools.common import period_overlay
 from qa_tools.common import promotion
 from qa_tools.common import ticket_reconciler
@@ -60,7 +60,7 @@ from qa_tools.common.git_identity import get_run_by
 from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_writer import (
-    finish_run, open_run, write_qa_result)
+    finish_run, open_run, scope_of_run, write_qa_result)
 from . import build_per_run_warehouses
 from . import dataset_stats
 from . import run_dbt_bdm
@@ -283,6 +283,12 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     if compared:
         write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, left_out.TOOL,
                          {"left_out": compared})
+    # AND NOTHING IN SCOPE WENT MISSING (REQ-PIPE-188 criteria 6 and 10) -
+    # the same guard as Child Protection's, through the same scope rule,
+    # whose answer here is every check on the one table.
+    if readable:
+        asked_for.check_nothing_missing(run_id, COLLECTION_ID, results,
+                                        scope_of_run(run_id))
     # run_by stamped only on this write, not the 4 real-tool writes above -
     # one value per run is all qa_tools/common/changelog.py needs, and
     # dataset_stats.json is the one file guaranteed to exist for every

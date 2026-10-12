@@ -133,7 +133,8 @@ schema:
         # lint`/`test` rejected the original invented names outright - see
         # README.md's known-disagreements section for the full account.
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registration_number:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
@@ -149,7 +150,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registration_number:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^BDM-[0-9]{9}$"
@@ -167,7 +169,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: duplicateValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registration_number:duplicateValues_datacontract
+            metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
@@ -198,7 +201,8 @@ schema:
         # not a project-invented convention.
         classification: pii
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_given_names:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             unit: percent
             mustBeLessThan: 1
@@ -215,7 +219,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_given_names:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
@@ -240,7 +245,8 @@ schema:
         required: true
         classification: pii
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_family_name:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             unit: percent
             mustBeLessThan: 1
@@ -258,7 +264,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_family_name:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
@@ -282,7 +289,8 @@ schema:
         physicalType: date
         required: true
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
@@ -299,7 +307,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - type: sql
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:range_check_datacontract
+            type: sql
             dimension: conformity
             # mustBeBetween is numeric-only in the real ODCS model (no date
             # strings) - a date-range rule needs a custom SQL check instead.
@@ -322,7 +331,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - type: sql
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:freshness_datacontract
+            type: sql
             # "timeliness" (not "conformity"/"consistency" like this
             # column's other 2 rules) - the real ODCS dimension enum's word
             # for "is the data current enough to be useful", not used
@@ -364,7 +374,8 @@ schema:
         physicalType: varchar(1)
         required: true
         quality:
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:sex:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               validValues: ["M", "F", "X"]
@@ -388,7 +399,8 @@ schema:
         physicalType: varchar(100)
         required: true
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_suburb:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             unit: percent
             mustBeLessThan: 2
@@ -406,7 +418,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_suburb:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               # Was a character-set regex (same as child_given_names) until
@@ -450,7 +463,8 @@ schema:
           # don't have a native warn/error split within one metric the way
           # SodaCL does; the warning-equivalent behaviour still lives in
           # Soda/dbt's own two-tier checks.
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_facility:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             unit: percent
             mustBeLessThan: 35
@@ -473,7 +487,8 @@ schema:
         physicalType: date
         required: true
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_registered:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
@@ -490,7 +505,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - type: sql
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_registered:date_ordering_datacontract
+            type: sql
             # a cross-field logical rule, not a format/pattern match -
             # ODCS's "consistency" dimension (not "conformity") fits a
             # relationship holding true across a record's own fields. No
@@ -525,7 +541,8 @@ schema:
         required: false
         classification: pii
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_1_name:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             unit: percent
             mustBeLessThan: 15
@@ -543,7 +560,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_1_name:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
@@ -568,7 +586,8 @@ schema:
         required: false
         classification: pii
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_2_name:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             unit: percent
             mustBeLessThan: 50
@@ -585,7 +604,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_2_name:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^[A-Za-z][A-Za-z. -]*$"
@@ -615,7 +635,8 @@ schema:
           "invalid code" state a boolean column can land in the way a
           string column like sex can.
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:is_multiple_birth:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
@@ -632,7 +653,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - type: sql
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:is_multiple_birth:sibling_match_datacontract
+            type: sql
             dimension: consistency
             # A self-join within one model - datacontract-cli's {model}
             # template resolves to the same view both times it's used, so
@@ -689,7 +711,8 @@ schema:
         required: true
         description: BDM's internal record ID. Kept alongside registration_number to help trace re-extractions.
         quality:
-          - metric: duplicateValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:source_system_record_id:duplicateValues_datacontract
+            metric: duplicateValues
             dimension: uniqueness
             mustBe: 0
             severity: error
@@ -705,7 +728,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - metric: invalidValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:source_system_record_id:invalidValues_datacontract
+            metric: invalidValues
             dimension: conformity
             arguments:
               pattern: "^SRC-[0-9]{9}$"
@@ -730,7 +754,8 @@ schema:
         required: true
         description: When this record was extracted from BDM's source system, not when the file landed in S3.
         quality:
-          - metric: nullValues
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:extract_timestamp:nullValues_datacontract
+            metric: nullValues
             dimension: completeness
             mustBe: 0
             severity: error
@@ -747,7 +772,8 @@ schema:
               - property: failure_indicates
                 value: >
                   self-evident
-          - type: sql
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:extract_timestamp:timestamp_ordering_datacontract
+            type: sql
             dimension: consistency
             query: "SELECT COUNT(*) FROM {model} WHERE extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL 1 DAY"
             mustBe: 0
@@ -775,7 +801,8 @@ schema:
       # duplicateValues metric works at field level directly (no need for
       # the arguments.properties list a table-level composite-key check
       # would need for a single column).
-      - metric: rowCount
+      - id: data-asset-1:registry-services:civil-registration:birth-registrations:rowCount_datacontract
+        metric: rowCount
         dimension: completeness
         mustBeBetween: [500, 20000]
         severity: warning

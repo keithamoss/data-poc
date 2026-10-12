@@ -263,8 +263,10 @@ def close_scan_connections(scan) -> int:
     return closed
 
 
-def readable_checks_yaml(path: str, unreadable) -> str:
-    """The SodaCL file at `path`, less every check this run cannot read.
+def readable_checks_yaml(path: str, unreadable, keep=None) -> str:
+    """The SodaCL file at `path`, less every check this run cannot read -
+    and, given `keep`, less every check not in it: the run's scope
+    (REQ-PIPE-191), removed by check id the same way.
 
     THE SODA HALF OF dbt_common.exclude_unreadable(), and the same
     latent defect one tool over (found 2026-10-02). A run's view schema
@@ -290,18 +292,19 @@ def readable_checks_yaml(path: str, unreadable) -> str:
     gone = set(unreadable)
     with open(path) as f:
         text = f.read()
-    if not gone:
+    if not gone and keep is None:
         # VERBATIM in the ordinary case, so a run that can read every
         # table is handed exactly the authored file and no round-trip.
         return text
-    out, _ = _split(config_yaml.parse(text), gone, _declared_reads_tables())
+    out, _ = _split(config_yaml.parse(text), gone, _declared_reads_tables(), keep)
     return yaml.safe_dump(out, sort_keys=False)
 
 
-def left_out_checks(path: str, unreadable) -> list[str]:
-    """The check ids readable_checks_yaml() leaves out, so the run can
-    reconcile them against what it recorded as not evaluated
-    (REQ-PIPE-115 criterion 17)."""
+def left_out_checks(path: str, unreadable, keep=None) -> list[str]:
+    """The check ids readable_checks_yaml() leaves out for being
+    unreadable, so the run can reconcile them against what it recorded as
+    not evaluated (REQ-PIPE-115 criterion 17). Given `keep`, only those in
+    it: a check outside the run's scope was never its to leave out."""
 
     from qa_tools.common.qa_results_writer import _declared_reads_tables
 
@@ -310,7 +313,7 @@ def left_out_checks(path: str, unreadable) -> list[str]:
         return []
     with open(path) as f:
         doc = config_yaml.parse(f)
-    _, removed = _split(doc, gone, _declared_reads_tables())
+    _, removed = _split(doc, gone, _declared_reads_tables(), keep)
     return removed
 
 
@@ -322,22 +325,32 @@ def _check_id_of(item) -> str | None:
     return None
 
 
-def _split(doc: dict, gone: set, declared: dict) -> tuple[dict, list[str]]:
-    """(the document less every unreadable check, the ids taken out)."""
+def _split(doc: dict, gone: set, declared: dict,
+           keep=None) -> tuple[dict, list[str]]:
+    """(the document less every unreadable check and - given `keep` - every
+    check not in it, the unreadable ids taken out). A section left with no
+    checks by `keep` is dropped rather than handed empty."""
+    def wanted(check_id):
+        return keep is None or check_id in keep
+
     out, removed = {}, []
     for key, checks in doc.items():
         if key.startswith("checks for ") and key[len("checks for "):].strip() in gone:
             if isinstance(checks, list):
-                removed.extend(c for c in map(_check_id_of, checks) if c)
+                removed.extend(c for c in map(_check_id_of, checks) if c and wanted(c))
             continue
         if isinstance(checks, list):
             kept = []
             for item in checks:
                 check_id = _check_id_of(item)
+                if keep is not None and not wanted(check_id):
+                    continue
                 if check_id and gone & set(declared.get(check_id, ())):
                     removed.append(check_id)
                     continue
                 kept.append(item)
+            if keep is not None and not kept:
+                continue
             checks = kept
         out[key] = checks
     return out, removed

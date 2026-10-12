@@ -30,7 +30,18 @@ def _dbt_cp(monkeypatch, cp_duckdb_dir):
 
 
 def test_clean_run_resolves_every_check_id_across_all_6_tables(_dbt_cp):
-    results = run_dbt_cp.evaluate_dbt_cp(_REF_RUN_ID, "2026-01-01T09:00:00Z")
+    """Over a run whose id names no table, so its scope is the whole
+    collection (REQ-PIPE-188 criterion 4) - a fixture's placements run is
+    asked only for placements' checks since dbt was scoped (REQ-PIPE-189)."""
+    import uuid
+
+    from conftest import clone_run_views
+    from qa_tools.common import supply_db
+
+    run_id = f"cp_whole_{uuid.uuid4().hex[:8]}"
+    with supply_db.connect(label="test-run-dbt-cp") as conn:
+        clone_run_views(conn, _REF_RUN_ID, run_id)
+    results = run_dbt_cp.evaluate_dbt_cp(run_id, "2026-01-01T09:00:00Z")
 
     assert results, "the real dbt build produced no CP test results at all"
     assert all(r["check_id"] for r in results), "every result must resolve a real check_id (evaluate_dbt_cp raises if not)"

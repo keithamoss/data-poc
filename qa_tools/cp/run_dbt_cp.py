@@ -51,12 +51,13 @@ import json
 import os
 
 
+from qa_tools.common import asked_for
 from qa_tools.common import left_out, supply_db
 from qa_tools.common import hierarchy
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
-    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, parse_threshold, run_dbt,
-    test_nodes,
+    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, names_by_check_id,
+    parse_threshold, parsed_test_nodes, run_dbt, selection, test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -243,7 +244,30 @@ def _check_id_for(node: dict) -> str | None:
                                  meta["name"] if meta else node["name"]))
 
 
+def test_names_by_check_id() -> dict[str, list[str]]:
+    """check id -> this collection's test node names, from the parsed
+    project through `_check_id_for` (REQ-PIPE-189 NFR 1)."""
+    return names_by_check_id(parsed_test_nodes(PROFILES_DIR, DBT_PROJECT_DIR), _check_id_for)
+
+
+def selection_for(check_ids) -> list[str]:
+    """`--select` for exactly these checks and the models they read."""
+    return selection(check_ids, test_names_by_check_id())
+
+
 def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188),
+    # and - once dbt is scoped (REQ-PIPE-189) - all it is asked to run.
+    asked = asked_for.ask(run_id, run_timestamp, cp_common.AGENCY_ID,
+                          cp_common.COLLECTION_ID, "dbt")
+    scoped = "dbt" in asked_for.SCOPED
+    if scoped and not asked:
+        # NOTHING ASKED RUNS NOTHING. `dbt build` with no `--select` builds
+        # the whole project, so an empty ask never reaches it; the raw
+        # output says so, and the run still records dbt.
+        write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp,
+                         "dbt", {"asked": []}, verified=[])
+        return []
     # No scratch database any more (REQ-PIPE-087) - see the BDM
     # counterpart and qa_tools/common/supply_db.py. dbt writes into its
     # own schema in the one PostgreSQL database.
@@ -275,9 +299,13 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         print(f"note: {run_id}: {exc}")
         return []
 
-    run_dbt("build", CP_MODELS + CP_SINGULAR_TESTS, target_path, PROFILES_DIR,
-            DBT_PROJECT_DIR, ROOT, run_schema=supply_db.run_schema(run_id),
-            run_id=run_id, exclude=exclude)
+    # ONLY THE ASKED-FOR TESTS AND THE MODELS THEY READ (REQ-PIPE-189
+    # criteria 1 and 2): `+test` lets dbt's graph pick the models, and an
+    # empty indirect selection stops it running every other test on them.
+    run_dbt("build", selection_for(asked) if scoped else CP_MODELS + CP_SINGULAR_TESTS,
+            target_path, PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
+            run_schema=supply_db.run_schema(run_id), run_id=run_id, exclude=exclude,
+            indirect_selection="empty" if scoped else None)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
@@ -294,10 +322,14 @@ def evaluate_dbt_cp(run_id: str, run_timestamp: str) -> list[dict]:
         # run can reconcile it against what it recorded as not evaluated
         # (REQ-PIPE-115 criterion 17) - the `+` follows dbt's lineage,
         # not the reads declaration, which is exactly why it is checked.
+        # Only what it was ASKED for: a test never selected was not left
+        # out, it was never this run's.
         ran = {r["unique_id"] for r in run_results["results"]}
+        wanted = set(asked)
         left_out.note(run_id, "dbt", [
             _check_id_for(node) for uid, node in nodes.items()
-            if uid not in ran and _table_for_test(node) is not None])
+            if uid not in ran and _table_for_test(node) is not None
+            and _check_id_for(node) in wanted])
 
     # Unqualified names resolve to dbt's own schema - see connect_dbt().
     conn = supply_db.connect_dbt(run_id)

@@ -85,7 +85,7 @@ already produced once, where json.dumps refused one on the way out.
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from qa_tools.common import supply_db
 
@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 37
+SCHEMA_VERSION = 38
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -323,6 +323,25 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".tables_read (
 --   "which runs read this table, in order" - the audit question
 CREATE INDEX IF NOT EXISTS tables_read_logical
     ON "{SCHEMA}".tables_read (logical_table);
+
+-- WHAT EACH TOOL WAS ASKED TO EVALUATE, per run (REQ-PIPE-188 criteria 8
+-- and 9). A tool asked for its run's scope rather than the whole
+-- collection produces narrower raw output, and this is what lets a reader
+-- years later see why without the code of the day: the rule is on qa.run
+-- (scope, reads_table), its answer on the day is here. Recorded for every
+-- tool a run invokes, scoped or not, so a run and tool with no rows here
+-- means it was not recorded rather than that nothing was asked for.
+-- ROWS rather than an array on tool_output, so "which runs were asked for
+-- check X" is one indexed query. Check ids only - never a supply value.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".asked_check (
+    run_key  text NOT NULL REFERENCES "{SCHEMA}".run ON DELETE CASCADE,
+    tool     text NOT NULL,
+    check_id text NOT NULL,
+    PRIMARY KEY (run_key, tool, check_id)
+);
+
+CREATE INDEX IF NOT EXISTS asked_check_by_check
+    ON "{SCHEMA}".asked_check (check_id);
 
 -- ONE RECORD PER LOAD ATTEMPT, append-only (REQ-PIPE-089 criterion 14,
 -- carrying REQ-PIPE-060's criteria 13-20 across unchanged). It is not a
@@ -1886,6 +1905,29 @@ def tables_read_for_run(conn: supply_db.SupplyConnection, run_key: str) -> dict[
     return {logical: physical for logical, physical in conn.execute(
         f'SELECT logical_table, physical_table FROM "{SCHEMA}".tables_read_visible '
         "WHERE run_key = ? ORDER BY logical_table", [run_key]).fetchall()}
+
+
+def record_asked(conn: supply_db.SupplyConnection, run_key: str, tool: str,
+                 check_ids: Iterable[str]) -> None:
+    """Record what `tool` was asked to evaluate on `run_key`, replacing what
+    was recorded for that run and tool before (REQ-PIPE-188)."""
+    conn.execute(f'DELETE FROM "{SCHEMA}".asked_check WHERE run_key = ? AND tool = ?',
+                 [run_key, tool])
+    ids = sorted(set(check_ids))
+    if ids:
+        conn.execute(
+            f'INSERT INTO "{SCHEMA}".asked_check (run_key, tool, check_id) '
+            "SELECT ?, ?, unnest(?::text[])", [run_key, tool, ids])
+
+
+def asked_for_run(conn: supply_db.SupplyConnection, run_key: str) -> dict[str, list[str]]:
+    """tool -> the sorted check ids it was asked for on `run_key`."""
+    out: dict[str, list[str]] = {}
+    for tool, check in conn.execute(
+            f'SELECT tool, check_id FROM "{SCHEMA}".asked_check WHERE run_key = ? '
+            "ORDER BY tool, check_id", [run_key]).fetchall():
+        out.setdefault(tool, []).append(check)
+    return out
 
 
 def tool_output_for(conn: supply_db.SupplyConnection, run_key: str, tool: str,

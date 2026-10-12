@@ -65,11 +65,12 @@ import os
 
 
 from . import bdm_common
+from qa_tools.common import asked_for
 from qa_tools.common import supply_db
 from qa_tools.common.check_lifecycle import dbt_check_id_lookup
 from qa_tools.common.dbt_common import (
-    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, parse_threshold, run_dbt,
-    test_nodes,
+    ENGINE_TAG, NothingLeftToBuild, exclude_unreadable, names_by_check_id,
+    parse_threshold, parsed_test_nodes, run_dbt, selection, test_nodes,
     failing_sample_keys_direct, failing_sample_keys_via_values,
 )
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -257,7 +258,41 @@ def _unreadable_in(run_id: str) -> frozenset[str]:
         conn.close()
 
 
+def _check_id_for(node: dict) -> str | None:
+    """The check id a test node is recorded under, or None for a node that
+    is not this collection's - the lookup the results loop makes, and the
+    one the selection is computed through (REQ-PIPE-189 NFR 1)."""
+    meta = node.get("test_metadata")
+    if meta:
+        if (node.get("attached_node") or "").split(".")[-1] != "stg_birth_registrations":
+            return None
+        return _CHECK_ID_LOOKUP.get(("stg_birth_registrations", node["column_name"] or None,
+                                     meta["name"]))
+    if node["name"] not in _SINGULAR_TESTS:
+        return None
+    return _CHECK_ID_LOOKUP.get((None, None, node["name"]))
+
+
+def test_names_by_check_id() -> dict[str, list[str]]:
+    """check id -> this collection's test node names, from the parsed
+    project through `_check_id_for` (REQ-PIPE-189 NFR 1)."""
+    return names_by_check_id(parsed_test_nodes(PROFILES_DIR, DBT_PROJECT_DIR), _check_id_for)
+
+
+def selection_for(check_ids) -> list[str]:
+    """`--select` for exactly these checks and the model they read."""
+    return selection(check_ids, test_names_by_check_id())
+
+
 def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked = asked_for.ask(run_id, run_timestamp, AGENCY_ID, COLLECTION_ID, "dbt")
+    scoped = "dbt" in asked_for.SCOPED
+    if scoped and not asked:
+        # Never an empty --select - see evaluate_dbt_cp().
+        write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp, "dbt",
+                         {"asked": []}, verified=[])
+        return []
     # No scratch database any more (REQ-PIPE-087): dbt writes its
     # staging models and its --store-failures audit tables into its own
     # SCHEMA in the one PostgreSQL database, and the connection opened
@@ -301,10 +336,13 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
         print(f"note: {run_id}: {exc}")
         return []
 
-    run_dbt("build", ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
+    # The same scoped path as Child Protection's (REQ-PIPE-188 criterion
+    # 10), whose answer here is every check on the one table.
+    run_dbt("build", selection_for(asked) if scoped
+            else ["stg_birth_registrations", *_SINGULAR_TESTS], target_path,
             PROFILES_DIR, DBT_PROJECT_DIR, ROOT,
             run_schema=supply_db.run_schema(run_id), run_id=run_id,
-            exclude=exclude)
+            exclude=exclude, indirect_selection="empty" if scoped else None)
 
     with open(os.path.join(target_path, "manifest.json")) as f:
         manifest = json.load(f)
@@ -382,7 +420,7 @@ def evaluate_dbt_bdm(run_id: str, run_timestamp: str) -> list[dict]:
             # model.
             check_id_model = "stg_birth_registrations" if meta else None
             check_id_column = node["column_name"] if (meta and node["column_name"]) else None
-            check_id = _CHECK_ID_LOOKUP.get((check_id_model, check_id_column, test_name))
+            check_id = _check_id_for(node)
             if check_id is None:
                 raise ValueError(f"no check_id found for dbt test {test_name!r} "
                                   f"(model={check_id_model!r}, column={check_id_column!r}) - schema.yml "

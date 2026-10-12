@@ -39,8 +39,27 @@ LABEL_BY_METRIC = {
 }
 
 
-def run_against_warehouse(contract_path: str, schema: str):
+class SelectionRefused(RuntimeError):
+    """datacontract-cli could not select what the run asked for - a rule id
+    or a model the contract does not hold (REQ-PIPE-190 criterion 7)."""
+
+
+#: The checks datacontract-cli adds when a selection names something the
+#: contract does not hold. It reports them rather than raising.
+_SELECTION_CHECKS = ("Check that quality rule id exists", "Check that schema name exists")
+
+
+def run_against_warehouse(contract_path: str, schema: str, *,
+                          quality_ids: set[str] | None = None,
+                          schema_name: str | None = None):
     """Test the contract against the WAREHOUSE, not the file that arrived.
+
+    `quality_ids` and `schema_name` ARE THE TOOL'S OWN OPTIONS (REQ-PIPE-190,
+    Keith 2026-10-12): a run asks for its scope through them, and the
+    contract text is never pruned to do it - the seam the declined
+    REQ-PIPE-161 touched. Neither is passed where the caller asks for
+    everything. A selection the tool cannot honour raises SelectionRefused
+    rather than testing anything else.
 
     THIS IS WHAT REQ-QAC-088 IS FOR. Until now this tool read the
     supplier's CSV directly through a "local_test" server, which made it
@@ -106,11 +125,37 @@ def run_against_warehouse(contract_path: str, schema: str):
             "one - it treats an empty value as missing. Give the database a "
             "real password and put it in MOTHMAN_SUPPLY_DSN.")
 
+    selected = {}
+    if quality_ids is not None:
+        selected["quality_ids"] = set(quality_ids)
+    if schema_name is not None:
+        selected["schema_name"] = schema_name
     dc = DataContract(data_contract_str=yaml.dump(d), server="warehouse",
                       include_failed_samples=True,
                       config={"DATACONTRACT_POSTGRES_USERNAME": fields["user"],
-                              "DATACONTRACT_POSTGRES_PASSWORD": fields["password"]})
-    return dc.test()
+                              "DATACONTRACT_POSTGRES_PASSWORD": fields["password"]},
+                      **selected)
+    run = dc.test()
+    refused = [c for c in run.checks if c.name in _SELECTION_CHECKS
+               and getattr(c.result, "value", c.result) != "passed"]
+    if selected and refused:
+        raise SelectionRefused(
+            "datacontract-cli could not select what this run asked for - "
+            + "; ".join(f"{c.name}: {c.reason}" for c in refused)
+            + ". Refused rather than testing the whole contract instead.")
+    return run
+
+
+def selection_for(contract_path: str, asked: list[str]) -> dict:
+    """The options a run asks datacontract-cli with: its rules by id, and
+    their model where they all sit on one (REQ-PIPE-190 criterion 3)."""
+    from qa_tools.common import check_lifecycle
+
+    models = {check_lifecycle.contract_rule_models(contract_path).get(c) for c in asked}
+    options: dict = {"quality_ids": {check_lifecycle.odcs_quality_id(c) for c in asked}}
+    if len(models) == 1 and None not in models:
+        options["schema_name"] = models.pop()
+    return options
 
 
 # datacontract-cli's own SAMPLEABLE_METRICS (missing_count/invalid_count/

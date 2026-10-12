@@ -94,6 +94,11 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     # run gets forwarded, and a real run row would need a real database.
     monkeypatch.setattr(orchestrate_bdm, "open_run", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_bdm, "finish_run", lambda *a, **k: None)
+    # Every tool above returns nothing, which REQ-PIPE-188's guard rightly
+    # refuses - stubbed on the same terms, since this test is about the
+    # reference forwarded, not about what came back.
+    monkeypatch.setattr(orchestrate_bdm.asked_for, "check_nothing_missing",
+                        lambda *a, **k: None)
     # The orchestrators no longer import duckdb directly - they open
     # the supply database through supply_db.connect() and set the
     # run's view schema on it (REQ-PIPE-068).

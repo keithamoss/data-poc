@@ -31,16 +31,18 @@ from __future__ import annotations
 import os
 
 from . import bdm_common
+from qa_tools.common import asked_for
 from qa_tools.common import supply_db
 from qa_tools.common.datacontract_common import (
     ENGINE_TAG, DIMENSION_BY_METRIC, LABEL_BY_METRIC, SAMPLEABLE_METRICS,
-    run_against_warehouse, failing_sample_keys, check_id_from_quality_definition,
+    run_against_warehouse, selection_for, failing_sample_keys,
+    check_id_from_quality_definition,
     fail_threshold_from_quality_definition,
 )
 from qa_tools.common.check_lifecycle import (
     name_by_check_id, parse_contract_check_metadata,
 )
-from qa_tools.common.qa_results_writer import write_qa_result
+from qa_tools.common.qa_results_writer import run_owner, write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -87,6 +89,19 @@ CHECK_NAME_BY_ID = name_by_check_id(parse_contract_check_metadata(CONTRACT_PATH)
 
 
 def evaluate_datacontract_bdm(run_id: str, run_timestamp: str) -> list[dict]:
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked = asked_for.ask(run_id, run_timestamp, AGENCY_ID, COLLECTION_ID, "datacontract")
+    scoped = "datacontract" in asked_for.SCOPED
+    if scoped and not asked:
+        # NOTHING ASKED RUNS NOTHING - see run_dbt_cp.evaluate_dbt_cp().
+        write_qa_result(AGENCY_ID, COLLECTION_ID, run_id, run_timestamp,
+                         "datacontract", {"asked": []}, verified=[])
+        return []
+    # ITS OWN OPTIONS, NEVER A PRUNED CONTRACT (REQ-PIPE-190): the run's
+    # rules by id, and their model where they all sit on one. Neither for a
+    # run whose id names no table, which asks for the whole contract.
+    options = (selection_for(CONTRACT_PATH, asked)
+               if scoped and run_owner(run_id) is not None else {})
     # THE WAREHOUSE, NOT THE FILE (REQ-QAC-088). This tool used to read
     # the supplier's CSV directly, which made it the one tool answering a
     # different question from the other three - they checked what had
@@ -97,7 +112,7 @@ def evaluate_datacontract_bdm(run_id: str, run_timestamp: str) -> list[dict]:
     # module still use it for reporting", and nothing did - it was
     # accepted and ignored, which is exactly the shape of the dead
     # parameter that cost a test eighty seconds a run elsewhere.
-    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id))
+    run = run_against_warehouse(CONTRACT_PATH, supply_db.run_schema(run_id), **options)
 
     results = []
     for c in run.checks:

@@ -16,6 +16,7 @@ import os
 
 import psycopg
 
+from qa_tools.common import asked_for
 from qa_tools.common import hierarchy, left_out
 from qa_tools.common.evidently_common import (
     ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
@@ -225,6 +226,8 @@ def evaluate_evidently_cp(run_id: str, run_timestamp: str,
     check is then reported as having no reference, and specifically NOT
     as passing - see evidently_common.NO_REFERENCE.
     """
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked_for.ask(run_id, run_timestamp, cp_common.AGENCY_ID, cp_common.COLLECTION_ID, "evidently")
     results = []
     if _psi_applies(run_id):
         results.append(_psi_result(run_id, run_timestamp, reference_run_id))

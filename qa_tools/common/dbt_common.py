@@ -13,6 +13,8 @@ guessed in advance - see plans/qa-pipeline.md #84.
 from __future__ import annotations
 import os
 import re
+import threading
+from pathlib import Path
 
 
 from qa_tools.common import supply_db
@@ -47,8 +49,14 @@ def parse_threshold(spec: str | None) -> float | None:
 def run_dbt(command: str, select: list[str], target_path: str,
             profiles_dir: str, project_dir: str, root: str,
             run_schema: str | None = None, run_id: str | None = None,
-            exclude: list[str] | None = None) -> None:
+            exclude: list[str] | None = None,
+            indirect_selection: str | None = None) -> None:
     """Run dbt against the one PostgreSQL database.
+
+    `indirect_selection="empty"` runs only the tests `select` names
+    (REQ-PIPE-189 criterion 2): without it `dbt build` also runs every test
+    whose parents were all built, which is every other test on a model
+    built for a cross-table one.
 
     `db_path` IS GONE from this signature (REQ-PIPE-087). It used to name
     dbt's own scratch DuckDB file, which existed because dbt writes and
@@ -80,18 +88,6 @@ def run_dbt(command: str, select: list[str], target_path: str,
     are. Excluding by hand would mean this project maintaining its own
     copy of the DAG.
     """
-    env = dict(os.environ)
-    # PARSED WITH psycopg's OWN conninfo PARSER, not a regex. dbt-postgres
-    # wants discrete host/port/user/dbname fields and this project holds
-    # one DSN, and the three forms that DSN legitimately takes - a URL, a
-    # keyword string, and a unix socket as `?host=/tmp` - are exactly
-    # where a hand-rolled parser gets one wrong.
-    fields = supply_db.connection_fields()
-    env["DBT_PG_HOST"] = fields["host"]
-    env["DBT_PG_PORT"] = fields["port"]
-    env["DBT_PG_USER"] = fields["user"]
-    env["DBT_PG_PASSWORD"] = fields["password"]
-    env["DBT_PG_DBNAME"] = fields["dbname"]
     # PER RUN. Without a run_id there is no isolation to give, so this
     # refuses rather than silently sharing one schema again - which is
     # the bug this parameter exists to prevent.
@@ -108,9 +104,7 @@ def run_dbt(command: str, select: list[str], target_path: str,
     source_schema = supply_db.dbt_source_schema()
     _prepare_worker_schemas(worker_schema, source_schema, run_schema)
     supply_db.built_by_worker(run_id)
-    env["DBT_PG_SCHEMA"] = worker_schema
-    env["DBT_RUN_SCHEMA"] = source_schema
-    env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
+    env = _dbt_env()
     # STALE OUTPUT IS REMOVED BEFORE THE RUN, not trusted after it.
     # target_path is per-run and persists, so a build that fails early
     # leaves the PREVIOUS build's run_results.json in place and the
@@ -138,9 +132,128 @@ def run_dbt(command: str, select: list[str], target_path: str,
         # per-row samples (see plans/qa-pipeline.md #15).
         [command, "--profiles-dir", profiles_dir, "--project-dir", project_dir, "--quiet",
          "--target-path", target_path, "--select", *select,
-         *(("--exclude", *exclude) if exclude else ()), "--store-failures"],
+         *(("--exclude", *exclude) if exclude else ()),
+         *(("--indirect-selection", indirect_selection) if indirect_selection else ()),
+         "--store-failures"],
         env, target_path)
     _refuse_a_build_that_did_not_run(completed, target_path)
+
+
+def _dbt_env() -> dict:
+    """The environment every dbt invocation in this process runs under -
+    one function, so a parse and a build agree on everything dbt's partial
+    parse is keyed on (REQ-PIPE-157)."""
+    env = dict(os.environ)
+    # PARSED WITH psycopg's OWN conninfo PARSER, not a regex. dbt-postgres
+    # wants discrete host/port/user/dbname fields and this project holds
+    # one DSN, and the three forms that DSN legitimately takes - a URL, a
+    # keyword string, and a unix socket as `?host=/tmp` - are exactly
+    # where a hand-rolled parser gets one wrong.
+    fields = supply_db.connection_fields()
+    env["DBT_PG_HOST"] = fields["host"]
+    env["DBT_PG_PORT"] = fields["port"]
+    env["DBT_PG_USER"] = fields["user"]
+    env["DBT_PG_PASSWORD"] = fields["password"]
+    env["DBT_PG_DBNAME"] = fields["dbname"]
+    env["DBT_PG_SCHEMA"] = supply_db.dbt_worker_schema()
+    env["DBT_RUN_SCHEMA"] = supply_db.dbt_source_schema()
+    env["DBT_SEND_ANONYMOUS_USAGE_STATS"] = "False"
+    return env
+
+
+class UnknownCheck(ValueError):
+    """A check was asked for that no dbt test in the project carries."""
+
+
+#: The project's test nodes, keyed on the content of every file dbt parses
+#: (REQ-PIPE-189). A few entries: a process sees one tree, a test a handful.
+_parsed: dict[str, dict[str, dict]] = {}
+_parsed_lock = threading.Lock()
+_PARSED_KEEP = 4
+_PARSED_SKIP = {"target", "dbt_packages", "logs"}
+
+
+def _project_fingerprint(project_dir: str) -> str:
+    """A digest of every file dbt reads from the project, by content."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    root = Path(project_dir)
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root)
+        if rel.parts[0] in _PARSED_SKIP or not path.is_file():
+            continue
+        digest.update(str(rel).encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def parsed_test_nodes(profiles_dir: str, project_dir: str) -> dict[str, dict]:
+    """Every test node in the dbt project, by unique id - parsed ONCE per
+    process while the project is unchanged (REQ-PIPE-189 criterion 5),
+    through the same long-lived worker and environment as every build, so
+    the build after it reuses that partial parse rather than paying for
+    its own."""
+    import json
+    import shutil
+    import tempfile
+
+    from qa_tools.common import dbt_worker
+
+    key = _project_fingerprint(project_dir)
+    with _parsed_lock:
+        hit = _parsed.get(key)
+    if hit is None:
+        target = tempfile.mkdtemp(prefix="mothman-dbt-parse-")
+        try:
+            completed = dbt_worker.invoke(
+                ["parse", "--profiles-dir", profiles_dir, "--project-dir", project_dir,
+                 "--quiet", "--target-path", target], _dbt_env(), target)
+            manifest_path = os.path.join(target, "manifest.json")
+            if not os.path.exists(manifest_path):
+                said = "\n".join(p.strip() for p in (completed.stdout, completed.stderr)
+                                 if p and p.strip())
+                raise DbtRunFailed(f"dbt parse wrote no manifest. dbt said:\n"
+                                   f"{said or '(nothing at all)'}")
+            with open(manifest_path) as f:
+                hit = test_nodes(json.load(f))
+        finally:
+            shutil.rmtree(target, ignore_errors=True)
+        with _parsed_lock:
+            _parsed[key] = hit
+            while len(_parsed) > _PARSED_KEEP:
+                _parsed.pop(next(iter(_parsed)))
+    return hit
+
+
+def forget_parsed_tests() -> None:
+    """Forget the parsed project - for a test that counts parses."""
+    with _parsed_lock:
+        _parsed.clear()
+
+
+def names_by_check_id(nodes: dict[str, dict], check_id_for) -> dict[str, list[str]]:
+    """check id -> the test node names that record it, through the caller's
+    own node-to-check-id lookup (NFR 1: never a hand-kept list of names).
+    A node the lookup does not claim belongs to another collection."""
+    out: dict[str, set[str]] = {}
+    for node in nodes.values():
+        check = check_id_for(node)
+        if check:
+            out.setdefault(check, set()).add(node["name"])
+    return {check: sorted(names) for check, names in out.items()}
+
+
+def selection(check_ids, names: dict[str, list[str]]) -> list[str]:
+    """`--select` arguments for exactly these checks: each test by name with
+    its ancestors (`+name`), so dbt's own graph decides which staging models
+    those tests read and builds them (criterion 1)."""
+    unknown = sorted(c for c in check_ids if c not in names)
+    if unknown:
+        raise UnknownCheck(
+            f"asked for {len(unknown)} check(s) no dbt test records: "
+            f"{', '.join(unknown)}. The asked-for set and the project disagree, "
+            f"so nothing is selected rather than a guess.")
+    return sorted({f"+{name}" for c in check_ids for name in names[c]})
 
 
 def _prepare_worker_schemas(worker_schema: str, source_schema: str,

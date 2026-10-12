@@ -30,6 +30,7 @@ import os
 import sys
 
 
+from qa_tools.common import asked_for
 from qa_tools.common import (arrivals, delivery, delivery_log, in_flight_log,
                               supply_db)
 from qa_tools.common import decision_log
@@ -291,11 +292,19 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
     # only that it agreed. Nothing is written where nothing was left out.
     noted = left_out.take(run_id)
     if _reconciles(entry, run_id):
-        compared = left_out.reconcile(run_id, noted, [*blast, *missing],
-                                      scope_of_run(run_id))
+        in_scope = scope_of_run(run_id)
+        compared = left_out.reconcile(run_id, noted, [*blast, *missing], in_scope)
         if compared:
             write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id,
                              run_timestamp, left_out.TOOL, {"left_out": compared})
+        # AND NOTHING IN SCOPE WENT MISSING ALTOGETHER (REQ-PIPE-188
+        # criterion 6) - see asked_for.py. The reconciliation above
+        # compares what a tool SAID it left out; a tool asked for the wrong
+        # subset says nothing, so every in-scope check must have a verdict
+        # or a not-evaluated record. Only where the tools ran.
+        if readable:
+            asked_for.check_nothing_missing(run_id, cp_common.COLLECTION_ID,
+                                            results, in_scope)
     # run_by stamped only on this write - see orchestrate_bdm.py's
     # identical comment.
     write_qa_result(cp_common.AGENCY_ID, cp_common.COLLECTION_ID, run_id, run_timestamp, "dataset_stats", stats,

@@ -29,6 +29,7 @@ from qa_tools.common.evidently_common import (
     ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
     status_for_psi, status_for_row_drop, compute_psi,
 )
+from qa_tools.common import asked_for
 from qa_tools.common import drift_reference
 from qa_tools.common.qa_results_writer import write_qa_result
 from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
@@ -168,6 +169,8 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
     which is the trap `build_all(raw_dir=...)` had already sprung
     once.
     """
+    # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
+    asked_for.ask(run_id, run_timestamp, AGENCY_ID, COLLECTION_ID, "evidently")
     current = _current_frame(run_id)
     n_total = len(current)
 
