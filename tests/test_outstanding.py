@@ -335,63 +335,6 @@ class TestItFaultsNobody:
                 assert phrase not in text, (item.kind, phrase)
 
 
-class TestItReadsRecordsAndNeverSupplyRows:
-    """The NFR, RESTATED rather than kept as it was.
-
-    It used to read "this feeds a dashboard build and may never open
-    data/", and it was tested by asserting the module named no
-    database driver at all - which worked while every record it needed
-    was a committed file. REQ-PIPE-089 moved two of its four producers
-    into the database, so "opens no database" would now be a test that
-    passes only because the import sits one module away, which is
-    worse than no test.
-
-    The line it has to hold is Keith's own, 2026-09-27: a build may
-    read recorded QA results, never actual data, and never anything
-    else. The delivery record and the load outcome are recorded
-    metadata; a staged, promoted, rejected or period schema holds the
-    extract itself. So the claim is about WHICH schema, not about
-    whether a connection exists.
-    """
-
-    #: Every schema that holds supply rows. Named here rather than
-    #: derived, because the point is that a new one must be added
-    #: deliberately - a derivation would quietly admit whatever came
-    #: along next.
-    FORBIDDEN = ("staging", "rejected", "promoted", "period_", "sample")
-
-    def test_it_reads_no_schema_that_holds_supply_rows(self):
-        source = (outstanding.__file__ and open(outstanding.__file__).read()) or ""
-        named = [s for s in self.FORBIDDEN if s in source]
-        assert not named, (
-            f"outstanding.py names {named}, which hold the extract itself. It may read "
-            f"recorded metadata and nothing else.")
-
-    def test_it_reaches_the_database_only_through_the_record_modules(self):
-        """A connection of its own would be the thing to worry about:
-        the two modules it goes through can only answer questions about
-        records, and `supply_db.connect` can answer any question at
-        all."""
-        import ast
-
-        source = (outstanding.__file__ and open(outstanding.__file__).read()) or ""
-        imported = set()
-        for node in ast.walk(ast.parse(source)):
-            if isinstance(node, ast.Import):
-                imported.update(a.name.split(".")[0] for a in node.names)
-            elif isinstance(node, ast.ImportFrom):
-                imported.update(a.name for a in node.names)
-                if node.module:
-                    imported.add(node.module.split(".")[0])
-
-        # THE IMPORTS, not the source text. Written as a substring
-        # search first, which promptly failed on a docstring explaining
-        # why `supply_db` is not imported - a test that cannot tell
-        # prose from code is a test that punishes the explanation.
-        assert "supply_db" not in imported
-        assert "duckdb" not in imported
-
-
 class TestTheRecordTheDashboardReads:
     def test_as_record_carries_the_total_and_the_per_scope_counts(self, tmp_path, clean_delivery_log):
         _delivery(clean_delivery_log, "monday",

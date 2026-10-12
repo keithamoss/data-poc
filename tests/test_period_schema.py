@@ -382,10 +382,14 @@ class TestACheckIsEvaluatedOnce:
         "qa_tools/bdm/build_results_from_history.py",
         "qa_tools/cp/build_results_from_history.py",
     ])
-    def test_the_replay_path_re_runs_no_tool_and_opens_no_warehouse(self, path):
+    def test_the_replay_path_re_runs_no_tool(self, path):
+        """Re-deriving a verdict is not a privilege question - a tool's
+        evaluation parses its own artefacts - so it stays here. That the
+        replay path reads no supply rows is proven by running it as the
+        publisher role, in tests/test_readers_read_no_supply_rows.py."""
         source = Path(path).read_text()
-        for forbidden in ("import duckdb", "supply_db.connect", "evaluate_dbt",
-                           "evaluate_soda", "evaluate_datacontract", "evaluate_evidently"):
+        for forbidden in ("evaluate_dbt", "evaluate_soda", "evaluate_datacontract",
+                          "evaluate_evidently"):
             assert forbidden not in source, (
                 f"{path} would re-derive a historical verdict via {forbidden!r} "
                 f"instead of replaying the one that was recorded")

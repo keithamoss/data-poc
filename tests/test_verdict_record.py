@@ -9,7 +9,6 @@ it LATE - which is the re-judgement these tests drive.
 from __future__ import annotations
 
 import copy
-import inspect
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -228,14 +227,6 @@ class TestReJudgement:
                             lambda *a, **k: calls.append(a[1]) or real(*a, **k))
         assert len(verdict.rejudged(clean, DATASET, _agreement(_grace_one_hour))) == 5
         assert len(calls) == 1
-
-    def test_it_reads_recorded_metadata_and_configuration_only(self):
-        """Criterion 8: never supply rows."""
-        source = inspect.getsource(verdict.compared)
-        for table in ("filing_current", "supply_receipt", "{TABLE}"):
-            assert table in source
-        for forbidden in ("staging", "period_tables", "rows_of", "supply_rows"):
-            assert forbidden not in source
 
 
 def _move_q3_to_july_25(doc):

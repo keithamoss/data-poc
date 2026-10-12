@@ -162,15 +162,6 @@ class TestTheRemedy:
         assert "reset-synthetic" not in _refusal(conn, cal, asset).remedy
 
 
-def test_it_reads_recorded_metadata_and_configuration_only():
-    """Criterion 6."""
-    import inspect
-
-    source = inspect.getsource(agreement_drift)
-    for forbidden in ("staging", "period_tables", "supply_rows", "SELECT"):
-        assert forbidden not in source
-
-
 class TestTheCommandAndThePass:
     """Criteria 2-4 through the routes a person and a scheduler see."""
 

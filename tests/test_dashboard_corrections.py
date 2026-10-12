@@ -69,14 +69,6 @@ def test_each_applied_correction_is_one_activity_entry(conn, manager, by_supply,
     assert entry["moved"] == 1 and entry["published_at"]
 
 
-def test_it_reads_recorded_facts_and_configuration_only():
-    import inspect
-
-    source = inspect.getsource(corrections)
-    for forbidden in ("staging_schema_for", "run_schema", "period_tables", "candidates_in"):
-        assert forbidden not in source
-
-
 class TestCriticFindingsOn172:
     """delivery-critic on REQ-DASH-172 (post-build-review #149). Each failed
     before its fix."""

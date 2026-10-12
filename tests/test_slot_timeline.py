@@ -154,33 +154,6 @@ class TestItAgreesWithTheRuleItShipsAnswersFor:
             assert by_lookup == by_rule, f"disagreed at {at}"
 
 
-class TestItReadsTheLogAndNothingElse:
-    """Criterion 3. What a period resolved to as at T is a fact about
-    decisions taken; the warehouse's current contents are the result of
-    the newest one, so reading those answers "now" whatever T was."""
-
-    def test_it_names_no_schema_that_holds_supply_rows(self):
-        import ast
-        import inspect
-
-        # THE CODE, NOT THE PROSE. The module's own docstring explains
-        # at length what it does NOT read, so a substring search over
-        # the source finds every forbidden word and proves nothing -
-        # the same false positive this project hit once already on
-        # outstanding.py. Strings and names in the parsed tree are what
-        # a query would actually be built from.
-        tree = ast.parse(inspect.getsource(slot_timeline))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
-                continue  # a bare docstring expression
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                for forbidden in ("staging", "period_", "rejected"):
-                    assert forbidden not in node.value, (
-                        f"slot_timeline builds a string naming {forbidden!r}, "
-                        f"which is about the warehouse's contents rather "
-                        f"than the decisions taken")
-
-
 class TestEachEntryCanBeTiedToItsRun:
     """The page needs to get from "this slot held supply X" to the run
     whose results it should show, and the supply id is not a run id.

@@ -213,15 +213,6 @@ def test_nothing_is_recorded(conn):
     assert counts() == before
 
 
-def test_it_reads_configuration_and_recorded_facts_only():
-    """Criterion 8: no supply rows - no staging, period or run schema."""
-    import inspect
-
-    source = inspect.getsource(correction_trial)
-    for forbidden in ("staging_schema_for", "run_schema", "period_tables", "candidates_in"):
-        assert forbidden not in source
-
-
 class TestTheCommands:
     """Criteria 1, 7, 9, 12 and 14, through the real commands."""
 
