@@ -1155,6 +1155,22 @@ to the exact right file/line/folder with zero console errors.
     propose cuts - the e2e module is the long pole, and #86's parked
     test-pruning pass is the related item. Not scoped yet.
 
+    **MEASURED 2026-10-13** (`pytest --durations=0`, 4,666 tests; wall
+    clock not clean - plans edits and other gates ran beside it - but the
+    per-file sums are). 1,722s of test time across 221 files, on 4 workers:
+    - `test_dashboard_e2e.py` **396s, 204 tests - THE LONG POLE.** `--dist
+      loadfile` pins the whole file to ONE worker, so it alone is ~6.6 min
+      of wall clock while the other three workers finish the remaining
+      ~1,330s between them (~5.5 min each). Splitting it - several files
+      sharing one build per worker, or `--dist loadgroup` - is the single
+      biggest cut available, and costs a dashboard build per extra worker.
+    - `test_embed_dashboard_data.py` 169s for **13 tests (~13s each)** -
+      almost certainly rebuilding the dashboard per test.
+    - `test_generate_to_target.py` 110s/32, `test_dbt_worker.py` 96s/10,
+      `test_cli_cp.py` 68s/10, `test_cli_plans.py` **60s for 4 tests**.
+    The top six files are 55% of all test time. Next: a proposal for Keith
+    per file - share a fixture, split the pole - before changing any test.
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
