@@ -7938,4 +7938,17 @@ twice. It deliberately did not re-find the `TypeError`.
       `test_the_gate_refuses_naming_the_newer_one`, a KeyError on
       `cp-carers` in the fast half - not reproduced; a leftover filing is
       the likely cause, and 49a70df's isolation fixes may cover it, which
-      that push's own CI run is what settles.
+      that push's own CI run is what settles. IT DID NOT: 5d43376's run
+      failed it again with five `test_replacement_setting` tests, all on one
+      worker, all because the agreement backstop had frozen `cp-carers`.
+      Not reproducible by running the fast half (timing decides which
+      modules share a worker), so every module was run ALONE in its own
+      database and probed for a refusal afterwards: one hit,
+      `test_schedule_ended_hold`, whose tests file `cp-carers` into slots of
+      a monkeypatched calendar and left the filings - read against the
+      committed calendar they are "no longer a period of its schedule".
+      Reproduced deterministically (that module first, then the two: 6
+      failed); FIXED by its `conn` fixture forgetting the filings each test
+      made. The sweep is the method worth keeping for this class: a leftover
+      row survives its module, so probing each module alone finds it without
+      needing CI's worker order.

@@ -52,10 +52,21 @@ class TestTheRuleKnowsTheScheduleEnded:
 
 @pytest.fixture
 def conn(supply_dsn):
+    """Forgets the filings each test makes (2026-10-12, CI on 5d43376):
+    they sit in slots of a monkeypatched calendar, so once the committed one
+    is back the agreement backstop reads them as moved and freezes
+    cp-carers for every later module on the same worker."""
+    import filing_support
+    from qa_tools.common import filing
+
     with supply_db.connect(label="test-schedule-ended") as c:
         qa_store.ensure_schema(c)
         c.execute(f"DELETE FROM {supply_holds.TABLE}")
-        yield c
+        (before,) = c.execute(f"SELECT coalesce(max(id), 0) FROM {filing.TABLE}").fetchone()
+        try:
+            yield c
+        finally:
+            filing_support.forget(c, "dataset_id = 'cp-carers' AND id > ?", [before])
 
 
 class TestTheHoldSaysWhatToEdit:
