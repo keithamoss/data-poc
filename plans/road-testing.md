@@ -40,6 +40,43 @@ TestClosingAPanelReachedByItsUrl, three failing first). #16's
 resupply pile-up is built too (REQ-PIPE-118 onward) and stays until its
 remaining decisions are checked into the requirements that own the rest.
 
+**PROPOSED SPRINTS FOR WHAT IS LEFT, 2026-10-12** - a proposal for Keith,
+not a commitment: none of sprints 1, 3 or 4 has a requirement yet, so
+each goes through delivery-scoper and his sign-off before anything is
+built. Ordered by value to a busy data-team leader at the dashboard.
+
+- **Sprint 1 - "where do I put my effort?" (#1, #2; M).** The overview and
+  dataset list say how big each problem is and what each trend measures:
+  labelled sparklines on dataset and column pages, "N of M checks not
+  green" on cards, a failing-COLUMNS count where Trend sits now (Keith's
+  2026-10-06 answers). Questions: does Tier 1 roll the count up to agency
+  cards, and where does Trend go? First because at 30 datasets every red
+  looking the same is what stops triage.
+- **Sprint 2 - "don't mislead me" (#18, #17; S-M).** A past date never
+  shows today's "not the latest file" panel (#18 - `promotionSplit()`
+  renders the build-time state on every as-of date). Questions: hide the
+  panel in a past view, or compute it as at that date from REQ-PIPE-081's
+  filing events (fits his 2026-10-04 "shows it as it was", but changes
+  REQ-DASH-056's built behaviour)? And close #17 (same trial, two verdicts)
+  as not reproduced after one more attempt?
+- **Sprint 3 - "what actually changed?" (#9, #10; L).** One distribution
+  component in the drill-down: this supply against the last promoted one
+  (REQ-QAC-108's reference), the invalid values for any check that has
+  them, and an honest "no breakdown for this check" where it does not.
+  Questions: derive the breakdown from each check's declared rule (one
+  copy, retiring the hand-kept lists in both dataset_stats.py) or keep the
+  allowlist; a top-N cap for wide columns; sensitive columns.
+- **Sprint 4 - new check kinds (#4, #6; M-L).** Cardinality drift (gains
+  and losses separately, against the last promoted supply) and declared
+  known-bad dates with percentage bands (the Soda user-defined-metric
+  route already proven on 3.5.6). Questions: thresholds, which columns,
+  baseline and resupply rules, band values. Last because it adds detection
+  rather than making today's results readable, and its values need
+  sprints 1 and 3's displays.
+- **Not scheduled:** #12 stays parked (Keith, 2026-10-06). #16 is built and
+  waits only on checking its remaining decisions into the requirements
+  that own the rest before its ~1,100 lines go.
+
 **STALENESS SWEEP, 2026-10-06** (a read-only agent checked every open
 entry against the code; the claims below were verified before being
 written here). DELETED as fixed by later work: "Arrived at" was the
