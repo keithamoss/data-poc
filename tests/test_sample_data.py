@@ -335,7 +335,6 @@ class TestDiscardingIsSomethingAPersonDoes:
         would make the discard automatic somewhere, which is the thing
         forbidden.
         """
-        import pathlib
         import subprocess
 
         out = subprocess.run(
@@ -345,12 +344,9 @@ class TestDiscardingIsSomethingAPersonDoes:
             capture_output=True, text=True).stdout
         callers = {line.split(":")[0] for line in out.splitlines() if line.strip()}
         assert callers == {"cli/supply.py"}, out
-        # AND THE COMMAND ASKS FIRST, like `mothman supply tidy` - the two
-        # destructive commands in this group behave the same way, through
-        # common.confirm_drop since 2026-10-06 (production's typed id, which
-        # --yes cannot skip - post-build-review #119 D2).
-        source = pathlib.Path("cli/supply.py").read_text()
-        assert "confirm_drop(" in source.split("def discard_sample_command")[1].split("\ndef ")[0]
+        # AND THE COMMAND ASKS FIRST, like `mothman supply tidy` - driven
+        # in tests/test_stated_environment.py's
+        # test_discard_sample_with_yes_still_asks.
 
 
 class TestACrossTableCheckMaySpanThem:
@@ -613,18 +609,48 @@ class TestATableNameIsNotADatasetId:
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         assert sample_data.is_sample_table("cp-referrals") is False
 
-    def test_both_staging_paths_decide_from_the_table(self):
-        """Structural, because the unit test above cannot catch a CALLER
-        passing the wrong one - which is exactly how this got through.
+    @pytest.mark.parametrize("builder", ["cp", "bdm"])
+    def test_both_staging_paths_decide_from_the_table(self, builder, tmp_path, monkeypatch,
+                                                      supply_dsn):
+        """The unit tests above cannot catch a CALLER passing the wrong one -
+        which is exactly how this got through. So each real builder stages a
+        sample dataset's file, by its TABLE name, and the rows land in the
+        sample schema. A builder asking the dataset-id form instead raises
+        on the table name or files the rows as a real supply."""
+        from qa_tools.bdm import build_per_run_warehouses
+        from qa_tools.cp import build_cp_warehouses
 
-        Neither builder may ask the dataset-id form: one of them has only a
-        table name that is sometimes standing in for a dataset id, and the
-        other would then be one edit away from the same fault.
-        """
-        import pathlib
-
-        for path in ("qa_tools/cp/build_cp_warehouses.py",
-                     "qa_tools/bdm/build_per_run_warehouses.py"):
-            source = pathlib.Path(path).read_text()
-            assert "ensure_schema_for_table(" in source, path
-            assert "sample_data.ensure_schema_for(" not in source, path
+        bdm_sample = {k: v for k, v in AGREED.items() if k != "calendar"}
+        bdm_sample["no_calendar"] = "not-yet-agreed"
+        if builder == "bdm":
+            _asset_with([bdm_sample], tmp_path, monkeypatch)
+        else:
+            # THE REAL TREE, with the sample dataset added to Child
+            # Protection: the CP builder rebuilds the run's views over every
+            # table of its collection, so the collection has to be whole.
+            doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
+            for agency in doc["hierarchy"]["agencies"]:
+                for collection in agency["collections"]:
+                    if collection["id"] == "child-protection":
+                        collection["datasets"].append(SAMPLE)
+            agreement_split.repoint(monkeypatch, tmp_path, doc)
+        csv = tmp_path / "supply.csv"
+        if builder == "cp":
+            csv.write_text("referral_id\nR1\n")
+            physical = build_cp_warehouses.add_table_to_run(
+                "sample_table_run", "cp_referrals", str(csv))
+        else:
+            csv.write_text("registration_id,child_family_name\nBR0001,SMITH\n")
+            physical = build_per_run_warehouses.build_one(
+                "sample_table_run", str(csv), "2026-01-01")
+        assert physical, "the builder staged nothing"
+        try:
+            with supply_db.connect(read_only=True, label="test-sample-landing") as conn:
+                landed = conn.execute(
+                    "SELECT table_schema FROM information_schema.tables WHERE table_name = ?",
+                    [physical]).fetchall()
+            assert landed == [(supply_db.SAMPLE_SCHEMA,)], landed
+        finally:
+            with supply_db.connect(label="test-sample-landing") as conn:
+                for schema in (supply_db.SAMPLE_SCHEMA, supply_db.STAGING_SCHEMA):
+                    conn.execute(f'DROP TABLE IF EXISTS "{schema}"."{physical}" CASCADE')

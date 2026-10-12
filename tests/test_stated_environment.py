@@ -233,13 +233,44 @@ class TestDroppingThingsNeedsTheTypedId:
             with supply_db.connect(label="test-tidy") as conn:
                 conn.execute(f'DROP SCHEMA IF EXISTS "{leftover}"')
 
-    def test_discard_sample_asks_through_the_same_confirmation(self):
-        import inspect
+    def test_discard_sample_with_yes_still_asks(self, confirming, tmp_path, monkeypatch):
+        """The same confirmation as `supply tidy`, run for real: a sample
+        dataset with data waiting, `--yes`, and the typed id is still asked
+        for - and refusing it drops nothing."""
+        from click.testing import CliRunner
 
-        from cli import supply
+        import agreement_split
+        from cli.supply import supply_group
 
-        source = inspect.getsource(supply.discard_sample_command.callback)
-        assert "confirm_drop(" in source and "click.confirm(" not in source
+        doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
+        for agency in doc["hierarchy"]["agencies"]:
+            for collection in agency["collections"]:
+                if collection["id"] == "child-protection":
+                    collection["datasets"].append({
+                        "id": "cp-referrals", "name": "Referrals", "table": "cp_referrals",
+                        "no_calendar": "not-yet-agreed",
+                        "arrival_pattern": r"cp_referrals\.csv"})
+        agreement_split.repoint(monkeypatch, tmp_path, doc)
+        waiting = supply_db.staged_table("cp_referrals", "2026-01-01T00:00:00+00:00")
+        with supply_db.connect(label="test-discard-sample") as conn:
+            supply_db.ensure_schemas(conn)
+            conn.execute(f'CREATE TABLE "{supply_db.SAMPLE_SCHEMA}"."{waiting}" (x int)')
+        try:
+            result = CliRunner().invoke(
+                supply_group, ["discard-sample", "--dataset", "cp-referrals", "--yes"])
+            assert result.exit_code == 0, result.output
+            assert confirming and confirming[0][1] is True, "--yes skipped the typed id"
+            with supply_db.connect(label="test-discard-sample") as conn:
+                assert conn.execute(
+                    "SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema = ? AND table_name = ?",
+                    [supply_db.SAMPLE_SCHEMA, waiting]).fetchall(), \
+                    "refused, so nothing dropped"
+        finally:
+            with supply_db.connect(label="test-discard-sample") as conn:
+                conn.execute(
+                    f'DROP TABLE IF EXISTS "{supply_db.SAMPLE_SCHEMA}"."{waiting}" CASCADE')
+            agreement_split.clear_caches()
 
 
 class TestInProductionTheTypedIdIsTheKeepDecision:

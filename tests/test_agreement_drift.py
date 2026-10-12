@@ -22,6 +22,14 @@ DATASET = "cp-clients"
 RECEIVED = datetime(2023, 8, 1, 12, tzinfo=PERTH)
 
 
+def _today() -> str:
+    """The asset's own date now - the day the fixture's filing is recorded.
+    A correction counts only if dated on or after that (agreement_drift.
+    _accounted), so a hard-coded date here made these tests go red the day
+    after it was written (2026-10-12)."""
+    return asset_time.local_date(asset_time.now()).isoformat()
+
+
 @pytest.fixture
 def conn(supply_dsn):
     with supply_db.connect(label="test-agreement-drift") as c:
@@ -110,7 +118,7 @@ class TestADeclaredCorrectionAccountsForIt:
         entry["participation"]["versions"][0]["grace"] = "1h"
         key = "dataset cp-clients participation 2023-01-01"
         now = agreement_freeze.flatten(cal, asset)[key].value
-        entry["corrections"] = [{"change_reference": "CAB-1", "date": "2026-10-11",
+        entry["corrections"] = [{"change_reference": "CAB-1", "date": _today(),
                                  "author": "a test", "approver": "keithamoss",
                                  "reason": "grace was agreed as one hour",
                                  "changes": [{"item": key, "old": None, "new": now}]}]
@@ -120,7 +128,7 @@ class TestADeclaredCorrectionAccountsForIt:
         cal, asset = _docs()
         entry = _clients(cal)
         entry["participation"]["versions"][0]["grace"] = "1h"
-        entry["corrections"] = [{"change_reference": "CAB-1", "date": "2026-10-11",
+        entry["corrections"] = [{"change_reference": "CAB-1", "date": _today(),
                                  "author": "a test", "approver": "keithamoss", "reason": "r",
                                  "changes": [{"item": "calendar quarterly period 2027-Q1",
                                               "old": "2027-02-01", "new": "2027-02-02"}]}]
@@ -251,8 +259,8 @@ class TestCriticFindingsOn173:
         _clients(cal)["participation"]["versions"][0]["grace"] = "1h"
         return cal, asset
 
-    def _correction(self, item, new, date="2026-10-11"):
-        return {"change_reference": "OLD-1", "date": date, "author": "a test",
+    def _correction(self, item, new, date=None):
+        return {"change_reference": "OLD-1", "date": date or _today(), "author": "a test",
                 "approver": "keithamoss", "reason": "r",
                 "changes": [{"item": item, "old": None, "new": new}]}
 
@@ -349,7 +357,7 @@ class TestARetroactiveNotExpectedIsCaught:
         entry = _clients(cal)
         entry["not_expected"] = [{"period": "2023-Q3", "reason": "declared after the fact"}]
         entry["corrections"] = [{
-            "change_reference": "CAB-NE", "date": "2026-10-11", "author": "a",
+            "change_reference": "CAB-NE", "date": _today(), "author": "a",
             "approver": "b", "reason": "r",
             "changes": [{"item": f"dataset {DATASET} not_expected 2023-Q3", "old": None,
                          "new": "declared after the fact"}]}]

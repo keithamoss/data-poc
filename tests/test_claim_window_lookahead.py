@@ -45,8 +45,8 @@ def _candidates(dataset_id: str, at: datetime):
     `slots_for_dataset()` on purpose: that function also backs
     `mothman schedule show`, where quietly adding a quarter nobody
     asked for would be its own bug. So the thing under test is the
-    pair, and the structural test below is what keeps the two real
-    call sites using it.
+    pair, and the test at the bottom drives the two real call sites
+    to keep them using it.
     """
     return slots_mod.slots_for_dataset(
         dataset_id, until=slots_mod.claimable_until(dataset_id, at.date()))
@@ -142,15 +142,37 @@ class TestTheSlotStaysVisibleOnceFilled:
         offered = {s.period.name for s in _candidates(QUARTERLY, A_WEEK_EARLY)}
         assert "2023-Q3" in offered
 
-    def test_BOTH_call_sites_use_the_lookahead(self):
-        """Structural, because the two drifting apart is the defect
-        rather than either value being wrong on its own."""
-        import inspect
+    def test_BOTH_real_entry_points_use_the_lookahead(self, supply_dsn, tmp_path):
+        """Driven through the two real call sites, because the two
+        drifting apart is the defect rather than either value being
+        wrong on its own: a supply arriving a week early is FILED to the
+        quarter it is early for, and the slot list a dashboard is built
+        from shows that quarter - for the dataset that filed into it and
+        for one that has filed nothing at all."""
+        from qa_tools.common import (arrivals, delivery, delivery_log, filing, qa_store,
+                                     slot_state, supply_db)
 
-        from qa_tools.common import filing, slot_state
+        deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
+        (deliveries / "early").mkdir(parents=True)
+        receipts.mkdir()
+        (deliveries / "early" / "cp_clients.csv").write_text("a\n1\n")
+        delivery.write_receipts("early", A_WEEK_EARLY.isoformat(), receipts,
+                                files=["cp_clients.csv"], sequence=1)
+        with supply_db.connect(label="test-claim-window") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
+        for d in delivery.list_deliveries(deliveries, receipts):
+            delivery_log.record(d, arrivals.recognise(d))
+        found = arrivals.arrivals_for("child-protection", "cp_run_", deliveries, receipts)
+        assert found, "test precondition - the delivery must be an arrival"
 
-        for where in (filing.file_arrivals, slot_state.states_for):
-            assert "claimable_until" in inspect.getsource(where), (
-                f"{where.__qualname__} must take the same claim-window "
-                f"lookahead, or the two drift and a slot filled early is "
-                f"accepted by one and invisible to the other")
+        filed = filing.file_arrivals(found)
+        assert [(a.dataset_id, a.slot) for a in filed] == [(QUARTERLY, "2023-Q3")]
+
+        with supply_db.connect(read_only=True, label="test-claim-window") as conn:
+            listed = {(s.dataset_id, s.period) for s in
+                      slot_state.states_for(conn, "child-protection", now=A_WEEK_EARLY)}
+        assert (QUARTERLY, "2023-Q3") in listed
+        assert ("cp-carers", "2023-Q3") in listed, (
+            "a slot whose window is open, with nothing filed to it, is not listed - "
+            "slot_state has lost the claim-window lookahead filing uses")

@@ -15,6 +15,7 @@ from them.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -356,27 +357,33 @@ class TestAFilingIsRecordedInTheDatabase:
                              f'REVOKE ALL ON TABLES FROM "{role}"')
             filings.execute(f'DROP ROLE IF EXISTS "{role}"')
 
-    def test_the_path_cannot_quietly_come_back_into_use(self):
-        """Criterion 5. Out of the repository AND out of .gitignore - the
-        second half is the one that matters, because an ignored path is a
-        path somebody's next experiment writes to without noticing."""
-        from pathlib import Path
+    def test_no_code_path_writes_a_filing_to_disk(self, filings, tmp_path, monkeypatch):
+        """Criteria 5 and 6, by doing it: file a supply, hold one and
+        re-file one, from an empty working directory, and nothing appears
+        on disk - neither where the process started nor at the top of the
+        repository, where the retired `filings/` tree lived. A path coming
+        back would look like a helpful offline fallback, and would be
+        silent."""
+        from qa_tools.common import supply_db
 
-        root = Path(__file__).resolve().parent.parent
-        assert not (root / "filings").exists(), "the filings/ tree is back"
-        assert "filings/" not in (root / ".gitignore").read_text(), \
-            "filings/ is still ignored, so writing to it would be silent"
+        repo = Path(__file__).resolve().parent.parent
+        top_level_before = {p.name for p in repo.iterdir()}
+        work = tmp_path / "cwd"
+        work.mkdir()
+        monkeypatch.chdir(work)
 
-    def test_no_code_path_writes_a_filing_to_disk(self):
-        """Criterion 6, asserted on the module rather than by reading it.
-        A path constant or an open() is how one would come back, and it
-        would look like a helpful offline fallback."""
-        import inspect
+        assert filing_support.file(_assignment())
+        assert filing_support.file(_assignment(slot=None, branch=assignment.HELD,
+                                               supply_id="cp-clients@held"))
+        with supply_db.connect(label="test-filing-no-files") as conn:
+            assert filing.refile(conn, "cp-clients", "cp-clients@2026", "2026-Q3",
+                                 decision_id=1) is not None
 
-        source = inspect.getsource(filing)
-        for forbidden in ("FILINGS_DIR", "path_for", "write_text(", "mkdir("):
-            assert forbidden not in source, \
-                f"{forbidden} is back in filing.py - a filing is a row, not a file"
+        assert filing.filing_for("cp-clients", "cp-clients@2026")["slot"] == "2026-Q3", \
+            "test precondition - the filings must really have been recorded"
+        assert list(work.rglob("*")) == [], "filing wrote files into the working directory"
+        assert {p.name for p in repo.iterdir()} - top_level_before == set(), \
+            "filing created something at the top of the repository"
 
 
 class TestWhichPeriodAnArrivalWasFiledTo:

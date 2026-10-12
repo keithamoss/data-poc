@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import pytest
 
+import rebuild_support
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import tables_read as tr
 from qa_tools.common.qa_results_writer import write_qa_result
@@ -212,12 +213,23 @@ class TestCompletenessIsWhatThisDatasetActuallyOwes:
         for dataset in ("cp-clients", "cp-carers", "cp-notifications"):
             assert set(reader.expected_tools_for(dataset)) >= {"dbt", "soda", "datacontract"}
 
-    def test_it_is_derived_from_the_checks_rather_than_configured(self):
+    def test_it_is_derived_from_the_checks_rather_than_configured(self, monkeypatch):
         """So a dataset's first Evidently check changes what it owes
-        with no list anywhere to remember."""
-        import inspect
-        source = inspect.getsource(reader.expected_tools_for)
-        assert "collect_checks" in source
+        with no list anywhere to remember: define one, and the dataset
+        owes Evidently a result."""
+        from types import SimpleNamespace
+
+        from qa_tools.common import validate_check_lifecycle as vcl
+
+        dataset = "a-dataset-nothing-checks-yet"
+        assert reader.expected_tools_for(dataset) == (), "test precondition"
+
+        real = vcl.collect_checks
+        new_check = SimpleNamespace(check_id=(
+            f"data-asset-1.{AGENCY}.{COLLECTION}.{dataset}.col.drift_evidently"))
+        monkeypatch.setattr(vcl, "collect_checks", lambda *a, **k: [*real(*a, **k), new_check])
+
+        assert reader.expected_tools_for(dataset) == ("evidently",)
 
     def test_a_run_missing_a_tools_raw_output_is_incomplete_and_says_which(self, recorded):
         missing = reader.missing_tools(AGENCY, COLLECTION, "r1")
@@ -300,20 +312,25 @@ class TestOneAgreedOrdering:
             assert len(keys) == len(results), (
                 f"{name}: {len(results) - len(keys)} duplicate (run_id, check_id) pairs")
 
-    def test_both_orchestrators_and_both_rebuilds_apply_it(self):
-        """Asserted structurally. A path that skipped it would produce
-        results that differ from the others for no reason a reader
-        could see."""
-        import importlib
-        import inspect
-        for module, function in [
-            ("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
-            ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
-            ("qa_tools.cp.build_results_from_history", "build_results_from_history"),
-            ("qa_tools.bdm.build_results_from_history", "build_results_from_history"),
-        ]:
-            mod = importlib.import_module(module)
-            assert "canonical_order" in inspect.getsource(getattr(mod, function)), module
+    @pytest.mark.parametrize("module", rebuild_support.REBUILDS)
+    def test_both_rebuilds_apply_it(self, module, clean_qa_history, tmp_path, monkeypatch):
+        """Results recorded out of order come back from the real rebuild
+        in the agreed order. A path that skipped it would produce results
+        that differ from the others for no reason a reader could see.
+
+        The orchestrators' live batch paths, which used to be grepped for
+        the same call here, are not driven: they run every real tool."""
+        rs = rebuild_support
+        rs.record_run(module, "r2", 2, {"soda": [rs.check(module, "zebra", "soda")]})
+        rs.record_run(module, "r1", 1, {
+            "soda": [rs.check(module, "zebra", "soda"), rs.check(module, "apple", "soda")],
+            "dbt": [rs.check(module, "mango", "dbt")],
+        })
+
+        got = [(r["run_id"], r["check_id"].rsplit(".", 1)[-1])
+               for r in rs.rebuild(module, tmp_path, monkeypatch)["results"]]
+        assert got == [("r1", "mango_dbt"), ("r1", "apple_soda"), ("r1", "zebra_soda"),
+                       ("r2", "zebra_soda")]
 
 
 class TestTheRegenerationCommand:
@@ -329,14 +346,6 @@ class TestTheRegenerationCommand:
 
         assert "reset-synthetic" in env_group.commands
         assert "bootstrap" in pipeline_group.commands
-        assert "regenerate-history" not in pipeline_group.commands
-
-    def test_no_per_collection_delete_is_left(self):
-        """A second deletion path is what REQ-PIPE-144 criterion 23 rules
-        out - delete_history() went with the command it served."""
-        from qa_tools.common import qa_store
-
-        assert not hasattr(qa_store, "delete_history")
 
 
 class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:

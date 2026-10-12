@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+import rebuild_support
 from qa_tools.common import qa_results_reader as reader
 from qa_tools.common import qa_results_writer as writer
 from qa_tools.common import tables_read as tr
@@ -46,7 +47,8 @@ class TestItIsRecordedInItsOwnScope:
 
     @pytest.fixture(autouse=True)
     def _fresh(self, clean_qa_history, finish_runs):
-        writer._declared_reads_tables.cache_clear()
+        from qa_tools.common import tables_read as _tr
+        _tr.forget_declared_reads()
         self.finish = finish_runs
 
     def _write(self, verified, raw=None):
@@ -141,17 +143,30 @@ class TestTheRebuildPathReadsTheScope:
     def test_an_absent_scope_reads_as_nothing_rather_than_raising(self, clean_qa_history):
         assert reader.read_cross_table_results(AGENCY, COLLECTION) == []
 
-    @pytest.mark.parametrize("module", ["qa_tools.cp.build_results_from_history",
-                                         "qa_tools.bdm.build_results_from_history"])
-    def test_both_rebuild_paths_read_the_scope(self, deployment_history, module):
-        """Asserted structurally. A rebuild that omits this looks
-        entirely healthy - it just publishes fewer checks than the run
-        actually produced."""
-        import importlib
-        import inspect
+    @pytest.mark.parametrize("module", rebuild_support.REBUILDS)
+    def test_both_rebuild_paths_read_the_scope(self, clean_qa_history, tmp_path, monkeypatch,
+                                               module):
+        """A run recorded with one cross-table result and one ordinary
+        one, rebuilt by the real path: both come out. A rebuild that
+        omitted the scope looks entirely healthy - it just publishes
+        fewer checks than the run actually produced.
 
-        mod = importlib.import_module(module)
-        assert "read_cross_table_results" in inspect.getsource(mod.build_results_from_history)
+        Birth Registrations has no cross-table check of its own, so a
+        Child Protection one stands in: what is under test is that its
+        rebuild reads the scope at all."""
+        tr.forget_declared_reads()
+        spanning = _a_real_cross_table_check_id()
+        ordinary = rebuild_support.check(module, "row_count", "dbt")
+        rebuild_support.record_run(module, "r1", 1, {"dbt": [
+            ordinary, {"check_id": spanning, "dataset_id": "cp-placements",
+                       "status": "fail", "engine": "dbt"}]})
+        agency, collection = rebuild_support.ids(module)
+        assert [r["check_id"] for r in reader.read_cross_table_results(agency, collection)] \
+            == [spanning], "test precondition - the result must be in the cross-table scope"
+
+        published = {r["check_id"] for r in
+                     rebuild_support.rebuild(module, tmp_path, monkeypatch)["results"]}
+        assert published == {ordinary["check_id"], spanning}
 
 
 class TestItReachesEveryParticipatingDataset:

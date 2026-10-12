@@ -168,7 +168,7 @@ class TestItReachesTheRecordedResult:
         assert declaring, "no real check declares it reads cp_carers"
         check_id = declaring[0].check_id
 
-        qa_results_writer._declared_reads_tables.cache_clear()
+        tr.forget_declared_reads()
         qa_results_writer.write_qa_result(
             "child-protection-family-support", "child-protection", "cp_run_001",
             "2026-09-25T22:00:00+08:00", "dbt", {"raw": True},
@@ -197,7 +197,7 @@ class TestItReachesTheRecordedResult:
         # An EMPTY database on this worker's PostgreSQL, which is what a
         # fresh file used to give (REQ-TEST-095).
         dbsupport.use_empty_supply_db(monkeypatch)
-        qa_results_writer._declared_reads_tables.cache_clear()
+        tr.forget_declared_reads()
 
         qa_results_writer.write_qa_result(
             "a", "b", "run_1", "2026-09-25T22:00:00+08:00", "dbt", {},
@@ -394,15 +394,21 @@ class TestTheGateRefusesAReservedDatasetId:
                  for d in hierarchy.all_datasets()]
         assert validate_hierarchy.reserved_name_errors(real) == []
 
-    def test_the_gate_runs_as_part_of_the_real_hierarchy_validation(self):
+    def test_the_gate_runs_as_part_of_the_real_hierarchy_validation(self, monkeypatch):
         """Wired in, not merely written. A validator function nothing
         calls is the shape of guard that passes review and catches
-        nothing."""
-        import inspect
+        nothing - so the real hierarchy validation is run over a tree
+        with one dataset renamed into the reserved prefix."""
+        import dataclasses
 
-        from qa_tools.common import validate_hierarchy
+        from qa_tools.common import hierarchy, validate_hierarchy
 
-        assert "reserved_name_errors" in inspect.getsource(validate_hierarchy.validate)
+        real = hierarchy.all_datasets()
+        renamed = [dataclasses.replace(real[0], dataset_id="_cross-table"), *real[1:]]
+        monkeypatch.setattr(hierarchy, "all_datasets", lambda: renamed)
+
+        errors = validate_hierarchy.validate()
+        assert any("_cross-table" in e and "reserved" in e.lower() for e in errors), errors
 
 
 class TestTheBusinessRuleShapes:

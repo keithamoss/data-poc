@@ -30,14 +30,15 @@ def test_parses_a_real_check_id_into_named_segments():
     assert c.tool == "dbt"
 
 
-def test_the_grammar_carries_no_table_segment():
-    """REQ-QAC-039 dropped it, and it is worth asserting rather than
-    inferring from the test above: the old segment named the dbt STAGING
-    MODEL (stg_birth_registrations), so every check - including the
-    Soda, datacontract-cli and Evidently ones with no staging model -
-    carried one tool's vocabulary in a tool-neutral identifier."""
-    assert "table" not in ci.SEGMENT_NAMES
-    assert not hasattr(ci.parse(_REAL), "table")
+def test_the_grammar_is_exactly_these_segments_in_this_order():
+    """The whole grammar, pinned, so any change to it - a segment added,
+    dropped or reordered - is a deliberate edit here rather than a
+    surprise downstream. REQ-QAC-039 is the worked example: it dropped a
+    `table` segment that named the dbt STAGING MODEL, so every check -
+    Soda, datacontract-cli and Evidently included - had carried one
+    tool's vocabulary in a tool-neutral identifier."""
+    assert ci.SEGMENT_NAMES == (
+        "data_asset", "agency", "collection", "dataset", "column", "check_name", "tool")
 
 
 def test_a_table_level_check_has_no_column_rather_than_a_guessed_one():

@@ -417,13 +417,21 @@ class TestTheTicketsOwnBodySaysWhereItIsNow:
     def test_the_body_goes_first(self):
         """If the pass dies between the two, the body is the half worth
         having: it is the one a reader sees without scrolling."""
-        import ast
-        import inspect
+        calls = []
 
-        tree = ast.parse(inspect.getsource(tr.reconcile))
-        calls = [n.func.attr for n in ast.walk(tree)
-                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
-                  and n.func.attr in ("set_body", "comment")]
+        class Recording(FakeTickets):
+            def set_body(self, ticket, body):
+                calls.append("set_body")
+                super().set_body(ticket, body)
+
+            def comment(self, ticket, body):
+                calls.append("comment")
+                super().comment(ticket, body)
+
+        svc = Recording()
+        tr.reconcile(svc, [a_slot(slot_state.OVERDUE)], policy=tr.ALL)
+        calls.clear()
+        tr.reconcile(svc, [a_slot(slot_state.REJECTED)], policy=tr.ALL)
         assert calls == ["set_body", "comment"], calls
 
 
@@ -467,41 +475,56 @@ class TestAPersonsOperationGoesThroughTheSamePass:
             "qa_tools/common/filing_from_github.py",
         }
 
-    def test_every_route_that_records_a_decision_reconciles_the_same_way(self):
-        """Criterion 14's positive half: there is ONE function a filing
-        decision reconciles through, and it calls this pass."""
-        import inspect
-
+    @staticmethod
+    def _decided(changed, monkeypatch):
+        """Hand reconcile_after() a decision's outcome, with the pass
+        itself replaced by a recorder, and return what it was asked."""
         from qa_tools.common import filing_decisions
 
-        source = inspect.getsource(filing_decisions.reconcile_after)
-        assert "ticket_reconciler.report(ticket_reconciler.after_runs(" in source
+        asked = []
+        monkeypatch.setattr(tr, "after_runs", lambda collection_id, **k:
+                            asked.append(("after_runs", collection_id)) or "the outcome")
+        monkeypatch.setattr(tr, "report", lambda outcome: asked.append(("report", outcome)))
+        filing_decisions.reconcile_after(filing_decisions.Outcome(
+            operation="promote", dataset_id="cp-carers", period="2026-Q3",
+            changed=changed, message="done"), "child-protection")
+        return asked
 
-    def test_the_pass_covers_every_slot_so_a_new_periods_tickets_appear(self):
+    def test_every_route_that_records_a_decision_reconciles_the_same_way(self, monkeypatch):
+        """Criterion 14's positive half: there is ONE function a filing
+        decision reconciles through, and it runs this pass - the whole
+        collection's, reported the ordinary way."""
+        assert self._decided(True, monkeypatch) == [
+            ("after_runs", "child-protection"), ("report", "the outcome")]
+
+    def test_the_pass_covers_every_slot_so_a_new_periods_tickets_appear(self, supply_dsn,
+                                                                        monkeypatch):
         """Criterion 1's second path, which used to have nothing to hook.
 
-        `mothman` had no command that opened a period, so a period opened
-        by explicit instruction could not get its tickets. A person's
-        SUBSTITUTE opens one (substitution.substitute -> open_period), it
-        is reachable since REQ-GHUB-082's routes landed, and the pass it
-        reconciles through reads EVERY slot rather than a run's own.
+        A person's SUBSTITUTE opens a period no run has touched, and it
+        reconciles through this pass - so the pass has to read EVERY slot
+        rather than a run's own. Driven here over a history with nothing
+        filed at all: every slot is one no run touched, and every one
+        that needs somebody gets its ticket.
         """
-        import inspect
+        from qa_tools.common import qa_store, supply_db
+        from qa_tools.common import slots as slots_mod
 
-        from qa_tools.common import substitution
+        svc = FakeTickets()
+        monkeypatch.setattr(tr, "service_from_env", lambda: svc)
+        with supply_db.connect(label="test-reconcile-every-slot") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
+            outcome = tr.after_runs("child-protection", conn=conn)
 
-        assert "open_period" in inspect.getsource(substitution.substitute)
-        assert "states_for" in inspect.getsource(tr.after_runs), (
-            "a run-scoped pass would never see the new period's slots")
+        first = slots_mod.slots_for_dataset("cp-carers")[0].name
+        assert outcome.opened, "the pass opened no ticket at all"
+        assert f"cp-carers/{first}" in outcome.opened, (
+            "a slot no run touched got no ticket - a run-scoped pass would "
+            "never see a newly opened period")
 
-    def test_a_refused_decision_reconciles_nothing(self):
+    def test_a_refused_decision_reconciles_nothing(self, monkeypatch):
         """Criterion 15, from the other end: a refusal appends nothing,
         so the pass would find nothing changed and say nothing - which
         is why the refusal is said directly instead."""
-        import inspect
-
-        from qa_tools.common import filing_decisions
-
-        source = inspect.getsource(filing_decisions.reconcile_after)
-        assert "if not outcome.changed:" in source
-        assert "return" in source
+        assert self._decided(False, monkeypatch) == []

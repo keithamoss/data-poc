@@ -306,13 +306,37 @@ class TestTheCalendarEntry:
         assert "Next period owed: 2023-Q3" in out and "grace 8h" in out
         assert "corrections" in out.lower()
 
-    def test_the_view_edits_no_configuration(self):
-        import inspect
-
+    def test_the_view_edits_no_configuration(self, conn, monkeypatch, capsys):
+        """Viewing and previewing only - configuration is edited in git,
+        where it is reviewed and the schedule gate runs. So every branch of
+        the entry is walked (the agreement in force, the impact preview,
+        the draft entry) and every configuration file is byte-for-byte
+        what it was."""
+        from cli import common
         from cli import schedule as schedule_cli
-        source = inspect.getsource(schedule_cli.calendar_menu) + inspect.getsource(
-            schedule_cli._draft)
-        assert "calendar.yaml\").write" not in source and "CALENDAR_YAML" not in source
+
+        contract = agreement.CALENDAR_YAML.parent
+        before = {p: p.read_bytes() for p in sorted(contract.rglob("*")) if p.is_file()}
+        assert agreement.CALENDAR_YAML in before, "test precondition - the calendar is read"
+
+        datasets, steps = iter([DATASET, None]), iter(
+            [schedule_cli._CAL_PREVIEW, schedule_cli._CAL_DRAFT, schedule_cli._CAL_ANOTHER])
+
+        def select(message, choices, **_k):
+            if message.startswith("Which dataset"):
+                return next(datasets)
+            if message.startswith("What next"):
+                return next(steps)
+            return choices[-1]
+
+        monkeypatch.setattr(common, "select", select)
+        monkeypatch.setattr(common, "text_prompt", lambda *a, **k: "2023-07-01")
+        monkeypatch.setattr(common, "path_prompt", lambda *a, **k: "")
+        schedule_cli.calendar_menu()
+        assert next(steps, "walked") == "walked", "test precondition - every branch was taken"
+
+        after = {p: p.read_bytes() for p in sorted(contract.rglob("*")) if p.is_file()}
+        assert after == before, "the Calendar entry changed configuration"
 
 
 def test_a_declared_correction_reads_applied_once_a_verdict_names_it(conn):

@@ -131,20 +131,27 @@ class TestItFollowsAReFile:
         assert filing.recorded_arrival(DATASET, "s").received_at == ARRIVED
 
     def test_it_is_never_recomputed_from_the_promotion_instant(self, clean):
-        """Criterion 8's second half, asserted structurally: a verdict
-        taken from when somebody got round to promoting would make
-        punctuality a property of OUR responsiveness rather than the
-        supplier's."""
-        import ast
-        import inspect
-        import textwrap
+        """Criterion 8's second half: a verdict taken from when somebody
+        got round to promoting would make punctuality a property of OUR
+        responsiveness rather than the supplier's. So the supply arrives
+        early, is promoted the better part of a year later, and still
+        reads early - while the promotion itself is visibly recorded."""
+        from qa_tools.common import decision_log
+        from qa_tools.cp import cp_common as cp_common_ids
 
-        from qa_tools.common import verdict
+        _file(supply_id="promoted-late")
+        promoted = datetime(2024, 6, 3, 9, tzinfo=PERTH)
+        with decision_log.apply_decision(clean, decision_log.Decision(
+                agency_id=cp_common_ids.AGENCY_ID, collection_id=cp_common_ids.COLLECTION_ID,
+                dataset_id=DATASET, action=decision_log.PROMOTE, supply="promoted-late",
+                actor="somebody", actor_kind=decision_log.PERSON,
+                effective_at=promoted.isoformat(), to_slot=EARLY_SLOT, reason="late to it")):
+            pass
 
-        for fn in (filing._judged_for, verdict.judge):
-            tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
-            names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
-            assert not {"promoted_at", "promoted_into", "effective_at"} & names
+        got = filing.recorded_arrival(DATASET, "promoted-late")
+        assert got.filled_at == promoted, "test precondition - the promotion must have landed"
+        assert got.classification == classify_mod.EARLY
+        assert filing.filing_for(DATASET, "promoted-late")["classification"] == classify_mod.EARLY
 
 
 class TestTheIntervalFromReceiptToPromotion:
@@ -184,77 +191,23 @@ class TestTheRealFilingPathRecordsIt:
     says nothing about the path that actually feeds it.
     """
 
-    def test_every_branch_of_the_rule_carries_the_arrival_instant(self):
-        """Asserted over the real function rather than one branch,
-        because the bug was five branches being right and one wrong
-        being just as broken as all six."""
-        import ast
-        import inspect
-        import textwrap
-
-        tree = ast.parse(textwrap.dedent(inspect.getsource(assignment.assign)))
-        built = [n for n in ast.walk(tree)
-                 if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "Assignment"]
-        assert built, "assign() builds no Assignment - has it been renamed?"
-        missing = [n.lineno for n in built
-                   if "received_at" not in {k.arg for k in n.keywords}]
-        assert not missing, (
-            f"{len(missing)} of {len(built)} Assignment(...) in assign() omit "
-            f"received_at, at lines {missing} - those supplies record no "
-            f"arrival instant and so no classification")
-
-    def test_and_the_rule_really_returns_one(self, clean):
-        """The structural test above would pass on a literal `None`, so
-        this drives the real function and looks at the value."""
+    @pytest.mark.parametrize("branch, filled, at", [
+        (assignment.OPEN_UNFILLED, frozenset(), ARRIVED),
+        (assignment.RESUPPLY, frozenset({EARLY_SLOT}), ARRIVED),
+        # Long before this dataset's first claim window opens, so no
+        # slot is open to take it.
+        (assignment.HELD, frozenset(), datetime(1999, 1, 4, 9, tzinfo=PERTH)),
+    ])
+    def test_every_branch_of_the_rule_carries_the_arrival_instant(self, branch, filled, at):
+        """Driven through every branch of the real function, because the
+        bug was some branches being right and one wrong being just as
+        broken as all of them."""
         from qa_tools.common import slots as slots_mod
 
         got = assignment.assign(
-            DATASET, f"{DATASET}@202307250100000000", ARRIVED,
+            DATASET, f"{DATASET}@{at:%Y%m%d%H}00000000", at,
             slots_mod.slots_for_dataset(
                 DATASET, until=slots_mod.claimable_until(DATASET, ARRIVED.date())),
-            frozenset())
-        assert got.received_at == ARRIVED
-class TestTheRetiredDerivations:
-    """Criteria 2 and 3 - gone, not merely unused."""
-
-    def test_the_arrival_date_derivation_is_gone(self):
-        """Criterion 2. It could only look BACKWARDS from the arrival
-        date, so it could never see a slot that had not started - which
-        is why 'early' was unreachable through it."""
-        # pipeline/cadence.py itself is gone since REQ-PIPE-110, which
-        # moved what was left of it to qa_tools/common/agreement.py.
-        import importlib.util
-
-        from qa_tools.common import agreement
-
-        assert importlib.util.find_spec("pipeline.cadence") is None
-        assert not hasattr(agreement, "classify_arrival")
-
-    def test_the_builders_no_longer_derive_it(self):
-        """Criterion 3. Blanking was a workaround for the derivation
-        being wrong on exactly those supplies; with the derivation gone
-        the workaround hides a real answer."""
-        import pathlib
-
-        # ON THE IMPORT, not on the text: both modules still MENTION
-        # the retired function in a comment explaining why it is gone,
-        # and a substring check cannot tell that from a call. An
-        # import is unambiguous - and since the function no longer
-        # exists, one would fail at module load anyway.
-        import ast
-
-        for name in ("build_dashboard_data.py", "build_cp_dashboard_data.py"):
-            tree = ast.parse(pathlib.Path("pipeline", name).read_text())
-            imported = {a.name for n in ast.walk(tree)
-                        if isinstance(n, ast.ImportFrom) for a in n.names}
-            assert "classify_arrival" not in imported, f"{name} still imports it"
-
-    def test_the_template_no_longer_blanks_a_resupplys_verdict(self):
-        """Criterion 3. Blanking was a workaround for the derivation
-        being wrong on exactly those supplies; with the derivation gone
-        the workaround hides a real answer."""
-        import pathlib as _p
-
-        src = _p.Path("dashboard/qa-reporting-dashboard.template.html").read_text()
-        assert "arrivalStatus: idx===0" not in src
-        assert "arrivedAt: idx===0" not in src
+            filled)
+        assert got.branch == branch, f"test precondition - expected the {branch} branch"
+        assert got.received_at == at

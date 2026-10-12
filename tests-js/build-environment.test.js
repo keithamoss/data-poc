@@ -90,6 +90,19 @@ describe("REQ-DASH-094 - a build says which environment it came from", () => {
     expect(dashboard.window.document.getElementById("clock-text").textContent).toContain("abc1234");
   });
 
+  it("renders the environment and the commit into the build stamp, the commit as seven characters", () => {
+    // REQ-PIPE-092 criteria 7 and 17: the stamp says where the build came
+    // from and which commit - and a reader does not read a forty-character sha.
+    dashboard = withProvenance({
+      environment: { id: "sandbox", label: "Claude Code sandbox", publishes: false },
+      commit: "0123456789abcdef0123456789abcdef01234567",
+    });
+    const text = dashboard.window.document.getElementById("clock-text").textContent;
+    expect(text).toContain("Claude Code sandbox");
+    expect(text).toContain("0123456");
+    expect(text).not.toContain("01234567");
+  });
+
   it("renders with zero console errors in every one of those states", () => {
     // Criterion 7, held to the same bar as the rest of this suite.
     for (const provenance of [PUBLISHED, SANDBOX, { environment: null, commit: null }]) {

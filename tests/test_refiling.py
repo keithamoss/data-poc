@@ -168,22 +168,54 @@ class TestItIsLocalToTheSupplyThatMoved:
         _refile("d", "s", "2026-Q3")
         assert filing.filing_for("d", "other")["slot"] == "2026-Q2"
 
-    def test_it_reads_one_record_rather_than_the_whole_history(self):
-        """Checked against the executable BODY, not the whole source -
-        a first version of this grepped the docstring too and failed on
-        the word "for" inside a sentence."""
-        import ast
-        import inspect
-        import textwrap
+    def test_it_reads_one_record_rather_than_the_whole_history(self, filings, monkeypatch):
+        """Counted, not grepped, as test_assignment's slot bisection is:
+        with a long history filed for the dataset, answering one supply's
+        verdict reads one filing row and resolves one slot."""
+        for n in range(60):
+            filing_support.file(assignment.Assignment(
+                dataset_id="d", supply_id=f"history-{n:03d}", slot="2026-Q2",
+                branch=assignment.OPEN_UNFILLED, considered=("2026-Q2",)))
 
-        tree = ast.parse(textwrap.dedent(inspect.getsource(filing.classification_of)))
-        body = tree.body[0].body
-        if isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
-            body = body[1:]          # drop the docstring
-        code = "\n".join(ast.unparse(node) for node in body)
-        assert "filings_of(" not in code, (
-            "answering one supply's verdict must not walk a dataset's history")
-        assert not any(isinstance(n, (ast.For, ast.While))
-                        for node in body for n in ast.walk(node)), (
-            "a loop here means the cost grows with history, which is what the "
-            "non-functional constraint forbids")
+        rows_read = []
+        real_connect = filing._connect
+
+        class Counting:
+            def __init__(self, conn):
+                self._conn = conn
+
+            def __enter__(self):
+                self._conn.__enter__()
+                return self
+
+            def __exit__(self, *exc):
+                return self._conn.__exit__(*exc)
+
+            def execute(self, *args, **kwargs):
+                return CountedCursor(self._conn.execute(*args, **kwargs))
+
+        class CountedCursor:
+            def __init__(self, cursor):
+                self._cursor = cursor
+
+            def fetchall(self):
+                rows = self._cursor.fetchall()
+                rows_read.append(len(rows))
+                return rows
+
+            def fetchone(self):
+                row = self._cursor.fetchone()
+                rows_read.append(0 if row is None else 1)
+                return row
+
+        monkeypatch.setattr(filing, "_connect", lambda label: Counting(real_connect(label)))
+        resolved = []
+
+        got = filing.classification_of(
+            "d", "s", ARRIVED, lambda name: resolved.append(name) or _slot_by_name(name))
+
+        assert got == classify_mod.LATE
+        assert sum(rows_read) == 1, (
+            f"{sum(rows_read)} filing rows read for one supply's verdict - the cost "
+            f"grows with history, which the non-functional constraint forbids")
+        assert resolved == ["2026-Q2"]

@@ -105,13 +105,34 @@ describe("waitedChip", () => {
 });
 
 describe("a resupply keeps its own verdict", () => {
-  it("the blanking path is gone from the template", () => {
+  // Criterion 3. The supply history used to blank the verdict and the
+  // receipt instant on every attempt in a chain but the first, which was
+  // right about the arrival-date derivation it was written for and wrong
+  // about the recorded verdict, which every attempt has its own of.
+  function redThenResupplied() {
+    const history = [
+      { run_id: "r1", run_date: "2026-01-01", value: 3 },  // red: opens a chain
+      { run_id: "r2", run_date: "2026-01-02", value: 0 },  // green: its resupply
+    ];
+    return {
+      id: "birth-registrations",
+      sla: { cadence: { type: "daily", expected_time: "14:00" } },
+      runs: history.map(({ run_id, run_date }) => ({ run_id, run_date })),
+      arrivalByRun: {
+        r1: { slot: "2026-01-01", arrivalStatus: "on_time", arrivedAt: "2026-01-01T09:00:00+08:00" },
+        r2: { slot: "2026-01-01", arrivalStatus: "late", arrivedAt: "2026-01-02T16:30:00+08:00" },
+      },
+      columns: [{ checks: [{ warn: 1, fail: 2, history }] }],
+    };
+  }
+
+  it("carries the resupply's own recorded verdict and receipt instant", () => {
     const win = load();
-    // Criterion 3, asserted against the real committed template. It
-    // used to blank every attempt in a chain but the first, which was
-    // right about the derivation it was written for and wrong about
-    // the recorded one.
-    const src = win.document.documentElement.outerHTML;
-    expect(src).not.toContain("arrivalStatus: idx===0");
+    const chains = win.buildSupplyHistory(redThenResupplied());
+    const entries = chains.flatMap(c => c.entries);
+    const resupply = entries.find(e => e.run_id === "r2");
+    expect(resupply.isResupply).toBe(true);   // the precondition: it IS a resupply
+    expect(resupply.arrivalStatus).toBe("late");
+    expect(resupply.arrivedAt).toBe("2026-01-02T16:30:00+08:00");
   });
 });

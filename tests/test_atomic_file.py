@@ -11,6 +11,8 @@ import json
 
 import pytest
 
+import rebuild_support
+
 
 def test_an_interrupted_write_leaves_the_previous_file_whole(tmp_path):
     from qa_tools.common import atomic_file
@@ -28,12 +30,24 @@ def test_an_interrupted_write_leaves_the_previous_file_whole(tmp_path):
     assert [p.name for p in tmp_path.iterdir()] == ["results.json"], "no temp file left"
 
 
-@pytest.mark.parametrize("module", ["qa_tools.bdm.build_results_from_history",
-                                    "qa_tools.cp.build_results_from_history"])
-def test_both_results_writers_write_atomically(module):
-    import importlib
-    import inspect
+@pytest.mark.parametrize("module", rebuild_support.REBUILDS)
+def test_an_interrupted_rebuild_leaves_the_previous_results_whole(
+        module, clean_qa_history, tmp_path, monkeypatch):
+    """Both results writers, driven for real and interrupted part-way
+    through writing: the results file a reader would open is still the
+    previous one, whole. A writer that truncated and streamed in place
+    would leave half a file - the shape CI parsed on d6dce26."""
+    previous = {"results": ["the previous build"]}
+    (tmp_path / "results.json").write_text(json.dumps(previous))
+    real_dump = json.dump
 
-    source = inspect.getsource(importlib.import_module(module))
-    assert "atomic_file.write_json(RESULTS_PATH" in source
-    assert 'open(RESULTS_PATH, "w")' not in source
+    def interrupted(obj, f, **kwargs):
+        f.write('{"results": [')
+        raise RuntimeError("interrupted part-way")
+
+    monkeypatch.setattr(json, "dump", interrupted)
+    with pytest.raises(RuntimeError, match="interrupted"):
+        rebuild_support.rebuild(module, tmp_path, monkeypatch)
+    monkeypatch.setattr(json, "dump", real_dump)
+
+    assert json.loads((tmp_path / "results.json").read_text()) == previous

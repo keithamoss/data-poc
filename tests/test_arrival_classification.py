@@ -129,21 +129,28 @@ class TestItNeverLooksAtTheArrivalDateToPickASlot:
         signature = inspect.signature(classify_mod.classify)
         assert list(signature.parameters) == ["arrived_at", "slot"]
 
-    def test_the_module_does_not_reach_for_the_old_derivation(self):
-        import inspect
-        source = inspect.getsource(classify_mod)
-        body = source[source.index("from __future__"):]
-        assert "cycle_start" not in body and "classify_arrival(" not in body
-
 
 class TestARejectedSupplyIsClassifiedToo:
     """Criterion 7 - "arrived three weeks late AND was bad" is exactly
     what belongs on the record for a supply that never got promoted."""
 
-    def test_classification_cannot_see_whether_a_supply_was_promoted(self):
-        import inspect
-        source = inspect.getsource(classify_mod.classify)
-        for banned in ("promoted", "rejected", "status"):
-            assert banned not in source, (
-                f"classification must not depend on {banned} - it happens at check time, "
-                f"before a promotion decision that may never be taken")
+    def test_classification_cannot_see_whether_a_supply_was_promoted(self, monkeypatch):
+        """It happens at check time, before a promotion decision that may
+        never be taken. Its signature (pinned above) gives it no way to
+        be told; this shows it does not go and look either - with every
+        database connection refused, it still answers, and the answer is
+        the same as with one available."""
+        from qa_tools.common import supply_db
+
+        slot = _slot("Q3", datetime(2026, 8, 1, 12, tzinfo=PERTH))
+        cases = [(datetime(2026, 7, 25, 9, tzinfo=PERTH), slot, classify_mod.EARLY),
+                 (datetime(2026, 8, 1, 14, tzinfo=PERTH), slot, classify_mod.LATE),
+                 (datetime(2026, 8, 1, 14, tzinfo=PERTH), None, classify_mod.UNFILED)]
+
+        def refused(*_a, **_k):
+            raise AssertionError("classify() reached for the database - it must not "
+                                 "depend on what was promoted or rejected")
+
+        monkeypatch.setattr(supply_db, "connect", refused)
+        for at, filed_to, expected in cases:
+            assert classify_mod.classify(at, filed_to) == expected

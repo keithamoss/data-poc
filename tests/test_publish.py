@@ -21,7 +21,6 @@ What can actually go wrong is quieter:
 from __future__ import annotations
 
 import ast
-import inspect
 from pathlib import Path
 
 import pytest
@@ -34,30 +33,61 @@ ROOT = Path(__file__).resolve().parents[1]
 class TestThereIsExactlyOnePublishPath:
     """Criterion 10, and criterion 15 for the prompt specifically."""
 
-    def test_the_command_delegates_rather_than_pushing_for_itself(self):
-        source = inspect.getsource(dashboard_cli.publish_command.callback)
-        assert "publish(" in source
-        # The git ARGUMENT, not the word - "push" appears in help text and
-        # prose, and a test that matched those would fail for describing
-        # itself.
-        assert '"push"' not in source
+    @staticmethod
+    def _through_the_command(monkeypatch):
+        from click.testing import CliRunner
 
-    def test_pipeline_run_publish_calls_the_same_function(self):
+        result = CliRunner().invoke(dashboard_cli.publish_command, [])
+        assert result.exit_code == 0, result.output
+
+    @staticmethod
+    def _through_pipeline_run(monkeypatch):
+        """`pipeline run --publish` with everything before the publish
+        stubbed out - the real run regenerates and checks every supply."""
+        import contextlib
+
+        from click.testing import CliRunner
+
         from cli import pipeline
+        from dashboard import snapshot_dashboard
+        from qa_tools.common import bootstrap, processing_pass
 
-        source = inspect.getsource(pipeline.run_command.callback)
-        assert "dashboard_cli.publish()" in source, \
-            "pipeline run --publish does not go through the one publish path"
-        assert '"push"' not in source
+        monkeypatch.setattr(bootstrap, "holds_history", lambda conn: False)
+        monkeypatch.setattr(processing_pass, "pass_lock",
+                            lambda *a, **k: contextlib.nullcontext())
+        monkeypatch.setattr(pipeline, "_run_bdm", lambda sequential: None)
+        monkeypatch.setattr(pipeline, "_run_cp", lambda sequential: None)
+        monkeypatch.setattr(bootstrap, "_confirm_corrections", lambda say: None)
+        monkeypatch.setattr(bootstrap, "targets_agree", lambda names: [])
+        monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)
+        monkeypatch.setattr(dashboard_cli, "_embed", lambda: None)
+        monkeypatch.setattr(snapshot_dashboard, "sync_local_snapshots", lambda: [])
+        result = CliRunner().invoke(pipeline.run_command, ["--publish"])
+        assert result.exit_code == 0, result.output
 
-    def test_the_wizards_prompt_calls_the_same_function(self):
+    @staticmethod
+    def _through_the_wizards_prompt(monkeypatch):
         """Criterion 15 in as many words: the prompt reaches the site by
         the same path the command uses, and by no other."""
         from cli import common
 
-        source = inspect.getsource(common.offer_to_publish)
-        assert "dashboard_cli.publish()" in source
-        assert '"push"' not in source
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+        monkeypatch.setattr(common, "confirm", lambda *a, **k: True)
+        common.offer_to_publish()
+
+    @pytest.mark.parametrize("route", ["_through_the_command", "_through_pipeline_run",
+                                       "_through_the_wizards_prompt"])
+    def test_every_route_publishes_through_the_one_function(self, route, monkeypatch, tmp_path):
+        """Each of the three entry points reaches the site by calling
+        dashboard.publish() once - so none of them can push for itself."""
+        monkeypatch.chdir(tmp_path)
+        calls = []
+        monkeypatch.setattr(dashboard_cli, "publish", lambda **kwargs: calls.append(kwargs))
+
+        getattr(self, route)(monkeypatch)
+
+        assert len(calls) == 1, f"{route} reached publish() {len(calls)} times"
 
     def test_only_one_function_in_the_cli_pushes_anything(self):
         """The structural version of the same claim - so a fourth entry
@@ -78,14 +108,40 @@ class TestTheGateCannotBeSkipped:
     """Criteria 4 and 5: the render check runs where the build runs, and
     only a build that passed it is published."""
 
-    def test_publish_runs_the_render_check(self):
-        source = inspect.getsource(dashboard_cli.publish)
-        assert "_check_renders()" in source
+    @staticmethod
+    def _record_the_steps(monkeypatch, tmp_path, *, gate_fails=False):
+        from dashboard import snapshot_dashboard
 
-    def test_it_runs_the_check_before_it_publishes(self):
+        monkeypatch.chdir(tmp_path)
+        steps = []
+
+        def step(name, fail=False):
+            def _run(*a, **k):
+                steps.append(name)
+                if fail:
+                    raise RuntimeError("the render check failed")
+            return _run
+
+        for name in ("_rebuild_results", "_build_data", "_embed", "_publish"):
+            monkeypatch.setattr(dashboard_cli, name, step(name))
+        monkeypatch.setattr(dashboard_cli, "_check_renders", step("_check_renders", gate_fails))
+        monkeypatch.setattr(snapshot_dashboard, "take_snapshot", step("take_snapshot"))
+        monkeypatch.setattr(snapshot_dashboard, "prepare_deploy_site", step("prepare_deploy_site"))
+        return steps
+
+    def test_it_runs_the_check_after_the_build_and_before_it_publishes(self, monkeypatch, tmp_path):
         """Order, not presence. A gate after the push is not a gate."""
-        source = inspect.getsource(dashboard_cli.publish)
-        assert source.index("_check_renders()") < source.index("_publish(")
+        steps = self._record_the_steps(monkeypatch, tmp_path)
+        dashboard_cli.publish()
+        assert steps == ["_rebuild_results", "_build_data", "_embed", "_check_renders",
+                         "take_snapshot", "prepare_deploy_site", "_publish"]
+
+    def test_a_failed_render_check_publishes_nothing(self, monkeypatch, tmp_path):
+        steps = self._record_the_steps(monkeypatch, tmp_path, gate_fails=True)
+        with pytest.raises(RuntimeError, match="render check"):
+            dashboard_cli.publish()
+        assert "_check_renders" in steps, "test precondition - the gate must have run"
+        assert "_publish" not in steps and "take_snapshot" not in steps
 
     def test_a_publish_with_nothing_built_refuses(self, tmp_path):
         """Criterion 5 from the other side. _publish() is reachable with a
@@ -116,13 +172,26 @@ class TestPublishingIsAlwaysAsked:
         with click.Context(pipeline.run_command) as ctx:
             assert publish_opt.get_default(ctx) is False
 
-    def test_the_prompt_defaults_to_not_publishing(self):
+    def test_the_prompt_defaults_to_not_publishing(self, monkeypatch):
         """Criterion 14: a prompt they answer, and the answer that changes
         what the public sees is not the default one."""
         from cli import common
 
-        source = inspect.getsource(common.offer_to_publish)
-        assert "default=False" in source
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+        asked = []
+        monkeypatch.setattr(common.questionary, "confirm",
+                            lambda message, **kwargs: asked.append(kwargs) or object())
+        monkeypatch.setattr(common, "_ask", lambda question: False)
+
+        def _never(**_k):
+            raise AssertionError("published although the answer was no")
+
+        monkeypatch.setattr(dashboard_cli, "publish", _never)
+        common.offer_to_publish()
+
+        assert len(asked) == 1, "the person was not asked"
+        assert asked[0]["default"] is False
 
     def test_the_prompt_says_nothing_with_no_terminal(self, monkeypatch, capsys):
         """There is nobody to ask, and the safe answer to "shall I change
@@ -235,31 +304,75 @@ class TestTheArtifactSaysWhereItCameFrom:
         assert "const BUILD_PROVENANCE = null;" in self.TEMPLATE.read_text(), \
             "the raw template must claim no environment - it was never built"
 
-    def test_the_embed_fills_it_with_the_environment_and_the_commit(self):
-        from dashboard import embed_dashboard_data
+    @staticmethod
+    def _embedded_provenance(monkeypatch, tmp_path) -> dict:
+        """Run the real embed() into tmp and read BUILD_PROVENANCE back
+        out of the page it wrote. The two dashboard JSON inputs are stubbed:
+        they are build artefacts, and what is under test is the stamp."""
+        import json
+        import re
 
-        body = inspect.getsource(embed_dashboard_data.embed)
-        assert "BUILD_PROVENANCE" in body
-        assert "environments.current_or_none()" in body
-        assert "current_commit_sha()" in body
+        from dashboard import embed_dashboard_data as edd
+        from pipeline import corrections
 
-    def test_absence_of_either_is_tolerated_rather_than_invented(self):
+        targets = []
+        for const_name, _real in edd.TARGETS:
+            stub = tmp_path / f"{const_name}.json"
+            stub.write_text(json.dumps({"stub": const_name}))
+            targets.append((const_name, str(stub)))
+        monkeypatch.setattr(edd, "TARGETS", targets)
+        monkeypatch.setattr(corrections, "applied_feed", lambda: [])
+        # The sprint graph re-parses requirements.yaml several times over,
+        # which is most of embed()'s cost and nothing to do with the stamp.
+        monkeypatch.setattr(edd, "dependency_data", lambda: {"sprints": [], "stale": []})
+        monkeypatch.setattr(edd, "DASHBOARD_HTML", tmp_path / "out.html")
+
+        edd.embed()
+
+        found = re.search(r"const BUILD_PROVENANCE = (.*?);\n",
+                          (tmp_path / "out.html").read_text())
+        assert found, "BUILD_PROVENANCE was not embedded at all"
+        return json.loads(found.group(1))
+
+    def test_the_embed_fills_it_with_the_environment_and_the_commit(self, monkeypatch, tmp_path):
+        from types import SimpleNamespace
+
+        from dashboard import embed_dashboard_data as edd
+
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        monkeypatch.setattr(edd, "current_commit_sha", lambda *a, **k: sha)
+        monkeypatch.setattr(edd.environments, "current_or_none", lambda: SimpleNamespace(
+            id="sandbox", label="A sandbox", publishes=False))
+
+        assert self._embedded_provenance(monkeypatch, tmp_path) == {
+            "environment": {"id": "sandbox", "label": "A sandbox", "publishes": False},
+            "commit": sha}
+
+    def test_absence_of_either_is_tolerated_rather_than_invented(self, monkeypatch, tmp_path):
         """An environment is unset on a checkout nobody configured, and a
         commit is unavailable in a container built from a tarball. Both are
         ordinary; claiming a value for either would not be."""
-        from dashboard import embed_dashboard_data
+        from dashboard import embed_dashboard_data as edd
 
-        body = inspect.getsource(embed_dashboard_data.embed)
-        assert "except Exception:" in body
-        assert 'commit = None' in body
+        # ONLY THE FIRST ASK FAILS, which is the provenance stamp's. The
+        # GitHub-links step asks again later and does NOT tolerate a
+        # missing commit - so a build with no repository at all still
+        # fails there, which is a separate matter from what the stamp
+        # claims. If the order ever changed, the stamp would get the sha
+        # and this would fail rather than pass quietly.
+        asked = []
 
-    def test_the_page_renders_both_into_the_build_stamp(self):
-        text = self.TEMPLATE.read_text()
-        stamp = text[text.index("function renderBuildStamp()"):]
-        stamp = stamp[:stamp.index("renderBuildStamp();")]
-        assert "BUILD_PROVENANCE.environment" in stamp
-        assert "BUILD_PROVENANCE.commit" in stamp
-        assert ".slice(0, 7)" in stamp, "a reader does not read a forty-character sha"
+        def no_repository_the_first_time(*_a, **_k):
+            asked.append(1)
+            if len(asked) == 1:
+                raise FileNotFoundError("git")
+            return "f" * 40
+
+        monkeypatch.setattr(edd, "current_commit_sha", no_repository_the_first_time)
+        monkeypatch.setattr(edd.environments, "current_or_none", lambda: None)
+
+        assert self._embedded_provenance(monkeypatch, tmp_path) == {
+            "environment": None, "commit": None}
 
 
 class TestThePublishedContentCannotMixWithTheSource:
@@ -268,21 +381,52 @@ class TestThePublishedContentCannotMixWithTheSource:
     def test_it_publishes_to_a_branch_of_its_own(self):
         assert dashboard_cli.PAGES_BRANCH == "gh-pages"
 
-    def test_it_uses_a_detached_worktree_rather_than_checking_the_branch_out(self):
-        """The reason is not tidiness: every other arrangement puts a build
+    def test_it_publishes_from_a_worktree_the_source_never_shares(self, tmp_path, monkeypatch):
+        """A real publish, into a throwaway repository whose `origin` is a
+        local bare one. The source branch's HEAD, index and working tree
+        are untouched, and the published branch is an orphan holding the
+        built site alone.
+
+        The reason is not tidiness: every other arrangement puts a build
         output somewhere `git add -A` on the source branch can reach, and
         this project has already had a committed dashboard build for that
-        reason."""
-        source = inspect.getsource(dashboard_cli._publish)
-        assert "worktree" in source
-        assert "--detach" in source
-        assert "--orphan" in source
+        reason. And `.nojekyll` is there because Pages otherwise runs the
+        content through Jekyll, which silently drops anything beginning
+        with an underscore."""
+        import subprocess
 
-    def test_it_writes_nojekyll(self):
-        """Pages otherwise runs the content through Jekyll, which silently
-        drops anything beginning with an underscore - a failure that would
-        be very hard to diagnose from the outside."""
-        assert ".nojekyll" in inspect.getsource(dashboard_cli._publish)
+        def git(*args, cwd):
+            return subprocess.run(["git", *args], cwd=cwd, check=True,
+                                  capture_output=True, text=True).stdout.strip()
+
+        origin, source, site = tmp_path / "origin.git", tmp_path / "source", tmp_path / "site"
+        git("init", "--bare", "--quiet", str(origin), cwd=tmp_path)
+        source.mkdir()
+        git("init", "--quiet", "-b", "main", cwd=source)
+        git("config", "user.email", "tests@example.gov.au", cwd=source)
+        git("config", "user.name", "tests", cwd=source)
+        (source / "code.py").write_text("print('source')\n")
+        git("add", "-A", cwd=source)
+        git("commit", "--quiet", "-m", "source", cwd=source)
+        git("remote", "add", "origin", str(origin), cwd=source)
+        site.mkdir()
+        (site / "index.html").write_text("<p>built</p>")
+        head_before = git("rev-parse", "HEAD", cwd=source)
+
+        monkeypatch.chdir(source)
+        monkeypatch.setattr(dashboard_cli, "_short_sha", lambda: "abc1234")
+        dashboard_cli._publish(site, branch="gh-pages", dry_run=False)
+
+        assert git("rev-parse", "HEAD", cwd=source) == head_before
+        assert git("rev-parse", "--abbrev-ref", "HEAD", cwd=source) == "main"
+        assert git("status", "--porcelain", cwd=source) == "", \
+            "the publish left something in the source working tree or index"
+        published = git("ls-tree", "-r", "--name-only", "gh-pages", cwd=origin).splitlines()
+        assert sorted(published) == [".nojekyll", "index.html"]
+        assert git("rev-list", "--count", "gh-pages", cwd=origin) == "1", \
+            "the published branch shares history with the source"
+        assert len(git("worktree", "list", cwd=source).splitlines()) == 1, \
+            "the publish worktree was left registered"
 
 
 class TestTheWorkflowCarriesEveryVariableThePipelineNeeds:

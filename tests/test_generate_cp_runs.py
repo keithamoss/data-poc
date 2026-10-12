@@ -62,7 +62,15 @@ def raw_dir(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
-def manifest(raw_dir):
+def real_data_before(raw_dir):
+    """The supply-shaped files under the REAL data/ before this module
+    generates anything, so the generator's writes outside its redirected
+    root can be seen afterwards."""
+    return generator_isolation.supply_files_under_data()
+
+
+@pytest.fixture(scope="module")
+def manifest(raw_dir, real_data_before):
     """This generator's own BOOKKEEPING, which is the only place it is
     written now (REQ-GEN-043) - data/{raw,cp_raw}/manifest.json held a
     second copy of exactly this list and is retired. Still called
@@ -189,15 +197,23 @@ def test_deliveries_in_one_slot_advance_in_time(manifest):
             f"{slot_id}: deliveries disagree about which period they are for"
 
 
-def test_no_manifest_entry_carries_a_retired_field(manifest):
-    """The NFR stated directly, against real generated output: nothing
-    should be able to use the retired sense of "delivery" after this."""
-    retired = ("delivery_id", "delivery_date", "attempt_number", "is_resupply",
-               "supersedes_run_id", "arrived_date", "run_date",
-               "slot_attempt_number", "slot_is_resupply")
-    for e in manifest:
-        present = [f for f in retired if f in e]
-        assert present == [], f"{e['run_id']} still carries {present}"
+def test_the_generator_writes_a_delivery_and_nothing_beside_it(manifest, raw_dir, real_data_before):
+    """REQ-PIPE-102 criterion 2, by what generation leaves behind. The
+    generator used to write each run as a flat CSV (data/raw/ or
+    data/cp_raw/) AS WELL AS a real delivery. Its output root now holds
+    the delivery tree, its receipts and the bookkeeping - and the
+    scenario placements, which scenario_injection writes at the end of a
+    run - and the real data/ tree gains no supply file at all."""
+    root = raw_dir.parent
+    written = {p.name for p in root.iterdir()}
+    assert {"deliveries", "receipts", "generator_bookkeeping.json"} <= written, \
+        f"the generator did not write a delivery, its receipts and its bookkeeping: {sorted(written)}"
+    assert list((root / "deliveries").iterdir()), "no delivery was generated at all"
+    beside = written - generator_isolation.GENERATOR_OUTPUTS
+    assert not beside, f"the generator wrote something beside the delivery: {sorted(beside)}"
+    elsewhere = generator_isolation.supply_files_under_data() - real_data_before
+    assert not elsewhere, \
+        f"the generator wrote a supply file into the real data/ tree: {sorted(map(str, elsewhere))}"
 
 
 def test_no_run_id_carries_a_date(manifest):

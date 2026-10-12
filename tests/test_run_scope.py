@@ -100,17 +100,33 @@ def test_a_sibling_check_kept_for_reading_this_table_names_this_arrival(scoped):
     assert reevaluation.CAUSED_BY not in by_id[CLIENTS_OWN]
 
 
-def test_the_scope_uses_reevaluations_own_plan_and_mark():
+def test_the_scope_uses_reevaluations_own_plan_and_mark(scoped, monkeypatch):
     """REQ-PIPE-079 criteria 6 and 7 have ONE implementation each:
     reevaluation.plan() decides which checks an arriving table sets off,
     reevaluation.mark() names the cause. The run scope used to carry its
     own copy of both while those two sat uncalled - the "fourth
     implementation of which checks touch this table" plan()'s own
-    docstring warns is how they come to disagree."""
-    import ast
-    import inspect
+    docstring warns is how they come to disagree. So both are spied on:
+    the scope asks plan() about this run's table, keeps what it answers,
+    and has mark() name the cause on what it kept."""
+    from qa_tools.common import reevaluation
 
-    tree = ast.parse(inspect.getsource(writer._scope_to_run))
-    called = {n.func.attr for n in ast.walk(tree)
-              if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)}
-    assert {"plan", "mark"} <= called
+    planned, marked = [], []
+    real_plan, real_mark = reevaluation.plan, reevaluation.mark
+
+    def spy_plan(**kwargs):
+        planned.append(kwargs["table"])
+        return real_plan(**kwargs)
+
+    def spy_mark(record, **kwargs):
+        marked.append(record["check_id"])
+        return real_mark(record, **kwargs)
+
+    monkeypatch.setattr(reevaluation, "plan", spy_plan)
+    monkeypatch.setattr(reevaluation, "mark", spy_mark)
+    records = _records()
+    writer._scope_to_run(records, RUN)
+
+    assert planned == ["cp_clients"]
+    assert marked == [PLACEMENTS_FK]
+    assert [r["check_id"] for r in records] == [CLIENTS_OWN, PLACEMENTS_FK]
