@@ -7958,6 +7958,5 @@ twice. It deliberately did not re-find the `TypeError`.
       ~68k of product Python, about 1:1; ~2.3 tests per acceptance criterion
       on the 167 built requirements (1,833 criteria). Offered a
       criterion-by-criterion pruning pass, a numeric target, or a speed-only
-      pass; he chose none. Do not re-propose a pruning pass on size alone -
-      the rules in CLAUDE.md ("A test earns its place...") still govern each
-      new or touched test.
+      pass; he parked it - "leave it in the pocket for later" - and is happy
+      for it to be proposed again. Parked as `plans/running-thoughts.md` #86.

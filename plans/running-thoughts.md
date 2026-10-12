@@ -4779,7 +4779,7 @@ Belongs with batch 5's check work.
     slot; allow it only as a declared correction (REQ-PIPE-111); or version
     membership like participation.
 
-80. **[todo, 2026-10-11]** **[Testing & dev tooling]** **A timing assertion in
+80. **[done, 2026-10-11]** **[Testing & dev tooling]** **A timing assertion in
     tests/test_dbt_worker.py fails under full-suite load.**
     `TestOneWorkerPerProcess::test_later_runs_reuse_the_parse` asserts that
     every later dbt run is faster than the first (`max(times[1:]) <
@@ -4791,6 +4791,11 @@ Belongs with batch 5's check work.
     "Unable to do partial parsing" line is absent) than through wall-clock
     time on a shared four-core sandbox. Not fixed here: noticed during
     REQ-GEN-183's gate, outside its scope.
+    **DONE 2026-10-12, and it was a real defect, not load:** the dbt worker
+    kept a stale partial parse an earlier process had left in a run's
+    target, so a later run parsed in full. Fixed and the test now observes
+    the kept parse rather than timing (post-build-review #158, REQ-PIPE-157's
+    decisions).
 
 81. **[todo, 2026-10-11]** **[Testing & dev tooling]** **`mothman check
     --no-pytest` passes with a stale `plans/INDEX.md`.** Seen writing
@@ -4878,3 +4883,23 @@ Belongs with batch 5's check work.
     in which case tests/equiv_support.py should exclude it like the other
     surrogate ids. REQ-PIPE-188's equivalence criterion will meet the same
     thing.
+
+86. **[parked, 2026-10-12]** **[Testing & dev tooling]** **A pruning pass on
+    the test suite, criterion by criterion - in the pocket for later.**
+    Keith asked why there are ~4,600 Python tests ("that seems insane").
+    Measured: 4,269 distinct test functions (800 parametrized cases) in 351
+    modules; ~69k lines of test code against ~68k of product Python, about
+    1:1; ~2.3 tests per acceptance criterion across the 167 built
+    requirements (1,833 criteria). The three review passes that day only
+    removed tests that were worthless on their face (memorials, duplicates,
+    tautologies, source greps); none asked "what is the fewest tests that
+    would catch this criterion breaking". The pass offered: go criterion by
+    criterion, keep the fewest tests that would catch each breaking, fold
+    near-duplicates into parametrized cases, report every cut and why. The
+    honest cost: most of the day's real bugs (the stale dbt parse, the
+    leftover filings) were caught by exactly the tests that look
+    excessive. Keith: "leave it in the pocket for later" - and happy for it
+    to be proposed again, so raise it when the suite's time or weight next
+    gets in the way. Alternatives offered and not chosen: a numeric target
+    (cut to N, weakest first), and a speed-only pass on the browser tests,
+    which are ~85% of the suite's wall clock.
