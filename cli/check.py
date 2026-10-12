@@ -93,6 +93,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # avoid breaking a check, so a SQL check that names none is refused here.
     ("columns", ["uv", "run", "mothman", "dashboard", "validate-reads-columns"],
      "every SQL-bodied check names the columns it reads", False),
+    # running-thoughts #81: commit rule B re-runs only this cheap gate after
+    # a plans edit, and a stale index is what a plans edit most often
+    # breaks - the 2026-09-23 incident was exactly that, caught only by CI.
+    ("plans", ["uv", "run", "mothman", "dashboard", "plans-index", "--check"],
+     "plans/INDEX.md matches plans/*.md", False),
     ("requirements", ["uv", "run", "mothman", "dashboard", "validate-requirements"],
      "every linked test and implemented_by symbol still exists", False),
     # REQ-DOCS-072. The delivery plan and the register are two records

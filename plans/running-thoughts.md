@@ -4797,7 +4797,7 @@ Belongs with batch 5's check work.
     the kept parse rather than timing (post-build-review #158, REQ-PIPE-157's
     decisions).
 
-81. **[todo, 2026-10-11]** **[Testing & dev tooling]** **`mothman check
+81. **[done, 2026-10-12]** **[Testing & dev tooling]** **`mothman check
     --no-pytest` passes with a stale `plans/INDEX.md`.** Seen writing
     post-build-review #153: the index check lives only in
     tests/test_plans_index.py, so the cheap gate CLAUDE.md's commit rule B
@@ -4805,6 +4805,10 @@ Belongs with batch 5's check work.
     most often breaks - the 2026-09-23 incident's own failure. Caught here
     only because the plans test was run by hand. Probably a `plans-index
     --check` gate in `mothman check`'s list.
+    **DONE 2026-10-12:** exactly that - a `plans` gate running `mothman
+    dashboard plans-index --check`, so `--no-pytest` now catches it
+    (tests/test_cli_check.py test_the_cheap_gate_checks_the_plans_index,
+    failing first).
 
 82. **[done, 2026-10-11]** **[Data generation]** **A resend drawn clean
     fails the three sibling checks.** Found re-measuring REQ-GEN-184:

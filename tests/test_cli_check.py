@@ -90,6 +90,16 @@ def test_no_pytest_skips_only_the_python_suite(record):
     assert len(calls) == len(check_cli._GATES) - 1
 
 
+def test_the_cheap_gate_checks_the_plans_index(record):
+    """running-thoughts #81: CLAUDE.md's commit rule B re-runs only
+    `--no-pytest` after a plans edit, and a stale plans/INDEX.md is the
+    thing a plans edit most often breaks - it was checked only inside
+    pytest, so the cheap gate passed over it."""
+    calls, _ = record
+    _runner.invoke(check_cli.check_command, ["--no-pytest"])
+    assert ["uv", "run", "mothman", "dashboard", "plans-index", "--check"] in calls
+
+
 def test_a_missing_toolchain_is_reported_as_not_run_rather_than_passed(monkeypatch):
     """A fresh container has no node_modules until `npm ci` is run. The
     dangerous outcome is not the failure, it is a green summary that
