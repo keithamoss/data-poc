@@ -26,8 +26,7 @@ anything here that turns into real build work becomes a requirement in
 `requirements.yaml`, and the entry comes out when it lands.
 
 **SECOND SWEEP, 2026-10-12** (the same method). DELETED as fixed:
-#3, datasets supplied for the FOLLOWING period (REQ-PIPE-167, built:
-`days_before` on a participation); #11, supply-history columns out of
+#11, supply-history columns out of
 line (5c5a616's shared colgroup, asserted in tests-js/supply-history);
 #14, "Client reference" three times with nothing to tell them apart
 (REQ-QAC-037: a cross-table row names its table, column and tool); and
@@ -39,6 +38,8 @@ unless the app itself pushed that entry (tests/test_dashboard_e2e.py
 TestClosingAPanelReachedByItsUrl, three failing first). #16's
 resupply pile-up is built too (REQ-PIPE-118 onward) and stays until its
 remaining decisions are checked into the requirements that own the rest.
+#3 was deleted in this sweep as fixed by REQ-PIPE-167 and REOPENED the
+same evening by Keith - it is a different concept, not yet scoped.
 
 **PROPOSED SPRINTS FOR WHAT IS LEFT, 2026-10-12** - a proposal for Keith,
 not a commitment: none of sprints 1, 3 or 4 has a requirement yet, so
@@ -73,6 +74,7 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   baseline and resupply rules, band values. Last because it adds detection
   rather than making today's results readable, and its values need
   sprints 1 and 3's displays.
+- **To scope first:** #3 (data arriving now that belongs in the NEXT period's schema), reopened by Keith 2026-10-12 - a concept of its own, not REQ-PIPE-167.
 - **Not scheduled:** #12 stays parked (Keith, 2026-10-06). #16 is built and
   waits only on checking its remaining decisions into the requirements
   that own the rest before its ~1,100 lines go.
@@ -197,6 +199,87 @@ two levels) and #17.
    trend column beside it (item 1) - adding a second number to that row
    without fixing the first risks two unexplained figures instead of
    one.
+
+3. **[todo, 2026-09-24]** **[Pipeline & publishing]** **A
+   regularly scheduled dataset whose supplies are FOR THE FOLLOWING
+   PERIOD.** Keith's own worked example, 2026-09-24: data arriving in
+   January does not fill Q1 - it fills **Q2**. Operational reality is
+   that some datasets deliver for the current period and some for the
+   next, and this is a per-dataset property.
+
+   **The DESIGN QUESTION is settled; the WORK is not, and is
+   deliberately not in these sprints.** Corrected 2026-09-24 after this
+   entry was briefly marked done at `REQ-PIPE-062`'s sign-off - the
+   sign-off resolved how it fits the model, which is not the same as
+   building it. Keith's own placement: "that can go into the future log
+   in the road testing plan file".
+
+   **What is settled** (recorded on `REQ-PIPE-062`): it is NOT an
+   exception to criterion 5, which stays absolute. The SCHEDULE
+   expresses it, not the rule - that dataset's slot for the following
+   period carries a due instant and claim window already open when the
+   supply arrives, so nothing claims forward. Slots are already
+   per-dataset, so no new configuration axis is needed. Same mechanism
+   as the daily-cutoff and arrives-a-week-early cases that requirement
+   deleted.
+
+   **What is NOT built**: nothing declares, per dataset, that its
+   supplies are for the following period, and nothing generates its
+   slot calendar accordingly. Today a dataset's slots are derived on
+   the assumption that a period's supply arrives within that period.
+
+   **NAME COLLISION - do not merge this with `plans/supply-model.md`
+   sprint 25.** Keith used "carry forward" for both on 2026-09-24, and
+   they share a phrase and nothing else. Sprint 25 is a HUMAN DECISION
+   that a supply is never coming, pointing a period's view at the last
+   green supply so downstream consumers have something to query. THIS
+   is a SCHEDULING PROPERTY of a healthy, punctual dataset. Sprint 25
+   is being renamed for exactly this reason (backfill or patch are his
+   candidates); this entry should not inherit whichever name it loses. Keith's own ask, 2026-09-24. Some
+   datasets' supplies are for the period they arrive in; others' are
+   for the following one. His own framing: "does it appear in a slot in
+   this period, or does it need to go into a slot in the next period?"
+   - and it is configured at DATASET level, which he chose over
+   collection level so that one rule applies consistently even where a
+   whole collection happens to share it.
+
+   **Logged here because he raised it here, but it is NOT a road-testing
+   sighting** - it is a supply-model design question, and it collides
+   directly with a requirement that is drafted and not yet signed.
+   `REQ-PIPE-062` criterion 5 says the system SHALL NOT assign a supply
+   to a slot whose claim window has not opened, "under any rule or any
+   circumstance". A dataset whose deliveries are FOR the next period is
+   doing exactly that, under the current wording.
+
+   **The distinction that probably resolves it, and it is not yet
+   settled.** Criterion 5 exists to stop a LATE supply being
+   misattributed forward to a slot that has not come due, which would
+   silently mark a future obligation as met. A per-dataset "supplies
+   are for the following period" offset is a different thing: it moves
+   where the dataset's period BOUNDARY sits relative to arrival, rather
+   than letting an arbitrary arrival claim ahead. If that reading
+   holds, this is a property of the slot calendar rather than an
+   exception to the assignment rule - and criterion 5 stays absolute,
+   which is worth preserving, because an absolute rule with one
+   exception is how forward-claiming comes back.
+
+   **Not yet checked**: whether this is the same idea as
+   `contract/data-asset.yaml`'s existing `as_of_offset_days`, which is a
+   VIEWING offset and data-asset-level rather than per-dataset, or a
+   genuinely separate concept that merely rhymes with it. They must not
+   be conflated by accident.
+
+   **REOPENED 2026-10-12 (Keith).** A sweep that day deleted this entry as
+   fixed by REQ-PIPE-167 (built 2026-10-07: a participation's `days_before`
+   moves a slot's due instant ahead of its period's date). Keith: "that's
+   literally talking about data that needs to be arriving now, but going
+   into the next period schema. It's an entirely different concept that we
+   need to scope. It shouldn't be closed." So this is NOT done, and it
+   needs scoping with him - starting with how it differs from what
+   REQ-PIPE-167 built, so the scoping says exactly what that requirement
+   does not cover. No Child Protection or Birth Registrations dataset uses
+   `days_before` today.
+
 
 4. **[todo, 2026-09-24]** **[QA checks & contract]** **Cardinality
    drift - watch how many distinct values a column has, not which ones
