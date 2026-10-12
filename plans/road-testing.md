@@ -25,7 +25,10 @@ status (`todo` / `investigate` / `in-progress` / `parked` / `done` /
 anything here that turns into real build work becomes a requirement in
 `requirements.yaml`, and the entry comes out when it lands.
 
-**SECOND SWEEP, 2026-10-12** (the same method). DELETED as fixed:
+**SECOND SWEEP, 2026-10-12** (the same method). Tags tidied the same
+night at Keith's go-ahead: #12 to parked, #16 to blocked (built, waiting
+on its decisions moving into requirements), #5 (done, REQ-DASH-071)
+deleted. DELETED as fixed:
 #11, supply-history columns out of
 line (5c5a616's shared colgroup, asserted in tests-js/supply-history);
 #14, "Client reference" three times with nothing to tell them apart
@@ -93,7 +96,9 @@ requirements:
 - #2 sizing a problem: the dataset list counts failing COLUMNS, in its own
   column where Trend sits today.
 - #3 following-period datasets: scoped with the calendar group
-  (REQ-PIPE-110 to 113), not on its own.
+  (REQ-PIPE-110 to 113), not on its own. CORRECTED 2026-10-12 (Keith): that
+  scoping produced REQ-PIPE-167's `days_before`, which is NOT #3 - #3 is
+  data arriving now that belongs in the next period's schema, still open.
 - #4 cardinality drift: a percentage change in distinct count, gains and
   losses counted separately, against the last promoted supply.
 - #6 known date outliers: declared in the contract, on any date column,
@@ -347,19 +352,6 @@ two levels) and #17.
    title. A count of distinct values is exactly the metric a reader
    would otherwise assume was a row count.
 
-5. **[done, 2026-09-25]** **[Dashboard UI]** **The dashboard should
-   display Perth time, not UTC.** Keith's own sighting, 2026-09-24.
-
-   **BUILT by `REQ-DASH-071`, 2026-09-25.** All three shapes this
-   sighting separated are closed - the hard-coded `" UTC"` slice, the
-   bare `toLocaleDateString` with no zone, and the date-only string
-   read as midnight UTC - along with the snapshot banner's own
-   viewer-zone time, which it had flagged as honest rather than
-   correct. Both of its open questions were answered by Keith and are
-   recorded on the requirement: the asset's zone is always the one to
-   show, and a time carries NO zone label, because there is only one
-   clock and a label would imply a second.
-
 6. **[todo, 2026-09-24]** **[QA checks & contract]** **Known
    date-of-birth outliers, declared explicitly, with a tiered
    percentage tolerance.** Keith's own ask, 2026-09-24. Some bad dates
@@ -537,7 +529,7 @@ two levels) and #17.
     breakdown should also show the compared run, which is item 9's
     question arriving from the other direction.
 
-12. **[todo, 2026-09-24]** **[QA checks & contract]** **A completeness
+12. **[parked, 2026-09-24]** **[QA checks & contract]** **A completeness
     check for a TALL dataset: every event must have exactly one row per
     expected category.** Keith's own ask, 2026-09-24, with his own
     worked example - a geocoding dataset holding one row per geocoding
@@ -628,7 +620,7 @@ two levels) and #17.
     so something has to be generated either way, and `plans/
     data-generation.md` is where that lands rather than here.
 
-16. **[investigate, 2026-10-03]** **[Pipeline & publishing]** **A clean
+16. **[blocked, 2026-10-03]** **[Pipeline & publishing]** **A clean
     resupply cannot get through once a quarter has two undecided
     versions of anything.**
 
@@ -1529,7 +1521,8 @@ two levels) and #17.
       **SET 2/3 ANSWERS, Keith 2026-10-07:** `not_expected` is FROZEN like
       dates once its claim window opens (after the fact: mark-not-supplied,
       or a declared correction); the following-period offset (sighting #3,
-      REQ-PIPE-167) is a DAYS offset and is BUILT NOW, in this batch;
+      REQ-PIPE-167) is a DAYS offset and is BUILT NOW, in this batch [CORRECTED
+      2026-10-12, Keith: REQ-PIPE-167 is not sighting #3, which stays open];
       collection-level participation defaults - YES, nearest wins;
       excused lateness counts SEPARATELY in any punctuality figure; a
       second timezone is NEVER LABELLED on the dashboard (REQ-DASH-071's
