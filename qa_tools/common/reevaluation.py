@@ -63,6 +63,52 @@ def plan(*, table: str, period: str, reads: Mapping[str, list[str]]) -> Plan:
                     check_id for check_id, tables in reads.items() if table in tables))
 
 
+def _dataset_of_table(table: str) -> str | None:
+    from qa_tools.common import hierarchy
+
+    try:
+        return hierarchy.dataset_for_table(table).dataset_id
+    except hierarchy.UnknownDatasetError:
+        return None
+
+
+def reading_checks(*, table: str, period: str, reads: Mapping[str, list[str]]) -> frozenset[str]:
+    """Every CROSS-TABLE check that reads this table: those that declare it
+    (plan()), and those filed under its own dataset - which read it too but
+    declare only the OTHER tables they read, their own being implicit
+    (post-build-review #161: the second kind was missed, so a supply such a
+    check had turned red was never re-evaluated when this table arrived)."""
+    from qa_tools.common import check_id as check_id_mod
+
+    own = _dataset_of_table(table)
+    filed_here = set()
+    for check_id, declared in reads.items():
+        parsed = check_id_mod.try_parse(check_id)
+        if declared and parsed is not None and parsed.dataset == own:
+            filed_here.add(check_id)
+    return plan(table=table, period=period, reads=reads).check_ids | frozenset(filed_here)
+
+
+def counts_toward(check_id: str, *, table: str, reads: Mapping[str, list[str]]) -> set[str]:
+    """The datasets a check reading `table` counts toward - the one it is
+    filed under and every dataset whose table it declares it reads, the
+    rule promotion.status_of uses ("a referential check ... belongs to
+    both") - except `table`'s own dataset, whose supplies are what arrived
+    or left, not readers of it."""
+    from qa_tools.common import check_id as check_id_mod
+
+    out = set()
+    parsed = check_id_mod.try_parse(check_id)
+    if parsed is not None:
+        out.add(parsed.dataset)
+    for declared in reads.get(check_id) or ():
+        dataset_id = _dataset_of_table(declared)
+        if dataset_id is not None:
+            out.add(dataset_id)
+    out.discard(_dataset_of_table(table))
+    return out
+
+
 def mark(record: Mapping[str, Any], *, caused_by: str) -> dict:
     """Name, on a re-evaluated result, the arrival that caused it.
 

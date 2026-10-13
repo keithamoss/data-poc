@@ -333,18 +333,19 @@ def _readers_scope(run_id: str) -> list[str] | None:
 
 
 def _readers_of(tables: list[str], dataset_id: str, run_id: str) -> set[str]:
-    """`dataset_id`'s checks that read one of `tables` - reevaluation.plan(),
-    the one answer, per moved table."""
-    from qa_tools.common import check_id as check_id_mod
+    """The checks that read one of `tables` and count toward `dataset_id` -
+    reevaluation.reading_checks() and counts_toward(), the one answer
+    knock_on.readers() also uses (post-build-review #161: this kept only
+    checks FILED under the dataset, so a check filed elsewhere that counts
+    toward it was re-run and then thrown away)."""
     from qa_tools.common import reevaluation
 
     reads = _declared_reads_tables()
     period = _period_of_run(dataset_id, run_id)
     out: set[str] = set()
     for table in tables:
-        for check in reevaluation.plan(table=table, period=period, reads=reads).check_ids:
-            parsed = check_id_mod.try_parse(check)
-            if parsed is not None and parsed.dataset == dataset_id:
+        for check in reevaluation.reading_checks(table=table, period=period, reads=reads):
+            if dataset_id in reevaluation.counts_toward(check, table=table, reads=reads):
                 out.add(check)
     return out
 

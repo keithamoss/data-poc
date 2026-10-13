@@ -88,3 +88,26 @@ class TestTheResultSaysWhatCausedIt:
 
         assert reevaluation.CAUSED_BY not in qa_store._RESULT_COLUMNS
         assert reevaluation.CAUSED_BY not in qa_store._KEY_COLUMNS
+
+
+class TestACheckFiledUnderTheArrivingTableCountsTowardWhatItReads:
+    """post-build-review #161: a cross-table check declares only the OTHER
+    tables it reads, so plan() never listed one filed under the arriving
+    table's own dataset - and the writer kept only checks FILED under the
+    reader's dataset. Against the project's real declarations: when
+    investigations arrives, the investigations-filed checks that read
+    notifications are re-evaluated for notifications."""
+
+    def test_it(self):
+        from qa_tools.common import promotion
+
+        reads = promotion._declared_reads()
+        assert reads, "no declared reads - the check below would prove nothing"
+        checks = reevaluation.reading_checks(table="cp_investigations", period="2023-Q4",
+                                             reads=reads)
+        mine = {c for c in checks
+                if "cp-notifications" in reevaluation.counts_toward(
+                    c, table="cp_investigations", reads=reads)}
+        assert any(".cp-investigations.notification_id.relationships" in c for c in mine), mine
+        assert not any("cp-investigations" in reevaluation.counts_toward(
+            c, table="cp_investigations", reads=reads) for c in checks)

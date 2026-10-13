@@ -116,17 +116,15 @@ def _read_as(conn, run_key: str, table: str) -> str | None:
 def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -> list[Reader]:
     """Every supply in `period` whose cross-table checks read one of
     `tables`, and whether each must run again (criteria 1, 4; NFR 4)."""
-    from qa_tools.common import check_id as check_id_mod
     from qa_tools.common import decision_log, reevaluation, supersession, supply_status
 
     found: dict[tuple[str, str], Reader] = {}
     for table in tables:
-        checks = reevaluation.plan(table=table, period=period, reads=reads).check_ids
+        checks = reevaluation.reading_checks(table=table, period=period, reads=reads)
         by_dataset: dict[str, set[str]] = {}
         for cid in checks:
-            parsed = check_id_mod.try_parse(cid)
-            if parsed is not None:
-                by_dataset.setdefault(parsed.dataset, set()).add(cid)
+            for dataset_id in reevaluation.counts_toward(cid, table=table, reads=reads):
+                by_dataset.setdefault(dataset_id, set()).add(cid)
         holds = _now_holds(conn, table, period)
         for dataset_id, mine in sorted(by_dataset.items()):
             h = decision_log.held(conn, dataset_id, period)

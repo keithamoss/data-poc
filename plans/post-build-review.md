@@ -8051,7 +8051,7 @@ twice. It deliberately did not re-find the `TypeError`.
     "which file is the supply?" text are unreachable; the GitHub decision
     handler has no caller outside tests.
 
-161. **[in-progress, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
+161. **[done, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
     **TS-67's scripted re-files left their QA re-checks owed - the bootstrap
     never runs a scripted decision's re-check.** Found by delivery-architect
     reviewing REQ-GEN-196, then CONFIRMED against the bootstrapped database
@@ -8106,6 +8106,31 @@ twice. It deliberately did not re-find the `TypeError`.
     cp-notifications likewise ("still-failing"). Hypothesis, not yet
     verified: an unrunnable read records no dependency, so REQ-PIPE-121's
     knock-on never learns the supply reads those tables.
+    **FIXED THE SAME DAY, and the hypothesis was wrong.** The dependency was
+    recorded; the RULE for who re-evaluates was the fault, implemented
+    twice and narrower than the status rule both times.
+    promotion.status_of counts a cross-table check toward EVERY dataset
+    whose table it reads ("a referential check ... belongs to both"), but:
+    (a) reevaluation.plan selects checks by their DECLARED tables, and a
+    cross-table check declares only the OTHER tables it reads - its own,
+    the table of the dataset it is filed under, is implicit - so when
+    investigations arrived, the investigations-filed checks that had turned
+    clients and notifications red were never selected; (b) knock_on.readers
+    grouped the selected checks by the dataset they are FILED under; and
+    (c) the results writer's readers-only filter (`_readers_of`) kept only
+    checks filed under the reader's dataset, so a re-run notifications
+    supply had those very results thrown away. Fixed once:
+    reevaluation.reading_checks() (declared readers plus cross-table checks
+    filed under the table's own dataset) and counts_toward() (filed dataset
+    plus every declared table's dataset, minus the moving table's own),
+    used by both knock_on.readers and the writer. Tests, each failing
+    first: tests/test_knock_on.py `TestEveryDatasetACheckCountsTowardIsAReader`
+    (with the real plan() and the real shape of a declaration) and
+    tests/test_reevaluation.py
+    `TestACheckFiledUnderTheArrivingTableCountsTowardWhatItReads` (against
+    the project's real declarations). Re-bootstrapped from empty, 3m56s:
+    2023-Q4 now holds all five re-filed supplies promoted and cp-case-workers
+    inherited; the arrival golden is unchanged.
 
 162. **[done, 2026-10-13]** **[Testing & dev tooling]** **The premise gate
     could fail on a directory it never scans.** Seen in the full gate for

@@ -304,3 +304,43 @@ class TestThePersonIsToldWhoWillBeReChecked:
         # when applied, so no re-check is promised (finding 2).
         assert "re-check" not in said(fd.INHERIT, None)
 
+
+
+class TestEveryDatasetACheckCountsTowardIsAReader:
+    """post-build-review #161's last problem: a cross-table check counts
+    toward the status of EVERY dataset whose table it declares it reads
+    (promotion.status_of - "a referential check ... belongs to both"), but
+    readers() grouped checks only by the dataset they are FILED under. So
+    when investigations' table arrived in 2023-Q4, the waiting clients
+    supply - red only because those very checks could not run before -
+    was never re-evaluated, and TS-67's clients stayed red for good. Worse,
+    a cross-table check declares only the OTHER tables it reads (its own is
+    implicit), so reevaluation.plan never even listed it when the table it
+    is filed under arrived."""
+
+    CHECK = ("data-asset-1.child-protection-family-support.child-protection."
+             "cp-investigations.cp_client_id.relationships_dbt")
+
+    def test_a_waiting_supply_in_another_dataset_the_check_reads_is_a_reader(
+            self, monkeypatch, conn):
+        from qa_tools.common import reevaluation, supersession, supply_status
+
+        # AS DECLARED FOR REAL: a cross-table check filed under
+        # investigations names only the OTHER table it reads; its own,
+        # cp_investigations, is implicit - so the real plan() never lists it
+        # when investigations arrives (checked against the bootstrapped
+        # history, 2026-10-13). plan() is not stood in.
+        reads = {self.CHECK: ["cp_clients"]}
+        assert self.CHECK not in reevaluation.plan(
+            table="cp_investigations", period="2023-Q4", reads=reads).check_ids
+        monkeypatch.setattr(dl, "held", lambda c, ds, p: None)
+        monkeypatch.setattr(supersession, "waiting_in",
+                            lambda c, ds, p: ["cp-clients@k"] if ds == "cp-clients" else [])
+        monkeypatch.setattr(qa_store, "current_run", lambda c, ds, s: "run")
+        monkeypatch.setattr(supply_status, "latest_results", lambda c, ds, s: [])
+        monkeypatch.setattr(knock_on, "_now_holds", lambda c, t, p: None)
+
+        got = knock_on.readers(conn, "2023-Q4", ["cp_investigations"], reads)
+
+        assert [(r.dataset_id, r.supply) for r in got] == [("cp-clients", "cp-clients@k")]
+        assert got[0].stale and got[0].tables == {"cp_investigations"}

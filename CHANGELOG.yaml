@@ -129,6 +129,14 @@ releases:
               time, and a re-check that did run stopped the Child Protection
               dashboard building. Both are fixed, and the synthetic history's
               scripted decisions now run their re-checks too.
+          - headline: A check between two tables re-checks both when one arrives
+            components: ["Pipeline & publishing"]
+            description: >
+              A check comparing two tables counts toward both datasets, but
+              when one table arrived only the dataset the check was filed
+              under was checked again. A supply that check had turned red,
+              because the other table was not there yet, now gets checked
+              again and can be promoted.
           - headline: Only settling the two files ends "Two files, choose one"
             components: ["Pipeline & publishing"]
             description: >
