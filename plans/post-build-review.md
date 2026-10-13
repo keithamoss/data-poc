@@ -8485,7 +8485,7 @@ twice. It deliberately did not re-find the `TypeError`.
       only on CI; the July red cascade (resends filling neighbouring days)
       predates this and remains Keith's call - the reds no longer touch.
 
-173. **[todo, 2026-10-13]** **[Pipeline & publishing]** **A person's
+173. **[done, 2026-10-13]** **[Pipeline & publishing]** **A person's
     PROMOTE checks nothing about the supply's filing or QA - a held, an
     unfiled, or another period's supply goes into a period unchecked.**
     SIGNIFICANT, Keith's to sign off. Found by the delivery-architect
@@ -8542,3 +8542,24 @@ twice. It deliberately did not re-find the `TypeError`.
       failed load; promote-over and removing a substitution after a
       warning; red or amber deliberately allowed - and NO check that any QA
       ran, which is this item.
+    - **Built, 2026-10-13, each failing first.** Fix 1 (63bd965):
+      `filing_decisions._refuse_promoting_where_it_is_not_filed`, in both
+      `consequences()` (before the reason is asked) and `apply()`; unfiled,
+      held and elsewhere each refused with what to do instead (reject or
+      correct the calendar; `--operation refile`). First tried in
+      `decision_log._judge` as proposed - it refused 147 fixtures that WRITE
+      a person's promote as history rather than make one, and the rule never
+      needed it, so it sits where only a person's route passes. The three
+      advising texts are corrected. One choose-file test had only ever
+      passed through the loophole (promoting into the delivery's own day,
+      not the day before it is filed to) and was rebuilt; `pair_support.Pair`
+      now takes its period from the real filing. Fix 2: the same place
+      refuses while a RECHECK is owed for the supply, or when its current
+      run (`supply_current_run`) completed before its latest filing - both
+      stamped on the replay clock. Fix 3: REPRODUCED -
+      `knock_on.readers()` handed a re-filed supply owed its re-check to the
+      re-gate on its old period's results. Fixed by skipping it as a supply
+      not yet run is skipped (its own re-check gates it); a REEVALUATE owed
+      is deliberately not a refusal, since it re-runs only reading checks
+      and the gate after it judges the supply's whole status. Decisions on
+      REQ-PIPE-075 and REQ-PIPE-121.

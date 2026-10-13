@@ -117,9 +117,10 @@ def _read_as(conn, run_key: str, table: str) -> str | None:
 def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -> list[Reader]:
     """Every supply in `period` whose cross-table checks read one of
     `tables`, and whether each must run again (criteria 1, 4; NFR 4)."""
-    from qa_tools.common import decision_log, reevaluation, supersession, supply_status
+    from qa_tools.common import decision_log, recheck, reevaluation, supersession, supply_status
 
     found: dict[tuple[str, str], Reader] = {}
+    owed_rechecks: dict[str, set[str]] = {}
     for table in tables:
         checks = reevaluation.reading_checks(table=table, period=period, reads=reads)
         by_dataset: dict[str, set[str]] = {}
@@ -137,6 +138,15 @@ def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -
                 # A SUPPLY NOT YET RUN IS SKIPPED (criterion 4): its own first
                 # run will read the period as it stands.
                 if qa_store.current_run(conn, dataset_id, supply) is None:
+                    continue
+                # NOR ONE OWED ITS FULL RE-CHECK (post-build-review #173, L3):
+                # re-filed or settled, its newest results are another
+                # period's, and re-gating on them is how the rule would
+                # promote it here unchecked. Its re-check reads the period as
+                # it stands and gates it, as the first run does above.
+                if supply in owed_rechecks.setdefault(dataset_id, {
+                        o.supply_id for o in recheck.owed(conn, dataset_id)
+                        if o.kind == recheck.RECHECK}):
                     continue
                 reader = found.setdefault((dataset_id, supply),
                                           Reader(dataset_id, supply, is_waiting))

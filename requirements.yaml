@@ -12602,6 +12602,7 @@ requirements:
       - tests/test_filing_before_checks.py::TestTheFilingCallComesBeforeTheToolRuns
       - tests/test_filing_before_checks.py::TestFilingIsInterleavedRatherThanDoneUpFront
       - tests/test_parallel_orchestrate.py::TestArrivalsThatDependOnEachOther
+      - tests/test_promote_requires_filing.py
     evidence:
       - >
         Built 2026-09-28, overnight. The spine had existed since earlier
@@ -12756,6 +12757,23 @@ requirements:
         GREEN two transforms downstream.
     dependencies: [REQ-PIPE-074, REQ-PIPE-062, REQ-PIPE-035, REQ-PIPE-064]
     decisions:
+      - >
+        A PERSON'S PROMOTE IS JUDGED AGAINST THE SUPPLY'S FILING AND ITS
+        CHECKS (post-build-review #173; Keith, 2026-10-13: "there should be
+        no way to move things into a period and then skip doing checks").
+        Criteria 5, 8 and 17 were only ever enforced for the rule; a person's
+        promote read neither the filing nor any run. Now refused, in
+        filing_decisions (the one implementation every person's route shares,
+        before the reason is asked and again on apply): a supply never filed,
+        a HELD one (reject it, or correct the calendar - REQ-PIPE-163 is how a
+        held supply will be placed), one filed to another period (re-file it
+        first), one with a re-check owed, and one with no run of its own
+        checks completed since its latest filing. Red and amber stay a
+        person's to promote. Judged in filing_decisions rather than
+        decision_log._judge: the log is also written directly by test
+        fixtures and by the rule, whose own gate already promotes only into
+        the filed period, and placing it there refused 147 fixtures that
+        record a person's promote as history rather than make one.
       - >
         CRITERION 9 IS MET BY SOMETHING STRONGER THAN IT ASKS FOR, AND
         KEITH SHOULD CONFIRM THE WORDING. It asks for the decision-log
@@ -27225,6 +27243,15 @@ requirements:
         supply-less, naming every failing supply in its reason and the cause in
         caused_by_decision; `mothman supply decisions` shows it in bold red where every other rule entry is
         dimmed (criterion 13).
+      - 'A SUPPLY OWED ITS FULL RE-CHECK IS NOT A READER (post-build-review #173
+        fix 3, Keith 2026-10-13: test first, fix only if it reproduces - it did).
+        Re-filed or settled, its newest results are another period''s, and
+        readers() handed it to the re-gate as a waiting supply, so the rule could
+        promote it into its new period unchecked. It is skipped exactly as a supply
+        not yet run is (criterion 4): its owed re-check reads the period as it
+        stands and gates it. Rejected: making supply_status.latest_results
+        period-aware instead, which would change every status reader to close one
+        path.'
     open_questions: []
 
   - id: REQ-PIPE-122

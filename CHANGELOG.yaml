@@ -225,6 +225,16 @@ releases:
             description: >
               The page now scrolls to the "You have left" banner, which names the
               date you left, and your browser's Back button returns you there.
+          - headline: A supply goes into a period only once it has been checked there
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting a supply by hand used to skip every check on where it
+              was filed, so a held supply, or one filed to another period,
+              could go in without its checks ever running there. It is now
+              refused, and so is a promotion while the supply's re-check is
+              still owed. Each refusal tells you what to do instead. The
+              automatic rule also now leaves a supply owed its re-check
+              alone until that re-check runs.
   - date: "2026-10-12"
     summary: >
       Rebuilding the whole history takes half as long, and failing Child

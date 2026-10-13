@@ -167,6 +167,42 @@ class TestTheRun:
         assert cleared == [] and gated == []
 
 
+class TestASupplyOwedItsReCheckIsLeftToIt:
+    """post-build-review #173, L3 (fix 3, Keith 2026-10-13: test first, fix
+    only if it reproduces). A re-filed or settled supply is owed a full
+    re-check against its new period, and until it runs its newest results
+    are the OLD period's. A re-evaluation of the new period re-gated it on
+    those - so the RULE could promote it there unchecked. Its own re-check
+    reads the period as it stands and gates it, exactly as a supply not yet
+    run is left to its first run (criterion 4)."""
+
+    def _a_reader(self, monkeypatch, conn, period, *, owed):
+        from qa_tools.common import reevaluation, supply_status
+
+        supply, _table = _filed(conn, period, "2099-01-01T01:00:00+00:00")
+        if owed:
+            recheck.owe(conn, dataset_id=DS, supply_id=supply, load_id=1)
+        monkeypatch.setattr(reevaluation, "reading_checks",
+                            lambda *, table, period, reads: frozenset({"a-reading-check"}))
+        monkeypatch.setattr(reevaluation, "counts_toward",
+                            lambda cid, *, table, reads: {DS})
+        monkeypatch.setattr(knock_on, "_now_holds", lambda c, t, p: None)
+        monkeypatch.setattr(supply_status, "latest_results", lambda c, ds, s: [])
+        return supply
+
+    def test_without_one_it_is_a_reader(self, monkeypatch, conn, period):
+        supply = self._a_reader(monkeypatch, conn, period, owed=False)
+        got = knock_on.readers(conn, period, ["cp_x"], {})
+        assert [(r.supply, r.waiting) for r in got] == [(supply, True)], \
+            "the control: the same supply, nothing owed, IS re-gated"
+
+    def test_with_one_it_is_not_re_gated_on_another_periods_results(
+            self, monkeypatch, conn, period):
+        supply = self._a_reader(monkeypatch, conn, period, owed=True)
+        got = knock_on.readers(conn, period, ["cp_x"], {})
+        assert supply not in [r.supply for r in got]
+
+
 class TestTheShoutIsOneRecordNamingTheCause:
     """Criterion 12, against the real log."""
 

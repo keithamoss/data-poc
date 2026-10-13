@@ -442,6 +442,7 @@ class TestCriticFindingsOn193:
         p = self._pair(conn, day)
         one, two = (n for n, _ in p.files)
         p.settle(conn, actor, (one, "reject"), (two, "reject"))
+        p.rechecked(conn, p.second)
         request = fd.Request(operation=fd.PROMOTE, dataset_id=DS, actor=actor,
                              reason="it was the right file after all", period=p.period,
                              supply=p.second, confirmed=True)
@@ -568,6 +569,7 @@ class TestCriticFindingsOn194:
                               (f"birth_registrations_{day}-1.csv", _at(day, "09:45"))])
         one, two = (n for n, _ in p.files)
         p.settle(conn, actor, (one, "supply"), (two, "reject"))
+        p.rechecked(conn, p.pair)
         promote = fd.Request(operation=fd.PROMOTE, dataset_id=DS, actor=actor, reason="r",
                              period=p.period, supply=p.pair, confirmed=True)
         promote = fd.Request(**{**promote.__dict__,

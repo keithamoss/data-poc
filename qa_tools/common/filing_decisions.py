@@ -884,6 +884,40 @@ def _refuse_promoting_where_it_is_not_filed(conn, request: Request) -> None:
             f"  mothman supply decide --operation refile --dataset {request.dataset_id} "
             f"--period {where} --supply {request.supply} --to-period {request.period} "
             f"--reason '<why>'")
+    _refuse_promoting_what_is_not_checked_there(conn, request)
+
+
+def _refuse_promoting_what_is_not_checked_there(conn, request: Request) -> None:
+    """NOR BEFORE ITS CHECKS HAVE RUN AGAINST THAT FILING (post-build-review
+    #173 fix 2; Keith, 2026-10-13). A re-filed or settled supply is owed a
+    re-check, and until it runs its verdicts are the old period's - so a
+    promote is refused while a re-check is owed for the supply, or when no
+    run of its own checks has completed since its latest filing. Red and
+    amber stay a person's to promote; what is refused is no verdict at all
+    for where it now stands."""
+    from qa_tools.common import filing, qa_store, recheck
+
+    owed = [o for o in recheck.owed(conn, request.dataset_id)
+            if o.kind == recheck.RECHECK and o.supply_id == request.supply]
+    if owed:
+        raise decision_log.DecisionRefused(
+            f"{request.supply} has a re-check owed against {request.period}, so the "
+            f"verdicts it has now are from before it was last filed or settled. Let the "
+            f"re-check run first - `mothman pipeline process` runs every owed one - and "
+            f"then decide on its result. Nothing was recorded.")
+    rows = conn.execute(
+        f"SELECT f.recorded_at, r.completed_at FROM {filing.CURRENT} f "
+        f'LEFT JOIN "{qa_store.SCHEMA}".supply_current_run r '
+        "ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
+        "WHERE f.dataset_id = ? AND f.supply_id = ?",
+        [request.dataset_id, request.supply]).fetchall()
+    filed_at, completed_at = rows[0] if rows else (None, None)
+    if completed_at is None or (filed_at is not None and completed_at < filed_at):
+        raise decision_log.DecisionRefused(
+            f"{request.supply} has no run of its checks that completed since it was "
+            f"filed to {request.period}, so nothing has checked it there yet. Wait for "
+            f"its run to finish (`mothman pipeline process` runs anything owed), then "
+            f"decide on its result. Nothing was recorded.")
 
 
 def _refuse_promoting_what_never_loaded(conn, request: Request) -> None:

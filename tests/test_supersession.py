@@ -50,6 +50,10 @@ def _filed(conn, period, received, *, staged=True):
     if staged:
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
         conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+        # And checked, as its arrival leaves it (post-build-review #173 fix 2).
+        import filing_support
+
+        filing_support.checked(conn, DS, supply)
     return supply, physical
 
 

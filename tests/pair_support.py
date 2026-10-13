@@ -82,6 +82,18 @@ class Pair:
             conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (n int)')
             self.table[name] = physical
 
+    def rechecked(self, conn, supply):
+        """Its owed re-check run and cleared, as the processing pass leaves
+        it - a person promotes only what is checked since it was last filed
+        or settled (post-build-review #173 fix 2)."""
+        import filing_support
+        from qa_tools.common import recheck
+
+        run_key = filing_support.checked(conn, DS, supply)
+        conn.execute(f"UPDATE {recheck.TABLE} SET cleared_at = now(), cleared_by_run = ? "
+                     "WHERE dataset_id = ? AND supply_id = ? AND kind = ? "
+                     "AND cleared_at IS NULL", [run_key, DS, supply, recheck.RECHECK])
+
     def answers(self, *pairs):
         return tuple(settlement.Answer(*p) for p in pairs)
 

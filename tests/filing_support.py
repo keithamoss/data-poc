@@ -79,3 +79,23 @@ def filed(conn, dataset_id: str, supply_id: str, slot: str | None) -> None:
     delivery = f"pytest-{dataset_id}-{supply_id}"
     ensure_delivery(delivery, dataset_id, None)
     place(conn, dataset_id, supply_id, slot, delivery)
+    checked(conn, dataset_id, supply_id)
+
+
+def checked(conn, dataset_id: str, supply_id: str) -> str:
+    """A completed run of the supply's own checks, as its arrival leaves one:
+    a person promotes only what has been checked since it was last filed
+    (post-build-review #173 fix 2)."""
+    import uuid
+
+    from qa_tools.common import hierarchy, qa_store
+
+    ds = hierarchy.dataset(dataset_id)
+    run_key = f"pytest-run-{uuid.uuid4().hex[:12]}"
+    qa_store.record_run(conn, run_key=run_key, agency_id=ds.agency_id,
+                        collection_id=ds.collection_id,
+                        run_timestamp="2099-01-01T10:00:00+08:00", run_by="pytest",
+                        environment="sandbox")
+    qa_store.set_run_purpose(conn, run_key, dataset_id=dataset_id, supply_id=supply_id)
+    qa_store.complete_run(conn, run_key)
+    return run_key
