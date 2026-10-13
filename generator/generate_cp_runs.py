@@ -536,7 +536,7 @@ def _previous_delivery_names() -> list[str]:
     return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
 
 def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
-                    placement=None):
+                    placement=None, drawn: str | None = None):
     """The arrivals ONE injected scenario needs, in place of the
     ordinary chain (REQ-GEN-044) - the Child Protection counterpart to
     generate_runs.py's own, and see that one's docstring for why an
@@ -563,12 +563,27 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
                 where=f"{injection.scenario_id}, its {extra.at} arrival")
             if placement is not None:
                 placement.arrivals[n]["target"]["moved"] = moved
+        elif extra.severity and extra.severity_tables:
+            # ONLY THE TABLES NAMED (REQ-GEN-199 criterion 1): TS-75 is red by
+            # cp_clients' own preset alone, the other five clean.
+            only = {t: payload[t] for t in extra.severity_tables}
+            this = {**payload, **provider.dirty(only, severity=extra.severity,
+                                                 seed=seed + 800 + n,
+                                                 previous_row_count=None)}
         elif extra.severity:
             this = provider.dirty(payload, severity=extra.severity,
                                    seed=seed + 800 + n, previous_row_count=None)
+        severity = extra.severity
+        if (not extra.severity and extra.target is None and n == 0
+                and drawn == "amber" and injection.keeps_drawn_severity):
+            # THE PERIOD'S OWN DRAWN SEVERITY, on the tables the scenario
+            # does not shape (REQ-GEN-199, PROVISIONAL).
+            this = provider.dirty(payload, severity=drawn, seed=seed + 800,
+                                   previous_row_count=None)
+            severity = drawn
         deliveries.append(Delivery(
             received_date=period.date + timedelta(days=extra.day_offset),
-            severity=extra.severity, payload=this))
+            severity=severity, payload=this))
     return deliveries
 
 
@@ -626,8 +641,12 @@ def _ordinary_severities(periods, injected_by_period) -> list:
 
     green = frozenset(name for _inj, placement in injected_by_period.values()
                       for name in placement.built_green)
+    # A SCENARIO THAT KEEPS ITS PERIOD'S DRAWN SEVERITY (REQ-GEN-199) can
+    # carry an ordinary amber like any clean period.
     unavailable = frozenset(i for i, p in enumerate(periods)
-                            if p.name in injected_by_period or p.name in green)
+                            if (p.name in injected_by_period
+                                and not injected_by_period[p.name][0].keeps_drawn_severity)
+                            or p.name in green)
     out = targeting.outside_hold([sev for _q, sev in RUN_PLAN[:len(periods)]],
                                  [p.date for p in periods], "cp-clients",
                                  keep_clean=frozenset({0}), unavailable=unavailable)
@@ -678,7 +697,7 @@ def main() -> None:
         injected = injected_by_period.get(period.name)
         if injected is not None:
             deliveries = _injected_chain(provider, injected[0], period, seed,
-                                          placement=injected[1])
+                                          placement=injected[1], drawn=severity)
         else:
             deliveries = list(run_slot_chain(
                 provider, snapshot_date, seed, id_offset=0, n_rows=0,
@@ -769,6 +788,10 @@ def main() -> None:
         scenario_injection.check_suppressed_days_are_empty(placed, recognised)
         scenario_injection.resolve_run_ids(placed, recognised)
         scenario_injection.check_every_index_has_its_supply(placed)
+        # TS-79 IN THE SAME WRITE (REQ-GEN-199 criterion 20): every Child
+        # Protection regeneration replaces its records rather than merging
+        # past them, so a stale date cannot survive an ANCHOR_DATE bump.
+        placed += scenario_injection.inheritance_placements(periods)
         written = scenario_injection.write_placements(
             placed, merge=True)
         print(f"Recorded {len(placed)} injected scenario placement(s) -> {written}")

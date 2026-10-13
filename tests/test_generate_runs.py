@@ -99,8 +99,23 @@ def _injected_periods() -> tuple[set[str], set[str]]:
     periods = schedule.periods_for_dataset(
         "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
     placed = [si.resolve(i, periods) for i in si.for_dataset("birth-registrations")]
-    return ({p.period for p in placed},
+    # A COVERED PERIOD is the scenario's own as much as its anchor
+    # (REQ-GEN-199, TS-78): its supply is one of the scenario's arrivals.
+    return ({p.period for p in placed} | _covered_periods(),
             {name for p in placed for name in p.suppressed})
+
+
+def _covered_periods() -> set[str]:
+    """Periods whose own supply is written with an injected scenario's
+    anchor (Injection.covers), so no slot of their own appears."""
+    from generator import scenario_injection as si
+    from generator.anchor_date import get_anchor_date
+    from qa_tools.common import schedule
+
+    periods = schedule.periods_for_dataset(
+        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    return {name for i in si.for_dataset("birth-registrations")
+            for name in si.resolve(i, periods).covered}
 
 
 def _planned_severities() -> list:

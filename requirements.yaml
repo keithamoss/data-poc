@@ -32072,7 +32072,44 @@ requirements:
     date_written: '2026-10-13'
     story: As Keith showing what the dashboard says about a past date, I want the synthetic history to hold a real case of each thing REQ-DASH-197 and REQ-DASH-198 word differently on a past date - a supply that waited and was later rejected, a substitution later removed and one later replaced, a supply promoted after a newer one, and an inheritance - each listed in the test-scenarios panel with a link that opens on a date where it shows, so that I can demonstrate them on a real bootstrapped page rather than on a fixture history spliced into a test.
     moscow: should
-    status: not_started
+    status: built
+    implemented_by:
+    - generator/scenario_injection.py::INJECTIONS
+    - generator/scenario_injection.py::Injection
+    - generator/scenario_injection.py::apply_file_shape
+    - generator/scenario_injection.py::carries
+    - generator/scenario_injection.py::filed_early_into
+    - generator/scenario_injection.py::inheritance_placements
+    - generator/generate_runs.py::_covered
+    - generator/generate_cp_runs.py::_injected_chain
+    - generator/generate_cp_runs.py::_ordinary_severities
+    - contract/scripted_decisions.yaml
+    - contract/data-asset.yaml
+    - plans/supply-model.md
+    linked_tests:
+    - tests/test_as_at_scenarios.py
+    - tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips
+    - tests/test_dashboard_e2e.py::TestTheAsAtReadingsOnTheRealHistory
+    - tests/test_generate_cp_runs.py
+    - tests/test_generate_to_target.py::TestEachPlantedScenarioSitsInItsEra
+    evidence:
+    - '2026-10-13, overnight #4: reset and bootstrapped from empty in 7m00s (Birth Registrations 342s, Child Protection 270s), every scripted decision played - TS-77 substituted 3 May 2023 and promoted 9 June; TS-75 rejected 22 February 2024; TS-76 substituted 3 February 2025, removed and marked not supplied 20 April; TS-78''s D and D+2 withheld under hold and promoted by the person at 20:00 on 31 August and 10:00 on 2 September. Every chip''s quoted text found on the real built page at 1280x800 with zero console errors (the six below the fold are post-build-review #174). Full mothman check on the built tree: pytest 4940 passed, 8 xfailed (seven of them the findings above), 4 failed - the arrival-semantics golden and distribution, re-captured with only the planted arrivals moving, and a settings-changelog test that assumed every entry was a converted one - npm 668 passed. Those three modules then: 42 passed, 1 xfailed.'
+    unmet_criteria:
+    - criterion: 'Criterion 9 - "promoted and red, permanently, as the delivery-architect found (H1)". On the real build neither cp-clients nor cp-carers is red after TS-76''s substitution ends; the register records what was observed (clients amber, carers green).'
+      why: 'The cross-table checks reading cp_placements are filed under cp-placements, so nothing runs them for clients or carers in a quarter with no placements supply. The criterion''s wording asserts something the system does not do; changing it is Keith''s.'
+      owner: Keith (post-build-review #174)
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 16 - every supply held under hold is TS-43''s or TS-78''s. Two more wait on 8 September 2026: TS-47''s late file and that day''s own supply.'
+      why: 'Inside the original 1-9 September era, not the added 30 August version; the guard is a strict expected failure until the history is changed one of the ways post-build-review #175 lays out.'
+      owner: Keith (post-build-review #175)
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 33, in part - six chips'' quoted elements open below the initial 1280x800 viewport (TS-75a, TS-75b, TS-76''s and TS-77a''s "Since", TS-77b, TS-78a).'
+      why: 'Criterion 34 makes this a finding against the page; the fix is a dashboard change (a scenario jump that scrolls to its subject), which this requirement does not own.'
+      owner: Keith (post-build-review #174)
+      blocked_by:
+        unowned: true
     signed_off:
       by: Keith
       date: "2026-10-13"
@@ -32175,6 +32212,15 @@ requirements:
     - 'THE CHILD PROTECTION COLLISION CHECK IS PER DELIVERY, ALREADY (verified 2026-10-13): _plan_injections() runs no_two_scenarios_share_a_period() with every CP injection re-keyed to one dataset, because one delivery carries all six tables - so v2''s separate per-delivery criterion is replaced by reusing that check (M4). Occupied CP anchors: -3, -4, -5, -6, -10, -12 and -8 (TS-56), -9 a red chain, and -13 in effect (TS-67''s early filing). New: TS-75 -11, TS-76 -7 (stands on -8), TS-77 -14 (stands on -15); kept off -1 (today''s page), -2 (newest, TS-79a''s period) and -15 (the first quarter).'
     - 'FINAL UX PASS 2026-10-13: TS-77b''s Breaks-as narrowed to the panel''s reason line only - its standing-in drill-down sentences are correct today, so a change there is a regression, not #164 being decided; TS-78b quotes the in-place receipt as a date and time (the verdict line shows the time since #166); TS-76/TS-77 quote the pill as ''Substituted from <period>''.'
     - 'FINAL ARCHITECT PASS 2026-10-13: TS-79''s placements are written in the same write_placements call as Child Protection''s injected ones, so a regeneration replaces them rather than merging past them (a stale TS-79 date after an ANCHOR_DATE bump was B4 coming back another way).'
+    - 'BUILT 2026-10-13, OVERNIGHT #4. ONE PLACEMENT FOR SEVERAL DAYS is a new Injection field, `covers`: the periods after the anchor whose own supplies are the scenario''s arrivals on those days. No ordinary chain is written for them, they are claimed and kept quiet like the anchor, each covered arrival gets fresh rows for its own day with the id block its slot would have had, the generator''s record files it under its own period and slot, and the green following period is the one after the last. Rejected: three injections for TS-78 (D+1 would be claimed twice - the decision above); churning D''s payload into D+1''s (yesterday''s extract on today''s date reads stale).'
+    - 'BUILT: `hold_days` names the offsets that must be in a hold era; outside it, generation refuses naming the scenario (criterion 15), checked in resolve() so `mothman scenarios validate` and both generators see it.'
+    - 'BUILT: a link''s `arrival N` and a script''s `supply N` count only the arrivals that CARRY the placement''s own dataset''s file (scenario_injection.carries/supply_arrivals). TS-77''s first delivery leaves cp_placements out by design, so its late file is supply 0 for cp-placements; without this, check_every_index_has_its_supply refused the history, rightly, because the two indexes named different files. Rejected: keying TS-76/TS-77 on cp-clients (their chips must open cp-placements'' page).'
+    - 'BUILT: the Child Protection collision check resolves each injection WITHOUT its links - it re-keys every injection to cp-clients, and a link must be resolved against its own dataset''s files; the generator''s own resolve() still validates every link.'
+    - 'BUILT: an early arrival claims the quarter it files into when it is received before its anchor''s claim window opens (filed_early_into), so TS-67 claims 2023-Q3 (-13). Only arrivals dated before their anchor are looked at, so an ordinary injection never reaches the calendar.'
+    - 'PROVISIONAL (a), Keith to confirm: TS-76 and TS-77 KEEP THE ORDINARY AMBER DRAWN FOR THEIR QUARTER (Injection.keeps_drawn_severity) on the tables they do not shape. Child Protection had three drawn ambers on quarters the three new scenarios took and one clean quarter left to move them to (-13); its calendar starts in 2023, so the history cannot be lengthened at the old end, and REQ-GEN-184 criterion 9 says every drawn amber is generated. So TS-75''s amber moves to -13, and TS-76''s and TS-77''s stay in their own deliveries - an amber cp-clients in each, which the register records. Rejected: dropping an amber (breaks REQ-GEN-184 c9); moving an anchor (Keith''s); lengthening (impossible here).'
+    - 'PROVISIONAL (b): TS-79''s link dates are the MIDDLE of each quarter. The generator cannot know when the inheritance is recorded (the pipeline decides that, within two weeks of the quarter''s date on this history), and a mid-quarter date is inside the period and after it.'
+    - 'PROVISIONAL (c): the dates, timed so each link falls between its events and every resupply lands on a weekday - TS-75 rejected 21 days after arrival (09:00 22 Feb 2024), corrected file 28 days after (29 Feb); TS-76 substituted 48 hours after due (3 Feb 2025) and removed and marked not supplied once the next quarter''s window opened (20 Apr); TS-77 substituted 48 hours after due, late file 38 days after (Thursday 8 Jun 2023), promoted 24 hours later; TS-78''s receipts at 14:00.'
+    - 'PROVISIONAL (d): the six quoted texts below the initial viewport are STRICT expected failures naming post-build-review #174, and criterion 16''s guard is a strict expected failure naming #175 - each fails the day its finding is fixed, and neither assertion was loosened.'
   - id: REQ-GEN-200
     title: A scripted decision can be about a PERIOD that received no supply - substitute, de-substitute and mark-not-supplied, timed from the period's due instant, with the stood-on period named relative to the placement
     date_written: '2026-10-13'

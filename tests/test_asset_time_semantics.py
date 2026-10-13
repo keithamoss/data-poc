@@ -160,6 +160,17 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     and verdict; 32 went and 79 came because the new July days now hold the
     ordinary reds (moved before the scenarios) and August holds the pairs.
 
+    RE-CAPTURED 2026-10-13 NIGHT FOR REQ-GEN-199 (TS-75 to TS-78 planted).
+    The procedure first: 119 deliveries, zero `handfiled-*`, `mothman dashboard
+    rebuild` before the capture. 208 arrivals. What moved: Birth
+    Registrations' 28 August to 2 September - TS-78's lead-ins, D to D+2 and
+    its following day - now arrive at their stated 14:00 and 14:30 (six ids
+    out, six in); the three Child Protection quarters TS-75, TS-76 and TS-77
+    took arrive at the scenario's 09:00 (three ids per table each way);
+    cp-clients gains TS-75's corrected file, cp-placements loses TS-76's and
+    TS-77's on-time supplies and gains TS-77's late one. NO arrival present
+    in both changed its instant or its verdict.
+
     RE-CAPTURED 2026-10-12 FOR REQ-GEN-195 (Child Protection arrives early:
     TS-9, TS-65, TS-66, and TS-67 too early). The procedure first: 69
     deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
@@ -426,13 +437,19 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         deliveries, zero `handfiled-*`, the dashboard rebuilt. Every Child
         Protection entry identical; the 27 Birth Registrations arrivals in
         both captures unchanged; Birth Registrations 70 / 18 / 12 over 100.
+
+        MEASURED AGAIN 2026-10-13 NIGHT FOR REQ-GEN-199: 134 / 38 / 28 / 8 over
+        the same 208. TS-78's six days now arrive at their stated 14:00 and
+        14:30 and the three Child Protection quarters TS-75 to TS-77 took at
+        09:00 - fixed instants in place of ones read from the rows - and no
+        arrival present in both captures changed its verdict.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 132, "early": 39, "late": 29, "unfiled": 8}
+        assert counts == {"on_time": 134, "early": 38, "late": 28, "unfiled": 8}
         assert sum(counts.values()) == 208
 
 

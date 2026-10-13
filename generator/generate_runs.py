@@ -547,7 +547,15 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     deliveries = []
     payload = provider.generate(period.date, seed=seed, n_rows=n_rows, id_offset=id_offset)
     for n, extra in enumerate(injection.arrivals):
-        if n:
+        if n and 0 < extra.day_offset <= injection.covers \
+                and extra.day_offset != injection.arrivals[n - 1].day_offset:
+            # A COVERED DAY'S OWN SUPPLY (REQ-GEN-199): that day's extract, with
+            # the id block its own slot would have had - not a resend of D's.
+            day = period.date + timedelta(days=extra.day_offset)
+            payload = provider.generate(day, seed=seed + 50 * extra.day_offset,
+                                        n_rows=n_rows,
+                                        id_offset=id_offset + extra.day_offset * ID_BLOCK)
+        elif n:
             payload = provider.churn(payload, seed=seed + 900 + n, run_date=period.date,
                                       id_offset=id_offset + (n + 1) * (ID_BLOCK // 10))
         if extra.files:
@@ -748,9 +756,20 @@ def _plan_injections(periods):
     # other period's resend lands on it - on the first planted rebuild one
     # landed on TS-45's day before TS-45 did, filled it, and TS-45's own
     # supply was refused. TS-47's own day was only clear before by luck.
+    # A COVERED PERIOD (REQ-GEN-199, TS-78) is the scenario's own as much as
+    # its anchor: its supply is one of the scenario's arrivals, and no other
+    # period's resend may land on it.
     quiet = {name for _, placement in resolved
-             for name in (*placement.quiet, *placement.built_green, placement.period)}
+             for name in (*placement.quiet, *placement.built_green, placement.period,
+                          *placement.covered)}
     return resolved, by_period, suppressed, quiet
+
+
+def _covered(injected_by_period) -> frozenset[str]:
+    """Every period whose own supply is an injected scenario's arrival on
+    that day (Injection.covers): no ordinary chain is written for it."""
+    return frozenset(name for _inj, placement in injected_by_period.values()
+                     for name in placement.covered)
 
 
 def _days_to_avoid(period_name: str, suppressed: set[str], quiet: set[str]) -> set[str]:
@@ -780,7 +799,9 @@ def main() -> None:
     (resolved_injections, injected_by_period, suppressed_periods,
      quiet_periods) = _plan_injections(periods)
     # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
-    severities = _ordinary_severities(periods, injected_by_period, suppressed_periods)
+    covered_periods = _covered(injected_by_period)
+    severities = _ordinary_severities(periods, injected_by_period,
+                                      suppressed_periods | covered_periods)
     # ONLY THEN is the last history cleared: a scenario or target refused
     # above leaves the one already on disk standing (REQ-GEN-184
     # criterion 11).
@@ -804,6 +825,8 @@ def main() -> None:
         + [p.date for p in periods if p.name in green_periods]
         + [p.date for p in periods if p.name in injected_by_period and any(
             x.targets for x in injected_by_period[p.name][0].arrivals)]
+        # A COVERED DAY'S OWN SUPPLY is built to a target too (REQ-GEN-199).
+        + [p.date for p in periods if p.name in covered_periods]
         # THE NEXT DAY'S EXTRACT A PAIR SENDS EARLY is built to a target too
         # (REQ-GEN-196): never stale either.
         + [p.date + timedelta(days=1) for p in periods if p.name in injected_by_period
@@ -832,6 +855,11 @@ def main() -> None:
         if period.name in suppressed_periods:
             print(f"{period.name}: no supply at all (an injected scenario needs this "
                   f"day empty)")
+            continue
+        if period.name in covered_periods:
+            # ITS SUPPLY IS THE SCENARIO'S (REQ-GEN-199): written with the
+            # anchor's arrivals, so nothing more here. The size carries on.
+            print(f"{period.name}: its supply is an injected scenario's arrival")
             continue
 
         injected = injected_by_period.get(period.name)
@@ -864,6 +892,14 @@ def main() -> None:
                 shifted_onto, last_day=periods[-1].date)
         entries = _manifest_entries_for_slot(deliveries, slot_id, period.name,
                                               len(manifest), id_offset, seed)
+        if injected is not None and injected[0].covers:
+            # A COVERED DAY'S SUPPLY IS THAT DAY'S (REQ-GEN-199): recorded
+            # under its own period, which is what it is for.
+            for delivery_obj, entry in zip(deliveries, entries):
+                offset = (delivery_obj.received_date - slot_date).days
+                if 0 < offset <= injected[0].covers:
+                    entry["period"] = periods[periods.index(period) + offset].name
+                    entry["slot_id"] = f"slot_{i + offset:03d}"
 
         for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
             # ONE WRITE, NOT TWO (REQ-PIPE-102, extended to Birth

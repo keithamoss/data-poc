@@ -128,6 +128,10 @@ class ExtraArrival:
     #: TWO FILES IN ONE DELIVERY for one table (REQ-GEN-196), each with its
     #: own receipt; `at` is then the earlier file's.
     files: tuple[PairFile, ...] = ()
+    #: THE TABLES `severity` DIRTIES, for a collection whose delivery carries
+    #: several (REQ-GEN-199 criterion 1: TS-75's cp_clients alone, the other
+    #: five clean). Empty is the preset's own pick, as before.
+    severity_tables: tuple[str, ...] = ()
 
     @property
     def targets(self) -> tuple:
@@ -142,6 +146,9 @@ class ExtraArrival:
             if f.target is not None and f.severity is not None:
                 raise CannotPlace(f"a pair file at {f.at} names both a severity and a "
                                   f"target - it is one or the other")
+        if self.severity_tables and self.severity is None:
+            raise CannotPlace(f"an arrival at {self.at} names the tables a severity "
+                              f"dirties ({', '.join(self.severity_tables)}) and no severity")
         if self.target is not None and self.severity is not None:
             raise CannotPlace(f"an arrival at {self.at} names both a severity "
                               f"({self.severity}) and a target - a target replaces the "
@@ -236,6 +243,28 @@ class Injection:
     #: own supply to come after the settlement - a green one, on time.
     green_follow: bool = False
 
+    #: HOW MANY PERIODS AFTER THE ANCHOR ARE THIS INJECTION'S OWN (REQ-GEN-199,
+    #: TS-78): their own supplies are this injection's arrivals on those days,
+    #: so no ordinary chain is written for them, they are claimed like the
+    #: anchor, and the green following period is the one after the last.
+    #: ONE PLACEMENT for several days, because D+1 is both D's following day
+    #: and D+2's lead-in - two injections claiming it would collide.
+    covers: int = 0
+
+    #: WHETHER THE DELIVERY KEEPS THE ORDINARY SEVERITY DRAWN FOR ITS PERIOD
+    #: (REQ-GEN-199, PROVISIONAL - Keith to confirm). A scenario that shapes
+    #: only one table's PRESENCE (TS-76, TS-77) leaves the rest of the
+    #: delivery as the draw made it, so an ordinary amber drawn there is
+    #: generated there rather than moved: Child Protection has no clean
+    #: quarter left to move it to, and REQ-GEN-184 criterion 9 says every
+    #: drawn amber is generated.
+    keeps_drawn_severity: bool = False
+
+    #: Offsets from the anchor that must fall inside a `hold` amber-setting
+    #: era (REQ-GEN-199 criterion 15). Generation REFUSES, naming the
+    #: scenario, when one does not - never shifting it outside the era.
+    hold_days: tuple[int, ...] = ()
+
     @property
     def is_targeted(self) -> bool:
         return any(a.targets for a in self.arrivals)
@@ -257,6 +286,9 @@ class Placement:
     #: and the green period after it (REQ-GEN-185 criteria 1 and 3).
     lead_in: tuple[str, ...] = ()
     follow: tuple[str, ...] = ()
+    #: The periods after the anchor whose own supplies are this injection's
+    #: arrivals (Injection.covers).
+    covered: tuple[str, ...] = ()
     #: Scenario id -> its link's resolved in-place-on date (REQ-GEN-201
     #: criterion 5). Absent ids keep the default.
     in_place_on: tuple[tuple[str, str], ...] = ()
@@ -329,6 +361,15 @@ FILE_SHAPES: dict[str, str] = {
     "columns_reordered":
         "cp_carers.csv arrives with its first two columns swapped, header and rows "
         "alike - the same data, laid out differently by an upstream export.",
+    # REQ-GEN-199 criterion 6. cp_placements BECAUSE NO CHECK READS IT AS A
+    # PARENT: its absence breaks no other table's referential check, so the
+    # other five promote normally and the substitution is what shows.
+    "one_table_missing":
+        "the six-file delivery with cp_placements.csv absent - the supplier's "
+        "extract left one table out - and the other five unchanged.",
+    "missing_table_late":
+        "cp_placements.csv arriving on its own, later in the quarter - the table "
+        "the delivery left out, sent once the supplier noticed.",
     # PER FILE (REQ-GEN-196's named-shapes NFR): applied to whichever file a
     # pair names, never hardwired to one filename.
     "unreadable_file":
@@ -407,6 +448,33 @@ def reordered(content: str) -> str:
     return out.getvalue()
 
 
+def carries(shape: str | None, table: str) -> bool:
+    """Whether a delivery of this shape carries `table`'s file at all
+    (REQ-GEN-199). A delivery that leaves the table out BY DESIGN is not one
+    of that dataset's supplies, so it takes no supply index - which is how a
+    link's `arrival N` and a script's `supply N` keep naming the same file
+    when one delivery deliberately has none (TS-76, TS-77)."""
+    if shape == "one_table_only":
+        return table == "cp_clients"
+    if shape == "missing_table_late":
+        return table == "cp_placements"
+    if shape == "one_table_missing":
+        return table != "cp_placements"
+    return True
+
+
+def supply_arrivals(placement) -> list[dict]:
+    """The placement's arrivals that carry its own dataset's file, in order -
+    what a script's `supply N` and a link's `arrival N` index."""
+    from qa_tools.common import hierarchy
+
+    try:
+        table = hierarchy.dataset(placement.dataset).table
+    except Exception:  # noqa: BLE001 - an unknown dataset carries everything
+        return list(placement.arrivals)
+    return [a for a in placement.arrivals if carries(a.get("file_shape"), table)]
+
+
 def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]:
     """One delivery's file set, as the named shape wants it.
 
@@ -434,6 +502,10 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
         out["placements (2).csv"] = files["cp_placements.csv"]
     elif shape == "columns_reordered":
         out["cp_carers.csv"] = reordered(files["cp_carers.csv"])
+    elif shape == "one_table_missing":
+        out.pop("cp_placements.csv")
+    elif shape == "missing_table_late":
+        out = {"cp_placements.csv": files["cp_placements.csv"]}
     return out
 
 
@@ -482,6 +554,15 @@ def resolve(injection: Injection, periods: Sequence,
                 f"is outside the generated history")
         quiet.append(periods[at].name)
 
+    covered = []
+    for k in range(1, injection.covers + 1):
+        if index + k >= len(periods):
+            raise CannotPlace(
+                f"{injection.scenario_id}: it needs the {injection.covers} period(s) after "
+                f"{anchor.name} as its own, and the generated history ends before them")
+        covered.append(periods[index + k].name)
+    _refuse_outside_hold(injection, anchor.date)
+
     # A TARGETED SCENARIO'S LEAD-IN AND THE PERIOD AFTER IT (REQ-GEN-185):
     # both must exist in the generated history - placing them anywhere else
     # would measure the target against something it was not built for.
@@ -496,12 +577,13 @@ def resolve(injection: Injection, periods: Sequence,
             lead_in.append(periods[index - k].name)
     # NO GREEN FOLLOW WHERE THE NEXT DAY IS SUPPRESSED (REQ-GEN-196
     # criterion 19): it is filled only by a re-filed file.
+    after = index + injection.covers + 1
     if (injection.is_targeted or injection.green_follow) and 1 not in injection.suppress:
-        if index + 1 >= len(periods):
+        if after >= len(periods):
             raise CannotPlace(
-                f"{injection.scenario_id}: it needs the period after {anchor.name} "
-                f"generated green, and the history ends there")
-        follow.append(periods[index + 1].name)
+                f"{injection.scenario_id}: it needs the period after "
+                f"{periods[after - 1].name} generated green, and the history ends there")
+        follow.append(periods[after].name)
 
     arrivals = []
     for extra in injection.arrivals:
@@ -536,7 +618,8 @@ def resolve(injection: Injection, periods: Sequence,
         suppressed=tuple(suppressed),
         quiet=tuple(quiet),
         lead_in=tuple(lead_in),
-        follow=tuple(follow))
+        follow=tuple(follow),
+        covered=tuple(covered))
     if not injection.links:
         return placement
     # THE DATE WRITTEN IS THE DATE VALIDATED (REQ-GEN-201 criterion 9):
@@ -547,6 +630,26 @@ def resolve(injection: Injection, periods: Sequence,
         raise CannotPlace("; ".join(refused))
     return dataclasses.replace(placement, in_place_on=tuple(
         (d.scenario_id, d.on.isoformat()) for d in dates))
+
+
+def _refuse_outside_hold(injection: Injection, anchor_day: date) -> None:
+    """REQ-GEN-199 criterion 15: each of `hold_days` falls inside a `hold`
+    amber-setting era, or generation is refused naming the scenario - never
+    shifted outside the era, which would make its held supplies promote
+    themselves."""
+    if not injection.hold_days:
+        return
+    from qa_tools.common import amber_setting, asset_time
+
+    outside = [anchor_day + timedelta(days=k) for k in injection.hold_days
+               if amber_setting.resolve(injection.dataset_id, asset_time.start_of_day(
+                   anchor_day + timedelta(days=k))).value != amber_setting.HOLD]
+    if outside:
+        raise CannotPlace(
+            f"{injection.scenario_id}: {', '.join(d.isoformat() for d in outside)} "
+            f"fall(s) outside a hold amber-setting era, and the scenario's held supplies "
+            f"need it - move the anchor back inside the era (contract/data-asset.yaml's "
+            f"amber_setting), or add a version; it is not shifted for you")
 
 
 def link_dates(injection: Injection, placement: Placement,
@@ -568,10 +671,12 @@ def link_dates(injection: Injection, placement: Placement,
     ours = (injection.scenario_id, *injection.also_demonstrates)
     mine = [s for s in scripts if s.scenario in ours]
 
+    supplies = supply_arrivals(placement)
+
     def arrival_at(index: int) -> datetime | None:
-        if not 0 <= index < len(placement.arrivals):
+        if not 0 <= index < len(supplies):
             return None
-        a = placement.arrivals[index]
+        a = supplies[index]
         return asset_time.wall_clock(date.fromisoformat(a["date"]), a["at"])
 
     def event(ref) -> tuple[str, datetime | None, str | None]:
@@ -584,8 +689,8 @@ def link_dates(injection: Injection, placement: Placement,
             at = arrival_at(ref)
             return label, at, (None if at is not None else
                                f"{label} does not exist - the injection has "
-                               f"{len(placement.arrivals)}; name one of 0 to "
-                               f"{len(placement.arrivals) - 1}")
+                               f"{len(supplies)} carrying {placement.dataset}'s file; "
+                               f"name one of 0 to {len(supplies) - 1}")
         label = f"decision {ref!r}"
         named = [s for s in mine if s.name == ref]
         if not named:
@@ -690,7 +795,8 @@ def check_every_index_has_its_supply(placements: Sequence[Placement],
         scripts = scripted_decisions.load()
     by_id = {i.scenario_id: i for i in (injections if injections is not None else INJECTIONS)}
     for placement in placements:
-        gap = next((n for n, a in enumerate(placement.arrivals) if not a.get("run_id")), None)
+        gap = next((n for n, a in enumerate(supply_arrivals(placement))
+                    if not a.get("run_id")), None)
         if gap is None:
             continue
         injection = by_id.get(placement.scenario_id)
@@ -748,7 +854,11 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
     """
     seen: dict[tuple[str, str], str] = {}
     for injection in injections:
-        placement = resolve(injection, periods_by_dataset[injection.dataset_id])
+        periods = periods_by_dataset[injection.dataset_id]
+        # PERIODS ONLY: its links are resolved by the caller's own resolve(),
+        # against its own dataset - the Child Protection check re-keys every
+        # injection to one dataset, whose files a link must not be read in.
+        placement = resolve(dataclasses.replace(injection, links=()), periods)
         # A LEAD-IN OR FOLLOWING PERIOD IS CLAIMED like the anchor itself
         # (REQ-GEN-185 criterion 5): another scenario's anchor, emptied or
         # quiet day landing on one fails here naming both.
@@ -761,8 +871,10 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
                 f"{injection.scenario_id} suppresses {', '.join(sorted(own))}, which is "
                 f"its own lead-in or following period - a targeted supply needs that "
                 f"day generated green")
-        for name in dict.fromkeys((placement.period, *placement.suppressed,
-                                   *placement.quiet, *placement.built_green)):
+        for name in dict.fromkeys((placement.period, *placement.covered,
+                                   *placement.suppressed, *placement.quiet,
+                                   *placement.built_green,
+                                   *filed_early_into(injection, placement, periods))):
             key = (injection.dataset_id, name)
             if key in seen and seen[key] != injection.scenario_id:
                 raise CannotPlace(
@@ -771,6 +883,76 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
                     f"what it claims - each one's outcome would depend on the other's "
                     f"arrivals. Move one to a different anchor.")
             seen[key] = injection.scenario_id
+
+
+def filed_early_into(injection: Injection, placement: Placement,
+                     periods: Sequence) -> tuple[str, ...]:
+    """The period before the anchor, where an arrival is received before the
+    anchor's own claim window opens (REQ-GEN-199 criterion 28): the open slot
+    then is the previous period's, so the filing rule files it there, and the
+    scenario claims that period as surely as its anchor. TS-67 arrives twenty
+    days early and files into the quarter before its own; a scenario placed
+    there would have TS-67's whole delivery land in it, and keying the check
+    on TS-67's anchor alone did not catch it."""
+    from qa_tools.common import asset_time, slots
+
+    names = [p.name for p in periods]
+    index = names.index(placement.period)
+    # ONLY AN ARRIVAL BEFORE ITS ANCHOR'S OWN DAY can be early for it.
+    if index == 0 or not any(date.fromisoformat(a["date"]) < placement.period_date
+                             for a in placement.arrivals):
+        return ()
+    opens = slots.slot_instants(injection.dataset_id, placement.period_date).claim_opens_at
+    early = any(asset_time.wall_clock(date.fromisoformat(a["date"]), a["at"]) < opens
+                for a in placement.arrivals)
+    return (names[index - 1],) if early else ()
+
+
+#: TS-79's dataset: the one Child Protection table delivered only in some
+#: quarters, so it inherits in the rest (REQ-GEN-199 criteria 19-21).
+INHERITING_DATASET = "cp-case-workers"
+
+
+def inheritance_placements(periods: Sequence) -> list[Placement]:
+    """TS-79a and TS-79b, written AFTER generation rather than injected
+    (REQ-GEN-199 criterion 20; delivery-architect B4): they add nothing to the
+    data and claim no period - each is a quarter cp-case-workers already
+    inherits in, because its participation leaves it out. Resolved from the
+    calendar's participation and the generated periods, never written into
+    configuration, so an ANCHOR_DATE bump moves them with the history.
+
+    TS-79a is the newest inherited quarter before the build's own (the last
+    generated one), TS-79b the oldest - whose source is the history's first
+    supply. Each is in place on the MIDDLE of its quarter: the inheritance is
+    recorded when the period is first processed after it falls due, which on
+    this history is within two weeks of the quarter's date."""
+    from qa_tools.common import schedule
+
+    if len(periods) < 2:
+        raise CannotPlace("TS-79: the generated history is too short to hold an "
+                          "inherited quarter")
+    delivered = {p.name for p in schedule.periods_for_dataset(
+        INHERITING_DATASET, until=periods[-1].date)}
+    inherited = [i for i, p in enumerate(periods[:-1]) if p.name not in delivered and i > 0]
+    if not inherited:
+        raise CannotPlace(f"TS-79: {INHERITING_DATASET} inherits in no generated quarter - "
+                          f"its participation in contract/calendar.yaml now covers every "
+                          f"one, so there is no inheritance to link")
+    out = []
+    for sid, i, why in (("TS-79a", inherited[-1], "the newest quarter it inherits in "
+                                                  "before the build's own"),
+                        ("TS-79b", inherited[0], "the oldest, whose source is the "
+                                                 "history's first supply")):
+        p, nxt = periods[i], periods[i + 1]
+        middle = p.date + (nxt.date - p.date) / 2
+        out.append(Placement(
+            scenario_id=sid, dataset=INHERITING_DATASET, period=p.name,
+            period_date=p.date,
+            config=(f"quarterly; {INHERITING_DATASET} is delivered only in the quarters "
+                    f"contract/calendar.yaml's participation names, so {p.name} - {why} - "
+                    f"inherits {periods[i - 1].name}'s supply. Nothing generated for it."),
+            in_place_on=((sid, middle.isoformat()),)))
+    return out
 
 
 def resolve_run_ids(placements: Sequence[Placement], recognised) -> None:
@@ -1027,7 +1209,7 @@ INJECTIONS: tuple[Injection, ...] = (
         scenario_id="TS-43",
         dataset_id="birth-registrations",
         anchor=-18,
-        config="daily; the amber setting is HOLD from 2026-09-01. A scripted person "
+        config="daily; the amber setting is HOLD from 2026-08-30 (REQ-GEN-199). A scripted person "
                "promotes the held supply the next morning, twenty hours after it arrives "
                "and before that day's supply (REQ-GEN-185 criterion 7).",
         arrivals=(
@@ -1330,6 +1512,108 @@ INJECTIONS: tuple[Injection, ...] = (
         ),
         suppress=(1,),
         lead_in=1,
+    ),
+    # WHAT THE AS-AT PANEL AND QUALIFIER SAY ON A PAST DATE (REQ-GEN-199;
+    # Keith, 2026-10-13): a real case of each thing REQ-DASH-197 and
+    # REQ-DASH-198 word differently, each scenario with several moments as
+    # LETTERED SIBLINGS sharing one placement, each sibling's link dated
+    # between two of its events (REQ-GEN-201). Shapes and instants only - the
+    # scripted person makes the decisions, the pipeline everything else.
+    Injection(
+        scenario_id="TS-75a",
+        dataset_id="cp-clients",
+        # A QUARTER WHOSE CLIENTS PERIOD HOLDS NOTHING ELSE when the held
+        # supply arrives (criterion 3), so its reason is "awaiting a decision"
+        # and not post-build-review #164's "superseded".
+        anchor=-11,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st. The whole delivery "
+               "arrives on time with cp_clients alone built to fail; a person rejects "
+               "it three weeks later, and a corrected cp_clients follows a week after "
+               "that, filling the quarter.",
+        arrivals=(
+            ExtraArrival(0, "09:00", "red",
+                         "all six tables on time, cp_clients dirtied by its own red "
+                         "preset and the other five clean",
+                         severity_tables=("cp_clients",)),
+            ExtraArrival(28, "10:00", None,
+                         "the corrected cp_clients alone, a week after the rejection and "
+                         "well before the next quarter's window",
+                         file_shape="one_table_only"),
+        ),
+        also_demonstrates=("TS-75b",),
+        links=(Link("TS-75a", 7, 0, "TS-75 reject"),
+               Link("TS-75b", 3, "TS-75 reject", 1)),
+    ),
+    Injection(
+        scenario_id="TS-76",
+        dataset_id="cp-placements",
+        # STANDS ON -8, TS-56's quarter, whose cp_placements is clean and
+        # promoted (only cp_carers' columns are reordered there).
+        anchor=-7,
+        config="quarterly, as TS-75a. The delivery leaves cp_placements out; a person "
+               "substitutes the quarter onto the previous one, and when the next "
+               "quarter's window has opened removes the substitution and marks the "
+               "quarter not supplied, at the same instant.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "five of the six tables, on time - cp_placements.csv absent",
+                         file_shape="one_table_missing"),
+        ),
+        links=(Link("TS-76", 14, "TS-76 substitute", "TS-76 de-substitute"),),
+        keeps_drawn_severity=True,
+    ),
+    Injection(
+        scenario_id="TS-77a",
+        dataset_id="cp-placements",
+        # STANDS ON -15, THE HISTORY'S FIRST QUARTER, which holds a clean
+        # promoted cp_placements. Not -13, where TS-67's early delivery files
+        # (criterion 28; Keith, 2026-10-13).
+        anchor=-14,
+        config="quarterly, as TS-75a. The delivery leaves cp_placements out and a "
+               "person substitutes the quarter onto the previous one; cp_placements "
+               "arrives on its own thirty-eight days later, waits a day, and the same person "
+               "promotes it - which removes the substitution.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "five of the six tables, on time - cp_placements.csv absent",
+                         file_shape="one_table_missing"),
+            # 38 DAYS: a Thursday - every resupply arrives on a weekday.
+            ExtraArrival(38, "10:00", None,
+                         "cp_placements alone, late, before the next quarter's window",
+                         file_shape="missing_table_late"),
+        ),
+        also_demonstrates=("TS-77b",),
+        # `0` IS THE LATE FILE: the first delivery carries no cp_placements,
+        # so it takes no supply index (carries()).
+        links=(Link("TS-77a", 14, "TS-77 substitute", 0),
+               Link("TS-77b", 0, 0, "TS-77 promote")),
+        keeps_drawn_severity=True,
+    ),
+    Injection(
+        scenario_id="TS-78a",
+        dataset_id="birth-registrations",
+        # D = 30 AUGUST, inside the hold era that now starts that day
+        # (contract/data-asset.yaml; Keith, 2026-10-13). Refused, never
+        # shifted, if the era stops covering D to D+2 (criterion 15).
+        anchor=-24,
+        covers=2,
+        hold_days=(0, 1, 2),
+        quiet=(0, 1, 2, 3),
+        config="daily; the amber setting is HOLD from 2026-08-30. D's supply is amber "
+               "and held; D+1's is green and promoted by the rule; a person promotes "
+               "D's into D at 20:00 on D+1. D+2's is amber and held, and the person "
+               "promotes it at 10:00 on D+3, before D+3's own supply.",
+        arrivals=(
+            ExtraArrival(0, "14:00", None, "D's supply, built to amber on parent 1 nulls",
+                         target=Target("amber", ("registering_parent_1_name.completeness",))),
+            ExtraArrival(1, "14:00", None, "D+1's supply, built green",
+                         target=Target("green")),
+            ExtraArrival(2, "14:00", None, "D+2's supply, built to amber on parent 2 nulls",
+                         target=Target("amber", ("registering_parent_2_name.completeness",))),
+        ),
+        also_demonstrates=("TS-78b",),
+        links=(Link("TS-78a", 0, "TS-78 promote D", 2),
+               Link("TS-78b", 0, 2, "TS-78 promote D+2")),
     ),
 )
 

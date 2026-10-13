@@ -97,13 +97,15 @@ class TestAChildProtectionAmber:
 
 class TestOutOfTheHoldEra:
     def test_an_amber_in_the_hold_era_swaps_with_a_clean_period_outside_it(self):
-        dates = [date(2026, 8, 30) + pd.Timedelta(days=i).to_pytimedelta() for i in range(8)]
-        sevs = [None, None, None, "amber", None, "red", None, None]   # 2026-09-02 is held
+        # 27 AUGUST ONWARDS: the hold era starts on 30 August since REQ-GEN-199
+        # added TS-78's version, so 28 and 29 August are the clean days outside.
+        dates = [date(2026, 8, 27) + pd.Timedelta(days=i).to_pytimedelta() for i in range(8)]
+        sevs = [None, None, None, None, None, "red", "amber", None]   # 2026-09-02 is held
         out = targeting.outside_hold(sevs, dates, "birth-registrations",
                                      keep_clean=frozenset({0, 7}))
         assert out.count("amber") == 1 and out.count("red") == 1
-        assert out[3] is None and out[out.index("amber")] == "amber"
-        assert dates[out.index("amber")] < date(2026, 9, 1) or \
+        assert out[6] is None and out[out.index("amber")] == "amber"
+        assert dates[out.index("amber")] < date(2026, 8, 30) or \
             dates[out.index("amber")] >= date(2026, 9, 10)
 
     def test_no_clean_period_outside_it_is_refused(self):
@@ -123,7 +125,7 @@ class TestTheGeneratedHistory:
                                                until=get_anchor_date())[-g.N_DELIVERIES:]
         _r, by_period, suppressed, _q = g._plan_injections(periods)
         return g, periods, by_period, suppressed, g._ordinary_severities(
-            periods, by_period, suppressed)
+            periods, by_period, suppressed | g._covered(by_period))
 
     def test_birth_registrations_ambers_land_where_they_can_be_generated(self):
         """Criterion 9: none in the hold era, none on a period an injected
@@ -150,7 +152,10 @@ class TestTheGeneratedHistory:
         _r, by_period = cp._plan_injections(periods)
         sevs = cp._ordinary_severities(periods, by_period)
         assert sevs.count("amber") == [s for _q, s in cp.RUN_PLAN].count("amber")
-        assert not [p.name for p, s in zip(periods, sevs) if s == "amber" and p.name in by_period]
+        # EXCEPT where the scenario keeps its period's drawn amber
+        # (REQ-GEN-199: TS-76 and TS-77 shape only cp_placements' presence).
+        assert not [p.name for p, s in zip(periods, sevs) if s == "amber"
+                    and p.name in by_period and not by_period[p.name][0].keeps_drawn_severity]
 
     def test_reds_are_where_they_were_drawn_and_only_ambers_moved(self):
         """Criterion 10."""
@@ -845,7 +850,8 @@ class TestEachPlantedScenarioSitsInItsEra:
     demonstrates - silently for TS-44 and TS-46."""
 
     ERAS = {"TS-43": ("amber", "hold"), "TS-44": ("amber", "promote-and-acknowledge"),
-            "TS-45": ("amber", "promote-and-acknowledge"), "TS-46": ("replacement", "green")}
+            "TS-45": ("amber", "promote-and-acknowledge"), "TS-46": ("replacement", "green"),
+            "TS-78a": ("amber", "hold")}
 
     def test_each_anchor_falls_under_the_setting_it_needs(self):
         from generator import generate_runs as g

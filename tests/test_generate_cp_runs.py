@@ -104,10 +104,29 @@ def _delivery_dir(raw_dir, entry):
     return raw_dir / entry["delivery"]
 
 
+def _shape_of(entry, manifest) -> str | None:
+    """The file shape an injected delivery was written in, by its position
+    in its slot - None for an ordinary one (REQ-GEN-199's shapes leave a
+    table out, or carry one alone, ON PURPOSE)."""
+    from generator.anchor_date import get_anchor_date
+
+    periods = generate_cp_runs.schedule.periods_for_dataset(
+        generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
+    _, injected = generate_cp_runs._plan_injections(periods)
+    if entry["period"] not in injected:
+        return None
+    slot = sorted((e for e in manifest if e["slot_id"] == entry["slot_id"]),
+                  key=lambda e: e["run_index"])
+    return injected[entry["period"]][0].arrivals[slot.index(entry)].file_shape
+
+
 def test_every_manifest_entry_has_real_files_on_disk(manifest, raw_dir):
+    from generator import scenario_injection as si
+
     for entry in manifest:
         run_dir = _delivery_dir(raw_dir, entry)
-        for table in generate_cp_runs.TABLES:
+        shape = _shape_of(entry, manifest)
+        for table in (t for t in generate_cp_runs.TABLES if si.carries(shape, t)):
             path = run_dir / f"{table}.csv"
             assert path.exists(), f"{entry['run_id']}: {path} missing"
             assert path.stat().st_size > 0
@@ -135,8 +154,20 @@ def test_severity_counts_match_run_plan(manifest):
     periods = schedule.periods_for_dataset(
         generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
     _, injected = generate_cp_runs._plan_injections(periods)
-    expected = [injected[p.name][0].arrivals[0].severity if p.name in injected else severity
-                for (_, severity), p in zip(generate_cp_runs.RUN_PLAN, periods)]
+    # THE PLANNED SEVERITY, ambers moved off periods that cannot take them
+    # (REQ-GEN-184 criterion 9) - and a scenario that keeps its period's
+    # drawn amber carries it (REQ-GEN-199).
+    planned = generate_cp_runs._ordinary_severities(periods, injected)
+
+    def first_of(name, severity):
+        injection = injected[name][0]
+        own = injection.arrivals[0].severity
+        if own is None and injection.keeps_drawn_severity and severity == "amber":
+            return severity
+        return own
+
+    expected = [first_of(p.name, severity) if p.name in injected else severity
+                for severity, p in zip(planned, periods)]
     # Sort by run_index (a real int, matching RUN_PLAN's own generation
     # order), not slot_id (a zero-padded string) - a plain string sort
     # broke for real once the count crossed a fixed padding width
@@ -152,8 +183,17 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
     for e in manifest:
         by_slot.setdefault(e["slot_id"], []).append(e)
 
+    from generator.anchor_date import get_anchor_date
+
+    periods = generate_cp_runs.schedule.periods_for_dataset(
+        generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
+    _, injected = generate_cp_runs._plan_injections(periods)
     for slot_id, deliveries in by_slot.items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
+        # AN INJECTED SLOT IS THE SCENARIO'S SHAPE, not a resupply chain
+        # (REQ-GEN-199: TS-75's corrected file, TS-77's late one).
+        if deliveries[0]["period"] in injected:
+            continue
         if len(deliveries) > 1:
             assert deliveries[0]["dirty_severity"] == "red", \
                 f"{slot_id} has more than one delivery but the first wasn't red"
@@ -236,6 +276,8 @@ def test_clean_runs_never_have_bad_cp_clients_values(manifest, raw_dir):
         if entry["dirty_severity"] is not None:
             continue
         run_dir = _delivery_dir(raw_dir, entry)
+        if not (run_dir / "cp_clients.csv").exists():
+            continue  # a delivery of another table alone (REQ-GEN-199)
         with open(run_dir / "cp_clients.csv") as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")
@@ -250,6 +292,8 @@ def test_some_dirty_runs_inject_bad_cp_clients_values(manifest, raw_dir):
         if entry["dirty_severity"] is None:
             continue
         run_dir = _delivery_dir(raw_dir, entry)
+        if not (run_dir / "cp_clients.csv").exists():
+            continue  # a delivery of another table alone (REQ-GEN-199)
         with open(run_dir / "cp_clients.csv") as f:
             lines = f.read().splitlines()
         header = lines[0].split(",")

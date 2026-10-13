@@ -92,10 +92,18 @@ class TestSettingsChangelogsAreStructured:
         as altering a frozen version (delivery-architect S1)."""
         new = self._doc()
         old = self._doc()
+        # ONLY THE ENTRIES THE CONVERSION PRODUCED were ever strings: one
+        # written since in the structured form (REQ-GEN-199's 30 August
+        # version) has a real author, which a string cannot carry.
         for key in ("amber_setting", "replacement_setting"):
             for version in old[key]["versions"]:
-                version["changelog"] = [f"{e['date']}: {e['change']}"
-                                        for e in version["changelog"]]
+                version["changelog"] = [
+                    f"{e['date']}: {e['change']}"
+                    if e.get("author") == amber_setting.CONVERTED_AUTHOR else e
+                    for e in version["changelog"]]
+        assert any(isinstance(e, str) for k in ("amber_setting", "replacement_setting")
+                   for v in old[k]["versions"] for e in v["changelog"]), \
+            "precondition: some entries are in the old string form"
         assert amber_setting.past_change_problems(old, new, date(2030, 1, 1),
                                                   synthetic=False) == []
 

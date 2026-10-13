@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**23 of 47 scenarios marked for injection have data behind them today.** 85 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**32 of 56 scenarios marked for injection have data behind them today.** 94 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -582,7 +582,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 
 **What it would look like if the rule were wrong.** It promotes itself, as it would under promote.
 
-*Config: daily; the amber setting is HOLD from 2026-09-01; a scripted promotion at 10:00 the next morning.*
+*Config: daily; the amber setting is HOLD from 2026-08-30 (TS-78's version, REQ-GEN-199); a scripted promotion at 10:00 the next morning.*
 
 | Where to look | |
 |---|---|
@@ -590,7 +590,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 | Supplies | `birth_registrations__202609051400000800` |
 | Period | 2026-09-05 |
 | Set the in-place-on date to | 2026-09-05 |
-| Built to | amber on place_of_birth_facility.completeness (450 of 2,021), the 2026-09-05 14:00 arrival |
+| Built to | amber on place_of_birth_facility.completeness (445 of 1,933), the 2026-09-05 14:00 arrival |
 
 ### TS-44 - An amber supply promoted and awaiting acknowledgement
 
@@ -790,6 +790,131 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 **What it would look like if the rule were wrong.** Committed; or the hook's entry and the command's entry differ.
 
 *unit test - no generated data, nothing to navigate to*
+
+### TS-75a - A supply rejected after it waited - while it waited
+
+Cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with cp_clients alone built red by its own preset; the other five clean. *Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22 February; a corrected cp_clients alone arrives at 10:00 on 29 February.* **Expect** (REQ-DASH-197), on 8 February, in the as-at panel under the results' verdict line: the heading "On Thursday, 8 February 2024 the warehouse did not hold the latest file", the column "Latest arrival by Thursday, 8 February 2024 — not promoted" naming cp-clients@202402010900000800, and the reason "this supply was staged and nobody had decided about it yet". **What the other tables show**: the red clients turned notifications', investigations' and placements' own cross-table checks red, so all three wait for a person on 8 and 25 February; carers waited until 10 February and then promoted green; case workers promoted green on 6 February. When the corrected cp_clients arrives the re-evaluation promotes clients, notifications, investigations and placements green (11 March). **Breaks as**: no panel; or the reason "superseded" (post-build-review #164's reading, which this quarter is placed to avoid).
+
+**What it would look like if the rule were wrong.** No panel; or the reason "superseded" (post-build-review #164's reading, which this quarter is placed to avoid).
+
+*Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22 February; a corrected cp_clients alone arrives at 10:00 on 29 February.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
+| Period | 2024-Q1 |
+| Set the in-place-on date to | 2024-02-08 |
+
+### TS-75b - A supply rejected after it waited - after it was rejected
+
+The same placement, on 25 February. **Expect** (REQ-DASH-197), in the same panel: "On Sunday, 25 February 2024 the warehouse did not hold the latest file", the same supply, and the reason "a person had rejected this supply, so it was not promoted". The other tables as TS-75a's, carers now promoted. From 29 February the corrected supply fills the quarter and cp-clients ends healthy. **Breaks as**: the panel naming the corrected supply, or still "nobody had decided".
+
+**What it would look like if the rule were wrong.** The panel naming the corrected supply, or still "nobody had decided".
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
+| Period | 2024-Q1 |
+| Set the in-place-on date to | 2024-02-25 |
+
+### TS-76 - A substitution later removed
+
+Cp-placements, 2025-Q1: the delivery leaves cp_placements out; a person substitutes the quarter onto 2024-Q4 at 09:00 on 3 February, and at 09:00 on 20 April - once the next quarter's window has opened - removes the substitution and marks the quarter not supplied, in that order, at one instant. *Config: quarterly, as TS-75a.* **Expect** (REQ-DASH-198), on 17 February: the pill "Substituted from 2024-Q4" beside the dataset's title, and in its drill-down, below the results' heading, "Since removed, as from Sunday, 20 April 2025". The quarter closes "not supplied (accepted)". **What cp-clients and cp-carers read for 2025-Q1** (H1): clients promoted AMBER on arrival and stays amber before, during and after the substitution - the amber is the ordinary one drawn for this quarter, which the delivery keeps (REQ-GEN-199's PROVISIONAL choice); carers waited until 9 February, then promoted GREEN and stays green. Neither is red after the substitution ends: the cross-table checks reading cp_placements are filed under cp-placements, so in a quarter with no placements supply nothing runs them for clients or carers (the architect's H1 expected red; post-build-review #174). **Breaks as**: no pill on 17 February; or "Since replaced".
+
+**What it would look like if the rule were wrong.** No pill on 17 February; or "Since replaced".
+
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | — |
+| Period | 2025-Q1 |
+| Set the in-place-on date to | 2025-02-17 |
+
+### TS-77a - A substitution later replaced - while it stood
+
+Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitutes onto 2023-Q1 at 09:00 on 3 May; cp_placements alone arrives at 10:00 on 8 June and the person promotes it at 10:00 on 9 June, which removes the substitution. *Config: quarterly, as TS-75a.* **Expect** (REQ-DASH-198), on 17 May: the pill "Substituted from 2023-Q1", and in its drill-down "Since replaced, as from Friday, 9 June 2023". **What cp-clients and cp-carers read for 2023-Q2**: both waited on 2 May; clients promoted AMBER (its quarter's drawn amber, kept) on 7 May and carers GREEN on 3 May, and both stay so while the substitution stands, on 8 June and after the promotion. **Breaks as**: no pill; or "Since removed".
+
+**What it would look like if the rule were wrong.** No pill; or "Since removed".
+
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | `cp_placements__202306081000000800` |
+| Period | 2023-Q2 |
+| Set the in-place-on date to | 2023-05-17 |
+
+### TS-77b - Known wrong today (post-build-review #164): A substitution later replaced - the day the late file waited
+
+**What it demonstrates.** Today the as-at panel ("On Thursday, 8 June 2023 the warehouse did not hold the latest file") gives the late supply the reason "this one had been superseded - a newer version had arrived for the same period, a person had set it aside, or a later supply had been promoted into the period - so it was no longer what the period held" - against a period whose holder is a SUBSTITUTED supply, a variant of #164 - while the pill's drill-down reads "Since replaced, as from Friday, 9 June 2023" and "2023-Q2 holds 2023-Q1's supply; the results below are a newer supply awaiting a decision." Once #164 is decided the panel's reason line should say the supply was waiting for a decision. **Breaks as**: a different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.
+
+**What it would look like if the rule were wrong.** A different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.
+
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | `cp_placements__202306081000000800` |
+| Period | 2023-Q2 |
+| Set the in-place-on date to | 2023-06-08 |
+
+### TS-78a - A supply promoted after a newer one - the day it was promoted
+
+Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's supply amber and held; D+1's green and promoted by the rule; a person promotes D's into D at 20:00 on D+1; D+2's amber and held, promoted by the person at 10:00 on D+3, before D+3's green supply. *Config: daily; the amber setting is HOLD from 2026-08-30 (contract/data-asset.yaml, the version added for this scenario); D to D+3 quiet.* **Expect** (REQ-DASH-197 criterion 6), on 31 August, in the as-at panel: "On Monday, 31 August 2026 the newest file was not the newest promotion", the column "Latest arrival — promoted into Monday, 31 August 2026", and the reason "a supply promoted later into Sunday, 30 August 2026 was what downstream read most recently". **Breaks as**: no panel; or the generic "did not hold the latest file". Depends on the hold era covering 30 August to 1 September; generation refuses, naming TS-78a, if it stops doing so.
+
+**What it would look like if the rule were wrong.** No panel; or the generic "did not hold the latest file". Depends on the hold era covering 30 August to 1 September; generation refuses, naming TS-78a, if it stops doing so.
+
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202608301400000800`, `birth_registrations__202608311400000800`, `birth_registrations__202609011400000800` |
+| Period | 2026-08-30 |
+| Set the in-place-on date to | 2026-08-31 |
+| Built to | amber on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
+| Built to | green, the 2026-08-31 14:00 arrival |
+| Built to | amber on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
+
+### TS-78b - A supply promoted after a newer one - the day after
+
+The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: "Awaiting a decision — the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place yet. The supply in place is the one received 2:00pm Sunday, 30 August 2026." - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.
+
+**What it would look like if the rule were wrong.** The verdict line naming 31 August's supply as in place.
+
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202608301400000800`, `birth_registrations__202608311400000800`, `birth_registrations__202609011400000800` |
+| Period | 2026-08-30 |
+| Set the in-place-on date to | 2026-09-01 |
+| Built to | amber on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
+| Built to | green, the 2026-08-31 14:00 arrival |
+| Built to | amber on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
+
+### TS-79a - An inherited quarter - the newest
+
+Cp-case-workers, the newest quarter before the build's own in which it is not delivered (2026-Q2 today), so it inherits the quarter before. Nothing generated; the placement is written after generation from the calendar's participation, in place on the middle of the quarter. *Config: quarterly; cp-case-workers participates only in Q1 and Q3.* **Expect** (REQ-DASH-198): the pill "Inherited from 2026-Q1" beside the dataset's title. **Breaks as**: no pill; or a stale date after ANCHOR_DATE moves.
+
+**What it would look like if the rule were wrong.** No pill; or a stale date after ANCHOR_DATE moves.
+
+| Where to look | |
+|---|---|
+| Dataset | cp-case-workers |
+| Supplies | — |
+| Period | 2026-Q2 |
+| Set the in-place-on date to | 2026-06-16 |
+
+### TS-79b - An inherited quarter - the oldest
+
+**What it demonstrates.** Its page looks identical to TS-79a's - the pill "Inherited from 2023-Q1" - and it is here because its source is the history's first supply, so it shows inheritance at the edge where there is nothing earlier to fall back on. **Breaks as**: no pill.
+
+**What it would look like if the rule were wrong.** No pill.
+
+| Where to look | |
+|---|---|
+| Dataset | cp-case-workers |
+| Supplies | — |
+| Period | 2023-Q2 |
+| Set the in-place-on date to | 2023-06-16 |
 
 
 <!-- scenario-map-data
@@ -1501,8 +1626,9 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
    "demonstrates": "The amber supply is not promoted; the rule records a promotion-withheld note naming the setting, and the slot reads amber, waiting for a person (REQ-PIPE-122).",
    "breaksAs": "It promotes itself, as it would under promote.",
-   "config": "Config: daily; the amber setting is HOLD from 2026-09-01; a scripted promotion at 10:00 the next morning.",
+   "config": "Config: daily; the amber setting is HOLD from 2026-08-30 (TS-78's version, REQ-GEN-199); a scripted promotion at 10:00 the next morning.",
    "requirements": [
+    "REQ-GEN-199",
     "REQ-PIPE-122",
     "REQ-GEN-184",
     "REQ-GEN-185"
@@ -1527,14 +1653,14 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
         "nulls": 495,
-        "of_rows": 2021
+        "of_rows": 1933
        },
        {
         "rule": "place_of_birth_facility.completeness",
         "to": "amber",
-        "nulls": 450,
-        "of_rows": 2021,
-        "was": 43
+        "nulls": 445,
+        "of_rows": 1933,
+        "was": 46
        }
       ]
      }
@@ -2242,6 +2368,295 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
       ]
      }
     ]
+   }
+  },
+  {
+   "id": "TS-75a",
+   "mode": "INJECT",
+   "title": "A supply rejected after it waited - while it waited",
+   "section": "Calendar corrections",
+   "demonstrates": "Cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with cp_clients alone built red by its own preset; the other five clean. *Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22 February; a corrected cp_clients alone arrives at 10:00 on 29 February.* **Expect** (REQ-DASH-197), on 8 February, in the as-at panel under the results' verdict line: the heading \"On Thursday, 8 February 2024 the warehouse did not hold the latest file\", the column \"Latest arrival by Thursday, 8 February 2024 \u2014 not promoted\" naming cp-clients@202402010900000800, and the reason \"this supply was staged and nobody had decided about it yet\". **What the other tables show**: the red clients turned notifications', investigations' and placements' own cross-table checks red, so all three wait for a person on 8 and 25 February; carers waited until 10 February and then promoted green; case workers promoted green on 6 February. When the corrected cp_clients arrives the re-evaluation promotes clients, notifications, investigations and placements green (11 March). **Breaks as**: no panel; or the reason \"superseded\" (post-build-review #164's reading, which this quarter is placed to avoid).",
+   "breaksAs": "No panel; or the reason \"superseded\" (post-build-review #164's reading, which this quarter is placed to avoid).",
+   "config": "Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22 February; a corrected cp_clients alone arrives at 10:00 on 29 February.",
+   "requirements": [
+    "REQ-DASH-197"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202402010900000800",
+     "cp_clients__202402291000000800"
+    ],
+    "period": "2024-Q1",
+    "inPlaceOn": "2024-02-08"
+   }
+  },
+  {
+   "id": "TS-75b",
+   "mode": "INJECT",
+   "title": "A supply rejected after it waited - after it was rejected",
+   "section": "Calendar corrections",
+   "demonstrates": "The same placement, on 25 February. **Expect** (REQ-DASH-197), in the same panel: \"On Sunday, 25 February 2024 the warehouse did not hold the latest file\", the same supply, and the reason \"a person had rejected this supply, so it was not promoted\". The other tables as TS-75a's, carers now promoted. From 29 February the corrected supply fills the quarter and cp-clients ends healthy. **Breaks as**: the panel naming the corrected supply, or still \"nobody had decided\".",
+   "breaksAs": "The panel naming the corrected supply, or still \"nobody had decided\".",
+   "config": null,
+   "requirements": [
+    "REQ-DASH-197"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202402010900000800",
+     "cp_clients__202402291000000800"
+    ],
+    "period": "2024-Q1",
+    "inPlaceOn": "2024-02-25"
+   }
+  },
+  {
+   "id": "TS-76",
+   "mode": "INJECT",
+   "title": "A substitution later removed",
+   "section": "Calendar corrections",
+   "demonstrates": "Cp-placements, 2025-Q1: the delivery leaves cp_placements out; a person substitutes the quarter onto 2024-Q4 at 09:00 on 3 February, and at 09:00 on 20 April - once the next quarter's window has opened - removes the substitution and marks the quarter not supplied, in that order, at one instant. *Config: quarterly, as TS-75a.* **Expect** (REQ-DASH-198), on 17 February: the pill \"Substituted from 2024-Q4\" beside the dataset's title, and in its drill-down, below the results' heading, \"Since removed, as from Sunday, 20 April 2025\". The quarter closes \"not supplied (accepted)\". **What cp-clients and cp-carers read for 2025-Q1** (H1): clients promoted AMBER on arrival and stays amber before, during and after the substitution - the amber is the ordinary one drawn for this quarter, which the delivery keeps (REQ-GEN-199's PROVISIONAL choice); carers waited until 9 February, then promoted GREEN and stays green. Neither is red after the substitution ends: the cross-table checks reading cp_placements are filed under cp-placements, so in a quarter with no placements supply nothing runs them for clients or carers (the architect's H1 expected red; post-build-review #174). **Breaks as**: no pill on 17 February; or \"Since replaced\".",
+   "breaksAs": "No pill on 17 February; or \"Since replaced\".",
+   "config": null,
+   "requirements": [
+    "REQ-DASH-198",
+    "REQ-GEN-199"
+   ],
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [],
+    "period": "2025-Q1",
+    "inPlaceOn": "2025-02-17"
+   }
+  },
+  {
+   "id": "TS-77a",
+   "mode": "INJECT",
+   "title": "A substitution later replaced - while it stood",
+   "section": "Calendar corrections",
+   "demonstrates": "Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitutes onto 2023-Q1 at 09:00 on 3 May; cp_placements alone arrives at 10:00 on 8 June and the person promotes it at 10:00 on 9 June, which removes the substitution. *Config: quarterly, as TS-75a.* **Expect** (REQ-DASH-198), on 17 May: the pill \"Substituted from 2023-Q1\", and in its drill-down \"Since replaced, as from Friday, 9 June 2023\". **What cp-clients and cp-carers read for 2023-Q2**: both waited on 2 May; clients promoted AMBER (its quarter's drawn amber, kept) on 7 May and carers GREEN on 3 May, and both stay so while the substitution stands, on 8 June and after the promotion. **Breaks as**: no pill; or \"Since removed\".",
+   "breaksAs": "No pill; or \"Since removed\".",
+   "config": null,
+   "requirements": [
+    "REQ-DASH-198"
+   ],
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [
+     "cp_placements__202306081000000800"
+    ],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-05-17"
+   }
+  },
+  {
+   "id": "TS-77b",
+   "mode": "INJECT",
+   "title": "Known wrong today (post-build-review #164): A substitution later replaced - the day the late file waited",
+   "section": "Calendar corrections",
+   "demonstrates": "Today the as-at panel (\"On Thursday, 8 June 2023 the warehouse did not hold the latest file\") gives the late supply the reason \"this one had been superseded - a newer version had arrived for the same period, a person had set it aside, or a later supply had been promoted into the period - so it was no longer what the period held\" - against a period whose holder is a SUBSTITUTED supply, a variant of #164 - while the pill's drill-down reads \"Since replaced, as from Friday, 9 June 2023\" and \"2023-Q2 holds 2023-Q1's supply; the results below are a newer supply awaiting a decision.\" Once #164 is decided the panel's reason line should say the supply was waiting for a decision. **Breaks as**: a different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.",
+   "breaksAs": "A different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.",
+   "config": null,
+   "requirements": [],
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [
+     "cp_placements__202306081000000800"
+    ],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-06-08"
+   }
+  },
+  {
+   "id": "TS-78a",
+   "mode": "INJECT",
+   "title": "A supply promoted after a newer one - the day it was promoted",
+   "section": "Calendar corrections",
+   "demonstrates": "Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's supply amber and held; D+1's green and promoted by the rule; a person promotes D's into D at 20:00 on D+1; D+2's amber and held, promoted by the person at 10:00 on D+3, before D+3's green supply. *Config: daily; the amber setting is HOLD from 2026-08-30 (contract/data-asset.yaml, the version added for this scenario); D to D+3 quiet.* **Expect** (REQ-DASH-197 criterion 6), on 31 August, in the as-at panel: \"On Monday, 31 August 2026 the newest file was not the newest promotion\", the column \"Latest arrival \u2014 promoted into Monday, 31 August 2026\", and the reason \"a supply promoted later into Sunday, 30 August 2026 was what downstream read most recently\". **Breaks as**: no panel; or the generic \"did not hold the latest file\". Depends on the hold era covering 30 August to 1 September; generation refuses, naming TS-78a, if it stops doing so.",
+   "breaksAs": "No panel; or the generic \"did not hold the latest file\". Depends on the hold era covering 30 August to 1 September; generation refuses, naming TS-78a, if it stops doing so.",
+   "config": null,
+   "requirements": [
+    "REQ-DASH-197"
+   ],
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202608301400000800",
+     "birth_registrations__202608311400000800",
+     "birth_registrations__202609011400000800"
+    ],
+    "period": "2026-08-30",
+    "inPlaceOn": "2026-08-31",
+    "targets": [
+     {
+      "date": "2026-08-30",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "registering_parent_1_name.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1933
+       },
+       {
+        "rule": "registering_parent_1_name.completeness",
+        "to": "amber",
+        "nulls": 145,
+        "of_rows": 1933,
+        "was": 38
+       }
+      ]
+     },
+     {
+      "date": "2026-08-31",
+      "at": "14:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1933
+       }
+      ]
+     },
+     {
+      "date": "2026-09-01",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "registering_parent_2_name.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "amber",
+        "nulls": 625,
+        "of_rows": 1933,
+        "was": 526
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "TS-78b",
+   "mode": "INJECT",
+   "title": "A supply promoted after a newer one - the day after",
+   "section": "Calendar corrections",
+   "demonstrates": "The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the verdict line above the results: \"Awaiting a decision \u2014 the results below are the newest supply, received 2:00pm Tuesday, 1 September 2026, which is not in place yet. The supply in place is the one received 2:00pm Sunday, 30 August 2026.\" - naming D's supply, not D+1's, which is newer by receipt. **Breaks as**: the verdict line naming 31 August's supply as in place.",
+   "breaksAs": "The verdict line naming 31 August's supply as in place.",
+   "config": null,
+   "requirements": [
+    "REQ-DASH-197"
+   ],
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202608301400000800",
+     "birth_registrations__202608311400000800",
+     "birth_registrations__202609011400000800"
+    ],
+    "period": "2026-08-30",
+    "inPlaceOn": "2026-09-01",
+    "targets": [
+     {
+      "date": "2026-08-30",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "registering_parent_1_name.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1933
+       },
+       {
+        "rule": "registering_parent_1_name.completeness",
+        "to": "amber",
+        "nulls": 145,
+        "of_rows": 1933,
+        "was": 38
+       }
+      ]
+     },
+     {
+      "date": "2026-08-31",
+      "at": "14:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 1933
+       }
+      ]
+     },
+     {
+      "date": "2026-09-01",
+      "at": "14:00",
+      "built_to": "amber",
+      "rules": [
+       "registering_parent_2_name.completeness"
+      ],
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "amber",
+        "nulls": 625,
+        "of_rows": 1933,
+        "was": 526
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "TS-79a",
+   "mode": "INJECT",
+   "title": "An inherited quarter - the newest",
+   "section": "Calendar corrections",
+   "demonstrates": "Cp-case-workers, the newest quarter before the build's own in which it is not delivered (2026-Q2 today), so it inherits the quarter before. Nothing generated; the placement is written after generation from the calendar's participation, in place on the middle of the quarter. *Config: quarterly; cp-case-workers participates only in Q1 and Q3.* **Expect** (REQ-DASH-198): the pill \"Inherited from 2026-Q1\" beside the dataset's title. **Breaks as**: no pill; or a stale date after ANCHOR_DATE moves.",
+   "breaksAs": "No pill; or a stale date after ANCHOR_DATE moves.",
+   "config": null,
+   "requirements": [
+    "REQ-DASH-198"
+   ],
+   "coordinates": {
+    "dataset": "cp-case-workers",
+    "supplies": [],
+    "period": "2026-Q2",
+    "inPlaceOn": "2026-06-16"
+   }
+  },
+  {
+   "id": "TS-79b",
+   "mode": "INJECT",
+   "title": "An inherited quarter - the oldest",
+   "section": "Calendar corrections",
+   "demonstrates": "Its page looks identical to TS-79a's - the pill \"Inherited from 2023-Q1\" - and it is here because its source is the history's first supply, so it shows inheritance at the edge where there is nothing earlier to fall back on. **Breaks as**: no pill.",
+   "breaksAs": "No pill.",
+   "config": null,
+   "requirements": [],
+   "coordinates": {
+    "dataset": "cp-case-workers",
+    "supplies": [],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-06-16"
    }
   }
  ]

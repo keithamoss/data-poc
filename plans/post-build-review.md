@@ -8563,3 +8563,52 @@ twice. It deliberately did not re-find the `TypeError`.
       is deliberately not a refusal, since it re-runs only reading checks
       and the gate after it judges the supply's whole status. Decisions on
       REQ-PIPE-075 and REQ-PIPE-121.
+
+174. **[todo, 2026-10-13]** **[Data generation]** **[Dashboard UI]**
+    **REQ-GEN-199's first bootstrapped build: six of its quoted texts open
+    below the fold, and TS-76's after-state is not the red the architect
+    predicted.** Found by the build itself, overnight #4, against the real
+    bootstrapped page at 1280x800 - not by a critic.
+    - **Below the fold (criterion 34 - a finding against the page, the
+      assertion not loosened).** Clicking a chip lands on the right page and
+      date, but the as-at panel opens at y=729-1771px (TS-75a, TS-75b, TS-77b,
+      TS-78a) and the substitution drill-down's "Since ..." line at y=974px
+      (TS-76, TS-77a), with TS-77b's drill-down sentences at y=790 onward. The
+      pills (TS-76, TS-77a, TS-79a, TS-79b) and TS-78b's verdict line are on
+      screen. tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips carries
+      each of the six as a STRICT expected failure naming this item, so the day
+      the page brings one into view it fails and its entry comes out. The
+      likely page fix is a scenario jump that scrolls to what its scenario is
+      about - a dashboard change, so not built tonight.
+    - **H1 did not reproduce.** REQ-GEN-199 criterion 9 says to record that
+      TS-76 leaves cp-clients and cp-carers "promoted and red, permanently".
+      On the real build neither is red: clients promoted AMBER (its quarter's
+      drawn amber, kept - see PROVISIONAL (a) in the morning report) and
+      carers GREEN, before, during and after the substitution. The cross-table
+      checks reading cp_placements are filed under cp-placements, so in a
+      quarter with no placements supply nothing runs them for clients or
+      carers. The register records what was observed; the criterion's wording
+      needs Keith (SIGNIFICANT: it changes a signed claim).
+    - **Keith to decide**: the page fix for the fold, and criterion 9's
+      wording.
+
+175. **[todo, 2026-10-13]** **[Data generation]** **Two supplies that are
+    neither TS-43's nor TS-78's wait under hold on 8 September 2026.** Found
+    by REQ-GEN-199 criterion 16's guard on its first run, overnight #4.
+    - **What**: TS-47's late file (the 7 September extract arriving at 11:00
+      on 8 September, by design - its drift and row-count checks flag it) and
+      8 September's own supply (an ordinary chain whose rows tripped a
+      not-null warning) both read amber inside the 1-9 September hold era, so
+      the rule held each, and the second superseded the first.
+    - **Not caused by the 30 August version** - 8 September has always been
+      in the era. Whether it predates tonight is unknown: the generator
+      change moved the row-count chain (TS-78's days), and checking needs a
+      second rebuild, which overnight #3's terms rule out.
+    - **The guard is kept exact** - a strict expected failure naming this
+      item, not an allowance - so the criterion is not loosened.
+    - **Options for Keith**: (1) TS-47 `green_follow` so 8 September's own
+      supply is built green, and accept TS-47's late file under hold by
+      amending criterion 16 to name it; (2) move TS-47 out of the hold era;
+      (3) build every ordinary day inside a hold era green. Recommended (1):
+      TS-47's late file being held is a true consequence of the era, and its
+      register entry can say so.

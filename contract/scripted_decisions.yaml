@@ -146,3 +146,70 @@ decisions:
     day_offset: 1
     files: ["refile:+1", reject]
     reason: "The first file is the next day's extract, sent early, and the second is test data; nothing came for this day."
+  # REQ-GEN-199: what the as-at panel and qualifier say on a past date.
+  # TS-75: cp_clients' red supply waits, and a person rejects it three weeks
+  # after it arrived; a corrected one-table resupply fills the quarter later.
+  - scenario: TS-75a
+    name: TS-75 reject
+    operation: reject
+    dataset: cp-clients
+    supply: 0
+    after_hours: 504
+    reason: "Client records fail their checks - the supplier is sending a corrected cp_clients extract."
+  # TS-76: the delivery left cp_placements out; the quarter stands on the one
+  # before until the next quarter's window has opened, when the substitution is
+  # removed and the quarter marked not supplied - de-substitution first.
+  - scenario: TS-76
+    name: TS-76 substitute
+    operation: substitute
+    dataset: cp-placements
+    scope: period
+    stands_on: -1
+    after_hours: 48
+    reason: "The supplier's delivery left placements out; the previous quarter's placements stand in until it is resent."
+  - scenario: TS-76
+    name: TS-76 de-substitute
+    operation: de-substitute
+    dataset: cp-placements
+    scope: period
+    after_hours: 1872
+    reason: "Placements for this quarter will not be resent; the previous quarter's should no longer stand in for it."
+  - scenario: TS-76
+    operation: mark-not-supplied
+    dataset: cp-placements
+    scope: period
+    after_hours: 1872
+    reason: "The supplier confirmed placements for this quarter will not be supplied."
+  # TS-77: the same omission, but cp_placements arrives late, waits a day, and
+  # the person promotes it - which removes the substitution.
+  - scenario: TS-77a
+    name: TS-77 substitute
+    operation: substitute
+    dataset: cp-placements
+    scope: period
+    stands_on: -1
+    after_hours: 48
+    reason: "The supplier's delivery left placements out; the previous quarter's placements stand in until it is resent."
+  - scenario: TS-77a
+    name: TS-77 promote
+    operation: promote
+    dataset: cp-placements
+    supply: 0
+    after_hours: 24
+    reason: "The supplier's resent placements for this quarter - checked, and replacing the stand-in."
+  # TS-78: a supply promoted after a newer one. D's held amber is promoted at
+  # 20:00 on D+1, after D+1's own promotion; D+2's at 10:00 on D+3.
+  - scenario: TS-78a
+    name: TS-78 promote D
+    operation: promote
+    dataset: birth-registrations
+    supply: 0
+    after_hours: 30
+    reason: "Parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
+  - scenario: TS-78a
+    name: TS-78 promote D+2
+    operation: promote
+    dataset: birth-registrations
+    supply: 2
+    after_hours: 20
+    reason: "Second-parent names missing on more registrations than usual, explained by the supplier; accepted for this day."

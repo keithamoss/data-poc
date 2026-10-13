@@ -318,10 +318,14 @@ class TestAPeriodScopedScriptIsValidated:
         assert any("names neither" in f for f in sd.problems(loaded, registered={"TS-1"}))
 
     def test_every_existing_script_still_names_its_supply(self):
-        """Criterion 10: the nine committed scripts play unedited."""
+        """Criterion 10: the nine committed scripts play unedited - every script
+        not scoped to a period still names its supply. REQ-GEN-199 added the
+        first period-scoped ones (TS-76, TS-77), which is this capability
+        being used, not a regression."""
         loaded = sd.load()
         assert loaded, "precondition: the committed script has entries"
-        assert all(s.supply_index is not None and s.scope is None for s in loaded)
+        assert all(s.supply_index is not None for s in loaded if s.scope is None)
+        assert all(s.supply_index is None for s in loaded if s.scope == sd.PERIOD)
 
 
 class TestThePeriodsDueInstantIsTheCalendars:

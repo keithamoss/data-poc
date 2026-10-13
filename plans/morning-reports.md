@@ -1295,3 +1295,16 @@ one or more component tags, and a date.
            generator work.
         Left for Keith: the close-out sign-off; REQ-GEN-136's criteria 3-5,
         8, 9 and 11 (his call, or REQ-GEN-203 once signed); REQ-GEN-137's.
+      - REQ-GEN-199 BUILT (pending its gate and critic): TS-75a/b, TS-76,
+        TS-77a/b, TS-78a/b and TS-79a/b are in the history, their scripted
+        decisions play, and every chip's quoted text is on the real page. The
+        night's one rebuild for it was 7m00s from empty. FOUR PROVISIONALS,
+        all on the requirement's decisions: (a) TS-76 and TS-77 keep the
+        ordinary amber drawn for their quarter - Child Protection had no clean
+        quarter left to move it to; (b) TS-79's link dates are mid-quarter;
+        (c) the scenario dates and times; (d) known findings carried as STRICT
+        expected failures rather than loosened assertions. TWO FINDINGS FOR
+        YOU: post-build-review #174 (six quoted texts open below the fold at
+        1280x800, and TS-76's after-state is not the red criterion 9 asserts)
+        and #175 (two more supplies wait under hold on 8 September - TS-47's
+        late file and that day's own).

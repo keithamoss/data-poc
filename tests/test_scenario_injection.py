@@ -515,9 +515,15 @@ class TestEveryChildProtectionInjectionIsPlanned:
     dataset of the collection is planned against the delivery's periods,
     and two may never share one."""
 
-    def test_an_injection_on_another_dataset_is_planned(self):
+    def test_an_injection_on_another_dataset_is_planned(self, monkeypatch):
+        import dataclasses
+
         from generator import generate_cp_runs as cp
 
+        # PLANNED WITHOUT LINKS: these periods are made up, so a link's
+        # period-scoped decision has no real slot to be timed from.
+        monkeypatch.setattr(si, "INJECTIONS", tuple(
+            dataclasses.replace(i, links=()) for i in si.INJECTIONS))
         resolved, by_period = cp._plan_injections(_daily(30))
         assert "TS-56" in {inj.scenario_id for inj, _ in resolved}
 

@@ -4316,3 +4316,144 @@ class TestThePlantedPairsOnTheBuiltDashboard:
         were both rejected - not 'a supply'."""
         text, _day = self._text_on(page, built_dashboard_html, "TS-73", 2)
         assert "2 files arrived and were rejected" in text, text[:2000]
+
+
+#: REQ-GEN-199 criteria 32-34: each chip, the element holding the text its
+#: register Expect quotes, and that text - from plans/supply-model.md.
+_AS_AT_CHIPS = (
+    ("TS-75a", '[data-testid="promotion-split"]',
+     "this supply was staged and nobody had decided about it yet"),
+    ("TS-75b", '[data-testid="promotion-split"]',
+     "a person had rejected this supply, so it was not promoted"),
+    ("TS-76", '[data-testid="standing-in"]', "Substituted from 2024-Q4"),
+    ("TS-76", '[data-testid="standing-in-since"]', "Since removed, as from"),
+    ("TS-77a", '[data-testid="standing-in"]', "Substituted from 2023-Q1"),
+    ("TS-77a", '[data-testid="standing-in-since"]', "Since replaced, as from"),
+    ("TS-77b", '[data-testid="promotion-split"]', "this one had been superseded"),
+    ("TS-77b", '[data-testid="standing-in-detail"]',
+     "2023-Q2 holds 2023-Q1's supply; the results below are a newer supply awaiting "
+     "a decision."),
+    ("TS-78a", '[data-testid="promotion-split"]',
+     "the newest file was not the newest promotion"),
+    ("TS-78b", ".verdict-of", "The supply in place is the one received 2:00pm Sunday, "
+     "30 August 2026."),
+    ("TS-79a", '[data-testid="standing-in"]', "Inherited from 2026-Q1"),
+    ("TS-79b", '[data-testid="standing-in"]', "Inherited from 2023-Q1"),
+)
+
+#: FOUND BY THIS TEST ON ITS FIRST RUN, 2026-10-13, and recorded as a finding
+#: against the page rather than resolved by loosening it (criterion 34;
+#: post-build-review #174): the element opens below the initial 1280x800
+#: viewport. STRICT, so the day the page brings it into view this fails and
+#: the entry comes out.
+_BELOW_THE_FOLD = {
+    ("TS-75a", '[data-testid="promotion-split"]'),
+    ("TS-75b", '[data-testid="promotion-split"]'),
+    ("TS-76", '[data-testid="standing-in-since"]'),
+    ("TS-77a", '[data-testid="standing-in-since"]'),
+    ("TS-77b", '[data-testid="promotion-split"]'),
+    ("TS-77b", '[data-testid="standing-in-detail"]'),
+    ("TS-78a", '[data-testid="promotion-split"]'),
+}
+
+
+def _chip_params():
+    for sid, where, text in _AS_AT_CHIPS:
+        marks = ()
+        if (sid, where) in _BELOW_THE_FOLD:
+            marks = (pytest.mark.xfail(strict=True, reason=(
+                "post-build-review #174: opens below the initial 1280x800 viewport - a "
+                "finding against the page (REQ-GEN-199 criterion 34)")),)
+        yield pytest.param(sid, where, text, marks=marks, id=f"{sid}-{where}")
+
+
+class TestTheAsAtScenarioChips:
+    """REQ-GEN-199 criteria 32-34: each of this requirement's chips opens on a
+    date where the text its register Expect quotes is on the page, in the
+    initial 1280x800 viewport without scrolling, and the same URL cold-loaded
+    shows it again - with no console error (clean_page)."""
+
+    @pytest.mark.parametrize("sid,where,text", list(_chip_params()))
+    def test_the_quoted_text_is_on_screen_and_survives_a_cold_reload(
+            self, clean_page, built_dashboard_html, sid, where, text):
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get(sid)
+        assert placement is not None and placement.in_place_on, f"{sid} is not placed"
+        clean_page.set_viewport_size({"width": 1280, "height": 800})
+        _goto(clean_page, built_dashboard_html)
+        clean_page.locator("#scenarios-btn").click()
+        clean_page.wait_for_timeout(400)
+        index = clean_page.evaluate(f"SCENARIO_MAP.findIndex(e => e.id === '{sid}')")
+        assert index >= 0, f"{sid} is not in the embedded map"
+        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.wait_for_timeout(700)
+        assert f"in-place-on={placement.in_place_on}" in clean_page.url
+
+        def holder():
+            found = clean_page.locator(where).filter(has_text=text)
+            assert found.count() >= 1, f"{sid}: {text!r} is not in {where}"
+            return found.first
+
+        el = holder()
+        assert text in " ".join(el.text_content().split())
+        box = el.bounding_box()
+        assert box and box["y"] >= 0 and box["y"] + box["height"] <= 800, (
+            f"{sid}: {where} spans {box and int(box['y'])}-"
+            f"{box and int(box['y'] + box['height'])}px, outside the initial viewport")
+
+        clean_page.reload()
+        clean_page.wait_for_function(
+            "() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        assert text in " ".join(holder().text_content().split())
+
+
+class TestTheAsAtReadingsOnTheRealHistory:
+    """REQ-GEN-199 criteria 30 and 31: REQ-DASH-197 criterion 16's
+    awaiting-then-rejected reading and REQ-DASH-198 criterion 7's removed and
+    replaced substitutions, on dates taken from the built data - beside the
+    fixture-history tests above, which stay for a run with no deployment."""
+
+    CLIENTS = {"tier": "dataset", "agencyId": "child-protection-family-support",
+               "collectionId": "child-protection", "datasetId": "cp-clients"}
+    PLACEMENTS = {**CLIENTS, "datasetId": "cp-placements"}
+
+    @staticmethod
+    def _on(sid):
+        from qa_tools.common import scenario_map
+
+        placement = scenario_map.read_placements().get(sid)
+        assert placement is not None, f"{sid} is not placed in this history"
+        return placement.in_place_on
+
+    def _panel(self, page):
+        panel = page.locator('[data-testid="promotion-split"]')
+        assert panel.count() == 1
+        return " ".join(panel.inner_text().split())
+
+    def test_awaiting_on_the_day_it_waited(self, clean_page, built_dashboard_html):
+        on = self._on("TS-75a")
+        _goto(clean_page, built_dashboard_html, state=self.CLIENTS, in_place_on=on)
+        text = self._panel(clean_page)
+        day = clean_page.evaluate(f"() => fmtDay('{on}')")
+        assert f"On {day} the warehouse did not hold the latest file" in text
+        assert "nobody had decided" in text and "rejected" not in text.lower()
+
+    def test_rejected_after_the_rejection(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.CLIENTS,
+              in_place_on=self._on("TS-75b"))
+        assert "a person had rejected this supply" in self._panel(clean_page)
+
+    def test_a_removed_substitution_says_since_removed(self, clean_page,
+                                                       built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.PLACEMENTS,
+              in_place_on=self._on("TS-76"))
+        since = clean_page.locator('[data-testid="standing-in-since"]')
+        assert since.count() == 1 and "Since removed" in since.inner_text()
+
+    def test_a_replaced_substitution_says_since_replaced(self, clean_page,
+                                                         built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state=self.PLACEMENTS,
+              in_place_on=self._on("TS-77a"))
+        since = clean_page.locator('[data-testid="standing-in-since"]')
+        assert since.count() == 1 and "Since replaced" in since.inner_text()
