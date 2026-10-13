@@ -32456,6 +32456,9 @@ requirements:
     story: As the person working a period's supplies, I want to say what each of two files that arrived together for one dataset actually is, so that a contested dataset stops being a dead end and every file that turns out to be a supply is checked and judged like any other.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-13"
     source: 'Keith, 2026-10-05 (REQ-PIPE-144 decision ''THE CONTESTED-PAIR CHOICE GOES TO SPRINT 9'': a new filing decision on both routes, writing a new filing in REQ-PIPE-141''s append-only shape); gap logged 2026-10-12 as plans/running-thoughts.md #87 after re-testing REQ-PIPE-144 criteria 14 and 42 once REQ-PIPE-141 shipped. Drafted by delivery-scoper 2026-10-12; signed by Keith 2026-10-13, then unsigned the same day pending his re-signing of the reviewed text.'
     acceptance_criteria:
     - 'THE SYSTEM SHALL offer settling a contested pair as a supply-scoped filing decision on the TERMINAL route only, through filing_decisions, the one implementation every route shares (REQ-GHUB-082 criteria 3 and 13): driven by the TUI, which is the expected way to make it, and also accepted from the flag form for someone working from the CLI; and SHALL NOT offer it on the GitHub route. DECIDED Keith, 2026-10-13: "TUI should drive this all ... CLI can offer [it] if the user is driving it from there, but I expect most to use the TUI."'
@@ -32554,6 +32557,9 @@ requirements:
     story: As someone looking at a dataset that reads 'Two files for one table', I want every message about it to tell me exactly where to settle it, and the dataset to stop reading contested only when the contest has really ended, so that nothing points me at a remedy that does not exist.
     moscow: must
     status: not_started
+    signed_off:
+      by: Keith
+      date: "2026-10-13"
     source: 'plans/running-thoughts.md #87 (2026-10-12): REQ-PIPE-141''s re-file refusal, the correction trial''s refusal and REQ-PIPE-115''s ''Two files, choose one'' item each name a step no decision performs. Drafted by delivery-scoper 2026-10-12 as the follow-through half of REQ-PIPE-193; not yet signed off.'
     acceptance_criteria:
     - 'WHILE a contested-table outstanding item is open, THE SYSTEM SHALL word it, on the terminal and the dashboard, to name both files with their receipts, to say the pair is settled by saying what each file is, and to say where: at ''mothman > Filing decisions > {collection name} > Supplies waiting on a decision (listed first)'' - and SHALL NOT hand over a command to paste nor say the decision is ''not yet possible''. DECIDED Keith, 2026-10-13: the TUI drives it.'
