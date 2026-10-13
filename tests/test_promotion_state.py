@@ -303,3 +303,28 @@ class TestAPeriodStandingInOnAnEarlierOne:
         record = promotion_state.state_for(dataset, conn).as_record()["standingIn"]
         assert set(record) == {"kind", "level", "period", "standsOn", "supply",
                                 "decidedBy", "reason", "byAPerson"}
+
+
+class TestAStandInIsDecidedByAName:
+    """post-build-review #176 (REQ-GEN-199's critic, N1): a substitution's
+    drill-down read "Decided by scripted-history@synthetic.invalid" - the raw
+    actor email - where every other decision on the page shows the person's
+    name, so a scripted substitution was labelled scripted (REQ-GEN-199 NFR
+    5). The record the page reads carries the display name."""
+
+    def test_the_record_names_the_person_not_their_email(self):
+        from qa_tools.common import people
+
+        email = "fpycnkgvmt@privaterelay.appleid.com"
+        name = people.display_name(email)
+        assert name and name != email, "precondition: the person has a name"
+        record = promotion_state.StandingIn(
+            kind=promotion_state.SUBSTITUTED, period="2025-Q1", stands_on="2024-Q4",
+            supply="cp-placements@x", decided_by=email).as_record()
+        assert record["decidedBy"] == name
+
+    def test_nobody_stays_nobody(self):
+        record = promotion_state.StandingIn(
+            kind=promotion_state.INHERITED, period="2025-Q2", stands_on="2025-Q1",
+            supply="cp-case-workers@x").as_record()
+        assert record["decidedBy"] is None

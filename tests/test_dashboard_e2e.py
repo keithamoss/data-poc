@@ -4008,8 +4008,10 @@ def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
     fixture history in this worker's own database - never the deployment's.
 
     REQ-DASH-197 criterion 16 asks for an arrival awaiting a decision on a
-    date and rejected later, and the bootstrapped history holds none; the
-    criterion's answer is a fixture history, never a skip. The fixture is
+    date and rejected later. The bootstrapped history holds one since
+    REQ-GEN-199 (TS-75, TestTheAsAtReadingsOnTheRealHistory); this fixture
+    history stays as the path that does not depend on which scenarios the
+    history happens to plant. The fixture is
     one promoted supply, a second awaiting until a rejection three weeks
     later, and a third filed after the date the test looks at.
     """
@@ -4344,8 +4346,10 @@ _AS_AT_CHIPS = (
 #: FOUND BY THIS TEST ON ITS FIRST RUN, 2026-10-13, and recorded as a finding
 #: against the page rather than resolved by loosening it (criterion 34;
 #: post-build-review #174): the element opens below the initial 1280x800
-#: viewport. STRICT, so the day the page brings it into view this fails and
-#: the entry comes out.
+#: viewport. ONLY THE VIEWPORT CHECK IS INVERTED for these - the quoted text and
+#: the cold reload are asserted for every chip (the critic's T1: a whole-test
+#: expected failure hid content regressions) - so the day the page brings one
+#: into view the inverted check fails and its entry comes out.
 _BELOW_THE_FOLD = {
     ("TS-75a", '[data-testid="promotion-split"]'),
     ("TS-75b", '[data-testid="promotion-split"]'),
@@ -4357,23 +4361,14 @@ _BELOW_THE_FOLD = {
 }
 
 
-def _chip_params():
-    for sid, where, text in _AS_AT_CHIPS:
-        marks = ()
-        if (sid, where) in _BELOW_THE_FOLD:
-            marks = (pytest.mark.xfail(strict=True, reason=(
-                "post-build-review #174: opens below the initial 1280x800 viewport - a "
-                "finding against the page (REQ-GEN-199 criterion 34)")),)
-        yield pytest.param(sid, where, text, marks=marks, id=f"{sid}-{where}")
-
-
 class TestTheAsAtScenarioChips:
     """REQ-GEN-199 criteria 32-34: each of this requirement's chips opens on a
     date where the text its register Expect quotes is on the page, in the
     initial 1280x800 viewport without scrolling, and the same URL cold-loaded
     shows it again - with no console error (clean_page)."""
 
-    @pytest.mark.parametrize("sid,where,text", list(_chip_params()))
+    @pytest.mark.parametrize("sid,where,text", [
+        pytest.param(sid, where, text, id=f"{sid}-{where}") for sid, where, text in _AS_AT_CHIPS])
     def test_the_quoted_text_is_on_screen_and_survives_a_cold_reload(
             self, clean_page, built_dashboard_html, sid, where, text):
         from qa_tools.common import scenario_map
@@ -4398,9 +4393,14 @@ class TestTheAsAtScenarioChips:
         el = holder()
         assert text in " ".join(el.text_content().split())
         box = el.bounding_box()
-        assert box and box["y"] >= 0 and box["y"] + box["height"] <= 800, (
-            f"{sid}: {where} spans {box and int(box['y'])}-"
-            f"{box and int(box['y'] + box['height'])}px, outside the initial viewport")
+        on_screen = bool(box) and box["y"] >= 0 and box["y"] + box["height"] <= 800
+        span = f"{box and int(box['y'])}-{box and int(box['y'] + box['height'])}px"
+        if (sid, where) in _BELOW_THE_FOLD:
+            assert not on_screen, (f"{sid}: {where} is now inside the initial viewport "
+                                   f"({span}) - post-build-review #174 is fixed for it, so "
+                                   f"remove its _BELOW_THE_FOLD entry")
+        else:
+            assert on_screen, f"{sid}: {where} spans {span}, outside the initial viewport"
 
         clean_page.reload()
         clean_page.wait_for_function(

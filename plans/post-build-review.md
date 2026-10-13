@@ -8612,3 +8612,48 @@ twice. It deliberately did not re-find the `TypeError`.
       (3) build every ordinary day inside a hold era green. Recommended (1):
       TS-47's late file being held is a true consequence of the era, and its
       register entry can say so.
+
+176. **[done, 2026-10-14]** **[Data generation]** **[Dashboard UI]** **The
+    delivery-critic on REQ-GEN-199 as built (274e7a6)** - overnight #4. Every
+    criterion's claim checked against the real database and page (the critic
+    drove the built page at 1280x800); the strict-xfail findings #174 and #175
+    confirmed honest. Fixed the same night, defects failing first:
+    - **N1 (defect, fixed test-first)**: a substitution's drill-down read
+      "Decided by scripted-history@synthetic.invalid" - the raw actor email -
+      where the rest of the page shows the person's name, so a scripted
+      substitution was labelled scripted (REQ-GEN-199 NFR 5).
+      promotion_state.StandingIn.as_record now carries people.display_name();
+      tests/test_promotion_state.py::TestAStandInIsDecidedByAName failed first.
+      Not REQ-GEN-199's code - REQ-DASH-198's display, exposed by it.
+    - **G1 (latent, fixed test-first)**: the replay read `supply N` from a
+      placement's recorded supplies, which counted any arrival with a run id,
+      while links counted only arrivals carrying the dataset's file; the two
+      agreed today and would have diverged for a shaped delivery given its only
+      run by resolve_run_ids' fallback. The recorded supplies now come from
+      supply_arrivals().
+    - **G2 (latent, fixed test-first)**: a drawn RED on a quarter that keeps
+      its drawn severity would be planned and not written; now refused.
+    - **T1**: the chip test's whole-test expected failures hid content and
+      cold-reload regressions on the seven below-the-fold cases; now every
+      chip's text and reload is asserted and only the viewport check is
+      inverted for #174's cases. **T2**: the hold guard compared slots, and
+      as one strict xfail also hid a TS-78 regression; split, keyed by
+      supply - the planted ambers ARE held (passes), nothing else is (#175's
+      xfail). **T3**: the resupply-follows-red exemption narrowed to the one
+      scenario that needs it.
+    - **F4**: two register dates a day early (UTC read as Perth) - 11 and 7
+      February. **G6**: TS-79's config text names the quarter it really
+      inherits from. **O2**: TS-79's Expect now says what else its pages show.
+      **D1**: REQ-GEN-199's source line said "not signed off". Criterion 30's
+      fixture docstring corrected; TS-79's "too short" refusal says what to do.
+    - **Recorded, not changed**: G3 - the amber moved off TS-75's quarter went
+      to -13, the quarter TS-67 files into (harmless; TS-67 still meets a filled
+      slot). G4 - filed_early_into misses a same-day early arrival and always
+      claims the quarter before; neither occurs. G5 - covered-day bookkeeping
+      keeps the anchor's id_offset and seed (cosmetic). O1 - TS-77's decision
+      log has a rule refusal effective five days AFTER the person's promote of
+      the same supply though recorded first; replay timing, plausibly #90's
+      family - to investigate.
+    - **For Keith**: criterion 22 lists TS-79a/TS-79b as "sharing one
+      placement" while criterion 19 gives them different quarters - the two
+      cannot both hold; the build follows 19. Wording only.

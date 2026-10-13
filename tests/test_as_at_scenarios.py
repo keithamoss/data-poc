@@ -67,6 +67,36 @@ class TestTheTwoNewFileShapes:
         assert shapes == ["missing_table_late"]
 
 
+class TestASupplyIndexNamesOneFileEverywhere:
+    """The critic's G1: the replay read `supply N` from the placement's
+    recorded supplies, which counted any arrival given a run id - including a
+    delivery that carried none of the dataset's file, given its only run by
+    resolve_run_ids' fallback - while links counted only arrivals carrying
+    the file. The recorded supplies now come from the same list."""
+
+    def test_a_delivery_without_the_datasets_file_takes_no_supply_index(self):
+        placement = si.resolve(_injection("TS-77a"), _cp_periods())
+        placement.arrivals[0]["run_id"] = "cp_clients__the_five_table_delivery"
+        placement.arrivals[1]["run_id"] = "cp_placements__the_late_file"
+        assert placement.as_record()["supplies"] == ["cp_placements__the_late_file"]
+
+
+class TestAKeptSeverityIsOnlyEverAnAmber:
+    """The critic's G2: a scenario that keeps its quarter's drawn severity
+    keeps an amber; a drawn red would be planned and not written."""
+
+    def test_a_drawn_red_on_such_a_quarter_is_refused(self, monkeypatch):
+        from generator import generate_cp_runs
+
+        periods = _cp_periods()
+        index = [p.name for p in periods].index(si.resolve(_injection("TS-76"), periods).period)
+        plan = list(generate_cp_runs.RUN_PLAN)
+        plan[index] = (plan[index][0], "red")
+        monkeypatch.setattr(generate_cp_runs, "RUN_PLAN", plan)
+        with pytest.raises(si.CannotPlace, match="TS-76.*keeps only an amber"):
+            generate_cp_runs._plan_injections(periods)
+
+
 class TestOnePlacementCoversSeveralDays:
     """TS-78: D, D+1 and D+2 are one placement, because D+1 is both D's
     following day and D+2's lead-in."""
@@ -236,25 +266,35 @@ def test_a_targeted_amber_is_never_named_with_a_severity():
 class TestOnlyThePlantedAmbersWaitUnderHold:
     """Criterion 16, on the bootstrapped history: every supply the rule held
     under the hold amber setting is TS-43's or TS-78's - the guard that the
-    back-dated 30 August version held nothing else."""
+    back-dated 30 August version held nothing else. KEYED BY SUPPLY, and split
+    in two (the critic's T2): that the planted supplies ARE held passes today;
+    that NOTHING ELSE is held is the strict expected failure #175 records."""
+
+    @staticmethod
+    def _held_and_planted():
+        from qa_tools.common import decision_log as dl
+        from qa_tools.common import scenario_map, scripted_decisions, supply_db
+
+        placements = scenario_map.read_placements()
+        planted = set()
+        for sid, index in (("TS-43", 0), ("TS-78a", 0), ("TS-78a", 2)):
+            run = placements[sid].supplies[index]
+            planted.add(scripted_decisions._supply_of("birth-registrations", run))
+        with supply_db.connect(label="test-hold-guard") as conn:
+            held = {s for (s,) in conn.execute(
+                f"SELECT supply FROM {dl.TABLE} WHERE action = ? AND amber_setting = 'hold'",
+                [dl.PROMOTION_WITHHELD]).fetchall()}
+        return held, planted
+
+    def test_the_planted_ambers_are_held(self, deployment_history):
+        held, planted = self._held_and_planted()
+        assert len(planted) == 3, planted
+        assert planted <= held, f"not held under hold: {sorted(planted - held)}"
 
     @pytest.mark.xfail(strict=True, reason=(
         "post-build-review #175: on the first bootstrap two more supplies waited under "
-        "hold on 2026-09-08 - TS-47's late file (yesterday's extract, flagged by drift "
-        "and row count) and that day's own supply (a natural not-null warning). Keith "
-        "to decide; the criterion is not loosened"))
-    def test_every_hold_withheld_supply_is_ts_43s_or_ts_78s(self, deployment_history):
-        from qa_tools.common import decision_log as dl
-        from qa_tools.common import supply_db
-
-        periods = _bdm_periods()
-        ts78 = si.resolve(_injection("TS-78a"), periods)
-        allowed = {si.resolve(_injection("TS-43"), periods).period,
-                   ts78.period, ts78.covered[-1]}
-        with supply_db.connect(label="test-hold-guard") as conn:
-            held = {(ds, slot) for ds, slot in conn.execute(
-                f"SELECT dataset_id, to_slot FROM {dl.TABLE} WHERE action = ? "
-                "AND amber_setting = 'hold'", [dl.PROMOTION_WITHHELD]).fetchall()}
-        assert held, "precondition: the history holds supplies waiting under hold"
-        assert {slot for _ds, slot in held} == allowed, held
-        assert {ds for ds, _slot in held} == {"birth-registrations"}
+        "hold on 2026-09-08 - TS-47's late file and that day's own supply. Keith to "
+        "decide; the criterion is not loosened"))
+    def test_nothing_else_is_held(self, deployment_history):
+        held, planted = self._held_and_planted()
+        assert held - planted == set(), sorted(held - planted)

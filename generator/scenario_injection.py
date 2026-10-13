@@ -322,7 +322,10 @@ class Placement:
             "dataset": self.dataset,
             "period": self.period,
             "in_place_on": self.in_place_on_for(self.scenario_id),
-            "supplies": [a["run_id"] for a in self.arrivals if a.get("run_id")],
+            # THE SAME LIST A LINK'S `arrival N` INDEXES (supply_arrivals): a
+            # delivery that leaves this dataset's file out takes no index, so
+            # a script's `supply N` names the same file (the critic's G1).
+            "supplies": [a["run_id"] for a in supply_arrivals(self) if a.get("run_id")],
             "config": self.config,
             "lead_in": list(self.lead_in),
             "follow": list(self.follow),
@@ -930,7 +933,7 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
 
     if len(periods) < 2:
         raise CannotPlace("TS-79: the generated history is too short to hold an "
-                          "inherited quarter")
+                          "inherited quarter - lengthen the Child Protection history")
     delivered = {p.name for p in schedule.periods_for_dataset(
         INHERITING_DATASET, until=periods[-1].date)}
     inherited = [i for i, p in enumerate(periods[:-1]) if p.name not in delivered and i > 0]
@@ -945,12 +948,16 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
                                                  "history's first supply")):
         p, nxt = periods[i], periods[i + 1]
         middle = p.date + (nxt.date - p.date) / 2
+        # THE QUARTER IT INHERITS FROM is the latest one it was delivered in,
+        # not simply the one before (the critic's G6).
+        source = next(periods[j].name for j in range(i - 1, -1, -1)
+                      if periods[j].name in delivered)
         out.append(Placement(
             scenario_id=sid, dataset=INHERITING_DATASET, period=p.name,
             period_date=p.date,
             config=(f"quarterly; {INHERITING_DATASET} is delivered only in the quarters "
                     f"contract/calendar.yaml's participation names, so {p.name} - {why} - "
-                    f"inherits {periods[i - 1].name}'s supply. Nothing generated for it."),
+                    f"inherits {source}'s supply. Nothing generated for it."),
             in_place_on=((sid, middle.isoformat()),)))
     return out
 

@@ -190,9 +190,11 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
     _, injected = generate_cp_runs._plan_injections(periods)
     for slot_id, deliveries in by_slot.items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
-        # AN INJECTED SLOT IS THE SCENARIO'S SHAPE, not a resupply chain
-        # (REQ-GEN-199: TS-75's corrected file, TS-77's late one).
-        if deliveries[0]["period"] in injected:
+        # A SCENARIO WHOSE FIRST DELIVERY KEEPS ITS QUARTER'S DRAWN AMBER is
+        # the only injected chain that continues after a non-red delivery
+        # (REQ-GEN-199: TS-77's late file after its amber first delivery).
+        if deliveries[0]["period"] in injected \
+                and injected[deliveries[0]["period"]][0].keeps_drawn_severity:
             continue
         if len(deliveries) > 1:
             assert deliveries[0]["dirty_severity"] == "red", \

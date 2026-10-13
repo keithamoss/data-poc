@@ -3870,8 +3870,8 @@ cp-clients@202402010900000800, and the reason "this supply was staged and
 nobody had decided about it yet". **What the other tables show**: the red
 clients turned notifications', investigations' and placements' own
 cross-table checks red, so all three wait for a person on 8 and 25
-February; carers waited until 10 February and then promoted green; case
-workers promoted green on 6 February. When the corrected cp_clients
+February; carers waited until 11 February and then promoted green; case
+workers promoted green on 7 February. When the corrected cp_clients
 arrives the re-evaluation promotes clients, notifications, investigations
 and placements green (11 March). **Breaks as**: no panel; or the reason
 "superseded" (post-build-review #164's reading, which this quarter is
@@ -3963,7 +3963,11 @@ the newest quarter before the build's own in which it is not delivered
 placement is written after generation from the calendar's participation,
 in place on the middle of the quarter. *Config: quarterly; cp-case-workers
 participates only in Q1 and Q3.* **Expect** (REQ-DASH-198): the pill
-"Inherited from 2026-Q1" beside the dataset's title. **Breaks as**: no pill;
+"Inherited from 2026-Q1" beside the dataset's title. The same page also shows
+an as-at panel and an "Awaiting a decision" verdict line about a May supply
+that is "not filed to any period": ordinary deliveries carry cp_case_workers
+in months it does not take part in, and each is held (TS-52's shape) - the
+pill, not the panel, is what this scenario points at. **Breaks as**: no pill;
 or a stale date after ANCHOR_DATE moves.
 
 **TS-79b `[INJECT]` An inherited quarter - the oldest.** The oldest

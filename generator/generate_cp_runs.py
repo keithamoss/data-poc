@@ -627,6 +627,17 @@ def _plan_injections(periods):
                                        f"{injection.scenario_id}, its {extra.at} arrival")
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
+    # A DRAWN RED ON A KEEPS-DRAWN QUARTER IS REFUSED (the critic's G2): the
+    # scenario keeps only an amber, so a red would be planned and not written.
+    for injection, placement in resolved:
+        if injection.keeps_drawn_severity:
+            drawn = dict(zip((p.name for p in periods),
+                             (sev for _q, sev in RUN_PLAN[:len(periods)]))).get(placement.period)
+            if drawn == "red":
+                raise scenario_injection.CannotPlace(
+                    f"{injection.scenario_id}: an ordinary red is drawn for {placement.period}, "
+                    f"which this scenario keeps the drawn severity of - it keeps only an amber. "
+                    f"Move the anchor to a quarter drawn clean or amber.")
     return resolved, by_period
 
 

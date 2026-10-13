@@ -128,10 +128,15 @@ class StandingIn:
         return self.kind == SUBSTITUTED
 
     def as_record(self) -> dict:
+        # THE PERSON'S NAME, as every other decision on the page shows it
+        # (post-build-review #176): the raw email read "Decided by
+        # scripted-history@synthetic.invalid" on a scripted substitution.
+        from qa_tools.common import people
+
         return {"kind": self.kind, "level": self.level, "period": self.period,
                 "standsOn": self.stands_on, "supply": self.supply,
-                "decidedBy": self.decided_by, "reason": self.reason,
-                "byAPerson": self.by_a_person}
+                "decidedBy": people.display_name(self.decided_by) if self.decided_by else None,
+                "reason": self.reason, "byAPerson": self.by_a_person}
 
 
 @dataclass(frozen=True)
