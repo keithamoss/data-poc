@@ -1346,3 +1346,33 @@ one or more component tags, and a date.
         draft overnight, for him to review in the morning. NOT BUILT; the
         draft lives in the session scratchpad and the morning report, never in
         requirements.yaml until signed.
+      - THE REVIEWED FINAL DRAFT IS READY, 00:30 Perth - in
+        `docs/drafts/calendar-close-out/`: `summary-and-questions.md` (start
+        here - one paragraph per requirement and 28 questions in 8 sets,
+        recommended option first), `requirements-draft.yaml` (the full text,
+        eleven requirements) and the three reviews it folds in. Committed
+        because the session scratchpad does not outlive the container; it is
+        a DRAFT, not the register - nothing in requirements.yaml changed, and
+        it goes in only as you sign each one. Merged with the live register it
+        validates clean (203 requirements, zero errors).
+        HOW IT GOT THERE: the scoper drafted round 1-2 on 2026-10-13 and
+        three new ones overnight (REQ-DASH-204, REQ-GEN-205 - criterion 23's
+        TS-57 to TS-62, forks (e)-(h) above now its questions - and REQ-GEN-
+        206, REQ-GEN-136/137's leftovers); delivery-architect, delivery-cli-ux
+        and delivery-dashboard-ux reviewed the batch; the scoper folded every
+        no-choice fix in as an amendment with its finding named in
+        `decisions:`, turned every real fork into a question, and added two
+        requirements the reviews showed were missing - REQ-GEN-207 (grow the
+        Child Protection history ONCE, first, keeping today's quarters
+        byte-identical: the batch needs about seventeen more quarters, not
+        eight) and REQ-DASH-208 (a scenario link scrolls to its subject -
+        post-build-review #174).
+        SCOPER PASSES, said up front per the sign-off rule: REQ-PIPE-179 and
+        REQ-DASH-182 have only the joint 2026-10-13 pass; REQ-DASH-180 has
+        none; REQ-GEN-207 and REQ-DASH-208 are unreviewed by architect or UX.
+        ONE CORRECTION OF MINE TO THE FOLD: the architect found that a
+        bootstrap stamps a replayed correction's confirmation with the real
+        clock (true - post-build-review #177), but its fix, "stamp it at the
+        replay's end", would confirm REQ-PIPE-181 nineteen days before its
+        own date. REQ-GEN-205 criterion 19 now proposes the later of the two;
+        question 28 is yours.

@@ -1,0 +1,1947 @@
+requirements:
+- id: REQ-GEN-207
+  title: The Child Protection history is grown earlier, once, by as many quarters as the batch's planned scenarios need, with
+    every existing quarter unchanged
+  date_written: '2026-10-14'
+  story: As Keith adding scenarios to Child Protection's synthetic history, I want it to start earlier by as many quarters
+    as the planned scenarios need, so that each new scenario has a quarter of its own without moving any scenario already
+    planted and quoted.
+  moscow: must
+  status: not_started
+  source: PROPOSED by the round 3 architect review (2026-10-14, Q1 option A), following Keith's own call of 2026-10-13 to
+    grow the Child Protection history earlier for TS-63 (REQ-PIPE-179). Drafted by delivery-scoper overnight 2026-10-13 to
+    14 while Keith was asleep; not yet reviewed as a requirement of its own.
+  acceptance_criteria:
+  - THE SYSTEM SHALL add Child Protection quarters before 2023-Q1 at the old end - dated entries in the quarterly calendar,
+    and versions of the collection's participation_defaults and of each dataset's participation taking effect from the first
+    added quarter - as Birth Registrations' history was grown (REQ-GEN-196), each with a changelog line saying why.
+  - THE SYSTEM SHALL size the growth by a dry run of the generator's collision refusal over every scenario this batch plans
+    - TS-42 and TS-80 (REQ-GEN-203), TS-57 to TS-62 (REQ-GEN-205), TS-63 (REQ-PIPE-179), TS-50 and TS-55 (REQ-GEN-206) - adding
+    the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run's output in
+    this requirement's evidence.
+  - THE SYSTEM SHALL count the period a scenario's substitution stands on (stands_on) as claimed by that scenario under REQ-GEN-044's
+    collision rule, so that 2023-Q1, which TS-77a stands on, is no longer read as free.
+  - THE SYSTEM SHALL leave every existing Child Protection quarter's generated deliveries byte-identical - drawing the added
+    quarters' run plan, seeds and slots separately from the existing fifteen - so that every planted scenario, the characterization
+    pin (tests/fixtures/arrival_semantics_golden.json) and every quoted register text stay as they are, and SHALL keep TS-79b
+    on the quarter it names today rather than the new oldest inherited quarter.
+  - THE SYSTEM SHALL add, in the same change, amber_setting and replacement_setting versions taking effect on or before the
+    earliest claim-opening instant of the first added quarter, carrying the values today's 2023-01-01 versions carry, so that
+    no grown supply meets a setting with no version in force.
+  - THE SYSTEM SHALL record, in the register beside the scenarios placed in grown quarters, that checks introduced on 2023-01-15
+    did not exist for supplies before that date, and what the page shows for them there as observed on the first bootstrapped
+    build.
+  - THE SYSTEM SHALL generate the added quarters as ordinary deliveries - the usual six files, whole - and SHALL NOT plant
+    any scenario in them in this change.
+  - THE SYSTEM SHALL land the growth in a change of its own, before any declared correction edits a grown quarter.
+  - THE SYSTEM SHALL measure a bootstrap from empty before and after the growth and log both in CLAUDE.md's running log.
+  non_functional_requirements:
+  - 'BOOTSTRAP COST: Child Protection replays about 17s a quarter beside Birth Registrations'' ~330s. The architect counts
+    about seventeen quarters of demand (A3), not the scoper''s eight, which would take Child Protection to roughly 550s and
+    make it the critical path - a bootstrap of about nine to ten minutes (architect E22) against 7m00s on 2026-10-13. The
+    dry run (criterion 2) gives the real count; measure rather than estimate.'
+  - 'CONFIGURATION ONLY: calendar, participation and setting versions plus generator configuration; every effect is in the
+    database.'
+  - 'DETERMINISM: seeded, so a regenerate reproduces the grown history; criterion 4 is checked by diffing the existing quarters''
+    deliveries before and after.'
+  - 'NO SILENCED WARNING: growing earlier leaves the quarterly calendar''s forward runway, and its warning, as they are.'
+  dependencies:
+  - REQ-GEN-044
+  - REQ-GEN-196
+  - REQ-PIPE-110
+  - REQ-PIPE-111
+  - REQ-PIPE-122
+  - REQ-PIPE-123
+  decisions:
+  - 'GROW EARLIER, NOT INTO TODAY''S QUARTERS (Keith, 2026-10-13, architect review answers, for TS-63): REQ-GEN-199 found
+    no clean Child Protection quarter left. REJECTED fitting new scenarios among the fifteen.'
+  - 'ITS OWN REQUIREMENT, BUILT FIRST, SIZED BY A DRY RUN (architect Q1 option A, PROPOSED - Keith to confirm): four requirements
+    need grown quarters (REQ-GEN-203, REQ-GEN-205, REQ-GEN-206, REQ-PIPE-179), so one owner grows the history once. REJECTED
+    each growing what it needs (three edits to one calendar''s old end) and REQ-GEN-205 owning it (the scoper''s first recommendation,
+    superseded by the architect''s).'
+  - 'THE BUDGET WAS UNDER-COUNTED (architect A3): about seventeen quarters of demand, not eight; and the collision rule ignores
+    a substitution''s stood-on period, so 2023-Q1 (TS-77a''s) read as free. Criteria 2 and 3.'
+  - 'A BLOCKER: SETTINGS HAVE NO DEFAULT (architect A1, verified 2026-10-14): amber_setting and replacement_setting in contract/data-asset.yaml
+    start 2023-01-01 and carry no default, so a supply received before then has no setting in force - criterion 5.'
+  - 'A BLOCKER: ''NO EXISTING SCENARIO MOVES'' WAS FALSE AS DRAFTED (architect A2, verified 2026-10-14): generator/generate_cp_runs.py
+    builds RUN_PLAN from N_QUARTERS = 15 and one seeded shuffle, its seeds and slots run from the oldest quarter and the first
+    delivery is kept clean - so adding quarters redraws every existing one, and TS-79b (the oldest inherited quarter) moves.
+    Criterion 4 is written to option A of Keith''s question; option B accepts the redraw and recaptures the golden and every
+    Child Protection quote.'
+  - 'ITS OWN CHANGE, CORRECTIONS LATER (architect A4, verified 2026-10-14): agreement_freeze exempts a newly ADDED version
+    or date on a synthetic asset, but a declared correction that changes nothing is refused - so the growth lands alone and
+    the corrections of REQ-GEN-205 and REQ-PIPE-179 come in later changes against the grown calendar. Criterion 8.'
+  - 'SUGGESTED BUILD ORDER FOR THE WHOLE CLOSE-OUT BATCH (architect, 2026-10-14): this requirement; REQ-PIPE-202; REQ-GEN-203;
+    REQ-DASH-204; REQ-DASH-182; REQ-PIPE-163; REQ-PIPE-179; REQ-DASH-180; REQ-GEN-205; REQ-GEN-206 - with REQ-DASH-208 before
+    the first of REQ-GEN-205 and 206''s bootstraps (dashboard UX 14).'
+  - 'THE RUNWAY WARNING STAYS (Keith, 2026-10-13): ''the point of the warning is to demonstrate the proof of concept of what
+    it does''. Growth is at the old end only.'
+  open_questions:
+  - 'ARCHITECT Q1 - WHO GROWS THE HISTORY, AND DO EXISTING QUARTERS STAY BYTE-IDENTICAL. Recommended (A): this requirement,
+    built first and sized by a dry run, existing quarters byte-identical (criterion 4) - no quoted text, golden or scenario
+    moves. (B) REQ-GEN-205 owns the growth and the existing quarters are redrawn - the golden, every Child Protection quote
+    and any refused placement recaptured. (C) this requirement, but redrawn - simpler generator code, the same recapture cost
+    as B.'
+- id: REQ-PIPE-202
+  title: Child Protection's Client Register recognises its file under more than one name, so two of its files in one delivery
+    are a contested pair
+  date_written: '2026-10-13'
+  story: As Keith showing how one contested table ripples through a collection with cross-table checks, I want Child Protection's
+    Client Register to recognise its extract under more than one file name, so that two of its files in one delivery are recognised
+    as the contested pair the pipeline already knows how to handle, rather than one supply and one unrecognised file.
+  moscow: should
+  status: not_started
+  source: 'Keith, 2026-10-13, closing out the calendar group (plans/running-thoughts.md, the close-out entry): widen ONE Child
+    Protection arrival pattern so TS-42 (REQ-GEN-136 criterion 3) can be planted - a behaviour change with its own requirement,
+    superseding REQ-GEN-196''s ''no pattern is widened'' decision. Drafted by delivery-scoper the same evening.'
+  acceptance_criteria:
+  - THE SYSTEM SHALL declare cp-clients' arrival pattern in contract/data-asset.yaml as `cp_clients(_[^/]+)?\.csv`, matching
+    `cp_clients.csv` and every name of the form `cp_clients_<suffix>.csv`, and SHALL leave every other dataset's pattern unchanged.
+  - THE SYSTEM SHALL keep TS-38's names - `CLIENTS_EXTRACT_FINAL.csv` and `placements (2).csv` - unrecognised under the new
+    pattern, and the arrival-pattern gate (REQ-PIPE-058 criterion 8) SHALL pass against the recorded delivery log after the
+    change.
+  - WHEN one delivery carries two files the new pattern matches, THE SYSTEM SHALL recognise them as one contested arrival
+    of cp-clients (REQ-PIPE-105 criterion 6), staging both and checking neither, through the same recognition Birth Registrations'
+    pairs use and with no path specific to Child Protection.
+  - WHILE cp_clients is contested for an arrival, THE SYSTEM SHALL raise the contested outstanding item for cp-clients naming
+    both files (REQ-PIPE-115 criterion 8), and SHALL record each cross-table check that reads cp_clients, in the runs of that
+    arrival's other tables, once as not evaluated, red, with contested as its reason (REQ-PIPE-115 criteria 14 to 16).
+  - THE SYSTEM SHALL run the file checks on each file of a Child Protection pair separately, recording each under its own
+    filename, and WHERE the load refuses one of them SHALL keep the pair contested (REQ-PIPE-115 criterion 24).
+  - WHEN a later arrival's cp_clients file is filed to the pair's period, THE SYSTEM SHALL supersede both files and treat
+    the contest as resolved (REQ-PIPE-118 criteria 1 and 13, REQ-PIPE-194 criterion 9), and WHEN that file is promoted SHALL
+    re-evaluate the readers waiting in that period through the one knock-on handler (REQ-PIPE-121).
+  - THE SYSTEM SHALL let a person settle a Child Protection pair through REQ-PIPE-193's choose-file on exactly the terms a
+    Birth Registrations pair is settled, and SHALL have fixture tests, written first, that drive the real Child Protection
+    orchestrator to settle one pair as this period's supply plus a spare copy and one as this period's supply plus a re-file,
+    asserting each supply's own run id and period and that the readers' cross-table checks are re-evaluated by the knock-on.
+  - WHEN Child Protection files are loaded from a folder on any route - the trial (`mothman cp qa --trial`), the Synthetic-mode
+    check of a recorded arrival (cli/cp.py run_check) and a trial's reference folder - THE SYSTEM SHALL attribute them by
+    arrival pattern as the commit route does, and SHALL leave a contested table out of the load as Birth Registrations' load
+    does; and IF any dataset matches no file or several files, THEN SHALL refuse naming the dataset, the files and where the
+    pair is settled, and SHALL NOT check either file.
+  - 'THE SYSTEM SHALL change, in the same change, every test that pins cp_clients to one exact filename - tests/test_holds.py''s
+    test_two_files_for_one_dataset_are_held asserts `cp_clients_2.csv` is unmatched - to assert the reachable shape instead,
+    and SHALL add TS-39''s unit test: `cp_clients.csv` beside `cp_clients_part2.csv` is held as contested, never chosen between.'
+  - THE SYSTEM SHALL reproduce the arrival-semantics characterization pin (tests/fixtures/arrival_semantics_golden.json) unchanged
+    across the change, so that widening the pattern changes no existing arrival's attribution, verdict or instant.
+  - THE SYSTEM SHALL say, beside the pattern in contract/data-asset.yaml, that it was widened for the synthetic asset's demonstration
+    of a contested Child Protection table and why, and SHALL leave the ODCS contract's arrivalPattern keyPattern unchanged,
+    it being a transport value rather than the matcher (REQ-PIPE-058 criterion 4).
+  - THE SYSTEM SHALL record, in the same change, a decision on REQ-GEN-196 that its 'BIRTH REGISTRATIONS, NOT CHILD PROTECTION'
+    decision was superseded by this requirement, and SHALL update TS-39's and TS-34's register entries in plans/supply-model.md
+    - TS-39 now reachable for cp_clients, TS-34 still not, cp_placements' pattern being exact.
+  non_functional_requirements:
+  - 'CONFIGURATION ONLY: one line of contract/data-asset.yaml plus its comment; recognition, staging, contest detection, settlement
+    and supersession are all built and collection-agnostic (arrivals.Arrival.contested, build_cp_warehouses.stage_arrival
+    stages every matched file, dataset_blockers, settlement) - verified by reading them 2026-10-13. Choose-file has no Child
+    Protection test today (tests/test_choose_file.py names no CP dataset), which is what criterion 7 closes.'
+  - 'LOUD, NOT QUIET, BY DESIGN - AND THE COST AT SCALE: after this, any stray `cp_clients_<anything>.csv` sent beside the
+    real extract contests the table and turns three readers red (cp_notifications, cp_investigations, cp_placements carry
+    referential checks on cp_client_id) until a person settles it or a later file supersedes it. That is the correct direction
+    - a quiet choice between files is the false green REQ-PIPE-059 exists to prevent - but it is a real availability cost,
+    which is why criterion 11 says this is a demonstration choice for the synthetic asset and not advice for a real Child
+    Protection pattern.'
+  - 'SECURITY: a widened pattern lets more supplier-controlled names reach recognition. Matching stays re.fullmatch over names
+    capped at MAX_FILENAME_LENGTH (the bounded ReDoS residual Keith accepted for REQ-PIPE-058), a filename never reaches a
+    SQL identifier (staging uses an ordinal), and every filename shown on the dashboard is rendered as text.'
+  - 'PRIVACY: filenames are shown on the dashboard and in the terminal (REQ-PIPE-194). Synthetic names carry nothing; a real
+    supplier''s naming could, so this changes nothing about what is shown, only which names are recognised.'
+  - 'NO SUPPLY ROWS: everything here is decided from filenames, receipts and recorded results.'
+  - 'AUDITABILITY: the pattern is not a frozen agreement item (REQ-PIPE-111 covers contract/calendar.yaml), so its history
+    is git''s and the comment''s; a CHANGELOG.yaml entry goes in the same push.'
+  dependencies:
+  - REQ-PIPE-058
+  - REQ-PIPE-105
+  - REQ-PIPE-115
+  - REQ-PIPE-118
+  - REQ-PIPE-121
+  - REQ-PIPE-193
+  - REQ-PIPE-194
+  decisions:
+  - 'WIDEN ONE CHILD PROTECTION PATTERN (Keith, 2026-10-13): so TS-42 can be planted. SUPERSEDES REQ-GEN-196''s ''BIRTH REGISTRATIONS,
+    NOT CHILD PROTECTION ... No pattern is widened; TS-42 stays not injectable''.'
+  - REJECTED widening all six (it would make TS-34 plantable too, but Keith asked for one, and every widened table is another
+    table a stray file can contest).
+  - 'cp_clients WITH AN UNDERSCORE SUFFIX, `cp_clients(_[^/]+)?\.csv` (DECIDED Keith, 2026-10-13, set 3 Q11, option A): the
+    most-read table in the collection, so a contested cp_clients shows the blast radius TS-34 calls the interesting part on
+    three readers at once; it owes every quarter, unlike cp-case-workers; TS-12 and TS-38 already use it. The suffix needs
+    a separator and keeps TS-38''s names unrecognised, matching Birth Registrations'' own `_` convention. REJECTED a free
+    suffix `cp_clients[^/]*\.csv`, and a quieter table such as cp_carers - quiet is the opposite of what TS-42 is for.'
+  - 'THE TRIAL ROUTE ATTRIBUTES BY PATTERN TOO (DECIDED Keith, 2026-10-13, set 4 Q14, option A): cli/cp.py''s _require_all_six
+    and the trial''s own path list assumed `<table>.csv`, while the commit route attributes by pattern - after the widening
+    a folder could commit but not trial. REJECTED keeping exact names for trials.'
+  - 'A DEMONSTRATION CHOICE, SAID IN A COMMENT (DECIDED Keith, 2026-10-13, set 4 Q16, option A): the widened pattern is the
+    synthetic asset''s, for showing a contested Child Protection table, and the comment beside it in contract/data-asset.yaml
+    says so (criterion 11). REJECTED presenting it as the pattern recommended for a real Child Protection supply, where a
+    stray suffixed file would contest the table.'
+  - 'THE PLANTING IS ITS OWN REQUIREMENT (DECIDED Keith, 2026-10-13, set 3 Q12, option A): REQ-GEN-203 plants TS-42 and TS-80.'
+  - 'EVERY CHILD PROTECTION LOAD ROUTE, NOT ONLY THE TRIAL (CLI UX 1, round 3 fold, delivery-scoper, 2026-10-14): cli/cp.py''s
+    _load_delivery_from_folder loads f"{table}.csv" after _require_all_six, and run_check and the reference folder go through
+    it - so after the widening a Synthetic-mode check of a pair''s arrival would silently check `cp_clients.csv` and never
+    its partner, a quiet choice between files. Verified 2026-10-14. Criterion 8 widened from the trial to every route.'
+  open_questions:
+  - 'CLI UX C - WHAT THE CHILD PROTECTION SYNTHETIC-MODE PICKER SHOWS FOR A PAIR''S ARRIVAL. Recommended (A): list the arrival
+    marked ''two files for one table'', and refuse when it is picked, naming both files and where the pair is settled. (B)
+    leave the arrival out of the picker. (C) list it unmarked and refuse only on pick.'
+- id: REQ-GEN-203
+  title: Child Protection's generated history has a contested Client Register pair that a later file supersedes (TS-42) and
+    one a scripted person settles (TS-80)
+  date_written: '2026-10-13'
+  story: As Keith showing what a contested table does to a collection with cross-table checks, I want one Child Protection
+    delivery in the synthetic history to carry two Client Register files that a later resend supersedes, and another whose
+    two files a person settles, so that I can show the table read contested, its three readers read red for it, and both ways
+    the contest ends clear them - on a real page rather than in a test.
+  moscow: should
+  status: not_started
+  source: Keith, 2026-10-13 (widen one Child Protection pattern so TS-42 can be planted). Drafted by delivery-scoper the same
+    evening as the planting half of that decision, delivering REQ-GEN-136 criterion 3.
+  acceptance_criteria:
+  - THE SYSTEM SHALL generate, as registered scenario TS-42, through REQ-GEN-044's injection mechanism, one Child Protection
+    delivery in a quarter no other scenario claims, carrying the six usual files plus a second Client Register file, `cp_clients_v2.csv`
+    - a re-export whose rows differ from `cp_clients.csv`'s - with the two Client Register files received ten minutes apart,
+    both inside the quarter's claim window and before its due time.
+  - THE SYSTEM SHALL let each file of an injected Child Protection delivery carry its own receipt instant where the scenario
+    states one, as REQ-GEN-196's pairs do for Birth Registrations, and SHALL keep the one shared instant for every injected
+    delivery that states none.
+  - THE SYSTEM SHALL generate, for the same quarter, a later delivery carrying `cp_clients.csv` alone, received after the
+    quarter's due time and before the next quarter's claim window opens, built green (REQ-GEN-184) so the gate's own promotion
+    and the knock-on re-evaluation of its readers can be seen.
+  - THE SYSTEM SHALL generate only those arrival shapes, and SHALL NOT generate any contest, supersession, verdict or promotion
+    the scenario expects (REQ-GEN-044 criterion 6).
+  - 'THE SYSTEM SHALL give TS-42 two scenario links (REQ-GEN-201): one on the pair''s arrival day, where cp-clients reads
+    ''Two files for one table'' and its three readers'' cross-table checks read contested, and one on the later file''s asset
+    day, where the pair''s row reads ''superseded by the supply received <instant>'' (REQ-PIPE-194 criterion 10).'
+  - IF TS-42 cannot be placed - its quarter falls outside the generated history or shares a claimed quarter with another scenario
+    - THEN generation SHALL refuse before writing anything, naming the scenario, and SHALL NOT drop, shift or relax it.
+  - THE SYSTEM SHALL update TS-42's register entry in plans/supply-model.md with its configuration, what it expects and how
+    it would break, and SHALL clear REQ-GEN-136's unmet entry for criterion 3, naming this requirement.
+  - THE SYSTEM SHALL generate, as registered scenario TS-80, through REQ-GEN-044's injection mechanism, one Child Protection
+    delivery in a quarter no other scenario claims, carrying the six usual files plus a stray test file, `cp_clients_TEST.csv`
+    - well-formed and loaded, the Client Register's real columns with rows that are plainly test data (every client named
+    'TEST', from a fixed seed) - received at 08:20 on the quarter's due day, and the real `cp_clients.csv` at 08:30, both
+    before the 09:00 due time.
+  - THE SYSTEM SHALL have TS-80's pair settled by a scripted person (REQ-GEN-135) through REQ-PIPE-193's choose-file, at 11:00
+    the following day on the asset's clock, as file one (the test file) rejected and file two (the real extract) this quarter's
+    supply, naming each file by its receipt position as REQ-GEN-196 criterion 7 does, and SHALL have the QA run and promotion
+    gate the settlement owes run in the replay at that instant through the playback hook (REQ-GEN-196 criterion 10).
+  - THE SYSTEM SHALL build TS-80's real extract to green (REQ-GEN-184), keyed by its delivery and filename (REQ-GEN-196 criterion
+    19), and SHALL NOT target the rejected test file.
+  - WHEN the synthetic history is bootstrapped, THE SYSTEM SHALL show on the built dashboard, on TS-80's arrival day, cp-clients
+    reading 'Two files for one table' and its three readers' cross-table checks reading contested, and from the settlement's
+    asset day the pair's settled row with the test file rejected, the real extract early and promoted, and the readers re-checked
+    by the knock-on (REQ-PIPE-121).
+  non_functional_requirements:
+  - 'BOOTSTRAP COST: three Child Protection deliveries, one settlement''s QA run and the knock-on re-checks they cause. Measure
+    a bootstrap from empty before and after (4m42s on 2026-10-13) and log both in CLAUDE.md''s running log, as REQ-GEN-196
+    did.'
+  - 'NOISE: the pair turns three readers red for one quarter until the later file is promoted; count it in the scenario''s
+    register entry so the red is known rather than discovered by someone reading the dashboard cold.'
+  - DETERMINISM and loud failure are REQ-GEN-044's, inherited (criteria 3 and 4).
+  - 'CONFIGURATION ONLY: the injection and register; every effect lives in the database.'
+  dependencies:
+  - REQ-PIPE-202
+  - REQ-GEN-044
+  - REQ-GEN-136
+  - REQ-GEN-184
+  - REQ-GEN-201
+  - REQ-PIPE-193
+  - REQ-GEN-135
+  - REQ-GEN-196
+  - REQ-GEN-207
+  decisions:
+  - 'THE PATH NO BIRTH REGISTRATIONS SCENARIO SHOWS (delivery-scoper, 2026-10-13): TS-68 to TS-74 are each settled by a scripted
+    person; none ends by a later arrival. REQ-PIPE-194 criterion 10''s ''superseded by the supply received {instant}'' row,
+    and dataset_blockers counting the rule''s supersession as the end of a contest, have no real page until TS-42 - which
+    is why it is resolved by a later file, as REQ-GEN-136 criterion 3 already says, rather than settled.'
+  - 'ITS OWN REQUIREMENT (DECIDED Keith, 2026-10-13, set 3 Q12, option A), delivering REQ-GEN-136 criterion 3: the Child Protection
+    generator has no per-file receipts for an injected delivery and PairFile is Birth Registrations-only - real generator
+    work criterion 3''s one line does not specify. REJECTED building it under REQ-GEN-136 criterion 3 directly.'
+  - 'TS-42''s FILES: `cp_clients.csv` PLUS A DIFFERING RE-EXPORT `cp_clients_v2.csv`, LATER SUPERSEDED BY A CLEAN `cp_clients.csv`
+    (DECIDED Keith, 2026-10-13, set 4 Q13, option A): two files where nobody can tell which is right and only a later file
+    settles it. REJECTED a byte-identical duplicate (TS-68 already shows a duplicate send) and a split extract (TS-39''s unit
+    test covers that shape).'
+  - 'ONE CHILD PROTECTION PAIR IS ALSO SETTLED BY A SCRIPTED PERSON - TS-80 (DECIDED Keith, 2026-10-13, set 4 Q15, option
+    B, against the scoper''s recommendation): settlement is shown seven ways for Birth Registrations, but only Child Protection
+    has cross-table readers, so only here can a settlement be seen clearing the readers it turned red. TS-80 is the next free
+    scenario id (TS-75 to TS-79 belong to REQ-GEN-199 and its siblings).'
+  - 'PROPOSED, NOT KEITH''S - TS-80''s OUTCOME: a stray test file rejected and the real extract this quarter''s supply (TS-71''s
+    shape). Chosen because it is the commonest real cause of two files - a test extract sent by mistake - and because it makes
+    a supply, so the settlement''s QA run, its gate and the knock-on re-check of all three readers are all on the page. REJECTED
+    a spare copy (TS-68''s duplicate, which a later reader cannot tell from TS-42 at a glance) and ''reject both'' (no supply,
+    so no knock-on to see). The real extract `cp_clients.csv` sorts before `cp_clients_TEST.csv`, so the chosen file is #1
+    by name here; REQ-GEN-196''s TS-68 and TS-70 already exercise the opposite order.'
+  - 'PROPOSED, NOT KEITH''S - QUARTERS (corrected 2026-10-14): after REQ-GEN-199 the claimed Child Protection anchors are
+    -3 to -12, -14 and -15, and -13 too - TS-67''s early delivery files into 2023-Q3 and REQ-GEN-199 criterion 28 makes that
+    a claim, so the earlier suggestion of -13 for TS-42 would be refused. Free today: -15''s neighbourhood none; -2 (2026-Q2)
+    and -1 (current) only, plus 2024-Q3 (-9, a red chain) by the scoper''s count. So TS-42 and TS-80 need the Child Protection
+    history GROWN EARLIER - REQ-GEN-205''s open question proposes growing it once, by about eight quarters, for TS-42, TS-80,
+    TS-63 and TS-57 to TS-61 together.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect A5 (REQ-GEN-207 is a dependency - the one
+    growth owner); architect E20 raised as open question 2 rather than amended, being a real fork (Q5).'
+  open_questions:
+  - 'WHICH QUARTERS - answered by REQ-GEN-207 if Keith takes architect Q1 option A: TS-42 and TS-80 go in quarters the grown
+    history adds, sized by its dry run (-13 is NOT free: TS-67 files into it; 2023-Q1 is NOT free either: TS-77a stands on
+    it, architect A3).'
+  - 'ARCHITECT Q5 - CRITERIA 3 AND 10 SAY ''BUILT GREEN (REQ-GEN-184)'', WHICH THE CHILD PROTECTION GENERATOR REFUSES TODAY
+    for a targeted supply without lead-ins (generate_cp_runs.py''s targeting refusal, architect E20). Recommended (A): this
+    requirement builds the Child Protection lead-in quarters and targeting the green needs, as REQ-GEN-185 did for Birth Registrations.
+    (B) ''built clean'' - an ordinary clean delivery with no target, accepting that its verdict is whatever the draw gives
+    and recording it in the register.'
+- id: REQ-DASH-204
+  title: A dataset turned red by another table's two files says so at the top of its page, naming that table
+  date_written: '2026-10-14'
+  story: As a data team leader opening a Child Protection dataset that reads red, I want the top of its page to tell me when
+    the red comes from ANOTHER table having two files for one table, naming that table, so that I go to the one decision that
+    clears it instead of hunting through this dataset's checks for a fault it does not have.
+  moscow: should
+  status: not_started
+  source: 'Keith, 2026-10-13 evening, answering the CLI and dashboard UX reviews of the calendar close-out batch (plans/running-thoughts.md
+    #92): ''a reader dataset turned red by ANOTHER table''s contest gets a NEW DASHBOARD REQUIREMENT NOW (a top-of-page line
+    naming the contested table), not a later sighting.'' Drafted by delivery-scoper overnight 2026-10-13 to 14 while Keith
+    was asleep, so every fork is an open question rather than a decision.'
+  acceptance_criteria:
+  - WHERE the run the dataset's status is computed from on the date on show includes a cross-table check recorded as not evaluated
+    because a table belonging to ANOTHER dataset was contested (REQ-PIPE-115 criteria 14 to 16), THE SYSTEM SHALL show at
+    the top of that dataset's page ONE notice in the page's red notice style - after the waiting-blocker banner and before
+    the exhausted-schedule banner - holding one line per such table, each beginning, in bold, 'Red because <that dataset's
+    display name> has two files for one table' and naming the period.
+  - THE SYSTEM SHALL say in that line how many of this dataset's checks read the contested table and could not run, that those
+    checks did not fail on this dataset's own data, and that they run again once the pair is settled - 'say what each file
+    is' (REQ-PIPE-194 criterion 15) - or a later file supersedes it.
+  - THE SYSTEM SHALL NOT word the line so that it says or implies this dataset has nothing else wrong, and SHALL NOT change
+    the dataset's status because of it - the line explains the red and never removes it.
+  - THE SYSTEM SHALL show one line per contested table however many of the dataset's checks read it, and SHALL NOT show a
+    line per check.
+  - THE SYSTEM SHALL make the contested dataset's name in the line a real link (<a href>) to that dataset's page at the same
+    date on show, built as affectsLinks() builds its links, so that middle-click and copying the link keep the date.
+  - THE SYSTEM SHALL judge the line as at the date on show - from the run the dataset's status is computed from on that date
+    and the contest's opening and resolving instants on the asset's clock (REQ-PIPE-194 criteria 9 and 14) - and SHALL NOT
+    judge it as at the build.
+  - WHILE the contest is resolved on the date on show but the run the dataset's status is computed from still carries checks
+    not evaluated because of it, THE SYSTEM SHALL say in the line that the pair was settled, or superseded, on <date on the
+    asset's clock>, that these checks have not run again since, and what runs them again - a later supply of <dataset> promoted
+    into the period, or a person's re-check of this supply (REQ-PIPE-164, once built) - and SHALL NOT say that the red is
+    waiting on the pair.
+  - WHEN the dataset's checks have been re-evaluated (REQ-PIPE-121's knock-on) so that the run its status is computed from
+    carries no check not evaluated because of the contest, THE SYSTEM SHALL show no line.
+  - THE SYSTEM SHALL NOT show the line on the contested dataset's own page, whose banner already says 'Two files for one table'.
+  - THE SYSTEM SHALL record, for every not-evaluated cross-table result, the reason's code for EACH table it names (unrunnable_codes_by_table,
+    beside today's single unrunnable_code), SHALL carry it and a held-supply record's held_tables into the dashboard data,
+    and SHALL identify the blocking table and its cause from those fields alone, never by parsing the reason's prose; records
+    written before this change SHALL be read by their single unrunnable_code.
+  - THE SYSTEM SHALL compute the line at build time from recorded QA results and recorded decisions only, and SHALL NOT read
+    supply rows.
+  - THE SYSTEM SHALL render every name in the line as text, never as markup.
+  - THE SYSTEM SHALL have a real-browser test, against a dashboard built from a fixture history, written first and seen to
+    fail, in which a reader dataset shows one line naming the contested table while the pair is open - though three of its
+    checks read that table - and shows no line once its checks have been re-evaluated after the settlement.
+  - WHERE the synthetic history holds TS-42 or TS-80 (REQ-GEN-203), THE SYSTEM SHALL quote the line, as the page words it,
+    in each scenario's register entry for its three reader datasets on the pair's arrival day.
+  non_functional_requirements:
+  - 'SCALE (CLAUDE.md''s ~30-datasets rule): one line per contested table, never per check - cp-investigations alone carries
+    several checks reading cp_clients (Soda and dbt referential checks, reads_tables [cp_clients]), and on a thirty-dataset
+    asset a widely read table could hold many readers red at once; each reader''s page says the cause once.'
+  - 'PERFORMANCE: computed once per dataset per build from the results already embedded; no per-render scan of history, so
+    page load does not grow with the number of past runs.'
+  - 'THE BUILD RULE: a build may read recorded QA results, never actual data, and never anything else (criterion 11).'
+  - 'PRIVACY: the line names the other dataset and the period, never the two filenames - those stay on the contested dataset''s
+    own banner (REQ-PIPE-194 criterion 1) - so a supplier''s file naming is shown in one place, not repeated on every reader.'
+  - 'ACCESSIBILITY AND CONSISTENCY: the same notice styling and role=''status'' the page''s other top-of-page banners use,
+    and the one label REQ-PIPE-194 criterion 15 fixes; no new asset, so the self-hosted, file:// and offline viewing paths
+    are unaffected.'
+  - 'TEST FIRST for criterion 3 above all: a line that read as ''this dataset is fine'' would be the false-green direction.'
+  dependencies:
+  - REQ-PIPE-115
+  - REQ-PIPE-194
+  - REQ-PIPE-121
+  - REQ-DASH-197
+  - REQ-PIPE-202
+  - REQ-GEN-203
+  - REQ-PIPE-164
+  decisions:
+  - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the contested table. REJECTED leaving
+    it for a later road-testing sighting.'
+  - 'WHY A READER GOES RED, VERIFIED IN CODE 2026-10-14 (delivery-scoper): qa_tools/common/unrunnable.py records each cross-table
+    check that reads a contested table as status fail with unrunnable_code ''contested'', in the reader''s OWN run (REQ-PIPE-115
+    criteria 14 to 16; period_schema.CONTESTED outranks every slot reason); promotion.status_of counts every contributing
+    check, so the reader''s status is red and the gate withholds it. Child Protection''s readers of cp_clients are cp-notifications,
+    cp-investigations and cp-placements (reads_tables [cp_clients] in contract/child-protection-soda-checks.yml and dbt_project/models/staging/schema.yml),
+    several checks each.'
+  - 'WHAT THE PAGE SAYS TODAY, VERIFIED IN THE TEMPLATE 2026-10-14: the reader''s pill is red; each affected check card carries
+    ''not evaluated in the latest run''; the reason appears only inside the check''s drawer, under ''Not evaluated in the
+    current run''. The top-of-page banners (blockedBanner, waitingBanner) are about the dataset''s OWN supply only, so nothing
+    at the top names the other table. pipeline/build_cp_dashboard_data.py carries only the reason''s prose to the page, not
+    its code or table - hence criterion 10.'
+  - 'THE SAME SHAPE IS ON THE REAL PAGE TODAY FOR AN UNLOADABLE TABLE: the bootstrapped database (queried 2026-10-14) holds
+    ''could-not-be-loaded'' records against cp_clients in all three readers'' runs, from TS-12''s quarter, and no ''contested''
+    ones - Child Protection cannot be contested until REQ-PIPE-202 widens the pattern. Whether the line covers that kind too
+    is open question 1.'
+  - 'THE LINE EXPLAINS THE RED, NEVER REMOVES IT (delivery-scoper, PROPOSED): a check that could not run counts as red until
+    it can - the template''s own drawer text says so, and REQ-PIPE-115 records it red. REJECTED showing such a reader amber
+    or with its status recomputed without those checks: that is the false-green direction, and the gate would disagree with
+    the page.'
+  - 'NAMES THE DATASET AND PERIOD, NOT THE FILES (delivery-scoper, PROPOSED): the contested dataset''s own banner names both
+    files; repeating them on every reader multiplies a supplier''s naming across pages for no gain in what to do.'
+  - 'ONE LINE PER CONTESTED TABLE (CLAUDE.md scale rule, the caller''s brief): REJECTED a line per affected check, which on
+    cp-investigations would repeat one cause several times.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect D17 (criterion 10 - unrunnable.py writes
+    ONE unrunnable_code per record, the first table''s by name order, and keeps no per-table reason, while held tables are
+    recorded separately by held_blast_radius as tool ''held'' with held_tables; so the recorder gains a per-table code, which
+    makes this requirement touch the PIPE recorder, said here rather than hidden); architect D18 (''results in place'' was
+    undefined for a red reader - now ''the run the dataset''s status is computed from on the date on show''); dashboard UX
+    4 (criterion 1 - one notice in the red notice style, its place among the banners, a bold first sentence); dashboard UX
+    5 (criterion 5 - a real href built as affectsLinks() builds them, verified in the template); dashboard UX 8 (criterion
+    7 names what runs the checks again).'
+  - 'OPEN QUESTION 1''s FIRST PREMISE WAS WRONG, CORRECTED (dashboard UX 3, verified 2026-10-14): a held table''s readers
+    are recorded by held_blast_radius (tool ''held'', held_tables, held_reason), not under an unrunnable_code; and unrunnable
+    records also carry past-due and staged-awaiting-decision, so ''another table is overdue'' - the commonest such red at
+    thirty datasets - is a candidate too. The question is re-offered below with that option.'
+  open_questions:
+  - 'SET A Q1 - WHICH CAUSES GET THE LINE (dashboard UX 3, superseding the scoper''s first question). Recommended (A): every
+    red not-evaluated cause rooted in another table - two files for one table, could not be loaded, held with no period, overdue
+    (past-due), staged and awaiting a decision - each with its own wording and next step, never a ''no data'' (not-yet-due)
+    one. (B) contested and could-not-be-loaded only (TS-12''s readers are red that way today). (C) contested only, as Keith
+    worded the ask.'
+  - 'SET A Q2 - WHAT THE COLLECTION LEVEL SHOWS. Recommended (B): a note under each such reader''s pill in the collection
+    table (the noSupplyNote shape), the contested dataset''s own banner ending ''Affects <reader links>'' (affectsLinks()),
+    and one line on the collection card in the redPromotedMarker shape naming the contested table once. (A) the row note and
+    ''Affects'' only, no card line. (C) none - each reader simply counts red.'
+  - 'SET A Q3 WITH CLI UX B - WHAT A RED READER''S WAITING ITEM SAYS, ON THE PAGE AND IN THE TERMINAL. Today the reader''s
+    verdict line and outstanding item (''awaiting a decision - you can promote / reject'') and the terminal queue all invite
+    a decision on the reader, when the decision that clears it is the pair''s. Recommended (A): both halves - on the page,
+    a criterion here that the reader''s item says nothing needs deciding here and that settling <dataset>''s pair re-checks
+    and re-gates it (REQ-PIPE-121); in the terminal, a small PIPE requirement drafted now, the queue grouping such readers
+    under the pair. (B) the page half only, the terminal left to the road-testing review. (C) leave both.'
+  - 'SET A Q4 - MoSCoW. Recommended (A): must, since REQ-GEN-203 puts three red readers on the real page and the architect''s
+    build order puts this before it. (B) should - the red is explained one click down, confusing rather than false.'
+  - 'ARCHITECT Q3 WITH THE SCOPER''S SETTLED-NOT-RE-CHECKED STATE - AFTER ''REJECT BOTH'', THE READERS STAY RED FOR GOOD:
+    the knock-on re-evaluates only when a period''s holding changes (decision_log.apply_decision), and rejecting both files
+    changes nothing held. Recommended (A): yes, re-check them - a small PIPE follow-up so that settling a pair, any outcome,
+    re-evaluates the readers waiting in its period; criterion 7''s wording here covers the meantime. (B) no - the readers
+    wait for the next supply or a person''s re-check (REQ-PIPE-164), and criterion 7 says so.'
+- id: REQ-DASH-182
+  title: The dashboard shows every period a dataset owes nothing in, with its reason, and the delivery time in force on the
+    date on show
+  date_written: '2026-10-10'
+  story: As a data team leader reading a dataset's supply history, I want a period it owes nothing in to say so, with the
+    reason, and its delivery time to be the one in force on the date I am looking at, so that I never read a deliberate gap
+    as a missed supply or judge a supply against a due time that did not apply.
+  moscow: must
+  status: not_started
+  source: 'Split out of REQ-PIPE-110 on 2026-10-10 (Keith, T9, option A, the delivery-scoper''s recommendation) with the criteria
+    and decision it carried. NOT YET THROUGH delivery-scoper as a requirement of its own - say so when it is presented for
+    sign-off. Scoper pass 2026-10-13: delivery-scoper, 2026-10-13 - joint pass on REQ-PIPE-163, REQ-PIPE-179 and REQ-DASH-182
+    with the Child Protection pattern widening (Keith, 2026-10-13: close out the calendar group before the road-testing review;
+    scope 163 WITH 179 so 179 does not amend a requirement that may change under it).'
+  acceptance_criteria:
+  - THE SYSTEM SHALL show every period a dataset owes nothing in - whether by participation or by not_expected - together
+    with its reason, and SHALL NOT omit it.
+  - WHERE the dashboard shows a period a dataset owes nothing in, THE SYSTEM SHALL show it as a quiet row stating its kind
+    - a participation row, 'Not expected - <reason>', and WHERE the dataset is turned off (REQ-PIPE-179), 'Turned off - <reason>'
+    (REQ-DASH-180 criterion 15) - in its chronological place among the supply cycles, each run of consecutive periods of the
+    same kind and reason as one row giving its first and last period and their count, only for periods up to the date on show,
+    and SHALL NOT show it red, among things needing action, or as 'No supply'; a participation row, which recurs, SHALL carry
+    a short label generated from the configuration - 'Not owed - outside its agreed months (Feb, Aug)' - and the authored
+    reason SHALL be shown once, on the dataset's agreement tile, not on every row.
+  - WHERE the dashboard shows a dataset's delivery time or cycle, THE SYSTEM SHALL take it from the values resolved for the
+    dataset on the date on show - expected time, grace, participates and days before - each from the level REQ-PIPE-181 resolves
+    it to; WHERE the date falls before its first participation version, SHALL show 'Not yet owing - first version takes effect
+    <date>'; and WHERE the dataset is turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says.
+  - THE SYSTEM SHALL render every reason it shows as text, never as markup.
+  - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
+  - THE SYSTEM SHALL NOT show periods before a dataset's first participation version as owed-nothing rows.
+  - WHERE a dataset's supply for a period is due on an earlier day than the period's date (days_before above 0), THE SYSTEM
+    SHALL say so in the delivery-time label - 'by 22:00 the day before' where it is one day, 'by 22:00, N days before each
+    date' where it is more - and SHALL NOT show the time alone.
+  - WHERE a dataset's calendar is not exactly four delivery months a year, or its periods fall on different days of the month,
+    THE SYSTEM SHALL still label its cycle in words, and SHALL NOT render the label blank.
+  - WHERE an owed-nothing period stands on an earlier supply by inheritance (REQ-PIPE-098), THE SYSTEM SHALL show that on
+    the same row - the period it stands on - rather than as a second row or a second pill for the same period; and the standing-in
+    heading above that row SHALL name the row's kind label.
+  - WHERE the current cycle on the date on show is a period the dataset owes nothing in, THE SYSTEM SHALL show that period's
+    owed-nothing row in place of 'No deliveries in the current cycle yet.'
+  non_functional_requirements:
+  - Rendered from REQ-PIPE-110's agreement value; this only consumes it (docs/components.md).
+  - Same date formatting as everything else on the page (REQ-DASH-071).
+  - 'SCALE: rows are collapsed per run of periods (criterion 2), so the page carries one row per change of kind or reason,
+    not one per period - a daily dataset owing nothing for a year is one row, and thirty datasets over years stay a handful
+    of rows each.'
+  - 'PERFORMANCE: computed at build time from configuration through REQ-PIPE-181''s one resolution function, never per period
+    in the browser; the build''s time does not grow with the length of history beyond reading the calendar once.'
+  - 'PRIVACY: reasons are authored configuration text, rendered as text (criterion 4); nothing here reads or shows supply
+    rows.'
+  dependencies:
+  - REQ-PIPE-110
+  - REQ-DASH-071
+  - REQ-PIPE-181
+  - REQ-PIPE-098
+  - REQ-DASH-198
+  - REQ-PIPE-113
+  - REQ-PIPE-106
+  decisions:
+  - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith, T9, option A), on the REQ-PIPE-154 / REQ-DASH-155 pattern: the configuration
+    and its rendering are separate reviewable units. REQ-DASH-180''s turned-off rows are owed-nothing rows of a third kind
+    and depend on this. The decision below travelled from REQ-PIPE-110 unchanged.'
+  - 'PERIODS OWED NOTHING ARE QUIET, NEVER RED (delivery-dashboard-ux pre-build review, 2026-10-07): a reason row, grouped
+    in supply history, never ''No supply'' and never in needs-action. The SLA label follows the participation version in force
+    on the date on show.'
+  - 'ROUND 3 FOLDED, 2026-10-10 (main session): the three kind labels fixed in one place so REQ-DASH-180 cannot drift (delivery-dashboard-ux
+    15); rows in chronological place, a run of periods collapsed to one row, nothing after the date on show - a daily dataset
+    turned off for a year would otherwise show 365 rows (14); the delivery time taken from resolved values with their levels,
+    and said for a date before the first version (13, delivery-scoper F, delivery-architect 15); periods before the first
+    version are not owed-nothing rows (delivery-scoper L).'
+  - 'TWO LABEL DEFECTS LEFT HERE BY BUILT WORK (verified 2026-10-13): post-build-review #138 #5 - the delivery-time label
+    ignores days_before (''by 22:00'' for a supply due the evening before); #137 L9 - a calendar not four months a year labels
+    as ''authored'', which the page renders blank, and mixed days give day_of_month None. agreement.cadence() still takes
+    the newest version only, its docstring saying ''Which version applies on the date on show is REQ-DASH-182''s''. Criteria
+    7 and 8 carry the first two; criterion 3 the third.'
+  - 'BUILDABLE BEFORE REQ-PIPE-179 (DECIDED Keith, 2026-10-13, set 3 Q9, option A): the three labels stay fixed in this one
+    requirement, the turned-off one as a WHERE clause that is vacuous until a turn-off can be configured; REQ-DASH-180 criterion
+    15 stays the owner of the turned-off row''s behaviour. REJECTED waiting for 179.'
+  - 'ONE ROW FOR AN INHERITED OWED-NOTHING PERIOD (DECIDED Keith, 2026-10-13, set 3 Q10, option A): every owed-nothing period
+    inherits (REQ-PIPE-098), and the page already marks an inherited period with a standing-in pill saying ''Nothing was owed
+    for this period'' (REQ-DASH-198); criterion 9 puts the period it stands on in the owed-nothing row. REJECTED a reason
+    row beside the existing pill, which says the same thing twice.'
+  - 'NO ''Not expected'' ROW INSIDE A TURNED-OFF GAP (DECIDED Keith, 2026-10-13, on REQ-PIPE-179 criterion 21): such an entry
+    is rejected as configuration, so the two kinds never meet on one period.'
+  - 'KEITH''S THREE ANSWERS OF 2026-10-13 (DECIDED Keith, 2026-10-13 evening, answering the CLI and dashboard UX reviews -
+    plans/running-thoughts.md #92; carried in by dashboard UX 1, 2026-10-14, as a carry-over gap): owed-nothing rows that
+    recur (cp-case-workers'' May and November) read a SHORT generated label, ''Not owed - outside its agreed months (Feb,
+    Aug)'', with the authored reason once on the agreement tile (criterion 2); the current cycle shows its owed-nothing row
+    in place of ''No deliveries in the current cycle yet.'' (criterion 10); and the due-before label reads ''by 22:00 the
+    day before'' for one day and ''by 22:00, N days before each date'' for more (criterion 7). REJECTED repeating the authored
+    reason on every recurring row.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): dashboard UX 1 (the three answers above, which had
+    not reached the criteria); dashboard UX 12 (criterion 9 - the standing-in heading names the kind). This requirement had
+    the 2026-10-13 joint scoper pass, not one of its own (dashboard UX 16).'
+  open_questions: []
+- id: REQ-PIPE-163
+  title: A person can place a held supply into a period, from the terminal
+  date_written: '2026-10-07'
+  story: As the person working through supplies the filing rule refused to place, I want to say which period a held supply
+    belongs to and have it filed, checked and gated there, so that a supply held because of a calendar mistake - ours or the
+    supplier's - is not stuck forever with rejection as the only way out.
+  moscow: must
+  status: not_started
+  source: 'delivery-scoper, 2026-10-07 - a gap found auditing Keith''s condition on REQ-PIPE-111 (''assuming the TUI offers
+    users ALL of the tools a human would need to undo mistakes ... and otherwise undo and fix up everything that automated
+    rules decide''). Verified against built code: qa_tools/common/refiling.py refuses a held supply with ''Place it instead;
+    `mothman supply holds` shows how'', no filing decision named place exists (filing_decisions.OPERATIONS), and `mothman
+    supply holds` lists ''file it to a slot yourself'' with no command. Re-scoped jointly with REQ-PIPE-179 by delivery-scoper,
+    2026-10-13 - joint pass on REQ-PIPE-163, REQ-PIPE-179 and REQ-DASH-182 with the Child Protection pattern widening (Keith,
+    2026-10-13: close out the calendar group before the road-testing review; scope 163 WITH 179 so 179 does not amend a requirement
+    that may change under it).'
+  acceptance_criteria:
+  - 'THE SYSTEM SHALL offer PLACE as a filing decision a person raises about a supply held by the assignment rule (REQ-PIPE-064)
+    - whichever path raised the hold: the rule at arrival, a confirmed correction (REQ-PIPE-170 criterion 8) or a settlement
+    whose file landed where no slot was open (REQ-PIPE-193 criterion 11) - naming the period it is to be filed to, on the
+    same terms as every other filing decision - actor, mandatory reason, allowlist, refusal, one implementation behind every
+    route.'
+  - WHEN a person places a held supply, THE SYSTEM SHALL, in one transaction, record a filing of it to the named period AS
+    A RE-FILE FROM NO PERIOD BY THAT PERSON - the same filing row and decision a re-file appends, its from-period empty, with
+    no decision-log action of its own - resolve its hold naming that decision (REQ-PIPE-078 criterion 6) and record an owed
+    re-check (REQ-PIPE-140); the terminal, the flag route's output and the dashboard SHALL still call it a placement, criterion
+    41 saying how; and criterion 39 amends the decision log so that it accepts such a re-file from a person.
+  - WHEN a placement is recorded in the terminal's filing-decisions door, THE SYSTEM SHALL run its owed re-check straight
+    after the transaction commits, while the person waits, applying the promotion gate exactly as for a re-filed supply (REQ-PIPE-141
+    criteria 7, 9, 13, 15 and 18).
+  - WHEN a placement is recorded through `mothman supply decide`, THE SYSTEM SHALL say that its checks are owed, SHALL print
+    `mothman pipeline process` on a line of its own, saying that it runs every owed QA run and not only this one, and SHALL
+    NOT wait for them.
+  - THE SYSTEM SHALL NOT run any QA inside the transaction that records a placement.
+  - THE SYSTEM SHALL allow placing into a closed period and into a period whose claim window had not opened at the supply's
+    receipt instant, because a person deciding is not the assignment rule (REQ-PIPE-062 criterion 5 and REQ-PIPE-064 criterion
+    2 bind the rule).
+  - IF the named period is not one the dataset's calendar generates, or is one the dataset owes nothing in - not participating,
+    listed not_expected, or for any other reason the one participation resolution gives (REQ-PIPE-179 criterion 27 once built)
+    - THEN THE SYSTEM SHALL refuse it, saying which and quoting the reason the configuration gives, and print the command
+    that lists the dataset's periods - `mothman schedule show --dataset <id>` - on a line of its own; and WHERE the period
+    lies inside a turned-off gap, the refusal SHALL be the one REQ-PIPE-179 criterion 20 words, given in place of this one
+    rather than beside it.
+  - IF the named period is owed and its slot is resolved by a person's inheritance, THEN THE SYSTEM SHALL refuse it and name
+    un-inherit as the step that must come first, as a re-file does (REQ-PIPE-141 criterion 12); a period owed nothing SHALL
+    be refused under criterion 7 instead, never with advice to un-inherit.
+  - THE SYSTEM SHALL compute the placed supply's arrival classification against the slot it was placed in, so that a supply
+    placed after its slot closed reads late, and SHALL record it as a verdict carrying the slot's resolved inputs and the
+    agreement that judged it (REQ-PIPE-168 criterion 1).
+  - THE SYSTEM SHALL list every held supply in the terminal's filing-decisions door, saying why it was held in the hold's
+    own reason, never as a choice between files, and SHALL offer place and reject on each, except a hold labelled schedule
+    ended (REQ-PIPE-154), which offers only adding dates.
+  - THE SYSTEM SHALL let a person reject a held supply from the terminal and through mothman supply decide, with a reason,
+    ending its hold.
+  - THE SYSTEM SHALL name, in `mothman supply holds`, in the dashboard's held-supply item and in every refusal that points
+    at placing, both the exact command that places a held supply - its supply and dataset filled in from what was typed or
+    shown - and the terminal screen that offers it, printing the command on a line of its own; and SHALL replace supply_holds.RESPONSES'
+    'file it to a slot yourself' with place, the operation that now exists.
+  - THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 1 and REQ-PIPE-074 criterion 1 to list place among
+    the filing decisions.
+  - THE SYSTEM SHALL offer place on the terminal route only - the filing-decisions door and mothman supply decide - and SHALL
+    NOT offer it on the GitHub route; THE SYSTEM SHALL amend, in the same change, REQ-GHUB-082 criterion 3 to name place beside
+    choose-file (REQ-PIPE-193) and REQ-PIPE-170's correction confirmation as operations offered on the terminal route only.
+  - THE SYSTEM SHALL take a placement through --supply and --to-period, SHALL refuse a placement without --supply, SHALL refuse
+    --period for a placement, which a held supply does not have, SHALL refuse a --dataset that does not match the supply's
+    own dataset, and SHALL name place among the operations in `mothman supply decide --help`.
+  - WHEN the terminal asks for the period to place a supply in, or to re-file one to, THE SYSTEM SHALL offer periods as a
+    choice rather than asking for a typed period - opening on the periods whose claim windows were nearest the supply's receipt
+    instant on both sides, each marked closed or not yet open and showing its one-word current state, with inherited periods
+    marked as needing un-inherit first, a period where an unaccepted version is waiting or an open contested pair stands marked
+    as needing that decided first, and any period the dataset owes nothing in shown in its place, marked with why and not
+    selectable - and SHALL offer a choice that pages to earlier or later periods; on the flag route --to-period SHALL accept
+    any period criterion 6 allows; and THE SYSTEM SHALL collapse each run of consecutive owed-nothing periods into one unselectable
+    row, as REQ-DASH-182 criterion 2 collapses them on the page, so that the nearest owed periods on either side are always
+    among those first shown.
+  - THE SYSTEM SHALL list held supplies in the queue of supplies waiting on a decision, grouped under their own heading, 'Held
+    - no period yet (N)', above the slot rows, each showing its dataset and receipt instant in place of a period - except
+    supplies held as turned off, which REQ-PIPE-179 criterion 34 lists in a quiet group of their own outside that count.
+  - WHEN a period has been chosen, and before the reason is asked for, THE SYSTEM SHALL show how the supply would classify
+    against that period's slot, what the slot holds now and what placing does to it, and SHALL NOT run any QA to predict a
+    verdict.
+  - WHEN a placement's QA finishes, THE SYSTEM SHALL end with one panel saying where the supply now stands - its period, its
+    verdict and what the gate did; WHERE it is waiting, SHALL say that it is filed and nothing is lost and SHALL offer the
+    next decision; and WHERE the checks did not run, SHALL say that they are owed, that the processing pass will finish them,
+    and that the placement stands; and WHERE the supply was placed, SHALL say that it had not been checked in <period> before,
+    and SHALL NOT say 'again' or that an earlier verdict stands.
+  - THE SYSTEM SHALL NOT use the words rejected or refused for a gate outcome in that panel, those words naming a person's
+    decision.
+  - WHEN the reason for a placement is asked for, THE SYSTEM SHALL say that it is published on the dashboard.
+  - THE SYSTEM SHALL NOT offer place or reject on a hold labelled schedule ended, which the rule re-files once dates cover
+    it (REQ-PIPE-154 criterion 7), keeping REQ-PIPE-154's decision that such a hold offers only adding dates; and WHERE the
+    filing-decisions door shows such a hold, THE SYSTEM SHALL show its reason, the advice to add the next dates to contract/calendar.yaml
+    and `mothman schedule draft-correction` on a line of its own for where a declared correction is needed, and SHALL NOT
+    end on 'nothing to decide'.
+  - IF the run that follows a placement - in the door or under --wait - is interrupted or fails to complete, THEN THE SYSTEM
+    SHALL leave it owed for the processing pass, the placement standing.
+  - THE SYSTEM SHALL NOT count a placement as a person's decision about the supply, so that a placed supply checked green
+    may promote itself under the gate; and SHALL amend, in the same change, REQ-PIPE-076 criterion 7 to name place beside
+    re-file and re-check.
+  - WHERE a placement or a re-file is recorded through `mothman supply decide --wait`, THE SYSTEM SHALL run its owed re-check
+    straight after the transaction commits, in the foreground, as the door does, and SHALL end with the shared outcome panel;
+    and SHALL amend, in the same change, REQ-PIPE-141 so that a re-file through decide accepts --wait likewise.
+  - THE SYSTEM SHALL end a placement, a re-file and a re-check with one shared outcome panel - criterion 19's - which SHALL
+    NOT use the words rejected or refused for a gate outcome.
+  - IF --wait is given with a decision that owes no QA run, THEN THE SYSTEM SHALL refuse it, naming the operation.
+  - WHERE `mothman supply decide --wait` records a decision whose checks then do not finish - the run failing, Ctrl-C, or
+    the run claimed elsewhere - THE SYSTEM SHALL exit with a code of its own, distinct from 0 and from 1, the panel saying
+    that the decision stands and its checks are still owed.
+  - IF a person stops a placement's run with Ctrl-C, THEN THE SYSTEM SHALL end without a traceback, say that the placement
+    stands and its checks are still owed, and print `mothman pipeline process` on a line of its own.
+  - WHERE the runner a person is waiting on - the door or decide --wait - finds the owed run already claimed, THE SYSTEM SHALL
+    say that it is being run elsewhere and will finish there, and SHALL NOT show a verdict.
+  - 'THE SYSTEM SHALL amend, in the same change, REQ-PIPE-140''s text to state the claim every runner of an owed run already
+    takes - the door, decide --wait and the processing pass claim it before running it, a claim is released if the process
+    holding it ends, and a runner finding it claimed skips it and leaves it owed - which was BUILT on 2026-10-11 (post-build-review
+    #136) and is not yet in that requirement''s criteria.'
+  - THE SYSTEM SHALL state in `mothman supply decide --help` that it leaves a decision's checks owed unless --wait is given.
+  - IF the named period's slot holds an open contested pair (REQ-PIPE-194 criterion 9), THEN THE SYSTEM SHALL refuse the placement,
+    append nothing, and say the pair is settled first, at 'mothman > Filing decisions > {collection name} > Supplies waiting
+    on a decision'.
+  - IF an unaccepted version of the supply's table - waiting in staging for the named period, neither promoted nor rejected
+    - is in that period, THEN THE SYSTEM SHALL refuse the placement and append nothing, naming the waiting supply and its
+    receipt on the asset's clock, and saying that it is decided first - promoted or rejected - at 'mothman > Filing decisions
+    > {collection name} > Supplies waiting on a decision', with the flag form `mothman supply decide --operation <promote|reject>
+    --dataset <id> --period <period> --supply <waiting supply> --reason '<why>'` printed on a line of its own; WHERE the waiting
+    version is one file of an open contested pair, criterion 33's refusal applies instead.
+  - IF the agreement backstop refuses the dataset (REQ-PIPE-173), THEN THE SYSTEM SHALL refuse the placement, saying that
+    the dataset's judged past changed without a declared correction, and SHALL NOT record anything.
+  - IF a GitHub comment names place, THEN THE SYSTEM SHALL append nothing and SHALL reply that the decision is made in the
+    terminal, at 'mothman > Filing decisions > {collection name} > Supplies waiting on a decision', as it does for choose-file
+    (REQ-PIPE-193 criterion 16).
+  - WHERE the held supply is one file of a held contested pair - both files of one delivery held for the same table (REQ-PIPE-194)
+    - THE SYSTEM SHALL list the pair as one row naming both files, counted once; SHALL place BOTH files into the named period
+    in the one transaction, still contested, so that the pair is settled there by choose-file (REQ-PIPE-193) and neither file
+    is checked or promoted before it is; SHALL name the second file's move as a consequence before the person confirms, requiring
+    --acknowledge on the flag route; SHALL end with the outcome panel offering to settle the pair now; and IF --wait is given,
+    THEN SHALL refuse it under criterion 27, printing where choose-file is offered and both filenames.
+  - 'THE SYSTEM SHALL keep refusing a person''s PROMOTE of a held supply (post-build-review #173, built 2026-10-13), and that
+    refusal SHALL give the hold''s own responses as its label works them out (REQ-PIPE-179 criterion 18) - place, with its
+    menu path and flag form, and reject for a plain or turned-off hold; adding dates for a schedule-ended one - each command
+    on a line of its own rather than inline.'
+  - THE SYSTEM SHALL amend, in the same change, the decision log's re-file rule - which today accepts a re-file naming no
+    period left only from the rule (qa_tools/common/decision_log.py) - so that a PERSON's re-file naming no period left is
+    accepted where, and only where, it places a supply with an open assignment-rule hold, and is refused otherwise, naming
+    place.
+  - THE SYSTEM SHALL file a held supply into a period through ONE shared placer - used by a person's placement, a confirmed
+    correction's placement (correction_apply._place) and the rule's re-file of holds configuration now covers (schedule_ended.refile_holds)
+    - which records the filing, resolves the hold and owes the re-check, so that no second implementation of placing exists;
+    and refiling.plan SHALL keep refusing a held supply as a re-file, pointing at place.
+  - THE SYSTEM SHALL call a placement 'placed into <period>' on every route that reports a decision - the decision's own confirmation
+    message, the filing-decisions door, `mothman supply decisions`, `mothman supply filings` and the refusal given when another
+    decision holds the supply's lock - and SHALL NOT show it as a re-file, as 'None -> <period>' or by a machine name, the
+    operation keeping the name place in filing_decisions.OPERATIONS.
+  non_functional_requirements:
+  - AT THE TARGET SCALE THIS IS NOT RARE. The synthetic database held 9 assignment-rule holds for Case Workers on 2026-10-07
+    and 8 on 2026-10-13 (`mothman supply holds`, re-run by the scoper), every one waiting on an action no route offers. A
+    schedule-ended backlog (REQ-PIPE-154) on a daily feed is a hold per day, and since 2026-10-13 a settlement can raise one
+    too (REQ-PIPE-193 criterion 11).
+  - A person's placement is the strongest form of 'I know which period this is', and it is recorded with actor and reason
+    like everything else - no placement without a reason, because a year later somebody will ask why a supply that arrived
+    in March sits in January.
+  - Gated exactly as a first arrival, under the settings in force at the instant of placing (REQ-PIPE-122, REQ-PIPE-123) -
+    a person placing a supply is not a person promoting it.
+  - 'PRIVACY: the placement''s reason is published on the dashboard (criterion 21). Today''s data is synthetic; in a real
+    deployment of Child Protection data the reason prompt is the one free-text field that could carry a child''s or family''s
+    details, so the prompt says it is published and the reason is rendered as text, never markup.'
+  - 'SECURITY: placing widens nothing - same allowlist, same actor recording, terminal only; the GitHub route replies and
+    records nothing (criterion 36).'
+  - TEST FIRST for every refusal that guards a false quiet or a double version - criteria 7, 33 and 34 above all - because
+    a placement that lands two waiting versions in one period looks exactly like one that works.
+  dependencies:
+  - REQ-PIPE-064
+  - REQ-PIPE-078
+  - REQ-PIPE-140
+  - REQ-PIPE-141
+  - REQ-PIPE-151
+  - REQ-PIPE-154
+  - REQ-PIPE-074
+  - REQ-GHUB-082
+  - REQ-PIPE-076
+  - REQ-PIPE-168
+  - REQ-PIPE-170
+  - REQ-PIPE-173
+  - REQ-PIPE-193
+  - REQ-PIPE-194
+  - REQ-PIPE-118
+  - REQ-DASH-175
+  decisions:
+  - 'A GAP IN BUILT BEHAVIOUR, NOT A NEW IDEA: REQ-PIPE-064''s hold record already names ''file it to a slot yourself'' as
+    the resolution, and qa_tools/common/refiling.py (post-build-review #114) already refuses a held supply by name and points
+    at placing - an operation that was never built. So the system today tells a person to do something it offers no way to
+    do.'
+  - 'PLACE, NOT RE-FILE (REQ-PIPE-141, post-build-review #114): a held supply has no period to leave, and re-file''s whole
+    contract - the old filing kept as history, the old period''s slot emptied and re-checked - has nothing to act on. A separate
+    word keeps both honest.'
+  - 'ALLOWED FORWARD AND INTO A CLOSED PERIOD: criterion 5 of REQ-PIPE-062 is absolute for the RULE because a rule that claims
+    forward silently marks a future obligation met; a person naming a period, with a reason, on the record, is the opposite
+    of silent. Re-file already allows both (REQ-PIPE-141 criterion 17; post-build-review #115 D2).'
+  - 'STILL NEEDED UNDER THE CORRECTION ROUTE (Keith, 2026-10-07): the hold exists today, whatever happens to calendars - 9
+    Case Workers supplies sit in it - and a correction can itself leave a supply with no period (REQ-PIPE-170 criterion 8).
+    Originally scoped as what made a strict REQ-PIPE-111 survivable; built in parallel with it, not before.'
+  - PLACE IS TERMINAL ONLY (Keith, 2026-10-07), against the recommendation to raise it on the target period's ticket. A held
+    supply has no slot and so no ticket, and the GitHub route is disabled. REQ-GHUB-082 criterion 3 is amended to name it
+    beside REQ-PIPE-170's confirmation, rather than broken silently.
+  - PLACE REUSES --to-period, NOT --period; PERIODS ARE CHOSEN, NOT TYPED, for place and re-file alike; held supplies are
+    grouped in the waiting-on-a-decision queue (delivery-cli-ux pre-build review, 2026-10-07).
+  - 'PLACEMENT RUNS QA EXACTLY AS A RE-FILE DOES (Keith, 2026-10-10, on the delivery-architect''s review): the placement,
+    the hold''s resolution and an owed re-check commit in one transaction; the terminal then runs the owed check straight
+    away while the person waits (filing_tui._run_owed), and the processing pass finishes it if the terminal is interrupted.
+    No QA runs inside filing_decisions. REJECTED running QA inside the placement''s own transaction: the four tools open their
+    own connections and cannot see uncommitted work, the decision''s locks would be held for the whole run, and a tool failure
+    would roll back the person''s decision. This replaces the 2026-10-08 wording ''run inline on the terminal''s own connection'',
+    which described the existing re-file behaviour as though it were new.'
+  - 'NO PREDICTED VERDICT BEFORE PLACING; CHEAP FACTS ONLY (Keith, 2026-10-10, on the delivery-cli-ux review): once a period
+    is chosen and before the reason is asked for, the terminal shows how the supply would classify against that slot (e.g.
+    ''would read late - 41 days after the window closed'') and what the slot holds now and what placing does to it (''empty
+    - this fills it'', ''holds a promoted supply - this one would wait as another version''). The real checks run after confirmation
+    and the outcome panel reports the verdict. REJECTED offering a trial placement (''try it here first''): a real prediction
+    runs all four tools, about a minute per try, and would extend the trial mechanism to unfiled supplies. This supersedes
+    the 2026-10-08 idea of a predicted verdict in the chooser (plans/running-thoughts.md #72).'
+  - 'THE PERIOD CHOOSER OPENS NEAR THE SUPPLY''S ARRIVAL (Keith, 2026-10-10, on the delivery-cli-ux review): it opens on the
+    periods whose claim windows were nearest the supply''s receipt instant, both sides, each marked closed or not yet open
+    with its one-word current state (empty, promoted, inherited - un-inherit first, ...), and offers ''An earlier or later
+    period...'' to page further; --to-period on the flag route accepts any period criterion 6 allows. REJECTED listing every
+    period: thousands of rows on a daily feed. Note for the builder: filing_queue.slots_of stops at today, so reusing it would
+    silently drop the not-yet-open periods criterion 6 permits. The same chooser serves re-file (criterion 16).'
+  - 'REVIEW FOLD-IN, 2026-10-10: criteria on the outcome panel, the held label in the queue, the flag route, the refusal text
+    and the chooser came from the delivery-cli-ux and delivery-architect pre-build reviews of 2026-10-08, with Keith''s answers
+    recorded in the three decisions above. The dashboard half of placing - the ''Placed by hand'' tag and the resolved hold
+    row - is split into REQ-DASH-175 on the REQ-PIPE-154 / REQ-DASH-155 pattern, rather than added here.'
+  - '`mothman supply decide` KEEPS TODAY''S BEHAVIOUR FOR A PLACEMENT (Keith, 2026-10-10, on the delivery-scoper second pass):
+    it records the placement, says the checks are owed and names the command that runs them; it does not wait for them. The
+    filing-decisions door in the TUI runs them straight away. REJECTED making decide match the TUI: it would wait about a
+    minute per supply, which a script calling it does not want. Criterion 2 is to be split so the door and decide each have
+    their own, testable statement.'
+  - 'FOLDED 2026-10-10 (main session): criterion 2 is split into the transaction (2), the door running the checks (3) and
+    decide leaving them owed (4), per the decide decision above; the reason prompt says it is published on the dashboard,
+    as re-check''s does; REQ-PIPE-154 criterion 7 is amended by same-change criterion so the rule never re-files a supply
+    a person has already placed or rejected - the main session''s reading of that amendment (SUPERSEDED by round 3 Q7 below:
+    schedule-ended holds are never placed or rejected, so criterion 22 now states that instead); REQ-PIPE-140, REQ-PIPE-151,
+    REQ-PIPE-154 and REQ-PIPE-074 added as dependencies. Criterion numbers cited in earlier decisions refer to the list before
+    this split (old 3 is now 5, old 13 now 15).'
+  - 'decide --wait COVERS PLACE AND RE-FILE TOO (Keith, 2026-10-10, round 3 Q1, option A, the delivery-cli-ux recommendation):
+    `mothman supply decide --wait` runs the owed checks in the foreground and ends with the outcome panel for a placement
+    and a re-file, as it does for a re-check (REQ-PIPE-164); without --wait, decide records and leaves the checks owed as
+    before, so a script is unaffected unless it asks. --wait on a decision that owes no checks (reject, and the like) is refused,
+    naming the operation. REQ-PIPE-141 (re-file, built) is to be amended in the same change; that wording comes to Keith at
+    sign-off. REJECTED --wait for re-check only (decide would behave differently by operation). To be folded into criteria
+    with the rest of round 3.'
+  - 'SCHEDULE-ENDED HOLDS KEEP OFFERING ONLY ADDING DATES (Keith, 2026-10-10, round 3 Q7, option A, the delivery-architect''s
+    recommendation): REQ-PIPE-154''s decision of 2026-10-07 stands - a schedule-ended hold files itself once dates exist,
+    so place and reject are not offered on it; criterion 10 excepts it and criterion 22 says so. REJECTED reversing the REQ-PIPE-154
+    decision.'
+  - 'ROUND 3 FOLDED, 2026-10-10 (main session): a placement is not a person''s decision for the gate (delivery-architect 1,
+    verified in rejection.decided_by_a_person, which exempts only supersede, un-supersede and re-file - the same fix Keith
+    chose for re-check); decide --wait for place and re-file (Keith Q1) and its exit code (Keith Q4); one shared outcome panel
+    with the word ban (delivery-cli-ux M8); --wait refused where nothing is owed (M10); Ctrl-C (M7); a claimed run said, not
+    silent (M9); the claim moved to REQ-PIPE-140 for every runner, since none claims today (delivery-architect 5); the real
+    command in the period refusal (M5); owed-nothing periods shown but not selectable in the chooser (M6, delivery-scoper
+    I); the held heading named (L5); criterion 3''s WHEN and IF split (delivery-scoper L); stale numbers in the chooser decision
+    corrected in place (delivery-scoper J). Criterion numbers in decisions written before this fold refer to the list as it
+    then stood.'
+  - 'VERIFIED AGAINST CODE, 2026-10-13 (delivery-scoper): still unbuilt - filing_decisions.OPERATIONS has no place, refiling.py
+    still refuses a held supply with ''Place it instead'', `mothman supply holds` still lists ''file it to a slot yourself'',
+    filing_queue lists no held supply, and decide has no --wait. ALREADY BUILT: criterion 31''s claim (recheck.run''s advisory
+    lock, post-build-review #136, 2026-10-11), and the claimed-elsewhere message criterion 30 needs (recheck.CLAIMED_ELSEWHERE)
+    - so criterion 31 now asks only that REQ-PIPE-140''s text say what the code does.'
+  - 'THREE PRODUCERS OF THE SAME HOLD (delivery-scoper, 2026-10-13): the assignment rule, a confirmed correction (REQ-PIPE-170
+    criterion 8, correction_apply) and a settlement whose file''s own receipt finds no open slot (REQ-PIPE-193 criterion 11,
+    settlement.apply) all raise supply_holds.ASSIGNMENT_RULE, so place covers all three without a second operation.'
+  - 'CRITERION 8 NARROWED (delivery-scoper, 2026-10-13): owed-nothing periods are inherited too (inheritance._does_not_participate),
+    so ''un-inherit first'' was the advice they would get - and un-inheriting does not make a period owed. Criterion 7 is
+    judged first.'
+  - '163 WRITTEN IN ITS FINAL, TURN-OFF-AWARE FORM (DECIDED Keith, 2026-10-13, scoper set 1 Q1, option A): criteria 7 and
+    17 are written now so that REQ-PIPE-179 amends nothing in this requirement. REJECTED 179 amending 163 after it is built
+    - the requirement would change under its own build.'
+  - 'EVERY OWED-NOTHING PERIOD REFUSED ON THE FLAG ROUTE (DECIDED Keith, 2026-10-13, set 1 Q2, option A): the typed command
+    and the menu agree - the chooser (criterion 16) already shows owed-nothing periods unselectable, and criterion 7 now refuses
+    the same periods by flag, through the one participation resolution, so a turn-off adds no amendment here. REJECTED refusing
+    only non-participation, which left not_expected periods placeable by flags alone. Criterion 8 is narrowed to owed periods
+    because owed-nothing periods inherit too and un-inheriting does not make a period owed.'
+  - 'NO PLACEMENT INTO AN OPEN CONTESTED PAIR (DECIDED Keith, 2026-10-13, set 1 Q3, option A): criterion 33 refuses it - ''settle
+    first''. A placement would supersede the pair by another name, which REQ-PIPE-193 criterion 25 refuses for a person''s
+    supersede, and dataset_blockers would count it as the contest''s end. REJECTED letting it supersede the pair. Found in
+    passing on 2026-10-13 that refiling.plan had no such refusal for a re-file''s target; BUILT since (refiling.py''s settlement.open_pair_in
+    check, post-build-review #172) - corrected by architect F24, 2026-10-14.'
+  - 'REFUSE WHILE A VERSION IS WAITING, NEVER SUPERSEDE IT (DECIDED Keith, 2026-10-13, set 1 Q4, option B, against the scoper''s
+    recommendation): IF an unaccepted version of the table is waiting in the named period, the placement is refused until
+    a person decides that version (criterion 34), naming it and where to decide it. So a placement never supersedes anything,
+    REQ-PIPE-118 is NOT amended, and REQ-PIPE-141 criterion 6 (a re-file''s supersession) is not cited by criterion 3. REJECTED
+    superseding inside the placement''s transaction as a re-file does: it would have needed REQ-PIPE-118''s receipt-order
+    rule amended for a second exception, and it decides a waiting supply''s fate as a side effect of deciding another''s.
+    The chooser marks such a period as needing that decided first (criterion 16).'
+  - 'A PLACEMENT IS A RE-FILE FROM NO PERIOD (DECIDED Keith, 2026-10-13 (architect review answers)): asked how different place
+    and re-file really are and what a new log action costs, Keith chose to record a placement as a person''s re-file from
+    no period - place and re-file are one act underneath - while every surface still says ''placed''. REJECTED a new PLACE
+    decision-log action: a new action is a new kind in every reader of the log (the schema check, the as-at readers, the change-point
+    builder, the ticket text) for no difference in what happens.'
+  - 'A HELD PAIR IS PLACED WHOLE AND SETTLED WHERE IT LANDS (DECIDED Keith, 2026-10-13 (architect review answers)): asked
+    whether there is really no route for a held pair today (there is not - each file holds and nothing places them), placing
+    a held pair moves both files into the period, still contested, to be settled there. REJECTED placing one file and leaving
+    the other held (the pair would be split by a decision about only half of it); settling before placing (a settlement needs
+    a period to settle into).'
+  - 'PROMOTING A HELD SUPPLY IS REFUSED, AND PLACE IS THE ROUTE (DECIDED Keith, 2026-10-13 (architect review answers); post-build-review
+    #173 fix 1, built and pushed 63bd965 the same night): ''there should be no way to move things into a period and then skip
+    doing checks''. Keith is open to a later combined ''place and promote'' that keeps the checks - not in scope here.'
+  - 'KEITH''S RE-FILE-FROM-NO-PERIOD KEPT, THE RULE THAT REFUSES IT AMENDED (architect F23, 2026-10-14; Keith''s decision
+    of 2026-10-13 not reopened): decision_log.py refuses a REFILE with a to-slot and no from-slot unless the actor is the
+    rule, and refiling.plan refuses a held supply and an open contest - so criterion 2 as written could not be recorded. Criterion
+    39 relaxes the decision log for a person''s placement only; criterion 40 makes one placer of the three that exist or would
+    (correction_apply._place, schedule_ended.refile_holds, and this), found duplicated by the architect. F23''s question whether
+    readers waiting in the target period are owed a re-evaluation is answered by the knock-on as built: decision_log.apply_decision
+    records a period move only when the period''s holding changes, so a placement owes the readers nothing until its supply
+    is promoted, when REQ-PIPE-121 re-evaluates them.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14), each a wording or correctness fix with no fork: CLI
+    UX 3 (criterion 38 gives the hold''s own responses, commands on their own lines - the built text is inline backticks and
+    _show lifts only lines starting ''mothman ''); CLI UX 4 (criterion 41 - fd.apply''s message, the door, `supply decisions`
+    rendering ''None -> P'', `supply filings` and the lock refusal all said re-file or nothing); CLI UX 5 (criterion 19''s
+    placement wording); CLI UX 6 and architect F23 (criterion 37 - one row, the second file''s move a consequence, settle
+    offered, --wait refused with filenames); CLI UX 7 (criterion 22 - a schedule-ended hold was a dead end in the door); CLI
+    UX 8 (criterion 16 collapses owed-nothing runs); CLI UX 11 (criterion 12 fills in typed values); CLI UX 12 (criterion
+    15); CLI UX 13 (criterion 7 and REQ-PIPE-179 criterion 20 give one refusal); dashboard UX 9 (criterion 12 retires ''file
+    it to a slot yourself''); architect F24 (decision 21 corrected).'
+  - 'REUSE, FOR THE BUILDER (CLI UX 14): the outcome panel is filing_tui''s offer_after_run; held rows join queue_table; the
+    chooser''s unselectable rows reuse settle_tui''s Option.unavailable; the door is the existing Tier 1 Filing decisions
+    entry.'
+  - 'THE PAGE HALF OF ''placed'' IS REQ-DASH-175''s (dashboard UX 9): REQ-DASH-175 (unsigned, 2026-10-10) criterion 12 forbids
+    the raw operation name, which after criterion 2 is re-file with an empty from-period. An amendment to REQ-DASH-175 - such
+    a re-file reads ''Placed in <period>'' - is proposed beside this batch and presented with this requirement; REQ-DASH-175
+    is not redrafted here.'
+  open_questions:
+  - Criteria 35 (refuse where the agreement backstop refuses the dataset) and 36 (the GitHub reply) are the scoper's, added
+    for consistency with REQ-PIPE-170 criterion 26 and REQ-PIPE-193 criterion 16 - not yet put to Keith; confirm at sign-off.
+  - Criterion 26 names re-check, which REQ-PIPE-164 (not_started) builds and which depends on this requirement; the re-check
+    half is vacuous until 164 lands. Left as is so 164's own criterion 17 keeps pointing at one panel.
+  - 'CLI UX D - SHOULD THE PERIOD CHOOSER (criterion 16) ALSO REPLACE THE TYPED PERIOD IN THE SETTLE FLOW''S ''refile'' OUTCOME?
+    Recommended (A): yes, amending REQ-PIPE-193 in the same change, so a period is never typed in the terminal. (B) no - the
+    settle flow keeps its typed prompt.'
+- id: REQ-PIPE-179
+  title: A dataset, or a whole collection, can be turned off for a time or for good, and nothing still owed goes quiet
+  date_written: '2026-10-10'
+  story: As the person who looks after a delivery agreement, I want to turn a dataset - or a whole collection - off when its
+    supplier stops supplying for a while or for good, without deleting its configuration or history, so that it stops owing
+    supplies from the right date while anything it still owed before then is chased as usual.
+  moscow: must
+  status: not_started
+  source: 'Keith, 2026-10-07 (effective_to, proposed by him while signing off REQ-PIPE-110) and 2026-10-10 (his answers to
+    the four-agent review of REQ-PIPE-110: delivery-scoper, delivery-architect, delivery-cli-ux, delivery-dashboard-ux). Split
+    out of REQ-PIPE-110 and drafted by the main session on 2026-10-10. NOT YET THROUGH delivery-scoper as a requirement of
+    its own - say so when it is presented for sign-off. Re-scoped jointly with REQ-PIPE-163 by delivery-scoper, 2026-10-13
+    - joint pass on REQ-PIPE-163, REQ-PIPE-179 and REQ-DASH-182 with the Child Protection pattern widening (Keith, 2026-10-13:
+    close out the calendar group before the road-testing review; scope 163 WITH 179 so 179 does not amend a requirement that
+    may change under it).'
+  acceptance_criteria:
+  - THE SYSTEM SHALL let a participation version - a dataset's, or a collection's participation_defaults version - state an
+    effective_to date, the last day it governs on the data asset's clock, inclusive.
+  - IF a participation version states effective_to without turned_off_reason, or turned_off_reason without effective_to, THEN
+    THE SYSTEM SHALL reject the configuration; and WHERE such a version states reason in place of turned_off_reason, the refusal
+    SHALL say that turned_off_reason is the key for a turn-off, reason being the explanation for owing only some periods.
+  - THE SYSTEM SHALL treat a dataset as turned off on a date WHERE its own latest participation version starting on or before
+    that date states an effective_to before it, or WHERE its collection's latest participation_defaults version starting on
+    or before that date states an effective_to before it and the dataset has no version of its own whose effective_from falls
+    after that effective_to and on or before the date.
+  - WHILE a dataset is turned off on a period's date, THE SYSTEM SHALL treat it as owing nothing in that period, and SHALL
+    keep the dataset and its configuration in contract/calendar.yaml.
+  - WHERE no later version follows an effective_to, THE SYSTEM SHALL treat the dataset as turned off from then on, with no
+    end.
+  - WHERE a dataset's own participation version takes effect inside its collection's turned-off gap, THE SYSTEM SHALL treat
+    that dataset alone as owing again from that version's effective_from, the rest of the collection staying off; and a later
+    collection version SHALL NOT end a dataset's own turn-off.
+  - WHILE a collection is turned off, THE SYSTEM SHALL take none of its participation values for any dataset, so that a dataset
+    bringing itself back on states its own due time and grace (REQ-PIPE-110 criterion 29); and IF a dataset's own version
+    taking effect inside its collection's turned-off gap leaves unstated any participation value its collection supplied it
+    on the day before the gap, THEN THE SYSTEM SHALL reject the configuration, naming the dataset, each value and the collection's
+    last value for it, and saying to state it.
+  - THE SYSTEM SHALL decide whether a dataset owes a period from the participation in force on that period's date, and SHALL
+    NOT decide it from the period's due date or from any supply's receipt date.
+  - IF effective_to is earlier than its own version's effective_from, falls on or after the next version's effective_from
+    at the same level, or leaves a gap before a later version that contains no period of the dataset's calendar - at collection
+    level, of any inheriting dataset's calendar - THEN THE SYSTEM SHALL reject the configuration, naming the dataset or collection
+    and the version, which rule it broke and the date to change; and THE SYSTEM SHALL accept a permanent turn-off even where
+    the calendar has no period after its effective_to.
+  - 'THE SYSTEM SHALL exclude effective_to and turned_off_reason from REQ-PIPE-110''s restate rule and from inherit: each
+    belongs to the one version that states it.'
+  - THE SYSTEM SHALL treat a change to effective_to - adding it, moving it or removing it - as an ordinary edit only where,
+    for every dataset and period whose owed-or-not status the change flips, that period's earliest claim-opening instant has
+    not yet passed - that instant computed, for a period inside a gap, with the inputs criterion 14 uses, and taken as the
+    earlier of its values under the configuration before and after the change - and SHALL otherwise require a declared correction
+    (REQ-PIPE-111), the refusal naming each period whose status the change flips and the claim-opening instant that has passed
+    for it, and printing `mothman schedule draft-correction` on a line of its own.
+  - THE SYSTEM SHALL freeze turned_off_reason together with its effective_to, and SHALL require a declared correction for
+    any change to it after that freeze, a change of wording included.
+  - THE SYSTEM SHALL generate no slot for a dataset in a period it owes nothing in by being turned off.
+  - THE SYSTEM SHALL close the last owed slot before a turned-off gap at the claim-opening instant the next calendar period
+    would have had for that dataset, each of its values resolved across levels as if every effective_to on or before that
+    period's date were absent; and WHERE there is no next calendar period, as REQ-PIPE-131 criterion 16 closes the last authored
+    period.
+  - WHEN a supply arrives for a dataset, THE SYSTEM SHALL apply the filing rule against the slots of the periods the dataset
+    owes, so that a supply finding an owed slot open at its receipt instant files there - late where past its due instant,
+    as a resupply where the slot is filled - whether or not the dataset is turned off on its receipt date.
+  - WHERE no owed slot is open at a supply's receipt instant and the calendar period whose slot would then be current - computed
+    with criterion 14's inputs - is one the dataset is turned off in, THE SYSTEM SHALL receive the supply, record it and run
+    its file checks, and SHALL hold it under REQ-PIPE-064's assignment-rule hold, recording as history a structured reason
+    naming the effective_to, the turned_off_reason and the level that turned it off.
+  - WHERE criterion 16 applies to a supply and its dataset's schedule has also ended (REQ-PIPE-154 criterion 1), THE SYSTEM
+    SHALL label the hold turned off rather than schedule ended.
+  - THE SYSTEM SHALL work out a held supply's label - turned off, schedule ended, or the plain assignment-rule hold - and
+    its advice and responses from the configuration in force when they are read, for display, for re-filing, for the processing
+    pass's tally, for the dashboard's backlog line and for every count, and SHALL keep the reason recorded when the hold was
+    raised as history only.
+  - WHEN configuration later gives any outstanding assignment-rule hold's receipt instant an open owed slot, whatever its
+    label, THE SYSTEM SHALL file it by the rule on the next processing pass, generalising REQ-PIPE-154's schedule-ended re-file
+    rather than adding a second re-filer, and SHALL leave every other hold for a person to place (REQ-PIPE-163) or reject,
+    except a schedule-ended hold, which offers only adding dates; and WHERE the hold is one file of a held contested pair,
+    SHALL re-file both files together, still contested (REQ-PIPE-163 criterion 37).
+  - THE SYSTEM SHALL NOT let any supply be placed (REQ-PIPE-163), re-filed (REQ-PIPE-141), moved by a confirmed correction
+    or carried out from a parked move (REQ-PIPE-170 criteria 7 and 26) into a period inside a turned-off gap; and a refusal
+    SHALL name the gap and its turned_off_reason and say that changing effective_to or effective_from in contract/calendar.yaml
+    is how a period becomes owed; for a placement this SHALL be the one refusal given, in place of REQ-PIPE-163 criterion
+    7's rather than beside it.
+  - IF a not_expected entry - a dataset's own - names a period inside a turned-off gap that applies to that dataset, whether
+    the turn-off is its own or its collection's, THEN THE SYSTEM SHALL reject the configuration, naming the dataset, the not_expected
+    entry's period, the gap (the effective_to it follows and the effective_from that ends it, or 'for good'), the level that
+    turned it off and its turned_off_reason, and saying to remove the entry - by a declared correction (REQ-PIPE-111) where
+    the entry is frozen.
+  - THE SYSTEM SHALL treat a turned-off period as REQ-PIPE-098's inheritance treats a period the dataset does not participate
+    in, so that the dataset's last promoted supply stands in it.
+  - THE SYSTEM SHALL keep counting among the states needing a person (REQ-PIPE-064 criterion 5, REQ-PIPE-132 criterion 10)
+    every item about a period the dataset owed - any period outside a turned-off gap - an open late slot, a supply on an owed
+    period waiting for a person's decision (red included), a slot closed unfilled, a promoted supply listed as 'Promoted,
+    then re-checked <verdict>' (REQ-PIPE-164) - until it is resolved, whether or not the dataset is turned off; a promoted
+    red supply counts as resolved for this purpose and keeps its red-promoted badge on the dataset.
+  - THE SYSTEM SHALL NOT count a supply held as turned off among the states needing a person - in the pipeline, the terminal's
+    queue or the dashboard - and SHALL amend, in the same change, REQ-PIPE-064 criterion 5 and REQ-PIPE-083 criterion 21 to
+    except it.
+  - THE SYSTEM SHALL leave a dataset turned off for good out of the runway minimum and the exhausted-schedule list, and for
+    a dataset in a temporary gap SHALL count towards its runway only the periods it owes once it is turned back on.
+  - THE SYSTEM SHALL count turned-off holds separately in the processing pass's summary, as REQ-PIPE-154 criterion 6 counts
+    schedule-ended holds.
+  - 'THE SYSTEM SHALL resolve participation through one helper that returns, for a dataset on a date, one of: not yet owing;
+    turned off, with its turned_off_reason, the level that turned it off and the last applying version''s resolved timing;
+    or the values REQ-PIPE-181 criterion 2 resolves for that date, each with its level - the one resolution function REQ-PIPE-181
+    names - and SHALL route every consumer of participation through it.'
+  - 'THE SYSTEM SHALL show, in the terminal''s Calendar entry (REQ-PIPE-169) and in `mothman schedule show --dataset <id>
+    --on <date>` (REQ-PIPE-181''s one renderer), for a dataset with an effective_to: the level that turned it off, and for
+    a dataset back on inside its collection''s gap, that its own version brought it back; the date it is turned off after
+    and its reason; which periods it still owes and until when their slots stay open; which periods it owes nothing in and
+    whether the turn-off is permanent; and the instant until which the turn-off can be changed by an ordinary edit.'
+  - WHILE a dataset is turned off on the date asked about and owes no period whose slot is still open, THE SYSTEM SHALL show
+    'Turned off - nothing due', and SHALL show the due time and grace of its last version only labelled 'when last on'; and
+    WHILE its last owed slot before a turn-off has closed and its effective_to has not yet passed, SHALL show 'Turning off
+    after <effective_to> - nothing more owed'.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-111 criterion 2 to give effective_to and turned_off_reason their
+    own freeze point as criterion 11 of this requirement states, and to count a turned-off dataset in a dated calendar entry's
+    freeze only for the first period of its gap; criterion 4 to add effective_to and turned_off_reason to what a dataset's
+    or collection's corrections cover; and criterion 15 to name mark-as-not-supplied (REQ-PIPE-132) as the after-the-fact
+    route for an effective_to as it does for not_expected.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-113 criteria 2 and 4 and REQ-PIPE-131 criteria 1 and 2 so that a
+    slot's inputs and closing instant follow criterion 14 of this requirement around a turned-off gap; and REQ-PIPE-134 criterion
+    1 so that the overlap gate skips a pair of consecutive periods both inside one turned-off gap, checks the last owed period
+    before a gap against the closing instant criterion 14 gives it, and checks that the first owed slot after a temporary
+    gap opens after the last owed slot before it closes.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-154 criteria 1, 2, 6 and 7 so that turned off outranks schedule ended
+    and every label they read is the one criterion 18 works out; REQ-PIPE-064 criterion 8 likewise; REQ-PIPE-098 criterion
+    1 to name a turned-off period beside one the dataset does not participate in; and REQ-PIPE-053 criteria 4, 10 and 15 so
+    that a dataset turned off for good is neither warned about nor counted; each amending the text as REQ-PIPE-181 left it.
+  - THE SYSTEM SHALL read all of this from committed configuration and recorded facts, and SHALL NOT read supply rows to decide
+    it.
+  - THE SYSTEM SHALL list supplies held as turned off in the terminal's queue in a quiet last group, 'Received while turned
+    off (N)', after the slot rows and outside the count of supplies waiting on a decision, each saying 'Received while <dataset>
+    is turned off (<reason>, set for <level>). Place it into a period it still owes, reject it, or change effective_to/effective_from
+    in contract/calendar.yaml if this period should be owed.'
+  - WHEN a declared correction changes effective_to, THE SYSTEM SHALL propose the filing moves that result through REQ-PIPE-170's
+    confirmation, a supply left in a period inside the new gap becoming a turned-off hold.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-170 so that IF a corrected configuration makes a supply's current
+    period one its dataset owes nothing in - by participation, not_expected or a turn-off - THEN keep is not offered for that
+    supply, and the correction proposes moving it to the owed slot the filing rule gives it or holding it, saying that the
+    period no longer owes a supply.
+  - IF a parked move's confirmed period lies inside a turned-off gap when its blocker clears, THEN THE SYSTEM SHALL leave
+    the move parked, say so naming the gap and its turned_off_reason, and list it among the states needing action, as REQ-PIPE-170
+    criterion 27 does for a supply no longer where it was parked from.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-173 so that a slot a recorded verdict was judged in, which the configuration
+    no longer owes because an effective_to was added or moved without a declared correction, counts as a difference the backstop
+    refuses, as a changed slot input does.
+  - THE SYSTEM SHALL generate, as registered scenario TS-63, in the same change that builds this requirement, a Child Protection
+    dataset turned off for a while in the synthetic history - DECLARED AS A CORRECTION in contract/calendar.yaml (REQ-PIPE-111),
+    giving a participation version an effective_to and a turned_off_reason and a later version turning it back on two quarters
+    later, the dataset's participation first split from the shared *cp_participation alias so that no other dataset is turned
+    off with it - placed in quarters REQ-GEN-207 adds by growing the Child Protection history earlier, so no existing scenario's
+    quarter moves; with, through REQ-GEN-044's injection mechanism, one supply for its last owed quarter arriving after the
+    effective_to but while that quarter's slot is open, and one supply arriving inside the gap with no owed slot open; and
+    SHALL update TS-63's register entry to the Child Protection calendar's real dates, saying that the ordinary deliveries
+    inside the gap still carry the dataset's file, which is received, held as turned off and counted in REQ-DASH-180's quiet
+    line.
+  - THE SYSTEM SHALL record, in the same change, that REQ-PIPE-170 criterion 23's TS-63 is delivered by criterion 39 of this
+    requirement, re-pointing REQ-PIPE-170's unmet entry for criterion 23 so that it names TS-57 to TS-62 only.
+  non_functional_requirements:
+  - 'A SHAPE CHANGE WITH MANY CONSUMERS - enumerate them mechanically and route each through the one helper (criterion 27).
+    Found by delivery-architect, 2026-10-10: schedule.periods_for_dataset, slots.slots_for_dataset and _calendar_periods,
+    period_overlap.overlaps_for, runway.calendar_runway, exhausted_datasets and schedule_ends_on, filing.final_period_for,
+    assignment.schedule_ended, supply_holds.reason_for/describe/responses/Tally, schedule_ended.refile_covered, inheritance._does_not_participate,
+    slots.is_owed_supplies, validate_schedule._expects_nothing_errors, dashboard/embed_dashboard_data.py, cli/schedule.py,
+    dataset_blockers.py and both pipeline/build_*_dashboard_data.py. supply_holds.SCHEDULE_FILE hardcodes a configuration
+    path and must read the agreement value instead. _version_in_force''s fallback to the first version must never apply to
+    participation. RE-ENUMERATED 2026-10-13 (delivery-scoper, by grep for participation_on, resolved_versions, participates,
+    is_owed, .expected, periods_for_dataset and not_expected): built since that list and missing from it - agreement_drift
+    (REQ-PIPE-173), agreement_freeze.flatten (REQ-PIPE-111), participation_view (REQ-PIPE-181), verdict (REQ-PIPE-168), correction_trial
+    and correction_apply (REQ-PIPE-170), settlement''s hold judgement (REQ-PIPE-193 criterion 11), cli/env.py, and both generators
+    (generate_runs.py, generate_cp_runs.py), which read a dataset''s periods to decide what to generate - a turned-off gap
+    generates no supply the dataset owes - the whole-delivery generator still writes the dataset''s file into each gap delivery,
+    which is received and held as turned off (architect E21). Re-run the grep at build time rather than trusting either list.'
+  - 'No false quiet: a turn-off never hides anything about a period that was owed. That is the line every criterion here is
+    held to, because a turn-off read as ''ignore it'' is the way an overdue supply would go unnoticed.'
+  - Config only for every rule about what is owed; no supply rows.
+  - 'PERFORMANCE: the helper is called per dataset per date by every consumer, so it works from REQ-PIPE-110''s one agreement
+    value and never re-reads the file; a dashboard build over thirty datasets and years of daily periods stays within its
+    existing time.'
+  - 'AUDITABLE: every effective_to and turned_off_reason sits on a version with a structured changelog entry (REQ-PIPE-110),
+    so who turned a dataset off, when and why is in the file, and changes after the freeze are declared corrections with an
+    approver.'
+  - 'TEST FIRST: each criterion that guards against a false quiet - criteria 14, 15, 16, 18 and 23 above all - gets a test
+    written first and seen to fail, because a turn-off that hides an owed period looks exactly like one that works.'
+  - 'SECURITY: turned_off_reason is free text from configuration and is rendered as text, never as markup, everywhere it is
+    shown.'
+  dependencies:
+  - REQ-PIPE-110
+  - REQ-PIPE-181
+  - REQ-PIPE-111
+  - REQ-PIPE-113
+  - REQ-PIPE-131
+  - REQ-PIPE-134
+  - REQ-PIPE-064
+  - REQ-PIPE-154
+  - REQ-PIPE-163
+  - REQ-PIPE-098
+  - REQ-PIPE-083
+  - REQ-PIPE-132
+  - REQ-PIPE-169
+  - REQ-PIPE-167
+  - REQ-PIPE-106
+  - REQ-PIPE-053
+  - REQ-PIPE-170
+  - REQ-PIPE-173
+  - REQ-PIPE-168
+  - REQ-PIPE-141
+  - REQ-PIPE-193
+  - REQ-GEN-044
+  - REQ-PIPE-111
+  - REQ-GEN-207
+  - REQ-DASH-180
+  open_questions:
+  - 'Criterion 38''s premise is unverified: whether agreement_drift already flags a slot that vanished. Check at build, test
+    first.'
+  - 'ARCHITECT Q2 - WHEN TS-63''s CORRECTION IS DATED. Recommended (A): before the gap, so that the gap''s arrivals are filed
+    under the corrected agreement as they arrive and the turn-off is seen as it happens (the ''Turning off'' marker, the hold
+    at arrival, criterion 39''s expectations) - at the cost of cp-carers reading ''awaiting confirmation'' from the grown
+    quarters to the end of the history, years on the as-at picker, because a replay confirms only at its end. (B) late in
+    the history, so the stretch is weeks - but then the gap''s arrivals are first filed as owed supplies and the turn-off
+    appears only as the correction''s moves and holds at the end, which is the correction route rather than the turn-off itself.'
+  - ARCHITECT Q4 - WHO APPROVES TS-63's FICTIONAL CORRECTION (as for REQ-GEN-205's). See REQ-GEN-205's question; one answer
+    covers both.
+  decisions:
+  - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith, on the delivery-scoper review): the turn-off mechanism - added to REQ-PIPE-110
+    in its 2026-10-07 sign-off commit without any agent review, which is why that sign-off was withdrawn - is its own requirement,
+    with its own review and sign-off, on the REQ-PIPE-154 / REQ-DASH-155 pattern. REJECTED keeping it all in REQ-PIPE-110:
+    39 criteria and growing, harder to review and to build against.'
+  - 'SUPERSEDED 2026-10-10 - three of its rulings were changed by Keith that day (arrivals go through the filing rule, the
+    real verdict is kept with a marker, effective_to has its own freeze point); see the decisions below. WAS: A DATASET IS
+    TURNED OFF BY effective_to ON ITS PARTICIPATION VERSION (Keith, 2026-10-07, while signing this off): he asked for a dataset
+    to stay in the calendar and stay configured but be turned off, permanently or for a time, and proposed effective_to himself.
+    The gap after a version''s effective_to and before the next version is the off period; no later version is permanent.
+    A reason is required. Arrivals while off are received, file-checked and held as turned off, and filed by the rule once
+    a later version turns it back on (Keith''s choice, over recording only or ignoring them). Shown quietly grey with its
+    reason, never red, never needing a person (his choice, over hiding it from rollups). Rejected: an `active:`/`connected:`/`enabled:`
+    flag - effective_to uses the versioning already there, so ''temporarily'' needs no second mechanism. A future effective_to
+    is freely editable; once in effect it changes only by a declared correction (REQ-PIPE-111).'
+  - 'SUPERSEDED 2026-10-10 by the Q-K wording below, which says under which configuration the freeze is judged. WAS: effective_to
+    FREEZES ON ITS OWN, LIKE not_expected (Keith, 2026-10-10, on the delivery-scoper and delivery-architect reviews of 2026-10-08):
+    a participation version''s effective_to is its own frozen item, frozen from the earliest claim-opening instant of the
+    first period it would stop the dataset owing; before that instant it may be added, moved or removed without a declared
+    correction even where the version itself is frozen, and after it only by a correction. So turning a running dataset off
+    from now on is an ordinary edit, and changing a turn-off already in effect goes through the correction route. REJECTED
+    treating it as part of the whole frozen version: every routine turn-off would need a CAB-approved correction - the ''gate
+    that fires on legitimate work'' REQ-PIPE-111''s own first NFR warns against. Needs REQ-PIPE-111 criterion 2 (freeze points)
+    and criterion 4 (what a dataset''s corrections cover) amended in the same change; Keith approved the substance 2026-10-10.'
+  - 'ARRIVALS WHILE TURNED OFF GO THROUGH THE FILING RULE AS NORMAL (Keith, 2026-10-10, on the delivery-scoper and delivery-architect
+    reviews): periods inside an off gap generate no slot for the dataset; a supply that arrives while the dataset is off but
+    finds an owed slot still open files there as usual - late if past its due date, a resupply waiting for a person if the
+    slot is already filled; only a supply that finds no open owed slot is held, labelled turned off, and may be placed by
+    hand (REQ-PIPE-163). Worked example agreed with Keith - quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim
+    window 30 days before due, 2 days'' grace, effective_to 2026-03-31: a February supply arriving 10 March files to February,
+    late; one arriving 5 April (dataset off, February''s slot still open) files to February, late; one arriving 20 April (February
+    closed, May owed nothing) is held as turned off. REJECTED holding everything received during the gap (criterion 38 as
+    first drafted): it judged by receipt date where the rest of the design judges by the period''s date, and it hid a late
+    supply for an owed period as ''turned off'' - the false-green direction. Criterion 38 (REQ-PIPE-110''s, as it then stood;
+    now criteria 15 to 19 here) is to be rewritten to match.'
+  - 'THE LAST OWED SLOT BEFORE A GAP CLOSES WHEN THE NEXT PERIOD''S CLAIM WINDOW WOULD HAVE OPENED (Keith, 2026-10-10): computed
+    with the inputs of the participation version that last applied, as if the next calendar period were still owed - in the
+    example, February closes on 15 April. Needed because REQ-PIPE-113 criterion 4 closes a slot at the next period''s claim-opening
+    instant, and inside a gap that period has no slot, so without this rule the last slot before a turn-off would have no
+    closing instant. REQ-PIPE-113 to be amended to match (it is signed off; the wording goes to Keith first).'
+  - 'A TURNED-OFF HOLD IS RE-FILED BY THE RULE IF CONFIGURATION LATER GIVES ITS RECEIPT AN OPEN OWED SLOT, AND OTHERWISE WAITS
+    FOR A PERSON (Keith, 2026-10-10, open question Q-B, option B): REQ-PIPE-154''s schedule-ended re-file (schedule_ended.refile_covered)
+    is generalised to cover both labels, with no second re-filer; a supply the new configuration still gives no open owed
+    slot stays held for a person to place (REQ-PIPE-163) or reject. Criterion 38 (REQ-PIPE-110''s, as it then stood; now criteria
+    15 to 19 here)''s second half is rewritten to that. REJECTED letting a person place a turned-off hold into a period inside
+    the gap (option C) - Keith: if someone wants that period owed, they change the effective_to and effective_from dates;
+    placing into a gap period would nullify the point of having them. REJECTED leaving every such hold to a person (option
+    A): a supply the configuration now covers would sit waiting for work the rule can do.'
+  - 'A COLLECTION CAN BE TURNED OFF AS A UNIT (Keith, 2026-10-10, open question Q-F, option B): a collection''s participation_defaults
+    version may carry effective_to and turned_off_reason, turning off every dataset that inherits from it, each showing the
+    collection''s reason - Keith: ''in the case of Child Protection we''d probably be turning it off at collection level''.
+    The same freeze, closing and arrival rules apply as for a dataset''s own effective_to. REJECTED turn-off per dataset only:
+    thirty edits for one decision about one unit. ANSWERED BY THE DECISION BELOW - was STILL OPEN: whether one dataset''s
+    own later version may turn itself back on inside a collection-level turn-off (Keith''s dictated answer leaned both ways
+    - ''a collection is a unit'' and ''let''s leave the option open'').'
+  - 'REFINED 2026-10-10 by T1 below - on/off is NOT nearest-level-wins. WAS: A DATASET MAY TURN ITSELF BACK ON INSIDE A COLLECTION-LEVEL
+    TURN-OFF (Keith, 2026-10-10, answering the point left open by the decision above: ''let''s leave the option open''): a
+    dataset''s own participation version whose effective_from falls inside its collection''s turned-off gap brings that dataset
+    alone back on from that date, the rest of the collection staying off; nearest level wins, as for every other participation
+    value. Every display of whether a dataset is on (the TUI Calendar entry and schedule show, REQ-PIPE-169) must then say
+    which level decided it, since a reader would otherwise have to check two places. REJECTED treating the collection as an
+    indivisible unit: bringing one dataset back would then mean changing the collection''s dates for all of them.'
+  - 'TURNED-OFF PERIODS INHERIT THE LAST PROMOTED SUPPLY, AS A MONTH A DATASET DOES NOT PARTICIPATE IN DOES (Keith, 2026-10-10,
+    open question Q-G, option A): a gap period is treated by REQ-PIPE-098''s inheritance exactly as an owed-nothing period
+    is, so the table is present in every period and cross-table checks do not read it as missing. Keith''s reasoning: for
+    a temporary turn-off ''we probably do want to inherit it''. ACCEPTED COST: after a permanent turn-off the inherited copy
+    can be years old, and drift after a turn-back-on compares against it. Keith questioned whether a dataset that will never
+    be received again should be inherited or kept at all, and possibly whether this should be configurable - that is the larger
+    notion of a dataset being removed altogether, logged as plans/running-thoughts.md #77 rather than decided here. REJECTED
+    no inheritance in a gap (queries for those periods would find no table) and REJECTED inheriting only in a temporary gap
+    (''permanent'' only means ''no later version yet'', so behaviour would flip when someone turns it back on).'
+  - 'WHEN CHANGING effective_to NEEDS A CORRECTION - WORDING APPROVED (Keith, 2026-10-10, open question Q-K): a change to
+    effective_to - adding it, moving it or removing it - is an ordinary edit only if, for every period whose owed-or-not status
+    the change flips, that period''s earliest claim-opening instant has not yet passed; otherwise it needs a declared correction
+    (REQ-PIPE-111). This replaces the same morning''s ''frozen from the first period it would stop being owed'', which did
+    not say whether that was judged under the old value or the new one: moving effective_to from 2026-03-31 back to 2026-02-01
+    on 10 April would have passed under the old reading (first stopped period May, not yet frozen) while silently erasing
+    February''s obligation. Found by delivery-scoper and delivery-architect independently. Covers moving earlier, moving later,
+    adding and removing with one rule.'
+  - 'CLOSING RULE BEFORE A GAP: REJECTED closing the last owed slot at effective_to (a late supply for it would then be held,
+    the false quiet Keith turned down), and REJECTED closing it at its own late-after instant (a supply a day late would find
+    nothing open). The rule chosen is the one slots.py already applies in every other case, with the gap treated as if absent.'
+  - 'CORRECTED 2026-10-10 by T5 below: a hold is labelled by the slot that would be current at its receipt instant, not by
+    its receipt date. WAS: WHICH DATE DECIDES WHAT (delivery-architect, 2026-10-10): whether a period is owed follows its
+    period date; a hold''s label follows the receipt date on the asset clock; the dashboard follows the date on show. One
+    definition of ''turned off on D'' - D after effective_to and before the next version''s effective_from at that level -
+    with each consumer passing in its own date. A following-period dataset (REQ-PIPE-167) can have a period due before effective_to
+    that it nonetheless does not owe, because its period date falls after; that is consistent, and is stated so nobody reads
+    it as a defect.'
+  - 'THE TURNED-OFF HOLD REUSES REQ-PIPE-064''S KIND WITH A FLAG (delivery-architect, 2026-10-10), as schedule-ended holds
+    do: no new hold kind. A hold is written once (ON CONFLICT DO NOTHING), so its label is worked out from current configuration
+    when shown - otherwise a schedule-ended hold raised before a turn-off would advise adding dates for ever.'
+  - 'ON OR OFF FOLLOWS THE MOST RECENT VERSION AT EITHER LEVEL, SO A COLLECTION TURN-OFF REACHES EVERY DATASET (Keith, 2026-10-10,
+    T1, option A, recommended by delivery-scoper and delivery-architect): a dataset is turned off on date D if its own latest
+    participation version starting on or before D ended (effective_to) before D, or if its collection''s latest participation_defaults
+    version starting on or before D ended before D and the dataset has no version of its own whose effective_from falls after
+    that effective_to and on or before D. So a collection turn-off reaches a dataset whose own version began years earlier;
+    only a dataset version starting inside the gap brings that dataset back; and a later collection version never ends a dataset''s
+    own turn-off. Inside a collection gap the collection supplies no values, so a dataset version bringing itself back on
+    must state its own due time and grace (REQ-PIPE-110''s unresolved-value refusal). On/off is therefore NOT resolved by
+    per-value nearest-wins. REJECTED nearest-level-wins for on/off: a dataset with its own version would ignore the collection''s
+    turn-off, defeating ''turning Child Protection off as a unit''.'
+  - 'ITEMS ABOUT AN OWED PERIOD KEEP COUNTING UNTIL RESOLVED; THE DATASET LEAVES THE COLOUR ROLLUP ONCE ITS LAST OWED SLOT
+    HAS CLOSED AND NOTHING IS WAITING (Keith, 2026-10-10, T2, option A, recommended by all four reviewers): a slot that closed
+    unfilled and is overdue, a red verdict on an owed period, or a resupply waiting for a decision stays among the states
+    needing a person (REQ-PIPE-064 criterion 5, REQ-PIPE-132 criterion 10) until resolved, whether or not the dataset is turned
+    off; the dataset leaves its collection''s and asset''s colour rollup only once its last owed slot before the gap has closed
+    and no such item is still waiting; a red verdict keeps showing on the dataset itself beside its marker. REQ-DASH-180 criterion
+    6 is to be split into these two statements. REJECTED keeping it in the colour rollup until everything is resolved (a permanently
+    turned-off dataset with a red last supply would colour its collection for ever) and REJECTED dropping everything at the
+    close as drafted (an overdue last period would go quiet the moment the miss became real).'
+  - 'A SUPPLY HELD AS TURNED OFF DOES NOT NEED A PERSON; IT SHOWS AS A QUIET COUNT (Keith, 2026-10-10, T3, option A, recommended
+    by three reviewers): it is not among the states needing a person anywhere - pipeline, terminal queue or dashboard - and
+    shows on the dataset as one quiet line, ''N received while turned off, earliest <date>'', counted as at the date on show,
+    never red. It still waits for a person to place or reject it unless configuration later gives it an open owed slot (Q-B).
+    This also settles REQ-PIPE-179''s earlier open question on the same point, and REQ-DASH-180 criterion 10 stands. The built
+    REQ-PIPE-064 criterion 5 and REQ-PIPE-083 criterion 21, which count every held supply as needing action, are to be amended
+    in the same change; that wording comes to Keith at sign-off. REJECTED counting it like every other hold: a supplier still
+    sending files after being asked to stop would raise a needs-action item, and a ticket, each time.'
+  - 'ANSWERED BY T3 (Keith, 2026-10-10): a supply held as turned off is not among the states needing a person; it shows as
+    a quiet count on the dataset. See the T3 decision.'
+  - 'A HOLD''S LABEL IS WORKED OUT FROM CURRENT CONFIGURATION EVERYWHERE IT IS USED (Keith, 2026-10-10, T4, option A, the
+    delivery-architect''s recommendation): the label (turned off, schedule ended, or the plain assignment-rule hold), its
+    advice and its responses are computed from the configuration in force when they are read - for display, for re-filing
+    (schedule_ended.refile_covered''s filter), for the processing pass''s tally, for the dashboard''s backlog line and for
+    every count - so what is shown always agrees with what is re-filed and counted. The structured reason recorded when the
+    hold was raised stays as history. The built REQ-PIPE-154 criteria 2 and 6 and REQ-PIPE-064 criterion 8, which read the
+    recorded flag, are to be amended in the same change; that wording comes to Keith at sign-off. Cost accepted: a small per-hold
+    calculation, and holds are few. REJECTED keeping the recorded flag authoritative for re-filing and counts while only the
+    advice text is recomputed: the label shown could disagree with what is re-filed.'
+  - 'OWED-NESS GOES BY THE PERIOD''S DATE EVEN FOR A DATASET SUPPLYING AHEAD, AND HOLDS ARE LABELLED BY SLOT, NOT RECEIPT
+    DATE (Keith, 2026-10-10, T5, option A, the delivery-architect''s recommendation): a period is owed if the participation
+    in force on its period date owes it, never because its due date falls before effective_to - so for a dataset due 60 days
+    ahead and turned off after 2026-03-31, the May 2026 period (dated 15 May, due 16 March) is not owed, and a May supply
+    sent on 16 March finds no open owed slot and is held as turned off. A hold is labelled turned off where no owed slot is
+    open at its receipt instant and the calendar period whose slot would then be current (computed with criterion 12''s inputs)
+    is a turned-off period - so the stretch between the last owed slot closing and effective_to is labelled correctly too
+    (the architect found the receipt-date rule mislabelled it as schedule ended, advising ''add the next dates''). The ''WHICH
+    DATE DECIDES WHAT'' decision is to be corrected to this, and criterion 14 reworded. REJECTED owing a period whose due
+    date falls on or before effective_to: a second rule applying only to datasets that supply ahead.'
+  - 'A PERMANENT TURN-OFF AFTER THE CALENDAR''S LAST AUTHORED DATE IS ACCEPTED (Keith, 2026-10-10, T6, option A, recommended
+    by delivery-scoper and delivery-cli-ux): the refusal of a gap that contains no calendar period applies only where a later
+    version follows the effective_to - a temporary gap that turns nothing off; a permanent turn-off (no later version) is
+    accepted even where the calendar has no dates after effective_to, and it takes the dataset out of the exhausted-schedule
+    and runway warnings (criterion 21). So a supplier can be turned off the day they stop, which is the likeliest moment to
+    need it. Criterion 7 is to be reworded to ''...or leaves a gap before a later version that contains no period...''. REJECTED
+    refusing it until the next dates are authored.'
+  - 'A TURNED_OFF_REASON CHANGED AFTER ITS TURN-OFF HAS TAKEN EFFECT NEEDS A DECLARED CORRECTION, EVEN FOR A TYPO (Keith,
+    2026-10-10, T7, option A): turned_off_reason freezes with its effective_to (criterion 10), and any change to it after
+    the freeze - wording or meaning - is a declared correction with an approver; `mothman schedule draft-correction` prints
+    the entry. Consistent and fully auditable. REJECTED freezing only the meaning and allowing wording-only edits: no gate
+    can tell a typo fix from a rewritten reason.'
+  - 'TURNED OFF OUTRANKS SCHEDULE ENDED (main session, 2026-10-10, giving the reason the second review found missing - delivery-scoper
+    5 - for Keith to confirm at sign-off): a schedule-ended hold''s advice is ''add the next dates'', which would not make
+    a turned-off dataset owe anything, so the turned-off label is the one whose advice is true. The delivery-scoper''s earlier
+    suggestion, schedule ended first, is REJECTED for that reason.'
+  - 'FOLDED 2026-10-10 (main session), the second review round''s fixes and Keith''s T1-T7 answers now criteria: on/off by
+    the most recent version at either level, with a collection supplying no values while off (T1, delivery-architect F1, delivery-scoper
+    B2); owed items count until resolved, citing REQ-PIPE-064 and REQ-PIPE-132 rather than REQ-PIPE-083 (T2, delivery-scoper
+    B1 and 19); a turned-off hold is not needs-action, with REQ-PIPE-064 criterion 5 and REQ-PIPE-083 criterion 21 amended
+    (T3, delivery-scoper 22); the label computed from current configuration everywhere, the recorded reason kept as history
+    (T4, delivery-architect F4); holds labelled by slot (T5, delivery-architect F3); a permanent turn-off after the last authored
+    date accepted (T6, delivery-cli-ux F1); turned_off_reason changed only by correction (T7); the closing rule resolved per
+    value across levels (delivery-architect F2); the freeze instant for a gap period and under both configurations (delivery-scoper
+    17, delivery-architect F6); the display names the level and says ''Turned off - nothing due'' (delivery-cli-ux F2, F8;
+    delivery-scoper 4); a hint where reason is written for turned_off_reason (delivery-cli-ux F11); the overlap gate checks
+    across a gap (delivery-architect F5); REQ-PIPE-163, REQ-PIPE-154, REQ-PIPE-064 and REQ-PIPE-098 amendments numbered (delivery-scoper
+    check 5); runway wording (delivery-scoper 18); NFRs for performance, auditability, test-first and security (delivery-scoper
+    20 and 26); dependencies on REQ-PIPE-181, 132, 169, 167, 106 and 053 (delivery-scoper 21 and 26, delivery-architect F9).
+    How long a turned-off dataset''s history is kept is the larger question of removing a dataset, plans/running-thoughts.md
+    #77, not decided here. Criterion numbers in earlier decisions refer to the list before this fold.'
+  - 'REQ-PIPE-181 IS A MUST (Keith, 2026-10-10, round 3 Q2, option A): this requirement''s collection-level turn-off and its
+    display depend on REQ-PIPE-181, which was raised to must for that reason, so nothing here is conditional on it.'
+  - 'TURNED-OFF HOLDS ARE A QUIET LAST GROUP IN THE TERMINAL''S QUEUE (Keith, 2026-10-10, round 3 Q3, option A, the delivery-cli-ux
+    recommendation): listed after the slot rows as ''Received while turned off (N)'', outside the count of supplies waiting
+    on a decision, so place and reject stay one keypress away as on the dashboard''s quiet line (REQ-DASH-180). Each says
+    why: ''Received while <dataset> is turned off (<reason>, set for <level>). Place it into a period it still owes, reject
+    it, or change effective_to/effective_from in contract/calendar.yaml if this period should be owed.'' REQ-PIPE-163 criterion
+    17''s placement of held supplies is to be amended to match. REJECTED showing them only in `mothman supply holds`.'
+  - 'A DATASET BACK ON INSIDE ITS COLLECTION''S GAP MUST STATE EVERY VALUE THE COLLECTION GAVE IT (Keith, 2026-10-10, round
+    3 Q6, option A, recommended by delivery-architect and delivery-scoper): T1 left the collection supplying no values while
+    off and required only due time and grace, so a back-on version that left out participates would owe every period and one
+    that left out days before would drop to zero - a silent widening, the trap REQ-PIPE-050 exists for. Criterion 7 now refuses
+    it, naming each value. REJECTED resolving the collection''s last values as if effective_to were absent (it contradicts
+    T1''s wording).'
+  - A HELD SUPPLY IS RE-FILED BY THE RULE WHENEVER CONFIGURATION GIVES IT AN OPEN OWED SLOT, WHATEVER ITS LABEL (Keith, 2026-10-10,
+    round 3 Q8, option A - taken as 'the recommended option', though the main session had not stated a recommendation for
+    this one before Keith said so; it is the delivery-architect's proposed wording, and follows Keith's own Q-B reasoning
+    that a supply the configuration now covers should not wait for work the rule can do). This includes the plain assignment-rule
+    holds, such as the nine Case Workers holds, and is consistent with T4's label computed from current configuration. Schedule-ended
+    holds still offer only adding dates. REJECTED filtering on the label recorded when the hold was raised, which T4 rejected
+    for counts.
+  - 'KEEP IS NOT OFFERED WHERE A CORRECTION MAKES THE PERIOD OWED-NOTHING (Keith, 2026-10-10, round 3 Q9, option A, the delivery-scoper''s
+    recommendation): a supply kept in a period with no slot, which inherits, and into which nothing may be placed would have
+    three rules disagreeing about one period; Keith already rejected placing into a gap as ''nullifying the point''. REQ-PIPE-170
+    (signed) is amended by same-change criterion. REJECTED allowing keep with the kept supply outranking inheritance.'
+  - 'ROUND 3 FOLDED, 2026-10-10 (main session): owed items cover a promoted supply re-checked worse, and a promoted red supply
+    is resolved for counting (delivery-dashboard-ux 2-3); a turned-off hold is labelled by criterion 16 whatever its receipt
+    date (delivery-scoper E); the refusals say which rule and the date to change, and the correction-needed refusal names
+    each flipped period and prints draft-correction (delivery-cli-ux M2, M3); collection-level wording for flipped periods
+    and empty gaps (delivery-architect, low); ''any held supply'' for the gap (delivery-architect, delivery-scoper I); the
+    helper returns resolved values and is REQ-PIPE-181''s one function (delivery-architect 13); a supplying-ahead dataset''s
+    stretch between its last close and effective_to is marked (delivery-architect 10); turned-off holds a quiet last group
+    with their response wording (Keith Q3, delivery-cli-ux M4, delivery-architect 9); a correction to effective_to proposes
+    its filing moves through REQ-PIPE-170, and REQ-PIPE-170 is a dependency (delivery-architect 12, delivery-scoper A); REQ-PIPE-053
+    criteria 4, 10 and 15 amended (delivery-architect 11); the amendment order stated (delivery-architect 14); the chooser''s
+    handling of gap periods now lives in REQ-PIPE-163 criterion 16 itself. Criterion numbers in decisions written before this
+    fold refer to the list as it then stood.'
+  - 'PROPOSED, NOT KEITH''S - THE BACKSTOP SEES A TURN-OFF (criterion 38): agreement_drift compares each recorded verdict''s
+    slot with what the configuration resolves now ''for the same slot name'' - and a turn-off removes the slot (criterion
+    13). NOT VERIFIED that the comparison flags a vanished slot; the criterion makes it explicit either way. Commit-time freezing
+    (criterion 11) does not cover a force-push or out-of-band edit, which is the whole reason REQ-PIPE-173 exists.'
+  - '163 NO LONGER AMENDED HERE (DECIDED Keith, 2026-10-13, set 1 Q1, option A): REQ-PIPE-163 criteria 7 and 17 are written
+    turn-off-aware, so criterion 32 drops its 163 half and criterion 20 carries the gap-specific refusal wording that half
+    used to add.'
+  - 'EVERY ROUTE INTO A TURNED-OFF PERIOD IS REFUSED, AND A PARKED MOVE STAYS PARKED (DECIDED Keith, 2026-10-13, set 2 Q5,
+    option A): place, re-file, a confirmed correction''s move and a parked move alike (criterion 20); a parked move whose
+    confirmed period has since become turned off stays parked and says so (criterion 37) rather than being held, because the
+    asset manager confirmed it and a hold would hide that. REJECTED refusing placement only: a re-file is refused today only
+    where the target is already inherited, and a future gap period has no inheritance yet.'
+  - 'THE RULE RE-FILES EVERY ASSIGNMENT-RULE HOLD CONFIGURATION LATER COVERS (DECIDED Keith, 2026-10-13, set 2 Q6, option
+    A, confirming round 3 Q8 knowing its reach): that includes holds a confirmed correction raised (REQ-PIPE-170 criterion
+    8) and holds a person''s settlement raised (REQ-PIPE-193 criterion 11), not only the eight Case Workers holds. Schedule-ended
+    holds still offer only adding dates. REJECTED excluding holds that came from a person''s decision: the hold is a consequence
+    of that decision, not the decision, and a supply the configuration now covers should not wait for work the rule can do.'
+  - 'TURNED OFF OUTRANKS SCHEDULE ENDED - CONFIRMED (DECIDED Keith, 2026-10-13, set 2 Q7(a)): the main session''s reading
+    stands; a schedule-ended hold''s advice, ''add the next dates'', would not make a turned-off dataset owe anything.'
+  - 'A not_expected ENTRY INSIDE A TURNED-OFF GAP IS REJECTED AS CONFIGURATION (DECIDED Keith, 2026-10-13, set 2 Q7(b), REVERSING
+    the main session''s reading of 2026-10-10): ''you shouldn''t be able to have a not expected period while the dataset is
+    turned off - that doesn''t make sense.'' Criterion 21 now refuses it, naming the dataset, the entry, the gap and its turned_off_reason.
+    REJECTED accepting it and describing the period as turned off - two reasons for one owed-nothing period, one of them meaningless.
+    COST ACCEPTED: an entry already frozen when a later turn-off covers it must be removed by a declared correction in the
+    same change; the refusal says so. REQ-DASH-182 never shows a ''Not expected'' row inside a gap as a result.'
+  - '179 TAKES TS-63 OVER FROM REQ-PIPE-170 (DECIDED Keith, 2026-10-13, set 2 Q8, option B, against the scoper''s recommendation):
+    criterion 39 plants it in the same change that builds this requirement, and criterion 40 re-points REQ-PIPE-170''s unmet
+    criterion 23 to TS-57 to TS-62. PROPOSED, NOT KEITH''S: the dataset. cp-carers is the scoper''s suggestion - it owes every
+    quarter, is read by a cross-table check (so criterion 22''s inheritance is seen doing work), and is not cp-clients (TS-42,
+    TS-80) or cp-case-workers (its own participation gaps and standing holds). The register''s TS-63 config (15th of the month,
+    30-day window) is not the Child Protection calendar''s and is rewritten to the real one.'
+  - 'KEITH ACCEPTED THE CONFIGURATION SHAPE (DECIDED Keith, 2026-10-13, shown it during sign-off questions): a participation
+    version carrying effective_to and turned_off_reason; back on is a later version with its own effective_from.'
+  - 'TS-63''s TURN-OFF IS DECLARED AS A CORRECTION (DECIDED Keith, 2026-10-13 (architect review answers), round 3): like TS-57
+    to TS-62, not slipped in under REQ-PIPE-111''s synthetic exception for a newly added version. REJECTED extending the synthetic
+    exception to a new version''s effective_to (the scoper''s recommendation): the demo should show the turn-off going through
+    the same gate a real one would.'
+  - 'TS-63''s ROOM: GROW THE CHILD PROTECTION HISTORY EARLIER (DECIDED Keith, 2026-10-13 (architect review answers)): pre-2023
+    calendar and participation versions, as Birth Registrations was grown (REQ-GEN-196), so TS-63''s quarters are new ones
+    and no existing scenario moves. REJECTED fitting it among today''s fifteen quarters - REQ-GEN-199 found none left clean
+    (its PROVISIONAL (a)).'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect A4 (criterion 39 - cp-carers and the other
+    Child Protection datasets share one YAML alias, *cp_participation, in contract/calendar.yaml, so an effective_to added
+    to it would turn every one of them off; split first); architect A5 (TS-63''s quarters come from REQ-GEN-207, the one growth
+    owner, now a dependency); architect E21 (gap deliveries carry the dataset''s file - held as turned off and counted, said
+    in TS-63''s entry, and the generator NFR reworded from ''no ordinary supply'' to ''no supply the dataset owes''); architect
+    F24 (criterion 19 - a held pair re-filed by the rule moves whole); CLI UX 13 (criterion 20 is the one refusal for a gap).
+    The source''s note stands: this requirement had the 2026-10-13 joint scoper pass with REQ-PIPE-163, but no scoper pass
+    as a requirement of its own (dashboard UX 16).'
+- id: REQ-DASH-180
+  title: 'The dashboard shows a turned-off dataset honestly: its real verdict, a marker, and nothing owed gone quiet'
+  date_written: '2026-10-10'
+  story: As a data team leader glancing across thirty datasets, I want a dataset that has been turned off to read as turned
+    off - not as missed, not as failing, and not hiding a red verdict or an overdue period it still owed - so that I neither
+    chase a supplier we stopped asking nor miss one who is late with the last file we did ask for.
+  moscow: must
+  status: not_started
+  source: Keith's 2026-10-10 answers to the delivery-dashboard-ux reviews of REQ-PIPE-110 (2026-10-08 and 2026-10-10). Split
+    out of REQ-PIPE-110 and drafted by the main session on 2026-10-10. NOT YET THROUGH delivery-scoper as a requirement of
+    its own - say so when it is presented for sign-off. NOR THROUGH the 2026-10-13 joint scoper pass on REQ-PIPE-163, 179
+    and 182 (dashboard UX 16, 2026-10-14) - say both when presenting it.
+  acceptance_criteria:
+  - WHILE a dataset is turned off on the date on show, THE SYSTEM SHALL keep showing the verdict of the supply in place, red
+    included, with a 'Turned off since <date>' marker beside it, the date being the day after effective_to on the data asset's
+    clock, worded as criterion 4 says instead while that criterion applies.
+  - THE SYSTEM SHALL show the turned_off_reason as visible text in the dataset's header, and as the marker's title on the
+    collection table's row; and WHERE the turn-off is its collection's, the marker SHALL read 'Turned off with <collection>
+    since <date>', its title naming the level, and the collection card SHALL show the collection's turned_off_reason.
+  - THE SYSTEM SHALL draw the marker as an outline in the family of 'No delivery schedule agreed yet' with a solid border,
+    and SHALL NOT use the style or words of 'Schedule ended', 'Late (excused)' or 'Accepted'.
+  - WHILE a dataset is past its effective_to and its last owed slot before the gap has not yet closed, THE SYSTEM SHALL word
+    the marker 'Turning off - <period> supply still owed, open until <date and time>' while that period has no supply, and
+    'Turned off since <date> - <period> open for resupply until <date and time>' once it has one.
+  - THE SYSTEM SHALL NOT treat the verdict of the supply in place as stale because of a period the dataset owes nothing in,
+    whether by being turned off, by participation or by not_expected.
+  - THE SYSTEM SHALL keep counting in every needs-action count every item about a period the dataset owed - any period outside
+    a turned-off gap - a slot closed unfilled and overdue, a supply on an owed period waiting for a person's decision (red
+    included), a promoted supply listed as 'Promoted, then re-checked <verdict>' (REQ-PIPE-164) - until it is resolved, whether
+    or not the dataset is turned off; a promoted red supply counts as resolved for this purpose and keeps its red-promoted
+    badge on the dataset (criterion 7).
+  - THE SYSTEM SHALL leave a turned-off dataset out of its collection's and asset's colour rollup only WHILE its last owed
+    slot before the gap has closed and no item criterion 6 counts is waiting, returning it to the rollup whenever one is,
+    and SHALL keep showing a red verdict on the dataset itself beside its marker.
+  - WHERE every dataset in a collection, an agency or the asset's executive tier is left out of its rollup on the date on
+    show, all of them by criterion 7, THE SYSTEM SHALL show that group a 'Turned off' status, and SHALL NOT show it green.
+  - 'WHERE every dataset in a group is left out of its rollup but not all by criterion 7, THE SYSTEM SHALL show the group
+    a quiet ''Not counted'' status with a line saying why - e.g. ''3 datasets not counted: 2 turned off, 1 no schedule agreed
+    yet'' - and SHALL NOT show it green.'
+  - 'WHERE some but not all of a group''s datasets are left out of its rollup, THE SYSTEM SHALL say so in one quiet line on
+    every collection card, every agency card and the executive tier concerned - ''N datasets not counted in this status: <counts
+    by reason>'' - and SHALL show each such dataset''s marker on its row in the collection table; that line SHALL NOT count
+    an exhausted dataset, which the exhausted-schedule line already states, and SHALL be left out where it would only repeat
+    the group''s own status.'
+  - THE SYSTEM SHALL add 'Turned off' and 'Not counted', keyed turnedoff and notcounted, to the group statuses the page already
+    has (nodata, green, amber, red, exhausted, inactive) - in the template's status lists, in qa_tools/common/dataset_status.py,
+    in the shared status cases and in the legend alike - SHALL leave both out of every worst-of rollup as nodata, exhausted
+    and inactive are left out, and WHERE more than one would apply, SHALL show the first of exhausted, inactive, nodata, notcounted,
+    turnedoff.
+  - THE SYSTEM SHALL draw the group 'Turned off' and 'Not counted' statuses in the dataset turn-off marker's own style, and
+    SHALL NOT use the inactive status's struck-through icon.
+  - THE SYSTEM SHALL place the turn-off marker immediately after the status pill and the red-promoted badge, and before the
+    marker on a period standing on an inherited supply, with an icon none of the 'No delivery schedule agreed yet', inactive
+    or inherited markers uses.
+  - THE SYSTEM SHALL show a supply held as turned off in its own quiet section of supply history, 'Received while turned off',
+    and one quiet line on the dataset - 'N received while turned off, earliest <date>', counted as at the date on show - and
+    SHALL NOT show it red, under 'Waiting for a person', in a 'Waiting since' tile or in the outstanding count, and SHALL
+    NOT treat the dataset as blocked (REQ-PIPE-115 criterion 10) because of it, so that such a supply neither turns the dataset's
+    status red nor brings the dataset back into its group's rollup; the quiet line SHALL sit where the accepted-gaps note
+    sits (.accepted-gaps-note).
+  - THE SYSTEM SHALL show a turned-off gap's periods as owed-nothing rows (REQ-DASH-182) whose kind reads 'Turned off' with
+    the turned_off_reason, starting a new group wherever the kind or reason changes.
+  - WHILE a dataset is turned off on the date on show and owes no period whose slot is still open, THE SYSTEM SHALL show its
+    delivery-time tile as 'Turned off - nothing due' and SHALL NOT show the last version's due time as though it applied;
+    and WHILE it still owes a period whose slot is open, SHALL show that period's due time labelled with the period.
+  - THE SYSTEM SHALL NOT show a dataset turned off for good in the exhausted-schedule notice, its marker or the runway warning;
+    SHALL show a dataset in a temporary gap in the runway warning by the periods it owes once back on (REQ-PIPE-179 criterion
+    25); and SHALL show those for a dataset turned back on with no dates left from the moment it is back on.
+  - WHEN a dataset is turned back on, THE SYSTEM SHALL show it as any dataset between deliveries - the verdict of the supply
+    in place, never 'No data' - until its first owed period's slot opens, and SHALL keep the gap's owed-nothing rows in its
+    history.
+  - WHERE a supply for a still-owed period arrived after effective_to, THE SYSTEM SHALL show its arrival as plain Late where
+    it is late, never 'Late (excused)' because of the turn-off alone - a lateness a person excused reads as REQ-DASH-162 says
+    - with a note in the row's provenance cell that the period was still owed after the turn-off.
+  - THE SYSTEM SHALL judge every turned-off reading from the participation versions in force on the date on show, so that
+    a link to a date before or after a turn-off shows the dataset as it was then, and SHALL add nothing to the URL for it.
+  - THE SYSTEM SHALL render turned_off_reason as text, never as markup.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-053 criteria 16 to 19 so that a turned-off dataset is never shown
+    as exhausted, and REQ-DASH-155 criteria 1 and 3 so that the exhausted-schedule backlog counts only schedule-ended holds.
+  - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
+  - THE SYSTEM SHALL judge every instant these criteria turn on at the end of the date on show on the data asset's clock,
+    as the page already judges whether a blocker is open on the date on show.
+  - WHILE a dataset's last owed slot before a turn-off has closed and its effective_to has not yet passed, THE SYSTEM SHALL
+    show the marker 'Turning off after <effective_to> - nothing more owed', and SHALL apply criterion 7 from that close.
+  - WHERE a turned-off dataset has a red promoted supply, THE SYSTEM SHALL keep naming it in its collection card's red-promoted
+    line, with '(turned off)' after its name.
+  non_functional_requirements:
+  - 'At thirty datasets a per-dataset marker becomes noise unless it aggregates: the group card carries one line of counts
+    by reason, never a list of names.'
+  - Rendered from data REQ-PIPE-179 computes; this only consumes it (docs/components.md).
+  - Same date formatting as everything else on the page (REQ-DASH-071).
+  dependencies:
+  - REQ-PIPE-179
+  - REQ-PIPE-110
+  - REQ-DASH-182
+  - REQ-DASH-071
+  - REQ-DASH-155
+  - REQ-PIPE-053
+  - REQ-PIPE-181
+  - REQ-PIPE-164
+  - REQ-DASH-162
+  - REQ-PIPE-115
+  open_questions:
+  - 'THE ''Turning off after <date>'' FORESHADOW MARKER before effective_to (delivery-dashboard-ux F9; left out in round 3,
+    delivery-scoper G). Recommended (A): leave it out - dashboard UX round 3 leans no; criterion 25 already marks the stretch
+    after the last owed slot closes. (B) add it.'
+  decisions:
+  - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith), as REQ-DASH-155 was split from REQ-PIPE-154: the decision and its record
+    are one reviewable unit, the rendering another.'
+  - 'REFINED 2026-10-10 by Q-A and T2 below - items about an owed period keep counting; only the gap is left out. WAS: A TURNED-OFF
+    DATASET KEEPS ITS REAL VERDICT, WITH A ''TURNED OFF'' MARKER BESIDE IT (Keith, 2026-10-10, on the delivery-dashboard-ux
+    review): its status pill shows what the checks found, red included, with a quiet outline marker reading ''Turned off since
+    <date>'' and the reason - the pattern unagreedMarker already uses for ''No delivery schedule agreed yet'' - and the dataset
+    is left out of every collection and asset rollup and every needs-action count. Criterion 1 here is that rewording: not
+    red BECAUSE it is turned off, never hiding a verdict the data in place earned. REJECTED letting ''Turned off'' replace
+    the status pill: a red period still holding data people may query would be hidden one click down - a false quiet.'
+  - 'ITS MARKER WORDING SUPERSEDED 2026-10-10 by T8 below; the rest stands. WHILE TURNED OFF, ONLY THE GAP IS QUIET (Keith,
+    2026-10-10, open question Q-A, recommended by all four reviewers): anything about a period the dataset still owes - an
+    open late slot, a resupply waiting for a person, a slot closing unfilled, a red verdict - keeps counting among things
+    needing a person as normal; only the gap''s own periods are excluded. The dataset leaves the collection''s and asset''s
+    status once its last owed slot has closed (15 April in the worked example), and until then its marker reads ''Turning
+    off - last supply owed: <period>, open until <date>''. REJECTED leaving the whole dataset out from the day after effective_to:
+    an overdue or red owed period would go quiet - the false quiet Keith already turned down when choosing to keep the real
+    verdict.'
+  - 'CORRECTED 2026-10-10 (delivery-dashboard-ux, second pass): the page already has six status values (No data, green, amber,
+    red, exhausted, inactive), so ''Turned off'' is the seventh and ''Not counted'' the eighth, not the sixth; and its STILL
+    OPEN point is answered by the decision below. WAS: A COLLECTION OR AGENCY WHOSE DATASETS ARE ALL TURNED OFF READS AS A
+    NEW GROUP STATUS, ''TURNED OFF'' (Keith, 2026-10-10, open question Q-J, option C): the card shows a ''Turned off'' status
+    in place of the colour, never green. This closes the latent false green logged as post-build-review #135, where rollup()
+    returns green for a group whose every dataset is left out of the rollup. Keith chose it knowingly as a sixth status value,
+    which the dashboard has otherwise avoided. REJECTED a quiet grey ''No data'' pill with an ''N not counted'' line (reuses
+    a status that is slightly untrue) and REJECTED no pill with a line in words (the dashboard reviewer''s recommendation;
+    a card of a different shape). STILL OPEN: what a group shows when every dataset is left out of the rollup but not all
+    for being turned off (e.g. all ''No delivery schedule agreed yet'', or a mix) - #135 needs that answer too.'
+  - 'A GROUP WHERE NOTHING IS COUNTED FOR OTHER REASONS READS ''NOT COUNTED'', NOT ''TURNED OFF'' (Keith, 2026-10-10, answering
+    the point left open by the Q-J decision, option A): ''Turned off'' is shown only when every dataset in the group is turned
+    off; where every dataset is left out of the rollup but not all for that reason (all ''No delivery schedule agreed yet'',
+    or a mix), the group shows a quiet ''Not counted'' status with a line saying why, e.g. ''3 datasets not counted: 2 turned
+    off, 1 no schedule agreed yet''. Never green. Together with Q-J this is the answer post-build-review #135 was waiting
+    for. REJECTED using ''Turned off'' for any group where nothing is counted: untrue for datasets that simply have no schedule
+    yet.'
+  - 'THE FALSE QUIETS THE DASHBOARD REVIEW FOUND (delivery-dashboard-ux, 2026-10-10), each now a criterion: the staleness
+    rule would grey the real verdict after the next period''s date (criterion 5); excluding the whole dataset would hide an
+    overdue owed period (criterion 6); every existing hold path renders red and ''waiting for a person'' (criterion 10); and
+    rollup() returns green for a group with nothing counted (criteria 7-8, post-build-review #135).'
+  - 'A SOLID OUTLINE, NOT DASHED (delivery-dashboard-ux, 2026-10-10): on this page dashed means ''not yet / provisional''
+    (''No data'', ''No delivery schedule agreed yet''), and a turn-off is a decided state.'
+  - 'TWO MARKER WORDINGS BETWEEN effective_to AND THE LAST OWED SLOT CLOSING (Keith, 2026-10-10, T8, option B): while the
+    last owed period is still unfilled, the marker reads ''Turning off - <period> supply still owed, open until <date and
+    time>''; once it has a supply, ''Turned off since <date> - <period> open for resupply until <date and time>''; after the
+    slot closes, ''Turned off since <date>''. The closing is an instant, so its time is shown on the closing day (REQ-DASH-071).
+    Criterion 4 is to be reworded to this, and criterion 1 to say criterion 4''s wording replaces it while it applies. REJECTED
+    one wording true either way (less sharp) and REJECTED the draft (it told a reader to chase a supply already delivered).'
+  - 'NOT ADOPTED, optional (delivery-dashboard-ux F9, 2026-10-10): a ''Turning off after 31 Mar'' marker shown before effective_to
+    is reached. Left out as the reviewer marked it optional; Keith may add it at sign-off.'
+  - 'FOLDED 2026-10-10 (main session), the second review round''s fixes and Keith''s T2, T3 and T8 answers now criteria: needs-action
+    and the colour rollup split (T2, delivery-dashboard-ux F1, delivery-scoper B1); the group statuses keyed on the rollup
+    criterion rather than the date on show (delivery-dashboard-ux F2, delivery-scoper 24); two marker wordings, criterion
+    4 replacing criterion 1''s while it applies (T8, delivery-dashboard-ux F2 and F3, delivery-scoper 25); the new statuses
+    joined in both implementations, the shared cases and the legend, with an order (delivery-dashboard-ux F4); their look
+    (F5); the marker told apart from the inherited one (F6); the quiet received-while-off line (T3, F7); every collection
+    and agency card (F8); the delivery-time tile true while a period is still owed (delivery-scoper 23); reasons as text (delivery-architect,
+    security); the REQ-PIPE-053 and REQ-DASH-155 amendments (delivery-architect F9); the owed-nothing rows now REQ-DASH-182''s.
+    Criterion numbers in earlier decisions refer to the list before this fold.'
+  - 'A TURNED-OFF DATASET STAYS NAMED ON ITS COLLECTION''S RED-PROMOTED LINE, MARKED ''(turned off)'' (Keith, 2026-10-10,
+    round 3 Q5, option A, the delivery-dashboard-ux recommendation): its red promoted supply still sits in the period and
+    can be queried, so the red stays visible one level up, and the marker says why it no longer colours the card. REJECTED
+    dropping it from the line once out of the rollup.'
+  - 'ROUND 3 FOLDED, 2026-10-10 (main session): a turned-off hold no longer makes the dataset blocked - verified in the template''s
+    rollup(), where any blocked or waiting-blocker dataset rolls up red (delivery-dashboard-ux 1); owed items cover a promoted
+    supply re-checked worse, and a promoted red is resolved for counting (2-3); the rollup exclusion applies only while nothing
+    is waiting (4); a person''s excuse is not overridden (5); the executive tier and rollupStatuses() (6); the not-counted
+    line does not repeat the exhausted line (7); the marker''s placement and icon made testable (8); a collection-level turn-off
+    named as such (9, delivery-architect); status keys named (10); instants judged at the end of the date on show (11); Keith''s
+    Q5 (12); the runway wording for a temporary gap (delivery-scoper D); the delivery-time tile while a period is still owed
+    (delivery-scoper F); the supplying-ahead stretch marked (delivery-architect 10); REQ-PIPE-181, REQ-PIPE-164, REQ-DASH-162
+    and REQ-PIPE-115 added as dependencies. Criterion numbers in decisions written before this fold refer to the list as it
+    then stood.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): dashboard UX 10 (criterion 13 - after the red-promoted
+    badge too); dashboard UX 11 (criterion 14 - the quiet line in the accepted-gaps slot); dashboard UX 16 (process note in
+    the source).'
+- id: REQ-DASH-208
+  title: A scenario link from the test-scenarios panel lands with what the scenario is about in view
+  date_written: '2026-10-14'
+  story: As Keith showing someone a scenario from the test-scenarios panel, I want its link to land with the thing the scenario
+    is about on screen, so that I am not scrolling below the fold to find the quoted text while they watch.
+  moscow: should
+  status: not_started
+  source: 'plans/post-build-review.md #174 (REQ-GEN-199''s first bootstrapped build, overnight 2026-10-13: six quoted texts
+    open below the fold at 1280x800 - TS-75a, TS-75b, TS-77b and TS-78a in the as-at panel, TS-76 and TS-77a in the substitution
+    drill-down). PROPOSED by the round 3 dashboard UX review (finding 14, option A) and drafted by delivery-scoper overnight
+    2026-10-13 to 14 while Keith was asleep; not yet reviewed as a requirement of its own.'
+  acceptance_criteria:
+  - WHEN a scenario link (REQ-GEN-201) is followed from the test-scenarios panel, THE SYSTEM SHALL scroll the page so that
+    the element the scenario is about is in the viewport, and SHALL move focus to it, as drillToPeriod brings a period into
+    view.
+  - THE SYSTEM SHALL name each scenario's subject semantically in its placement record - the as-at panel, the verdict line,
+    the substitution drill-down, the standing-in pill or a supply-history row - and SHALL NOT name it by a CSS selector or
+    a pixel offset.
+  - WHERE the subject is inside a collapsed section of supply history, THE SYSTEM SHALL expand that section before scrolling
+    to it.
+  - THE SYSTEM SHALL mark the subject with a static accent border until the reader next scrolls or navigates, and SHALL NOT
+    animate it, scrolling instantly where the reader's system asks for reduced motion.
+  - WHEN the page is reloaded after a jump, THE SYSTEM SHALL open at the top as any reload does, the jump not surviving the
+    reload.
+  - 'THE SYSTEM SHALL amend, in the same change, REQ-GEN-199 criterion 36 so that each quoted text is asserted inside the
+    viewport once the jump has brought it there, rather than inside the initial viewport without scrolling, and SHALL remove
+    each strict expected failure naming post-build-review #174 as its text comes into view.'
+  - IF a scenario's subject is not on the page on its link's date, THEN THE SYSTEM SHALL leave the page at the top and SHALL
+    NOT scroll to a different element.
+  non_functional_requirements:
+  - 'ORDER: built before REQ-GEN-205''s and REQ-GEN-206''s bootstraps, so their new chips are written against a jump that
+    works (dashboard UX 14).'
+  - 'SCALE: the subject is named per scenario, so the panel''s growth (thirty-odd scenarios today) adds records, not code
+    paths.'
+  - 'ACCESSIBILITY: focus moves to the subject so a keyboard or screen-reader user lands where a sighted one does; no animation
+    (criterion 4).'
+  - 'NO NEW ASSET: template JavaScript and CSS only; the file:// and offline viewing paths are unaffected.'
+  dependencies:
+  - REQ-GEN-201
+  - REQ-GEN-199
+  - REQ-GEN-045
+  decisions:
+  - 'A PAGE FIX, NOT A LOOSER TEST (REQ-GEN-199 criterion 37; post-build-review #174): the six below-the-fold texts are findings
+    against the page, carried as strict expected failures. REJECTED accepting below-the-fold and loosening the assertion.'
+  - 'THE CRITERION NUMBER IS 36, NOT 34 (delivery-scoper, 2026-10-14): post-build-review #174 cites REQ-GEN-199 ''criterion
+    34''; in the register the viewport assertion is criterion 36 and its ''a finding against the page'' rule is criterion
+    37 (34 is the as-at test''s date source).'
+  - 'THE SHAPE (dashboard UX 14, PROPOSED): subject named semantically (a), collapsed history expanded (b), a static accent
+    border with no animation (c), a reload lands at the top with the jump state in history.state (d), REQ-GEN-199''s assertion
+    reworded (e). Criterion 5 is written to the review''s recommendation on Set B Q1.'
+  open_questions:
+  - 'SET B Q1 - SHOULD THE JUMP SURVIVE A RELOAD? Recommended (A): no - a reload opens at the top, as every reload does, the
+    jump state kept in history.state only (criterion 5 is written to this). (B) yes - the subject carried in the URL''s query
+    string, so a reloaded or shared link lands on it too, at the cost of another query parameter every link builder must carry.'
+- id: REQ-GEN-205
+  title: The synthetic history holds the calendar-correction scenarios TS-57 to TS-62 - a correction confirmed by a scripted
+    asset manager who keeps one supply, with others moved, held, parked and re-judged, and one left awaiting confirmation
+  date_written: '2026-10-14'
+  story: As Keith showing what happens when a delivery calendar turns out to have been wrong, I want the synthetic history
+    to hold a correction merged part way through it and confirmed by the asset manager - one supply moved, one kept, one held,
+    one parked behind an inheriting quarter and one only re-judged - and a second correction still awaiting confirmation,
+    so that every shape of REQ-PIPE-170 can be shown on the real dashboard and in the terminal rather than only in unit tests.
+  moscow: must
+  status: not_started
+  source: 'REQ-PIPE-170 criterion 23''s first half (signed 2026-10-07; TS-63 moved to REQ-PIPE-179 criterion 39 by Keith 2026-10-13).
+    Keith, 2026-10-13: the fictional past corrections are declared in contract/calendar.yaml. Scoped to design by the main
+    session overnight 2026-10-13 to 14 (plans/morning-reports.md entry 4, forks (e) to (h)), which stopped short of building
+    because a wrong guess would write fictional corrections into the real calendar file. Drafted by delivery-scoper the same
+    night while Keith was asleep, so every fork is an open question.'
+  acceptance_criteria:
+  - 'THE SYSTEM SHALL declare the corrections these scenarios need in contract/calendar.yaml itself, in the corrections: list
+    of each owner a correction changes, each with a change_reference, a date inside the synthetic history, an author, an approver
+    and a reason that says it is a fictional correction made to demonstrate the correction route on this synthetic asset,
+    and SHALL NOT declare them in a synthetic-only overlay file.'
+  - THE SYSTEM SHALL generate, through REQ-GEN-044's injection mechanism, only the arrivals the corrections act on, and SHALL
+    NOT generate any filing, move, hold, park, keep, verdict or confirmation the scenarios expect (REQ-GEN-044 criterion 6).
+  - WHEN the synthetic history is replayed, THE SYSTEM SHALL file and judge each of these arrivals against the agreement as
+    it stood at its receipt (REQ-PIPE-170 criterion 30), so that an arrival received before a correction's date is filed without
+    it.
+  - THE SYSTEM SHALL let contract/scripted_decisions.yaml declare a scripted correction confirmation - naming a declared correction
+    by change_reference, with no dataset of its own, and saying either keep, a list of supplies each named by scenario, dataset
+    and that scenario's supply index (never a generated id) with one keep_reason covering them, or pending - read only by
+    correction_replay.confirm_due, outside the Player that plays filing decisions and outside filing_decisions' operation
+    validation, each kept supply resolved to its supply id as scripted decisions resolve theirs (scripted_decisions._supply_of).
+  - IF a scripted correction confirmation names an undeclared change reference, an unknown scenario or supply index, a dataset
+    that scenario's arrival does not carry, keeps without a keep_reason, a keep_reason without keeps, pending together with
+    keeps, a confirmation with no keeps (which says nothing the default does not), any timing field (after_hours, at, day_offset),
+    or a change reference another confirmation already names, THEN `mothman scenarios validate` SHALL refuse it, naming the
+    entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
+  - WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31), THE SYSTEM SHALL confirm a
+    correction that has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script
+    names, SHALL leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with
+    none as it does today.
+  - IF a scripted keep names a supply its correction does not propose to move, or a scripted confirmation is refused for any
+    other reason, THEN THE SYSTEM SHALL stop the replay naming the scenario and the change reference, SHALL NOT drop the keep
+    or confirm without it, and SHALL list in that message the correction's proposed moves by scenario, dataset and supply
+    index where a scenario names them, so that the script can be put right.
+  - WHEN a bootstrap has confirmed corrections, THE SYSTEM SHALL run every QA run the confirmations owe - each moved or placed
+    supply's re-check and gate, and the knock-on re-evaluation of each period a move left or reached (REQ-PIPE-121) - through
+    recheck.run_all_owed inside the bootstrap's own pass lock and under the replay clock, before it rebuilds both collections'
+    results; SHALL say, before starting, how many runs are owed and that each takes about a minute; and IF any does not complete,
+    THEN SHALL stop the bootstrap naming it, as a refused scripted decision does.
+  - 'THE SYSTEM SHALL generate, as registered scenarios: TS-57, a supply re-judged by a confirmed correction with no move;
+    TS-58, a supply moved by it, re-checked and judged against the period it moved to; TS-59, a supply it would move that
+    the scripted asset manager keeps, with a reason; TS-60, a supply the corrected agreement gives no period, held on confirmation
+    with a hold naming the correction; TS-61, a cp-case-workers supply whose move is blocked because a later quarter inherits
+    it, parked on confirmation (REQ-PIPE-170 criterion 25); and TS-62, a correction merged and left awaiting confirmation,
+    with an arrival for a dataset it affects received after its date.'
+  - THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared
+    change alters together with the period before and the period after it; SHALL check that claim against every injection,
+    every post-generation placement (TS-52, TS-79a, TS-79b) and REQ-PIPE-179's TS-63 correction; and IF it meets a period
+    another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift either or relax the rule.
+  - THE SYSTEM SHALL place these scenarios in Child Protection quarters REQ-GEN-207 adds by growing the history earlier, so
+    that no existing scenario moves.
+  - THE SYSTEM SHALL give TS-57 to TS-61 each two lettered-sibling links (REQ-GEN-201) - 'a' on a date after their correction's
+    date and before its confirmation, where the affected datasets read awaiting confirmation (REQ-DASH-172 criterion 4), and
+    'b' on the history's last day, after the confirmation - and TS-62 one link on the history's last day; and SHALL extend
+    REQ-GEN-201's event vocabulary so that a link may be bounded by a declared correction's date, named by its change_reference,
+    and by the end of the history.
+  - THE SYSTEM SHALL update the register entries of TS-57 to TS-62 in plans/supply-model.md to the Child Protection calendar's
+    real values - the 1st of February, May, August and November, due 09:00 with 8 hours' grace, a 14-day claim window - and
+    to the correction each rides, each with a Config line, an Expect quoting what the page and the terminal say as observed
+    on the first bootstrapped build, and a Breaks as line.
+  - THE SYSTEM SHALL rewrite TS-61's Expect to the parking REQ-PIPE-170 criterion 25 built (Keith, 2026-10-11, answer (p))
+    - parked on confirmation, an outstanding item naming what blocks it and both ways it ends - in place of 'listed as blocked
+    ... the correction stays among the states needing action until it is moved or kept'.
+  - THE SYSTEM SHALL record in each scenario's register entry what it leaves standing at the end of the history - TS-61's
+    parked move as an outstanding item for as long as the quarter after it inherits, and TS-62's correction as a pending item
+    with its datasets reading awaiting confirmation - so that the needs-action items they add are known rather than discovered,
+    and TS-60's hold standing at the end of the history.
+  - THE SYSTEM SHALL have fixture tests, written first and seen to fail, that replay a small history with two declared corrections
+    and assert that a scripted keep is recorded as KEEP naming the change reference and the script's reason, that the other
+    move is carried out and re-checked before the replay ends, and that the correction scripted pending is still pending afterwards.
+  - THE SYSTEM SHALL clear REQ-PIPE-170's unmet entry for criterion 23, naming this requirement, in the change that builds
+    it.
+  - IF a correction's date, or a period one of its declared changes names, falls outside the generated history - as a date
+    fixed in configuration can once ANCHOR_DATE moves - THEN generation SHALL refuse naming the scenario and the change reference,
+    and SHALL NOT drop or shift it.
+  - THE SYSTEM SHALL stamp each confirmation a replay makes at the later of the two collections' last replayed instants and
+    the start of the correction's own date on the asset's clock, never at the wall-clock instant the bootstrap reaches it, with
+    a test written first and seen to fail against today's bootstrap._confirm_corrections, which opens a fresh replay clock with
+    no anchor and so stamps the real now. (PROPOSED - question 28; post-build-review #177.)
+  - WHEN a bootstrap is resumed (bootstrap.resume), THE SYSTEM SHALL confirm the due corrections and run what they owe exactly
+    as a bootstrap from empty does.
+  non_functional_requirements:
+  - 'NOISE: a correction that moves a date re-judges every supply of every dataset in the period it alters. Count, in the
+    register entries, every period these corrections leave unfilled, red or awaiting confirmation and every outstanding item
+    they add.'
+  - 'FICTIONAL CORRECTIONS IN THE REAL CALENDAR FILE (Keith, 2026-10-13): each is gated by REQ-PIPE-111 exactly as a real
+    one would be - the agreement-freeze gate in mothman check, the entry printed by `mothman schedule draft-correction` -
+    which is the point of showing them. Each reason says it is fictional so nobody later reads it as the agency''s history.'
+  - 'SECURITY: the scripted confirmation plays back as the synthetic actor holding the asset-manager role during playback
+    only, on an asset that declares itself synthetic (people.require_role, people.playback, scripted_decisions._refuse_unless_synthetic);
+    nothing here widens what a person or script may do on a real asset.'
+  - 'SCALE: the corrections alter named periods only (criterion 10); a correction to a whole calendar version would re-judge
+    every period of every dataset on the calendar - thirty datasets at the target - and is not a shape to demonstrate here.'
+  - 'PROCESS: before the first rebuild, the builder shows Keith each correction''s exact edits and its impact preview (REQ-PIPE-169)
+    against the generated history, with the dates - the main session''s own offer on fork (g).'
+  - DETERMINISM and loud failure are REQ-GEN-044's, inherited (criteria 3 and 4); configuration only, every effect in the
+    database.
+  - 'BOOTSTRAP COST: 7m00s from empty on 2026-10-13. The growth is REQ-GEN-207''s to measure; this requirement adds its own
+    arrivals plus the post-confirmation runs (criterion 8), which run serially after BOTH replays at about a minute each and
+    add to the total directly - so count them in the dry run and measure from empty before and after, logged in CLAUDE.md''s
+    running log.'
+  dependencies:
+  - REQ-PIPE-170
+  - REQ-PIPE-111
+  - REQ-PIPE-168
+  - REQ-PIPE-169
+  - REQ-PIPE-121
+  - REQ-GEN-044
+  - REQ-GEN-135
+  - REQ-GEN-196
+  - REQ-GEN-201
+  - REQ-DASH-172
+  - REQ-GEN-207
+  - REQ-PIPE-140
+  - REQ-DASH-208
+  decisions:
+  - 'DECLARED IN contract/calendar.yaml ITSELF (Keith, 2026-10-13): ''this asset is a synthetic data asset for demo purposes,
+    so that is fine''. REJECTED a synthetic-only overlay file.'
+  - 'THE MECHANISM IS BUILT AND NOT REOPENED (Keith, 2026-10-11, answer (n); REQ-PIPE-170 criteria 30 and 31): a replay stages
+    each correction - reverted until the start of its date on the asset''s clock, then in force - and confirms each due one
+    once BOTH collections'' replays finish, stamped at the end of the replay, as the synthetic asset manager through correction_apply.confirm.
+    REJECTED replaying the collections one after the other or as one stream (costs the parallel bootstrap). A one-collection
+    replay leaves corrections pending (PROVISIONAL in REQ-PIPE-170).'
+  - 'HOW THE GENERATOR STAGES IT WAS LEFT TO THE BUILDER (Keith, 2026-10-08, signing off the route): REQ-PIPE-111 already
+    lets a synthetic asset add past-dated versions. Answered since for the declaration (above) and the staging (criteria 30
+    and 31); what remains is the scripted manager''s choices, which this requirement adds.'
+  - 'TS-63 IS NOT HERE (Keith, 2026-10-13): REQ-PIPE-179 criterion 39 plants it in the change that builds the turn-off, declared
+    as a correction like these.'
+  - 'KEEP AND ''LEAVE IT PENDING'' ARE THE MANAGER''S, SAID IN THE SCRIPT FILE (main session, overnight 2026-10-13, fork (e),
+    PROVISIONAL until Keith answers open question 1): a scripted confirmation naming the change_reference - first proposed
+    as a confirm-correction operation in decisions:, now recommended as a top-level corrections: list (CLI UX A). REJECTED
+    flags on the correction itself: a keep is the asset manager''s decision about a supply, not part of the agreement.'
+  - 'WHY THE BUILD STOPPED AT DESIGN (main session, overnight #4): four forks stack, and a wrong guess on the first writes
+    fictional corrections into the real calendar file that every later one builds on.'
+  - 'A MOVED SUPPLY''S RE-CHECK IS LEFT OWED BY TODAY''S BOOTSTRAP (found by delivery-scoper reading qa_tools/common/bootstrap.py,
+    2026-10-14, PROPOSED fix): _confirm_corrections calls correction_replay.confirm_due and then rebuilds results; no processing
+    pass follows, and REQ-PIPE-170''s own PROVISIONAL decision is that ''automatically'' means the next pass. So TS-58''s
+    ''re-QA''d and re-gated automatically'' would not be on the page. Criterion 8 runs what is owed before the rebuild. REJECTED
+    leaving it for the next `mothman pipeline process`, which a demo history may never get.'
+  - 'THE REGISTER''S CONFIG LINE IS NOT THE CHILD PROTECTION CALENDAR (found 2026-10-14): it says the 15th, 17:00, 2 days''
+    grace, a 30-day window; contract/calendar.yaml says the 1st, 09:00, 8 hours, 14 days. Criterion 13. The same defect REQ-PIPE-179
+    records for TS-63.'
+  - 'THE QUARTER BUDGET, COMPUTED WITH THE GENERATOR''S OWN COLLISION LOGIC (delivery-scoper, 2026-10-14): of fifteen Child
+    Protection quarters, the only ones no scenario claims are 2023-Q1, 2024-Q3, 2026-Q2 and the current 2026-Q3. REQ-GEN-203
+    wants two and REQ-PIPE-179 several. REQ-GEN-203''s suggested -13 (2023-Q3) is TS-67''s filed-early quarter (scenario_injection.filed_early_into)
+    and would collide - reported to the main session. Keith already chose to grow the history earlier for TS-63 (REQ-PIPE-179,
+    2026-10-13); criterion 11 follows that.'
+  - 'BLOCKED IS SHOWN ON cp-case-workers (main session fork (g), PROVISIONAL): it is delivered only in February and August,
+    so the quarter after each of its supplies inherits it (REQ-GEN-199''s TS-79 mechanism), and refiling refuses to move a
+    supply a later period stands on. REJECTED a substitution as the blocker: TS-76''s and TS-77''s both end, so a move blocked
+    by one would drain.'
+  - 'STILL REJECTED (REQ-GEN-044): a scenario label on the dataset pages.'
+  - 'A PROBABLE DEFECT IN BUILT CODE, FOR post-build-review (architect B10, verified 2026-10-14): bootstrap._confirm_corrections
+    enters replay_clock.replaying(), whose start() sets no anchor, so replay_clock.now() returns the real wall clock and correction_replay.confirm_due
+    stamps the confirmation at the real now - not ''at the end of the replay'' as REQ-PIPE-170''s decision (n) says. Criterion
+    19 fixes it test-first; the main session should open its own post-build-review entry, the fix touching a signed requirement''s
+    built behaviour.'
+  - 'B10''s ANCHOR CORRECTED BY THE MAIN SESSION (2026-10-14, post-build-review #177): the end of the replay alone is wrong
+    for the one correction that exists - REQ-PIPE-181 is dated 2026-10-11 and the replayed history ends 2026-09-22, so that
+    anchor would confirm it nineteen days before it was merged. Criterion 19 therefore takes the later of the replay''s end
+    and the correction''s date. Rejected: the replay''s end alone (architect B10''s amendment); keeping the real clock (not
+    reproducible). Keith''s choice - question 28.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect A5 (REQ-PIPE-179 dropped from the dependencies,
+    REQ-GEN-207 added; REQ-PIPE-170''s unmet entry for criterion 23 is re-pointed at sign-off - criterion 17 clears TS-57
+    to TS-62, REQ-PIPE-179 criterion 40 TS-63); architect A6 (criterion 10 - a correction''s claim counted once, checked against
+    injections, post-generation placements and TS-63); architect A7 (criterion 18 - configuration-dated scenarios do not move
+    with ANCHOR_DATE, so refuse); architect B8 and CLI UX 2 and 9 (criteria 4 and 5 - read only by confirm_due, outside the
+    Player and the filing-decision validation, a change_reference and no dataset, keeps by scenario, DATASET and index resolved
+    through _supply_of, the shape''s refusals); architect B9 and CLI UX 10 (criterion 8 - recheck.run_all_owed inside the
+    pass lock, stop if incomplete, say how many and how long; criterion 7 lists the proposed moves); architect B10 (criterion
+    19); architect B12 (criterion 15 - TS-60''s hold stands); architect B13 (criterion 20 - carried rather than accepted,
+    because a resumed bootstrap would otherwise end with every correction pending); dashboard UX 13 (criterion 12 - lettered
+    siblings, since REQ-GEN-201 writes one date per id; a link bounded by a correction''s date and the end of history).'
+  open_questions:
+  - 'CLI UX A WITH FORK (e) - WHERE A SCRIPTED CONFIRMATION LIVES. Recommended (A): a separate top-level corrections: list
+    in contract/scripted_decisions.yaml (CLI UX A, superseding the scoper''s first recommendation of a confirm-correction
+    operation in decisions:) - it is read only by confirm_due and has none of a filing decision''s fields, so keeping it out
+    of decisions: keeps the Player and its validation unchanged. (B) a confirm-correction operation in the existing decisions:
+    list. (C) keys on the correction entry in contract/calendar.yaml - rejected by the main session: a keep is the manager''s
+    decision, not the agreement''s.'
+  - 'FORK (f) - ONE CORRECTION OR SEVERAL. Recommended (A): two change references - one confirmed correction carrying TS-57
+    to TS-61, so one applied summary shows all five shapes as criterion 23 reads, and one left pending for TS-62. (B) one
+    per scenario, six change references - each shape isolated, at the cost of five confirmations and more claimed quarters.'
+  - 'FORK (g) - TS-62''s COLLECTION AND EVERY CORRECTION''S DATE. Recommended (A): TS-62 on Birth Registrations, dated a few
+    days before the end, its later arrival the next daily supply - claiming no Child Protection quarter, at the cost of Birth
+    Registrations reading awaiting confirmation at the end of the history; every correction dated late even when it edits
+    an old quarter, so ''awaiting confirmation'' lasts weeks on the page, not years. (B) TS-62 on Child Protection, dated
+    before 2026-Q3''s delivery.'
+  - 'FORK (h) - WHICH CALENDAR ITEMS THE CORRECTIONS EDIT. Recommended (A): one grown quarter''s date per shape in the quarterly
+    calendar''s dates: list - the narrowest frozen item; the builder confirms each shape with the impact preview before any
+    rebuild. (B) claim-window changes as the register words TS-58 to TS-60 - a version-level value, so changing it for one
+    quarter needs extra versions either side, and changing it outright re-judges every quarter.'
+  - 'TS-61 AFTER PARKING. Recommended (A): the parked move stays parked to the end of the history (the inheritance never clears)
+    - a standing ''Correction move waiting'' item on cp-case-workers, said in its register entry. (B) a later scripted keep
+    of the parked move (REQ-PIPE-170 criterion 28), showing that route and leaving nothing outstanding.'
+  - 'ARCHITECT Q4 - WHO APPROVES THE FICTIONAL CORRECTIONS (here and TS-63''s). agreement_freeze''s approvers exclude the
+    synthetic identities. Recommended (A): Keith''s real identity as approver, each reason saying the correction is fictional
+    and made for the demonstration. (B) extend REQ-PIPE-111''s synthetic exception so a synthetic asset''s correction needs
+    no real approver - which would make the demo skip the gate a real correction passes.'
+- id: REQ-GEN-206
+  title: The last planted scenarios of REQ-GEN-136 and REQ-GEN-137 - Case Workers' held gap arrival, a reader re-checked after
+    a replacement, Keith's un-supersede case, a substitution and a three-kind _manifest - and REQ-GEN-199's held-day finding
+  date_written: '2026-10-14'
+  story: As Keith showing someone the supply model, I want the last shapes REQ-GEN-136 and REQ-GEN-137 promised either in
+    the generated history or deliberately dropped with my reason, so that the scenario panel's 'no data behind it' list holds
+    only what we chose not to plant.
+  moscow: should
+  status: not_started
+  source: 'REQ-GEN-136 criteria 4, 5, 8, 9 and 11 and REQ-GEN-137 criteria 2, 5 and 6 (both signed 2026-10-04, built with
+    these unmet) - Keith''s calendar close-out, 2026-10-13 (plans/running-thoughts.md #92: ''REQ-GEN-136''s leftovers'').
+    Also plans/post-build-review.md #174 and #175, found by REQ-GEN-199''s first bootstrapped build overnight 2026-10-13.
+    REQ-GEN-136 criterion 3 (TS-42) is REQ-GEN-203''s and is not here. Drafted by delivery-scoper overnight 2026-10-13 to
+    14 while Keith was asleep, so every fork is an open question.'
+  acceptance_criteria:
+  - THE SYSTEM SHALL register TS-52 as a placement written after generation, as TS-79's are (scenario_injection.inheritance_placements),
+    chosen from configuration and the generated deliveries alone - the newest cp-case-workers supply received when no period
+    it delivers in was open, and not one any declared correction moves, holds or places - with a scenario link (REQ-GEN-201)
+    on a date after its receipt and no arrival of its own, delivering REQ-GEN-136 criterion 11.
+  - IF the generated history holds no such held cp-case-workers supply, THEN generation SHALL refuse naming TS-52, and SHALL
+    NOT pick a supply held for another reason.
+  - THE SYSTEM SHALL record TS-54 as also demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted onto 2024-Q4
+    by a scripted person (REQ-GEN-200) - with its own link on a date while the substitution stands, delivering REQ-GEN-137
+    criterion 5, and SHALL replace TS-54's register text 'the script has no field for the period stood on', which REQ-GEN-200's
+    stands_on answered.
+  - THE SYSTEM SHALL plant TS-55 in a quarter cp-case-workers does not deliver in, whose delivery leaves one other table out
+    and whose period a scripted person substitutes onto the quarter before (REQ-GEN-200), never removed or replaced, so that
+    at the end of the history that quarter's _manifest lists promoted, inherited and substituted tables together (REQ-PIPE-130),
+    delivering REQ-GEN-137 criterion 6, in a quarter REQ-GEN-207 adds; and SHALL write TS-55's Expect as open question 7 settles,
+    no dashboard page showing a period's _manifest today.
+  - THE SYSTEM SHALL plant TS-53, Keith's worked un-supersede case, delivering REQ-GEN-137 criterion 2, in the shape open
+    question 2 settles - a good file superseded by a bad later one; a scripted person rejects the bad one and then un-supersedes
+    the good one, in that order (REQ-PIPE-120); the good one re-checked - recording in TS-53's register entry whether the
+    gate or a person promotes it.
+  - THE SYSTEM SHALL plant TS-50's replacement half - a green one-table cp_clients resupply replacing its promoted supply
+    under a Child Protection replacement setting of green in force at its receipt, its three readers re-checked by the one
+    knock-on handler (REQ-PIPE-121) - and SHALL record its supersession half as also demonstrated by REQ-GEN-203's TS-42,
+    delivering REQ-GEN-136 criterion 8.
+  - THE SYSTEM SHALL express any setting era these scenarios need as an effective-dated version in contract/data-asset.yaml,
+    scoped no wider than the collection it serves, as REQ-GEN-136 criterion 14 requires, and SHALL state in each register
+    entry the setting version in force where it lands.
+  - THE SYSTEM SHALL record, in TS-48's, TS-49's and TS-51's register entries and in REQ-GEN-136's unmet entries for criteria
+    4, 5 and 9, the answer to open question 1 - planted by a named requirement, demonstrated by a named existing scenario,
+    or not to be planted with Keith's reason - and SHALL NOT leave those entries reading 'Unowned'.
+  - THE SYSTEM SHALL generate only arrival shapes and scripted decisions, and SHALL NOT generate any verdict, filing, supersession,
+    promotion, inheritance or substitution the scenarios expect (REQ-GEN-044 criterion 6).
+  - IF a scenario here cannot be placed - no free quarter or day under REQ-GEN-044's collision rule, or a needed setting era
+    not in force where it lands - THEN generation SHALL refuse naming the scenario, and SHALL NOT shift it, relax the rule
+    or drop it.
+  - 'THE SYSTEM SHALL build 8 September 2026''s own Birth Registrations supply green by giving TS-47 a green following day
+    (REQ-GEN-185), and SHALL state in TS-47''s register entry that its late file is held because 8 September lies in the hold
+    era, so that only the supplies TS-43, TS-47 and TS-78 account for wait under hold that day (post-build-review #175, option
+    1); TS-47''s following day is claimed by TS-47, and IF another scenario claims it, THEN generation SHALL refuse naming
+    both rather than shift either.'
+  - 'THE SYSTEM SHALL remove, in the change that resolves each, every strict expected failure naming post-build-review #175,
+    so that REQ-GEN-199''s guard is exact again with no allowance.'
+  - THE SYSTEM SHALL update each scenario's register entry here with its configuration, an Expect quoting what the page says
+    as observed on the first bootstrapped build, and a Breaks as line, and SHALL clear each unmet entry it delivers on REQ-GEN-136
+    and REQ-GEN-137, naming this requirement.
+  non_functional_requirements:
+  - 'BOOTSTRAP COST: TS-52 and TS-54 add nothing generated; TS-55 one delivery; TS-53 one Birth Registrations resend and one
+    re-check; TS-50 one Child Protection resupply and three reader re-checks; #175''s fix none. Measure from empty before
+    and after (7m00s on 2026-10-13) and log both in CLAUDE.md''s running log.'
+  - 'NOISE: inside a setting era the setting applies to every supply, not only the scenario''s (REQ-GEN-136''s own NFR) -
+    count what TS-50''s Child Protection replacement era and TS-53''s era boundary replace or hold, and record it. TS-52''s
+    held supply is one of the standing Case Workers holds (eight on 2026-10-13), each counted as needing a person - known,
+    not added.'
+  - 'QUARTER BUDGET: Child Protection has four unclaimed quarters today (2023-Q1, 2024-Q3, 2026-Q2, 2026-Q3) against demand
+    from REQ-GEN-203, REQ-GEN-205, REQ-PIPE-179 and this requirement; TS-55 needs a May or November quarter, and 2026-Q2 is
+    the only free one, which REQ-GEN-203 also suggests for TS-80. Coordinated through the history growth REQ-GEN-205''s open
+    question 5 assigns.'
+  - 'CONFIGURATION ONLY: the injections, the scripts, the setting eras and the register; every effect lives in the database.
+    DETERMINISM and loud failure are REQ-GEN-044''s, inherited.'
+  - 'SECURITY: every decision plays back through REQ-GEN-135 as the synthetic person, only on an asset declaring itself synthetic;
+    nothing writes a decision-log entry by another route (REQ-GEN-137 criterion 7).'
+  dependencies:
+  - REQ-GEN-136
+  - REQ-GEN-137
+  - REQ-GEN-044
+  - REQ-GEN-135
+  - REQ-GEN-185
+  - REQ-GEN-199
+  - REQ-GEN-200
+  - REQ-GEN-201
+  - REQ-GEN-203
+  - REQ-GEN-205
+  - REQ-PIPE-120
+  - REQ-PIPE-121
+  - REQ-PIPE-123
+  - REQ-PIPE-130
+  - REQ-GEN-207
+  - REQ-DASH-208
+  decisions:
+  - 'BUILT ON THE EXISTING MACHINERY (Keith, 2026-10-04, REQ-GEN-136): the register in plans/supply-model.md, REQ-GEN-044''s
+    injection table, REQ-GEN-045''s map and REQ-GEN-135''s scripts. EVERY SHAPE OF THE BATCH GETS A PLANTED SCENARIO (Keith,
+    2026-10-04) - so a shape is dropped only by Keith''s decision, never quietly.'
+  - TS-42 IS REQ-GEN-203's (Keith, 2026-10-13, widen one Child Protection pattern), and is not repeated here.
+  - 'KEITH LEFT TS-48, TS-49 AND TS-51 OUT OF REQ-GEN-183..186 (Keith, 2026-10-11, question 4, recorded on REQ-GEN-184: ''OUT
+    OF SCOPE: Child Protection''s cross-table outcomes TS-48, TS-49 and TS-51 ... They need named red targets and referential
+    closure across six tables''). Asked again in open question 1 rather than assumed either way.'
+  - 'TS-52 BY A POST-GENERATION PLACEMENT, NOT AN INJECTION: its register entry already says the ordinary history produces
+    it - Case Workers files arrive in every delivery and are held where cp-case-workers does not deliver (TS-33a, REQ-PIPE-131)
+    - and ''an injection would record a placement for what is already there''. REQ-GEN-199 built the writer for that (inheritance_placements,
+    delivery-architect B4) for TS-79.'
+  - 'REQ-GEN-137 CRITERION 5''s BLOCKER IS GONE: its unmet ''why'' says the script has no field for the period stood on; REQ-GEN-200
+    added stands_on, and TS-76 and TS-77a now substitute onto an earlier promoted supply (REQ-GEN-199). TS-76 is the proposed
+    carrier because its substitution stands for eleven weeks with a link already on 17 February 2025.'
+  - 'NO PERIOD HOLDS ALL THREE KINDS TODAY: TS-77''s substitution was replaced and TS-76''s removed, and both sit in quarters
+    cp-case-workers delivers in. TS-55 needs a substitution that still stands at the end of the history in a quarter cp-case-workers
+    inherits in (a May or November quarter). REQ-GEN-137''s NFR that ''no dataset declares'' a non-participating period is
+    stale: cp-case-workers'' participation provides the inheritance since REQ-PIPE-110.'
+  - 'THE UN-SUPERSEDE ORDER IS FIXED (REQ-GEN-137, Keith''s option A item 3): reject the bad newer file first, then un-supersede
+    the good one, because REQ-PIPE-120 refuses an un-supersede beside a waiting version.'
+  - 'TS-50''s SUPERSESSION HALF RIDES TS-42 (delivery-scoper, PROPOSED): REQ-GEN-203 criterion 3 already has a later green
+    cp_clients file supersede the pair and its promotion re-evaluate the readers; a second scenario for the same route would
+    claim another quarter for nothing. The replacement half has no carrier: Birth Registrations'' TS-46 is a replacement with
+    no reader, and Child Protection has never run under a replacement setting other than never.'
+  - '#175 IS GENERATOR WORK AND IS TAKEN HERE AS CRITERIA (delivery-scoper''s call, PROVISIONAL on open question 5): option
+    1 - TS-47 green_follow, its late file''s hold stated as a true consequence of the era - is the recommendation post-build-review
+    #175 itself makes. REJECTED (2) moving TS-47 out of the hold era, which moves a planted scenario for a side effect, and
+    (3) building every ordinary day of a hold era green, which hides the era''s real effect on ordinary supplies.'
+  - 'STILL REJECTED (REQ-GEN-044): a scenario label on injected runs or dataset pages.'
+  - '#174 IS NOT TAKEN HERE AS CRITERIA: its page fix is drafted as its own requirement, REQ-DASH-208 (dashboard UX 14, option
+    A), to be built before this requirement''s bootstrap; its second half, REQ-GEN-199''s wording, stays open question 6 -
+    a signed claim.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect C14 (criterion 1 - TS-52 chosen from configuration
+    and deliveries alone, never a supply a correction touches); architect C16 (criterion 11 - TS-47''s following day claimed,
+    refused not shifted); architect A5 (REQ-GEN-207 the growth owner); dashboard UX 15 (no page shows _manifest, so TS-55''s
+    surface is open question 7); architect C15 folded into open question 3 (TS-50 needs Child Protection targeting - the same
+    fork as REQ-GEN-203''s).'
+  open_questions:
+  - '1. TS-48, TS-49 AND TS-51 - STILL WANTED? Keith left them out on 2026-10-11. Recommended (A): TS-48 recorded as also
+    demonstrated by TS-75 (REQ-GEN-199) - its three readers go red on cross-table checks reading the red cp_clients and are
+    promoted green when the corrected cp_clients'' promotion re-evaluates them (REQ-PIPE-121), which is TS-48''s outcome though
+    the readers arrived with the delivery rather than as a one-table correction - and TS-49 and TS-51 marked not to be planted,
+    with his 2026-10-11 reason (named red cross-table targets and referential closure across six tables), amending REQ-GEN-136
+    criteria 5 and 9 by his decision. (B) plant all three as their own requirement, extending REQ-GEN-184''s targeting to
+    Child Protection cross-table reds. (C) drop all three, including TS-48.'
+  - '2. TS-53''s SHAPE (the question REQ-GEN-137''s unmet entry has waited on since 2026-10-05). Under the rules as built
+    a good file is superseded only while waiting, and a green one waits only behind a filled slot or a hold, so after the
+    un-supersede the gate will not promote it - unless the setting changed in between. Recommended (A): plant it across a
+    replacement-setting boundary on Birth Registrations - the good resupply and the bad resend arrive on the last day of a
+    replacement-never era, and the scripted reject and un-supersede land after a green era begins, so the re-check runs under
+    green and the gate promotes it, meeting criterion 2 as written (to be proven by a fixture test first: that an un-superseded
+    supply''s re-check is gated under the setting in force at that instant). (B) add a fourth scripted decision, a person''s
+    promote, and amend criterion 2''s ''promoted by the gate'' to ''promoted by a person''. (C) drop TS-53 with Keith''s reason.'
+  - '3. TS-50''s REPLACEMENT HALF (with architect C15 / Q5: it needs a TARGETED green Child Protection resupply, which the
+    generator refuses today without lead-ins). Recommended (A): plant it, with the Child Protection targeting REQ-GEN-203''s
+    question 2 builds, in a Child Protection quarter gained by growing the history, under a short collection-level replacement-green
+    era - it is the one route by which a reader is re-checked that no page shows. (B) amend REQ-GEN-136 criterion 8 to the
+    supersession half only, carried by TS-42, saving a quarter and an era.'
+  - '4. TS-54''s CARRIER. Recommended (A): TS-76 (substitution stands 3 February to 20 April 2025). (B) TS-77a (substitution
+    stands 3 May to 9 June 2023, ends by replacement). (C) TS-55''s own substitution, once planted - one placement carrying
+    both.'
+  - '5. #175 - which option. Recommended (1), taken as criteria 11 and 12: TS-47 gets a green following day and its late file''s
+    hold is stated. (2) move TS-47 out of the 1-9 September hold era. (3) build every ordinary day inside a hold era green.
+    Note: whether the held 8 September supply predates REQ-GEN-199''s row-count chain change is unknown and needs one rebuild
+    to settle.'
+  - '6. #174''s REQ-GEN-199 CRITERION 9 WORDING (a signed claim): it says TS-76 leaves cp-clients and cp-carers ''promoted
+    and red, permanently''; the real build shows clients amber and carers green, because the cross-table checks reading cp_placements
+    are filed under cp-placements and nothing runs them for clients or carers in a quarter with no placements supply. Recommended
+    (A): reword criterion 9 to record what was observed, as the register already does. (B) keep the wording and treat the
+    missing red as a defect - that would be a pipeline question (should a quarter''s absent table make the readers'' cross-table
+    checks run and go red?), not generator work.'
+  - '7. TS-55''s SURFACE (dashboard UX Set B Q2). No dashboard page shows a period''s _manifest. Recommended (A): TS-55''s
+    Expect quotes the terminal or a query of the period''s _manifest, and its chip opens the substituted dataset''s page,
+    where the ''Substituted from'' pill shows. (B) a separate dashboard item - a period-composition view listing promoted,
+    inherited and substituted tables - drafted as its own requirement.'
