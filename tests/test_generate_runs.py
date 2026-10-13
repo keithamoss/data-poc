@@ -518,3 +518,22 @@ class TestARefusalNamesTheScenarios:
         said = str(refused.value)
         assert "TS-68" in said and "TS-1" in said, said
         assert "lengthen the history or move an anchor" in said, said
+
+
+class TestNoResendIsPushedFarFromItsDay:
+    """#172 D1: the pairs' days once made 4-18 August one solid quiet block,
+    and three late-July reds had their resends pushed past it, 22 to 27
+    days late - one became 19 August's supply and turned TS-73's green
+    following day red. A resend lands within days of its slot (the ordinary
+    delays are one to three days, at most five here)."""
+
+    LIMIT_DAYS = 10
+
+    def test_every_arrival_is_within_ten_days_of_its_slot(self, manifest):
+        from datetime import date
+
+        late = [(e["run_id"], e["period"], e["received_at"][:10]) for e in manifest
+                if (date.fromisoformat(e["received_at"][:10])
+                    - date.fromisoformat(e["period"])).days > self.LIMIT_DAYS]
+        assert manifest, "the generated history is empty"
+        assert late == [], late

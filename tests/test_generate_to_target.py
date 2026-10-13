@@ -413,7 +413,7 @@ class TestAnInjectedTargetEndToEnd:
         drawn = g.RUN_PLAN
         g.RUN_PLAN = [(n, None) for n, _sev in drawn]
         extra = si.Injection(
-            scenario_id="TS-TARGET", dataset_id=g.DATASET_ID, anchor=-52,
+            scenario_id="TS-TARGET", dataset_id=g.DATASET_ID, anchor=-70,
             config="a test injection",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target("amber", (self.KEY,)),
                                       note="built to amber"),))
@@ -492,7 +492,7 @@ class TestRefusedBeforeAnythingIsWritten:
         from generator.output import redirect
 
         bad = si.Injection(
-            scenario_id="TS-BAD", dataset_id=g.DATASET_ID, anchor=-52, config="test",
+            scenario_id="TS-BAD", dataset_id=g.DATASET_ID, anchor=-70, config="test",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target(
                 "amber", ("sex.conformity",))),))
         original = si.INJECTIONS
@@ -713,7 +713,7 @@ class TestLeadInsEndToEnd:
         drawn = g.RUN_PLAN
         g.RUN_PLAN = [(n, None) for n, _sev in drawn]
         extra = si.Injection(
-            scenario_id="TS-LEAD", dataset_id=g.DATASET_ID, anchor=-52, config="a test",
+            scenario_id="TS-LEAD", dataset_id=g.DATASET_ID, anchor=-70, config="a test",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target("amber")),
                       si.ExtraArrival(0, "16:00", target=targeting.Target("green"))))
         original = si.INJECTIONS

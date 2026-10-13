@@ -136,7 +136,7 @@ releases:
           - headline: Seven example pairs of files in the demo history
             components: ["Data generation"]
             description: >
-              Birth Registrations' demo history now runs 80 days and includes
+              Birth Registrations' demo history now runs 85 days and includes
               seven deliveries with two files for one table: a duplicate, the
               next day's file sent early, a corrected resend, stray test
               files, and a pair where neither file is usable. Each reads "two
@@ -178,6 +178,25 @@ releases:
               Excusing a late supply no longer stops a dataset showing "Two
               files, choose one". Only rejecting the pair, or a later supply
               replacing it, ends that now.
+          - headline: A pair with one unreadable file is not checked early
+            components: ["Pipeline & publishing"]
+            description: >
+              When one of two files for a table could not be loaded, the other
+              used to be checked as if it were the supply before anyone had
+              settled the pair. Neither is checked now until a person decides,
+              as the page already said.
+          - headline: A re-file cannot end someone else's pair
+            components: ["Pipeline & publishing"]
+            description: >
+              Re-filing a supply into a period where two files are still
+              waiting to be settled is now refused, with where to settle them.
+              It used to supersede the pair without anyone choosing a file.
+          - headline: The file that never loaded is named on a settled pair
+            components: ["Dashboard UI"]
+            description: >
+              A settled pair now marks the file the load refused as never
+              loaded, with the file check's reason, and a day where both files
+              were rejected says so in those words.
           - headline: A settled spare file is never "the latest file"
             components: ["Dashboard UI"]
             description: >

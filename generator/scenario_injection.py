@@ -1193,15 +1193,17 @@ INJECTIONS: tuple[Injection, ...] = (
     # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two
     # files carry their own receipts, settled by a scripted person at 11:00
     # the next day (contract/scripted_decisions.yaml), so the arrival day
-    # reads contested and the day after reads settled. Placed in August:
-    # after the July days REQ-GEN-196 criterion 20 added, which is where the
-    # ordinary reds move to (_reds_clear_of_scenarios), and before TS-78's
-    # late-August days. Only a file the
-    # script makes a supply is targeted (criterion 19).
+    # reads contested and the day after reads settled. Placed 28 July to 25
+    # August WITH ORDINARY DAYS BETWEEN THEM (post-build-review #172, Keith):
+    # packed into one block they left a late-July red's resends nowhere to
+    # land for three weeks, and one turned TS-73's green following day red.
+    # After the early-July days the ordinary reds move to
+    # (_reds_clear_of_scenarios) and before TS-78's late-August days. Only a
+    # file the script makes a supply is targeted (criterion 19).
     Injection(
         scenario_id="TS-68",
         dataset_id="birth-registrations",
-        anchor=-49,
+        anchor=-57,
         config=_PAIR_CONFIG + " A duplicate send: the same extract twice, ten minutes "
                "apart, the duplicate's name sorting before the original's.",
         arrivals=(
@@ -1218,7 +1220,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-69",
         dataset_id="birth-registrations",
-        anchor=-46,
+        anchor=-52,
         config=_PAIR_CONFIG + " The next day's extract is sent early, in the same "
                "delivery as today's; the next day has no supply of its own.",
         arrivals=(
@@ -1237,7 +1239,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-70",
         dataset_id="birth-registrations",
-        anchor=-43,
+        anchor=-47,
         config=_PAIR_CONFIG + " The day's extract arrives on time with a fault, and a "
                "corrected re-export follows at 16:30 - after the grace, before the next "
                "day's window - named to sort first.",
@@ -1256,7 +1258,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-71",
         dataset_id="birth-registrations",
-        anchor=-40,
+        anchor=-42,
         config=_PAIR_CONFIG + " A stray test file that loads arrives before the day's "
                "real extract.",
         arrivals=(
@@ -1293,7 +1295,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-73",
         dataset_id="birth-registrations",
-        anchor=-34,
+        anchor=-33,
         config=_PAIR_CONFIG + " A faulty extract and a stray test file; a person "
                "rejects both, and the day stays owed.",
         arrivals=(
@@ -1311,7 +1313,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-74",
         dataset_id="birth-registrations",
-        anchor=-30,
+        anchor=-29,
         config=_PAIR_CONFIG + " Tomorrow's extract sent early beside a stray test file, "
                "and nothing for today: the early file is re-filed, the test file "
                "rejected, and today stays owed.",

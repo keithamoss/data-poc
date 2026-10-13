@@ -3044,11 +3044,14 @@ own supply.* Every pair **Expects** to read "Two files for one table" -
 contested, the dataset red - on its arrival day, where its scenario link
 opens, and settled from the next day. Every pair **Breaks as** the
 dashboard still reading contested after the settlement, or the wrong file
-checked. Placed in early August, after the July days that hold the ordinary reds.
+checked. Placed 28 July to 25 August, with ordinary days between them for
+resends to land on (post-build-review #172), after the early-July days
+that hold the ordinary reds. Received before 14:00, a pair's chosen
+file reads EARLY (before its due time), not on time (Keith, 2026-10-13).
 
 **TS-68 `[INJECT]` A duplicate send.** The day's extract at 13:40, the same
 bytes again at 13:50 named `birth_registrations_<D>-1.csv`, which sorts
-first. **Expect**: file one D's supply, on time and promoted; file two kept
+first. **Expect**: file one D's supply, early and promoted; file two kept
 but superseded. **Breaks as**: the duplicate, sorting first, taken as file
 one - the staged ordinal and the supply ordinal disagreeing.
 
@@ -3062,19 +3065,19 @@ re-filed file checked against D.
 with a planted fault at 13:40, the corrected re-export at 16:30 - after the
 grace, before D+1's window - named `-resend`, sorting first. **Expect**:
 file one rejected; file two D's supply, its own receipt taken, so D reads
-**late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read on time
+**late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read early
 from file one's receipt.
 
 **TS-71 `[INJECT]` A stray test file that loads.** `_TEST.csv` with every
 registrant named TEST at 13:20, the real extract at 13:40. **Expect**: the
-test file rejected; the real one D's supply, on time. **Breaks as**: the
+test file rejected; the real one D's supply, early. **Breaks as**: the
 test rows checked as D's supply.
 
 **TS-72 `[INJECT]` A stray test file the load refuses.** The real extract
 at 13:30, a ragged `-test.csv` at 13:35 - first by bytes, second by the
 database's collation. **Expect**: the test file offered only "rejected",
 named as never loaded; the real file D's supply, checked by the real
-tools, on time and promoted. **Breaks as**: the real file named as the one
+tools, early and promoted, and the refused file marked as never loaded. **Breaks as**: the real file named as the one
 that never loaded.
 
 **TS-73 `[INJECT]` Reject both.** A faulty extract at 13:20 and a stray

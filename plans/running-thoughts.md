@@ -5076,3 +5076,55 @@ could never have computed it), and it belongs with batch 5's check work.
     Evidence" block (links into the dashboard, requirement ids), one card
     per item, nothing deleted as items are built. Needs scoping into a
     requirement before it is built.
+    **Steps (1) and (2) DONE the same evening**, reported to Keith in
+    conversation. Step (2) found the calendar group built except two open
+    pieces of built requirements (REQ-PIPE-170 criterion 23's TS-57..63 in
+    the history; REQ-GEN-136's criteria 3, 4/5, 8, 9 and 11) and three
+    unsigned drafts (REQ-PIPE-163, REQ-PIPE-179, REQ-DASH-182).
+    **Keith's call, 2026-10-13 evening: close out the calendar group
+    BEFORE the road-testing review** - REQ-PIPE-170's and REQ-GEN-136's
+    leftovers, and REQ-PIPE-179 and REQ-DASH-182 built. His answers:
+    REQ-GEN-199 first while those are scoped in parallel; REQ-PIPE-163
+    scoped WITH REQ-PIPE-179 (179 amends 163); REQ-PIPE-170's fictional
+    past corrections are declared in contract/calendar.yaml itself ("this
+    asset is a synthetic data asset for demo purposes, so that is fine"),
+    not a synthetic-only overlay file; and REQ-GEN-136 criterion 3 (TS-42)
+    by WIDENING ONE Child Protection arrival pattern, a behaviour change
+    with its own requirement - superseding REQ-GEN-196's "no pattern is
+    widened" decision. Scoper pass on 163/179/182 plus the pattern
+    requirement started the same evening.
+    **Scoper pass the same evening** (163, 179, 182, plus new REQ-PIPE-202
+    widen cp_clients' pattern and REQ-GEN-203 plant TS-42; draft in the
+    session scratchpad, not yet in requirements.yaml). **Keith's answers,
+    2026-10-13 ~20:30 Perth:** 163 - written in its final turn-off-aware
+    form now so 179 amends nothing in it; a typed --period owing nothing
+    (not participating, not_expected, turned off) is refused like the menu;
+    placing into a period with an OPEN PAIR is refused ("settle first");
+    placing over a WAITING VERSION is REFUSED UNTIL IT IS DECIDED (not the
+    scoper's "supersede it" - no REQ-PIPE-118 amendment). 179 - every route
+    into a turned-off period refused (place, re-file, correction move,
+    parked move stays parked); the rule re-files ANY hold configuration
+    later covers, whoever caused it; "turned off" outranks "schedule
+    ended"; but a not_expected entry INSIDE a turned-off gap is REJECTED as
+    configuration ("you shouldn't be able to have a not expected period
+    while the dataset is turned off - that doesn't make sense"), reversing
+    the drafted reading; 179 TAKES TS-63 OVER from REQ-PIPE-170 c23. He
+    asked to see the config: shown as a participation version with
+    effective_to + turned_off_reason, back on = a later version. 182 -
+    buildable now, "Turned off" as a WHERE clause; one row for an
+    owed-nothing period that inherits. 202 - cp_clients(_[^/]+)?\.csv, a
+    demo choice said so in a comment; the trial route attributes by pattern
+    too. 203 - its own requirement; TS-42's files cp_clients.csv plus a
+    differing cp_clients_v2.csv re-export, later superseded by a clean
+    file; AND (not the scoper's recommendation) ONE scripted Child
+    Protection pair settled by a person in the demo history.
+    **Round 2 the same evening:** the scoper folded all sixteen answers in
+    (Q15 B gives REQ-GEN-203 a second scenario, TS-80: a stray
+    cp_clients_TEST.csv beside the real extract, settled by a scripted
+    person - reject the test file, supply the real one, PROPOSED). One new
+    fork, answered by Keith: TS-63's turn-off is DECLARED AS A CORRECTION
+    in calendar.yaml, like TS-57..62 - not slipped in under the synthetic
+    exception for a newly added version. Still to confirm at sign-off:
+    163 criteria 35 (refuse where the agreement backstop refuses the
+    dataset) and 36 (GitHub reply). Architect + CLI UX + dashboard UX
+    reviews started next.

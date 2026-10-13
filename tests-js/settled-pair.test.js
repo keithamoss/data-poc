@@ -145,3 +145,20 @@ describe("#171 UX fixes", () => {
     expect(w.inPlaceOnQueueItems([], data)).toEqual([]);
   });
 });
+
+describe("a file the load refused (#172 D2, REQ-GEN-196 criterion 16)", () => {
+  it("is marked as never loaded on the settled row, with the file check's reason", () => {
+    const w = load();
+    const refused = {...SETTLED,
+      loadFailures: [{file: "b.csv", why: "it has more fields than its header on line 943"}],
+      settlement: {...SETTLED.settlement, files: [
+        SETTLED.settlement.files[0],
+        {...SETTLED.settlement.files[1], outcome: "rejected", toPeriod: null}]}};
+    const html = w.blockerHistoryRows("cp-case-workers", "2026-04-01", SOURCE(refused));
+    const b = html.slice(html.indexOf("b.csv"));
+    expect(b).toContain("rejected");
+    expect(b).toContain("never loaded");
+    expect(b).toContain("more fields than its header");
+    expect(html.slice(html.indexOf("a.csv"), html.indexOf("b.csv"))).not.toContain("never loaded");
+  });
+});

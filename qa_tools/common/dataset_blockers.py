@@ -226,7 +226,11 @@ def _contested(db) -> list[Blocker]:
     from qa_tools.common import asset_time, display_time, load_log, supply_db
 
     decided = _deciding(db)
-    failures = load_log.failures(conn=db)
+    # EVERY LOAD THAT FAILED, NOT THE QUEUE OF ONES STILL WAITING: a
+    # rejection drains load_log.failures(), and this record is the pair's
+    # history - once settled it must still say which file never loaded
+    # (post-build-review #172).
+    failures = [r for r in load_log.latest_by_table(None, db).values() if not r.loaded]
     out = []
     for delivery, dataset_id, files, received_at in db.execute(
             "SELECT c.delivery, c.dataset_id, c.files, "

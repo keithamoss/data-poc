@@ -145,7 +145,11 @@ _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_
 # existing scenario, with every ordinary red and amber still drawn. The
 # extra forty are added at the OLD end (from 2026-07-05), so every existing
 # negative anchor keeps its calendar date.
-N_DELIVERIES = 80
+# 85, NOT 80 (Keith, 2026-10-13, post-build-review #172): the pairs sit apart
+# with ordinary days between them, which left the ordinary reds no room to
+# sit apart themselves - five more days, from 2026-06-30, so no two reds fall
+# on neighbouring days.
+N_DELIVERIES = 85
 
 
 # The clean/amber/red mix across the scheduled deliveries. Named rather
@@ -268,7 +272,13 @@ def _reds_clear_of_scenarios(severities: list, unavailable: frozenset[int],
     for i in range(start, len(out)):
         if out[i] != "red":
             continue
-        swap = next((j for j in range(start - 1, 0, -1) if out[j] is None), None)
+        # SPREAD, NOT PACKED (post-build-review #172): a red beside another
+        # red has its resends land on that red's day - or on the same
+        # instant as its neighbour's, which the generator refuses. A slot
+        # with no red either side first; any clean slot only when none is.
+        free = [j for j in range(start - 1, 0, -1) if out[j] is None]
+        swap = next((j for j in free if "red" not in (out[j - 1], out[j + 1] if j + 1 < len(out) else None)),
+                    free[0] if free else None)
         if swap is None:
             raise targeting.TargetError(
                 f"{DATASET_ID}: the ordinary red drawn for {names[i] if names else i} falls among the "

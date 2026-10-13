@@ -8429,3 +8429,58 @@ twice. It deliberately did not re-find the `TypeError`.
       - kept, can be brought back" keeps its plain hyphen: it is the
       wording criterion 10 quotes. A refused correction trial on the CLI
       printing the settle form was not verified.
+
+172. **[in-progress, 2026-10-13]** **[Data generation, Pipeline & publishing, Dashboard UI]**
+    **The delivery critic on REQ-GEN-196 as built (6c68fb8), and a defect
+    the scoper found on the same evening.** Each claim checked against the
+    code and the bootstrapped database first; 17 of 21 criteria met.
+    - **D1 - Keith's call: SPACE THE PAIRS OUT.** The seven pairs and their
+      green days made 4-18 August one solid quiet block, so three late-July
+      reds had their resends pushed past it 22 to 27 days late; one became
+      19 August's supply and TS-73's green following day read RED, sized
+      against the wrong supply. Nothing caught it: only placements with
+      TARGETS were compared after replay. Fixed three ways, each failing
+      first: every day built green is now compared (`generator/targets.py`,
+      `TestWhatWasBuilt::test_a_green_follow_with_no_target_is_still_compared`
+      - and on the unfixed history it found exactly TS-73's day); the pairs
+      sit 28 July to 25 August with ordinary days between them; and no
+      arrival may land more than ten days after its slot
+      (`TestNoResendIsPushedFarFromItsDay`). Spacing left the ordinary
+      reds no room to sit apart - seven in a row, two neighbours' resends on
+      one receipt instant, which the generator refuses - so the red mover
+      now prefers a slot with no red beside it, and the history grew to 85
+      days from 2026-06-30 (an earlier calendar version, never a moved one;
+      Keith's option allowed "more history").
+    - **D2 - the refused file was never marked "never loaded"** on the
+      settled row (criterion 16). Two causes, both fixed test-first: the
+      row never read `loadFailures`; and the blocker record took them from
+      the load QUEUE, which a rejection drains, so once settled the record
+      forgot the file had been refused (`dataset_blockers._contested` reads
+      every failed load now).
+    - **F - an open pair with one refused file was CHECKED.** The load gate
+      dropped the refused file from the run's candidates, so TS-72's
+      arrival run read the other file as a clean supply (80 checks recorded)
+      while the page said nothing is checked until a person decides. The
+      overlay now treats an open pair's staged names as its candidates, a
+      refused one included, so neither is read (`period_overlay.build`).
+    - **Scoper, 2026-10-13: a plain re-file into a period holding an open
+      pair went through**, superseding the pair and ending its contest with
+      nobody settling it. Refused now, through the same
+      `settlement.open_pair_in` a settlement's own re-file uses
+      (`TestARefileIntoAnOpenPair`, failing first).
+    - **Flaky test** (`TestASettledAwayFileIsNotTheLatestArrival`): another
+      test's SETTLED pair on the same day became the latest arrival -
+      `pair_support.free_day` avoided only open pairs; it avoids any now.
+    - **Polish:** the register and SCENARIOS.md said "on time" where the
+      pairs read early (criteria 14-16 were reworded); a "neither" pair read
+      "a supply arrived and was rejected" - now "2 files arrived and were
+      rejected", from a count in the closed-slot record.
+    - **Test quality:** the one-decision-per-pair test overwrote by filename
+      and could not see a second decision - it keeps every row now; the
+      unknown-shape refusal the NFR requires is tested; page-level tests
+      added for criteria 14, 16 and 17 (late 4:30pm, never loaded, 2 files
+      rejected).
+    - **Not changed, said so:** C9's test-first order is not verifiable
+      (test and fix in one commit); C16's en_US collation half is proven
+      only on CI; the July red cascade (resends filling neighbouring days)
+      predates this and remains Keith's call - the reds no longer touch.

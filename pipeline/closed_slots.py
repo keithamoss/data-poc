@@ -133,7 +133,10 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
         if gone and not live:
             supply, received = gone[-1]
             rej = {**rejected[supply], "supply": supply, "receivedAt": received,
-                   "failedLoad": supply_holds.arrival_key_of(supply) in failed_keys}
+                   "failedLoad": supply_holds.arrival_key_of(supply) in failed_keys,
+                   # How many were rejected: a settled pair's 'neither' is two
+                   # (post-build-review #172).
+                   "count": len(gone)}
         out.append({"period": slot.name, "index": index, "closesAt": closes.isoformat(),
                     "changes": own_changes, "filedAt": filed_first,
                     "marks": marks.get(slot.name, []), "rejected": rej})

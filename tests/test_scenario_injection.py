@@ -638,3 +638,28 @@ def test_a_pair_targets_only_the_files_its_script_makes_supplies():
             assert (f.target is not None) == makes_a_supply, (
                 f"{injection.scenario_id} file {position} is {outcome} and "
                 f"{'not ' if f.target is None else ''}targeted")
+
+
+class TestAPerFileShape:
+    """REQ-GEN-196's NFR: shapes are named, applied per file, and an unknown
+    name raises (#172: the raise was untested)."""
+
+    CSV = "child_given_names,child_family_name,x\nAva,Ryan,1\n"
+
+    def test_an_unknown_shape_is_refused_naming_the_known_ones(self):
+        from generator import scenario_injection as si
+
+        with pytest.raises(si.CannotPlace, match="unknown per-file shape 'typo'.*stray_test_rows"):
+            si.shape_file("typo", self.CSV)
+
+    def test_stray_test_rows_names_every_registrant_test(self):
+        from generator import scenario_injection as si
+
+        out = si.shape_file("stray_test_rows", self.CSV)
+        assert "Ava" not in out and "Ryan" not in out and out.count("TEST") >= 2
+
+    def test_a_pair_file_shape_is_not_a_delivery_shape(self):
+        from generator import scenario_injection as si
+
+        with pytest.raises(si.CannotPlace):
+            si.apply_file_shape("stray_test_rows", {"a.csv": self.CSV})

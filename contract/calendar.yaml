@@ -140,6 +140,18 @@ calendars:
       # FORTY EARLIER DAYS (REQ-GEN-196 criterion 20, Keith, 2026-10-13): the
       # same reasoning as the version after it - an earlier version, never a
       # moved one - so the history can grow to 80 daily supplies at its OLD end.
+      # FIVE MORE, EARLIER AGAIN (post-build-review #172, Keith, 2026-10-13):
+      # spacing the seven pairs left the ordinary reds no room to sit apart,
+      # and two neighbouring reds' resends claimed one receipt instant.
+      - effective_from: "2026-06-30"
+        changelog:
+          - date: "2026-10-13"
+            author: REQ-GEN-196
+            change: >-
+              Five days of daily supply before 2026-07-05: the synthetic history grows from 80 daily supplies to 85 so the contested pairs can sit apart (Keith's call) and the ordinary reds never fall on neighbouring days. Added at the old end, as the version after it was. The same rule and claim window.
+        claim_window: 4h
+        cadence:
+          rule: daily
       - effective_from: "2026-07-05"
         changelog:
           - date: "2026-10-13"
@@ -211,6 +223,17 @@ datasets:
     participation:
       versions:
         # FORTY MORE, AS AN EARLIER VERSION AGAIN (REQ-GEN-196 criterion 20).
+        # FIVE MORE (post-build-review #172) - see the daily calendar above.
+        - effective_from: "2026-06-30"
+          expected_time: "14:00"
+          grace: 1h
+          changelog:
+            - date: "2026-10-13"
+              author: REQ-GEN-196
+              change: >-
+                Birth Registrations owes a supply from 2026-06-30, five days
+                earlier - the synthetic history is 85 days now. The same due
+                time and grace as the versions after it.
         - effective_from: "2026-07-05"
           expected_time: "14:00"
           grace: 1h

@@ -77,7 +77,11 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
             out.append(Built(f"the ordinary amber for {entry['period']}", BDM_DATASET,
                              entry["delivery"], "amber", day=entry["period"]))
     for record in placed:
-        if record.get("dataset") != BDM_DATASET or not record.get("targets"):
+        # EVERY DAY BUILT GREEN, targeted placement or not (post-build-review
+        # #172): TS-73's green following day has no target of its own and
+        # read red on the page with nothing to say so.
+        if record.get("dataset") != BDM_DATASET or not (
+                record.get("targets") or record.get("lead_in") or record.get("follow")):
             continue
         scenario = record["scenario_id"]
         lead_in = record.get("lead_in") or []
@@ -87,7 +91,7 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
             out.append(Built(f"{scenario}'s green {role} {period}", BDM_DATASET,
                              _only(by_period, period, scenario)["delivery"], "green",
                              scenario=scenario, day=period))
-        for target in record["targets"]:
+        for target in record.get("targets") or ():
             if target.get("filename"):
                 # A PAIR'S FILE, keyed by its delivery and filename, on the
                 # day its extract is for (REQ-GEN-196 criterion 19).

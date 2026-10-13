@@ -4284,3 +4284,31 @@ class TestThePlantedPairsOnTheBuiltDashboard:
                             for i in range(settled.count()))
                 if f"birth_registrations_{day}" in t]
         assert len(mine) == 1 and "Settled" in mine[0], mine
+
+    def _text_on(self, page, html, sid, days_after):
+        from datetime import date, timedelta
+
+        from qa_tools.common import scenario_map
+
+        placed = scenario_map.read_placements()[sid]
+        on = date.fromisoformat(placed.period) + timedelta(days=days_after)
+        _goto(page, html, state=TestASettledPairOnThePage()._where(placed.dataset),
+              in_place_on=str(on))
+        return " ".join(page.locator("#view").inner_text().split()), date.fromisoformat(placed.period)
+
+    def test_ts70_reads_late_from_the_corrected_files_receipt(self, page, built_dashboard_html):
+        """Criterion 14: D's supply is the 16:30 re-export, so D is late."""
+        text, _day = self._text_on(page, built_dashboard_html, "TS-70", 1)
+        assert "Late 4:30pm" in text, text[:2000]
+
+    def test_ts72_marks_the_refused_file_never_loaded(self, page, built_dashboard_html):
+        """Criterion 16 (#172 D2): the settled row says which file never loaded."""
+        text, day = self._text_on(page, built_dashboard_html, "TS-72", 1)
+        assert f"birth_registrations_{day}-test.csv" in text
+        assert "never loaded" in text, text[:2000]
+
+    def test_ts73_says_both_files_were_rejected(self, page, built_dashboard_html):
+        """Criterion 17: D is left owed, and the page says two files came and
+        were both rejected - not 'a supply'."""
+        text, _day = self._text_on(page, built_dashboard_html, "TS-73", 2)
+        assert "2 files arrived and were rejected" in text, text[:2000]

@@ -86,7 +86,14 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
             f"shows how.")
     if from_period == to_period:
         raise decision_log.DecisionRefused(f"{supply} is already filed to {to_period}.")
-    from qa_tools.common import supply_files
+    from qa_tools.common import settlement, supply_files
+
+    # INTO A PERIOD HOLDING AN OPEN PAIR (post-build-review #172): the
+    # re-filed supply would supersede that pair and end its contest without
+    # anybody settling it - refused as a settlement's own re-file is (#170).
+    blocked = settlement.open_pair_in(conn, dataset_id, to_period, besides=supply)
+    if blocked:
+        raise decision_log.DecisionRefused(blocked)
 
     if supply_files.open_contest(conn, dataset_id, supply) is not None:
         # Criterion 11: the contest is per arrival. JUDGED BY THE OPEN

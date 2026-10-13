@@ -13,16 +13,17 @@ TABLE = "birth_registrations"
 
 def free_day(conn, start: date, span: int = 300) -> date:
     """A random day in [start, start+span) where neither it nor the next
-    day holds an open pair already - a test database keeps every pair the
-    earlier tests left, and a re-file into a period holding one is refused
-    (post-build-review #170)."""
+    day holds a pair already - a test database keeps every pair the earlier
+    tests left, and a re-file into a period holding an open one is refused
+    (post-build-review #170). SETTLED pairs count too (#172): a settled
+    pair's supplies on the same day can be another test's latest arrival."""
     import random
 
     from qa_tools.common import dataset_blockers
 
     taken = set()
     for blocker in dataset_blockers.contests(conn):
-        if blocker.dataset_id == DS and blocker.is_open:
+        if blocker.dataset_id == DS:
             found = supply_files.resolve(conn, DS, blocker.supply)
             if found is not None and found.period:
                 taken.add(found.period)

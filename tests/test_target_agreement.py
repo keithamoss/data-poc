@@ -104,6 +104,20 @@ class TestWhatWasBuilt:
         assert not built["lead1"].injected
         assert built["amb"].target == "amber" and built["cpamb"].dataset_id == "cp-clients"
 
+    def test_a_green_follow_with_no_target_is_still_compared(self, tmp_path):
+        """#172 D1: a placement with no targets (TS-73's green_follow) skipped
+        its green following day, so the day read RED on the page and nothing
+        compared it with what it was built to."""
+        book = _book(tmp_path, [_entry("2026-08-20", "pair", at="13:20"),
+                                _entry("2026-08-21", "after")])
+        placed = tmp_path / "placed.json"
+        placed.write_text(json.dumps({"placements": [{
+            "scenario_id": "TS-73", "dataset": DS, "lead_in": [],
+            "follow": ["2026-08-21"], "targets": []}]}))
+        built = {b.delivery: b for b in targets.written(book, placed)}
+        assert set(built) == {"after"}
+        assert built["after"].target == "green" and not built["after"].injected
+
     def test_a_record_the_placement_does_not_match_is_refused(self, tmp_path):
         book = _book(tmp_path, [_entry("2026-09-04", "lead2")])
         placed = tmp_path / "placed.json"

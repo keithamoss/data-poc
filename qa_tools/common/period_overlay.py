@@ -118,6 +118,13 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
         # else its arrival carried (REQ-PIPE-193 criterion 13): a settled
         # pair's supply is one of the two tables.
         own = [t for t in own if t in set(own_physical)]
+    else:
+        # AN OPEN PAIR STAYS CONTESTED WHEN ONE FILE WAS REFUSED
+        # (post-build-review #172): the load-record gate drops the refused
+        # file, so its one loaded sibling would read as a clean supply and
+        # be checked before anybody said which file is the supply. Both of
+        # the pair's staged names are its candidates, so neither is read.
+        own = sorted(set(own) | set(_open_pair_tables(conn, own_table, arrival_key)))
     staged[own_table] = sorted(own)
 
     withheld = None
@@ -202,6 +209,20 @@ def name_held_siblings(conn, res: supply_db.Resolution, arrival) -> list[str]:
             res.held[table] = held.supply_id
             moved.append(table)
     return moved
+
+
+def _open_pair_tables(conn, own_table: str, arrival_key: str) -> tuple[str, ...]:
+    """Every staged name an OPEN pair in this arrival owns, a refused file's
+    included - or () where this arrival's file for the table is no open
+    pair. Through the one resolver (REQ-PIPE-193 criterion 13)."""
+    from qa_tools.common import hierarchy, supply_files
+
+    try:
+        dataset_id = hierarchy.dataset_for_table(own_table).dataset_id
+    except hierarchy.UnknownDatasetError:
+        return ()
+    pair = supply_files.resolve(conn, dataset_id, f"{dataset_id}@{arrival_key}#1")
+    return tuple(pair.own) if pair is not None and pair.is_pair else ()
 
 
 def _withhold_if_held(arrival, dataset_id: str, own_table: str, *,

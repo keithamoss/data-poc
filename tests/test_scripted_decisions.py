@@ -521,8 +521,14 @@ class TestThePlantedPairsAreSettled:
                 f"SELECT d.id, f.filename, f.outcome, f.to_slot FROM {dl.TABLE} d "
                 'JOIN "qa".decision_file f ON f.decision_id = d.id '
                 "WHERE d.action = 'choose-file' AND d.actor = ?", [SYNTHETIC]).fetchall()
-        by_file = {name: (decision, outcome, to_slot)
-                   for decision, name, outcome, to_slot in rows}
+        # EVERY ROW KEPT (#172): keyed by filename alone, a second decision
+        # for the same file overwrote the first and still read as one.
+        all_for: dict[str, list] = {}
+        for decision, name, outcome, to_slot in rows:
+            all_for.setdefault(name, []).append((decision, outcome, to_slot))
+        twice = {n: r for n, r in all_for.items() if len(r) > 1}
+        assert not twice, f"files settled more than once: {twice}"
+        by_file = {name: found[0] for name, found in all_for.items()}
         for sid, files in self.EXPECTED.items():
             day = date.fromisoformat(placed[sid].period)
             nxt = (day + timedelta(days=1)).isoformat()

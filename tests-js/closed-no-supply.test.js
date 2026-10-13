@@ -128,6 +128,13 @@ describe("a period whose supply was rejected (REQ-PIPE-153 criterion 9)", () => 
     expect(text).toContain("a supply arrived, could not be loaded and was rejected by Keith Moss");
     expect(text).toContain("supplier is resending");
   });
+
+  it("counts the files when a person rejected two (#172, TS-73)", () => {
+    const w = load();
+    const two = {...REJECTED, rejected: {...REJECTED.rejected, failedLoad: false, count: 2}};
+    const text = w.gapText(w.groupGaps([two])[0]);
+    expect(text).toContain("2 files arrived and were rejected by Keith Moss");
+  });
 });
 
 describe("the queue is read as at the date on show (UX critic, 2026-10-05)", () => {

@@ -4987,7 +4987,12 @@ function groupGaps(slots){
 function gapText(group){
   if(group.rejected){
     const r = group.rejected;
-    return `${fmtPeriodOrDay(group.periods[0])}: a supply arrived${r.failedLoad ? ", could not be loaded" : ""} and was rejected by ${r.actor}, ${fmtInstant(r.at)}${r.reason ? ` ("${r.reason}")` : ""}`;
+    // TWO FILES, BOTH REJECTED (a settled pair's 'neither', #172) are said
+    // as two, not as one supply.
+    const what = (r.count || 1) > 1
+      ? `${r.count} files arrived${r.failedLoad ? ", one could not be loaded," : ""} and were rejected`
+      : `a supply arrived${r.failedLoad ? ", could not be loaded" : ""} and was rejected`;
+    return `${fmtPeriodOrDay(group.periods[0])}: ${what} by ${r.actor}, ${fmtInstant(r.at)}${r.reason ? ` ("${r.reason}")` : ""}`;
   }
   const daily = /^\d{4}-\d{2}-\d{2}$/.test(group.periods[0]);
   const unit = daily ? "day" : "period";
@@ -5980,13 +5985,19 @@ const SETTLED_SAID = {supply:"this period's supply", rejected:"rejected",
 function settledPairRow(b, datasetId, inPlaceOnDateStr){
   const s = b.settlement;
   const period = settledPairPeriod(datasetId, b);
+  // A FILE THE LOAD REFUSED is marked as never loaded, with the file
+  // check's own reason (REQ-GEN-196 criterion 16; post-build-review #172).
+  const refused = new Map((b.loadFailures || []).map(x => [x.file, x.why]));
   const files = (s.files || []).map(f=>{
+    const never = refused.has(f.filename)
+      ? ` <span style="color:var(--ink-muted);">— never loaded${refused.get(f.filename) ? `: ${escHtml(refused.get(f.filename))}` : ""}</span>`
+      : "";
     const said = f.outcome === "refiled"
       ? refiledFileLink(datasetId, f.toPeriod, period, inPlaceOnDateStr)
       : f.outcome === "supply" && period
       ? `this period's supply (${escHtml(fmtPeriodOrDay(period))})`
       : escHtml(SETTLED_SAID[f.outcome] || f.outcome);
-    return `<div data-settled-file="${escAttr(f.outcome)}"><span class="mono">${escHtml(f.filename)}</span>${f.receivedAt ? `, received ${fmtInstant(f.receivedAt)}` : ""} — ${said}</div>`;
+    return `<div data-settled-file="${escAttr(f.outcome)}"><span class="mono">${escHtml(f.filename)}</span>${f.receivedAt ? `, received ${fmtInstant(f.receivedAt)}` : ""} — ${said}${never}</div>`;
   }).join("");
   return `<tr data-blocker="${b.kind}" data-settled>
     <td>${fmtInstant(b.openedAt)}</td>

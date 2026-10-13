@@ -193,6 +193,35 @@ class TestARefusedFile:
         with pytest.raises(decision_log.DecisionRefused, match="never loaded"):
             p.settle(conn, actor, (one, "reject"), (two, "supply"))
 
+    def test_its_open_arrival_run_checks_neither_file(self, conn, day):
+        """#172 F: the load-record gate dropped the refused file from the
+        run's candidates, so an OPEN pair with one refused file looked like
+        one clean supply and its arrival run checked the other file - while
+        the page said nothing is checked until a person says which is which."""
+        from qa_tools.common import load_log, period_overlay
+
+        p = self._pair(conn, day)
+        loaded_file = p.files[0][0]
+        load_log.record(p.delivery, DS, p.table[loaded_file], load_log.LOADED,
+                        _at(day, "13:30").isoformat())
+        run_id = f"{TABLE}__{p.key}"
+        out = period_overlay.build(
+            conn, run_id, period=p.period, own_table=TABLE, arrival_key=p.key,
+            tables=[TABLE], loaded=frozenset({p.table[loaded_file]}))
+        assert TABLE in out.resolution.ambiguous, out.as_record()
+        assert TABLE not in out.readable
+
+    def test_the_pairs_record_still_names_it_once_settled(self, conn, actor, day):
+        """#172 D2: the blocker record read the refused file from the load
+        queue, which a rejection drains - so once settled, the record (and
+        the page's never-loaded mark) forgot the file was ever refused."""
+        p = self._pair(conn, day)
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "supply"), (two, "reject"))
+        (record,) = [b for b in dataset_blockers.contests(conn) if b.supply == p.pair]
+        assert [name for name, _ in record.load_failures] == [two]
+        assert "ragged" in record.load_failures[0][1]
+
     def test_the_other_file_is_checked_on_its_own(self, conn, actor, day):
         p = self._pair(conn, day)
         one, two = (n for n, _ in p.files)
@@ -707,3 +736,29 @@ class TestASettledAwayFileIsNotTheLatestArrival:
         sql = promotion_state.state_for(DS, conn, as_at=after).arrived_supply
         walk = promotion_timeline._History(conn, DS, []).panel(after)[0]["arrived"]["supply"]
         assert sql == walk == outcomes["supply"], (sql, walk, outcomes)
+
+
+class TestARefileIntoAnOpenPair:
+    """Found by the scoper (2026-10-13), checked test-first (#172): a plain
+    re-file into a period holding an OPEN pair. It must be refused - as a
+    settlement's re-file into one is (#170) - or the re-filed supply would
+    supersede the pair and end the contest without anybody settling it."""
+
+    def test_it_is_refused_and_the_pair_stays_open(self, conn, actor, day):
+        other_day = free_day(conn, day + timedelta(days=5), span=60)
+        moved = Pair(conn, other_day, [(f"birth_registrations_{other_day}.csv", _at(other_day, "13:40")),
+                                        (f"birth_registrations_{other_day}-1.csv", _at(other_day, "13:50"))])
+        (a, _), (b, _) = moved.files
+        moved.settle(conn, actor, (a, "supply"), (b, "reject"))
+        target = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
+                                   (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
+        request = fd.Request(operation=fd.REFILE, dataset_id=DS, actor=actor, reason="r",
+                             period=moved.period, supply=moved.pair, to_period=target.period,
+                             confirmed=True)
+        # Refused before anything is shown as a consequence, and on apply.
+        with pytest.raises(decision_log.DecisionRefused, match="two files of its own"):
+            fd.consequences(conn, request)
+        with pytest.raises(decision_log.DecisionRefused, match="two files of its own"):
+            fd.apply(request, effective_at=_at(other_day + timedelta(days=1), "12:00").isoformat(),
+                     conn=conn)
+        assert _open(conn, target)
