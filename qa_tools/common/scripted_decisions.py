@@ -253,7 +253,7 @@ def _apply(t: Timed) -> None:
                 # NO TYPED ENVIRONMENT ID (REQ-PIPE-093 criterion 9): scripted
                 # playback is unattended, and the published PoC is bootstrapped in
                 # production from synthetic data - a prompt would make it unbootable.
-                fd.apply(ask(key or None), effective_at=t.at.isoformat(), conn=conn)
+                outcome = fd.apply(ask(key or None), effective_at=t.at.isoformat(), conn=conn)
         except Exception as exc:  # noqa: BLE001 - criterion 6: ANY failure stops the replay
             raise ScriptRefused(
                 f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} "
@@ -261,3 +261,29 @@ def _apply(t: Timed) -> None:
                 f"The replay stops here rather than continue with a history missing it."
             ) from exc
     print(f"scripted: {s.operation} {s.dataset_id} {t.period} ({s.scenario})")
+    if outcome.owed is not None:
+        _run_the_re_check_it_owed(t, outcome.owed)
+
+
+def _run_the_re_check_it_owed(t: Timed, owed_id: int) -> None:
+    """The re-check a decision owed, run at the decision's own instant, as
+    the terminal runs it while a person waits (post-build-review #161;
+    Keith, 2026-10-13: every scripted decision). It used to be discarded, so
+    TS-67's re-filed supplies were never checked nor gated in their new
+    period. The decision is committed first, so the run reads it. A re-check
+    that does not complete stops the replay, as a refused decision does
+    (criterion 6): a history whose decision was never checked is the same
+    gap."""
+    from qa_tools.common import recheck
+
+    s = t.script
+    try:
+        got = recheck.run(owed_id)
+    except Exception as exc:  # noqa: BLE001 - criterion 6, as above
+        got = recheck.Outcome(owed_id, "", False, str(exc))
+    if not got.completed:
+        raise ScriptRefused(
+            f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} - was "
+            f"recorded, but the re-check it owed did not complete: {got.message}. The "
+            f"replay stops here rather than continue with a history missing it.")
+    print(f"scripted: re-checked {s.dataset_id} ({s.scenario}): {got.status or got.message}")

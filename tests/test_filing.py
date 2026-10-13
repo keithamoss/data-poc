@@ -434,3 +434,30 @@ class TestWhichPeriodAnArrivalWasFiledTo:
                                    slot=None, branch=assignment.HELD))
         assert filing.period_of(
             "cp-clients", "2026-08-01T01:00:00.000000+00:00") is None
+
+
+class TestAReceiptKeepsItsOwnOffset:
+    """post-build-review #161, found when playback first ran a re-check
+    (TS-67's): received_at_of returned the receipt instant as the database
+    hands it back - in UTC - so a key derived from it no longer matched the
+    key the supply was staged and filed under, which carry the writer's own
+    offset. A re-check of a Perth-time receipt found neither its staged
+    table nor its period. The receipt view keeps the writer's text; the
+    receipt comes back with its own offset, and so with its own key."""
+
+    def test_the_key_from_the_receipt_is_the_key_the_supply_carries(self, filings):
+        from qa_tools.common import supply_db
+
+        received = datetime(2023, 10, 12, 10, 0, tzinfo=PERTH)
+        key = supply_db.arrival_segment(received)
+        supply = f"cp-clients@{key}"
+        name = f"pytest-offset-{uuid.uuid4().hex[:8]}"
+        filing_support.ensure_delivery(name, "cp-clients", received)
+        with supply_db.connect(label="test-offset") as conn:
+            filing_support.place(conn, "cp-clients", supply, "2023-Q4", name)
+
+        got = filing.received_at_of("cp-clients", supply)
+
+        assert got == received
+        assert supply_db.arrival_segment(got) == key, (
+            f"{got.isoformat()} gives {supply_db.arrival_segment(got)}, not {key}")

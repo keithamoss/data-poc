@@ -8051,7 +8051,7 @@ twice. It deliberately did not re-find the `TypeError`.
     "which file is the supply?" text are unreachable; the GitHub decision
     handler has no caller outside tests.
 
-161. **[todo, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
+161. **[in-progress, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
     **TS-67's scripted re-files left their QA re-checks owed - the bootstrap
     never runs a scripted decision's re-check.** Found by delivery-architect
     reviewing REQ-GEN-196, then CONFIRMED against the bootstrapped database
@@ -8072,3 +8072,48 @@ twice. It deliberately did not re-find the `TypeError`.
     leaving them owed). This changes TS-67's history - the five supplies
     get checked and gated - so the golden is re-captured. To be fixed
     test-first; REQ-GEN-196 depends on it.
+    **FIXED 2026-10-13, test-first, and it exposed two more defects that any
+    real re-check would have hit** - none of them reachable before, because
+    no decision in the synthetic history had ever had its re-check RUN:
+    - **Playback discarded the re-check** (the finding above):
+      `scripted_decisions._apply` now runs the owed re-check at the
+      decision's own instant, and a re-check that does not complete stops
+      the replay as a refused decision does. Test:
+      tests/test_scripted_decisions.py `TestAScriptedDecisionsReCheckIsRun::
+      test_no_re_check_a_scripted_decision_owed_is_left_open` (failed first
+      on TS-67's five).
+    - **Every re-check of a Perth-time receipt found neither its table nor
+      its period.** `filing.received_at_of` returned the instant in UTC, so
+      the key derived from it (`...0200000000`) never matched the key the
+      supply was staged and filed under (`...1000000800`). Fixed at the
+      source: it returns the writer's own text from the receipt view, with
+      the instant as fallback. Test: tests/test_filing.py
+      `TestAReceiptKeepsItsOwnOffset` (failed first).
+    - **A re-check run crashed the Child Protection results build**
+      (KeyError: 'run_index'): `recheck.execute` recorded no run_index, and
+      the rebuild sorts every current run by it. It now carries its
+      arrival's own. Test: `test_every_run_records_its_place_in_the_history`
+      (failed first on twelve runs - TS-67's and older re-evaluations').
+    Re-bootstrapped from empty, 3m51s; the arrival golden moved five run
+    ids to `__r1` and nothing else.
+    **STILL OPEN - the third problem, its own fix next (Keith: commit, then
+    chase it):** a supply whose cross-table checks were UNRUNNABLE because
+    a sibling table was not in the period yet is not re-evaluated when that
+    table arrives. TS-67's scripted re-files land one dataset at a time, so
+    cp-clients' re-check ran before its siblings were in 2023-Q4, went red,
+    was refused promotion, and nothing re-checked it when investigations,
+    placements and carers were promoted into 2023-Q4 minutes later;
+    cp-notifications likewise ("still-failing"). Hypothesis, not yet
+    verified: an unrunnable read records no dependency, so REQ-PIPE-121's
+    knock-on never learns the supply reads those tables.
+
+162. **[done, 2026-10-13]** **[Testing & dev tooling]** **The premise gate
+    could fail on a directory it never scans.** Seen in the full gate for
+    #161: `TestTheRepositoryIsClean` failed with FileNotFoundError on
+    `data/dbt_scratch/.../dbt_target/<run>__r6`. validate_premise walked the
+    whole tree with rglob and skipped `data/` only afterwards, so another
+    test worker removing its dbt scratch mid-walk crashed the scan - a race
+    on a path the gate never reads. Fixed: the walk prunes every skipped
+    directory before entering it (os.walk). Test, failing first:
+    tests/test_validate_premise.py `TestTheWalkNeverEntersASkippedDirectory`.
+    Minor under the 2026-09-25 rule.

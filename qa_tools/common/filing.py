@@ -580,12 +580,28 @@ class RecordedArrival:
 
 def received_at_of(dataset_id: str, supply_id: str) -> datetime | None:
     """Our receipt instant for this supply - from the one receipt view
-    (REQ-PIPE-144 criterion 16), never a copy on the filing."""
+    (REQ-PIPE-144 criterion 16), never a copy on the filing.
+
+    WITH THE WRITER'S OWN OFFSET (post-build-review #161): the instant
+    column comes back in UTC, and a key derived from it - a staged table's
+    name, a filing's arrival key - no longer matches the key the supply
+    carries, which kept the writer's offset (REQ-PIPE-069 criterion 5). A
+    re-check of a Perth-time receipt found neither its table nor its
+    period. The view keeps the writer's text for exactly this; the instant
+    is the fallback for a row without it. Comparisons are unaffected - two
+    aware datetimes compare by instant."""
     with _connect("mothman:filing-read") as conn:
         rows = conn.execute(
-            f"SELECT received_instant FROM {RECEIPT} WHERE dataset_id = ? AND supply_id = ?",
+            f"SELECT received_at, received_instant FROM {RECEIPT} "
+            "WHERE dataset_id = ? AND supply_id = ?",
             [dataset_id, supply_id]).fetchall()
-    return rows[0][0] if rows else None
+    if not rows:
+        return None
+    text, instant = rows[0]
+    try:
+        return datetime.fromisoformat(text) if text else instant
+    except ValueError:
+        return instant
 
 
 def recorded_arrival(dataset_id: str, supply_id: str) -> RecordedArrival | None:

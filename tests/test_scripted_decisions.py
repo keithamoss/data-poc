@@ -227,3 +227,41 @@ class TestRecordedAtItsOwnInstant:
         # The replay clock runs on from its anchor at real speed, so a few
         # milliseconds pass; before the fix this was a day.
         assert timedelta(0) <= recorded - effective < timedelta(seconds=5)
+
+
+class TestAScriptedDecisionsReCheckIsRun:
+    """post-build-review #161: a scripted decision that owes a re-check
+    (TS-67's re-files) left it owed, because playback discarded what
+    filing_decisions.apply returned and nothing in the replay drains a
+    re-check. So the re-filed supplies were never checked nor gated in
+    their new period. Keith, 2026-10-13: playback runs every scripted
+    decision's owed re-check at the decision's own instant."""
+
+    def test_no_re_check_a_scripted_decision_owed_is_left_open(self, deployment_history):
+        from qa_tools.common import supply_db
+
+        with supply_db.connect(read_only=True, label="test-161") as conn:
+            scripted = conn.execute(
+                f"SELECT count(*) FROM {dl.TABLE} WHERE actor = ?", [SYNTHETIC]).fetchone()[0]
+            assert scripted, "the history holds no scripted decision to check"
+            owed = conn.execute(
+                "SELECT o.dataset_id, o.supply_id FROM qa.owed_run o "
+                f"JOIN {dl.TABLE} d ON d.id = o.caused_by_decision "
+                "WHERE o.kind = 'recheck' AND o.cleared_at IS NULL AND d.actor = ?",
+                [SYNTHETIC]).fetchall()
+        assert owed == [], f"scripted decisions left these re-checks owed: {owed}"
+
+    def test_every_run_records_its_place_in_the_history(self, deployment_history):
+        """post-build-review #161: a re-check run was recorded without the
+        run_index its arrival carries, and the results rebuild sorts every
+        current run by it - so the first history holding a re-check that
+        ran crashed the Child Protection build (KeyError: 'run_index')."""
+        from qa_tools.common import supply_db
+
+        with supply_db.connect(read_only=True, label="test-161") as conn:
+            rows = conn.execute(
+                "SELECT run_key FROM qa.dataset_stats "
+                "WHERE NOT (stats -> 'arrival_record') ? 'run_index'").fetchall()
+            total = conn.execute("SELECT count(*) FROM qa.dataset_stats").fetchone()[0]
+        assert total, "the history records no run"
+        assert rows == [], f"runs recorded without run_index: {[r[0] for r in rows]}"

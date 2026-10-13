@@ -111,7 +111,7 @@ intro: >
 releases:
   - date: "2026-10-13"
     summary: >
-      Two fixes for a dataset where two files arrived for one table.
+      Fixes for two files arriving for one table, and for re-checks after a decision.
     changes:
       - category: Fixed
         items:
@@ -121,6 +121,14 @@ releases:
               Promoting a dataset where two files claim the same table used to
               move both into the period. It is now refused, and tells you to
               reject the pair and ask the supplier to resend.
+          - headline: Re-checks after a decision work for Perth-time supplies
+            components: ["Pipeline & publishing"]
+            description: >
+              Re-checking a supply after a person re-filed or restored it
+              could not find the supply's own table when it arrived on Perth
+              time, and a re-check that did run stopped the Child Protection
+              dashboard building. Both are fixed, and the synthetic history's
+              scripted decisions now run their re-checks too.
           - headline: Only settling the two files ends "Two files, choose one"
             components: ["Pipeline & publishing"]
             description: >

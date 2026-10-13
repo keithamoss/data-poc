@@ -155,6 +155,11 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     other arrival changed its instant or its verdict.
     Re-captured again the same day once a scripted person re-files TS-67 to
     2023-Q4: exactly five verdicts moved, late -> early, nothing else.
+    And once more for post-build-review #161 (playback runs a scripted
+    decision's owed re-check): TS-67's five re-filed supplies now have a
+    re-check run, which is their CURRENT run, so five ids moved from
+    `<table>__<key>` to `<table>__<key>__r1` - same instants, same verdicts,
+    distribution unchanged.
 
     RE-CAPTURED 2026-10-11 AGAIN FOR REQ-GEN-185 (TS-43 to TS-46 planted, the
     history 40 days). The procedure first: 69 deliveries, zero `handfiled-*`,

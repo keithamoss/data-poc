@@ -135,19 +135,30 @@ def _is_allowed(rel: str) -> str | None:
     return None
 
 
+def _skipped(rel: str) -> bool:
+    return any(part in rel.split("/") for part in SKIP_DIRS) \
+        or any(rel.startswith(d) for d in SKIP_DIRS)
+
+
 def _files() -> list[Path]:
+    """Every file to scan. A SKIPPED DIRECTORY IS PRUNED BEFORE IT IS
+    ENTERED (2026-10-13): rglob walked into data/ and skipped it only
+    afterwards, so another test worker removing its dbt scratch mid-walk
+    failed the gate with FileNotFoundError on a directory never scanned."""
+    import os
+
     out = []
-    for path in sorted(ROOT.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(ROOT).as_posix()
-        if any(part in rel.split("/") for part in SKIP_DIRS) \
-                or any(rel.startswith(d) for d in SKIP_DIRS):
-            continue
-        if path.suffix in SKIP_SUFFIXES or rel in SKIP_FILES:
-            continue
-        out.append(path)
-    return out
+    for here, dirs, files in os.walk(ROOT):
+        base = Path(here)
+        dirs[:] = sorted(d for d in dirs
+                         if not _skipped((base / d).relative_to(ROOT).as_posix()))
+        for name in files:
+            path = base / name
+            rel = path.relative_to(ROOT).as_posix()
+            if _skipped(rel) or path.suffix in SKIP_SUFFIXES or rel in SKIP_FILES:
+                continue
+            out.append(path)
+    return sorted(out)
 
 
 #: Fields in requirements.yaml this never reads, and why each is a RECORD

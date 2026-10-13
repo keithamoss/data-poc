@@ -128,6 +128,16 @@ def first_run_id(dataset_id: str, supply_id: str) -> str:
     return f"{logical}__{head}" + (f"__{ordinal}" if ordinal else "")
 
 
+def _run_index_of(first: str) -> int:
+    """The run_index the supply's own arrival recorded - 0 where its first
+    run recorded none, which sorts it first rather than failing."""
+    with supply_db.connect(label="mothman:recheck") as conn:
+        rows = conn.execute(
+            f'SELECT stats -> \'arrival_record\' ->> \'run_index\' FROM "{qa_store.SCHEMA}".dataset_stats '
+            "WHERE run_key = ? LIMIT 1", [first]).fetchall()
+    return int(rows[0][0]) if rows and rows[0][0] is not None else 0
+
+
 def _next_run_id(conn, first: str) -> str:
     """The next unused `__r<N>` - counting the ids an owed run has already
     taken as well as the runs recorded. An attempt that broke before its
@@ -195,9 +205,15 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     arrival = SimpleNamespace(
         run_id=run_key, received_at=received_at, sequence=0, delivery_name=delivery,
         files_by_dataset={dataset_id: (supply_id,)})
+    first = first_run_id(dataset_id, supply_id)
     entry = {
         "run_id": run_key, "received_at": received_at.isoformat(), "delivery": delivery,
-        "csv_path": "", "data_run_id": first_run_id(dataset_id, supply_id),
+        # ITS PLACE IN THE HISTORY IS ITS ARRIVAL'S (post-build-review #161):
+        # the results rebuild orders every current run by run_index, and a
+        # re-check recorded without one crashed it the first time a history
+        # held a re-check that ran.
+        "run_index": _run_index_of(first),
+        "csv_path": "", "data_run_id": first,
         # WHAT THIS RUN IS FOR, AND WHY (criteria 3 and 4).
         "purpose": {"dataset_id": dataset_id, "supply_id": supply_id, "period": period,
                     **purpose},

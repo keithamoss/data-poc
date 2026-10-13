@@ -158,3 +158,31 @@ class TestEveryAllowanceSaysWhy:
     def test_each_retired_premise_names_its_replacement(self):
         for pattern, correction in vp.RETIRED_PREMISES.items():
             assert "REQ-PIPE-" in correction, (pattern, correction)
+
+
+class TestTheWalkNeverEntersASkippedDirectory:
+    """A full gate failed on 2026-10-13 with FileNotFoundError on
+    data/dbt_scratch/.../dbt_target/<run>: rglob walked INTO data/ - which
+    is skipped, but only after the walk - and another worker's run removed
+    its scratch directory mid-walk. A skipped directory is pruned before it
+    is entered, so nothing it holds can fail the gate."""
+
+    def test_an_unlistable_skipped_directory_does_not_fail_the_walk(self, tmp_path, monkeypatch):
+        import os
+
+        from qa_tools.common import validate_premise as vp
+
+        (tmp_path / "data" / "dbt_scratch" / "gone").mkdir(parents=True)
+        (tmp_path / "plans").mkdir()
+        (tmp_path / "plans" / "a.md").write_text("x")
+        real = os.scandir
+
+        def scandir(path="."):
+            if "data" in os.fspath(path).split(os.sep):
+                raise FileNotFoundError(path)
+            return real(path)
+
+        monkeypatch.setattr(vp, "ROOT", tmp_path)
+        monkeypatch.setattr(os, "scandir", scandir)
+        files = vp._files()
+        assert [p.relative_to(tmp_path).as_posix() for p in files] == ["plans/a.md"]
