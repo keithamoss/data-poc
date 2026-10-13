@@ -5300,4 +5300,9 @@ could never have computed it), and it belongs with batch 5's check work.
     anything else. So the shout's trigger is one rule (a cross-table check
     could not run against everything it reads), and the detail lives on the
     dependency's own page.
+    AND (Keith, same morning): whatever shape is chosen must demonstrably
+    fix BOTH the false green and the false red above, and any similar
+    mis-reading found on the way (a held dependency, one red and never
+    promoted, one promoted later, re-filed or superseded) - each with a
+    criterion and a test that reproduces today's wrong reading first.
 
