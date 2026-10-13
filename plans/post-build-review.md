@@ -8050,6 +8050,15 @@ twice. It deliberately did not re-find the `TypeError`.
     rather than its filed `ds@key#1`; slot_state's HELD branch and its
     "which file is the supply?" text are unreachable; the GitHub decision
     handler has no caller outside tests.
+    **Since REQ-PIPE-193 (built 2026-10-13):** the promote refusal and its
+    test are replaced by `_refuse_on_an_open_pair`, which refuses every
+    supply decision on an open pair and names where to settle it
+    (tests/test_filing_decisions.py
+    `test_a_plain_decision_on_an_open_pair_is_refused_naming_where_it_is_settled`);
+    the queue now offers only "settle" on a two-file slot, so the STILL OPEN
+    item above is closed; choose-file closes a contest; knock_on and
+    slot_state read the resolver, and HELD is gone in favour of TWO_FILES.
+    The scripted-decision `ds@key` resolution is REQ-GEN-196 criterion 9.
 
 161. **[done, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
     **TS-67's scripted re-files left their QA re-checks owed - the bootstrap

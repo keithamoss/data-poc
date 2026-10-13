@@ -99,6 +99,8 @@ _WHAT_IT_DOES = {
                                        "with your reason"),
     filing_decisions.WITHDRAW_EXCUSE: ("withdraw the excuse - it reads late and not excused "
                                        "again"),
+    # NEVER 'choose-file' ON A SCREEN (REQ-PIPE-193 criterion 27).
+    filing_decisions.CHOOSE_FILE: "settle - say what each file is",
 }
 
 #: The same operations on ANOTHER VERSION WAITING in a promoted period
@@ -137,7 +139,7 @@ _HOW_IT_READS = {
     slot_state.NEVER_SUPPLIED: "[red]never supplied[/red]",
     slot_state.AWAITING_DECISION: "[yellow]awaiting a decision[/yellow]",
     slot_state.RETURNED: "[yellow]returned by a person[/yellow]",
-    slot_state.HELD: "[yellow]held - which file is the supply?[/yellow]",
+    slot_state.TWO_FILES: "[yellow]two files arrived - say what each file is[/yellow]",
     slot_state.PROMOTED: "[green]promoted[/green]",
     slot_state.REJECTED: "[red]rejected[/red]",
     slot_state.SUBSTITUTED: "[blue]substituted[/blue]",
@@ -236,13 +238,29 @@ def _show(text: str, *, title: str, style: str) -> None:
         console.print(command.strip(), soft_wrap=True, highlight=False, markup=False)
 
 
+def _refused(exc: Exception, operation: str, *, flag_route: bool) -> None:
+    """A refusal in its panel. On the FLAG route, a plain decision refused on
+    an open pair also prints the settle form below the panel, with the
+    pair's real filenames filled in (REQ-PIPE-193 criterion 25) - _show()
+    puts every `mothman` line below the panel, never wrapped."""
+    text = str(exc)
+    if flag_route and isinstance(exc, filing_decisions.OpenPair):
+        text += ("\nmothman supply decide --operation choose-file "
+                 f"--dataset {exc.dataset_id} --period {exc.period} "
+                 + " ".join(f"--file-outcome '{f}=<supply|refile:<period>|reject|supersede>'"
+                            for f in exc.files)
+                 + " --reason '<why>'")
+    _show(text, title=f"{operation} refused", style="red")
+
+
 def apply_decision(*, operation: str, dataset_id: str, period: str,
                    supply: str | None = None, stands_on: str | None = None,
                    to_period: str | None = None, reason: str | None = None,
                    actor: dict | None = None,
                    yes: bool = False,
                    acknowledged: str | None = None,
-                   through_period: str | None = None) -> filing_decisions.Outcome | None:
+                   through_period: str | None = None,
+                   flag_route: bool = False) -> filing_decisions.Outcome | None:
     """Collect what is missing, confirm, apply, and say what happened.
 
     RETURNS None WHERE NOTHING WAS APPENDED and an Outcome where the
@@ -274,7 +292,7 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
             period=period, to_period=to_period, supply=supply, stands_on=stands_on,
             through_period=through_period))
     except decision_log.DecisionRefused as exc:
-        _show(str(exc), title=f"{operation} refused", style="red")
+        _refused(exc, operation, flag_route=flag_route)
         return None
 
     if reason is None:
@@ -361,7 +379,7 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
             # decision_log raises already names the de-substitute or
             # un-inherit that would unblock it, so repeating it here would
             # be a second copy of a sentence that must not drift.
-            _show(str(exc), title=f"{operation} refused", style="red")
+            _refused(exc, operation, flag_route=flag_route)
             return None
     else:
         # Changed twice while being decided - said, never a silent exit.
@@ -373,8 +391,8 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
     if outcome.changed:
         console.print(Panel(Text(outcome.message, style="bold green"),
                              title="Recorded", border_style="green", expand=False))
-        if outcome.owed:
-            _run_owed(outcome.owed)
+        for owed_id in outcome.owed:
+            _run_owed(owed_id)
         _follow_up(hierarchy.dataset(dataset_id).collection_id)
         filing_decisions.reconcile_after(
             outcome, hierarchy.dataset(dataset_id).collection_id)
@@ -520,6 +538,9 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     if not offer:
         console.print("There is nothing to decide about this one.", style="dim")
         return
+    if state.state == slot_state.TWO_FILES:
+        _settle_on(state)
+        return
     if state.state == filing_queue.COULD_NOT_LOAD:
         # The recorded reason, and the response that is not a control.
         console.print(f"{state.supply} could not be loaded: {state.reason}. Reject it "
@@ -587,6 +608,27 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
                     period=state.period, supply=supply,
                     stands_on=stands_on, to_period=to_period,
                     through_period=through_period)
+
+
+def _settle_on(state: slot_state.SlotState) -> None:
+    """An open pair offers exactly two things (REQ-PIPE-194 criterion 4):
+    settle, or reject both - the second a settlement too, through the same
+    summary, reason and single confirmation."""
+    from cli import settle_tui
+    from qa_tools.common import settlement
+
+    with open_log() as conn:
+        promoted = decision_log.promoted_into(conn, state.dataset_id, state.period)
+        _delivery, _period, files = settlement.pair_files(conn, state.dataset_id, state.supply)
+    both = settle_tui.REJECT_BOTH_KEEPS if promoted else settle_tui.REJECT_BOTH
+    picked = common.select(f"{state.dataset_id} {state.period} - two files arrived. What "
+                           f"are you recording?", [settle_tui.SETTLE, both],
+                           flag_hint=_FLAG_HINT)
+    if picked is None:
+        return
+    answers = ([settlement.Answer(f.filename, settlement.REJECT) for f in files]
+               if picked == both else None)
+    settle_tui.settle(state.dataset_id, state.period, state.supply, answers=answers)
 
 
 def queue_flow(collection_id: str) -> None:

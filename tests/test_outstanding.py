@@ -468,7 +468,7 @@ class TestSuppliesAwaitingADecisionAreWaitingForAPerson:
             ss.SlotState("cp-carers", "2025-Q2", ss.AWAITING_DECISION, "cp-carers@2"),
             ss.SlotState("cp-clients", "2025-Q2", ss.AWAITING_DECISION, "cp-clients@1"),
             # A hold is the held-supply item's already, never counted twice.
-            ss.SlotState("cp-clients", "2025-Q3", ss.HELD, "cp-clients@2"),
+            ss.SlotState("cp-clients", "2025-Q3", ss.TWO_FILES, "cp-clients@2"),
         ])
         items = [i for i in outstanding.survey(observations_dir=tmp_path).items
                  if i.kind == outstanding.AWAITING_DECISION]

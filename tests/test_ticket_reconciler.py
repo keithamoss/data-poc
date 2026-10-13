@@ -205,7 +205,7 @@ class TestThePolicyDecidesWhichSlotsGetATicket:
 
     def test_needs_action_opens_one_for_a_slot_that_does(self):
         svc = FakeTickets()
-        out = tr.reconcile(svc, [a_slot(slot_state.HELD)], policy=tr.NEEDS_ACTION)
+        out = tr.reconcile(svc, [a_slot(slot_state.TWO_FILES)], policy=tr.NEEDS_ACTION)
         assert out.opened == ("cp-carers/2026-Q3",)
 
     def test_all_opens_one_for_everything(self):
@@ -265,7 +265,7 @@ class TestWhatTheTicketSays:
 
     @pytest.mark.parametrize("state", [
         slot_state.OVERDUE, slot_state.NEVER_SUPPLIED,
-        slot_state.AWAITING_DECISION, slot_state.RETURNED, slot_state.HELD,
+        slot_state.AWAITING_DECISION, slot_state.RETURNED, slot_state.TWO_FILES,
         slot_state.REJECTED, slot_state.PROMOTED, slot_state.SUBSTITUTED,
         slot_state.INHERITED, slot_state.NOT_YET_DUE])
     def test_every_state_renders(self, state):
@@ -273,9 +273,10 @@ class TestWhatTheTicketSays:
         assert state in body
 
     def test_it_names_the_responses_rather_than_offering_them(self):
-        body = tr.body_for(a_slot(slot_state.HELD))
+        body = tr.body_for(a_slot(slot_state.TWO_FILES))
         assert "What somebody can do:" in body
-        assert "which file is the supply" in body
+        # REQ-PIPE-194 criteria 4 and 15: the one phrase for what to do.
+        assert "say what each file is" in body
 
     def test_a_daily_period_is_written_in_words(self):
         body = tr.body_for(a_slot(period="2026-08-27"))

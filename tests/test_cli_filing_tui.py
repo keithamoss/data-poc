@@ -517,7 +517,8 @@ class TestEveryOperationIsReachableFromSomeDoor:
         for flow, states in (
                 (filing_tui.queue_flow, [(slot_state.AWAITING_DECISION, False),
                                           (slot_state.AWAITING_ACKNOWLEDGEMENT, False),
-                                          (slot_state.REJECTED, False)]),
+                                          (slot_state.REJECTED, False),
+                                          (slot_state.TWO_FILES, False)]),
                 (filing_tui.period_flow, [(slot_state.PROMOTED, False),
                                            (slot_state.OVERDUE, False),
                                            (slot_state.OVERDUE, True),

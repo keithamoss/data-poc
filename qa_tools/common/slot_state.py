@@ -41,8 +41,12 @@ NEVER_SUPPLIED = "never-supplied"
 AWAITING_DECISION = "awaiting-decision"
 #: A person looked at it and put it back.
 RETURNED = "returned-by-a-person"
-#: Filed here, but REQ-PIPE-059 could not tell which file is the supply.
-HELD = "held"
+#: TWO FILES ARRIVED FOR THIS TABLE and nobody has said what each is - an
+#: open contest (REQ-PIPE-194 criteria 4 and 5), reached from the one
+#: open-contest judgement (dataset_blockers). Settled by choose-file
+#: (REQ-PIPE-193). It was `held`, a state nothing reached, naming a remedy
+#: that did not exist.
+TWO_FILES = "two-files"
 #: A supply is promoted into it. The slot is answered.
 PROMOTED = "promoted"
 #: A person rejected the supply filed here, and nothing replaced it.
@@ -71,7 +75,7 @@ AWAITING_ACKNOWLEDGEMENT = "awaiting-acknowledgement"
 #: PROMOTED and NOT_YET_DUE are the two that do not: one is finished and
 #: the other has not started.
 NEEDS_ACTION = frozenset({
-    OVERDUE, NEVER_SUPPLIED, AWAITING_DECISION, RETURNED, HELD, REJECTED,
+    OVERDUE, NEVER_SUPPLIED, AWAITING_DECISION, RETURNED, TWO_FILES, REJECTED,
     AMBER_WAITING, AWAITING_ACKNOWLEDGEMENT,
 })
 
@@ -98,7 +102,7 @@ RESPONSES = {
                       "check the schedule is the one that was agreed"),
     AWAITING_DECISION: ("promote this supply", "reject it", "ask for a resupply"),
     RETURNED: ("promote this supply", "reject it", "ask for a resupply"),
-    HELD: ("say which file is the supply", "ask the supplier which to use"),
+    TWO_FILES: ("say what each file is", "ask the supplier which file to use"),
     REJECTED: ("ask for a resupply", "substitute an earlier period's supply"),
     PROMOTED: (),
     SUBSTITUTED: ("de-substitute this period",),
@@ -230,7 +234,7 @@ def _amber_waiting(conn, dataset_id: str, supply: str | None) -> bool:
 
 def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
              now: datetime, filings: dict, ever_delivered: bool,
-             held: bool = False) -> SlotState:
+             two_files: bool = False) -> SlotState:
     """Where this slot's supply has got to.
 
     `slot` is a slots.Slot; `filings` is {period: filing record} for
@@ -303,8 +307,8 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
             reason=_reason(conn, h.decision_id), closed=unfilled and closed)
 
     filed = filings.get(slot.name)
-    if held:
-        return SlotState(dataset_id=dataset_id, period=slot.name, state=HELD,
+    if two_files:
+        return SlotState(dataset_id=dataset_id, period=slot.name, state=TWO_FILES,
                           supply=(filed or {}).get("supply_id"))
     if filed and not _rejected(conn, dataset_id, filed.get("supply_id") or ""):
         # AWAITING A DECISION, closed or not (REQ-PIPE-132 criterion 3): a
@@ -393,8 +397,15 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
     from qa_tools.common import asset_time, filing, hierarchy
     from qa_tools.common import slots as slots_mod
 
+    from qa_tools.common import dataset_blockers
+
     now = now or asset_time.now()
     out: list[SlotState] = []
+    open_pairs: dict[str, frozenset[str]] = {}
+    for blocker in dataset_blockers.contests(conn):
+        if blocker.is_open:
+            open_pairs[blocker.dataset_id] = open_pairs.get(
+                blocker.dataset_id, frozenset()) | {blocker.supply}
     for entry in hierarchy.datasets_in_collection(collection_id):
         try:
             # THE SAME BOUND FILING USES (post-build-review #73), and
@@ -415,6 +426,9 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
             continue
         every = filing.filings_of(entry.dataset_id)
         filings = filings_by_period(conn, entry.dataset_id, every)
+        # AN OPEN CONTEST'S PERIOD, by the one judgement (REQ-PIPE-194
+        # criterion 5) - a pair's `#1` filed there whose contest is open.
+        pairs = open_pairs.get(entry.dataset_id, frozenset())
         ever = bool(every)
         # A PERIOD A SUPPLY WAS RE-FILED INTO, past the claim horizon
         # (post-build-review #115, D2): a person can file into a future
@@ -426,6 +440,8 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
             if found is not None:
                 dataset_slots.append(found)
         for slot in dataset_slots:
+            filed = (filings.get(slot.name) or {}).get("supply_id")
             out.append(state_of(conn, dataset_id=entry.dataset_id, slot=slot,
-                                 now=now, filings=filings, ever_delivered=ever))
+                                 now=now, filings=filings, ever_delivered=ever,
+                                 two_files=filed in pairs))
     return out

@@ -5069,4 +5069,6 @@ could never have computed it), and it belongs with batch 5's check work.
     ANSWERED by Keith 2026-10-13 and written into both requirements (the
     person chooses the unchosen file's fate - reject, keep and supersede,
     or re-file; the TUI offers discrete choices). Still unsigned: next is
-    sign-off. Delete this entry once both are built.
+    sign-off. Delete this entry once both are built. REQ-PIPE-193 BUILT
+    2026-10-13 (with 194's criteria 5 and 9 and the TWO_FILES wording);
+    REQ-PIPE-194 is next.

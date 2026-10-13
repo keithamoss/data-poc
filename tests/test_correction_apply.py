@@ -57,6 +57,22 @@ def _file(supply, slot, received):
         considered=(slot,), received_at=received))
 
 
+def _pair_id(minutes: int) -> str:
+    return f"{DATASET}@{asset_time.arrival_key(RECEIVED + timedelta(minutes=minutes))}#1"
+
+
+def _pair(minutes: int) -> str:
+    """A contested pair's `#1`, filed to 2023-Q3: two files of one delivery
+    for one table, so its contest is OPEN (REQ-PIPE-194 criteria 8 and 9) -
+    a `#` in the id alone is not a contest."""
+    at = RECEIVED + timedelta(minutes=minutes)
+    pair = _pair_id(minutes)
+    _file(pair, "2023-Q3", at)
+    filing_support.ensure_delivery(f"pytest-{DATASET}-{pair}", DATASET, at,
+                                   filename="cp_clients_v2.csv")
+    return pair
+
+
 def _docs():
     """The committed files with no corrections declared - the ones the real
     contract carries (REQ-PIPE-181's migration, for one) are not this
@@ -193,10 +209,10 @@ class TestConfirming:
                                      effective_at=AT, docs=docs)
 
     def test_a_blocked_move_may_still_be_kept_at_confirmation(self, conn, manager):
-        _file("apply-c@1#1", "2023-Q3", RECEIVED + timedelta(minutes=1))
+        apply_c_pair = _pair(1)
         docs = _corrected(_move_q3)
         done = correction_apply.confirm(
-            conn, "CAB-1", actor=manager, keep={(DATASET, "apply-c@1#1")},
+            conn, "CAB-1", actor=manager, keep={(DATASET, apply_c_pair)},
             keep_reason="contested - deciding separately", effective_at=AT, docs=docs)
         assert done.kept and done.moved
 
@@ -492,19 +508,19 @@ class TestScenarioRegister:
         assert hold.correction == "CAB-1"
 
     def test_ts61_a_blocked_move_keeps_the_correction_open(self, conn, manager):
-        _file("ts61@1#1", "2023-Q3", RECEIVED + timedelta(minutes=9))
+        ts61_pair = _pair(9)
         docs = _corrected(_move_q3)
         _p, t = correction_apply.trial_for(conn, "CAB-1", docs=docs)
-        [m] = [m for m in t.moves if m.supply_id == "ts61@1#1"]
+        [m] = [m for m in t.moves if m.supply_id == ts61_pair]
         assert m.blocked and "contested" in m.blocked
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
         # PARKED, NOT REFUSED (Keith, 2026-10-11, (p)): the rest is confirmed
         # and the blocked move waits on the outstanding list.
-        assert [x[1] for x in done.parked] == ["ts61@1#1"]
+        assert [x[1] for x in done.parked] == [ts61_pair]
         assert not correction_apply.pending(conn, docs)
-        assert [x.supply_id for x in correction_apply.parked(conn)] == ["ts61@1#1"]
-        assert filing.filing_for(DATASET, "ts61@1#1")["slot"] == "2023-Q3", "not moved"
+        assert [x.supply_id for x in correction_apply.parked(conn)] == [ts61_pair]
+        assert filing.filing_for(DATASET, ts61_pair)["slot"] == "2023-Q3", "not moved"
 
     def test_ts62_merged_not_confirmed_refuses_nothing(self, conn):
         from qa_tools.common import agreement_drift
@@ -706,19 +722,19 @@ class TestParkedMoves:
     period confirmed - or keep it, with a reason. Each failed before."""
 
     def test_the_rest_is_confirmed_and_the_blocked_one_parked(self, conn, manager):
-        _file("park-c@1#1", "2023-Q3", RECEIVED + timedelta(minutes=1))
+        park_c_pair = _pair(1)
         docs = _corrected(_move_q3)
         done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
                                         docs=docs)
         assert SUPPLY in {s for _d, s, *_ in done.moved}
         [(ds, supply, frm, to, why)] = done.parked
-        assert (ds, supply, frm) == (DATASET, "park-c@1#1", "2023-Q3") and "contested" in why
+        assert (ds, supply, frm) == (DATASET, park_c_pair, "2023-Q3") and "contested" in why
         [parked] = correction_apply.parked(conn)
         assert parked.reference == "CAB-1" and parked.to_period == to
         assert parked.confirmed_by == manager["email"]
         record = json.loads(conn.execute(
             f"SELECT summary::text FROM {correction_apply.APPLIED}").fetchall()[0][0])
-        assert record["parked"][0][1] == "park-c@1#1"
+        assert record["parked"][0][1] == park_c_pair
 
     def test_it_moves_to_the_period_confirmed_once_the_blocker_clears(self, conn, manager):
         _file("park-m", "2023-Q3", RECEIVED + timedelta(minutes=6))
@@ -755,44 +771,44 @@ class TestParkedMoves:
         assert len(correction_apply.parked(conn)) == 1
 
     def test_the_manager_may_keep_it_instead_with_a_reason(self, conn, manager):
-        _file("park-k@1#1", "2023-Q3", RECEIVED + timedelta(minutes=2))
+        park_k_pair = _pair(2)
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         with pytest.raises(decision_log.DecisionRefused, match="needs a reason"):
-            correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-k@1#1", actor=manager,
+            correction_apply.keep_parked(conn, "CAB-1", DATASET, park_k_pair, actor=manager,
                                          reason=" ", effective_at=AT)
-        correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-k@1#1", actor=manager,
+        correction_apply.keep_parked(conn, "CAB-1", DATASET, park_k_pair, actor=manager,
                                      reason="deciding the contest separately",
                                      effective_at=AT)
         assert correction_apply.parked(conn) == []
         reason = conn.execute(
             f"SELECT reason FROM {decision_log.TABLE} WHERE supply = ? AND action = ?",
-            ["park-k@1#1", decision_log.KEEP]).fetchall()[0][0]
+            [park_k_pair, decision_log.KEEP]).fetchall()[0][0]
         assert "CAB-1" in reason and "deciding the contest separately" in reason
         with pytest.raises(decision_log.DecisionRefused, match="no parked move"):
-            correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-k@1#1", actor=manager,
+            correction_apply.keep_parked(conn, "CAB-1", DATASET, park_k_pair, actor=manager,
                                          reason="again", effective_at=AT)
 
     def test_only_the_asset_manager_keeps_one(self, conn, manager):
-        _file("park-r@1#1", "2023-Q3", RECEIVED + timedelta(minutes=3))
+        park_r_pair = _pair(3)
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         nobody = {"email": "not-a-manager@example.org", "name": "Nobody"}
         with pytest.raises(people.RoleRefused):
-            correction_apply.keep_parked(conn, "CAB-1", DATASET, "park-r@1#1", actor=nobody,
+            correction_apply.keep_parked(conn, "CAB-1", DATASET, park_r_pair, actor=nobody,
                                          reason="r", effective_at=AT)
 
     def test_each_parked_move_is_an_outstanding_item(self, conn, manager):
         from qa_tools.common import outstanding
 
-        _file("park-o@1#1", "2023-Q3", RECEIVED + timedelta(minutes=4))
+        park_o_pair = _pair(4)
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         [item] = outstanding._from_parked_corrections(conn)
         assert item.kind == outstanding.PARKED_CORRECTION_MOVE
-        assert "CAB-1" in item.headline and "park-o@1#1" in item.headline
+        assert "CAB-1" in item.headline and park_o_pair in item.headline
         assert any("contested" in r for r in item.responses)
-        assert any("--keep park-o@1#1" in r for r in item.responses)
+        assert any(f"--keep {park_o_pair}" in r for r in item.responses)
 
 
 class TestParkedMovesOnEveryRoute:
@@ -804,7 +820,7 @@ class TestParkedMovesOnEveryRoute:
     def parked_one(self, conn, manager, monkeypatch):
         from qa_tools.common import correction_trial
 
-        _file("route-p@1#1", "2023-Q3", RECEIVED + timedelta(minutes=7))
+        _pair(7)
         docs = _corrected(_move_q3)
         monkeypatch.setattr(correction_trial, "working", lambda: docs)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
@@ -819,14 +835,14 @@ class TestParkedMovesOnEveryRoute:
     def test_corrections_lists_what_is_parked(self, conn, parked_one):
         got = self._run("corrections")
         assert got.exit_code == 0, got.output
-        assert "parked" in got.output and "route-p@1#1" in got.output
+        assert "parked" in got.output and _pair_id(7) in got.output
         assert "No corrections are waiting" not in got.output
 
     def test_the_confirmed_reference_takes_keep(self, conn, parked_one, monkeypatch, manager):
         from cli import filing_tui
 
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: manager)
-        got = self._run("confirm-correction", "--reference", "CAB-1", "--keep", "route-p@1#1",
+        got = self._run("confirm-correction", "--reference", "CAB-1", "--keep", _pair_id(7),
                         "--keep-reason", "deciding it separately", "--yes")
         assert got.exit_code == 0, got.output
         assert correction_apply.parked(conn) == []
@@ -845,7 +861,7 @@ class TestParkedMovesOnEveryRoute:
 
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: manager)
         asked = []
-        picks = iter([filing_tui._MENU_PARKED, "Keep cp-clients route-p@1#1"])
+        picks = iter([filing_tui._MENU_PARKED, f"Keep cp-clients {_pair_id(7)}"])
 
         def select(message, choices, **k):
             asked.append(list(choices))
@@ -972,7 +988,7 @@ class TestCriticFindingsOn152TheCommand:
         from qa_tools.common import correction_trial
         from test_correction_replay import _declare
 
-        _file("c5@1#1", "2023-Q3", RECEIVED + timedelta(minutes=19))
+        c5_pair = _pair(19)
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         later = _declare(docs, _grace, "CAB-2", asset_time.local_date(
@@ -980,13 +996,13 @@ class TestCriticFindingsOn152TheCommand:
         monkeypatch.setattr(correction_trial, "working", lambda: later)
         got = self._run("corrections", "--reference", "CAB-1")
         assert got.exit_code == 0, got.output
-        assert "c5@1#1" in got.output
+        assert c5_pair in got.output
 
     def test_5_an_unknown_reference_is_refused_even_with_nothing_pending(
             self, conn, manager, monkeypatch):
         from qa_tools.common import correction_trial
 
-        _file("c5b@1#1", "2023-Q3", RECEIVED + timedelta(minutes=20))
+        _pair(20)
         docs = _corrected(_move_q3)
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         monkeypatch.setattr(correction_trial, "working", lambda: docs)

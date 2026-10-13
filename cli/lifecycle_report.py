@@ -41,11 +41,10 @@ class Outcome:
 
 
 def _supply_of(arrival, dataset_id) -> str:
-    from qa_tools.common import asset_time
+    """The arrival's own supply - filing's one rule, never a copy of it."""
+    from qa_tools.common import filing
 
-    names = arrival.files_by_dataset.get(dataset_id) or ()
-    base = f"{dataset_id}@{asset_time.arrival_key(arrival.received_at)}"
-    return base if len(names) <= 1 else f"{base}#1"
+    return filing._supply_id_for(arrival, dataset_id)
 
 
 def outcome_of(conn, arrival) -> Outcome:
@@ -54,11 +53,12 @@ def outcome_of(conn, arrival) -> Outcome:
 
     (dataset_id, names), = arrival.files_by_dataset.items()
     supply = _supply_of(arrival, dataset_id)
-    base = supply.split("#", 1)[0]
+    # THE ARRIVAL'S OWN SUPPLY'S FILING (REQ-PIPE-193 criterion 13): a
+    # settled pair's `#2` is a supply of its own, filed on its own receipt.
     rows = conn.execute(
         f"SELECT slot, classification, considered FROM {filing.CURRENT} "
-        "WHERE dataset_id = ? AND split_part(supply_id, '#', 1) = ? ORDER BY id DESC LIMIT 1",
-        [dataset_id, base]).fetchall()
+        "WHERE dataset_id = ? AND supply_id = ? ORDER BY id DESC LIMIT 1",
+        [dataset_id, supply]).fetchall()
     extra: list[str] = []
     if rows and rows[0][0]:
         slot, classification, _ = rows[0]
@@ -85,8 +85,8 @@ def outcome_of(conn, arrival) -> Outcome:
     # inherited too). They are other datasets', into the period it opened.
     for inherited, slot, stands_on in conn.execute(
             f"SELECT dataset_id, to_slot, stands_on FROM {decision_log.TABLE} "
-            "WHERE action = ? AND split_part(caused_by_supply, '#', 1) = ? ORDER BY id",
-            [decision_log.INHERIT, base]).fetchall():
+            "WHERE action = ? AND caused_by_supply = ? ORDER BY id",
+            [decision_log.INHERIT, supply]).fetchall():
         extra.append(f"the rule inherited {inherited}'s {stands_on} supply into {slot}, "
                      f"which this promotion opened")
     return Outcome(arrival.run_id, dataset_id, filed, gate, tuple(extra))

@@ -87,6 +87,14 @@ def ordinal_of(supply_id: str) -> str:
     return text.rsplit("@", 1)[-1].partition("#")[2] if "@" in text else ""
 
 
+def arrival_of(supply_id: str) -> str:
+    """`<dataset>@<key>` - the arrival a supply came in, shared by a pair's
+    two supplies. For grouping by arrival; never a supply id of its own
+    for a pair."""
+    dataset, _, _key = (supply_id or "").rpartition("@")
+    return f"{dataset}@{staging_key_of(supply_id)}" if dataset else (supply_id or "")
+
+
 def pair_supply(supply_id: str) -> str:
     """The `#1` id a pair is filed under, from either of its supply ids."""
     dataset, _, key = (supply_id or "").rpartition("@")

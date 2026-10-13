@@ -109,12 +109,13 @@ class TestAFilingOutranksTheClock:
                       filings={due_yesterday.name: {"supply_id": f"{dataset}@1"}})
         assert got.state != slot_state.OVERDUE
 
-    def test_a_held_supply_says_which_file_is_the_question(
+    def test_an_open_pair_says_what_each_file_is_is_the_question(
             self, conn, dataset, due_yesterday):
-        got = _state(conn, dataset, due_yesterday, held=True,
-                      filings={due_yesterday.name: {"supply_id": f"{dataset}@1"}})
-        assert got.state == slot_state.HELD
-        assert "which file is the supply" in " ".join(got.responses)
+        """REQ-PIPE-194 criteria 4 and 5: the phrase for what to do."""
+        got = _state(conn, dataset, due_yesterday, two_files=True,
+                      filings={due_yesterday.name: {"supply_id": f"{dataset}@1#1"}})
+        assert got.state == slot_state.TWO_FILES
+        assert "say what each file is" in " ".join(got.responses)
 
 
 class TestADecisionOutranksBoth:
@@ -213,7 +214,7 @@ class TestEveryStateNamesItsResponses:
         until its responses are written."""
         for state in (slot_state.NOT_YET_DUE, slot_state.OVERDUE,
                        slot_state.NEVER_SUPPLIED, slot_state.AWAITING_DECISION,
-                       slot_state.RETURNED, slot_state.HELD,
+                       slot_state.RETURNED, slot_state.TWO_FILES,
                        slot_state.PROMOTED, slot_state.REJECTED,
                        slot_state.SUBSTITUTED, slot_state.INHERITED):
             assert state in slot_state.RESPONSES, state

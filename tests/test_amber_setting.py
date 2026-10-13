@@ -298,7 +298,7 @@ class TestShownApart:
         for state in (slot_state.AMBER_WAITING, slot_state.AWAITING_ACKNOWLEDGEMENT):
             assert state in slot_state.NEEDS_ACTION
             assert state in filing_queue.WITH_A_SUPPLY
-            assert state != slot_state.HELD and "held" not in state
+            assert state != slot_state.TWO_FILES and "held" not in state
 
     def test_acknowledge_is_offered_on_a_promotion_owing_one(self):
         state = slot_state.SlotState(dataset_id="d", period="p", supply="d@k",

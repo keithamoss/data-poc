@@ -168,3 +168,40 @@ class TestRunIds:
         assert supply_files.ordinal_of(f"{DATASET}@123#2") == "2"
         assert supply_files.ordinal_of(f"{DATASET}@123") == ""
         assert supply_files.pair_supply(f"{DATASET}@123#2") == f"{DATASET}@123#1"
+
+
+class TestNothingElseSplitsASupplyId:
+    """The requirement's mechanical-enumeration NFR (REQ-PIPE-193): nothing
+    outside the resolver splits or tests `#` on a supply id, and nothing
+    reads the last `__` segment of a table as its key.
+
+    AN ARCHITECTURE RULE WITH NO BEHAVIOUR TO OBSERVE, so it reads source -
+    the one case the test standard allows it (CLAUDE.md, 2026-10-12). Every
+    path found doing it on 2026-10-13 (about 75 of them) went through the
+    resolver; this keeps a new one from appearing."""
+
+    PATTERNS = (r'split\("#"', r"split\('#'", r'partition\("#"\)', r'"#" in ',
+                r"'#' in ", r"split_part\([^)]*'#'", r'rsplit\("__"')
+    #: Not supply ids: a YAML comment strip, a container image digest.
+    ALLOWED = {"qa_tools/common/agreement_freeze.py", "qa_tools/common/postgres_version.py",
+               "qa_tools/common/supply_files.py"}
+
+    def test_no_second_place(self):
+        import re
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        sources = [p for d in ("qa_tools", "pipeline", "cli", "generator")
+                   for p in (root / d).rglob("*.py")]
+        assert len(sources) > 100, "the source tree was not found"
+        found = []
+        for path in sources:
+            rel = path.relative_to(root).as_posix()
+            if rel in self.ALLOWED:
+                continue
+            for n, line in enumerate(path.read_text().splitlines(), 1):
+                if line.lstrip().startswith("#"):
+                    continue
+                if any(re.search(p, line) for p in self.PATTERNS):
+                    found.append(f"{rel}:{n}: {line.strip()}")
+        assert not found, "split a supply id through supply_files instead:\n" + "\n".join(found)

@@ -148,23 +148,31 @@ def run_for(conn: supply_db.SupplyConnection, dataset_id: str,
     current = qa_store.current_run(conn, dataset_id, supply)
     if current:
         return current
-    arrival = supply.rsplit("@", 1)[1]
+    from qa_tools.common import supply_files
+
     try:
         logical = hierarchy.dataset(dataset_id).table
     except hierarchy.UnknownDatasetError:
         return None
+    # ITS OWN TABLES, by the one resolver (REQ-PIPE-193 criterion 13) - the
+    # LIKE on the id's key kept a pair's `#1` and matched no table at all.
+    found = supply_files.resolve(conn, dataset_id, supply)
+    own = list(found.own) if found else []
+    if not own:
+        return None
+    arrival = supply_files.staging_key_of(supply)
 
     rows = conn.execute(
         f'SELECT t.run_key FROM "{qa_store.SCHEMA}".tables_read t '
         f'JOIN "{qa_store.SCHEMA}".run r ON r.run_key = t.run_key '
-        "WHERE t.logical_table = ? AND t.physical_table LIKE ? "
+        "WHERE t.logical_table = ? AND t.physical_table = ANY(?) "
         # THE RUN NAMED FOR THIS TABLE FIRST (dashboard UX critic on
         # 8a942e7, H1): a Child Protection run reads every sibling's table
         # for its cross-table checks, all at one instant, so the earliest
         # reader tied and the alphabetical tie-break named cp_carers' run
         # for every dataset's supply.
         "ORDER BY (t.run_key NOT LIKE ?), r.run_instant, t.run_key LIMIT 1",
-        [logical, f"{logical}__{arrival}%", f"{logical}__{arrival}%"]).fetchall()
+        [logical, own, f"{logical}__{arrival}%"]).fetchall()
     return rows[0][0] if rows else None
 
 

@@ -90,7 +90,10 @@ class TestWhatASlotOffers:
                               (slot_state.AWAITING_ACKNOWLEDGEMENT, False),
                               (slot_state.PROMOTED, False), (slot_state.REJECTED, False),
                               (slot_state.SUBSTITUTED, False), (slot_state.INHERITED, False),
-                              (slot_state.OVERDUE, False), (slot_state.OVERDUE, True)):
+                              (slot_state.OVERDUE, False), (slot_state.OVERDUE, True),
+                              # REQ-PIPE-194 criterion 4: an open pair offers the
+                              # settlement, and nothing else.
+                              (slot_state.TWO_FILES, False)):
             supply_scoped, period_scoped = filing_queue.operations_for(
                 _state(state, supply="cp-carers@1", closed=closed))
             offered |= set(supply_scoped) | set(period_scoped)
@@ -100,7 +103,7 @@ class TestWhatASlotOffers:
         """Criterion 31 made mechanical: whatever a slot is in, the first
         half of the answer can never contain a period-scoped operation."""
         for state in (slot_state.AWAITING_DECISION, slot_state.PROMOTED,
-                       slot_state.REJECTED, slot_state.HELD,
+                       slot_state.REJECTED, slot_state.TWO_FILES,
                        slot_state.RETURNED, slot_state.SUBSTITUTED,
                        slot_state.INHERITED, slot_state.OVERDUE):
             supply_scoped, _ = filing_queue.operations_for(
@@ -252,4 +255,4 @@ class TestOnlyTheStatesADecisionProducedSayARuleDecidedThem:
     def test_a_supply_merely_filed_is_not_one_of_them(self):
         assert slot_state.AWAITING_DECISION not in filing_queue.FROM_A_DECISION
         assert slot_state.OVERDUE not in filing_queue.FROM_A_DECISION
-        assert slot_state.HELD not in filing_queue.FROM_A_DECISION
+        assert slot_state.TWO_FILES not in filing_queue.FROM_A_DECISION

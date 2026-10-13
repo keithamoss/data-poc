@@ -43,7 +43,7 @@ from qa_tools.common import filing_decisions, qa_store, slot_state, supply_db
 #: of them is in `slot_state.NEEDS_ACTION` - this is a filter of that
 #: set, asserted below rather than trusted.
 WITH_A_SUPPLY = (slot_state.AWAITING_DECISION, slot_state.RETURNED,
-                 slot_state.HELD, slot_state.REJECTED,
+                 slot_state.TWO_FILES, slot_state.REJECTED,
                  slot_state.AMBER_WAITING, slot_state.AWAITING_ACKNOWLEDGEMENT)
 
 #: The needs-action states where nothing arrived, and so the ones the
@@ -262,7 +262,9 @@ def arrival_key_of(supply: str) -> str:
     a table name and the only safe join between them is the key they
     both carry.
     """
-    return (supply or "").rsplit("@", 1)[-1].split("#", 1)[0]
+    from qa_tools.common import supply_files
+
+    return supply_files.staging_key_of(supply)
 
 
 def from_run(conn: supply_db.SupplyConnection, collection_id: str, run_key: str, *,
@@ -282,7 +284,9 @@ def from_run(conn: supply_db.SupplyConnection, collection_id: str, run_key: str,
     rows = conn.execute(
         f'SELECT physical_table FROM "{qa_store.SCHEMA}".tables_read WHERE run_key = ?',
         [run_key]).fetchall()
-    keys = {str(r[0]).rsplit("__", 1)[-1] for r in rows if "__" in str(r[0])}
+    # THE KEY IS THE SECOND SEGMENT (REQ-PIPE-193 criterion 13): a pair's
+    # table ends in its ordinal, `cp_clients__<key>__2`.
+    keys = {parts[1] for parts in (supply_db.split_staged(str(r[0])) for r in rows) if parts}
     if not keys:
         return []
     return [s for s in awaiting(conn, collection_id, now=now)
@@ -319,6 +323,11 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
         # PROMOTE OVER, behind the warning; or set it aside.
         return (filing_decisions.PROMOTE, filing_decisions.REJECT,
                 filing_decisions.SUPERSEDE), ()
+    if state.state == slot_state.TWO_FILES:
+        # AN OPEN PAIR IS SETTLED, AND NOTHING ELSE (REQ-PIPE-194 criterion 4):
+        # 'settle' and 'reject both' are both choose-file - the TUI words the
+        # second - and no other operation is offered on any door.
+        return (filing_decisions.CHOOSE_FILE,), ()
     if state.state == COULD_NOT_LOAD:
         # REJECT ONLY (REQ-PIPE-153 criteria 5 and 6): promoting it is
         # refused on every route, and the other response - fix and

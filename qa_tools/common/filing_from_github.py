@@ -124,6 +124,11 @@ def read(comment: Comment) -> filing_decisions.Request:
 
     match = found[0]
     dataset_id, period = _split_slot(comment.slot_key)
+    if match.group("name") in filing_decisions.TERMINAL_ONLY:
+        # MADE IN THE TERMINAL, NEVER HERE (REQ-PIPE-193 criterion 16): the
+        # GitHub intake knows the operation's name, and appends nothing.
+        raise decision_log.DecisionRefused(
+            filing_decisions.terminal_only_reply(dataset_id, period))
     arguments = {m.group("key").lower(): m.group("value")
                  for m in _ARGUMENT.finditer(match.group("rest"))}
 

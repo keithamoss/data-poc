@@ -103,10 +103,11 @@ class TestTheEightAreOneList:
         for operation in fd.OPERATIONS:
             assert operation in dl.ACTIONS, operation
 
-    def test_there_are_fourteen_of_them(self):
-        """Eight, REQ-PIPE-132's mark as not supplied (2026-10-05), and
-        REQ-PIPE-161's excuse lateness and withdraw excuse (2026-10-11)."""
-        assert len(set(fd.OPERATIONS)) == 14
+    def test_there_are_fifteen_of_them(self):
+        """Eight, REQ-PIPE-132's mark as not supplied (2026-10-05),
+        REQ-PIPE-161's excuse lateness and withdraw excuse (2026-10-11), and
+        REQ-PIPE-193's settlement of a pair (2026-10-13)."""
+        assert len(set(fd.OPERATIONS)) == 15
         assert fd.MARK_NOT_SUPPLIED in fd.PERIOD_SCOPED
 
     def test_supply_scoped_and_period_scoped_partition_them(self):

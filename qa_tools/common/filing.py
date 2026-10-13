@@ -252,10 +252,15 @@ def filing_history(conn, dataset_id: str) -> list[dict]:
         f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = f.refiled_by '
         "WHERE f.dataset_id = ? ORDER BY f.id", [dataset_id]).fetchall()
     out = []
+    seen: set[str] = set()
     for supply, slot, refiled_by, recorded_at, received, decided, row_id in rows:
         at = received if refiled_by is None else (decided or recorded_at)
-        out.append({"supply_id": supply, "slot": slot, "first": refiled_by is None,
+        # A SUPPLY'S EARLIEST ROW IS ITS FIRST FILING, whoever wrote it: a
+        # settled pair's `#2` has no rule's filing - it became a supply when
+        # the settlement took effect (REQ-PIPE-193 criterion 12).
+        out.append({"supply_id": supply, "slot": slot, "first": supply not in seen,
                     "at": at, "id": row_id})
+        seen.add(supply)
     return out
 
 
@@ -303,11 +308,15 @@ def period_for_key(dataset_id: str, key: str) -> str | None:
     """period_of(), for a caller holding the ARRIVAL KEY - a run id's own
     suffix - rather than the instant. One matching rule for both, so the
     `#1` suffix a contested supply carries is handled in one place."""
+    from qa_tools.common import supply_files
+
+    # THE ARRIVAL'S OWN SUPPLY - its plain id, or a pair's `#1` - never a
+    # settled pair's `#2`, which may be filed elsewhere (REQ-PIPE-193
+    # criterion 13). One rule, shared with recorded_arrival_at().
     for record in filings_of(dataset_id):
         supply = record.get("supply_id") or ""
-        if "@" not in supply:
-            continue
-        if supply.rsplit("@", 1)[1].split("#", 1)[0] == key:
+        if (supply_files.staging_key_of(supply) == key
+                and supply_files.ordinal_of(supply) in ("", "1")):
             return record.get("slot")
     return None
 
@@ -570,6 +579,45 @@ def refile(conn, dataset_id: str, supply_id: str, to_slot: str, *,
             "classification": judged.classification}
 
 
+def assignment_at(dataset_id: str, supply_id: str, at: datetime) -> Assignment:
+    """What the filing rule says for a supply received at `at` - the same
+    slots, the same filled set and the same rule an arrival is filed by
+    (REQ-PIPE-131). A settlement asks it of the chosen file's own receipt
+    (REQ-PIPE-193 criteria 10 and 11)."""
+    from qa_tools.common import assignment as assign_mod
+    from qa_tools.common import slots as slots_mod
+
+    try:
+        slots = slots_mod.slots_for_dataset(
+            dataset_id, until=slots_mod.claimable_until(dataset_id, at.date()))
+    except (ValueError, KeyError, FileNotFoundError):
+        slots = []
+    return assign_mod.assign(dataset_id=dataset_id, supply_id=supply_id, at=at, slots=slots,
+                             filled=filled_slots(dataset_id),
+                             final_period=final_period_for(dataset_id))
+
+
+def file_settled(conn, dataset_id: str, supply_id: str, slot: str | None, *,
+                 delivery: str, decision_id: int, received_at: datetime | None,
+                 branch: str = "settled-by-a-person") -> int:
+    """A filing written by a settlement (REQ-PIPE-193 criteria 10 and 12), in
+    the caller's transaction: a `#2`'s first filing, or the settled supply's
+    new one where its own receipt changes its period or verdict. In
+    REQ-PIPE-141's append-only shape - a NEW row naming the decision, the
+    earlier row kept - with its verdict judged on THIS file's receipt
+    (REQ-PIPE-168). Returns the row's id."""
+    judged = _judged_for(dataset_id, slot, received_at)
+    at = _replay_clock.now()
+    new_id = conn.execute(
+        f"INSERT INTO {TABLE} (dataset_id, supply_id, slot, branch, considered, delivery, "
+        "classification, refiled_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "RETURNING id",
+        [dataset_id, supply_id, slot, branch, [slot] if slot else [], delivery,
+         judged.classification, decision_id, at]).fetchall()[0][0]
+    verdict_mod.record(conn, new_id, dataset_id, supply_id, judged, recorded_at=at)
+    return int(new_id)
+
+
 @dataclass(frozen=True)
 class RecordedArrival:
     """When a supply reached us, what that earned it, and how long it
@@ -717,12 +765,13 @@ def recorded_arrival_at(dataset_id: str, received_at) -> "RecordedArrival | None
     """
     from qa_tools.common import asset_time
 
+    from qa_tools.common import supply_files
+
     key = asset_time.arrival_key(received_at)
     for record in filings_of(dataset_id):
         supply = record.get("supply_id") or ""
-        if "@" not in supply:
-            continue
-        if supply.rsplit("@", 1)[1].split("#", 1)[0] == key:
+        if (supply_files.staging_key_of(supply) == key
+                and supply_files.ordinal_of(supply) in ("", "1")):
             return recorded_arrival(dataset_id, supply)
     return None
 

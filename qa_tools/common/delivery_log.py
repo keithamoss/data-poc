@@ -346,9 +346,27 @@ def supply_ids(deliveries: list[str],
     if not deliveries:
         return {}
     with _db(conn) as db:
+        # THE ARRIVAL'S OWN SUPPLY where a settled pair has two (REQ-PIPE-193
+        # criterion 13): newest id first, so `#1` - or the plain id - is the
+        # one the dict keeps. supply_ids_by_file() tells the two apart.
         return {(d, ds): supply for d, ds, supply in db.execute(
             f'SELECT delivery, dataset_id, supply_id FROM "{qa_store.SCHEMA}".supply_receipt '
-            "WHERE delivery = ANY(?)", [list(deliveries)]).fetchall()}
+            "WHERE delivery = ANY(?) ORDER BY supply_id DESC", [list(deliveries)]).fetchall()}
+
+
+def supply_ids_by_file(deliveries: list[str],
+                       conn: supply_db.SupplyConnection | None = None
+                       ) -> dict[tuple[str, str, str], str]:
+    """(delivery, dataset_id, filename) -> the supply that file IS - a
+    settled pair's two files are two supplies (REQ-PIPE-193 criterion 12),
+    read from the one receipt view, which reads qa.decision_file."""
+    if not deliveries:
+        return {}
+    with _db(conn) as db:
+        return {(d, ds, f): supply for d, ds, f, supply in db.execute(
+            f'SELECT delivery, dataset_id, filename, supply_id FROM '
+            f'"{qa_store.SCHEMA}".supply_receipt WHERE delivery = ANY(?)',
+            [list(deliveries)]).fetchall()}
 
 
 def sql() -> str:

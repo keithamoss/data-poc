@@ -966,11 +966,18 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
 @click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
                help="Confirm a decision's consequences beyond its own slot, by the key "
                     "its warning showed - needed with --yes where there are any.")
+@click.option("--file-outcome", "file_outcomes", multiple=True,
+               metavar="'<filename>=<supply|refile:<period>|reject|supersede>'",
+               help="For choose-file only, once per file of the pair, by the filename it "
+                    "arrived under: supply = the supply for the period; refile:<period> = "
+                    "re-file - this file belongs to another period; reject = reject - this "
+                    "file is wrong; it can be promoted back later on its own; supersede = a "
+                    "spare copy - kept, can be brought back.")
 def decide_command(operation: str, dataset_id: str, period: str | None,
                     from_period: str | None, through_period: str | None,
                     supply: str | None, stands_on: str | None,
                     to_period: str | None, reason: str | None, yes: bool,
-                    acknowledged: str | None) -> None:
+                    acknowledged: str | None, file_outcomes: tuple[str, ...] = ()) -> None:
     """Record one filing decision (REQ-GHUB-082 criteria 2, 3, 28).
 
     THE FLAG FORM OF THE WIZARD, calling the same implementation the
@@ -984,6 +991,27 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     """
     from cli import filing_tui
     from qa_tools.common import filing_queue
+
+    # A SETTLEMENT TAKES ITS OWN FLAGS AND NO OTHERS (REQ-PIPE-193 criterion
+    # 15) - each refusal names the flag.
+    if operation.lower() == filing_decisions.CHOOSE_FILE:
+        for flag, value in (("--supply", supply), ("--to-period", to_period),
+                            ("--stands-on", stands_on), ("--from-period", from_period),
+                            ("--through-period", through_period)):
+            if value:
+                raise click.UsageError(
+                    f"{flag} cannot be used with --operation choose-file: the pair is "
+                    f"named by --dataset and --period, and each file's outcome by "
+                    f"--file-outcome.")
+        if period is None:
+            raise click.UsageError("--period is required.")
+        outcome = _settle_from_flags(dataset_id, period, file_outcomes, reason=reason,
+                                     yes=yes, acknowledged=acknowledged)
+        if outcome is None:
+            raise SystemExit(1)
+        return
+    if file_outcomes:
+        raise click.UsageError("--file-outcome is for --operation choose-file only.")
 
     # ONE SHARED PAIR OF RANGE FLAGS (REQ-PIPE-161 criterion 15), never
     # --to-period, which is a re-file's target.
@@ -1026,13 +1054,56 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     outcome = filing_tui.apply_decision(
         operation=operation.lower(), dataset_id=dataset_id, period=period,
         supply=supply, stands_on=stands_on, to_period=to_period,
-        reason=reason, yes=yes, acknowledged=acknowledged)
+        reason=reason, yes=yes, acknowledged=acknowledged, flag_route=True)
     # A REFUSAL FAILS AND A NO-OP DOES NOT (criterion 26). Both end with
     # nothing appended and a panel already saying which, but a script
     # that treats "already promoted" as an error is a script that stops
     # on the ordinary case of two people working the same slot.
     if outcome is None:
         raise SystemExit(1)
+
+
+def _settle_from_flags(dataset_id: str, period: str, tokens: tuple[str, ...], *,
+                       reason: str | None, yes: bool, acknowledged: str | None):
+    """choose-file from the flag form (REQ-PIPE-193 criterion 15): the same
+    rules, refusals, warning and confirmation as the TUI. A file given no
+    outcome is asked for through the TUI's own screens at a terminal, and
+    refused - naming the form with the pair's real filenames - without one."""
+    import sys
+
+    from cli import filing_tui, settle_tui
+    from qa_tools.common import dataset_blockers, settlement, supply_files
+
+    with filing_tui.open_log() as conn:
+        pair = None
+        for blocker in dataset_blockers.contests(conn):
+            found = supply_files.resolve(conn, dataset_id, blocker.supply)
+            if (blocker.dataset_id == dataset_id and blocker.is_open
+                    and found is not None and found.period == period):
+                pair = blocker.supply
+                break
+        if pair is None:
+            filing_tui._show(f"No pair of files is waiting to be settled for {dataset_id} "
+                             f"{period}. Nothing was recorded.",
+                             title=settle_tui.REFUSED_TITLE, style="red")
+            return None
+        _delivery, _p, files = settlement.pair_files(conn, dataset_id, pair)
+    names = [f.filename for f in files]
+    answers = [settle_tui.parse_outcome(t, names) for t in tokens]
+    given = {a.filename for a in answers}
+    if len(given) != len(answers):
+        raise click.UsageError("each file takes exactly one --file-outcome.")
+    missing = [n for n in names if n not in given]
+    interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    if missing and not interactive:
+        raise click.UsageError(
+            f"no outcome was given for {' and '.join(missing)}. Give one per file:\n"
+            + "\n".join(f"  --file-outcome '{n}=<supply|refile:<period>|reject|supersede>'"
+                         for n in names))
+    return settle_tui.settle(dataset_id, period, pair,
+                             answers=answers if not missing else None,
+                             reason=reason, yes=yes, acknowledged=acknowledged,
+                             summary=bool(missing))
 
 
 @supply_group.command("corrections")

@@ -99,6 +99,8 @@ def _arrivals_in(record: dict, dataset_id: str | None,
     comes from the filing (through qa.supply_receipt); only an arrival
     nothing filed falls back to deriving one, from its own file's receipt.
     """
+    from qa_tools.common import supply_files
+
     out: list[Arrival] = []
     counts: dict[str, int] = {}
     filed = filed or {}
@@ -111,10 +113,19 @@ def _arrivals_in(record: dict, dataset_id: str | None,
             continue
         counts[found] = counts.get(found, 0) + 1
         own = {"received_at": entry.get("received_at") or record.get("received_at", "")}
+        delivery = record.get("delivery", "")
+        # THE SUPPLY THIS FILE IS, by its filename where a settlement made a
+        # pair's files two supplies (REQ-PIPE-193 criterion 12); else its
+        # arrival's supply; a pair's unsettled second file is `#N` of its
+        # arrival - never an id built from its own receipt, whose key names
+        # no table.
+        mine = filed.get((delivery, found, entry.get("filename", "")))
+        theirs = filed.get((delivery, found))
         out.append(Arrival(
             dataset_id=found,
-            supply_id=(filed.get((record.get("delivery", ""), found))
-                       or _supply_id(found, own, counts[found])),
+            supply_id=(mine or (theirs if counts[found] <= 1 else None)
+                       or (f"{supply_files.arrival_of(theirs)}#{counts[found]}" if theirs
+                           else _supply_id(found, own, counts[found]))),
             received_at=own["received_at"],
             sequence=int(entry.get("receipt_sequence") or 0),
             delivery=record.get("delivery", ""),
@@ -155,7 +166,9 @@ def arrivals_of(dataset_id: str, conn=None) -> list[Arrival]:
     """
     found: list[Arrival] = []
     records = delivery_log.records_carrying(dataset_id, conn=conn)
-    filed = delivery_log.supply_ids([r["delivery"] for r in records], conn=conn)
+    names = [r["delivery"] for r in records]
+    filed = {**delivery_log.supply_ids(names, conn=conn),
+             **delivery_log.supply_ids_by_file(names, conn=conn)}
     for record in records:
         found.extend(_arrivals_in(record, dataset_id, filed))
     return sorted(found, key=lambda a: a.sort_key)
@@ -173,8 +186,10 @@ def last_arrived(dataset_id: str, conn=None) -> Arrival | None:
     being worth anything once the records were rows.
     """
     for record in delivery_log.records_carrying(dataset_id, limit=1, conn=conn):
+        names = [record["delivery"]]
         found = _arrivals_in(record, dataset_id,
-                             delivery_log.supply_ids([record["delivery"]], conn=conn))
+                             {**delivery_log.supply_ids(names, conn=conn),
+                              **delivery_log.supply_ids_by_file(names, conn=conn)})
         if found:
             return max(found, key=lambda a: a.sort_key)
     return None

@@ -74,7 +74,7 @@ class TestANewFilingTheOldKept:
         (entry,) = [d for d in dl.decisions_for(conn, DS)
                     if d["action"] == dl.REFILE and d["supply"] == a]
         assert (entry["from_slot"], entry["to_slot"]) == (period, target)
-        (owed,) = [o for o in recheck.owed(conn, DS) if o.id == got.owed]
+        (owed,) = [o for o in recheck.owed(conn, DS) if o.id in got.owed]
         assert owed.supply_id == a and owed.caused_by_decision == entry["id"]
 
 

@@ -42,7 +42,9 @@ def stamped_name(logical: str, supply: str, conn=None) -> str:
     from qa_tools.common import supply_files
 
     if "@" in (supply or ""):
-        if conn is not None:
+        # Only a pair's file carries an ordinal; any other supply's name is
+        # its id's key, with no round trip.
+        if conn is not None and supply_files.ordinal_of(supply):
             from qa_tools.common import hierarchy
 
             try:

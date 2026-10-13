@@ -302,3 +302,25 @@ class TestARunReadsExactlyOnePeriod:
                 run_id="x", received_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
                 files_by_dataset={"cp-clients": ["a.csv"], "cp-carers": ["b.csv"]}),
                 tables=["cp_clients"])
+
+
+class TestASettledPairsRunReadsItsOwnFile:
+    """REQ-PIPE-193 criterion 13: once a pair is settled, a run about one of
+    its supplies reads that supply's own file - not both (which reads as
+    contested and is never checked), and never the other."""
+
+    def test_the_run_reads_the_file_its_supply_is(self, world):
+        key = _key()
+        for n, value in ((1, 10), (2, 20)):
+            world.stage("cp_clients", f"{key}__{n}", value=value, period_to=None)
+        out = world.build("cp_clients", key, own_physical=[f"cp_clients__{key}__2"])
+        assert "cp_clients" not in out.resolution.ambiguous
+        assert world.read(f"cp_clients__{key}", "cp_clients") == 20
+
+    def test_without_saying_which_both_files_are_contested(self, world):
+        key = _key()
+        for n in (1, 2):
+            world.stage("cp_clients", f"{key}__{n}", period_to=None)
+        out = world.build("cp_clients", key)
+        assert set(out.resolution.ambiguous["cp_clients"]) == {
+            f"cp_clients__{key}__1", f"cp_clients__{key}__2"}

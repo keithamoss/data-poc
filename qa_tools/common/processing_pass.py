@@ -169,7 +169,9 @@ class Recorded:
 def _base(supply: str) -> str:
     """`cp-clients@2025...#1` -> `cp-clients@2025...`: a contested pair's
     supplies share their arrival."""
-    return (supply or "").split("#", 1)[0]
+    from qa_tools.common import supply_files
+
+    return supply_files.arrival_of(supply)
 
 
 def recorded(conn) -> Recorded:

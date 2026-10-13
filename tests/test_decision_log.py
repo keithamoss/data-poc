@@ -263,6 +263,7 @@ class TestNothingCanChangeAnEntry:
         and the key is only the first thing in the way."""
         for statement in (f'TRUNCATE "{qa_store.SCHEMA}".decision CASCADE',
                            f'TRUNCATE "{qa_store.SCHEMA}".hold, '
+                           f'"{qa_store.SCHEMA}".decision_file, '
                            f'"{qa_store.SCHEMA}".decision'):
             with pytest.raises(psycopg.Error, match="append-only"):
                 conn.execute(statement)

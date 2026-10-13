@@ -505,7 +505,7 @@ def _from_awaiting_decisions(conn=None) -> list[Item]:
     """
     from qa_tools.common import filing_queue, slot_state
 
-    skip = {slot_state.HELD, slot_state.REJECTED, filing_queue.COULD_NOT_LOAD}
+    skip = {slot_state.TWO_FILES, slot_state.REJECTED, filing_queue.COULD_NOT_LOAD}
     by_dataset: dict[str, list] = {}
     try:
         with delivery_log._db(conn) as db:

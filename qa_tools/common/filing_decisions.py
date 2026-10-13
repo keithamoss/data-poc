@@ -69,15 +69,25 @@ UN_SUPERSEDE = decision_log.UN_SUPERSEDE
 EXCUSE_LATENESS = decision_log.EXCUSE_LATENESS
 WITHDRAW_EXCUSE = decision_log.WITHDRAW_EXCUSE
 
+#: The fifteenth (REQ-PIPE-193): settle a contested pair by saying what each
+#: of its two files is. Supply-scoped, person only, reason required -
+#: offered on the TERMINAL route only (criterion 1).
+CHOOSE_FILE = decision_log.CHOOSE_FILE
+
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
               INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-              EXCUSE_LATENESS, WITHDRAW_EXCUSE)
+              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE)
+
+#: Offered on the terminal and never on GitHub (REQ-PIPE-193 criteria 1 and
+#: 16; Keith, 2026-10-13: "given the complexity of this, the choices and the
+#: options here ... just via the terminal").
+TERMINAL_ONLY = (CHOOSE_FILE,)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
 SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-                 EXCUSE_LATENESS, WITHDRAW_EXCUSE)
+                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
@@ -144,6 +154,9 @@ class Request:
     #: The key of the consequences the person was shown and confirmed
     #: (REQ-PIPE-128 criteria 6 and 9) - None where nothing was shown.
     acknowledged: str | None = None
+    #: A settlement's answer for each file of the pair (REQ-PIPE-193):
+    #: settlement.Answer per file. Empty for every other decision.
+    file_outcomes: tuple = ()
 
     @property
     def actor_name(self) -> str:
@@ -168,10 +181,11 @@ class Outcome:
     period: str | None
     changed: bool
     message: str
-    #: A re-check this decision left owed (REQ-PIPE-140 criterion 7) - run
-    #: by the terminal while the person waits, by the processing pass for
-    #: a decision made on GitHub (Keith, 2026-10-05).
-    owed: int | None = None
+    #: The re-checks this decision left owed (REQ-PIPE-140 criterion 7), in
+    #: the order they run - run by the terminal while the person waits, by
+    #: the processing pass for a decision made on GitHub (Keith, 2026-10-05).
+    #: A TUPLE since a settlement owes up to two (REQ-PIPE-193 criterion 21).
+    owed: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -268,6 +282,8 @@ def consequences(conn, request: Request) -> Consequences:
             done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
     if request.operation == REFILE and request.supply and request.to_period:
         lines, done = _refile_consequences(conn, request)
+    if request.operation == CHOOSE_FILE:
+        lines, done = _settlement_consequences(conn, request)
     if request.operation == EXCUSE_LATENESS and request.through_period:
         lines, done = _range_consequences(conn, request)
     readers = _readers_rechecked(conn, request)
@@ -437,10 +453,93 @@ def _refile_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
     return lines, done
 
 
+def terminal_only_reply(dataset_id: str, period: str | None) -> str:
+    """What the GitHub route says to a choose-file comment (REQ-PIPE-193
+    criterion 16): made in the terminal, and where - the pair's files named
+    as code, never a command to paste."""
+    from qa_tools.common import dataset_blockers, supply_files
+
+    files: tuple[str, ...] = ()
+    try:
+        with supply_db.connect(read_only=True, label="mothman:terminal-only") as conn:
+            for blocker in dataset_blockers.contests(conn):
+                if blocker.dataset_id != dataset_id or not blocker.is_open:
+                    continue
+                found = supply_files.resolve(conn, dataset_id, blocker.supply)
+                if found is not None and found.period == period:
+                    files = blocker.files
+                    break
+    except Exception:  # noqa: BLE001 - the reply stands without the names
+        files = ()
+    named = (" Two files arrived: " + " and ".join(f"`{f}`" for f in files) + "."
+             if files else "")
+    return (f"Settling two files for one table is made in the terminal, not on GitHub - it "
+            f"asks what each file is, with several choices for each.{named} It is settled "
+            f"at '{supply_files.where_to_settle(dataset_id)}'.")
+
+
+def settlement_plan(conn, request: Request):
+    """The settlement's one plan (REQ-PIPE-193 criterion 17): the warning
+    and the effect are both built from it."""
+    from qa_tools.common import settlement
+
+    return settlement.plan(conn, dataset_id=request.dataset_id, supply=request.supply,
+                           answers=list(request.file_outcomes))
+
+
+def _settlement_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
+    """EVERY consequence beyond moving the files it names, in one panel
+    above the single confirmation (criterion 17): a changed period or
+    verdict, a superseded waiting version, a hold, a second supply in
+    another period - and the QA runs that follow, how many, each file and
+    period, and that a green one may be promoted with no further decision.
+    In plain terms: files by name, datasets by name, periods by name."""
+    from qa_tools.common import settlement
+
+    p = settlement_plan(conn, request)
+    name = hierarchy.dataset(request.dataset_id).dataset_name
+    lines: list[str] = []
+    done: list[str] = []
+    for f in p.files:
+        if f.outcome == settlement.SUPPLY and f.held:
+            lines.append(
+                f"{f.file.filename} is received too early or too late for any period of "
+                f"{name} that is open, so it is HELD, not filed to {p.period} - a person "
+                f"places it later, and it is not checked until then.")
+            done.append(f"{f.file.filename} is held.")
+        elif f.outcome == settlement.SUPPLY and f.period_after != p.period:
+            lines.append(
+                f"{f.file.filename}'s own receipt files it to {f.period_after}, not "
+                f"{p.period}: the supply moves to {f.period_after}"
+                + (f" and is judged {f.classification_after}" if f.classification_after
+                   else "") + ".")
+        elif f.outcome == settlement.SUPPLY and f.new_filing:
+            lines.append(
+                f"{f.file.filename}'s own receipt is the supply's, so {p.period}'s supply is "
+                f"judged {f.classification_after or 'without a verdict'}"
+                + (f" rather than {p.classification}" if p.classification else "")
+                + ". A new filing records it; the earlier one is kept.")
+        elif f.outcome == settlement.REFILE:
+            lines.append(f"{f.file.filename} becomes a second supply, filed to "
+                         f"{f.to_period} on its own receipt.")
+        for d in f.displaced:
+            lines.append(f"{name}'s version waiting in {f.checked_in or f.to_period} "
+                         f"({d}) is superseded by {f.file.filename}.")
+            done.append(f"A waiting version in {f.checked_in or f.to_period} was superseded.")
+    if p.runs:
+        lines.append("\n".join(
+            [f"Then {len(p.runs)} QA run(s), one at a time, while you wait:"]
+            + [f"    {f.file.filename} against {f.checked_in}" for f in p.runs]
+            + ["  A supply that comes out green may be promoted by the promotion gate "
+               "with no further decision."]))
+        done.append(f"{len(p.runs)} QA run(s) owed.")
+    return lines, done
+
+
 def _spoken(operation: str) -> str:
     """The operation as a person writes it - `re-file`, as the menu and the
     warnings say it, never the identifier (#115, W8)."""
-    return "re-file" if operation == REFILE else operation
+    return {REFILE: "re-file", CHOOSE_FILE: "settlement"}.get(operation, operation)
 
 
 def offered(operation: str) -> str:
@@ -555,7 +654,7 @@ def _already(conn, request: Request) -> str | None:
     return None
 
 
-def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int | None:
+def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> tuple[int, ...]:
     """Dispatch to the operation that owns this decision's effect.
 
     EVERY ONE OF THESE ALREADY EXISTS, and nothing here re-implements
@@ -649,10 +748,11 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
 
         act = supersession.supersede if request.operation == SUPERSEDE \
             else supersession.un_supersede
-        return act(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+        owed = act(conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
                    dataset_id=request.dataset_id, supply=request.supply,
                    period=request.period, actor=request.actor_name, reason=reason,
                    effective_at=effective_at)
+        return (owed,) if owed is not None else ()
     elif request.operation == UN_INHERIT:
         inheritance.un_inherit(
             conn, dataset_id=request.dataset_id, period=request.period,
@@ -665,11 +765,22 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
 
         p = refiling.plan(conn, dataset_id=request.dataset_id, supply=request.supply,
                           to_period=request.to_period)
-        return refiling.apply(conn, p, agency_id=entry.agency_id,
-                              collection_id=entry.collection_id,
-                              actor=request.actor_name, reason=reason,
-                              effective_at=effective_at)
-    return None
+        return (refiling.apply(conn, p, agency_id=entry.agency_id,
+                               collection_id=entry.collection_id,
+                               actor=request.actor_name, reason=reason,
+                               effective_at=effective_at),)
+    elif request.operation == CHOOSE_FILE:
+        # REQ-PIPE-193: settlement owns the effect, from the plan the
+        # warning was built from.
+        from qa_tools.common import settlement
+
+        p = settlement_plan(conn, request)
+        _entry, owed = settlement.apply(
+            conn, p, agency_id=entry.agency_id, collection_id=entry.collection_id,
+            actor=request.actor_name, reason=reason, effective_at=effective_at,
+            answers=list(request.file_outcomes))
+        return owed
+    return ()
 
 
 def _staged(conn, dataset_id: str, supply: str) -> list[str]:

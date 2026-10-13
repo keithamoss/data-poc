@@ -224,7 +224,8 @@ class TestAPromotedSupplyRefiledIsCheckedInItsNewPeriod:
                                   confirmed=True, acknowledged=acknowledged)
             key = fd.consequences(conn, ask()).key
             got = fd.apply(ask(key), effective_at="2026-04-03T00:00:00+00:00", conn=conn)
-        done = recheck.run(got.owed, run_by="pytest@example.org")
+        (owed_id,) = got.owed
+        done = recheck.run(owed_id, run_by="pytest@example.org")
         assert done.completed, done.message
 
 

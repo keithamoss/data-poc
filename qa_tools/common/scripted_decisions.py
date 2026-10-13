@@ -439,8 +439,10 @@ def _apply(t: Timed) -> None:
                 f"The replay stops here rather than continue with a history missing it."
             ) from exc
     print(f"scripted: {s.operation} {s.dataset_id} {t.period} ({s.scenario})")
-    if outcome.owed is not None:
-        _run_the_re_check_it_owed(t, outcome.owed)
+    # EVERY RE-CHECK IT OWED, in order (REQ-GEN-196 criterion 10): a
+    # settlement owes one per file that became a supply.
+    for owed_id in outcome.owed:
+        _run_the_re_check_it_owed(t, owed_id)
 
 
 def _run_the_re_check_it_owed(t: Timed, owed_id: int) -> None:

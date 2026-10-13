@@ -479,11 +479,16 @@ def arrival_key_of(supply: str) -> str:
     available failures: the decision lands, the hold stays, and the
     queue keeps asking for work somebody has already done.
     """
+    from qa_tools.common import supply_db, supply_files
+
     text = supply or ""
     if "@" in text:
-        return text.rsplit("@", 1)[-1].split("#", 1)[0]
-    if "__" in text:
-        return text.rsplit("__", 1)[-1]
+        return supply_files.staging_key_of(text)
+    # A TABLE'S KEY IS ITS SECOND SEGMENT (REQ-PIPE-193 criterion 13): the
+    # last one is a pair's ordinal (`cp_clients__<key>__2`), not its key.
+    parts = supply_db.split_staged(text)
+    if parts:
+        return parts[1]
     return text
 
 

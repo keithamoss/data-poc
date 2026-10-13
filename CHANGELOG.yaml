@@ -111,9 +111,20 @@ intro: >
 releases:
   - date: "2026-10-13"
     summary: >
-      Fixes for two files arriving for one table, for re-checks after a
-      decision, and for past dates that showed today's files.
+      You can now say what each of two files for one table is. Also fixes
+      for re-checks after a decision and for past dates that showed
+      today's files.
     changes:
+      - category: New
+        items:
+          - headline: Settle two files that arrived for one table
+            components: ["Pipeline & publishing"]
+            description: >
+              When two files arrive for one table, open Filing decisions in
+              mothman and choose "settle". For each file you say whether it
+              is the period's supply, belongs to another period, is wrong,
+              or is a spare copy. Each file that becomes a supply is then
+              checked on its own, and the dataset stops reading "two files".
       - category: Fixed
         items:
           - headline: Two files for one table can no longer both be promoted

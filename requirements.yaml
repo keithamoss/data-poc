@@ -12248,7 +12248,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse and keep - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here).
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep and choose-file - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause).
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -14851,7 +14851,7 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11.
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29.
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -14860,8 +14860,11 @@ requirements:
         route raised the decision, and SHALL NOT give either route an
         operation the other lacks, except the confirmation of a calendar
         correction's moves and the keeps it records, which is offered on
-        the terminal route only (REQ-PIPE-170 criterion 10). AMENDED
-        2026-10-11 by REQ-PIPE-170 criterion 11.
+        the terminal route only (REQ-PIPE-170 criterion 10), and settling
+        a contested pair (choose-file), which is offered on the terminal
+        route only (REQ-PIPE-193 criteria 1 and 16). AMENDED 2026-10-11 by
+        REQ-PIPE-170 criterion 11, and 2026-10-13 by REQ-PIPE-193 criterion
+        29.
       - >
         THE SYSTEM SHALL take the actor from the authenticated author of
         a GitHub-raised decision, and SHALL NOT accept an actor stated
@@ -29171,22 +29174,6 @@ requirements:
     - qa_tools/common/synthetic_reset.py::reset
     - cli/env.py::reset_synthetic_command
     - cli/pipeline.py::run_command
-    unmet_criteria:
-    - criterion: Criteria 14 and 42 - when a person chooses which file of a contested
-        pair is the supply, take that file's own receipt and write a new filing
-        where it differs.
-      why: 'Nothing lets a person choose a file of a contested pair yet: no filing
-        decision offers it, on either route. The receipt view already reads per-file
-        receipts from qa.delivery_file, so the choice has what it needs to read
-        once it exists; the decision itself is not this requirement''s to invent.'
-      owner: 'UNOWNED since REQ-PIPE-141 shipped (re-tested 2026-10-12). Keith, 2026-10-05:
-        the choice is a new filing decision on both routes, writing the new filing in 141''s
-        append-only shape - but 141 as built only REFUSES a re-file of one file of a
-        contested pair (its criterion 11), naming resolving the contest as the step that
-        must come first, and no decision resolves one. Drafted 2026-10-12 as REQ-PIPE-193 (unsigned).'
-      blocked_by:
-        requirements:
-        - REQ-PIPE-193
     evidence:
     - '2026-10-04 (overnight sprint 4): the criterion 30 comparison. Two bootstraps
       from EMPTY databases, the same Perth day, the same server - `equiv144_before`
@@ -31531,7 +31518,7 @@ requirements:
     date_written: '2026-10-12'
     story: As the person working a period's supplies, I want to say what each of two files that arrived together for one dataset actually is, so that a contested dataset stops being a dead end and every file that turns out to be a supply is checked and judged like any other.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-13'
@@ -31626,6 +31613,42 @@ requirements:
     - 'SIGN-OFF REMOVED 2026-10-13 (Keith: ''remove it until re-signed''): the 2026-10-13 signature was given to criteria the architect, UX and third scoping reviews have since changed; nothing reads this as cleared to build until he signs the current text.'
     - 'FINAL REVIEW ROUND 2026-10-13 (scoper on 197/198, architect on all five, CLI and dashboard UX) - their consistency and wording fixes applied, with Keith''s answers: the full TUI path in every pointer; on the CLI route the refusal also shows the settle form; a person''s plain supersede of an open pair is refused like the plain reject. Architect: the resolver must allow ''none'' (a refused file) and ''both'' (an open pair); a settled run carries its arrival''s run_index; knock-on goes through reevaluation''s one rule (built 2026-10-13, post-build-review #161) rather than a settlement path; Outcome.owed becomes a tuple, since a settlement owes up to two runs (REQ-GEN-196 criterion 10).'
     - 'LATENT, NOT VERIFIED (architect): staging numbers files in Python byte order, while qa.delivery_contested sorts filenames by the database''s collation, which dataset_blockers then uses to map a refused load''s ordinal to a filename. Pinned as an NFR here; a test should show whether it already bites on CI''s en_US.utf8.'
+    - 'ONE RESOLVER, supply_files, IS THE ONLY PLACE A SUPPLY ID IS SPLIT (criterion 13): it maps a supply to its staged tables, period, staging key and own file. About 75 call sites were migrated to it on 2026-10-13 and tests/test_supply_files.py reads the source to keep a second one from appearing. REJECTED reading #N as staged __N: staging numbers files in Python byte order, so the file settled as #1 is often staged as __2.'
+    - 'qa.decision_file HOLDS ONE ROW PER FILE OF A SETTLEMENT (schema 40), append-only, beside the one choose-file entry; each file''s reject, supersede or re-file is its own entry carrying caused_by_decision. REJECTED widening qa.decision with per-file columns: a settlement names two files and the entry would carry a pair of everything.'
+    - 'THE SLOT STATE HELD BECAME TWO_FILES ("two files arrived - say what each file is"), and the queue offers only settle on it - which is REQ-PIPE-194 criteria 4 (in part), 5 and 9, built here because the resolver made them one change. The rest of 194 is its own build.'
+    - 'THE OWED RUNS ARE COMPUTED FROM THE PLAN BEFORE APPLY, so the confirmation panel and the progress display name the same runs the transaction owes (criteria 17 and 20); a failed run is said to be owed and is picked up by Process what has arrived, never retried by re-settling.'
+    - 'A PAIR WITH NO PERIOD (held before it was filed) IS REFUSED BEFORE ASKING (criterion 5): found by the real-tools test, which first produced a misleading message about a held pair.'
+    linked_tests:
+    - tests/test_choose_file.py
+    - tests/test_choose_file_runs.py
+    - tests/test_settle_tui.py
+    - tests/test_supply_files.py
+    - tests/test_dataset_blockers.py
+    - tests/test_filing_decisions.py
+    - tests/test_period_overlay.py
+    - tests/test_slot_state.py
+    - tests/test_filing_queue.py
+    implemented_by:
+    - qa_tools/common/settlement.py::plan
+    - qa_tools/common/settlement.py::apply
+    - qa_tools/common/supply_files.py::resolve
+    - qa_tools/common/supply_files.py::supply_for_table
+    - qa_tools/common/filing.py::file_settled
+    - qa_tools/common/filing_decisions.py::_refuse_on_an_open_pair
+    - qa_tools/common/qa_store.py::ensure_schema
+    - cli/settle_tui.py::collect
+    - cli/settle_tui.py::settle
+    - cli/supply.py::_settle_from_flags
+    evidence:
+    - '2026-10-13: tests/test_choose_file_runs.py settles a REAL two-file Birth Registrations delivery, recognised, staged and run by the per-arrival lifecycle, as supply plus re-file to the next day; both owed runs complete under dbt-core, Soda Core, datacontract-cli and Evidently, each recorded under its own supply''s run id with the arrival''s run_index, and each reads only its own staged table. Mutating the overlay to read the arrival''s tables by key makes it fail.'
+    - '2026-10-13: tests/test_choose_file.py covers every decision path on a seeded pair - duplicate send, the later file chosen, the next day''s file sent early, neither, a refused file, the rules of criterion 4, the warning and its recompute, atomicity, the GitHub refusal, criterion 22 and the contest closing - and tests/test_settle_tui.py the screens, Back, the summary and the flag form.'
+    unmet_criteria:
+    - criterion: Criterion 28 - proven end to end on a bootstrapped history by REQ-GEN-196's planted pairs (TS-68 to TS-74).
+      why: The planted pairs are REQ-GEN-196's to generate; each decision path is proven here on a seeded pair and once with the real tools.
+      owner: REQ-GEN-196
+      blocked_by:
+        requirements:
+        - REQ-GEN-196
     open_questions: []
   - id: REQ-PIPE-194
     title: Every place that tells a person to settle a contested pair says where and how, and the contest reads as resolved only once a person has settled it or it has been set aside
