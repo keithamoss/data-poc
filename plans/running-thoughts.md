@@ -1224,8 +1224,12 @@ to the exact right file/line/folder with zero console errors.
     everything else refuses an older database and names that command.
     Rejected: automatic on connect. RESET: reset-synthetic is kept for
     regenerating a synthetic history, but is no longer the remedy for a
-    schema gap. TOOL: OPEN. Keith leans towards our own runner and is open
-    to Alembic. Researched on his ask: Alembic with alembic_utils (0.8.8)
+    schema gap. TOOL: OPEN, between Alembic and Django, TIED (Keith,
+    2026-10-14, correcting my earlier record that he leaned towards our own
+    runner - he did not). OWN RUNNER REJECTED: "we just end up reinventing
+    models and migrations that Alembic and Django already do really well".
+    He is happy to pay for rewriting the hand-written schema SQL as real
+    models. More thought and analysis on Alembic vs Django later. Researched on his ask: Alembic with alembic_utils (0.8.8)
     DOES autogenerate views, functions, triggers and policies (my first
     comparison wrongly said it could not); Django manages triggers through
     django-pgtrigger and views through django-pgviews-redux, but only by

@@ -5,7 +5,10 @@ can get a feel for the day-to-day before choosing a tool. Decided already:
 versioned, forward-only migrations, from now (version 41 onwards), version 40
 as the baseline, applied by an explicit `mothman db migrate`, proved both in
 CI and by a dry run on a copy of the real database. Still open: the tool -
-our own runner or Alembic with alembic_utils.
+Alembic or Django, tied (Keith, 2026-10-14). Our own runner is rejected
+("reinventing models and migrations that Alembic and Django already do
+really well"), and rewriting the schema SQL as real models is an accepted
+cost. The own-runner column below is kept for the record.
 
 Scope: the QA metadata schema only (`qa`: filings, decisions, verdicts,
 runs, results, holds and their views and triggers). A contract changing a
