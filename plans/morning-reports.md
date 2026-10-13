@@ -1338,3 +1338,11 @@ one or more component tags, and a date.
             narrowed (TS-60) - each a fictional past edit to contract/
             calendar.yaml, which you have already said is fine for this
             synthetic asset.
+      - KEITH, ~23:50 Perth: "draft up some requirements and chuck them to the
+        scoper, the architect, and the UX reviewers, and then come back to me
+        with a final proposed draft for questions" - the calendar close-out
+        batch (REQ-PIPE-163, 179, 182 - with REQ-DASH-180 - 202, 203, REQ-PIPE-
+        170 criterion 23, REQ-GEN-136's leftovers) taken to a reviewed final
+        draft overnight, for him to review in the morning. NOT BUILT; the
+        draft lives in the session scratchpad and the morning report, never in
+        requirements.yaml until signed.
