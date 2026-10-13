@@ -227,17 +227,17 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-68 - A duplicate send
 
-**What it demonstrates.** File one D's supply, on time and promoted; file two kept but superseded. **Breaks as**: the duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.
+**What it demonstrates.** File one D's supply, early and promoted; file two kept but superseded. **Breaks as**: the duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.
 
 **What it would look like if the rule were wrong.** The duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.
 
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608051340000800` |
-| Period | 2026-08-05 |
-| Set the in-place-on date to | 2026-08-05 |
-| Built to | green, the 2026-08-05 13:40 arrival |
+| Supplies | `birth_registrations__202607281340000800` |
+| Period | 2026-07-28 |
+| Set the in-place-on date to | 2026-07-28 |
+| Built to | green, the 2026-07-28 13:40 arrival |
 
 ### TS-69 - Tomorrow's file sent early with today's
 
@@ -248,43 +248,43 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608081330000800` |
-| Period | 2026-08-08 |
-| Set the in-place-on date to | 2026-08-08 |
-| Built to | green, the 2026-08-08 13:30 arrival |
-| Built to | green, the 2026-08-08 13:45 arrival |
+| Supplies | `birth_registrations__202608021330000800` |
+| Period | 2026-08-02 |
+| Set the in-place-on date to | 2026-08-02 |
+| Built to | green, the 2026-08-02 13:30 arrival |
+| Built to | green, the 2026-08-02 13:45 arrival |
 
 ### TS-70 - A faulty file and its corrected re-export
 
-**What it demonstrates.** File one rejected; file two D's supply, its own receipt taken, so D reads **late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read on time from file one's receipt.
+**What it demonstrates.** File one rejected; file two D's supply, its own receipt taken, so D reads **late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read early from file one's receipt.
 
-**What it would look like if the rule were wrong.** D read on time from file one's receipt.
+**What it would look like if the rule were wrong.** D read early from file one's receipt.
 
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608111340000800` |
-| Period | 2026-08-11 |
-| Set the in-place-on date to | 2026-08-11 |
-| Built to | green, the 2026-08-11 16:30 arrival |
+| Supplies | `birth_registrations__202608071340000800` |
+| Period | 2026-08-07 |
+| Set the in-place-on date to | 2026-08-07 |
+| Built to | green, the 2026-08-07 16:30 arrival |
 
 ### TS-71 - A stray test file that loads
 
-**What it demonstrates.** The test file rejected; the real one D's supply, on time. **Breaks as**: the test rows checked as D's supply.
+**What it demonstrates.** The test file rejected; the real one D's supply, early. **Breaks as**: the test rows checked as D's supply.
 
 **What it would look like if the rule were wrong.** The test rows checked as D's supply.
 
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608141320000800` |
-| Period | 2026-08-14 |
-| Set the in-place-on date to | 2026-08-14 |
-| Built to | green, the 2026-08-14 13:40 arrival |
+| Supplies | `birth_registrations__202608121320000800` |
+| Period | 2026-08-12 |
+| Set the in-place-on date to | 2026-08-12 |
+| Built to | green, the 2026-08-12 13:40 arrival |
 
 ### TS-72 - A stray test file the load refuses
 
-**What it demonstrates.** The test file offered only "rejected", named as never loaded; the real file D's supply, checked by the real tools, on time and promoted. **Breaks as**: the real file named as the one that never loaded.
+**What it demonstrates.** The test file offered only "rejected", named as never loaded; the real file D's supply, checked by the real tools, early and promoted, and the refused file marked as never loaded. **Breaks as**: the real file named as the one that never loaded.
 
 **What it would look like if the rule were wrong.** The real file named as the one that never loaded.
 
@@ -305,9 +305,9 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608201320000800` |
-| Period | 2026-08-20 |
-| Set the in-place-on date to | 2026-08-20 |
+| Supplies | `birth_registrations__202608211320000800` |
+| Period | 2026-08-21 |
+| Set the in-place-on date to | 2026-08-21 |
 
 ### TS-74 - Re-file one, reject the other
 
@@ -318,10 +318,10 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Where to look | |
 |---|---|
 | Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608241330000800` |
-| Period | 2026-08-24 |
-| Set the in-place-on date to | 2026-08-24 |
-| Built to | green, the 2026-08-24 13:30 arrival |
+| Supplies | `birth_registrations__202608251330000800` |
+| Period | 2026-08-25 |
+| Set the in-place-on date to | 2026-08-25 |
+| Built to | green, the 2026-08-25 13:30 arrival |
 
 ## Delivery and multi-table
 
@@ -590,7 +590,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 | Supplies | `birth_registrations__202609051400000800` |
 | Period | 2026-09-05 |
 | Set the in-place-on date to | 2026-09-05 |
-| Built to | amber on place_of_birth_facility.completeness (446 of 1,942), the 2026-09-05 14:00 arrival |
+| Built to | amber on place_of_birth_facility.completeness (450 of 2,021), the 2026-09-05 14:00 arrival |
 
 ### TS-44 - An amber supply promoted and awaiting acknowledgement
 
@@ -606,7 +606,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 | Supplies | `birth_registrations__202609131400000800` |
 | Period | 2026-09-13 |
 | Set the in-place-on date to | 2026-09-13 |
-| Built to | amber on registering_parent_1_name.completeness (145 of 1,924), the 2026-09-13 14:00 arrival |
+| Built to | amber on registering_parent_1_name.completeness (145 of 1,993), the 2026-09-13 14:00 arrival |
 
 ### TS-45 - The same, acknowledged by a person
 
@@ -622,7 +622,7 @@ NOT IN THE DATA, and not for want of a build: Child Protection's arrival pattern
 | Supplies | `birth_registrations__202609171400000800` |
 | Period | 2026-09-17 |
 | Set the in-place-on date to | 2026-09-17 |
-| Built to | amber on registering_parent_2_name.completeness (625 of 1,873), the 2026-09-17 14:00 arrival |
+| Built to | amber on registering_parent_2_name.completeness (625 of 2,119), the 2026-09-17 14:00 arrival |
 
 ### TS-46 - A green resupply replaces the promoted supply
 
@@ -1527,14 +1527,14 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
         "nulls": 495,
-        "of_rows": 1942
+        "of_rows": 2021
        },
        {
         "rule": "place_of_birth_facility.completeness",
         "to": "amber",
-        "nulls": 446,
-        "of_rows": 1942,
-        "was": 47
+        "nulls": 450,
+        "of_rows": 2021,
+        "was": 43
        }
       ]
      }
@@ -1573,14 +1573,14 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
         "nulls": 495,
-        "of_rows": 1924
+        "of_rows": 1993
        },
        {
         "rule": "registering_parent_1_name.completeness",
         "to": "amber",
         "nulls": 145,
-        "of_rows": 1924,
-        "was": 44
+        "of_rows": 1993,
+        "was": 49
        }
       ]
      }
@@ -1620,8 +1620,8 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
         "rule": "registering_parent_2_name.completeness",
         "to": "amber",
         "nulls": 625,
-        "of_rows": 1873,
-        "was": 495
+        "of_rows": 2119,
+        "was": 576
        }
       ]
      }
@@ -1661,7 +1661,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
         "nulls": 495,
-        "of_rows": 1873
+        "of_rows": 2119
        }
       ]
      },
@@ -1675,7 +1675,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
         "nulls": 495,
-        "of_rows": 1873
+        "of_rows": 2119
        }
       ]
      }
@@ -2006,34 +2006,27 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "mode": "INJECT",
    "title": "A duplicate send",
    "section": "Arrival classification",
-   "demonstrates": "File one D's supply, on time and promoted; file two kept but superseded. **Breaks as**: the duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.",
+   "demonstrates": "File one D's supply, early and promoted; file two kept but superseded. **Breaks as**: the duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.",
    "breaksAs": "The duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.",
    "config": null,
    "requirements": [],
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202608051340000800"
+     "birth_registrations__202607281340000800"
     ],
-    "period": "2026-08-05",
-    "inPlaceOn": "2026-08-05",
+    "period": "2026-07-28",
+    "inPlaceOn": "2026-07-28",
     "targets": [
      {
-      "date": "2026-08-05",
+      "date": "2026-07-28",
       "at": "13:40",
-      "delivery": "05082026_PROD",
-      "filename": "birth_registrations_2026-08-05.csv",
-      "day": "2026-08-05",
+      "delivery": "BDM_20260728",
+      "filename": "birth_registrations_2026-07-28.csv",
+      "day": "2026-07-28",
       "built_to": "green",
       "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1857
-       }
-      ]
+      "moved": []
      }
     ]
    }
@@ -2050,42 +2043,35 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202608081330000800"
+     "birth_registrations__202608021330000800"
     ],
-    "period": "2026-08-08",
-    "inPlaceOn": "2026-08-08",
+    "period": "2026-08-02",
+    "inPlaceOn": "2026-08-02",
     "targets": [
      {
-      "date": "2026-08-08",
+      "date": "2026-08-02",
       "at": "13:30",
-      "delivery": "08082026_PROD",
-      "filename": "birth_registrations_2026-08-08.csv",
-      "day": "2026-08-08",
+      "delivery": "DCP_20260802",
+      "filename": "birth_registrations_2026-08-02.csv",
+      "day": "2026-08-02",
       "built_to": "green",
       "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1857
-       }
-      ]
+      "moved": []
      },
      {
-      "date": "2026-08-08",
+      "date": "2026-08-02",
       "at": "13:45",
-      "delivery": "08082026_PROD",
-      "filename": "birth_registrations_2026-08-09.csv",
-      "day": "2026-08-09",
+      "delivery": "DCP_20260802",
+      "filename": "birth_registrations_2026-08-03.csv",
+      "day": "2026-08-03",
       "built_to": "green",
       "rules": [],
       "moved": [
        {
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
-        "nulls": 495,
-        "of_rows": 1857
+        "nulls": 476,
+        "of_rows": 1764
        }
       ]
      }
@@ -2097,27 +2083,34 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "mode": "INJECT",
    "title": "A faulty file and its corrected re-export",
    "section": "Arrival classification",
-   "demonstrates": "File one rejected; file two D's supply, its own receipt taken, so D reads **late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read on time from file one's receipt.",
-   "breaksAs": "D read on time from file one's receipt.",
+   "demonstrates": "File one rejected; file two D's supply, its own receipt taken, so D reads **late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read early from file one's receipt.",
+   "breaksAs": "D read early from file one's receipt.",
    "config": null,
    "requirements": [],
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202608111340000800"
+     "birth_registrations__202608071340000800"
     ],
-    "period": "2026-08-11",
-    "inPlaceOn": "2026-08-11",
+    "period": "2026-08-07",
+    "inPlaceOn": "2026-08-07",
     "targets": [
      {
-      "date": "2026-08-11",
+      "date": "2026-08-07",
       "at": "16:30",
-      "delivery": "11082026_AGENCY",
-      "filename": "birth_registrations_2026-08-11-resend.csv",
-      "day": "2026-08-11",
+      "delivery": "REG_20260807",
+      "filename": "birth_registrations_2026-08-07-resend.csv",
+      "day": "2026-08-07",
       "built_to": "green",
       "rules": [],
-      "moved": []
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 2053
+       }
+      ]
      }
     ]
    }
@@ -2127,27 +2120,34 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "mode": "INJECT",
    "title": "A stray test file that loads",
    "section": "Arrival classification",
-   "demonstrates": "The test file rejected; the real one D's supply, on time. **Breaks as**: the test rows checked as D's supply.",
+   "demonstrates": "The test file rejected; the real one D's supply, early. **Breaks as**: the test rows checked as D's supply.",
    "breaksAs": "The test rows checked as D's supply.",
    "config": null,
    "requirements": [],
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202608141320000800"
+     "birth_registrations__202608121320000800"
     ],
-    "period": "2026-08-14",
-    "inPlaceOn": "2026-08-14",
+    "period": "2026-08-12",
+    "inPlaceOn": "2026-08-12",
     "targets": [
      {
-      "date": "2026-08-14",
+      "date": "2026-08-12",
       "at": "13:40",
-      "delivery": "Data Extract 14 Aug 2026",
-      "filename": "birth_registrations_2026-08-14.csv",
-      "day": "2026-08-14",
+      "delivery": "daily_extract_aug2026",
+      "filename": "birth_registrations_2026-08-12.csv",
+      "day": "2026-08-12",
       "built_to": "green",
       "rules": [],
-      "moved": []
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 2053
+       }
+      ]
      }
     ]
    }
@@ -2157,7 +2157,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "mode": "INJECT",
    "title": "A stray test file the load refuses",
    "section": "Arrival classification",
-   "demonstrates": "The test file offered only \"rejected\", named as never loaded; the real file D's supply, checked by the real tools, on time and promoted. **Breaks as**: the real file named as the one that never loaded.",
+   "demonstrates": "The test file offered only \"rejected\", named as never loaded; the real file D's supply, checked by the real tools, early and promoted, and the refused file marked as never loaded. **Breaks as**: the real file named as the one that never loaded.",
    "breaksAs": "The real file named as the one that never loaded.",
    "config": null,
    "requirements": [],
@@ -2172,12 +2172,19 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
      {
       "date": "2026-08-17",
       "at": "13:30",
-      "delivery": "d9f9c61266d3",
+      "delivery": "send-4449",
       "filename": "birth_registrations_2026-08-17.csv",
       "day": "2026-08-17",
       "built_to": "green",
       "rules": [],
-      "moved": []
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 495,
+        "of_rows": 2073
+       }
+      ]
      }
     ]
    }
@@ -2194,10 +2201,10 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202608201320000800"
+     "birth_registrations__202608211320000800"
     ],
-    "period": "2026-08-20",
-    "inPlaceOn": "2026-08-20"
+    "period": "2026-08-21",
+    "inPlaceOn": "2026-08-21"
    }
   },
   {
@@ -2212,25 +2219,25 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
    "coordinates": {
     "dataset": "birth-registrations",
     "supplies": [
-     "birth_registrations__202608241330000800"
+     "birth_registrations__202608251330000800"
     ],
-    "period": "2026-08-24",
-    "inPlaceOn": "2026-08-24",
+    "period": "2026-08-25",
+    "inPlaceOn": "2026-08-25",
     "targets": [
      {
-      "date": "2026-08-24",
+      "date": "2026-08-25",
       "at": "13:30",
-      "delivery": "24082026_SRC",
-      "filename": "birth_registrations_2026-08-25.csv",
-      "day": "2026-08-25",
+      "delivery": "Data Extract 25 Aug 2026",
+      "filename": "birth_registrations_2026-08-26.csv",
+      "day": "2026-08-26",
       "built_to": "green",
       "rules": [],
       "moved": [
        {
         "rule": "registering_parent_2_name.completeness",
         "to": "green",
-        "nulls": 491,
-        "of_rows": 1820
+        "nulls": 495,
+        "of_rows": 1933
        }
       ]
      }
