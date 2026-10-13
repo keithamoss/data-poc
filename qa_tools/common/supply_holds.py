@@ -499,17 +499,21 @@ def resolve_for_supply(conn, *, dataset_id: str, supply: str,
     Returns the supply ids resolved - usually none, because most
     decisions are about supplies nobody held.
 
-    MATCHED ON THE ARRIVAL KEY rather than on the id, for the reason
-    `arrival_key_of` gives. (It used to resolve several at once for the
-    delivery-level hold, retired 2026-10-02 by REQ-PIPE-105 criterion 6;
-    matching on the key costs nothing and stays.)
+    MATCHED ON THE SUPPLY, by the one resolver (REQ-PIPE-193 criterion 13,
+    post-build-review #170). A decision may name a physical table rather
+    than a supply id (post-build-review #64), so a table is resolved to its
+    supply first; the arrival key alone would let a decision about one
+    file of a pair resolve the other file's hold.
     """
+    from qa_tools.common import supply_files
+
     if not supply:
         return ()
-    key = arrival_key_of(supply)
+    about = supply if "@" in supply else (
+        supply_files.supply_for_table(conn, dataset_id, supply) or supply)
     resolved = []
     for held in outstanding(conn, dataset_id=dataset_id):
-        if arrival_key_of(held.supply_id) != key:
+        if held.supply_id != about:
             continue
         if resolve(conn, dataset_id=dataset_id, supply_id=held.supply_id,
                     decision_id=decision_id):
@@ -517,7 +521,7 @@ def resolve_for_supply(conn, *, dataset_id: str, supply: str,
     return tuple(resolved)
 
 
-def held_tables(conn, *, arrival_key: str) -> frozenset[str]:
+def held_tables(conn, *, arrival_key: str, supply: str | None = None) -> frozenset[str]:
     """The LOGICAL TABLE NAMES a run of THIS ARRIVAL must not build a view
     for - the tables whose supply in this arrival is held.
 
@@ -540,12 +544,21 @@ def held_tables(conn, *, arrival_key: str) -> frozenset[str]:
     A hold outlives the schedule it was raised under, and a run that
     cannot start because a retired dataset is still held is a worse
     failure than a view nothing reads.
-    """
-    from qa_tools.common import hierarchy
 
+    A RUN ABOUT ONE SUPPLY (`supply`) is withheld its own table only where
+    THAT supply is held (REQ-PIPE-193 criterion 13, #170): a settled
+    pair's two files share an arrival, and one file's hold says nothing
+    about the other. Other datasets' holds in the arrival still count.
+    """
+    from qa_tools.common import hierarchy, supply_files
+
+    own = supply_files.dataset_of(supply) if supply else None
     tables = set()
     for held in outstanding(conn):
-        if arrival_key_of(held.supply_id) != arrival_key:
+        if own is not None and held.dataset_id == own:
+            if held.supply_id != supply:
+                continue
+        elif arrival_key_of(held.supply_id) != arrival_key:
             continue
         try:
             tables.add(hierarchy.dataset(held.dataset_id).table)

@@ -1100,8 +1100,16 @@ def _settle_from_flags(dataset_id: str, period: str, tokens: tuple[str, ...], *,
             f"no outcome was given for {' and '.join(missing)}. Give one per file:\n"
             + "\n".join(f"  --file-outcome '{n}=<supply|refile:<period>|reject|supersede>'"
                          for n in names))
-    return settle_tui.settle(dataset_id, period, pair,
-                             answers=answers if not missing else None,
+    if not (reason or "").strip() and not interactive:
+        # SAID AS WHAT IS MISSING, with the command as given (#170).
+        raise click.UsageError(
+            "--reason is missing - a settlement records why. The same command with it:\n"
+            f"  mothman supply decide --operation choose-file --dataset {dataset_id} "
+            f"--period {period} "
+            + " ".join(f"--file-outcome '{t}'" for t in tokens)
+            + " --reason '<why>' --yes")
+    # A FILE GIVEN ALONE IS KEPT, and only the other asked (criterion 15, #170).
+    return settle_tui.settle(dataset_id, period, pair, answers=answers or None,
                              reason=reason, yes=yes, acknowledged=acknowledged,
                              summary=bool(missing))
 

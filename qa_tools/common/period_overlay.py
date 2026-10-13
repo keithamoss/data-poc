@@ -290,7 +290,9 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
     try:
         out = build(conn, arrival.run_id, period=period, own_table=own_table,
                     arrival_key=key, tables=agreed, loaded=loaded,
-                    held=supply_holds.held_tables(conn, arrival_key=key),
+                    held=supply_holds.held_tables(
+                        conn, arrival_key=key,
+                        supply=resolved.supply_id if resolved is not None else None),
                     own_physical=own_physical)
         if sample:
             found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,

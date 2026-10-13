@@ -198,6 +198,10 @@ class Consequences:
     #: What the success message confirms was done - the things the person
     #: was warned about, said back at the end.
     done: tuple[str, ...] = ()
+    #: Said in the panel but NOT part of the key: what always follows the
+    #: decision, so confirming it adds nothing - a settlement's QA runs
+    #: (Keith, 2026-10-13, post-build-review #170).
+    notes: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:
@@ -210,7 +214,8 @@ class ConsequencesNotAcknowledged(decision_log.DecisionRefused):
     """A decision with consequences, not confirmed against the warning in
     force now - never shown, or shown and since changed (criterion 9)."""
 
-    def __init__(self, found: Consequences, *, given: str | None):
+    def __init__(self, found: Consequences, *, given: str | None,
+                 terminal_only: bool = False):
         self.lines, self.key, self.given = found.lines, found.key, given
         # A WRONG KEY IS NOT NECESSARILY A CHANGE (post-build-review #112):
         # it may be mistyped, and blaming something that did not happen
@@ -218,12 +223,16 @@ class ConsequencesNotAcknowledged(decision_log.DecisionRefused):
         self.lead = (
             f"The key {given} does not match this decision's warning - mistyped, or what "
             f"the decision does has changed since it was shown. Nothing was done."
-            if given else "This decision does more than its own slot, so it needs that "
-            "confirmed. Nothing was done.")
+            if given else ("This decision has the consequences below, so it needs them "
+                           "confirmed. Nothing was done." if terminal_only else
+                           "This decision does more than its own slot, so it needs that "
+                           "confirmed. Nothing was done."))
+        # A TERMINAL-ONLY DECISION HAS NO TICKET TO COMMENT ON (#170).
         self.instruction = (
             f"To go ahead, confirm the current key {found.key}: add "
-            f"`--acknowledge {found.key}` to the same command, or on a ticket comment "
-            f"`acknowledge: {found.key}`.")
+            f"`--acknowledge {found.key}` to the same command"
+            + ("." if terminal_only else
+               f", or on a ticket comment `acknowledge: {found.key}`."))
         super().__init__(
             self.lead + "\n" + "\n".join(f"  - {line}" for line in found.lines)
             + "\n" + self.instruction)
@@ -282,8 +291,9 @@ def consequences(conn, request: Request) -> Consequences:
             done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
     if request.operation == REFILE and request.supply and request.to_period:
         lines, done = _refile_consequences(conn, request)
+    notes: list[str] = []
     if request.operation == CHOOSE_FILE:
-        lines, done = _settlement_consequences(conn, request)
+        lines, done, notes = _settlement_consequences(conn, request)
     if request.operation == EXCUSE_LATENESS and request.through_period:
         lines, done = _range_consequences(conn, request)
     readers = _readers_rechecked(conn, request)
@@ -291,7 +301,7 @@ def consequences(conn, request: Request) -> Consequences:
         lines += readers
         count = readers[0].count("\n")
         done.append(f"{count} supply/supplies reading it owed a re-check.")
-    return Consequences(lines=tuple(lines), done=tuple(done))
+    return Consequences(lines=tuple(lines), done=tuple(done), notes=tuple(notes))
 
 
 #: These move a table only where the supply named is the one the period holds.
@@ -487,7 +497,8 @@ def settlement_plan(conn, request: Request):
                            answers=list(request.file_outcomes))
 
 
-def _settlement_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
+def _settlement_consequences(conn, request: Request
+                             ) -> tuple[list[str], list[str], list[str]]:
     """EVERY consequence beyond moving the files it names, in one panel
     above the single confirmation (criterion 17): a changed period or
     verdict, a superseded waiting version, a hold, a second supply in
@@ -526,14 +537,19 @@ def _settlement_consequences(conn, request: Request) -> tuple[list[str], list[st
             lines.append(f"{name}'s version waiting in {f.checked_in or f.to_period} "
                          f"({d}) is superseded by {f.file.filename}.")
             done.append(f"A waiting version in {f.checked_in or f.to_period} was superseded.")
+    # THE RUNS ARE LISTED, NEVER KEYED (Keith, 2026-10-13, #170): every
+    # settlement that makes a supply owes them, so confirming them adds a
+    # second invocation and nothing else.
+    notes: list[str] = []
     if p.runs:
-        lines.append("\n".join(
-            [f"Then {len(p.runs)} QA run(s), one at a time, while you wait:"]
+        runs = "1 QA run" if len(p.runs) == 1 else f"{len(p.runs)} QA runs"
+        notes.append("\n".join(
+            [f"Then {runs}, one at a time, while you wait:"]
             + [f"    {f.file.filename} against {f.checked_in}" for f in p.runs]
             + ["  A supply that comes out green may be promoted by the promotion gate "
                "with no further decision."]))
-        done.append(f"{len(p.runs)} QA run(s) owed.")
-    return lines, done
+        done.append(f"{runs} owed.")
+    return lines, done, notes
 
 
 def _spoken(operation: str) -> str:
@@ -672,9 +688,10 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> tup
         # A SUBSTITUTION IS REMOVED ONLY ONCE ITS CONSEQUENCE WAS CONFIRMED
         # (REQ-PIPE-128 criterion 4) - apply() has already held the person
         # to the warning, so reaching here is that confirmation.
+        tables, source = _promotable(conn, request.dataset_id, request.supply)
         promotion.promote(
             conn, supply=request.supply, period=request.period,
-            physical_tables=_staged(conn, request.dataset_id, request.supply),
+            physical_tables=tables, from_schema=source,
             actor_kind=decision_log.PERSON, remove_substitution=True, **common)
     elif request.operation == REJECT:
         rejection.reject(
@@ -791,6 +808,23 @@ def _staged(conn, dataset_id: str, supply: str) -> list[str]:
     from qa_tools.common import supply_files
 
     return supply_files.tables_in(conn, dataset_id, supply, supply_db.STAGING_SCHEMA)
+
+
+def _promotable(conn, dataset_id: str, supply: str) -> tuple[list[str], str]:
+    """(tables, the schema they are in) a person's promotion takes: staging,
+    or - for a supply a person REJECTED - the rejected schema, which is how
+    a rejection is reversed (REQ-PIPE-075 criterion 9; REQ-PIPE-193
+    criteria 3 and 26). No route could do it until post-build-review #170:
+    promote looked only in staging, and refiling's own refusal advised it."""
+    from qa_tools.common import supply_files
+
+    staged = _staged(conn, dataset_id, supply)
+    if staged:
+        return staged, supply_db.STAGING_SCHEMA
+    rejected = supply_files.tables_in(conn, dataset_id, supply, supply_db.REJECTED_SCHEMA)
+    if rejected:
+        return rejected, supply_db.REJECTED_SCHEMA
+    return [], supply_db.STAGING_SCHEMA
 
 
 def _promoted_tables(conn, logical: str, request: Request) -> list[str]:
@@ -938,7 +972,9 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     # with the warning as it stands.
     found = consequences(conn, request)
     if found.lines and request.acknowledged != found.key:
-        raise ConsequencesNotAcknowledged(found, given=request.acknowledged)
+        raise ConsequencesNotAcknowledged(
+            found, given=request.acknowledged,
+            terminal_only=request.operation in TERMINAL_ONLY)
 
     owed = _apply_one(conn, request, reason, effective_at=effective_at)
     return Outcome(

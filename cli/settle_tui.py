@@ -42,6 +42,9 @@ WORDS = {
     REJECT: "reject - this file is wrong; it can be promoted back later on its own",
     SUPERSEDE: "a spare copy - kept, can be brought back",
 }
+#: Each outcome's short name, for an option that is ruled out.
+SHORT = {SUPPLY: "the supply", REFILE: "re-file", REJECT: "reject",
+         SUPERSEDE: "a spare copy"}
 #: The same, said back on the summary and the closing panel.
 SAID = {
     SUPPLY: "the supply for {period}",
@@ -49,6 +52,10 @@ SAID = {
     REJECT: "rejected",
     SUPERSEDE: "a spare copy - kept, can be brought back",
 }
+
+#: What collect() and settle() return for Back on the first file's
+#: question: back to the slot's operations (criterion 24), not out of it.
+BACK = object()
 
 REFUSED_TITLE = "Settlement refused"
 REASON_PROMPT = "Why are you settling these two files?"
@@ -75,8 +82,10 @@ class Option:
 
     @property
     def shown(self) -> str:
+        # A RULED-OUT OPTION IS SHOWN BY ITS SHORT NAME, so its reason fits
+        # on one line at an ordinary width (#170); picking it says it again.
         return self.label if self.unavailable is None else (
-            f"{self.label}  (not available: {self.unavailable})")
+            f"{SHORT[self.outcome]} - not available: {self.unavailable}")
 
 
 def first_options(files, period: str) -> list[Option]:
@@ -109,12 +118,11 @@ def second_options(files, period: str, first: settlement.Answer) -> list[Option]
         if second.refused and outcome != REJECT:
             why = "this file never loaded, so it can only be rejected"
         elif first.outcome == SUPERSEDE and outcome != SUPPLY:
-            why = (f"the first file is a spare copy, so this one is the supply for "
-                   f"{period}")
+            why = "the first file is a spare copy, so this one is the supply"
         elif outcome == SUPPLY and first.outcome == SUPPLY:
-            why = f"the first file is already the supply for {period}"
+            why = "the first file is already the supply"
         elif outcome == SUPERSEDE and first.outcome != SUPPLY:
-            why = f"a spare copy needs the other file to be the supply for {period}"
+            why = "only beside the other file as the supply"
         out.append(Option(outcome, label, why))
     return out
 
@@ -124,7 +132,12 @@ def said(answer: settlement.Answer, period: str) -> str:
 
 
 def summary_table(files, answers, period: str) -> Table:
-    table = Table("File", "Received", "What it is", box=None, pad_edge=False)
+    # A FILENAME FOLDS, NEVER TRUNCATES (#170): its end - `-resend` - is
+    # often all that tells the two apart.
+    table = Table(box=None, pad_edge=False)
+    table.add_column("File", overflow="fold")
+    table.add_column("Received")
+    table.add_column("What it is")
     by_name = {a.filename: a for a in answers}
     for f in files:
         from qa_tools.common import display_time
@@ -158,7 +171,8 @@ def _next_period(dataset_id: str, period: str) -> str | None:
         return None
 
 
-def _target(dataset_id: str, period: str, filename: str, taken: str | None) -> str | None:
+def _target(dataset_id: str, period: str, filename: str, taken: str | None, *,
+            besides: str | None = None) -> str | None:
     """Which period a re-filed file belongs to, the next period offered as
     the default (criterion 19). A refused target says why and asks again,
     before the reason is asked and keeping both files' answers."""
@@ -181,12 +195,19 @@ def _target(dataset_id: str, period: str, filename: str, taken: str | None) -> s
         elif answer == taken:
             why = f"the other file is already re-filed to {answer}"
         elif not refiling._on_calendar(dataset_id, answer):
-            why = f"{answer} is not a period {dataset_id} is delivered in"
+            why = (f"{answer} is not a period "
+                   f"{hierarchy.dataset(dataset_id).dataset_name} is delivered in")
         else:
             with _open() as conn:
                 h = decision_log.held(conn, dataset_id, answer)
+                # ANOTHER OPEN PAIR THERE is refused, as a plain supersede of
+                # it would be (Keith, 2026-10-13, #170).
+                blocked = settlement.open_pair_in(conn, dataset_id, answer,
+                                                  besides=besides or "")
             if h and h.held_as == decision_log.INHERITED:
                 why = f"nothing was expected for {answer}: it is inherited"
+            elif blocked:
+                why = blocked.rstrip(".")
         if why is None:
             return answer
         console.print(f"Not that period: {why}. Name another.", style="yellow")
@@ -199,22 +220,25 @@ def _open():
 
 
 def _ask_file(dataset_id: str, period: str, files, n: int,
-              first: settlement.Answer | None) -> settlement.Answer | None:
+              first: settlement.Answer | None, *,
+              besides: str | None = None) -> settlement.Answer | None:
     f = files[n]
     options = first_options(files, period) if n == 0 else second_options(files, period, first)
     if f.refused:
         console.print(f"{f.filename} never loaded - the load refused it - so it can only be "
                       f"rejected.", style="yellow")
-    picked = _pick(f"What is {f.filename}?", options)
-    if picked is None:
-        return None
-    to = None
-    if picked.outcome == REFILE:
-        to = _target(dataset_id, period, f.filename,
-                     first.to_period if first is not None else None)
-        if to is None:
+    while True:
+        picked = _pick(f"What is {f.filename}?", options)
+        if picked is None:
             return None
-    return settlement.Answer(f.filename, picked.outcome, to)
+        if picked.outcome != REFILE:
+            return settlement.Answer(f.filename, picked.outcome)
+        to = _target(dataset_id, period, f.filename,
+                     first.to_period if first is not None else None, besides=besides)
+        if to is not None:
+            return settlement.Answer(f.filename, REFILE, to)
+        # A BLANK PERIOD is "not re-file after all": this file's question
+        # again, never the whole settlement dropped (#170).
 
 
 def _still_allowed(files, period: str, first: settlement.Answer,
@@ -230,31 +254,43 @@ def _still_allowed(files, period: str, first: settlement.Answer,
 def collect(dataset_id: str, period: str, files, *,
             given: list[settlement.Answer] | None = None,
             reason: str | None = None,
-            summary: bool = True) -> tuple[list[settlement.Answer], str] | None:
+            summary: bool = True, check=None,
+            besides: str | None = None):
     """Each file's answer, then the summary and the reason (criterion 24).
     `given` answers (the flag form, or 'reject both') skip straight to the
     summary. Back on either file's question returns to the one before - the
     second file's to the first's, the first's out - keeping no answer from
-    the abandoned screen. Returns (answers, reason), or None where nothing
-    is to be recorded."""
+    the abandoned screen. A file given alone (the flag form) is kept and
+    only the other asked (criterion 15). `check` is the settlement's own
+    judgement of a whole combination, asked BEFORE the reason (criteria 4
+    and 19): a refusal is said and the second file asked again. Returns
+    (answers, reason), BACK for Back on the first file, or None where
+    nothing is to be recorded."""
     by_name = {a.filename: a for a in (given or [])}
     first = by_name.get(files[0].filename)
     second = by_name.get(files[1].filename)
-    step = 2 if first and second else 0
+    step = 2 if first and second else (1 if first else 0)
     while True:
         if step == 0:
-            first = _ask_file(dataset_id, period, files, 0, None)
+            first = _ask_file(dataset_id, period, files, 0, None, besides=besides)
             if first is None:
-                return None
+                return BACK
             step = 1 if not _still_allowed(files, period, first, second) else 2
             if step == 1:
                 second = None
         if step == 1:
-            second = _ask_file(dataset_id, period, files, 1, first)
+            second = _ask_file(dataset_id, period, files, 1, first, besides=besides)
             if second is None:
                 first, step = None, 0
                 continue
             step = 2
+        refused = check([first, second]) if check is not None else None
+        if refused:
+            console.print(f"Not that combination: {refused}", style="yellow")
+            if not summary:
+                return None
+            second, step = None, 1
+            continue
         if not summary:
             # THE FLAG FORM WITH EVERY FILE ANSWERED (criterion 15): the
             # summary is the TUI's affordance; the rules, the warning and the
@@ -319,11 +355,16 @@ def settle(dataset_id: str, period: str, supply: str, *,
     console.print(summary_table(files, [], period))
     console.print()
 
-    while True:
+    def check(chosen):
+        return _refusal_of(dataset_id, supply, chosen)
+
+    outcome = None
+    while outcome is None:
         got = collect(dataset_id, period, files, given=answers, reason=reason,
-                      summary=summary)
-        if got is None:
-            return None
+                      summary=summary, check=check if summary else None,
+                      besides=supply)
+        if got is None or got is BACK:
+            return got
         chosen, why_settle = got
         request = filing_decisions.Request(
             operation=filing_decisions.CHOOSE_FILE, dataset_id=dataset_id, actor=actor,
@@ -333,22 +374,87 @@ def settle(dataset_id: str, period: str, supply: str, *,
             shown = filing_tui._consequences(request)
         except decision_log.DecisionRefused as exc:
             filing_tui._show(str(exc), title=REFUSED_TITLE, style="red")
-            if answers is not None:
+            if not summary:
                 return None
             # A REFUSED COMBINATION SAYS WHICH RULE AND ASKS AGAIN, keeping
             # the answers to change (criterion 4).
             answers, reason = chosen, why_settle
             continue
-        break
+        # CRITERION 18: where what it does changed between the warning and
+        # the lock, the new warning is shown and the person asked again -
+        # once per change, never left at a bare refusal.
+        while True:
+            outcome = _confirm_and_apply(request, shown, name=name, period=period,
+                                         actor=actor, yes=yes, acknowledged=acknowledged)
+            if not isinstance(outcome, _Changed):
+                break
+            filing_tui._show(outcome.said, title="What this settlement does has changed",
+                             style="yellow")
+            if yes:
+                return None
+            shown = outcome.now
+        if outcome is None:
+            return None
+    applied, runs = outcome.outcome, outcome.runs
+    console.print(Panel(Text(applied.message, style="bold green"), title="Recorded",
+                        border_style="green", expand=False))
+    results = _run_what_it_owed(applied, runs, period)
+    _closing_panel(chosen, results, period)
+    filing_tui._follow_up(hierarchy.dataset(dataset_id).collection_id)
+    filing_decisions.reconcile_after(applied, hierarchy.dataset(dataset_id).collection_id)
+    return applied
+
+
+@dataclass(frozen=True)
+class _Changed:
+    """What the settlement does changed between the warning and the lock."""
+    now: filing_decisions.Consequences
+    said: str
+
+
+@dataclass(frozen=True)
+class _Applied:
+    outcome: filing_decisions.Outcome
+    runs: list
+
+
+def _refusal_of(dataset_id: str, supply: str, chosen) -> str | None:
+    """The settlement's own refusal of this combination, or None - asked
+    before the reason (criteria 4 and 19)."""
+    from cli import filing_tui
+
+    request = filing_decisions.Request(
+        operation=filing_decisions.CHOOSE_FILE, dataset_id=dataset_id, actor=None,
+        reason="", period=None, supply=supply, file_outcomes=tuple(chosen))
+    try:
+        with filing_tui.open_log() as conn:
+            filing_decisions.settlement_plan(conn, request)
+    except decision_log.DecisionRefused as exc:
+        return str(exc)
+    return None
+
+
+def _confirm_and_apply(request, shown, *, name: str, period: str, actor: dict, yes: bool,
+                       acknowledged: str | None):
+    """One warning, one confirmation, the apply: an _Applied, a _Changed,
+    or None where nothing was recorded."""
+    from cli import filing_tui
 
     # THE RUNS THAT FOLLOW, from the plan the warning was built from - the
     # owed ids come back in this order.
     with filing_tui.open_log() as conn:
         runs = [(f.file.filename, f.checked_in)
                 for f in filing_decisions.settlement_plan(conn, request).runs]
-    if shown.lines:
-        filing_tui._show("\n".join(f"- {line}" for line in shown.lines),
+    if shown.lines or shown.notes:
+        filing_tui._show("\n".join(f"- {line}" for line in (*shown.lines, *shown.notes)),
                          title="This settlement also does", style="yellow")
+    if yes and shown.lines and acknowledged != shown.key:
+        # REFUSED HERE, NOT AFTER "Recording..." (#170): the flag form with
+        # --yes and no key for the warning just shown.
+        exc = filing_decisions.ConsequencesNotAcknowledged(
+            shown, given=acknowledged, terminal_only=True)
+        filing_tui._show(f"{exc.lead}\n{exc.instruction}", title=REFUSED_TITLE, style="red")
+        return None
     if not common.confirm_change(
             CONFIRM.format(dataset=name, period=period, person=people.actor_name(actor)),
             yes=yes, default=False,
@@ -356,24 +462,29 @@ def settle(dataset_id: str, period: str, supply: str, *,
                        else "pass --yes")):
         console.print("Not recorded.", style="yellow")
         return None
-    if shown.lines and not yes:
-        request = dataclasses.replace(request, acknowledged=shown.key)
+    if not yes:
+        request = dataclasses.replace(request, acknowledged=shown.key or None)
     console.print(f"Recording - this waits up to {decision_log.LOCK_TIMEOUT} if a QA run or "
                   f"another decision is using these tables.", style="dim")
     try:
         outcome = filing_decisions.apply(request, effective_at=asset_time.now().isoformat())
+    except filing_decisions.ConsequencesNotAcknowledged as exc:
+        now = filing_decisions.Consequences(lines=exc.lines)
+        return _Changed(now, "It now does:\n" + "\n".join(f"- {line}" for line in exc.lines))
+    except settlement.Changed:
+        # Changed at the lock: worked out again, as it stands now.
+        try:
+            now = filing_tui._consequences(request)
+        except decision_log.DecisionRefused as exc:
+            filing_tui._show(str(exc), title=REFUSED_TITLE, style="red")
+            return None
+        return _Changed(now, "Something was filed or decided meanwhile. It now does:\n"
+                        + "\n".join(f"- {line}" for line in (*now.lines, *now.notes)))
     except (decision_log.DecisionRefused, filing_decisions.NotOffered,
             people.UnknownActor) as exc:
-        # CRITERION 18: what changed is said; the person asks again.
         filing_tui._show(str(exc), title=REFUSED_TITLE, style="red")
         return None
-    console.print(Panel(Text(outcome.message, style="bold green"), title="Recorded",
-                        border_style="green", expand=False))
-    results = _run_what_it_owed(outcome, runs, period)
-    _closing_panel(chosen, results, period)
-    filing_tui._follow_up(hierarchy.dataset(dataset_id).collection_id)
-    filing_decisions.reconcile_after(outcome, hierarchy.dataset(dataset_id).collection_id)
-    return outcome
+    return _Applied(outcome, runs)
 
 
 def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict[str, str]:
@@ -397,11 +508,15 @@ def _run_what_it_owed(outcome, runs: list[tuple[str, str]], period: str) -> dict
             out[filename] = got.message
         else:
             out[filename] = "not checked yet - owed"
-            console.print(Panel(Text(
-                f"The settlement is recorded. {label} did not finish ({got.message}), so it "
-                f"is owed, and is finished by 'Process what has arrived' (mothman pipeline "
-                f"process) or the next processing pass."),
-                title="Run owed", border_style="yellow", expand=False))
+            # PLAIN FIRST, THE DETAIL BENEATH (#170): what a person does
+            # next does not depend on the exception's wording.
+            body = Text(
+                f"The settlement is recorded. {label} did not finish, so it is owed - "
+                f"finished by 'Process what has arrived' (mothman pipeline process) or the "
+                f"next processing pass.")
+            body.append(f"\n\nDetail: {got.message}", style="dim")
+            console.print(Panel(body, title="Run owed", border_style="yellow",
+                                expand=False))
     return out
 
 

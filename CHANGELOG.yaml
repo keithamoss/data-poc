@@ -131,8 +131,14 @@ releases:
             components: ["Pipeline & publishing"]
             description: >
               Promoting a dataset where two files claim the same table used to
-              move both into the period. It is now refused, and tells you to
-              reject the pair and ask the supplier to resend.
+              move both into the period. It is now refused, and tells you
+              where to settle the two files instead.
+          - headline: A rejected supply can be promoted back
+            components: ["Pipeline & publishing"]
+            description: >
+              Promoting a supply you had rejected used to be refused, because
+              promotion only looked among the supplies still waiting. It now
+              brings the supply back, so a rejection can be undone.
           - headline: Re-checks after a decision work for Perth-time supplies
             components: ["Pipeline & publishing"]
             description: >

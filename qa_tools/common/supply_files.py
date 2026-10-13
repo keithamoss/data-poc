@@ -73,6 +73,11 @@ class Supply:
         return not self.settled and len(self.own) > 1
 
 
+def dataset_of(supply_id: str) -> str:
+    """The dataset a supply id names - the part before `@`."""
+    return supply_id.partition("@")[0]
+
+
 def staging_key_of(supply_id: str) -> str:
     """The arrival key a supply id carries - THE ONE PLACE a supply id is
     split (the requirement's mechanical-enumeration NFR)."""

@@ -177,7 +177,11 @@ def _contested(db) -> list[Blocker]:
             "         WHERE df.delivery = c.delivery AND df.dataset_id = c.dataset_id "
             "         ORDER BY df.received_instant, df.receipt_sequence LIMIT 1) "
             "FROM qa.delivery_contested c ORDER BY c.dataset_id, c.delivery").fetchall():
-        files = tuple(files or ())
+        # PYTHON'S BYTE ORDER, the order staging numbers the files in
+        # (supply_files.files_in_order) - never the database collation's,
+        # which on a non-C locale would name the wrong file as refused
+        # (REQ-PIPE-193's file-order NFR, post-build-review #170).
+        files = tuple(sorted(files or ()))
         key = asset_time.arrival_key(received_at)
         # THE ORDINAL IS THE FILE'S PLACE IN NAME ORDER - the same rule
         # supply_db.expected_tables() stages them under - so a refused

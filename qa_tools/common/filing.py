@@ -308,16 +308,46 @@ def period_for_key(dataset_id: str, key: str) -> str | None:
     """period_of(), for a caller holding the ARRIVAL KEY - a run id's own
     suffix - rather than the instant. One matching rule for both, so the
     `#1` suffix a contested supply carries is handled in one place."""
-    from qa_tools.common import supply_files
+    supply = supply_received_at_key(dataset_id, key)
+    if supply is None:
+        return None
+    return next((r.get("slot") for r in filings_of(dataset_id)
+                 if r.get("supply_id") == supply), None)
 
-    # THE ARRIVAL'S OWN SUPPLY - its plain id, or a pair's `#1` - never a
-    # settled pair's `#2`, which may be filed elsewhere (REQ-PIPE-193
-    # criterion 13). One rule, shared with recorded_arrival_at().
+
+def supply_received_at_key(dataset_id: str, key: str) -> str | None:
+    """The supply whose OWN receipt carries this arrival key - one rule for
+    period_for_key() and recorded_arrival_at().
+
+    BY THE RECEIPT, NOT THE ID (REQ-PIPE-193 criterion 13, post-build-review
+    #170): a settled pair's supply records its own file's receipt on its
+    runs, and when the later file is chosen - or the second is re-filed -
+    that receipt's key is not the staging key its id carries. The one
+    receipt view answers; an id whose staging key matches (its plain form
+    or a pair's `#1`) is the fallback for a supply with no receipt row."""
+    from qa_tools.common import asset_time, supply_files
+
+    with _connect("mothman:filing-read") as conn:
+        rows = conn.execute(
+            f"SELECT supply_id, received_at, received_instant FROM {RECEIPT} "
+            "WHERE dataset_id = ?", [dataset_id]).fetchall()
+    matched = []
+    for supply, text, instant in rows:
+        try:
+            at = datetime.fromisoformat(text) if text else instant
+        except ValueError:
+            at = instant
+        if at is not None and asset_time.arrival_key(at) == key:
+            matched.append(supply)
+    if matched:
+        # Two supplies on one instant is a pair whose `#1` has not been
+        # settled - the arrival's own supply is the first.
+        return min(matched, key=lambda s: (supply_files.ordinal_of(s) not in ("", "1"), s))
     for record in filings_of(dataset_id):
         supply = record.get("supply_id") or ""
         if (supply_files.staging_key_of(supply) == key
                 and supply_files.ordinal_of(supply) in ("", "1")):
-            return record.get("slot")
+            return supply
     return None
 
 
@@ -765,15 +795,8 @@ def recorded_arrival_at(dataset_id: str, received_at) -> "RecordedArrival | None
     """
     from qa_tools.common import asset_time
 
-    from qa_tools.common import supply_files
-
-    key = asset_time.arrival_key(received_at)
-    for record in filings_of(dataset_id):
-        supply = record.get("supply_id") or ""
-        if (supply_files.staging_key_of(supply) == key
-                and supply_files.ordinal_of(supply) in ("", "1")):
-            return recorded_arrival(dataset_id, supply)
-    return None
+    supply = supply_received_at_key(dataset_id, asset_time.arrival_key(received_at))
+    return recorded_arrival(dataset_id, supply) if supply else None
 
 
 def _filled_at(conn, dataset_id: str, supply_id: str, slot: str | None):

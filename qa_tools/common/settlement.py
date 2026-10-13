@@ -61,6 +61,11 @@ class PairFile:
     refused: bool
 
 
+class Changed(decision_log.DecisionRefused):
+    """What a settlement does changed between its warning and the lock
+    (criterion 18) - the terminal shows it as it stands now and asks again."""
+
+
 @dataclass(frozen=True)
 class Answer:
     """What a person said one file is."""
@@ -149,17 +154,52 @@ def refused_before_asking(conn, dataset_id: str, supply: str) -> str | None:
     supply is not an open pair - or None."""
     from qa_tools.common import supply_files
 
+    from qa_tools.common import hierarchy
+
+    name = hierarchy.dataset(dataset_id).dataset_name
     if supply_files.open_contest(conn, dataset_id, supply) is None:
-        return (f"{supply} is not a pair of files waiting to be settled - two files for "
-                f"one table whose contest is still open. Nothing was recorded.")
+        settled = conn.execute(
+            f"SELECT actor, effective_at FROM {decision_log.TABLE} WHERE dataset_id = ? "
+            "AND supply = ? AND action = ? ORDER BY id DESC LIMIT 1",
+            [dataset_id, supply_files.pair_supply(supply), decision_log.CHOOSE_FILE]
+        ).fetchall()
+        if settled:
+            # WHO AND WHEN - the question a person asks next (#170).
+            actor, when = settled[0]
+            return (f"These two files for {name} were already settled, by {actor} on "
+                    f"{str(when)[:16].replace('T', ' ')}. Nothing was recorded.")
+        return (f"No pair of files for {name} is waiting to be settled here - two files "
+                f"for one table whose contest is still open. Nothing was recorded.")
     found = supply_files.resolve(conn, dataset_id, supply_files.pair_supply(supply))
     if found is None or not found.period:
         # A PAIR HELD IN NO PERIOD has none to settle in - a settlement names
         # the period the pair was filed to (criterion 8).
-        return (f"{supply} arrived when no period of {dataset_id} was open, so the pair is "
-                f"held and filed to no period - there is none to settle it in. Nothing was "
-                f"recorded.")
+        return (f"These two files arrived when no period of {name} was open, so the pair "
+                f"is held and filed to no period - there is none to settle it in. Nothing "
+                f"was recorded.")
     return None
+
+
+def open_pair_in(conn, dataset_id: str, period: str, *, besides: str) -> str | None:
+    """Why a settled file cannot go into `period`, where it holds ANOTHER
+    pair still waiting to be settled - or None. Going in would supersede
+    that pair, which a person cannot do to an open pair directly either
+    (criterion 25; Keith, 2026-10-13, post-build-review #170)."""
+    from qa_tools.common import dataset_blockers, supply_files
+
+    waiting = []
+    for blocker in dataset_blockers.contests(conn):
+        if (blocker.dataset_id != dataset_id or not blocker.is_open
+                or blocker.supply == supply_files.pair_supply(besides)):
+            continue
+        found = supply_files.resolve(conn, dataset_id, blocker.supply)
+        if found is not None and found.period == period:
+            waiting.append(" and ".join(blocker.files))
+    if not waiting:
+        return None
+    return (f"{period} has two files of its own waiting to be settled - "
+            f"{'; '.join(waiting)}. Settle that pair first, at "
+            f"'{supply_files.where_to_settle(dataset_id)}', or name another period.")
 
 
 def offered(file: PairFile) -> tuple[str, ...]:
@@ -246,6 +286,9 @@ def plan(conn, *, dataset_id: str, supply: str, answers: list[Answer]) -> Plan:
                 raise decision_log.DecisionRefused(
                     f"nothing was expected from {dataset_id} for {a.to_period}: it is "
                     f"inherited. Un-inherit it first, or re-file to another period.")
+            blocked = open_pair_in(conn, dataset_id, a.to_period, besides=pair)
+            if blocked:
+                raise decision_log.DecisionRefused(f"{a.filename} cannot be re-filed: {blocked}")
             fp = replace(fp, displaced=tuple(supersession.waiting_in(
                 conn, dataset_id, a.to_period, besides=pair)))
         elif a.outcome == SUPPLY:
@@ -257,6 +300,10 @@ def plan(conn, *, dataset_id: str, supply: str, answers: list[Answer]) -> Plan:
             else:
                 verdict = filing._judged_for(dataset_id, judged.slot, f.received_at)
                 moved = judged.slot != period
+                blocked = moved and open_pair_in(conn, dataset_id, judged.slot, besides=pair)
+                if blocked:
+                    raise decision_log.DecisionRefused(
+                        f"{f.filename}'s own receipt files it to {judged.slot}, and {blocked}")
                 fp = replace(fp, period_after=judged.slot,
                              classification_after=verdict.classification,
                              new_filing=moved or verdict.classification != classification,
@@ -304,7 +351,7 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
             decision_log.lock_slot(conn, p.dataset_id, slot)
         now = plan(conn, dataset_id=p.dataset_id, supply=p.pair, answers=answers)
         if _what_it_does(now) != _what_it_does(p):
-            raise decision_log.DecisionRefused(
+            raise Changed(
                 f"What settling the two files for {p.dataset_id} {p.period} would do has "
                 f"changed since it was worked out - something was filed or decided "
                 f"meanwhile. Nothing was done; ask again to see it as it stands now.")
@@ -374,7 +421,7 @@ def _apply_file(conn, p: Plan, f: FilePlan, *, entry_id: int, reason: str,
                                     delivery=p.delivery, decision_id=refile_id,
                                     received_at=f.file.received_at,
                                     branch="refiled-by-a-person")
-        _displace(conn, p, f, f.to_period, common)
+        _displace(conn, p, f, f.to_period, common, entry_id)
         return recheck.owe(conn, dataset_id=p.dataset_id, supply_id=f.supply_id,
                            decision_id=entry_id)
     # THIS PERIOD'S SUPPLY.
@@ -390,12 +437,13 @@ def _apply_file(conn, p: Plan, f: FilePlan, *, entry_id: int, reason: str,
                             delivery=p.delivery, decision_id=entry_id,
                             received_at=f.file.received_at)
     if f.period_after != p.period:
-        _displace(conn, p, f, f.period_after, common)
+        _displace(conn, p, f, f.period_after, common, entry_id)
     return recheck.owe(conn, dataset_id=p.dataset_id, supply_id=f.supply_id,
                        decision_id=entry_id)
 
 
-def _displace(conn, p: Plan, f: FilePlan, period: str, common: dict) -> None:
+def _displace(conn, p: Plan, f: FilePlan, period: str, common: dict,
+              entry_id: int) -> None:
     """A file going into another period supersedes the versions waiting
     there, each its own rule-actor entry (REQ-PIPE-141 criterion 6)."""
     from qa_tools.common import supersession
@@ -405,4 +453,5 @@ def _displace(conn, p: Plan, f: FilePlan, period: str, common: dict) -> None:
             conn, agency_id=common["agency_id"], collection_id=common["collection_id"],
             dataset_id=p.dataset_id, supply=supply, period=period, by=f.supply_id,
             effective_at=common["effective_at"],
-            reason=f"{f.supply_id} was settled into {period} in its place")
+            reason=f"{f.supply_id} was settled into {period} in its place",
+            caused_by_decision=entry_id)

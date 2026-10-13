@@ -189,7 +189,7 @@ def supersede_earlier(conn, *, agency_id: str, collection_id: str, dataset_id: s
 
 def supersede_by_rule(conn, *, agency_id: str, collection_id: str, dataset_id: str,
                       supply: str, period: str, by: str, effective_at: str,
-                      reason: str) -> None:
+                      reason: str, caused_by_decision: int | None = None) -> None:
     """One waiting version set aside by the rule in favour of `by` - its own
     decision, its tables moved to the period's superseded schema in the
     caller's transaction. Shared by receipt order (criterion 1) and by a
@@ -200,7 +200,7 @@ def supersede_by_rule(conn, *, agency_id: str, collection_id: str, dataset_id: s
         agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
         action=decision_log.SUPERSEDE, supply=supply, actor=RULE_ACTOR,
         actor_kind=decision_log.RULE, effective_at=effective_at, from_slot=period,
-        reason=reason, superseded_by=by)
+        reason=reason, superseded_by=by, caused_by_decision=caused_by_decision)
     with decision_log.apply_decision(conn, decision):
         supply_db.create_if_absent(conn, f'CREATE SCHEMA IF NOT EXISTS "{target}"')
         for physical in tables:

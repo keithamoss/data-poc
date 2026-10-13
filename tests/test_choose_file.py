@@ -12,7 +12,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from pair_support import DS, Pair, _at
+from pair_support import DS, TABLE, Pair, _at
 from qa_tools.common import dataset_blockers, decision_log, filing
 from qa_tools.common import filing_decisions as fd
 from qa_tools.common import (people, qa_store, recheck, rejection, settlement,
@@ -229,7 +229,7 @@ class TestTheRules:
                               (f"birth_registrations_{day}-1.csv", _at(day, "13:45"))])
         one, two = (n for n, _ in p.files)
         p.settle(conn, actor, (one, "supply"), (two, "supersede"))
-        with pytest.raises(decision_log.DecisionRefused, match="not a pair of files waiting"):
+        with pytest.raises(decision_log.DecisionRefused, match="already settled, by"):
             p.settle(conn, actor, (one, "supply"), (two, "supersede"), acknowledged=None)
 
 
@@ -245,8 +245,8 @@ class TestTheWarning:
             operation=fd.CHOOSE_FILE, dataset_id=DS, actor=actor, reason="",
             period=p.period, supply=p.pair,
             file_outcomes=p.answers((early, "reject"), (late, "supply"))))
-        text = "\n".join(found.lines)
-        assert "own receipt is the supply's" in text
+        text = "\n".join((*found.lines, *found.notes))
+        assert "own receipt is the supply's" in "\n".join(found.lines)
         assert f"{late} against {p.period}" in text
         assert "promoted by the promotion gate with no further decision" in text
 
@@ -371,3 +371,118 @@ class TestTheRunsAfterASettlement:
         assert "run 1 of 1 - a.csv for P" in text
         assert "The settlement is recorded" in text and "Process what has arrived" in text
         assert "settle again" not in text and "settle it" not in text
+
+
+class TestCriticFindingsOn193:
+    """post-build-review #170 - each failed before its fix."""
+
+    def _pair(self, conn, day, second="-resend", at=("13:40", "13:50")):
+        return Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, at[0])),
+                                (f"birth_registrations_{day}{second}.csv", _at(day, at[1]))])
+
+    def test_the_runs_are_listed_but_need_no_key(self, conn, actor, day):
+        """Keith: every settlement owes runs, so listing them is not a side
+        effect to acknowledge - a plain supply + reject goes through with
+        --yes alone."""
+        p = self._pair(conn, day)
+        one, two = (n for n, _ in p.files)
+        found = fd.consequences(conn, fd.Request(
+            operation=fd.CHOOSE_FILE, dataset_id=DS, actor=actor, reason="r",
+            period=p.period, supply=p.pair,
+            file_outcomes=p.answers((one, "supply"), (two, "reject"))))
+        assert found.key == ""
+        assert any(f"{one} against {p.period}" in n for n in found.notes)
+        assert p.settle(conn, actor, (one, "supply"), (two, "reject"),
+                        acknowledged=None).changed
+
+    def test_a_refile_into_a_period_holding_an_open_pair_is_refused(self, conn, actor, day):
+        """Keith: as the plain supersede of an open pair is (criterion 25)."""
+        nxt = day + timedelta(days=1)
+        other = self._pair(conn, nxt)
+        p = self._pair(conn, day)
+        one, two = (n for n, _ in p.files)
+        with pytest.raises(decision_log.DecisionRefused, match="two files") as got:
+            p.settle(conn, actor, (one, "supply"), (two, "refile", other.period),
+                     acknowledged=None)
+        for name, _ in other.files:
+            assert name in str(got.value)
+        assert _open(conn, other) and _open(conn, p)
+
+    def test_a_rejected_file_is_promoted_back(self, conn, actor, day):
+        """Criteria 3 and 26, and REQ-PIPE-075 criterion 9: a rejection is
+        reversed by promoting the supply back, from the rejected schema."""
+        p = self._pair(conn, day)
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "reject"), (two, "reject"))
+        request = fd.Request(operation=fd.PROMOTE, dataset_id=DS, actor=actor,
+                             reason="it was the right file after all", period=p.period,
+                             supply=p.second, confirmed=True)
+        request = fd.Request(**{**request.__dict__,
+                                "acknowledged": fd.consequences(conn, request).key or None})
+        fd.apply(request, effective_at=_at(day + timedelta(days=2), "10:00").isoformat(),
+                 conn=conn)
+        assert decision_log.held(conn, DS, p.period).holder == p.second
+        assert _schema_of(conn, p.table[two]) != supply_db.REJECTED_SCHEMA
+        assert _schema_of(conn, p.table[one]) == supply_db.REJECTED_SCHEMA
+
+    def test_a_later_file_chosen_is_found_by_its_own_receipt(self, conn, actor, day):
+        """Criterion 13: the dashboard finds a run's arrival by the receipt
+        the run records, which for a settled supply is its own file's."""
+        early = f"birth_registrations_{day}.csv"
+        late = f"birth_registrations_{day}-resend.csv"
+        p = Pair(conn, day, [(early, _at(day, "13:40")), (late, _at(day, "16:30"))])
+        p.settle(conn, actor, (early, "reject"), (late, "supply"))
+        received = p.files[1][1]
+        assert filing.period_of(DS, received) == p.period
+        assert filing.recorded_arrival_at(DS, received).supply_id == p.pair
+
+    def test_a_refiled_second_file_is_found_by_its_own_receipt(self, conn, actor, day):
+        nxt = day + timedelta(days=1)
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{nxt}.csv", _at(day, "13:45"))])
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()))
+        assert filing.period_of(DS, p.files[1][1]) == nxt.isoformat()
+        assert filing.period_of(DS, p.files[0][1]) == p.period
+
+    def test_a_version_a_settlement_displaces_names_it_as_the_cause(self, conn, actor, day):
+        """Criterion 8: every entry a settlement makes names it."""
+        nxt = day + timedelta(days=1)
+        waiting = self._pair(conn, nxt)
+        w1, w2 = (n for n, _ in waiting.files)
+        waiting.settle(conn, actor, (w1, "supply"), (w2, "reject"))
+        p = self._pair(conn, day)
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()))
+        (choose,) = [d for d in _entries(conn, p.pair) if d["action"] == "choose-file"]
+        (displaced,) = [d for d in _entries(conn, waiting.pair) if d["action"] == "supersede"]
+        cause = conn.execute(f"SELECT caused_by_decision FROM {decision_log.TABLE} "
+                             "WHERE id = ?", [displaced["id"]]).fetchall()[0][0]
+        assert cause == choose["id"]
+
+    def _hold(self, conn, supply):
+        from qa_tools.common import supply_holds
+
+        supply_holds.raise_hold(conn, dataset_id=DS, supply_id=supply,
+                                kind=supply_holds.ASSIGNMENT_RULE,
+                                reason={"unavailable": []}, raised_by="pytest")
+
+    def test_a_decision_about_one_file_leaves_the_other_files_hold(self, conn, day):
+        """Criterion 13: a hold is one supply's, never its arrival's."""
+        from qa_tools.common import supply_holds
+
+        p = self._pair(conn, day)
+        self._hold(conn, p.pair)
+        assert supply_holds.resolve_for_supply(conn, dataset_id=DS, supply=p.second,
+                                               decision_id=1) == ()
+        assert p.pair in {h.supply_id for h in supply_holds.outstanding(conn, dataset_id=DS)}
+
+    def test_one_files_hold_does_not_withhold_the_other_files_run(self, conn, day):
+        from qa_tools.common import supply_holds
+
+        p = self._pair(conn, day)
+        self._hold(conn, p.pair)
+        assert TABLE not in supply_holds.held_tables(conn, arrival_key=p.key,
+                                                     supply=p.second)
+        assert TABLE in supply_holds.held_tables(conn, arrival_key=p.key, supply=p.pair)
+        assert TABLE in supply_holds.held_tables(conn, arrival_key=p.key)

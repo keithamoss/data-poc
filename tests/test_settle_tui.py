@@ -167,6 +167,19 @@ class TestTheFlagForm:
         flat = "".join(ch for ch in got.output if ch not in "│╭╮╰╯─ \n")
         assert f"--file-outcome'{two}=<supply|refile:<period>|reject|supersede>'" in flat
 
+    def test_a_missing_reason_says_so_with_the_real_filenames(self, conn, day):
+        """#170: not the generic template."""
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:45"))])
+        one, two = (n for n, _ in p.files)
+        got = CliRunner().invoke(supply_cli.supply_group, [
+            "decide", "--operation", "choose-file", "--dataset", DS, "--period", p.period,
+            "--file-outcome", f"{one}=supply", "--file-outcome", f"{two}=reject", "--yes"])
+        assert got.exit_code != 0
+        flat = "".join(ch for ch in got.output if ch not in "│╭╮╰╯─ \n")
+        assert "--reason" in flat and "missing" in flat
+        assert f"--file-outcome'{one}=supply'" in flat
+
     def test_it_settles_with_yes_and_the_key(self, conn, day, monkeypatch):
         from cli import filing_tui
         from qa_tools.common import people
@@ -207,3 +220,160 @@ class TestThePlainRejectOnTheFlagRoute:
             assert f"--file-outcome '{name}=" in got.output
         assert not [d for d in decision_log.decisions_for(conn, DS) if d["supply"] == p.pair]
 
+
+
+class TestCriticFindingsOn193:
+    """post-build-review #170 - each failed before its fix."""
+
+    def test_the_queue_says_when_a_settled_supplys_own_file_arrived(self, conn, day):
+        """Criterion 10: the later file chosen, the queue's Arrived column is
+        its receipt, not the arrival's first file's."""
+        from cli import filing_tui
+        from qa_tools.common import people
+        from qa_tools.common import filing_decisions as fd
+
+        early, late = f"birth_registrations_{day}.csv", f"birth_registrations_{day}-resend.csv"
+        p = Pair(conn, day, [(early, _at(day, "13:30")), (late, _at(day, "13:45"))])
+        request = fd.Request(
+            operation=fd.CHOOSE_FILE, dataset_id=DS,
+            actor=people.person_by_email(REAL_PERSON), reason="the resend is right",
+            period=p.period, supply=p.pair,
+            file_outcomes=(settlement.Answer(early, settlement.REJECT),
+                           settlement.Answer(late, settlement.SUPPLY)))
+        request = fd.Request(**{**request.__dict__,
+                                "acknowledged": fd.consequences(conn, request).key or None})
+        fd.apply(request, effective_at=_at(day + timedelta(days=1), "09:00").isoformat(),
+                 conn=conn)
+        assert filing_tui.arrived(p.pair) == f"{day} 13:45"
+
+    def test_a_filename_is_never_cut_in_the_summary(self):
+        from io import StringIO
+
+        from rich.console import Console
+
+        long = "birth_registrations_2026-10-07-resend-from-the-supplier.csv"
+        files = [settlement.PairFile("birth_registrations_2026-10-07.csv", _files()[0].received_at,
+                                     "t__1__1", False),
+                 settlement.PairFile(long, _files()[1].received_at, "t__1__2", False)]
+        out = StringIO()
+        Console(file=out, width=80).print(settle_tui.summary_table(
+            files, [settlement.Answer(files[0].filename, "supply"),
+                    settlement.Answer(long, "reject")], "2026-10-07"))
+        # FOLDED onto further lines of its own column - so its END, the part
+        # that tells two files apart, is on screen, and nothing is elided.
+        shown = out.getvalue()
+        assert "…" not in shown
+        assert "ier.csv" in shown or "supplier.csv" in shown
+
+
+class TestCriticFindingsOn193Screens:
+    """post-build-review #170, the screens - each failed before its fix."""
+
+    _script = TestTheScreens._script
+
+    def test_a_partial_flag_answer_is_kept(self, monkeypatch):
+        """Criterion 15: only the missing file is asked about."""
+        asked = self._script(monkeypatch, ["reject", "Record"], ["r"])
+        answers, _ = settle_tui.collect(
+            "ds", "P", _files(), given=[settlement.Answer("a.csv", settlement.SUPPLY)])
+        assert [m for m, _ in asked] == ["What is b.csv?", "Is that right?"]
+        assert [a.outcome for a in answers] == ["supply", "reject"]
+
+    def test_back_on_the_first_file_goes_back_to_the_slot(self, monkeypatch):
+        """Criterion 24: to the slot's operations, not out of it."""
+        self._script(monkeypatch, [None])
+        assert settle_tui.collect("ds", "P", _files()) is settle_tui.BACK
+
+    def test_a_blank_refile_target_asks_the_file_again(self, monkeypatch):
+        asked = self._script(monkeypatch, ["re-file", "the supply", "reject", "Record"], ["r"])
+        monkeypatch.setattr(settle_tui, "_target", lambda *a, **k: None)
+        answers, _ = settle_tui.collect("ds", "P", _files())
+        assert [m for m, _ in asked][:2] == ["What is a.csv?", "What is a.csv?"]
+        assert [a.outcome for a in answers] == ["supply", "reject"]
+
+    def test_a_combination_the_plan_refuses_is_said_before_the_reason(self, monkeypatch):
+        """Criteria 4 and 19: refused before the reason is asked, and the
+        second file asked again with the first's answer kept."""
+        asked = self._script(monkeypatch, ["the supply", "reject", "re-file", "Record"], ["r"])
+        monkeypatch.setattr(settle_tui, "_target", lambda *a, **k: "Q")
+        refusals = iter(["both files would be filed to P", None])
+        answers, reason = settle_tui.collect("ds", "P", _files(),
+                                             check=lambda answers: next(refusals))
+        assert [m for m, _ in asked].count("What is b.csv?") == 2
+        assert [a.outcome for a in answers] == ["supply", "refile"] and reason == "r"
+
+
+class TestTheTargetPrompt:
+    """Criterion 19 and #170: a target holding another open pair is refused
+    and asked again."""
+
+    def test_a_period_holding_an_open_pair_is_asked_again(self, conn, monkeypatch, capsys):
+        from qa_tools.common import slots
+
+        period = "2026-11-02"
+        first, second = (slots.relative_period(DS, period, 1),
+                         slots.relative_period(DS, period, 2))
+        answers = iter([first, second])
+        monkeypatch.setattr(common, "require_tty", lambda *a, **k: None)
+        monkeypatch.setattr(common, "_ask", lambda *a, **k: next(answers))
+        monkeypatch.setattr(settlement, "open_pair_in",
+                            lambda conn, ds, p, besides: (f"{p} has two files of its own"
+                                                          if p == first else None))
+        assert settle_tui._target(DS, period, "f.csv", None, besides=f"{DS}@1#1") == second
+        assert f"{first} has two files of its own" in capsys.readouterr().out
+
+
+class TestAChangedConsequenceIsShownAndAskedAgain:
+    """Criterion 18 and #170: what changed is said, and the person asked
+    again - not left at a refusal."""
+
+    def test_it_asks_again_with_the_new_warning(self, monkeypatch):
+        from cli import filing_tui
+        from qa_tools.common import filing_decisions as fd
+
+        first, now = fd.Consequences(lines=("A",)), fd.Consequences(lines=("B",))
+        shown = iter([first, now])
+        applied = []
+
+        def apply(request, **k):
+            applied.append(request.acknowledged)
+            if len(applied) == 1:
+                raise fd.ConsequencesNotAcknowledged(now, given=request.acknowledged,
+                                                     terminal_only=True)
+            return fd.Outcome(operation=fd.CHOOSE_FILE, dataset_id="ds", period="P",
+                              changed=True, message="ok")
+
+        monkeypatch.setattr(settlement, "refused_before_asking", lambda *a: None)
+        monkeypatch.setattr(settlement, "pair_files", lambda *a: ("d", "P", _files()))
+        monkeypatch.setattr(filing_tui, "open_log", lambda: _NullConn())
+        monkeypatch.setattr(filing_tui, "_consequences", lambda request: next(shown))
+        monkeypatch.setattr(fd, "settlement_plan", lambda conn, request: _NoRuns())
+        monkeypatch.setattr(fd, "apply", apply)
+        monkeypatch.setattr(common, "confirm_change", lambda *a, **k: True)
+        monkeypatch.setattr(settle_tui, "_run_what_it_owed", lambda *a, **k: {})
+        monkeypatch.setattr(filing_tui, "_follow_up", lambda *a, **k: None)
+        monkeypatch.setattr(fd, "reconcile_after", lambda *a, **k: None)
+        monkeypatch.setattr(settle_tui.hierarchy, "dataset", lambda ds: _DS())
+        got = settle_tui.settle("ds", "P", "ds@1#1", reason="r", summary=False,
+                                answers=[settlement.Answer("a.csv", "supply"),
+                                         settlement.Answer("b.csv", "reject")],
+                                actor={"email": "x@example.org", "name": "X"})
+        assert got is not None and got.changed
+        assert applied == [first.key, now.key]
+
+
+class _NullConn:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _NoRuns:
+    runs = ()
+
+
+class _DS:
+    dataset_name = "Birth Registrations"
+    collection_id = "civil-registration"

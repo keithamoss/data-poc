@@ -31618,6 +31618,10 @@ requirements:
     - 'THE SLOT STATE HELD BECAME TWO_FILES ("two files arrived - say what each file is"), and the queue offers only settle on it - which is REQ-PIPE-194 criteria 4 (in part), 5 and 9, built here because the resolver made them one change. The rest of 194 is its own build.'
     - 'THE OWED RUNS ARE COMPUTED FROM THE PLAN BEFORE APPLY, so the confirmation panel and the progress display name the same runs the transaction owes (criteria 17 and 20); a failed run is said to be owed and is picked up by Process what has arrived, never retried by re-settling.'
     - 'A PAIR WITH NO PERIOD (held before it was filed) IS REFUSED BEFORE ASKING (criterion 5): found by the real-tools test, which first produced a misleading message about a held pair.'
+    - 'POST-BUILD REVIEW #170 (Keith, 2026-10-13): a re-file - or a supply''s own receipt - into a period holding ANOTHER open pair is REFUSED, as a plain supersede of an open pair is (criterion 25), and the target prompt asks again. REJECTED allowing it with a warning naming the pair.'
+    - 'THE QA RUNS ARE LISTED, NEVER KEYED (Keith, 2026-10-13, #170): Consequences.notes are shown in the panel but left out of the acknowledgement key, so a plain settlement goes through the flag form with --yes alone. Only a real side effect (a moved or held supply, a changed verdict, a superseded version) needs --acknowledge.'
+    - 'A REJECTED FILE IS PROMOTED BACK FROM THE REJECTED SCHEMA (Keith, 2026-10-13, #170): filing_decisions._promotable looks there when the supply has nothing staged - a gap predating 193 that left REQ-PIPE-075 criterion 9 unreachable on every route.'
+    - 'A SUPPLY IS FOUND BY ITS OWN RECEIPT and a hold matched by its supply (Keith: both in 193, #170): filing.supply_received_at_key reads the receipt view, so the later file''s runs and the queue''s Arrived column carry its own receipt; supply_holds matches a hold by the supply, never its arrival key alone, for the run''s own dataset.'
     linked_tests:
     - tests/test_choose_file.py
     - tests/test_choose_file_runs.py
@@ -31641,6 +31645,7 @@ requirements:
     - cli/supply.py::_settle_from_flags
     evidence:
     - '2026-10-13: tests/test_choose_file_runs.py settles a REAL two-file Birth Registrations delivery, recognised, staged and run by the per-arrival lifecycle, as supply plus re-file to the next day; both owed runs complete under dbt-core, Soda Core, datacontract-cli and Evidently, each recorded under its own supply''s run id with the arrival''s run_index, and each reads only its own staged table. Mutating the overlay to read the arrival''s tables by key makes it fail.'
+    - '2026-10-13: post-build-review #170 fixes, each a failing test first - tests/test_choose_file.py TestCriticFindingsOn193 (runs need no key, re-file over an open pair refused, a rejected file promoted back, own-receipt lookups, displaced versions caused by the settlement, holds by supply) and tests/test_settle_tui.py TestCriticFindingsOn193, TestCriticFindingsOn193Screens, TestTheTargetPrompt, TestAChangedConsequenceIsShownAndAskedAgain.'
     - '2026-10-13: tests/test_choose_file.py covers every decision path on a seeded pair - duplicate send, the later file chosen, the next day''s file sent early, neither, a refused file, the rules of criterion 4, the warning and its recompute, atomicity, the GitHub refusal, criterion 22 and the contest closing - and tests/test_settle_tui.py the screens, Back, the summary and the flag form.'
     unmet_criteria:
     - criterion: Criterion 28 - proven end to end on a bootstrapped history by REQ-GEN-196's planted pairs (TS-68 to TS-74).

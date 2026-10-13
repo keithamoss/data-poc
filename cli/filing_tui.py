@@ -459,7 +459,16 @@ def arrived(supply: str | None) -> str:
     at any terminal width, and what a person reads it for is when the
     thing turned up.
     """
+    from qa_tools.common import asset_time, filing, supply_files
+
     key = filing_queue.arrival_key_of(supply or "")
+    # ITS OWN FILE'S RECEIPT where it has one (REQ-PIPE-193 criterion 10,
+    # post-build-review #170): a settled pair's supply may be the LATER
+    # file, whose receipt is not the key its id carries.
+    if supply and "@" in supply:
+        own = filing.received_at_of(supply_files.dataset_of(supply), supply)
+        if own is not None:
+            key = asset_time.arrival_key(own)
     if len(key) >= 12 and key.isdigit():
         return f"{key[0:4]}-{key[4:6]}-{key[6:8]} {key[8:10]}:{key[10:12]}"
     return key or "-"
@@ -621,14 +630,20 @@ def _settle_on(state: slot_state.SlotState) -> None:
         promoted = decision_log.promoted_into(conn, state.dataset_id, state.period)
         _delivery, _period, files = settlement.pair_files(conn, state.dataset_id, state.supply)
     both = settle_tui.REJECT_BOTH_KEEPS if promoted else settle_tui.REJECT_BOTH
-    picked = common.select(f"{state.dataset_id} {state.period} - two files arrived. What "
-                           f"are you recording?", [settle_tui.SETTLE, both],
-                           flag_hint=_FLAG_HINT)
-    if picked is None:
-        return
-    answers = ([settlement.Answer(f.filename, settlement.REJECT) for f in files]
-               if picked == both else None)
-    settle_tui.settle(state.dataset_id, state.period, state.supply, answers=answers)
+    name = hierarchy.dataset(state.dataset_id).dataset_name
+    # BACK ON THE FIRST FILE'S QUESTION RETURNS HERE (criterion 24, #170).
+    while True:
+        picked = common.select(f"{name} {state.period} - two files arrived. What are you "
+                               f"recording?", [settle_tui.SETTLE, both],
+                               flag_hint=_FLAG_HINT)
+        if picked is None:
+            return
+        answers = ([settlement.Answer(f.filename, settlement.REJECT) for f in files]
+                   if picked == both else None)
+        got = settle_tui.settle(state.dataset_id, state.period, state.supply,
+                                answers=answers)
+        if got is not settle_tui.BACK:
+            return
 
 
 def queue_flow(collection_id: str) -> None:

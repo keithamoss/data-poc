@@ -8315,3 +8315,65 @@ twice. It deliberately did not re-find the `TypeError`.
     - the real periods routing;
     - the ambiguity and cannot-be-timed branches;
     - parity with the replay's period-scoped timing.
+
+170. **[done, 2026-10-13]** **[Pipeline & publishing]** **The
+    delivery critic and CLI UX critic on REQ-PIPE-193 as built
+    (cbccb0b).** Every claim below was checked against the code before it
+    was written here. Keith decided four (2026-10-13); the rest are minor
+    and fixed test-first.
+    - **Keith's calls.**
+      - Re-filing a settled file into a period that holds ANOTHER open
+        pair quietly superseded that pair, named only by supply id.
+        REFUSE IT, as the plain supersede of an open pair is refused
+        (criterion 25): the target prompt says why and asks again.
+      - The flag form needed `--acknowledge` for every settlement that
+        made a supply, because the line listing the QA runs counted as a
+        consequence. The runs are LISTED but carry no key; only a real
+        side effect (moved, held, superseded) needs one. The refusal's
+        "more than its own slot" and "ticket comment" wording, both wrong
+        for a terminal-only decision, go with it.
+      - A rejected file "can be promoted back" (criteria 3, 26; built
+        REQ-PIPE-075 criterion 9), but PROMOTE only looked in staging -
+        no route could reverse a rejection, a gap predating 193 that
+        refiling's own refusal also advised. FIX PROMOTE to bring a
+        rejected supply back from the rejected schema, on every route.
+      - Criterion 13 gaps, BOTH IN 193: `filing.period_of`,
+        `period_for_key`, `recorded_arrival_at` and the queue's Arrived
+        column read the arrival key, not a settled supply's own receipt
+        (the later file's runs built as "arrival unknown"; the queue
+        showed 13:30 for a 13:45 file); and holds were matched by arrival
+        key alone (latent - no BDM receipt is held today).
+    - **Defects, minor.** Displaced versions not caused by the choose-file
+      entry (criterion 8); a changed consequence refused without saying
+      what changed or asking again (18); a partial `--file-outcome` at a
+      terminal dropped the given answer (15); a refused load named by the
+      database's filename order, not Python's (file-order NFR); a spare
+      copy where the supply moves, or both files landing in one period,
+      refused only after the reason (4, 19); Back on the first file left
+      the slot, and a blank re-file target dropped the settlement (24);
+      filenames truncated in the summary table at 80-100 columns, the
+      `-resend` that tells them apart cut (3, 24).
+    - **Polish.** Unavailable options' reasons cut off; the run-owed panel
+      showing an exception class, ids and "its earlier verdict stands"
+      for a supply never judged; the pointer's "(listed first)" and
+      collection name not matching the menus; the missing-`--reason`
+      refusal using placeholders; dataset and supply ids on TUI screens;
+      grammar ("supply/supplies", "run(s)").
+    - **Fixed, each with a failing test first** (tests/test_choose_file.py
+      `TestCriticFindingsOn193`; tests/test_settle_tui.py
+      `TestCriticFindingsOn193`, `...Screens`, `TestTheTargetPrompt`,
+      `TestAChangedConsequenceIsShownAndAskedAgain`): all four of Keith's
+      calls and every minor defect above; the ruled-out options' reasons,
+      the run-owed panel, the missing-`--reason` refusal, ids on the
+      slot prompt and the not-an-open-pair refusal (which now says who
+      settled it and when). F7's file order is fixed by sorting in Python;
+      NO FAILING TEST - this sandbox's C collation agrees with byte order,
+      so the defect cannot be reproduced here.
+    - **Left, and why.** The pointer's "(listed first)" and collection
+      NAME are signed criterion 16 wording while the collection picker
+      lists ids - which side moves is Keith's call, asked rather than
+      decided. The shared decision messages' "supply/supplies" and the
+      queue's date format belong to every decision, not to 193. The bare
+      `--- <run id> ---` line before each run comes from the orchestrator,
+      which every re-check prints.
+
