@@ -58,7 +58,13 @@ def _file(dataset_id, supply_id, slot, received_at):
 
 
 def _table_for(supply_id):
-    return "carers__" + supply_id.split("@")[-1]
+    """UNIQUE TO THIS TEST'S DATASET (post-build-review #167): named from the
+    supply's suffix alone, two tests on one worker both rejecting an `@2`
+    collided on `rejected.carers__2`, so the suite failed only when it shared
+    workers. The dataset id is a fresh uuid per test."""
+    dataset, suffix = supply_id.split("@")
+    tail = dataset.rsplit("-", 1)[-1]
+    return f"carers__{tail}_" + suffix.replace("-", "_").replace("#", "_")
 
 
 def _promote(conn, dataset_id, supply, period, at):

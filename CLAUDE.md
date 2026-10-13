@@ -870,7 +870,10 @@ Rough layout:
   as the history grew (one arrival at a time, 150 arrivals, knock-on
   re-runs, a census per run, file checks). See
   REQ-PIPE-188 to 192, which took a bootstrap from empty to 4m24s here
-  on 2026-10-12.
+  on 2026-10-12. Re-measured 2026-10-13 after REQ-GEN-195 and REQ-GEN-200
+  (TS-67's re-files and their re-checks): 4m42s from empty. REQ-GEN-196
+  (an 80-day Birth Registrations history) and REQ-GEN-199 will add to it -
+  re-measure after each, rather than estimate.
 
   So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
   than nineteen - 2,622 of 2,898 tests are in the fast half. The whole

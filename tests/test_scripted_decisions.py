@@ -265,3 +265,162 @@ class TestAScriptedDecisionsReCheckIsRun:
             total = conn.execute("SELECT count(*) FROM qa.dataset_stats").fetchone()[0]
         assert total, "the history records no run"
         assert rows == [], f"runs recorded without run_index: {[r[0] for r in rows]}"
+
+
+# ---------------------------------------------------------------------------
+# REQ-GEN-200: a scripted decision about a PERIOD that received no supply.
+# ---------------------------------------------------------------------------
+
+AGENCY, COLLECTION = "child-protection-family-support", "child-protection"
+
+
+def _period_script(**kw):
+    base = dict(scenario="TS-1", operation="substitute", dataset_id=DS, reason="scripted",
+                supply_index=None, after_hours=6, scope=sd.PERIOD, stands_on=-1)
+    base.update(kw)
+    return sd.Script(**base)
+
+
+class TestAPeriodScopedScriptIsValidated:
+    """Criteria 8 and 9, from configuration alone."""
+
+    def test_a_good_period_scoped_substitution_has_no_problems(self):
+        assert sd.problems([_period_script()], registered={"TS-1"}) == []
+
+    @pytest.mark.parametrize("kw,says", [
+        (dict(scope=None, stands_on=None, operation="promote"), "names neither a supply nor a period"),
+        (dict(supply_index=0), "names both a supply and `scope: period`"),
+        (dict(operation="promote", stands_on=None), "cannot be period-scoped"),
+        (dict(stands_on=None), "needs `stands_on:`"),
+        (dict(operation="de-substitute"), "only for a substitution"),
+        (dict(stands_on=0), "not before the period it fills"),
+        (dict(stands_on=2), "not before the period it fills"),
+        (dict(scope="slot"), "scope must be `period`"),
+    ])
+    def test_each_refusal_names_the_entry_and_what_to_change(self, kw, says):
+        found = sd.problems([_period_script(**kw)], registered={"TS-1"})
+        assert any(says in f and "decision 1 (TS-1)" in f for f in found), found
+
+    def test_an_absent_supply_is_not_read_as_supply_zero(self, tmp_path):
+        script = tmp_path / "s.yaml"
+        script.write_text("decisions:\n  - {scenario: TS-1, operation: promote, "
+                          f"dataset: {DS}, reason: r, after_hours: 1}}\n")
+        loaded = sd.load(script)
+        assert loaded[0].supply_index is None
+        assert any("names neither" in f for f in sd.problems(loaded, registered={"TS-1"}))
+
+    def test_every_existing_script_still_names_its_supply(self):
+        """Criterion 10: the nine committed scripts play unedited."""
+        loaded = sd.load()
+        assert loaded, "precondition: the committed script has entries"
+        assert all(s.supply_index is not None and s.scope is None for s in loaded)
+
+
+class TestTheRelativePeriodCountsTheDatasetsOwnPeriods:
+    """Criteria 3 and 4 (Keith, 2026-10-13): one resolver, the dataset's own
+    sequence - case-workers is delivered in February and August only."""
+
+    def test_case_workers_skips_the_quarter_it_owes_nothing_for(self):
+        from qa_tools.common import slots
+        assert slots.relative_period("cp-case-workers", "2024-Q3", -1) == "2024-Q1"
+        assert slots.relative_period("cp-clients", "2024-Q3", -1) == "2024-Q2"
+
+    def test_none_before_the_first_period_or_for_an_unknown_one(self):
+        from qa_tools.common import slots
+        first = slots.slots_for_dataset("cp-clients")[0].name
+        assert slots.relative_period("cp-clients", first, -1) is None
+        assert slots.relative_period("cp-clients", "no-such-period", -1) is None
+
+
+class TestAPeriodScopedDecisionIsPlayed:
+    """Criteria 1, 3, 5, 6, 7 and 11, against a real database. The calendar's
+    two lookups are pinned so the periods can be this test's own."""
+
+    DUE = datetime.fromisoformat("2026-05-01T01:00:00+00:00")
+
+    @pytest.fixture
+    def pinned(self, monkeypatch, period):
+        earlier = period + "-before"
+        monkeypatch.setattr(sd, "_due_at", lambda ds, p: self.DUE if p == period else None)
+        monkeypatch.setattr("qa_tools.common.slots.relative_period",
+                            lambda ds, p, off: earlier if (p, off) == (period, -1) else None)
+        return period, earlier
+
+    def _promoted(self, conn, period, received):
+        from qa_tools.common import promotion
+        supply, physical = _filed(conn, period, received)
+        promotion.promote(conn, agency_id=AGENCY, collection_id=COLLECTION, dataset_id=DS,
+                          supply=supply, period=period, physical_tables=[physical],
+                          actor="tester", actor_kind=dl.PERSON, effective_at=received)
+        return supply
+
+    def _player(self, scripts, period):
+        placements = {"TS-1": scenario_map.Placement(
+            scenario_id="TS-1", dataset=DS, supplies=(), period=period,
+            in_place_on="2026-05-02")}
+        return sd.Player("child-protection", scripts=scripts, placements=placements)
+
+    def test_a_substitution_is_timed_from_the_period_due_and_stands_on_its_supply(
+            self, conn, pinned):
+        period, earlier = pinned
+        stood = self._promoted(conn, earlier, "2026-02-01T01:00:00+00:00")
+        assert self._player([_period_script(after_hours=6)], period).finish() == 1
+        row = conn.execute(
+            f"SELECT action, to_slot, stands_on, supply, actor_kind, effective_at FROM {dl.TABLE} "
+            "WHERE dataset_id = ? AND to_slot = ? AND action = 'substitute'",
+            [DS, period]).fetchall()
+        assert len(row) == 1
+        action, to_slot, stands_on, supply, kind, at = row[0]
+        assert (stands_on, supply, kind) == (earlier, stood, dl.PERSON)
+        assert at == self.DUE + timedelta(hours=6)
+
+    def test_decisions_at_one_instant_play_in_the_order_listed(self, conn, pinned):
+        """Criterion 5. A de-substitution played BEFORE the substitution it
+        removes would be refused, so this fails if the order is not kept."""
+        period, earlier = pinned
+        self._promoted(conn, earlier, "2026-02-01T01:00:00+00:00")
+        scripts = [_period_script(after_hours=6),
+                   _period_script(operation="de-substitute", stands_on=None, after_hours=6)]
+        assert self._player(scripts, period).finish() == 2
+        actions = [r[0] for r in conn.execute(
+            f"SELECT action FROM {dl.TABLE} WHERE dataset_id = ? AND to_slot = ? "
+            "OR (dataset_id = ? AND from_slot = ? AND action = 'de-substitute') ORDER BY id",
+            [DS, period, DS, period]).fetchall()]
+        assert actions == ["substitute", "de-substitute"]
+
+    def test_listed_the_other_way_round_the_replay_stops(self, conn, pinned):
+        """The same two decisions in the opposite order: the de-substitution,
+        played first, has nothing to remove - and a scripted decision that
+        changes nothing stops the replay (Keith, 2026-10-13, amending
+        REQ-GEN-135 criterion 6): a history quietly lacking the decision a
+        scenario is about is what that criterion exists to prevent."""
+        period, earlier = pinned
+        self._promoted(conn, earlier, "2026-02-01T01:00:00+00:00")
+        scripts = [_period_script(operation="de-substitute", stands_on=None, after_hours=6),
+                   _period_script(after_hours=6)]
+        with pytest.raises(sd.ScriptRefused, match="changed nothing"):
+            self._player(scripts, period).finish()
+
+    def test_a_stood_on_period_holding_nothing_stops_the_replay(self, conn, pinned):
+        """Criteria 6 and 7: the filing decision's own refusal stands, naming
+        the scenario, the operation and the period - no fall-back."""
+        period, earlier = pinned
+        with pytest.raises(sd.ScriptRefused) as got:
+            self._player([_period_script()], period).finish()
+        message = str(got.value)
+        assert "TS-1" in message and "substitute" in message and period in message
+        assert not conn.execute(f"SELECT 1 FROM {dl.TABLE} WHERE to_slot = ?",
+                                [period]).fetchall()
+
+    def test_a_period_with_no_slot_is_refused_at_the_end_of_the_replay(self, conn, pinned):
+        _, _ = pinned
+        with pytest.raises(sd.ScriptRefused, match="no slot"):
+            self._player([_period_script()], "2099-not-a-slot").finish()
+
+    def test_refused_on_an_asset_that_is_not_synthetic(self, monkeypatch, tmp_path):
+        """Criterion 11."""
+        asset = tmp_path / "data-asset.yaml"
+        asset.write_text("synthetic: false\n")
+        monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", asset)
+        with pytest.raises(sd.ScriptRefused, match="synthetic"):
+            sd.Player("child-protection", scripts=[_period_script()], placements={})

@@ -312,6 +312,35 @@ def slot_named(dataset_id: str, period: str, agreement=None) -> Slot | None:
                  if s.name == period), None)
 
 
+def relative_period(dataset_id: str, period: str, offset: int,
+                    agreement=None) -> str | None:
+    """The period `offset` places from `period` in THIS DATASET'S OWN
+    sequence - the periods it takes part in - or None where there is none.
+
+    THE ONE RELATIVE-PERIOD RESOLVER (REQ-GEN-200 criterion 4, shared with
+    REQ-GEN-196 criterion 8's relative re-file target): a scripted decision
+    names "the period before" rather than a period name, so a script still
+    means the same thing when ANCHOR_DATE is bumped. Counted over the
+    dataset's OWN periods (Keith, 2026-10-13), as scenario anchors count -
+    for cp-case-workers, delivered in February and August only, the period
+    before 2024-Q3 is 2024-Q1, never the 2024-Q2 it owes nothing for.
+    """
+    from datetime import timedelta
+
+    from qa_tools.common import schedule as schedule_mod
+
+    on = schedule_mod.date_of(period, dataset_id)
+    if on is None:
+        return None
+    reach = timedelta(days=366 * max(1, offset)) if offset > 0 else timedelta(0)
+    names = [s.name for s in slots_for_dataset(dataset_id, until=on + reach,
+                                                agreement=agreement)]
+    if period not in names:
+        return None
+    at = names.index(period) + offset
+    return names[at] if 0 <= at < len(names) else None
+
+
 def _calendar_periods(dataset_id: str, until: date | None, agreement=None) -> list[Period]:
     """The full period sequence a dataset's slots close against - its
     calendar's, or its own dates where it overrides the calendar - with

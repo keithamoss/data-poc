@@ -8223,3 +8223,16 @@ twice. It deliberately did not re-find the `TypeError`.
     vocabulary for "no slot" across four blocks; the SLA tile ignoring a
     dataset's own participation; the held card's present tense on a past
     date; "superseded" naming its specific cause (with #164).
+
+167. **[done, 2026-10-13]** **[Testing & dev tooling]** **REQ-DASH-197's own
+    tests collided with an older module's on a shared worker.** Seen in the
+    full gate for REQ-GEN-200: `tests/test_promotion_as_at.py`'s
+    `test_a_later_rejection_reads_as_awaiting_before_it` failed with
+    `relation "carers__2" already exists in schema "rejected"`. Its
+    `_table_for` named a staged table from the supply's suffix alone, as
+    `tests/test_promotion_state.py` does, so both modules rejecting an `@2`
+    supply on one worker collided. Reproduced deterministically by running
+    the two modules together with the old helper (1 failed), and fixed by
+    naming the table from the test's own uuid dataset too (28 passed) - in
+    `tests/test_promotion_timeline.py` as well, which had the same helper.
+    A test defect, not a product one; minor under the 2026-09-25 rule.

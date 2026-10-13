@@ -29,6 +29,15 @@ same decisions at the same instants.
 A REFUSAL STOPS THE REPLAY (criterion 6), naming the scenario, the decision
 and the refusal - a history silently missing the decision a scenario is
 about is the failure REQ-GEN-044 exists to prevent.
+
+A DECISION ABOUT A PERIOD THAT RECEIVED NOTHING (REQ-GEN-200). Timing from a
+supply cannot place a substitution: the period it is about never received
+one. So a script may be scoped to the scenario's PERIOD instead (`scope:
+period`), timed a stated number of hours after that period was due, and a
+substitution names the period it stands on as an offset (`stands_on: -1`),
+resolved at play time through slots.relative_period() - the one resolver -
+with the supply that period then holds as promoted. Nothing in the script
+moves when ANCHOR_DATE is bumped.
 """
 from __future__ import annotations
 
@@ -46,6 +55,14 @@ class ScriptRefused(RuntimeError):
     """A scripted decision could not be played back. Loud by design."""
 
 
+#: The scope a script names when it is about its scenario's PERIOD rather
+#: than one of its supplies (REQ-GEN-200 criterion 1).
+PERIOD = "period"
+#: The decisions that may be period-scoped (criterion 2): the ones about a
+#: period that received no supply of its own.
+PERIOD_SCOPED_OPERATIONS = ("substitute", "de-substitute", "mark-not-supplied")
+
+
 @dataclass(frozen=True)
 class Script:
     scenario: str
@@ -53,8 +70,9 @@ class Script:
     dataset_id: str
     reason: str
     #: Which of the scenario's recorded supplies the decision is about (or is
-    #: timed from), by index - never a generated id (criterion 2).
-    supply_index: int
+    #: timed from), by index - never a generated id (criterion 2). None for a
+    #: period-scoped script, which names no supply (REQ-GEN-200).
+    supply_index: int | None
     #: Hours after that supply was received that the decision takes effect.
     after_hours: float
     #: Whether the decision names the supply (promote, reject, ...) or only
@@ -66,6 +84,12 @@ class Script:
     #: decision about a period the supply did NOT fill (marking it not
     #: supplied).
     period_from: str = "filed"
+    #: `period` scopes the decision to the scenario's placement period,
+    #: timed from that period's due instant (REQ-GEN-200 criterion 1).
+    scope: str | None = None
+    #: For a substitution: the period it stands on, as an offset from the
+    #: placement period in the dataset's own sequence (-1 the period before).
+    stands_on: int | None = None
 
 
 def load(path: Path | str | None = None) -> list[Script]:
@@ -79,10 +103,16 @@ def load(path: Path | str | None = None) -> list[Script]:
         out.append(Script(
             scenario=str(raw.get("scenario") or ""), operation=str(raw.get("operation") or ""),
             dataset_id=str(raw.get("dataset") or ""), reason=str(raw.get("reason") or ""),
-            supply_index=int(raw.get("supply", 0)), after_hours=float(raw.get("after_hours", 1)),
+            # NO DEFAULT SUPPLY (REQ-GEN-200 criterion 9): an absent index used
+            # to read as supply 0, so a script naming neither a supply nor a
+            # period was silently about the scenario's first supply.
+            supply_index=(int(raw["supply"]) if raw.get("supply") is not None else None),
+            after_hours=float(raw.get("after_hours", 1)),
             names_supply=bool(raw.get("names_supply", True)),
             to_period=raw.get("to_period"),
-            period_from=str(raw.get("period_from") or "filed")))
+            period_from=str(raw.get("period_from") or "filed"),
+            scope=(str(raw["scope"]) if raw.get("scope") is not None else None),
+            stands_on=(int(raw["stands_on"]) if raw.get("stands_on") is not None else None)))
     return out
 
 
@@ -107,6 +137,36 @@ def problems(scripts: list[Script], *, registered: set[str]) -> list[str]:
             hierarchy.dataset(s.dataset_id)
         except hierarchy.UnknownDatasetError:
             out.append(f"{where}: no dataset {s.dataset_id!r} in contract/data-asset.yaml")
+        out += _scope_problems(s, where)
+    return out
+
+
+def _scope_problems(s: Script, where: str) -> list[str]:
+    """REQ-GEN-200 criterion 8, from configuration alone: what a script is
+    about, and what a substitution stands on. Each names what to change."""
+    out = []
+    if s.scope not in (None, PERIOD):
+        out.append(f"{where}: scope must be `period` or absent, not {s.scope!r}")
+    period_scoped = s.scope == PERIOD
+    if s.supply_index is None and not period_scoped:
+        out.append(f"{where}: names neither a supply nor a period scope - give `supply: <index>` "
+                   f"for a decision about one of the scenario's supplies, or `scope: period` for "
+                   f"one about its period")
+    if period_scoped and s.supply_index is not None:
+        out.append(f"{where}: names both a supply and `scope: period` - a period-scoped decision "
+                   f"is timed from the period's due instant; drop `supply:`")
+    if period_scoped and s.operation not in PERIOD_SCOPED_OPERATIONS:
+        out.append(f"{where}: {s.operation!r} cannot be period-scoped - only "
+                   f"{', '.join(PERIOD_SCOPED_OPERATIONS)} are about a period with no supply; "
+                   f"name the supply instead")
+    if period_scoped and s.operation == "substitute" and s.stands_on is None:
+        out.append(f"{where}: a substitution needs `stands_on:` - the period it stands on, as "
+                   f"an offset (-1 the period before)")
+    if s.stands_on is not None and s.operation != "substitute":
+        out.append(f"{where}: `stands_on:` is only for a substitution, not {s.operation!r}")
+    if s.stands_on is not None and s.stands_on >= 0:
+        out.append(f"{where}: `stands_on: {s.stands_on}` is not before the period it fills - "
+                   f"a substitution stands on an EARLIER period (-1 the period before)")
     return out
 
 
@@ -116,6 +176,8 @@ class Timed:
     at: datetime
     supply: str | None
     period: str
+    #: The period a substitution stands on, resolved (REQ-GEN-200 criterion 3).
+    stands_on: str | None = None
 
 
 class Player:
@@ -148,6 +210,13 @@ class Player:
         ready, waiting = [], []
         for s in self.pending:
             placement = self.placements.get(s.scenario)
+            if s.scope == PERIOD:
+                timed, why = _timed_by_period(s, placement)
+                if timed is None:
+                    waiting.append((s, why))
+                else:
+                    ready.append(timed)
+                continue
             if placement is None or not placement.supplies:
                 waiting.append((s, "the scenario has no recorded placement with supplies - "
                                    "is it injected?"))
@@ -169,6 +238,10 @@ class Player:
             ready.append(Timed(s, received + timedelta(hours=s.after_hours),
                                supply if s.names_supply else None,
                                placement.period if s.period_from == "placement" else filed_to))
+        # STABLE, IN FILE ORDER AT ONE INSTANT (REQ-GEN-200 criterion 5):
+        # `ready` is built in script order, and sorted() never reorders equal
+        # keys - so a de-substitution listed before a mark-not-supplied on the
+        # same instant is recorded first.
         return sorted(ready, key=lambda t: t.at), waiting
 
     def before(self, arrival) -> int:
@@ -198,6 +271,39 @@ class Player:
             _apply(t)
             self.pending.remove(t.script)
         return len(due)
+
+
+def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:
+    """A period-scoped script's instant and periods (REQ-GEN-200 criteria 1
+    and 3), or None and why it cannot be placed. Its period is the
+    scenario's placement period; its instant is that period's due instant
+    plus `after_hours`; a substitution's stood-on period is resolved here,
+    its SUPPLY only when it is played - what that period holds depends on
+    the decisions before it."""
+    from qa_tools.common import slots
+
+    if placement is None or not placement.period:
+        return None, "the scenario has no recorded placement - is it injected?"
+    due = _due_at(s.dataset_id, placement.period)
+    if due is None:
+        return None, (f"{s.dataset_id} has no slot for {placement.period} - a period-scoped "
+                      f"decision is timed from when its period was due")
+    stood = None
+    if s.stands_on is not None:
+        stood = slots.relative_period(s.dataset_id, placement.period, s.stands_on)
+        if stood is None:
+            return None, (f"{s.dataset_id} has no period {abs(s.stands_on)} before "
+                          f"{placement.period} to stand on")
+    return Timed(s, due + timedelta(hours=s.after_hours), None, placement.period, stood), ""
+
+
+def _due_at(dataset_id: str, period: str) -> datetime | None:
+    """When this dataset's slot for `period` was due, as the slot schedule
+    computes it from configuration (REQ-GEN-200 criterion 1)."""
+    from qa_tools.common import schedule, slots
+
+    on = schedule.date_of(period, dataset_id)
+    return None if on is None else slots.slot_instants(dataset_id, on).due_at
 
 
 def _supply_of(dataset_id: str, run_id: str) -> str:
@@ -243,21 +349,42 @@ def _apply(t: Timed) -> None:
     with people.playback():
         actor = people.synthetic_actor()
 
-        def ask(key=None):
-            return fd.Request(operation=s.operation, dataset_id=s.dataset_id, actor=actor,
-                              reason=s.reason, period=t.period, supply=t.supply,
-                              to_period=s.to_period, confirmed=True, acknowledged=key)
         try:
             with _connect() as conn:
+                # THE SUPPLY THE STOOD-ON PERIOD HOLDS AS PROMOTED, at the
+                # decision's own instant (REQ-GEN-200 criterion 3). None where it
+                # holds nothing, and then the filing decision's own refusal
+                # stands - never a fall-back to another period (criterion 6).
+                supply = t.supply
+                if t.stands_on is not None:
+                    from qa_tools.common import decision_log
+                    supply = decision_log.promoted_into(conn, s.dataset_id, t.stands_on,
+                                                        t.at.isoformat())
+
+                def ask(key=None):
+                    return fd.Request(operation=s.operation, dataset_id=s.dataset_id,
+                                      actor=actor, reason=s.reason, period=t.period,
+                                      supply=supply, to_period=s.to_period,
+                                      stands_on=t.stands_on, confirmed=True,
+                                      acknowledged=key)
                 key = fd.consequences(conn, ask()).key
                 # NO TYPED ENVIRONMENT ID (REQ-PIPE-093 criterion 9): scripted
                 # playback is unattended, and the published PoC is bootstrapped in
                 # production from synthetic data - a prompt would make it unbootable.
                 outcome = fd.apply(ask(key or None), effective_at=t.at.isoformat(), conn=conn)
+                # A DECISION THAT CHANGED NOTHING STOPS THE REPLAY TOO (Keith,
+                # 2026-10-13, amending criterion 6): for a person "already done"
+                # is a true and useful answer, but a script exists to put a
+                # decision INTO the history, and one that changed nothing leaves
+                # the scenario quietly without it.
+                if not outcome.changed:
+                    raise RuntimeError(f"it changed nothing - {outcome.message}")
         except Exception as exc:  # noqa: BLE001 - criterion 6: ANY failure stops the replay
             raise ScriptRefused(
                 f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} "
-                f"{t.period} {t.supply or ''} at {t.at.isoformat()} - was refused: {exc}. "
+                f"{t.period} {t.supply or ''}"
+                f"{f' standing on {t.stands_on}' if t.stands_on else ''} at {t.at.isoformat()} "
+                f"- was refused: {exc}. "
                 f"The replay stops here rather than continue with a history missing it."
             ) from exc
     print(f"scripted: {s.operation} {s.dataset_id} {t.period} ({s.scenario})")

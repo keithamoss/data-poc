@@ -28418,25 +28418,16 @@ requirements:
     - '2026-10-04 (overnight sprint 3): today''s configuration passes for all seven datasets; with a 100-day claim window forced, every quarterly and daily dataset reports every overlapping pair and the schedule gate fails naming dataset, both periods, both instants and the overlap. 7 tests. The whole check over the real configuration runs in about 1.6s as part of `python -m qa_tools.common.validate_schedule`, so the ~20s validator budget is unchanged.'
 
   - id: REQ-GEN-135
-    title: "Synthetic history can play back scripted person decisions, through the same decision path a person uses"
-    date_written: "2026-10-04"
+    title: Synthetic history can play back scripted person decisions, through the same decision path a person uses
+    date_written: '2026-10-04'
     signed_off:
       by: Keith
-      date: "2026-10-04"
-    story: "As Keith demonstrating the supply model, I want the synthetic history to contain people's decisions - an un-supersede, a mark as not supplied, an acknowledgement, a substitution - taken at a scripted moment, so that the dashboard shows what happens after a person acts and not only what the rules do on their own."
+      date: '2026-10-04'
+    story: As Keith demonstrating the supply model, I want the synthetic history to contain people's decisions - an un-supersede, a mark as not supplied, an acknowledgement, a substitution - taken at a scripted moment, so that the dashboard shows what happens after a person acts and not only what the rules do on their own.
     moscow: must
     status: built
     evidence:
-    - '2026-10-05 (sprint 11): tests/test_scripted_decisions.py - 13 tests: the
-      script validated against configuration alone; the synthetic actor refused
-      outside playback, acting inside it, unreachable by GitHub, and the people
-      gate refusing a synthetic entry with a GitHub username, an assignment or
-      a placeholder mark; playback against a real database raising a PERSON''s
-      decision as the synthetic actor at the scripted instant before a later arrival,
-      waiting for an arrival received after it, stopping loudly on a refusal,
-      and refusing a non-synthetic asset; and no writer of the decision log but
-      decision_log itself. `mothman scenarios validate` gates the committed script
-      in `mothman check` and CI.'
+    - '2026-10-05 (sprint 11): tests/test_scripted_decisions.py - 13 tests: the script validated against configuration alone; the synthetic actor refused outside playback, acting inside it, unreachable by GitHub, and the people gate refusing a synthetic entry with a GitHub username, an assignment or a placeholder mark; playback against a real database raising a PERSON''s decision as the synthetic actor at the scripted instant before a later arrival, waiting for an arrival received after it, stopping loudly on a refusal, and refusing a non-synthetic asset; and no writer of the decision log but decision_log itself. `mothman scenarios validate` gates the committed script in `mothman check` and CI.'
     implemented_by:
     - qa_tools/common/scripted_decisions.py::Player
     - qa_tools/common/scripted_decisions.py::problems
@@ -28451,65 +28442,46 @@ requirements:
     - contract/scripted_decisions.yaml
     linked_tests:
     - tests/test_scripted_decisions.py
-    source: "Keith, 2026-10-04, 'SCRIPTED HUMAN DECISIONS WILL BE BUILT' (plans/road-testing.md #16 - 'the generator produces files only today, so synthetic history gains a way to play back seeded decisions'). Scoped by delivery-scoper 2026-10-04."
+    source: 'Keith, 2026-10-04, ''SCRIPTED HUMAN DECISIONS WILL BE BUILT'' (plans/road-testing.md #16 - ''the generator produces files only today, so synthetic history gains a way to play back seeded decisions''). Scoped by delivery-scoper 2026-10-04.'
     acceptance_criteria:
-      - "THE SYSTEM SHALL read scripted decisions from a committed configuration file, each naming the scenario it belongs to, the filing decision, the dataset, the supply or period it acts on, the instant it takes effect, and a reason."
-      - "THE SYSTEM SHALL identify the supply a scripted decision acts on through the scenario's recorded placement (REQ-GEN-044 criterion 7), and SHALL NOT require the script to name a generated supply id."
-      - "WHEN the pipeline replays the synthetic history, THE SYSTEM SHALL apply each scripted decision after every arrival received before its effective instant and before every arrival received at or after it."
-      - "THE SYSTEM SHALL apply a scripted decision through the one filing-decision implementation every route uses (REQ-GHUB-082 criterion 13), judged against the filing state at that point exactly as a person's would be (criterion 20), and SHALL NOT write the decision log by any other path."
-      - "THE SYSTEM SHALL record a scripted decision as a PERSON's decision, with a dedicated synthetic actor, the scripted reason, and the scripted instant as the instant it took effect."
-      - "IF a scripted decision is refused, THEN THE SYSTEM SHALL fail the replay loudly, naming the scenario, the decision and the refusal, and SHALL NOT continue with a history silently missing it."
-      - "THE SYSTEM SHALL produce the same decisions, at the same instants, with the same effects, every time the same configuration is replayed."
-      - "THE SYSTEM SHALL refuse to play back scripted decisions for any data asset whose configuration does not declare it synthetic."
-      - "THE SYSTEM SHALL hold the synthetic actor as an entry in contract/people.yaml marked synthetic, and SHALL apply the normal allowlist check to it like any other actor."
-      - "THE SYSTEM SHALL refuse the synthetic actor on the GitHub route, and on every route outside scripted playback."
-      - "THE SYSTEM SHALL amend REQ-GHUB-082 criterion 29 in the same change so that an entry marked synthetic needs no GitHub username, is never assigned a ticket, and may raise decisions only through scripted playback - and SHALL gate in CI that a synthetic entry carries no GitHub username and is not also marked placeholder."
-      - "THE SYSTEM SHALL show a scripted decision on the dataset pages exactly as any person's decision is shown there, and SHALL NOT label it as scripted on those pages."
-      - "THE SYSTEM SHALL validate the script in CI against configuration alone: every scenario it names is registered, every decision is one of the filing decisions, and every reason is present."
+    - THE SYSTEM SHALL read scripted decisions from a committed configuration file, each naming the scenario it belongs to, the filing decision, the dataset, the supply or period it acts on, the instant it takes effect, and a reason.
+    - THE SYSTEM SHALL identify the supply a scripted decision acts on through the scenario's recorded placement (REQ-GEN-044 criterion 7), and SHALL NOT require the script to name a generated supply id.
+    - WHEN the pipeline replays the synthetic history, THE SYSTEM SHALL apply each scripted decision after every arrival received before its effective instant and before every arrival received at or after it.
+    - THE SYSTEM SHALL apply a scripted decision through the one filing-decision implementation every route uses (REQ-GHUB-082 criterion 13), judged against the filing state at that point exactly as a person's would be (criterion 20), and SHALL NOT write the decision log by any other path.
+    - THE SYSTEM SHALL record a scripted decision as a PERSON's decision, with a dedicated synthetic actor, the scripted reason, and the scripted instant as the instant it took effect.
+    - 'IF a scripted decision is refused, THEN THE SYSTEM SHALL fail the replay loudly, naming the scenario, the decision and the refusal, and SHALL NOT continue with a history silently missing it. AMENDED 2026-10-13 (Keith, while building REQ-GEN-200): a scripted decision that changes nothing - the decision path''s ''already done'' - fails the replay as a refusal does.'
+    - THE SYSTEM SHALL produce the same decisions, at the same instants, with the same effects, every time the same configuration is replayed.
+    - THE SYSTEM SHALL refuse to play back scripted decisions for any data asset whose configuration does not declare it synthetic.
+    - THE SYSTEM SHALL hold the synthetic actor as an entry in contract/people.yaml marked synthetic, and SHALL apply the normal allowlist check to it like any other actor.
+    - THE SYSTEM SHALL refuse the synthetic actor on the GitHub route, and on every route outside scripted playback.
+    - THE SYSTEM SHALL amend REQ-GHUB-082 criterion 29 in the same change so that an entry marked synthetic needs no GitHub username, is never assigned a ticket, and may raise decisions only through scripted playback - and SHALL gate in CI that a synthetic entry carries no GitHub username and is not also marked placeholder.
+    - THE SYSTEM SHALL show a scripted decision on the dataset pages exactly as any person's decision is shown there, and SHALL NOT label it as scripted on those pages.
+    - 'THE SYSTEM SHALL validate the script in CI against configuration alone: every scenario it names is registered, every decision is one of the filing decisions, and every reason is present.'
     non_functional_requirements:
-      - "Configuration, not state: the script is committed and reviewed like the injection table; the decisions it produces are rows in the decision log, written only by a replay, never committed."
-      - "Security: this is the one path that writes person-decisions with no person behind them. It is closed by three locks that must all hold - the asset must declare itself synthetic, the actor must be the dedicated synthetic one, and the route must be playback. A test asserts each lock refuses on its own."
-      - "No back door: playback goes through filing_decisions.apply(); a test asserts the decision log has no other writer, so a later convenience path cannot quietly bypass the judgement."
-      - "Determinism: a decision's instant derives from its scenario's placement (an index into the generated periods, as REQ-GEN-044's injections are placed), with no random draw - so regenerating the history moves nothing."
-      - "Bootstrap cost: each scripted decision is one transaction plus whatever it triggers (an un-supersede re-runs QA; a promotion re-checks waiting readers under REQ-PIPE-121). Measure the bootstrap before and after and record both; flag it if it grows by more than a few percent."
-      - "Auditability: the decision log and the terminal name the synthetic actor, so anyone reading the record can tell a scripted decision from a real one, even though the dataset pages deliberately cannot."
+    - 'Configuration, not state: the script is committed and reviewed like the injection table; the decisions it produces are rows in the decision log, written only by a replay, never committed.'
+    - 'Security: this is the one path that writes person-decisions with no person behind them. It is closed by three locks that must all hold - the asset must declare itself synthetic, the actor must be the dedicated synthetic one, and the route must be playback. A test asserts each lock refuses on its own.'
+    - 'No back door: playback goes through filing_decisions.apply(); a test asserts the decision log has no other writer, so a later convenience path cannot quietly bypass the judgement.'
+    - 'Determinism: a decision''s instant derives from its scenario''s placement (an index into the generated periods, as REQ-GEN-044''s injections are placed), with no random draw - so regenerating the history moves nothing.'
+    - 'Bootstrap cost: each scripted decision is one transaction plus whatever it triggers (an un-supersede re-runs QA; a promotion re-checks waiting readers under REQ-PIPE-121). Measure the bootstrap before and after and record both; flag it if it grows by more than a few percent.'
+    - 'Auditability: the decision log and the terminal name the synthetic actor, so anyone reading the record can tell a scripted decision from a real one, even though the dataset pages deliberately cannot.'
     dependencies: []
     decisions:
-      - "SCRIPTED PERSON DECISIONS ARE BUILT (Keith, 2026-10-04), because the generator produces files only and half of the batch's shapes are what happens AFTER a person acts - un-supersede, mark as not supplied, acknowledge, substitute."
-      - "THE SAME DECISION PATH, NO BACK DOOR (Keith's condition, 2026-10-04). A scripted decision is judged exactly as a person's would be at that moment, so a scenario that scripts something the rules forbid fails the replay rather than planting a history the system could never have produced. REJECTED writing decision-log rows directly from the generator, which would demonstrate a state the real path might refuse."
-      - "THE SCRIPT IS CONFIGURATION, ITS EFFECTS ARE STATE (CLAUDE.md's standing rule): it is a committed, reviewed declaration of what a person does in the demonstration, like the injection table and SCENARIOS.md; the entries it produces live only in the database and are regenerated with it."
-      - "RECORDED AS A PERSON'S DECISION, NOT A RULE'S (Keith, 2026-10-04): the point is to show what a person's decision looks like, and REQ-PIPE-074 criterion 4 makes person and rule distinguishable - a rule actor would show the wrong thing. The ACTOR is what makes it clearly synthetic."
-      - "UNLABELLED ON THE DATASET PAGES (Keith, 2026-10-04: 'the dataset pages stay unlabelled'). The synthetic actor's identity is visible in the decision log and the terminal, which is where a person's identity is shown anyway; the pages show a person decided, as they would for anyone. Only the scenario view says what was planted."
-      - "THE EFFECTIVE INSTANT IS SCRIPTED, THE RECORDED INSTANT IS REAL, following REQ-PIPE-074 criterion 2's two instants and promotion.effective_at_for()'s precedent for replayed history, so the in-place-on view shows the decision at the moment the scenario says it happened."
-      - "GUARDED BY THE ASSET, NOT THE ENVIRONMENT (this draft). The published PoC dashboard is built in the `production` environment from synthetic data, so 'refuse in production' would hide the scenarios exactly where Keith wants them seen. What must never happen is a scripted decision acting on a REAL asset, so the asset's own configuration declares whether it is synthetic, and a real deployment never says so."
-      - "DETERMINISTIC BY PLACEMENT, NOT BY SEED, following REQ-GEN-044's injection module ('A seed would be a second thing that has to stay fixed for the placement to be reproducible'). Keith said 'deterministic from the seed'; placement-derived instants meet that and need nothing extra."
-      - "THE SYNTHETIC ACTOR LIVES IN contract/people.yaml, MARKED SYNTHETIC (Keith, 2026-10-04, option a), so the ordinary allowlist check applies to it exactly as to anyone. REJECTED keeping it only in the decision script with playback accepting it on the asset's say-so - that skips the allowlist for one actor, which is the back door Keith ruled out. COST, ACCEPTED: REQ-GHUB-082 criterion 29 (every non-placeholder needs a GitHub username; a placeholder may not raise a decision) did not allow for a third kind of entry, and is amended to."
-      - "THE SYNTHETIC DECLARATION GATES PLAYBACK ONLY (Keith, 2026-10-04). Distinct from REQ-PIPE-122's 'no synthetic exception': the asset's setting eras are ordinary dated versions and do not depend on the declaration; this declaration exists solely so scripted, person-less decisions can never act on a real asset. All three locks stay."
-      - 'THE ACTOR''S NAME IS AN ORDINARY FICTIONAL ONE, its EMAIL says synthetic
-        (PROVISIONAL, sprint 11): criterion 12 forbids labelling a scripted decision
-        on the dataset pages, which show a person''s name, while the NFR asks the
-        log and the terminal - which show the actor''s email - to name it. ''Robin
-        Hale'', scripted-history@synthetic.invalid.'
-      - 'WHEN AND ON WHAT, FROM THE PLACEMENT (criterion 2, NFR 4): a script names
-        its scenario, an index into that scenario''s recorded supplies, and hours
-        after that supply''s receipt; `period_from: placement` makes the decision
-        about the scenario''s own anchor period rather than where the supply was
-        filed (marking a day not supplied). A script whose supply has not arrived
-        yet waits for it; one still unplayable at the end of the replay stops it.'
-      - 'THE PLAYER IS PASSED ONLY BY THE BATCH (criterion 3, NFR 2): arrival_lifecycle.process_all
-        takes an optional player that the two batch pipelines construct; the terminal''s
-        hand-filed routes pass none.'
-      - 'ITS REFUSAL WORKED ON ITS FIRST REAL RUNS, which is the point of criterion
-        6 (2026-10-05). It refused TS-47''s mark-not-supplied because a resend had
-        filled the day (fixed in the generator with quiet days, REQ-GEN-044), and
-        TS-45''s acknowledgement because the supply meant to be amber was red (parked
-        with TS-43, TS-44 and TS-46). Each time the replay stopped naming the scenario
-        and the refusal rather than finishing with a history missing it. ALSO FOUND:
-        a script whose supply had not arrived yet crashed the player on the first
-        arrival - each script now waits for its own supply, and only the end of
-        the replay refuses one still waiting (tests/test_scripted_decisions.py TestASupplyNotYetFiled).'
+    - SCRIPTED PERSON DECISIONS ARE BUILT (Keith, 2026-10-04), because the generator produces files only and half of the batch's shapes are what happens AFTER a person acts - un-supersede, mark as not supplied, acknowledge, substitute.
+    - THE SAME DECISION PATH, NO BACK DOOR (Keith's condition, 2026-10-04). A scripted decision is judged exactly as a person's would be at that moment, so a scenario that scripts something the rules forbid fails the replay rather than planting a history the system could never have produced. REJECTED writing decision-log rows directly from the generator, which would demonstrate a state the real path might refuse.
+    - 'THE SCRIPT IS CONFIGURATION, ITS EFFECTS ARE STATE (CLAUDE.md''s standing rule): it is a committed, reviewed declaration of what a person does in the demonstration, like the injection table and SCENARIOS.md; the entries it produces live only in the database and are regenerated with it.'
+    - 'RECORDED AS A PERSON''S DECISION, NOT A RULE''S (Keith, 2026-10-04): the point is to show what a person''s decision looks like, and REQ-PIPE-074 criterion 4 makes person and rule distinguishable - a rule actor would show the wrong thing. The ACTOR is what makes it clearly synthetic.'
+    - 'UNLABELLED ON THE DATASET PAGES (Keith, 2026-10-04: ''the dataset pages stay unlabelled''). The synthetic actor''s identity is visible in the decision log and the terminal, which is where a person''s identity is shown anyway; the pages show a person decided, as they would for anyone. Only the scenario view says what was planted.'
+    - THE EFFECTIVE INSTANT IS SCRIPTED, THE RECORDED INSTANT IS REAL, following REQ-PIPE-074 criterion 2's two instants and promotion.effective_at_for()'s precedent for replayed history, so the in-place-on view shows the decision at the moment the scenario says it happened.
+    - GUARDED BY THE ASSET, NOT THE ENVIRONMENT (this draft). The published PoC dashboard is built in the `production` environment from synthetic data, so 'refuse in production' would hide the scenarios exactly where Keith wants them seen. What must never happen is a scripted decision acting on a REAL asset, so the asset's own configuration declares whether it is synthetic, and a real deployment never says so.
+    - DETERMINISTIC BY PLACEMENT, NOT BY SEED, following REQ-GEN-044's injection module ('A seed would be a second thing that has to stay fixed for the placement to be reproducible'). Keith said 'deterministic from the seed'; placement-derived instants meet that and need nothing extra.
+    - 'THE SYNTHETIC ACTOR LIVES IN contract/people.yaml, MARKED SYNTHETIC (Keith, 2026-10-04, option a), so the ordinary allowlist check applies to it exactly as to anyone. REJECTED keeping it only in the decision script with playback accepting it on the asset''s say-so - that skips the allowlist for one actor, which is the back door Keith ruled out. COST, ACCEPTED: REQ-GHUB-082 criterion 29 (every non-placeholder needs a GitHub username; a placeholder may not raise a decision) did not allow for a third kind of entry, and is amended to.'
+    - 'THE SYNTHETIC DECLARATION GATES PLAYBACK ONLY (Keith, 2026-10-04). Distinct from REQ-PIPE-122''s ''no synthetic exception'': the asset''s setting eras are ordinary dated versions and do not depend on the declaration; this declaration exists solely so scripted, person-less decisions can never act on a real asset. All three locks stay.'
+    - 'THE ACTOR''S NAME IS AN ORDINARY FICTIONAL ONE, its EMAIL says synthetic (PROVISIONAL, sprint 11): criterion 12 forbids labelling a scripted decision on the dataset pages, which show a person''s name, while the NFR asks the log and the terminal - which show the actor''s email - to name it. ''Robin Hale'', scripted-history@synthetic.invalid.'
+    - 'WHEN AND ON WHAT, FROM THE PLACEMENT (criterion 2, NFR 4): a script names its scenario, an index into that scenario''s recorded supplies, and hours after that supply''s receipt; `period_from: placement` makes the decision about the scenario''s own anchor period rather than where the supply was filed (marking a day not supplied). A script whose supply has not arrived yet waits for it; one still unplayable at the end of the replay stops it.'
+    - 'THE PLAYER IS PASSED ONLY BY THE BATCH (criterion 3, NFR 2): arrival_lifecycle.process_all takes an optional player that the two batch pipelines construct; the terminal''s hand-filed routes pass none.'
+    - 'ITS REFUSAL WORKED ON ITS FIRST REAL RUNS, which is the point of criterion 6 (2026-10-05). It refused TS-47''s mark-not-supplied because a resend had filled the day (fixed in the generator with quiet days, REQ-GEN-044), and TS-45''s acknowledgement because the supply meant to be amber was red (parked with TS-43, TS-44 and TS-46). Each time the replay stopped naming the scenario and the refusal rather than finishing with a history missing it. ALSO FOUND: a script whose supply had not arrived yet crashed the player on the first arrival - each script now waits for its own supply, and only the end of the replay refuses one still waiting (tests/test_scripted_decisions.py TestASupplyNotYetFiled).'
+    - 'AMENDED 2026-10-13 (Keith): a scripted decision that changed nothing fails the replay (REQ-GEN-200''s build found a de-substitution with nothing to remove passing silently). The nine committed scripts were re-played on a bootstrap from empty and each changes something.'
     open_questions: []
-
   - id: REQ-GEN-136
     title: "Every arrival-driven shape of the option A and period-closing batch is planted in the synthetic history"
     date_written: "2026-10-04"
@@ -31819,6 +31791,7 @@ requirements:
     - 'DECIDED Keith, 2026-10-13 (answer 2, round 3, on REQ-GEN-199''s open question 2): 80 deliveries, the ordinary amber and red SHARES unchanged, so the ordinary ambers and reds grow with the history - about 40 more runs per bootstrap, measured and logged in CLAUDE.md''s running log, not capped. Rejected: about 70 with the ordinary amber and red COUNTS held at today''s 8 and 5 (about 30 more runs, but a proportionally cleaner history than today''s); about 68 with each targeted pair taking one lead-in day (TS-44''s precedent - fewest runs, weakens each pair''s measurement).'
     - 'DECIDED Keith, 2026-10-13 (on REQ-GEN-200): criterion 8''s relative re-file target counts the DATASET''S OWN periods (those it takes part in), as scenario anchors do, and is resolved by the one relative-period resolver REQ-GEN-200 criterion 4 shares with scripted stands-on periods - whichever of the two is built first introduces it, the other uses it. Rejected: a second resolver; counting the calendar''s periods.'
     - 'AMENDED AND RE-APPROVED 2026-10-13 (Keith): criteria 20 and 21 added (the 80-delivery history and the refusal), the bootstrap-cost NFR replaced, four decisions above added - while scoping REQ-GEN-199/200/201.'
+    - 'REQ-GEN-200 WAS BUILT FIRST (2026-10-13), so criterion 8''s relative re-file target uses the resolver it introduced: slots.relative_period, counting the dataset''s own periods.'
     open_questions: []
   - id: REQ-DASH-197
     title: The "not the latest file" panel says what was promoted and what had arrived as at the date on show, never as at the build
@@ -32109,10 +32082,10 @@ requirements:
     date_written: '2026-10-13'
     story: As Keith building a synthetic history that shows a substitution being made, removed and replaced, I want a scripted person to make decisions about a period that never received a supply - substitute it onto an earlier period, take the substitution away, mark it not supplied - timed from when that period was due and naming the earlier period relative to the scenario, so that a scenario can demonstrate those decisions on a real bootstrapped page and keeps working when ANCHOR_DATE is bumped.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
-      date: "2026-10-13"
+      date: '2026-10-13'
     source: 'Keith, 2026-10-13, answer 3 on REQ-GEN-199 v3: split the scripted-decision capability out of REQ-GEN-199 into its own requirement, built before it. Carries v3 criteria 13 and 31 to 34 (delivery-architect findings B2, M4 and M5) and v3''s NFR on the synthetic lock. Drafted by delivery-scoper 2026-10-13. A proposal, not signed off.'
     acceptance_criteria:
     - THE SYSTEM SHALL let a scripted decision (REQ-GEN-135) be scoped to a PERIOD rather than a supply - naming no supply index - and SHALL time it a stated number of hours after the due instant of the scenario's placement period, as the slot schedule computes that instant from configuration, so that a decision about a period that received no supply has an instant.
@@ -32149,7 +32122,30 @@ requirements:
     - 'PROPOSED, NOT KEITH''S: only substitute, de-substitute and mark-not-supplied may be period-scoped - the three operations that act on a period rather than a supply. Others (inherit, un-inherit) can be added when a scenario needs one.'
     - 'DECIDED Keith, 2026-10-13: a relative period counts the DATASET''S OWN periods (the ones it takes part in), matching how scenario anchors count - over the calendar''s periods. This also governs REQ-GEN-196 criterion 8''s resolver, which is shared.'
     - 'FINAL ARCHITECT PASS 2026-10-13: REQ-GEN-196 is not a dependency - either may be built first, and criterion 4 says which introduces the one relative-period resolver.'
+    - 'BUILT FIRST, SO THIS INTRODUCED THE RESOLVER (criterion 4): slots.relative_period(dataset, period, offset), over slots_for_dataset - the dataset''s own expected periods. REQ-GEN-196 criterion 8 uses it.'
+    - 'A SUBSTITUTION''S SUPPLY IS RESOLVED WHEN IT IS PLAYED, not when it is timed: decision_log.promoted_into(stood-on period, as at the decision''s instant), because what that period holds depends on the decisions before it. None passes through to substitution''s own refusal (criterion 6).'
+    - 'FOUND IN THE BUILD AND DECIDED BY KEITH, 2026-10-13: a scripted decision that CHANGES NOTHING (filing_decisions'' ''already done'', Outcome.changed False) now stops the replay like a refusal - for a person ''already done'' is a true answer, but a script exists to put a decision into the history. Found because the reverse-order test of criterion 5 did not fail: a de-substitution with nothing to remove succeeded silently. Applies to every scripted decision; amends REQ-GEN-135 criterion 6. Rejected: leaving it, so a scenario could quietly lack its decision.'
     open_questions: []
+    linked_tests:
+    - tests/test_scripted_decisions.py::TestAPeriodScopedScriptIsValidated
+    - tests/test_scripted_decisions.py::TestTheRelativePeriodCountsTheDatasetsOwnPeriods
+    - tests/test_scripted_decisions.py::TestAPeriodScopedDecisionIsPlayed
+    - tests/test_scripted_decisions.py::TestPlayback
+    implemented_by:
+    - qa_tools/common/scripted_decisions.py::Script
+    - qa_tools/common/scripted_decisions.py::load
+    - qa_tools/common/scripted_decisions.py::_scope_problems
+    - qa_tools/common/scripted_decisions.py::_timed_by_period
+    - qa_tools/common/scripted_decisions.py::_due_at
+    - qa_tools/common/scripted_decisions.py::_apply
+    - qa_tools/common/slots.py::relative_period
+    evidence:
+    - '2026-10-13: a bootstrap from empty after the change (mothman env reset-synthetic, then mothman pipeline bootstrap, 4m42s) played all nine committed scripts - six TS-67, TS-43, TS-47, TS-45 - each changing something, and ran the five re-checks they owed; none was refused. That is criterion 10 and the no-op rule below on the real history.
+
+      '
+    - '2026-10-13: slots.relative_period counts the dataset''s own periods - the period before 2024-Q3 is 2024-Q1 for cp-case-workers (February and August only) and 2024-Q2 for cp-clients.
+
+      '
   - id: REQ-GEN-201
     title: Each link of a scenario can carry its own in-place-on date, declared between two of the scenario's own events and refused by validate when it falls outside them
     date_written: '2026-10-13'
