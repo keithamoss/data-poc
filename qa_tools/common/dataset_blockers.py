@@ -92,7 +92,16 @@ class Blocker:
                 "delivery": self.delivery, "rejected": self.rejected,
                 "scheduleEnded": self.schedule_ended,
                 "agreementRefused": self.agreement_refused,
-                "settlement": self.settlement, "supersededBy": self.superseded_by}
+                "settlement": self.settlement, "supersededBy": self.superseded_by,
+                # WHERE IT IS SETTLED, for the page's own wording on any date
+                # (REQ-PIPE-194 criteria 1 and 14, #171).
+                "settleAt": _settle_at(self.dataset_id) if self.kind == CONTESTED else None}
+
+
+def _settle_at(dataset_id: str) -> str:
+    from qa_tools.common import supply_files
+
+    return supply_files.where_to_settle(dataset_id)
 
 
 def _iso(value) -> str | None:
@@ -203,13 +212,18 @@ def _how_it_ended(db, dataset_id: str, pair: str, delivery: str,
               "supplyId": rows[name][0],
               "runId": supply_files.run_id_of(dataset_id, rows[name][0])}
              for name in list(receipts) + sorted(set(rows) - set(receipts)) if name in rows]
-    return {"actor": decided["actor"], "at": decided["at"], "reason": decided["reason"],
+    from qa_tools.common import people
+
+    # A NAME, NOT AN EMAIL (#171 E; REQ-PIPE-147 criterion 7's rule): the
+    # page is published, and every other decision on it shows a name.
+    return {"actor": people.display_name(decided["actor"]), "at": decided["at"],
+            "reason": decided["reason"],
             "arrivalRunId": supply_files.arrival_run_id_of(dataset_id, pair),
             "files": files}, None
 
 
 def _contested(db) -> list[Blocker]:
-    from qa_tools.common import asset_time, load_log, supply_db
+    from qa_tools.common import asset_time, display_time, load_log, supply_db
 
     decided = _deciding(db)
     failures = load_log.failures(conn=db)
@@ -239,9 +253,20 @@ def _contested(db) -> list[Blocker]:
             except (ValueError, IndexError):
                 name = record.physical
             refused.append((name, record.reason or "the load failed"))
-        listed = " and ".join(files)
+        # EACH FILE WITH ITS RECEIPT, AND WHERE (REQ-PIPE-194 criterion 1,
+        # #171): the page reads this reason on every date, the queue item
+        # only on the build's.
+        received = dict(db.execute(
+            "SELECT filename, received_instant FROM qa.delivery_file WHERE delivery = ? "
+            "AND dataset_id = ? ORDER BY received_instant, receipt_sequence, filename",
+            [delivery, dataset_id]).fetchall())
+        listed = " and ".join(
+            f"{name} (received {display_time.format_instant(received[name])})"
+            if received.get(name) else name
+            for name in (list(received) or list(files)))
         reason = (f"Two files claim this dataset's table in delivery {delivery!r}: "
-                  f"{listed}. Nothing is checked until a person says what each file is.")
+                  f"{listed}. Nothing is checked until a person says what each file is, "
+                  f"at '{_settle_at(dataset_id)}'.")
         if refused:
             reason += " " + " ".join(f"{name} could not be loaded ({why})."
                                      for name, why in refused)
@@ -259,6 +284,7 @@ def _contested(db) -> list[Blocker]:
 def _rejections(db) -> dict[tuple[str, str], dict]:
     """(dataset, arrival key) -> the first PERSON'S rejection of that
     arrival's supply: when it took effect, who, and why (REQ-PIPE-153)."""
+    from qa_tools.common import people
     from qa_tools.common import decision_log
 
     out: dict[tuple[str, str], dict] = {}
@@ -269,7 +295,8 @@ def _rejections(db) -> dict[tuple[str, str], dict]:
         if actor_kind != decision_log.PERSON:
             continue
         out.setdefault((dataset_id, _arrival_of(supply)),
-                       {"actor": actor, "at": _iso(effective_at), "reason": reason})
+                       {"actor": people.display_name(actor), "at": _iso(effective_at),
+                        "reason": reason})
     return out
 
 

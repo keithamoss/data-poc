@@ -8388,3 +8388,44 @@ twice. It deliberately did not re-find the `TypeError`.
       failures); `pair_support.free_day` now picks a day whose period and
       the next two hold none.
 
+
+171. **[done, 2026-10-13]** **[Pipeline & publishing, Dashboard UI]** **The
+    delivery critic and dashboard UX critic on REQ-PIPE-194 as built
+    (b5ca06d).** Each claim was checked against the code first.
+    - **Keith's call.** A re-filed file's link lands on its period's own
+      date, which can be before the settlement - the page there showed
+      the pair still open, under a banner saying the reader had followed a
+      re-filed file. KEEP THE DATE AND SAY SO: the banner adds "This file
+      was re-filed here on <day>; before then the pair was still waiting"
+      when the date on show is before the settlement. Rejected: opening on
+      the settlement's day (on a daily dataset that is another period).
+    - **Defects, each with a failing test first:**
+      - A. An open pair in a period that already held a promoted supply
+        read PROMOTED - the ticket said nothing was waiting, and the queue
+        offered promote, reject and supersede, each refused by the open
+        pair. The open pair now outranks every other slot state, and open
+        pairs are matched to slots by period through the resolver.
+      - B. Two files sharing one receipt instant (every multi-file delivery
+        in the bootstrap): the re-filed file's runs were found as the
+        other file's arrival, putting its row in the wrong period. The
+        build now takes the supply a run's own manifest entry states
+        (`recorded_arrival.stated_supply`).
+      - C. A settled supply's runs, dated by receipt, were in place on
+        dates before the settlement. Left out until its asset day.
+      - D. On a past date a pair open then and settled since was missing
+        from the waiting list and the cards' counts; it is put back from
+        the blocker record, which carries both ends and where to settle.
+      - E. The settler (and a rejecter) showed as a raw email on a public
+        page; now by name, through `people.display_name`.
+    - **Polish.** The blocker's own reason names each file's receipt and
+      where to settle it (the dataset page reads it on every date); the
+      label is no longer said twice; the cards count "1 table with two
+      files"; a settled supply line names its period.
+    - **Left, and why.** The settled row's Why column off-screen on a
+      phone, and Back landing at the top of the page, belong to the table
+      and REQ-DASH-198's Back for every row, not to this. Settled rows
+      accumulate above the current cycle as accepted gaps already do - a
+      30-dataset question for the supply history as a whole. "a spare copy
+      - kept, can be brought back" keeps its plain hyphen: it is the
+      wording criterion 10 quotes. A refused correction trial on the CLI
+      printing the settle form was not verified.

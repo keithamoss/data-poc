@@ -259,6 +259,14 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     # be about another supply or a refusal (post-build-review #84).
     h = decision_log.held(conn, dataset_id, slot.name)
     closed = slots_mod.is_closed(slot, now)
+    if two_files:
+        # AN OPEN PAIR OUTRANKS EVERYTHING ELSE about the slot (REQ-PIPE-194
+        # criteria 2 and 4; post-build-review #171 A): over a promoted
+        # period too, where it used to read PROMOTED and the queue offered
+        # three operations that were each refused.
+        return SlotState(dataset_id=dataset_id, period=slot.name, state=TWO_FILES,
+                          supply=(filings.get(slot.name) or {}).get("supply_id"),
+                          files=two_files if isinstance(two_files, tuple) else ())
     if h and left_by_refile(conn, dataset_id, slot.name, h):
         # EMPTIED BY A RE-FILE OUT, the supply now filed elsewhere
         # (post-build-review #115, D2 and D3): read as though nothing was
@@ -309,10 +317,6 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
             reason=_reason(conn, h.decision_id), closed=unfilled and closed)
 
     filed = filings.get(slot.name)
-    if two_files:
-        return SlotState(dataset_id=dataset_id, period=slot.name, state=TWO_FILES,
-                          supply=(filed or {}).get("supply_id"),
-                          files=two_files if isinstance(two_files, tuple) else ())
     if filed and not _rejected(conn, dataset_id, filed.get("supply_id") or ""):
         # AWAITING A DECISION, closed or not (REQ-PIPE-132 criterion 3): a
         # supply is here, so the period is not unsupplied. Not a superseded
@@ -405,9 +409,15 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
     now = now or asset_time.now()
     out: list[SlotState] = []
     open_pairs: dict[str, dict[str, tuple[str, ...]]] = {}
+    from qa_tools.common import supply_files
+
+    # BY PERIOD, through the one resolver: the pair's `#1` need not be the
+    # filing the period shows (#171 A - a promoted supply is).
     for blocker in dataset_blockers.contests(conn):
         if blocker.is_open:
-            open_pairs.setdefault(blocker.dataset_id, {})[blocker.supply] = blocker.files
+            found = supply_files.resolve(conn, blocker.dataset_id, blocker.supply)
+            if found is not None and found.period:
+                open_pairs.setdefault(blocker.dataset_id, {})[found.period] = blocker.files
     for entry in hierarchy.datasets_in_collection(collection_id):
         try:
             # THE SAME BOUND FILING USES (post-build-review #73), and
@@ -442,8 +452,7 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
             if found is not None:
                 dataset_slots.append(found)
         for slot in dataset_slots:
-            filed = (filings.get(slot.name) or {}).get("supply_id")
             out.append(state_of(conn, dataset_id=entry.dataset_id, slot=slot,
                                  now=now, filings=filings, ever_delivered=ever,
-                                 two_files=pairs.get(filed) or False))
+                                 two_files=pairs.get(slot.name) or False))
     return out

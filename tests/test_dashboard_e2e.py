@@ -4223,7 +4223,7 @@ class TestASettledPairOnThePage:
         assert settled.count() == 1
         text = " ".join(settled.inner_text().split())
         assert "Settled" in text and one in text and two in text
-        assert "this period's supply" in text and "re-filed to" in text
+        assert "this period's supply (" in text and "re-filed to" in text
 
     def test_the_refiled_files_link_cold_loads_framed_as_a_refile(
             self, page, dashboard_html_with_a_settled_pair):

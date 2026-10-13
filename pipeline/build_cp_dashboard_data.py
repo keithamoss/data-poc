@@ -577,7 +577,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
-        block = recorded_arrival.for_run(dataset_id, m["received_at"])
+        block = recorded_arrival.for_run(dataset_id, m["received_at"],
+                                         supply=recorded_arrival.stated_supply(m, dataset_id))
         arrival_by_run[run_id] = block
         arrival_history.append({"run_id": run_id, "run_date": _run_date(m),
                                  **block})

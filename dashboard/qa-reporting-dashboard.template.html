@@ -2598,7 +2598,8 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // re-filed out or superseded - is not the dataset's verdict, however
   // recently it arrived.
   const eligibleRuns = d.runs.filter(r => ranOnOrBeforeInPlaceOn(r.run_date, inPlaceOnDateStr)
-    && runStateInPlaceOn(d, r.run_id, inPlaceOnDateStr) !== "withdrawn");
+    && runStateInPlaceOn(d, r.run_id, inPlaceOnDateStr) !== "withdrawn"
+    && !settledBeforeIt(d.id, r.run_id, inPlaceOnDateStr));
   if(!eligibleRuns.length) return null; // never supplied yet as of this date
   const effectiveRun = eligibleRuns[eligibleRuns.length-1];
   const verdictState = runStateInPlaceOn(d, effectiveRun.run_id, inPlaceOnDateStr);
@@ -3920,10 +3921,14 @@ function arrivalBanner(ds){
   const followed = what ? `You followed ${what} out of` : "You followed a link out of";
   // A RE-FILED FILE WENT HERE; it is not a supply the period left stood on
   // (REQ-PIPE-194 criterion 12).
+  // SETTLED AFTER THE DATE LANDED ON (Keith, 2026-10-13, #171): the page
+  // here is what was in place then, so it says so rather than contradicting
+  // the link that brought the reader.
+  const settledLater = ARRIVAL_VIA === "refile" ? refileSettledAfter(ds && ds.id, nowOn) : null;
   const detail = here && ARRIVAL_VIA === "refile"
     ? `${followed} <b style="display:inline">${escHtml(String(left))}</b>.
        What you are looking at now is ${escHtml(String(here))} — the period that file was
-       re-filed to.`
+       re-filed to.${settledLater ? ` <span data-testid="refile-settled-later">This file was re-filed here on ${escHtml(fmtDay(settledLater))}; before then the pair was still waiting.</span>` : ""}`
     : here
     ? `${followed} <b style="display:inline">${escHtml(String(left))}</b>.
        What you are looking at now is ${escHtml(String(here))} — the period whose supply
@@ -4788,7 +4793,7 @@ const BLOCKER_LABEL = {held:"Held", contested:"Two files for one table",
   "agreement-refused":"Refused: the delivery agreement changed"};
 const BLOCKER_SAYS = {
   held:"no open period to file it to; waiting for a person",
-  contested:"two files for one table, waiting for a person to say what each file is",
+  contested:"waiting for a person to say what each file is",
   refused:"its supply arrived and could not be loaded",
   "agreement-refused":"a configuration problem on our side - its recorded judgements no longer match the agreement and no declared correction accounts for it"};
 function assetDateStrOf(value){
@@ -5138,7 +5143,28 @@ function inPlaceOnQueueItems(items, data){
       responses: ["substitute an earlier period's supply", "mark it as not supplied",
                   "re-file a late file into it"]}));
   })));
-  return [...gaps, ...kept];
+  // A PAIR THAT WAS OPEN ON THE DATE ON SHOW and has been settled since
+  // (REQ-PIPE-194 criterion 14; post-build-review #171 D): put back from the
+  // blocker record, which knows both ends, so the waiting list agrees with
+  // the red verdict beside it.
+  const pairs = [];
+  if(typeof CURRENT_IN_PLACE_ON !== "undefined"){
+    data.agencies.forEach(ag=> ag.collections.forEach(col=> col.datasets.forEach(ds=>{
+      if(kept.some(i=> i.kind === "contested-table" && i.datasetId === ds.id)) return;
+      blockersFor(ds.id).filter(b=> b.kind === "contested" && blockerOpenOn(b, CURRENT_IN_PLACE_ON))
+        .forEach(b=> pairs.push({
+          kind: "contested-table", severity: "needs-action", blocking: true,
+          agencyId: ag.id, collectionId: col.id, datasetId: ds.id, observedAt: b.openedAt,
+          headline: `${ds.name}: Two files for one table`, detail: b.reason,
+          responses: b.settleAt ? [`say what each file is, at '${b.settleAt}'`] : [],
+          actionable: true}));
+    })));
+  }
+  return [...gaps, ...pairs, ...kept];
+}
+function blockerOpenOn(b, onDateStr){
+  return assetDateStrOf(b.openedAt) <= onDateStr
+    && !(b.resolvedAt && assetDateStrOf(b.resolvedAt) <= onDateStr);
 }
 
 // CRITERION 2: a per-scope count on each affected agency and
@@ -5160,6 +5186,13 @@ function inPlaceOnQueueItems(items, data){
 // unmarked period AS AT THE DATE ON SHOW (criterion 9), and replaces the
 // queue's own closed-period items, which are judged as at the build. A
 // reader looking at last month sees last month's gaps, not today's.
+// A COUNT BESIDE A LABEL THAT STARTS WITH A NUMBER reads as one number
+// ("1 two files for one table"; #171, UX M3) - said as tables instead.
+function countedKind(label, n){
+  if(label === "two files for one table")
+    return `${n} ${pluralize(n, "table")} with two files`;
+  return `${n} ${label}`;
+}
 function outstandingMarker(scope, id, source, noSupply){
   let items = outstandingItems(scope, id, source);
   if(typeof noSupply === "number") items = items.filter(i=> i.kind !== "closed-unfilled-slot");
@@ -5174,7 +5207,7 @@ function outstandingMarker(scope, id, source, noSupply){
   const byKind = {};
   items.forEach(i=>{ const k = outstandingKindLabel(i.kind).toLowerCase(); byKind[k] = (byKind[k]||0) + 1; });
   const parts = [...(gaps ? [`${gaps} no supply`] : []),
-    ...Object.entries(byKind).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).map(([k,n])=>`${n} ${k}`)];
+    ...Object.entries(byKind).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0])).map(([k,n])=>countedKind(k, n))];
   const breakdown = parts.length > 1 || gaps ? `: ${parts.join(", ")}` : "";
   const words = `${total} ${pluralize(total,"thing")} waiting for a person${breakdown}`;
   return `<div class="outstanding-marker" style="margin-top:6px; font-size:12px; color:var(--ink); display:flex;
@@ -5615,6 +5648,29 @@ function excuseNote(datasetId, runId, inPlaceOnDateStr){
 function settledPairs(datasetId){
   return blockersFor(datasetId).filter(b=> b.kind === "contested" && b.settlement);
 }
+// The asset day a file was re-filed into `toPeriod`, where that is after
+// the date on show - else null.
+function refileSettledAfter(datasetId, toPeriod){
+  if(!datasetId || !toPeriod) return null;
+  for(const b of settledPairs(datasetId)){
+    if((b.settlement.files || []).some(f=> f.outcome === "refiled" && f.toPeriod === toPeriod)){
+      const day = assetDateStrOf(b.settlement.at);
+      return CURRENT_IN_PLACE_ON < day ? day : null;
+    }
+  }
+  return null;
+}
+// A RUN A SETTLEMENT CAUSED, on a date before the settlement (REQ-PIPE-194
+// criterion 14; post-build-review #171 C): it is dated by its file's
+// receipt, which comes first, but it only exists because of the settlement.
+function settledBeforeIt(datasetId, runId, inPlaceOnDateStr){
+  for(const b of settledPairs(datasetId)){
+    const caused = (b.settlement.files || []).some(f=> f.runId && (runId === f.runId
+      || String(runId).startsWith(f.runId + "__r")));
+    if(caused) return inPlaceOnDateStr < assetDateStrOf(b.settlement.at);
+  }
+  return false;
+}
 // The pair's own period: where its arrival was filed, else its receipt's day.
 function settledPairPeriod(datasetId, b){
   const raw = rawRealDatasetById(datasetId);
@@ -5927,6 +5983,8 @@ function settledPairRow(b, datasetId, inPlaceOnDateStr){
   const files = (s.files || []).map(f=>{
     const said = f.outcome === "refiled"
       ? refiledFileLink(datasetId, f.toPeriod, period, inPlaceOnDateStr)
+      : f.outcome === "supply" && period
+      ? `this period's supply (${escHtml(fmtPeriodOrDay(period))})`
       : escHtml(SETTLED_SAID[f.outcome] || f.outcome);
     return `<div data-settled-file="${escAttr(f.outcome)}"><span class="mono">${escHtml(f.filename)}</span>${f.receivedAt ? `, received ${fmtInstant(f.receivedAt)}` : ""} — ${said}</div>`;
   }).join("");

@@ -80,6 +80,16 @@ class TestATableTwoFilesClaimRaisesOneDatasetItem:
         assert item.actionable
         assert "mothman supply" not in said and "choose" not in item.headline
 
+    def test_the_blockers_own_reason_says_where_with_each_receipt(self, clean):
+        """#171 (UX M1): the dataset page reads the blocker's reason, on
+        any date - so it names each file's receipt and where to settle."""
+        from qa_tools.common import display_time, supply_files
+
+        _pair()
+        (b,) = [b for b in dataset_blockers.contests(clean) if b.dataset_id == DATASET]
+        assert display_time.format_instant(RECEIVED) in b.reason
+        assert supply_files.where_to_settle(DATASET) in b.reason
+
     def test_it_is_not_the_contested_file_kind(self, clean):
         """The opposite case - one file claimed by several datasets - keeps
         its own label."""

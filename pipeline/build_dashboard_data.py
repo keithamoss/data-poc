@@ -484,7 +484,8 @@ def build() -> dict:
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
-        block = recorded_arrival.for_run("birth-registrations", m["received_at"])
+        block = recorded_arrival.for_run("birth-registrations", m["received_at"],
+                                         supply=recorded_arrival.stated_supply(m, "birth-registrations"))
         arrival_by_run[run_id] = block
         arrival_history.append({"run_id": run_id, "run_date": _run_date(m),
                                  **block})

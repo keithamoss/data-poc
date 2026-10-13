@@ -31,7 +31,14 @@ from qa_tools.common import filing
 UNKNOWN = "unknown"
 
 
-def for_run(dataset_id: str, received_at) -> dict:
+def stated_supply(entry: dict, dataset_id: str) -> str | None:
+    """The supply a run's manifest entry says it is about, where it says
+    one for THIS dataset - a re-check's purpose does (REQ-PIPE-140)."""
+    purpose = entry.get("purpose") or {}
+    return purpose.get("supply_id") if purpose.get("dataset_id") == dataset_id else None
+
+
+def for_run(dataset_id: str, received_at, supply: str | None = None) -> dict:
     """The arrival block for one run, as the dashboard renders it.
 
     `arrivedAt` IS OUR RECEIPT INSTANT (criterion 4), not the
@@ -48,7 +55,12 @@ def for_run(dataset_id: str, received_at) -> dict:
     or zero would both read as "dealt with instantly", which is the
     opposite of what is true of a supply nobody has decided on.
     """
-    record = filing.recorded_arrival_at(dataset_id, received_at)
+    # THE SUPPLY THE RUN SAYS IT IS ABOUT, where it says one (REQ-PIPE-193
+    # criterion 13; post-build-review #171 B): a settled pair's two files
+    # can share one receipt instant, and then the instant names the
+    # arrival's supply, never the re-filed one.
+    record = (filing.recorded_arrival(dataset_id, supply) if supply
+              else filing.recorded_arrival_at(dataset_id, received_at))
     if record is None:
         return {"arrivedAt": None, "arrivalStatus": UNKNOWN,
                 "filledAt": None, "waitedSeconds": None, "awaiting": False,

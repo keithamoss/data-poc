@@ -514,7 +514,8 @@ class TestTheBlockerRecordsItsSettlement:
         p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()))
         (blocker,) = [b for b in dataset_blockers.contests(conn) if b.supply == p.pair]
         got = blocker.as_record()["settlement"]
-        assert got["actor"] and got["reason"] == "the supplier sent it twice"
+        assert got["actor"] == people.display_name(REAL_PERSON) != REAL_PERSON
+        assert got["reason"] == "the supplier sent it twice"
         assert got["at"] == blocker.resolved_at
         assert [(f["filename"], f["outcome"], f["toPeriod"]) for f in got["files"]] == [
             (one, "supply", None), (two, "refiled", nxt.isoformat())]
@@ -528,3 +529,53 @@ class TestTheBlockerRecordsItsSettlement:
                               (f"birth_registrations_{day}-1.csv", _at(day, "13:45"))])
         (blocker,) = [b for b in dataset_blockers.contests(conn) if b.supply == p.pair]
         assert blocker.as_record()["settlement"] is None
+
+
+class TestCriticFindingsOn194:
+    """post-build-review #171 - each failed before its fix."""
+
+    def _promoted_then_a_pair(self, conn, actor, day):
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "09:30")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "09:45"))])
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "supply"), (two, "reject"))
+        promote = fd.Request(operation=fd.PROMOTE, dataset_id=DS, actor=actor, reason="r",
+                             period=p.period, supply=p.pair, confirmed=True)
+        promote = fd.Request(**{**promote.__dict__,
+                                "acknowledged": fd.consequences(conn, promote).key or None})
+        fd.apply(promote, effective_at=_at(day, "12:00").isoformat(), conn=conn)
+        q = Pair(conn, day, [(f"birth_registrations_{day}-again.csv", _at(day, "15:30")),
+                              (f"birth_registrations_{day}-again-1.csv", _at(day, "15:45"))])
+        assert supply_files.open_contest(conn, DS, q.pair) is not None
+        return p, q
+
+    def test_a_pair_over_a_promoted_period_reads_two_files(self, conn, actor, day):
+        """Criteria 2 and 4: the slot is TWO_FILES - settled, not offered
+        promote, reject or supersede, each of which is refused."""
+        from qa_tools.common import filing_queue, slot_state
+
+        p, q = self._promoted_then_a_pair(conn, actor, day)
+        (state,) = [s for s in slot_state.states_for(conn, "civil-registration")
+                    if s.dataset_id == DS and s.period == p.period]
+        assert state.state == slot_state.TWO_FILES
+        assert set(state.files) == {n for n, _ in q.files}
+        waiting = [s for s in filing_queue.awaiting(conn, "civil-registration")
+                   if s.dataset_id == DS and s.period == p.period]
+        assert [filing_queue.operations_for(s)[0] for s in waiting] == [(fd.CHOOSE_FILE,)]
+
+    def test_a_refiled_file_sharing_its_pairs_receipt_is_found_as_itself(
+            self, conn, actor, day):
+        """#171 B: every multi-file delivery in the bootstrap shares one
+        receipt instant, so a re-filed file's runs were found as the other
+        file's arrival - its row in the wrong period. The run names its
+        supply (recheck's purpose); the build reads it."""
+        from pipeline import recorded_arrival
+
+        nxt = day + timedelta(days=1)
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{nxt}.csv", _at(day, "13:30"))])
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()))
+        received = filing.received_at_of(DS, p.second)
+        assert recorded_arrival.for_run(DS, received, supply=p.second)["slot"] == nxt.isoformat()
+        assert recorded_arrival.for_run(DS, received, supply=p.pair)["slot"] == p.period

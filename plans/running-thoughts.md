@@ -5045,3 +5045,34 @@ could never have computed it), and it belongs with batch 5's check work.
     (cut to N, weakest first), and a speed-only pass on the browser tests,
     which are ~85% of the suite's wall clock.
 
+
+92. **[todo, 2026-10-13]** **[Docs & process, Dashboard UI]** **What comes
+    after the contested-pair batch, and a "we heard / we built" view of
+    the road-testing feedback.** Priority: Keith's own order, 2026-10-13
+    evening - (1) once this batch is done, a high-level summary from
+    CHANGELOG.yaml of what was built or changed in the past two or three
+    days; (2) confirm the calendar requirements worked on over the past
+    week are all actually built; (3) pick up small items and open
+    questions that unblock things; (4) the next big priority for the
+    following few days: review plans/road-testing.md, turn it into
+    decisions and requirements, and build them.
+    **The road-testing feedback came from someone else** Keith showed the
+    PoC to. For each item he wants to go back to them with a short, super
+    high-level summary of how their feedback was addressed - enough to
+    talk them through it. So road-testing entries are NOT simply deleted
+    as they are built (a change to that file's own "the entry comes out
+    when it lands" rule): each keeps a post-build record - "you told us
+    this; this is what we heard; this is what we built; here is the
+    evidence". Better still, it is an artifact IN THE DASHBOARD that
+    Keith can click through with them: we heard / you described / we
+    built / evidence. Same document or a separate one beside
+    road-testing.md - he is easy either way. Expected to be ephemeral
+    (a few months at most).
+    **Answered the same evening (Keith, 2026-10-13):** "this batch" runs to
+    the end of the chain he set - REQ-GEN-196 and REQ-GEN-199 included -
+    before the summary and the rest. And the feedback view is ITS OWN
+    top-level dashboard tab, fed by road-testing.md itself: each entry
+    gains a short "You told us / What we heard / What we built /
+    Evidence" block (links into the dashboard, requirement ids), one card
+    per item, nothing deleted as items are built. Needs scoping into a
+    requirement before it is built.
