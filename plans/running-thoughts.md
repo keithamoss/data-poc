@@ -5269,3 +5269,23 @@ could never have computed it), and it belongs with batch 5's check work.
     this is schema evolution of the data itself - old supplies keep their
     shape, and promotion, period views and cross-table checks all read
     across supplies that may differ. Not scoped.
+
+95. **[todo, 2026-10-14]** **[Pipeline & publishing]** **[QA checks &
+    contract]** **[Dashboard UI]** **A dataset whose cross-table check could
+    not be judged is neither green nor red.** Keith, 2026-10-14, reviewing
+    the close-out batch: "that cross-table check isn't judging on
+    notifications, so you can't really rule it green - but it's also not a
+    true red." What happens today (checked in unrunnable.py and
+    qa.check_result): the dependency's state is read ONCE, at the reader's
+    arrival, and never revisited. Not yet due -> the check records `nodata`,
+    the reader can read green and be promoted, and nothing re-checks it if
+    the dependency then goes overdue or never comes (a FALSE GREEN).
+    Already overdue, contested or awaiting a decision -> the check records
+    `fail`, which rolls up, so the reader reads RED with no failure of its
+    own (e.g. a cp-investigations run, zero own failures, red for a missing
+    cp_carers). Proposed: a distinct "waiting on <table>" status the gate
+    does not promote on, re-checked when the dependency arrives or goes
+    overdue. His call: SCOPE IT FIRST with the scoper and architect, and
+    decide the re-check question as part of that. REQ-DASH-204, REQ-PIPE-210,
+    REQ-PIPE-211 and the still-failing shout (close-out R2) all hang on it.
+
