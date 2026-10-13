@@ -110,6 +110,22 @@ describe("standingInDrill", () => {
   });
 });
 
+describe("the drill is a real link (REQ-DASH-198 criteria 14 and 15)", () => {
+  it("carries the date, the period left, the date left and the kind", () => {
+    const w = load("http://localhost/");
+    const st = {...SUBSTITUTED, earnedOn: "2026-05-03"};
+    const html = w.standingInDrill({ id: "cp-carers", promotionState:
+      { standingIn: st, on: "2026-09-14", past: true } });
+    const href = /href="([^"]+)"/.exec(html)[1].replace(/&amp;/g, "&");
+    const params = new URL(href, "http://localhost/").searchParams;
+    expect(params.get("in-place-on")).toBe("2026-05-03");
+    expect(params.get("from")).toBe("2026-Q3");
+    expect(params.get("from-on")).toBe("2026-09-14");
+    expect(params.get("via")).toBe("substitution");
+    expect(html).toContain("<a ");
+  });
+});
+
 describe("arrivalBanner", () => {
   it("says nothing to a reader who navigated here directly", () => {
     // The 'only' is half the requirement: telling someone they have
@@ -126,10 +142,24 @@ describe("arrivalBanner", () => {
     expect(html).toContain('data-to="2026-08-01"');
   });
 
-  it("names which of the two kinds was followed", () => {
-    const w = load("http://localhost/?from=2026-Q3");
-    expect(w.arrivalBanner(ds(SUBSTITUTED))).toContain("a substitution");
-    expect(w.arrivalBanner(ds(INHERITED))).toContain("an inherited period");
+  it("names which of the two kinds was followed, from the URL", () => {
+    // REQ-DASH-198 criterion 10: the kind travels as `via`, and the banner
+    // never reads it off the standing-in record as at the date ARRIVED on -
+    // which here says the opposite kind, and must be ignored.
+    expect(load("http://localhost/?from=2026-Q3&via=substitution")
+      .arrivalBanner(ds(INHERITED))).toContain("a substitution");
+    expect(load("http://localhost/?from=2026-Q3&via=inheritance")
+      .arrivalBanner(ds(SUBSTITUTED))).toContain("an inherited period");
+  });
+
+  it("goes back to exactly the date left (REQ-DASH-198 criterion 11)", () => {
+    const w = load("http://localhost/?from=2026-Q3&from-on=2026-09-14&via=substitution");
+    expect(w.arrivalBanner(ds(null))).toContain('data-to="2026-09-14"');
+  });
+
+  it("falls back to the period's own date without a valid from-on (criterion 12)", () => {
+    const w = load("http://localhost/?from=2026-Q3&from-on=not-a-date");
+    expect(w.arrivalBanner(ds(null))).toContain('data-to="2026-08-01"');
   });
 
   it("still frames a hand-edited or shared link with no standing-in record", () => {

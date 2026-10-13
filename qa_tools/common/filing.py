@@ -230,6 +230,56 @@ def filings_of(dataset_id: str) -> list[dict]:
             "ORDER BY recorded_at, supply_id", [dataset_id]).fetchall()]
 
 
+def filing_history(conn, dataset_id: str) -> list[dict]:
+    """Every filing row of one dataset, each with the instant it TOOK
+    EFFECT, oldest row first (REQ-DASH-197 criteria 2, 3 and 22).
+
+    A SUPPLY'S FIRST FILING TAKES EFFECT AT ITS RECEIPT - it is written for
+    every arrival before any check (REQ-PIPE-075 criterion 7), and the
+    receipt is the asset-clock fact; `recorded_at` is only when this
+    process got round to writing it. A RE-FILE takes effect when the
+    decision that made it did. A row naming no real decision (a test's
+    move) falls back to when it was written.
+
+    Read once per build and walked in memory, so answering "as at" each
+    date costs nothing more per date (REQ-DASH-197's build-cost NFR).
+    """
+    rows = conn.execute(
+        f"SELECT f.supply_id, f.slot, f.refiled_by, f.recorded_at, r.received_instant, "
+        f"       d.effective_at, f.id "
+        f"FROM {TABLE} f "
+        f"JOIN {RECEIPT} r ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
+        f'LEFT JOIN "{qa_store.SCHEMA}".decision d ON d.id = f.refiled_by '
+        "WHERE f.dataset_id = ? ORDER BY f.id", [dataset_id]).fetchall()
+    out = []
+    for supply, slot, refiled_by, recorded_at, received, decided, row_id in rows:
+        at = received if refiled_by is None else (decided or recorded_at)
+        out.append({"supply_id": supply, "slot": slot, "first": refiled_by is None,
+                    "at": at, "id": row_id})
+    return out
+
+
+def filings_as_at(history: list[dict], as_at=None) -> list[dict]:
+    """Each supply first filed on or before `as_at`, with the period it was
+    filed to AS AT THAT INSTANT, ordered by when it was FIRST filed - so a
+    later re-file of an older supply never makes it the newest arrival
+    (REQ-DASH-197 criterion 3). `history` is filing_history()'s answer.
+    """
+    firsts: dict[str, dict] = {}
+    slots: dict[str, tuple] = {}
+    for row in history:
+        if as_at is not None and row["at"] > as_at:
+            continue
+        if row["first"]:
+            firsts[row["supply_id"]] = row
+        key = (row["at"], row["id"])
+        if row["supply_id"] not in slots or key >= slots[row["supply_id"]][0]:
+            slots[row["supply_id"]] = (key, row["slot"])
+    ordered = sorted(firsts.values(), key=lambda r: (r["at"], r["supply_id"]))
+    return [{"supply_id": r["supply_id"], "slot": slots[r["supply_id"]][1],
+             "first_at": r["at"]} for r in ordered]
+
+
 def period_of(dataset_id: str, received_at) -> str | None:
     """The period this dataset's supply from that arrival was filed to.
 

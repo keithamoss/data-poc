@@ -347,6 +347,17 @@ def embed() -> None:
     html = _replace_const(html, "BUILT_AT", json.dumps(built_at.isoformat()))
     print(f"Re-embedded BUILT_AT = {built_at.isoformat()}")
 
+    # WHY_NOT_SENTENCES - REQ-DASH-197 criterion 19. Each reason the latest
+    # arrival is not the promoted supply, present and past tense side by
+    # side, ONCE for the whole page and keyed by reason code. Configuration
+    # (promotion_state.WHY_NOT), not history: the page picks a tense and
+    # never writes or re-tenses a sentence itself.
+    from qa_tools.common import promotion_state
+    html = _replace_const(html, "WHY_NOT_SENTENCES", json.dumps(
+        {code: {"present": present, "past": past}
+         for code, (present, past) in promotion_state.WHY_NOT.items()},
+        separators=(",", ":")))
+
     # BUILD_PROVENANCE - REQ-PIPE-092 criteria 7 and 17. WHICH environment
     # built this page, and from WHICH commit.
     #

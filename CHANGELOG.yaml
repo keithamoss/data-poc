@@ -111,7 +111,8 @@ intro: >
 releases:
   - date: "2026-10-13"
     summary: >
-      Fixes for two files arriving for one table, and for re-checks after a decision.
+      Fixes for two files arriving for one table, for re-checks after a
+      decision, and for past dates that showed today's files.
     changes:
       - category: Fixed
         items:
@@ -143,6 +144,22 @@ releases:
               Excusing a late supply no longer stops a dataset showing "Two
               files, choose one". Only rejecting the pair, or a later supply
               replacing it, ends that now.
+          - headline: A past date no longer shows files from its future
+            components: ["Dashboard UI"]
+            description: >
+              The "not the latest file" panel now says what was promoted and
+              what had arrived on the date you picked, in the past tense and
+              naming that date, instead of today's files. The supply the
+              verdict line names as in place is now always the one the panel
+              names.
+          - headline: Inherited and substituted labels describe the period you are viewing
+            components: ["Dashboard UI"]
+            description: >
+              The "Inherited from" and "Substituted from" label now only shows
+              for the period on show, so today's view no longer names an
+              earlier quarter's stand-in. Following it lands on the day that
+              supply was promoted, and Back returns you to exactly the date
+              you left.
   - date: "2026-10-12"
     summary: >
       Rebuilding the whole history takes half as long, and failing Child

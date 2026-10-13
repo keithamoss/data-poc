@@ -3100,9 +3100,23 @@ class TestArrivedVersusPromoted:
         ("child-protection-family-support", "child-protection", "cp-carers"),
     )
 
-    def _open(self, page, html, agency, collection, dataset_id):
+    def _open(self, page, html, agency, collection, dataset_id, in_place_on=None):
         _goto(page, html, state={"tier": "dataset", "agencyId": agency,
-                                  "collectionId": collection, "datasetId": dataset_id})
+                                  "collectionId": collection, "datasetId": dataset_id},
+              in_place_on=in_place_on)
+
+    def _open_where_it_shows(self, page, html, agency, collection, dataset_id):
+        """Open the dataset on the newest date its panel shows, TAKEN FROM THE
+        EMBEDDED CHANGE POINTS (REQ-DASH-197) - it used to skip whenever the
+        latest arrival happened to be promoted today, proving nothing."""
+        self._open(page, html, agency, collection, dataset_id)
+        if page.locator('[data-testid="promotion-split"]').count():
+            return
+        days = page.evaluate(
+            "(id) => rawRealDatasets().find(d => d.id === id).promotionTimeline.points"
+            ".filter(p => p.differs).map(p => p.on)", dataset_id)
+        assert days, f"precondition: {dataset_id}'s history has a date the panel shows"
+        self._open(page, html, agency, collection, dataset_id, in_place_on=days[-1])
 
     @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
     def test_the_panel_agrees_with_the_data_about_whether_to_show_at_all(
@@ -3126,10 +3140,9 @@ class TestArrivedVersusPromoted:
     @pytest.mark.parametrize("agency,collection,dataset_id", DATASETS)
     def test_where_it_shows_it_names_both_supplies_and_says_why(
             self, clean_page, built_dashboard_html, agency, collection, dataset_id):
-        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        self._open_where_it_shows(clean_page, built_dashboard_html, agency, collection,
+                                  dataset_id)
         panel = clean_page.locator('[data-testid="promotion-split"]')
-        if panel.count() == 0:
-            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
         text = panel.inner_text()
         state = clean_page.evaluate(
             """(id) => DATA.agencies.flatMap(a=>a.collections)
@@ -3154,10 +3167,9 @@ class TestArrivedVersusPromoted:
         name is a bare ISO date - the one thing REQ-DASH-071 says a
         reader never sees. The panel is the newest place one could leak
         in."""
-        self._open(clean_page, built_dashboard_html, agency, collection, dataset_id)
+        self._open_where_it_shows(clean_page, built_dashboard_html, agency, collection,
+                                  dataset_id)
         panel = clean_page.locator('[data-testid="promotion-split"]')
-        if panel.count() == 0:
-            pytest.skip(f"{dataset_id}'s latest arrival IS what is promoted")
         # The supply IDENTIFIER legitimately carries digits, so the line
         # holding it is excluded rather than the whole panel: an
         # identifier is what somebody quotes in a ticket, not a date
@@ -3170,13 +3182,13 @@ class TestArrivedVersusPromoted:
 class TestAPeriodStandingInOnAnEarlierOne:
     """REQ-DASH-085 and REQ-DASH-100, in a real browser.
 
-    NO DATASET IN THIS DEPLOYMENT IS SUBSTITUTED OR INHERITED, and that
-    is stated rather than worked around: a substitution needs a person's
-    decision and no operator route exists yet, and inheritance needs a
-    dataset the schedule says is not due, which no configuration
-    declares. Writing either into the real decision log to make a test
-    pass would be fabricating an operator decision in an append-only
-    record.
+    NO DATASET IN THIS DEPLOYMENT IS SUBSTITUTED, and that is stated
+    rather than worked around: writing a substitution into the real
+    decision log to make a test pass would be fabricating an operator
+    decision in an append-only record. (cp-case-workers IS inherited
+    since REQ-GEN-044 gave inheritance a real instance; the real chain
+    from those decisions to the page is held by
+    TestTheQualifierAsAtTheDateOnShow below.)
 
     So these set the state ON THE PAGE and re-render. What that proves
     is the render layer - that the qualifier reaches the status line,
@@ -3306,11 +3318,15 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
     def _open(self, page, html, standing_in=None):
         _goto(page, html, state=self.WHERE)
         if standing_in is not None:
+            # THE CHANGE POINTS, since REQ-DASH-197/198: the page resolves the
+            # qualifier from them for the period on show and reads nothing
+            # else, so a patched promotionState would simply be overwritten.
             page.evaluate(
                 """(st) => {
                      const d = REAL_CP_DATA.datasets.find(x => x.id === "cp-carers");
-                     d.promotionState = Object.assign({}, d.promotionState,
-                                                       {standingIn: st});
+                     const tl = d.promotionTimeline || {points: [], standing: []};
+                     d.promotionTimeline = {...tl, standing: [...tl.standing,
+                       {on: "2026-08-01", period: st.period, standingIn: st, decisions: []}]};
                      DATA = buildData(CURRENT_IN_PLACE_ON);
                      renderFromState();
                    }""", standing_in)
@@ -3356,7 +3372,9 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
         clean_page.locator('[data-testid="standing-in-drill"]').click()
         clean_page.locator('[data-testid="arrival-back"]').click()
         params = self._params(clean_page)
-        assert params.get("in-place-on") == self.PERIOD_DATE
+        # EXACTLY THE DATE LEFT (REQ-DASH-198 criterion 11) - here the
+        # default date, which the address bar carries as no parameter.
+        assert params.get("in-place-on") is None
         assert "from" not in params
         assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
 
@@ -3895,3 +3913,208 @@ class TestClosingAPanelReachedByItsUrl:
         clean_page.locator("#check-panel-close").click()
         clean_page.wait_for_function("() => !STATE.checkKey")
         assert clean_page.evaluate("() => [!!STATE.columnName, history.length]") == [True, length]
+
+
+def _dataset_raw(page, dataset_id):
+    return page.evaluate("(id) => rawRealDatasets().find(d => d.id === id)", dataset_id)
+
+
+class TestTheQualifierAsAtTheDateOnShow:
+    """REQ-DASH-198 criterion 7, on the REAL inheritances cp-case-workers
+    carries - dates taken from the embedded change points, never the clock.
+    """
+
+    WHERE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+              "collectionId": "child-protection", "datasetId": "cp-case-workers"}
+
+    def _standing(self, page, html):
+        _goto(page, html, state=self.WHERE)
+        raw = _dataset_raw(page, "cp-case-workers")
+        opened = [e for e in raw["promotionTimeline"]["standing"] if e["standingIn"]]
+        assert opened, "precondition: cp-case-workers carries a real inheritance"
+        return opened[-1]
+
+    def test_no_qualifier_on_a_date_in_an_earlier_period(self, clean_page,
+                                                          built_dashboard_html):
+        entry = self._standing(clean_page, built_dashboard_html)
+        earlier = entry["earnedOn"]
+        assert earlier and earlier < entry["on"]
+        _goto(clean_page, built_dashboard_html, state=self.WHERE, in_place_on=earlier)
+        assert clean_page.locator('[data-testid="standing-in"]').count() == 0
+
+    def test_no_qualifier_on_the_builds_own_date_for_an_earlier_period(
+            self, clean_page, built_dashboard_html):
+        """The road-testing #18 case: 2026-Q2 stood on 2026-Q1, and a
+        2026-Q3 view said so."""
+        entry = self._standing(clean_page, built_dashboard_html)
+        today_period = clean_page.evaluate(
+            "() => periodNameFor('cp-case-workers', DEFAULT_IN_PLACE_ON)")
+        assert today_period != entry["period"], "precondition: today is a later period"
+        _goto(clean_page, built_dashboard_html, state=self.WHERE)
+        assert clean_page.locator('[data-testid="standing-in"]').count() == 0
+
+    def test_the_drill_from_a_past_date_and_the_way_back(self, clean_page,
+                                                          built_dashboard_html):
+        entry = self._standing(clean_page, built_dashboard_html)
+        on = entry["on"]
+        _goto(clean_page, built_dashboard_html, state=self.WHERE, in_place_on=on)
+        marker = clean_page.locator('[data-testid="standing-in"]')
+        assert marker.count() >= 1
+        assert "On " in (marker.first.get_attribute("title") or "")
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        params = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(clean_page.url).query))
+        assert params.get("in-place-on") == entry["earnedOn"]
+        assert params.get("from") == entry["period"]
+        assert params.get("from-on") == on
+        assert params.get("via") == "inheritance"
+        notice = clean_page.locator('[data-testid="arrival-notice"]')
+        text = " ".join(notice.inner_text().split())
+        assert f"You have left {entry['period']}" in text
+        assert entry["standingIn"]["standsOn"] in text
+        assert "an inherited period" in text
+        clean_page.reload()
+        clean_page.wait_for_function(
+            "() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 1
+        clean_page.locator('[data-testid="arrival-back"]').click()
+        params = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(clean_page.url).query))
+        assert params.get("in-place-on") == on
+        assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
+        assert clean_page.locator('[data-testid="standing-in"]').count() >= 1
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
+                                          tmp_path_factory) -> Path:
+    """The real built page, with cp-carers' change points replaced by the
+    REAL change-point build (pipeline.promotion_timeline) run over a small
+    fixture history in this worker's own database - never the deployment's.
+
+    REQ-DASH-197 criterion 16 asks for an arrival awaiting a decision on a
+    date and rejected later, and the bootstrapped history holds none; the
+    criterion's answer is a fixture history, never a skip. The fixture is
+    one promoted supply, a second awaiting until a rejection three weeks
+    later, and a third filed after the date the test looks at.
+    """
+    import uuid
+    from datetime import datetime, timezone
+
+    import filing_support
+    from dashboard import embed_dashboard_data as edd
+    from pipeline import promotion_timeline, slot_timeline
+    from qa_tools.common import assignment, promotion, qa_store, rejection, schedule, supply_db
+    from qa_tools.common import decision_log as dl
+
+    ds = f"cp-{uuid.uuid4().hex[:10]}"
+    dates = {"2026-Q2": date(2026, 5, 1), "2026-Q3": date(2026, 8, 1)}
+    at = lambda m, d, h=1: datetime(2026, m, d, h, tzinfo=timezone.utc)  # noqa: E731
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("MOTHMAN_SUPPLY_DSN", supply_dsn)
+        mp.setattr(schedule, "date_of", lambda name, _ds: dates.get(name))
+        with supply_db.connect(label="e2e-fixture-history") as conn:
+            qa_store.ensure_schema(conn)
+            conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
+
+            def file(n, period, when):
+                filing_support.file(assignment.Assignment(
+                    dataset_id=ds, supply_id=f"{ds}@{n}", slot=period,
+                    branch=assignment.OPEN_UNFILLED, considered=(period,),
+                    received_at=when))
+
+            def table(n):
+                name = f"carers__e2e{n}{ds[3:]}"
+                conn.execute(f'CREATE TABLE IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"."{name}" '
+                             "(id integer)")
+                return name
+            file(1, "2026-Q2", at(5, 2))
+            promotion.promote(conn, agency_id="child-protection-family-support",
+                              collection_id="child-protection", dataset_id=ds,
+                              supply=f"{ds}@1", period="2026-Q2", physical_tables=[table(1)],
+                              actor="tester", actor_kind=dl.PERSON,
+                              effective_at=at(5, 3).isoformat())
+            file(2, "2026-Q3", at(8, 2))
+            rejection.reject(conn, agency_id="child-protection-family-support",
+                             collection_id="child-protection", dataset_id=ds,
+                             supply=f"{ds}@2", physical_tables=[table(2)], actor="Keith",
+                             reason="wrong extract", effective_at=at(8, 25).isoformat(),
+                             from_slot="2026-Q3")
+            file(3, "2026-Q3", at(9, 1))
+            points = promotion_timeline.for_dataset(
+                ds, slot_timeline.for_dataset(ds, conn=conn), conn=conn)
+
+    tmp_path = tmp_path_factory.mktemp("later_rejection")
+    (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
+    (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
+    out = tmp_path / "dashboard_later_rejection.html"
+    html = built_dashboard_html.read_text()
+
+    def splice(record):
+        for d in record["datasets"]:
+            if d["id"] == "cp-carers":
+                d["promotionTimeline"] = points
+    out.write_text(_rewrite_const(html, "REAL_CP_DATA", splice))
+    return out
+
+
+class TestThePanelAsAtTheDateOnShow:
+    """REQ-DASH-197 criterion 16, cold-loading a past date's URL."""
+
+    WHERE = {"tier": "dataset", "agencyId": "child-protection-family-support",
+              "collectionId": "child-protection", "datasetId": "cp-carers"}
+    PAST = "2026-08-10"
+
+    def _panel(self, page):
+        panel = page.locator('[data-testid="promotion-split"]')
+        assert panel.count() == 1
+        return " ".join(panel.inner_text().split())
+
+    def test_a_later_rejection_reads_as_awaiting_in_the_past_tense(
+            self, clean_page, dashboard_html_with_a_later_rejection):
+        _goto(clean_page, dashboard_html_with_a_later_rejection, state=self.WHERE,
+              in_place_on=self.PAST)
+        text = self._panel(clean_page)
+        assert "nobody had decided" in text
+        assert "rejected" not in text.lower()
+        day = clean_page.evaluate(f"() => fmtDay('{self.PAST}')")
+        assert f"On {day} the warehouse did not hold the latest file" in text
+
+    def test_no_supply_filed_after_the_date_appears(
+            self, clean_page, dashboard_html_with_a_later_rejection):
+        _goto(clean_page, dashboard_html_with_a_later_rejection, state=self.WHERE,
+              in_place_on=self.PAST)
+        text = self._panel(clean_page)
+        assert "@2" in text and "@3" not in text
+
+    def test_changing_the_date_with_the_page_open_re_renders_it(
+            self, clean_page, dashboard_html_with_a_later_rejection):
+        _goto(clean_page, dashboard_html_with_a_later_rejection, state=self.WHERE,
+              in_place_on=self.PAST)
+        clean_page.evaluate("() => applyInPlaceOn('2026-09-05')")
+        clean_page.wait_for_timeout(300)
+        assert "@3" in self._panel(clean_page)
+
+    def test_on_the_builds_own_date_it_reads_as_it_always_has(
+            self, clean_page, dashboard_html_with_a_later_rejection):
+        _goto(clean_page, dashboard_html_with_a_later_rejection, state=self.WHERE)
+        text = self._panel(clean_page)
+        assert "What is in the warehouse is not the latest file" in text
+        assert "nobody has decided" in text
+
+    def test_the_verdict_line_and_the_panel_name_the_same_promoted_supply(
+            self, clean_page, built_dashboard_html):
+        """Criterion 13, on the real build: wherever the verdict line names
+        a supply in place while awaiting, it is the panel's promoted one."""
+        _goto(clean_page, built_dashboard_html, state=self.WHERE)
+        checked = clean_page.evaluate("""() => {
+          const d = rawRealDatasets().find(x => x.id === "cp-carers");
+          let n = 0, bad = [];
+          for (const p of d.promotionTimeline.points) {
+            const c = clipDatasetToInPlaceOn(d, p.on);
+            if (!c || c.verdictOf.state !== "awaiting" || !c.verdictOf.inPlaceRunId) continue;
+            n += 1;
+            if (c.verdictOf.inPlaceRunId !== (c.promotionState.promoted || {}).runId) bad.push(p.on);
+          }
+          return {n, bad};
+        }""")
+        assert checked["n"], "precondition: a date where the verdict is awaiting"
+        assert checked["bad"] == []

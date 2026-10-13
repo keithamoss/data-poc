@@ -67,23 +67,30 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None)
     seen: dict[str, int] = {}
     for instant in instants:
         changed = []
-        for slot, decision_id, fills in conn.execute(
-                f'SELECT slot, decision_id, fills FROM "{qa_store.SCHEMA}".slot_holds(?, ?)',
+        for slot, decision_id, fills, held_as, holder in conn.execute(
+                f'SELECT slot, decision_id, fills, held_as, holder '
+                f'FROM "{qa_store.SCHEMA}".slot_holds(?, ?)',
                 [dataset_id, instant]).fetchall():
             if seen.get(slot) != decision_id:
                 seen[slot] = decision_id
-                changed.append((slot, decision_id, fills))
+                changed.append((slot, decision_id, fills, held_as, holder))
         at = instant.isoformat() if hasattr(instant, "isoformat") else str(instant)
         # EMPTIED FIRST, then filled - so a re-file's two entries land in
         # an order a reader can follow, and so a lookup at the same
         # instant sees the destination rather than the origin.
-        for slot, decision_id, fills in sorted(changed, key=lambda c: (c[2] is not None, c[0])):
+        for slot, decision_id, fills, held_as, holder in sorted(
+                changed, key=lambda c: (c[2] is not None, c[0])):
             action, actor, actor_kind, reason = conn.execute(
                 f"SELECT action, actor, actor_kind, reason FROM {decision_log.TABLE} "
                 "WHERE id = ?", [decision_id]).fetchall()[0]
             out.append({"at": at, "action": action, "actor": actor,
                         "actor_kind": actor_kind, "reason": reason or "",
-                        "decision_id": decision_id, "slot": slot, "supply": fills})
+                        "decision_id": decision_id, "slot": slot, "supply": fills,
+                        # HOW THE SLOT IS HELD, and by whom even where it does
+                        # not FILL it (an inheritance): what the promotion
+                        # panel's as-at walk reads (REQ-DASH-197, REQ-DASH-198),
+                        # carried from qa.slot_holds rather than re-derived.
+                        "held_as": held_as, "holder": holder})
     return out
 
 
@@ -167,8 +174,8 @@ def supply_states(dataset_id: str,
             return supply_states(dataset_id, conn=opened)
     actions = tuple(_STATE_AFTER)
     out: dict[str, list[dict]] = {}
-    for supply, action, at, kind, newer, recorded in conn.execute(
-            f"SELECT supply, action, effective_at, actor_kind, superseded_by, recorded_at "
+    for decision_id, supply, action, at, kind, newer, recorded in conn.execute(
+            f"SELECT id, supply, action, effective_at, actor_kind, superseded_by, recorded_at "
             f"FROM {decision_log.TABLE} "
             f"WHERE dataset_id = ? AND supply IS NOT NULL AND action IN "
             f"({', '.join('?' * len(actions))}) ORDER BY effective_at, id",
@@ -182,7 +189,10 @@ def supply_states(dataset_id: str,
                  # WHEN IT WAS WRITTEN DOWN (REQ-PIPE-081 criterion 6): a
                  # decision recorded after the date on show changed it.
                  "recordedAt": recorded.isoformat() if hasattr(recorded, "isoformat")
-                               else str(recorded)}
+                               else str(recorded),
+                 # So the past-date notice names a decision once, however
+                 # many readers carry it (REQ-DASH-197 criterion 9).
+                 "decisionId": decision_id}
         if action == decision_log.SUPERSEDE:
             entry["supersededBy"] = newer
             setting = _replaced_under(conn, dataset_id, supply)

@@ -8142,3 +8142,34 @@ twice. It deliberately did not re-find the `TypeError`.
     directory before entering it (os.walk). Test, failing first:
     tests/test_validate_premise.py `TestTheWalkNeverEntersASkippedDirectory`.
     Minor under the 2026-09-25 rule.
+
+163. **[done, 2026-10-13]** **[Dashboard UI]** **A re-filed older supply
+    became "the latest arrival".** REQ-DASH-197 criterion 3 asked for this
+    to be tested first, as the architect suspected it. It was real:
+    `promotion_state.state_for()` took the latest arrival from
+    `filing.filings_of()`, ordered by the CURRENT filing row's `recorded_at`,
+    and a re-file writes a newer row - so re-filing an older supply after a
+    newer one arrived made the older one the panel's "latest arrival".
+    Fixed by ordering on when each supply was FIRST filed
+    (`filing.filings_as_at`, a filing taking effect at its receipt). Test,
+    failing first against the old code: tests/test_promotion_as_at.py
+    `TestALaterReFileDoesNotMakeAnOlderSupplyTheLatestArrival`. A defect in
+    built code that a signed criterion already named, so fixed in REQ-DASH-197's
+    own build.
+
+164. **[todo, 2026-10-13]** **[Dashboard UI]** **A resupply awaiting a
+    decision is told it was "superseded".** Seen driving the built page for
+    REQ-DASH-197, and NOT caused by it - the rule is REQ-DASH-056's
+    `_why_not`, unchanged. Birth Registrations on 8 September 2026: a 2:57pm
+    resupply for that day's period is still awaiting a decision, while the
+    11:00 supply for the same period is promoted. The panel's reason is
+    SUPERSEDED - "a newer version had arrived for the same period, a person
+    had set it aside, or a later supply had been promoted into the period" -
+    which is not what happened: the promoted supply arrived EARLIER, and the
+    verdict line on the same page says "Awaiting a decision". The branch is
+    "its period holds another supply". For a resupply waiting to replace the
+    one in place, the honest reason is closer to "awaiting a decision -
+    it would replace the supply in place". Not fixed: it changes what a
+    reason MEANS, which is Keith's (a significant change to agreed
+    behaviour under the 2026-09-25 rule). Question for Keith: a new reason
+    for a resupply awaiting a decision, or reword SUPERSEDED to cover it?

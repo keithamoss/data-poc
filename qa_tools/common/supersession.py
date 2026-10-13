@@ -40,7 +40,7 @@ def superseded_schema(period: str) -> str:
     return period_schema.period_schema(period) + SUFFIX
 
 
-def _latest(conn, dataset_id: str, supply: str):
+def _latest(conn, dataset_id: str, supply: str, as_at=None):
     """The latest supersession, un-supersession or re-file of this supply,
     as (action, superseded_by), or None.
 
@@ -53,13 +53,16 @@ def _latest(conn, dataset_id: str, supply: str):
     rows = conn.execute(
         f"SELECT action, superseded_by FROM {decision_log.TABLE} "
         "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?, ?) "
+        # AS AT AN INSTANT (REQ-DASH-197 criterion 22): effective_at, never
+        # recorded_at - what stood then, by everything known now.
+        "AND (?::timestamptz IS NULL OR effective_at <= ?::timestamptz) "
         "ORDER BY effective_at DESC, id DESC LIMIT 1",
         [dataset_id, supply, decision_log.SUPERSEDE, decision_log.UN_SUPERSEDE,
-         decision_log.REFILE]).fetchall()
+         decision_log.REFILE, as_at, as_at]).fetchall()
     return rows[0] if rows else None
 
 
-def is_superseded(conn, dataset_id: str, supply: str) -> bool:
+def is_superseded(conn, dataset_id: str, supply: str, as_at=None) -> bool:
     """Whether this supply stands superseded - its latest supersession not
     undone by a later un-supersede.
 
@@ -67,7 +70,7 @@ def is_superseded(conn, dataset_id: str, supply: str) -> bool:
     #109, F1): a PERSON's supersession names no newer supply, so asking
     the column made every one of them invisible - tables set aside, and
     nothing that read this knew."""
-    latest = _latest(conn, dataset_id, supply)
+    latest = _latest(conn, dataset_id, supply, as_at)
     return bool(latest) and latest[0] == decision_log.SUPERSEDE
 
 

@@ -28,11 +28,31 @@ describe("the verdict's supply", () => {
 
   it("shows a newer supply still awaiting, naming the one in place", () => {
     const w = loadDashboard().window;
-    const d = dataset({r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted"}]});
+    const d = {...dataset({r1: [{at: "2026-01-20T01:00:00+00:00", state: "promoted"}]}),
+      promotionTimeline: {standing: [], points: [
+        {on: "2026-01-20", promoted: {supply: "s1", period: "P1", runId: "r1"},
+         arrived: {supply: "s1", period: "P1", files: []}, differs: false, whyNot: null}]}};
     const clipped = w.clipDatasetToInPlaceOn(d, "2026-02-20");
     expect(clipped.runs.map(r=>r.run_id)).toEqual(["r1", "r2"]);
     expect(clipped.verdictOf).toEqual({state: "awaiting", inPlaceRunDate: "2026-01-10",
                                       inPlaceRunId: "r1"});
+  });
+
+  it("names the supply most recently PROMOTED, not the newest by receipt", () => {
+    // REQ-DASH-197 criterion 13: the same supply the panel names. r2 arrived
+    // later but r1 was promoted after it; the panel says r1, so must this.
+    const w = loadDashboard().window;
+    const runs = [...RUNS, {run_id: "r3", run_date: "2026-03-10"}];
+    const d = {id: "cp-carers", runs, columns: [],
+      runStates: {r1: [{at: "2026-03-01T01:00:00+00:00", state: "promoted"}],
+                  r2: [{at: "2026-02-15T01:00:00+00:00", state: "promoted"}]},
+      promotionTimeline: {standing: [], points: [
+        {on: "2026-03-01", promoted: {supply: "s1", period: "P1", runId: "r1"},
+         arrived: {supply: "s2", period: "P2", files: []}, differs: true,
+         whyNot: "promoted-into-its-own-period"}]}};
+    const clipped = w.clipDatasetToInPlaceOn(d, "2026-03-20");
+    expect(clipped.verdictOf.state).toBe("awaiting");
+    expect(clipped.verdictOf.inPlaceRunId).toBe("r1");
   });
 
   it("before the withdrawal the newer supply was the verdict", () => {

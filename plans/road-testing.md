@@ -58,14 +58,13 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   AND a small labelled one kept in the dataset list beside the count
   (Keith, 2026-10-13). First because at 30 datasets every red looking the
   same is what stops triage.
-- **Sprint 2 - "don't mislead me" (#18; S).** SCOPED 2026-10-13 by
-  delivery-scoper as REQ-DASH-197 (the "not the latest file" panel as at the
-  date on show, from change points worked out at build time, with the date
-  in its wording) and REQ-DASH-198 (the substituted/inherited label has the
-  same leak - live today for cp-case-workers). Keith answered the four
-  scoping questions the same morning; both unsigned, architect and
-  dashboard UX review next. #17 (same trial, two verdicts) CLOSED as not
-  reproduced, Keith 2026-10-13: "close it now" - deleted.
+- **Sprint 2 - "don't mislead me" (S).** BUILT 2026-10-13 as REQ-DASH-197
+  (the "not the latest file" panel as at the date on show) and REQ-DASH-198
+  (the substituted/inherited qualifier, which also named a period that had
+  not happened on today's cp-case-workers view). Entry #18 deleted with the
+  build; its decisions are on REQ-DASH-197. #17 closed earlier the same day.
+  Left open by it: post-build-review #164 (a resupply awaiting a decision is
+  told it was superseded) and #19 below.
 - **Sprint 3 - "what actually changed?" (#9, #10; L).** One distribution
   component in the drill-down: this supply against the last promoted one
   (REQ-QAC-108's reference), the invalid values for any check that has
@@ -1766,28 +1765,6 @@ Still to settle by driving the page: #8 and #17 - both since closed
  All the old unsigned
       drafts have now been refreshed except the parked calendar group
       (110-113) and REQ-QAC-145.
-
-18. **[investigate, 2026-10-07]** **[Dashboard UI]** **A past date shows
-    a warning about files from years later.** Seen by the dashboard UX
-    critic (post-build-review #132, out of its scope): Client Register with
-    the in-place-on date at 2023-08-05 shows "What is in the warehouse is
-    not the latest file - 2026-Q2 / 2026-Q3". If that notice reads files
-    received after the date on show, it is leaking the future into a past
-    view, which is what the as-of picker exists to prevent. A sighting, not
-    a diagnosis - not looked into yet.
-
-    **DIAGNOSED AND ANSWERED 2026-10-13.** It does leak: `promotionSplit()`
-    renders `ds.promotionState`, which the build computes once, as at the
-    build, so every past date shows today's promoted supply and today's
-    latest arrival. Keith chose to SHOW IT AS IT WAS THEN - work out, as at
-    the date on show, what was promoted and what had arrived unpromoted,
-    from the recorded filing and decision events - over hiding it on a
-    past date or labelling it "as of today". That amends REQ-DASH-056
-    (built: computed at build time), so it goes through the scoper and
-    sign-off as sprint 2's requirement.
-    SCOPED 2026-10-13 as REQ-DASH-197 (+ REQ-DASH-198 for the same leak in
-    the substituted/inherited label). Delete this entry when 197 is built,
-    once its decisions are confirmed carried.
 
 19. **[todo, 2026-10-13]** **[Dashboard UI]** **On a past date, the supply
     history lists supplies that arrived after it.** Found by delivery-scoper

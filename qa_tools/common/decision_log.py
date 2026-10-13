@@ -1024,6 +1024,10 @@ def promoted_supply(conn: supply_db.SupplyConnection, dataset_id: str,
         f"SELECT {', '.join('d.' + f for f in FIELDS)} "
         f'FROM "{qa_store.SCHEMA}".slot_holds(?, ?) h JOIN {TABLE} d ON d.id = h.decision_id '
         "WHERE h.held_as = ? "
-        "ORDER BY d.effective_at DESC, d.id DESC LIMIT 1",
+        # TWO PROMOTIONS AT ONE INSTANT: THE LATER PERIOD (REQ-DASH-197
+        # criterion 1; Keith, 2026-10-13). Period names sort in period order
+        # - '2026-Q2' after '2026-Q1', a date after the day before - and the
+        # id alone would have picked whichever was written second.
+        "ORDER BY d.effective_at DESC, h.slot DESC, d.id DESC LIMIT 1",
         [dataset_id, as_at, PROMOTED]))
     return rows[0] if rows else None

@@ -300,6 +300,16 @@ def all_blockers(conn=None) -> list[Blocker]:
         return _holds(db) + _contested(db) + _failed_loads(db)
 
 
+def contests(conn=None) -> list[Blocker]:
+    """Every contested pair, open or resolved - the one judgement of
+    whether a contest is open, for a reader that needs only contests
+    (REQ-DASH-197 criterion 4's 'two files for one table')."""
+    from qa_tools.common import delivery_log
+
+    with delivery_log._db(conn) as db:
+        return _contested(db)
+
+
 def refused_in_a_contest(conn=None) -> frozenset[tuple[str, str]]:
     """(dataset, physical) for every refused load that belongs to a
     contested pair - reported by the contest, never as its own item

@@ -120,8 +120,17 @@ def _refuse_if_not_there(moved, period: str, physical: str, supply: str) -> None
             f"the decision log. Nothing was done; find out where it went first.")
 
 
+#: A PERSON'S DECISIONS THAT SAY NOTHING ABOUT A SUPPLY'S DATA, so do not
+#: bar the rule from promoting it - the reasons are beside the query in
+#: decided_by_a_person(). Named once so the promotion panel's as-at walk
+#: (pipeline/promotion_timeline.py) reads the same list.
+NOT_A_DECISION_ABOUT_ITS_DATA = (
+    decision_log.SUPERSEDE, decision_log.UN_SUPERSEDE, decision_log.REFILE,
+    decision_log.EXCUSE_LATENESS, decision_log.WITHDRAW_EXCUSE, decision_log.KEEP)
+
+
 def decided_by_a_person(conn: supply_db.SupplyConnection,
-                        dataset_id: str, supply: str) -> bool:
+                        dataset_id: str, supply: str, as_at=None) -> bool:
     """Whether a PERSON has recorded any decision about this supply.
 
     Criteria 7, 11 and 12 in one question, and the scope is the whole
@@ -145,7 +154,9 @@ def decided_by_a_person(conn: supply_db.SupplyConnection,
     rows = conn.execute(
         f"SELECT 1 FROM {decision_log.TABLE} "
         "WHERE dataset_id = ? AND supply = ? AND actor_kind = ? "
-        "AND action NOT IN (?, ?, ?, ?, ?, ?) LIMIT 1",
+        f"AND action NOT IN ({', '.join('?' * len(NOT_A_DECISION_ABOUT_ITS_DATA))}) "
+        # AS AT AN INSTANT (REQ-DASH-197 criterion 22), on effective_at.
+        "AND (?::timestamptz IS NULL OR effective_at <= ?::timestamptz) LIMIT 1",
         # NOR DOES A RE-FILE (REQ-PIPE-141 criterion 8): the supply is
         # checked again in its new period and the gate decides, exactly as
         # for a first arrival - a person moving it is not a person deciding it.
@@ -154,9 +165,8 @@ def decided_by_a_person(conn: supply_db.SupplyConnection,
         # still waiting may promote itself under the gate.
         # NOR A KEEP (REQ-PIPE-170; delivery-critic on 170, D5): keeping a
         # supply where a correction would move it says nothing about its data.
-        [dataset_id, supply, decision_log.PERSON, decision_log.SUPERSEDE,
-         decision_log.UN_SUPERSEDE, decision_log.REFILE, decision_log.EXCUSE_LATENESS,
-         decision_log.WITHDRAW_EXCUSE, decision_log.KEEP]).fetchall()
+        [dataset_id, supply, decision_log.PERSON, *NOT_A_DECISION_ABOUT_ITS_DATA,
+         as_at, as_at]).fetchall()
     return bool(rows)
 
 

@@ -36,8 +36,7 @@ from qa_tools.common.validate_check_lifecycle import collect_checks
 from qa_tools.common import agreement
 from qa_tools.common import asset_time
 from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel, recorded_arrival,
-                      red_promoted, slot_timeline)
-from qa_tools.common import promotion_state
+                      promotion_timeline, red_promoted, slot_timeline)
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -491,6 +490,8 @@ def build() -> dict:
                                  **block})
     latest_block = arrival_by_run[latest_run]
 
+    # What each slot held, read once and shared by two embeds below.
+    slot_timeline_raw = slot_timeline.for_dataset("birth-registrations")
     return {
         "id": "birth-registrations",
         "name": "Birth Registrations",
@@ -512,8 +513,7 @@ def build() -> dict:
         # pipeline/slot_timeline.py for why the page must not be taught
         # to derive these for itself. Read from the decision log, with
         # each entry tied to the run that checked it.
-        "slotTimeline": slot_timeline.with_runs(
-            slot_timeline.for_dataset("birth-registrations"), "birth-registrations"),
+        "slotTimeline": slot_timeline.with_runs(slot_timeline_raw, "birth-registrations"),
         # EACH RUN'S SUPPLY, PROMOTED, AWAITING OR WITHDRAWN OVER TIME
         # (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05): the
         # page's verdict is the newest supply promoted or awaiting on the
@@ -558,8 +558,11 @@ def build() -> dict:
         # REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4), from
         # configuration and recorded verdicts only - None where it is not.
         "agreementRefusal": _agreement_refusal("birth-registrations"),
-        "promotionState": promotion_state.state_for(
-            "birth-registrations").as_record(),
+        # WHAT WAS PROMOTED AND WHAT HAD ARRIVED, AND WHAT EACH PERIOD STOOD
+        # ON, AS AT EACH DATE (REQ-DASH-197, REQ-DASH-198): change points, one
+        # walk of the slot timeline above - the page resolves promotionState
+        # for the date on show and never falls back to a build-time answer.
+        "promotionTimeline": promotion_timeline.for_dataset("birth-registrations", slot_timeline_raw),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
         "rowCount": row_count_by_run.get(latest_run),
