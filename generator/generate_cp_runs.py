@@ -572,6 +572,11 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     return deliveries
 
 
+def generated_periods() -> list:
+    """The periods this generator writes, oldest first - one delivery each."""
+    return schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-len(RUN_PLAN):]
+
+
 def _plan_injections(periods):
     """Where every Child Protection scenario lands, resolved BEFORE
     anything is written (REQ-GEN-044 criterion 4)."""
@@ -648,7 +653,7 @@ def main() -> None:
     # schedule while the pipeline measured them against another, and the
     # disagreement would read as a model failure rather than a config
     # duplication.
-    periods = schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-len(RUN_PLAN):]
+    periods = generated_periods()
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
     resolved_injections, injected_by_period = _plan_injections(periods)

@@ -34,9 +34,10 @@ worse than no injection at all, because the dashboard looks fine.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Sequence
 
@@ -97,6 +98,40 @@ class ExtraArrival:
 
 
 @dataclass(frozen=True)
+class Link:
+    """One scenario id's own in-place-on date, between two of its
+    placement's events (REQ-GEN-201).
+
+    LETTERED SIBLINGS SHARE ONE PLACEMENT (TS-75a, TS-75b, ...), and each
+    shows a different moment of it - so each carries its own date, and the
+    two events it must fall between, rather than the placement's one
+    default. A bounding event is an ARRIVAL, by the same index a scripted
+    decision uses for the placement's supplies, or a SCRIPTED DECISION, by
+    its `name:` - the only events whose instants configuration fixes
+    (criterion 2). `days` counts whole asset days from the FIRST event's
+    own day, 0 being that day (criterion 4).
+    """
+
+    scenario_id: str
+    days: int
+    #: An int is an arrival index; a str is a scripted decision's name.
+    first: int | str
+    second: int | str
+
+
+@dataclass(frozen=True)
+class LinkDate:
+    """A link resolved: its date, its two events' instants, and why it
+    cannot stand if it cannot (criteria 7-9)."""
+
+    scenario_id: str
+    on: date | None
+    first: tuple[str, datetime | None]
+    second: tuple[str, datetime | None]
+    problem: str | None = None
+
+
+@dataclass(frozen=True)
 class Injection:
     """One scenario's required shape, relative to an anchor period."""
 
@@ -140,6 +175,10 @@ class Injection:
     #: The period AFTER the anchor is generated green too, so the targeted
     #: perturbation does not carry into it (criterion 3).
     lead_in: int = 2
+    #: Per scenario id, the date its own placement record is in place on
+    #: (REQ-GEN-201). An id with no link keeps the default - the latest
+    #: day the placement has anything to show (criterion 6).
+    links: tuple[Link, ...] = ()
 
     @property
     def is_targeted(self) -> bool:
@@ -162,10 +201,26 @@ class Placement:
     #: and the green period after it (REQ-GEN-185 criteria 1 and 3).
     lead_in: tuple[str, ...] = ()
     follow: tuple[str, ...] = ()
+    #: Scenario id -> its link's resolved in-place-on date (REQ-GEN-201
+    #: criterion 5). Absent ids keep the default.
+    in_place_on: tuple[tuple[str, str], ...] = ()
 
     @property
     def built_green(self) -> tuple[str, ...]:
         return (*self.lead_in, *self.follow)
+
+    def in_place_on_for(self, scenario_id: str) -> str:
+        """A linked id's own date (REQ-GEN-201 criterion 5); otherwise the
+        latest day the placement has anything to show (criterion 6)."""
+        linked = dict(self.in_place_on).get(scenario_id)
+        if linked:
+            return linked
+        latest = self.period_date
+        for arrival in self.arrivals:
+            day = date.fromisoformat(arrival["date"])
+            if day > latest:
+                latest = day
+        return latest.isoformat()
 
     def as_record(self) -> dict:
         """The shape qa_tools/common/scenario_map.py reads.
@@ -174,16 +229,11 @@ class Placement:
         which is what a reader wants the dashboard set to - an earlier
         in-place-on date would hide the very arrival the scenario is about.
         """
-        latest = self.period_date
-        for arrival in self.arrivals:
-            day = date.fromisoformat(arrival["date"])
-            if day > latest:
-                latest = day
         return {
             "scenario_id": self.scenario_id,
             "dataset": self.dataset,
             "period": self.period,
-            "in_place_on": latest.isoformat(),
+            "in_place_on": self.in_place_on_for(self.scenario_id),
             "supplies": [a["run_id"] for a in self.arrivals if a.get("run_id")],
             "config": self.config,
             "lead_in": list(self.lead_in),
@@ -290,7 +340,8 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
     return out
 
 
-def resolve(injection: Injection, periods: Sequence) -> Placement:
+def resolve(injection: Injection, periods: Sequence,
+            scripts: Sequence | None = None) -> Placement:
     """Which real period this injection lands in.
 
     `periods` is the dataset's own generated periods, oldest first -
@@ -367,7 +418,7 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
             # verdict, never a value from a row.
             "target": extra.target.as_record() if extra.target is not None else None,
         })
-    return Placement(
+    placement = Placement(
         scenario_id=injection.scenario_id,
         dataset=injection.dataset_id,
         period=anchor.name,
@@ -378,6 +429,127 @@ def resolve(injection: Injection, periods: Sequence) -> Placement:
         quiet=tuple(quiet),
         lead_in=tuple(lead_in),
         follow=tuple(follow))
+    if not injection.links:
+        return placement
+    # THE DATE WRITTEN IS THE DATE VALIDATED (REQ-GEN-201 criterion 9):
+    # `mothman scenarios validate` asks link_dates() too.
+    dates = link_dates(injection, placement, scripts)
+    refused = [d.problem for d in dates if d.problem]
+    if refused:
+        raise CannotPlace("; ".join(refused))
+    return dataclasses.replace(placement, in_place_on=tuple(
+        (d.scenario_id, d.on.isoformat()) for d in dates))
+
+
+def link_dates(injection: Injection, placement: Placement,
+               scripts: Sequence | None = None) -> list[LinkDate]:
+    """THE ONE LINK RESOLVER (REQ-GEN-201 criterion 9): each link's date and
+    its two events' instants, from configuration and the calendar alone -
+    no generated history, no database (criterion 7) - with why it cannot
+    stand where it cannot (criteria 7 and 8).
+
+    An arrival's instant is the one the generator writes - its placed day
+    at its `at`, on the asset's clock. A scripted decision's is the one the
+    replay plays it at: its supply's receipt, or its period's due instant
+    for a period-scoped one, plus `after_hours`.
+    """
+    from qa_tools.common import asset_time, scripted_decisions
+
+    if scripts is None:
+        scripts = scripted_decisions.load()
+    ours = (injection.scenario_id, *injection.also_demonstrates)
+    mine = [s for s in scripts if s.scenario in ours]
+
+    def arrival_at(index: int) -> datetime | None:
+        if not 0 <= index < len(placement.arrivals):
+            return None
+        a = placement.arrivals[index]
+        return asset_time.wall_clock(date.fromisoformat(a["date"]), a["at"])
+
+    def event(ref) -> tuple[str, datetime | None, str | None]:
+        if isinstance(ref, int) and not isinstance(ref, bool):
+            label = f"arrival {ref}"
+            at = arrival_at(ref)
+            return label, at, (None if at is not None else
+                               f"{label} does not exist - the injection has "
+                               f"{len(placement.arrivals)}")
+        label = f"decision {ref!r}"
+        named = [s for s in mine if s.name == ref]
+        if not named:
+            return label, None, (f"no scripted decision of {', '.join(ours)} is named "
+                                 f"{ref!r}")
+        if len(named) > 1:
+            return label, None, (f"{len(named)} scripted decisions of {', '.join(ours)} "
+                                 f"are named {ref!r}, so it names none of them")
+        s = named[0]
+        if s.scope == scripted_decisions.PERIOD:
+            base = scripted_decisions._due_at(s.dataset_id, placement.period)
+            why = f"{s.dataset_id} has no slot for {placement.period}"
+        else:
+            base = arrival_at(s.supply_index if s.supply_index is not None else -1)
+            why = f"its supply {s.supply_index} is not one of the injection's arrivals"
+        if base is None:
+            return label, None, f"{label} cannot be timed: {why}"
+        return label, base + timedelta(hours=s.after_hours), None
+
+    out = []
+    for link in injection.links:
+        where = f"{injection.scenario_id}'s link for {link.scenario_id}"
+        first, second = event(link.first), event(link.second)
+        if link.scenario_id not in ours:
+            out.append(LinkDate(link.scenario_id, None, first[:2], second[:2],
+                                f"{where}: {link.scenario_id} is not a scenario this "
+                                f"placement demonstrates ({', '.join(ours)})"))
+            continue
+        broken = next((e[2] for e in (first, second) if e[2]), None)
+        if broken:
+            out.append(LinkDate(link.scenario_id, None, first[:2], second[:2],
+                                f"{where}: {broken}"))
+            continue
+        on = asset_time.local_date(first[1]) + timedelta(days=link.days)
+        end = asset_time.end_of_day(on)
+        problem = None
+        if not first[1] < end < second[1]:
+            problem = (f"{where}: the end of {on.isoformat()} ({end.isoformat()}) does not "
+                       f"fall strictly between {first[0]} at {first[1].isoformat()} and "
+                       f"{second[0]} at {second[1].isoformat()}")
+        out.append(LinkDate(link.scenario_id, on, first[:2], second[:2], problem))
+    return out
+
+
+def generated_periods(dataset_id: str) -> list:
+    """The periods the generator writes for this dataset, oldest first -
+    from configuration and the anchor date alone, as each generator's own
+    main() asks it."""
+    from qa_tools.common import hierarchy
+
+    cp = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")}
+    if dataset_id in cp:
+        from generator import generate_cp_runs
+
+        return generate_cp_runs.generated_periods()
+    from generator import generate_runs
+
+    return generate_runs.generated_periods()
+
+
+def link_problems(injections: Sequence[Injection] | None = None,
+                  scripts: Sequence | None = None) -> list[str]:
+    """Every declared link that cannot stand (REQ-GEN-201 criteria 7 and 8),
+    for `mothman scenarios validate` - through link_dates(), the resolver
+    the generator writes with (criterion 9)."""
+    out = []
+    for injection in (injections if injections is not None else INJECTIONS):
+        if not injection.links:
+            continue
+        try:
+            placement = resolve(dataclasses.replace(injection, links=()),
+                                generated_periods(injection.dataset_id))
+        except CannotPlace as exc:
+            out.append(str(exc))
+            continue
+        out += [d.problem for d in link_dates(injection, placement, scripts) if d.problem]
+    return out
 
 
 def for_dataset(dataset_id: str, injections: Sequence[Injection] | None = None
@@ -525,7 +697,8 @@ def write_placements(placements: Sequence[Placement],
     for placement in placements:
         record = placement.as_record()
         for also in _ALSO.get(placement.scenario_id, ()):
-            records.append({**record, "scenario_id": also})
+            records.append({**record, "scenario_id": also,
+                            "in_place_on": placement.in_place_on_for(also)})
         records.append(record)
     records.sort(key=lambda r: r["scenario_id"])
     target.write_text(json.dumps({"placements": records}, indent=2) + "\n")

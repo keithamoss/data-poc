@@ -625,6 +625,11 @@ def _no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
         seen[instant] = entry["run_id"]
 
 
+def generated_periods() -> list:
+    """The periods this generator writes, oldest first."""
+    return schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-N_DELIVERIES:]
+
+
 def _plan_injections(periods):
     """Where every Birth Registrations scenario lands, resolved BEFORE
     anything is written (REQ-GEN-044 criterion 4).
@@ -678,7 +683,7 @@ def main() -> None:
     # reasonable" would check against the last good reference point, not
     # against an already-failed attempt of the same delivery.
 
-    periods = schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-N_DELIVERIES:]
+    periods = generated_periods()
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
     # _plan_injections()'s own docstring.

@@ -296,6 +296,14 @@ class TestAPeriodScopedScriptIsValidated:
         (dict(stands_on=0), "not before the period it fills"),
         (dict(stands_on=2), "not before the period it fills"),
         (dict(scope="slot"), "scope must be `period`"),
+        # post-build-review #168: a supply-scoped substitution passed and
+        # then lost its stands_on at play time.
+        (dict(scope=None, supply_index=0), "a substitution is about a period"),
+        (dict(scope=None, supply_index=0, stands_on=None), "a substitution is about a period"),
+        (dict(after_hours=-500), "`after_hours: -500` is before"),
+        (dict(to_period="2024-Q1"), "`to_period:` means nothing on a period-scoped"),
+        (dict(period_from="placement"), "`period_from:` means nothing on a period-scoped"),
+        (dict(names_supply=False), "`names_supply:` means nothing on a period-scoped"),
     ])
     def test_each_refusal_names_the_entry_and_what_to_change(self, kw, says):
         found = sd.problems([_period_script(**kw)], registered={"TS-1"})
@@ -314,6 +322,60 @@ class TestAPeriodScopedScriptIsValidated:
         loaded = sd.load()
         assert loaded, "precondition: the committed script has entries"
         assert all(s.supply_index is not None and s.scope is None for s in loaded)
+
+
+class TestThePeriodsDueInstantIsTheCalendars:
+    """Criterion 1 against the REAL calendar (post-build-review #168): every
+    playback test pins _due_at, so nothing computed it."""
+
+    def test_due_at_is_the_slots_due_instant_not_its_claim_opening(self):
+        from qa_tools.common import schedule, slots
+
+        on = schedule.date_of("2024-Q3", "cp-placements")
+        due = sd._due_at("cp-placements", "2024-Q3")
+        assert due == slots.slot_instants("cp-placements", on).due_at
+        assert due.isoformat() == "2024-08-01T09:00:00+08:00"
+
+    def test_a_period_scoped_script_is_timed_from_it(self):
+        from types import SimpleNamespace
+
+        script = _period_script(dataset_id="cp-placements", after_hours=5)
+        timed, why = sd._timed_by_period(script, SimpleNamespace(period="2024-Q3"))
+        assert why == ""
+        assert timed.at.isoformat() == "2024-08-01T14:00:00+08:00"
+        assert timed.stands_on == "2024-Q2"
+
+    def test_before_plays_it_once_the_replay_reaches_its_instant(self, monkeypatch):
+        from types import SimpleNamespace
+
+        played = []
+        monkeypatch.setattr(sd, "_apply", lambda t: played.append(t.script.operation))
+        monkeypatch.setattr(sd, "_refuse_unless_synthetic", lambda: None)
+        player = sd.Player("child-protection", placements={"TS-1": SimpleNamespace(
+            period="2024-Q3", supplies=())}, scripts=[
+            _period_script(dataset_id="cp-placements"),
+            _period_script(dataset_id="cp-placements", operation="mark-not-supplied",
+                           stands_on=None)])
+        at = lambda iso: SimpleNamespace(received_at=datetime.fromisoformat(iso))
+        assert player.before(at("2024-07-01T00:00:00+08:00")) == 0
+        assert player.before(at("2024-09-01T00:00:00+08:00")) == 2
+        assert played == ["substitute", "mark-not-supplied"]
+
+
+class TestAMalformedScriptStopsTheReplayByName:
+    """post-build-review #168: a script naming neither a supply nor a period
+    scope reached the Player as a bare TypeError, naming no scenario."""
+
+    def test_it_is_refused_naming_the_scenario(self, monkeypatch):
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(sd, "_refuse_unless_synthetic", lambda: None)
+        player = sd.Player("child-protection", placements={"TS-1": SimpleNamespace(
+            period="2024-Q3", supplies=("run_001",))},
+            scripts=[_period_script(scope=None, stands_on=None, operation="promote",
+                                    dataset_id="cp-placements")])
+        with pytest.raises(sd.ScriptRefused, match="TS-1.*names neither a supply"):
+            player.finish()
 
 
 class TestTheRelativePeriodCountsTheDatasetsOwnPeriods:
@@ -409,6 +471,9 @@ class TestAPeriodScopedDecisionIsPlayed:
             self._player([_period_script()], period).finish()
         message = str(got.value)
         assert "TS-1" in message and "substitute" in message and period in message
+        # Substitution's OWN refusal, not any exception (post-build-review #168).
+        assert "holds no promoted supply" in message
+        assert "  " not in message and ".." not in message
         assert not conn.execute(f"SELECT 1 FROM {dl.TABLE} WHERE to_slot = ?",
                                 [period]).fetchall()
 

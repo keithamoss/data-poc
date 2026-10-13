@@ -90,6 +90,10 @@ class Script:
     #: For a substitution: the period it stands on, as an offset from the
     #: placement period in the dataset's own sequence (-1 the period before).
     stands_on: int | None = None
+    #: What a scenario link calls this decision when it bounds a date
+    #: (REQ-GEN-201 criterion 3) - unique within its scenario. A name, not
+    #: its position in the file, which an inserted decision would move.
+    name: str | None = None
 
 
 def load(path: Path | str | None = None) -> list[Script]:
@@ -112,7 +116,8 @@ def load(path: Path | str | None = None) -> list[Script]:
             to_period=raw.get("to_period"),
             period_from=str(raw.get("period_from") or "filed"),
             scope=(str(raw["scope"]) if raw.get("scope") is not None else None),
-            stands_on=(int(raw["stands_on"]) if raw.get("stands_on") is not None else None)))
+            stands_on=(int(raw["stands_on"]) if raw.get("stands_on") is not None else None),
+            name=(str(raw["name"]) if raw.get("name") is not None else None)))
     return out
 
 
@@ -138,6 +143,17 @@ def problems(scripts: list[Script], *, registered: set[str]) -> list[str]:
         except hierarchy.UnknownDatasetError:
             out.append(f"{where}: no dataset {s.dataset_id!r} in contract/data-asset.yaml")
         out += _scope_problems(s, where)
+    # ONE NAME, ONE DECISION, PER SCENARIO (REQ-GEN-201 criterion 3): a link
+    # naming a decision two carry names neither.
+    named: dict[tuple[str, str], int] = {}
+    for i, s in enumerate(scripts, 1):
+        if s.name is None:
+            continue
+        first = named.setdefault((s.scenario, s.name), i)
+        if first != i:
+            out.append(f"contract/scripted_decisions.yaml decisions {first} and {i} "
+                       f"({s.scenario}) are both named {s.name!r} - a name is unique "
+                       f"within its scenario")
     return out
 
 
@@ -162,6 +178,25 @@ def _scope_problems(s: Script, where: str) -> list[str]:
     if period_scoped and s.operation == "substitute" and s.stands_on is None:
         out.append(f"{where}: a substitution needs `stands_on:` - the period it stands on, as "
                    f"an offset (-1 the period before)")
+    # A SUBSTITUTION IS ALWAYS ABOUT A PERIOD (post-build-review #168): one
+    # scoped to a supply passed here and then lost its stands_on at play
+    # time, so the replay asked for a substitution standing on nothing.
+    if s.operation == "substitute" and not period_scoped:
+        out.append(f"{where}: a substitution is about a period with no supply of its own - "
+                   f"give `scope: period` and `stands_on:` (-1 the period before), not "
+                   f"`supply:`")
+    if s.after_hours < 0:
+        out.append(f"{where}: `after_hours: {s.after_hours}` is before the instant it is timed "
+                   f"from - a decision takes effect at or after it")
+    if period_scoped:
+        # FIELDS A PERIOD-SCOPED DECISION WOULD SILENTLY IGNORE: its period is
+        # the placement's and it names no supply.
+        for field_name, is_set in (("to_period", s.to_period is not None),
+                                   ("period_from", s.period_from != "filed"),
+                                   ("names_supply", not s.names_supply)):
+            if is_set:
+                out.append(f"{where}: `{field_name}:` means nothing on a period-scoped "
+                           f"decision, whose period is the scenario's own - drop it")
     if s.stands_on is not None and s.operation != "substitute":
         out.append(f"{where}: `stands_on:` is only for a substitution, not {s.operation!r}")
     if s.stands_on is not None and s.stands_on >= 0:
@@ -216,6 +251,13 @@ class Player:
                     waiting.append((s, why))
                 else:
                     ready.append(timed)
+                continue
+            if s.supply_index is None:
+                # Validate refuses this; the replay never calls validate, so
+                # it is named here rather than reaching a TypeError below
+                # (post-build-review #168).
+                waiting.append((s, "it names neither a supply nor a period scope - give "
+                                   "`supply: <index>` or `scope: period`"))
                 continue
             if placement is None or not placement.supplies:
                 waiting.append((s, "the scenario has no recorded placement with supplies - "
@@ -381,10 +423,11 @@ def _apply(t: Timed) -> None:
                     raise RuntimeError(f"it changed nothing - {outcome.message}")
         except Exception as exc:  # noqa: BLE001 - criterion 6: ANY failure stops the replay
             raise ScriptRefused(
-                f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} "
-                f"{t.period} {t.supply or ''}"
-                f"{f' standing on {t.stands_on}' if t.stands_on else ''} at {t.at.isoformat()} "
-                f"- was refused: {exc}. "
+                f"scripted decision for {s.scenario} - "
+                + " ".join(x for x in (s.operation, s.dataset_id, t.period, t.supply,
+                                       f"standing on {t.stands_on}" if t.stands_on else None,
+                                       f"at {t.at.isoformat()}") if x)
+                + f" - was refused: {str(exc).rstrip('.')}. "
                 f"The replay stops here rather than continue with a history missing it."
             ) from exc
     print(f"scripted: {s.operation} {s.dataset_id} {t.period} ({s.scenario})")

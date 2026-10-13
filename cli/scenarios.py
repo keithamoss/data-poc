@@ -87,12 +87,18 @@ def list_command(injected_only: bool) -> None:
 def validate_command() -> None:
     """Gate: the scripted decisions hold against configuration alone
     (REQ-GEN-135 criterion 13) - every scenario registered, every decision
-    a filing decision, every reason present, every dataset real."""
+    a filing decision, every reason present, every dataset real - and every
+    scenario link's date falls between its two events (REQ-GEN-201)."""
     from qa_tools.common import scripted_decisions
+
+    from generator import scenario_injection
 
     registered = {s.id for s in scenarios.parse_register()}
     script = scripted_decisions.load()
     found = scripted_decisions.problems(script, registered=registered)
+    # EACH SCENARIO LINK'S DATE BETWEEN ITS EVENTS (REQ-GEN-201), from
+    # configuration and the calendar alone.
+    found += scenario_injection.link_problems(scripts=script)
     if found:
         for problem in found:
             console.print(f"  - {problem}", style="red")

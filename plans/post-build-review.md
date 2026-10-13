@@ -8236,3 +8236,45 @@ twice. It deliberately did not re-find the `TypeError`.
     naming the table from the test's own uuid dataset too (28 passed) - in
     `tests/test_promotion_timeline.py` as well, which had the same helper.
     A test defect, not a product one; minor under the 2026-09-25 rule.
+
+168. **[in-progress, 2026-10-13]** **[Data Generation]** **The delivery
+    critic on REQ-GEN-200 as built (c610afc).** No criterion fails on the
+    period-scoped path TS-76 and TS-77 use. Each finding below was checked
+    against the code before it was acted on. Fixed test-first, all minor
+    under the 2026-09-25 rule:
+    - MEDIUM. A substitution scoped to a SUPPLY passed validate, with or
+      without `stands_on`, and then lost `stands_on` at play time - the
+      replay asked for a substitution standing on nothing. Validate now
+      refuses any substitution that is not `scope: period`, which is
+      criterion 8 read without the qualifier the code had added.
+    - MEDIUM (tests). Every playback test pinned `_due_at`, so the instant
+      criterion 1 is about was never computed by a test. New tests hold
+      the real due instant (cp-placements 2024-Q3 is 2024-08-01 09:00
+      Perth), a real `_timed_by_period`, and `Player.before()` playing two
+      period-scoped scripts in file order once the replay reaches them.
+    - LOW. A script naming neither a supply nor a scope reached the
+      Player as a bare `TypeError` naming no scenario, because the replay
+      never calls validate. It now waits with a reason, and the end of the
+      replay refuses it by name.
+    - LOW (tests). The stood-on-nothing test would have passed on any
+      exception. It now asserts substitution's own refusal.
+    - LOW (polish). The refusal message had a double space and a double
+      full stop. Validate now also refuses a negative `after_hours`, and
+      `to_period`, `period_from` or `names_supply` on a period-scoped
+      script, which used to be silently ignored.
+
+    OPEN, not fixed, for a later decision:
+    - LOW. `schedule.date_of` looks only a year past the REAL today, so
+      `relative_period` and `_due_at` answer differently as the calendar
+      date moves. For example, `relative_period("cp-clients", "2027-Q4",
+      -1)` is None today and will be 2027-Q3 after 2026-11-01. No
+      committed script reaches that far. REQ-GEN-196's relative re-file
+      target uses the same resolver with POSITIVE offsets, so check it
+      when that requirement is built.
+    - OBSERVATION. `_timed_by_period` never compares the placement's
+      dataset with the script's. A period the script's dataset does not
+      take part in is reported as "no period N before ...", when the real
+      problem is "not this dataset's period".
+    - The refusals raised at play time do not name the script entry or say
+      what to change (NFR 8). Validate already names both for every
+      configuration problem.

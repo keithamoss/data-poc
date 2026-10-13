@@ -32125,8 +32125,11 @@ requirements:
     - 'BUILT FIRST, SO THIS INTRODUCED THE RESOLVER (criterion 4): slots.relative_period(dataset, period, offset), over slots_for_dataset - the dataset''s own expected periods. REQ-GEN-196 criterion 8 uses it.'
     - 'A SUBSTITUTION''S SUPPLY IS RESOLVED WHEN IT IS PLAYED, not when it is timed: decision_log.promoted_into(stood-on period, as at the decision''s instant), because what that period holds depends on the decisions before it. None passes through to substitution''s own refusal (criterion 6).'
     - 'FOUND IN THE BUILD AND DECIDED BY KEITH, 2026-10-13: a scripted decision that CHANGES NOTHING (filing_decisions'' ''already done'', Outcome.changed False) now stops the replay like a refusal - for a person ''already done'' is a true answer, but a script exists to put a decision into the history. Found because the reverse-order test of criterion 5 did not fail: a de-substitution with nothing to remove succeeded silently. Applies to every scripted decision; amends REQ-GEN-135 criterion 6. Rejected: leaving it, so a scenario could quietly lack its decision.'
+    - 'A SUBSTITUTION IS ALWAYS PERIOD-SCOPED (post-build-review #168): validate refuses one scoped to a supply, with or without stands_on, because the supply path never carried stands_on to play time. Criterion 8 read without the qualifier the first build added.'
     open_questions: []
     linked_tests:
+    - tests/test_scripted_decisions.py::TestThePeriodsDueInstantIsTheCalendars
+    - tests/test_scripted_decisions.py::TestAMalformedScriptStopsTheReplayByName
     - tests/test_scripted_decisions.py::TestAPeriodScopedScriptIsValidated
     - tests/test_scripted_decisions.py::TestTheRelativePeriodCountsTheDatasetsOwnPeriods
     - tests/test_scripted_decisions.py::TestAPeriodScopedDecisionIsPlayed
@@ -32151,11 +32154,11 @@ requirements:
     date_written: '2026-10-13'
     story: As Keith demonstrating a scenario that has more than one moment worth showing, I want each of its links (lettered siblings sharing one placement) to open on its own declared date, bounded by the two events it must fall between, so that each link opens on a date where what it is about is actually on the page, and a date that drifts out of its window is caught from configuration before anyone bootstraps.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-13"
-    source: 'Keith, 2026-10-13, answer 3 on REQ-GEN-199 v3: split the per-link date capability out of REQ-GEN-199 into its own requirement, built before it. Carries v3 criteria 24 and 25 (delivery-architect finding B3). Drafted by delivery-scoper 2026-10-13. A proposal, not signed off.'
+    source: 'Keith, 2026-10-13, answer 3 on REQ-GEN-199 v3: split the per-link date capability out of REQ-GEN-199 into its own requirement, built before it. Carries v3 criteria 24 and 25 (delivery-architect finding B3). Drafted by delivery-scoper 2026-10-13.'
     acceptance_criteria:
     - THE SYSTEM SHALL let an Injection in generator/scenario_injection.py declare a LINK for each scenario id its placement demonstrates - its own id and each in also_demonstrates - giving that link's in-place-on date together with the two events of the same placement it must fall between.
     - THE SYSTEM SHALL let a link's bounding event be one of the injection's own arrivals, by the same supply index a scripted decision uses for that placement, or one of the scripted decisions (REQ-GEN-135, REQ-GEN-200) belonging to a scenario id the placement demonstrates, by the name that decision carries.
@@ -32189,3 +32192,22 @@ requirements:
     - 'DECIDED Keith, 2026-10-13: a link''s date counts whole asset days from its FIRST EVENT (0 = that event''s day) - over counting from the placement period like an arrival''s day_offset, so the commonest case - ''the day it arrived'' - is 0 and the window check is about the link alone.'
     - 'FINAL ARCHITECT PASS 2026-10-13: the `name:` key is a criterion of its own (with duplicate names refused), and an arrival is referenced by the same supply index a script uses, so a link and a script never number arrivals differently.'
     open_questions: []
+    linked_tests:
+    - tests/test_scenario_links.py::TestALinkIsDatedFromItsFirstEvent
+    - tests/test_scenario_links.py::TestTheDateMustFallBetweenItsEvents
+    - tests/test_scenario_links.py::TestALinkNamingNothingIsRefused
+    - tests/test_scenario_links.py::TestADecisionNameIsUniqueWithinItsScenario
+    - tests/test_scenario_links.py::TestThePlacementFileCarriesEachLinkedDate
+    - tests/test_scenario_links.py::TestValidateRefusesABadLink
+    implemented_by:
+    - generator/scenario_injection.py::Link
+    - generator/scenario_injection.py::link_dates
+    - generator/scenario_injection.py::link_problems
+    - generator/scenario_injection.py::resolve
+    - generator/scenario_injection.py::write_placements
+    - generator/scenario_injection.py::generated_periods
+    - qa_tools/common/scripted_decisions.py::problems
+    - cli/scenarios.py::validate_command
+    evidence:
+    - "2026-10-13: tests/test_scenario_links.py, 20 tests with no database. Swapping the end of the day for its start in link_dates() fails five of them, so criterion 4's reading of a bare date is held rather than assumed.\n"
+    - "2026-10-13: mothman scenarios validate passes on the committed configuration, which declares no links yet. REQ-GEN-199 is the first requirement to use them.\n"
