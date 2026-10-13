@@ -62,6 +62,42 @@ class CannotPlace(RuntimeError):
 
 
 @dataclass(frozen=True)
+class PairFile:
+    """One file of a delivery that carries two for one table (REQ-GEN-196).
+
+    `name` is a template - `{D}` is the placement day, `{D+1}` the day after
+    - so nothing here moves when ANCHOR_DATE is bumped. `content` says what
+    the rows are: `extract` (the day's), `next_day` (the next day's extract,
+    sent early), `duplicate` (byte-identical to the file before it),
+    or `corrected` (the first file's extract without its planted fault).
+    `shape` names a per-file transform from FILE_SHAPES - a stray test file
+    is `stray_test_rows`, a file the load refuses `unreadable_file`. A SHAPE, NEVER A VERDICT:
+    what the file IS, never what the pipeline will make of it."""
+
+    at: str
+    name: str
+    content: str = "extract"
+    severity: str | None = None
+    target: object | None = None
+    #: Named per-file transforms, applied in order (a stray test file that
+    #: also goes ragged is both).
+    shapes: tuple[str, ...] = ()
+    note: str = ""
+
+    def filename(self, day: date) -> str:
+        return self.name.replace("{D+1}", (day + timedelta(days=1)).isoformat()) \
+            .replace("{D}", day.isoformat())
+
+    @property
+    def built_for(self) -> int:
+        """Days after the placement day its extract is FOR."""
+        return 1 if self.content == "next_day" else 0
+
+
+PAIR_CONTENTS = ("extract", "next_day", "duplicate", "corrected")
+
+
+@dataclass(frozen=True)
 class ExtraArrival:
     """One arrival a scenario needs beyond the ordinary chain.
 
@@ -89,8 +125,23 @@ class ExtraArrival:
     #: replaces the preset outright, so naming both is refused. Still a
     #: shape, not a verdict: the real tools decide (criterion 6 above).
     target: object | None = None
+    #: TWO FILES IN ONE DELIVERY for one table (REQ-GEN-196), each with its
+    #: own receipt; `at` is then the earlier file's.
+    files: tuple[PairFile, ...] = ()
+
+    @property
+    def targets(self) -> tuple:
+        return tuple(x for x in (self.target, *(f.target for f in self.files))
+                     if x is not None)
 
     def __post_init__(self):
+        for f in self.files:
+            if f.content not in PAIR_CONTENTS:
+                raise CannotPlace(f"a pair file's content is one of "
+                                  f"{', '.join(PAIR_CONTENTS)}, not {f.content!r}")
+            if f.target is not None and f.severity is not None:
+                raise CannotPlace(f"a pair file at {f.at} names both a severity and a "
+                                  f"target - it is one or the other")
         if self.target is not None and self.severity is not None:
             raise CannotPlace(f"an arrival at {self.at} names both a severity "
                               f"({self.severity}) and a target - a target replaces the "
@@ -180,9 +231,14 @@ class Injection:
     #: day the placement has anything to show (criterion 6).
     links: tuple[Link, ...] = ()
 
+    #: A green day after the anchor, though nothing in it is targeted
+    #: (REQ-GEN-196): a pair settled at 11:00 the next day needs that day's
+    #: own supply to come after the settlement - a green one, on time.
+    green_follow: bool = False
+
     @property
     def is_targeted(self) -> bool:
-        return any(a.target is not None for a in self.arrivals)
+        return any(a.targets for a in self.arrivals)
 
 
 @dataclass(frozen=True)
@@ -239,7 +295,12 @@ class Placement:
             "lead_in": list(self.lead_in),
             "follow": list(self.follow),
             "targets": [{"date": a["date"], "at": a["at"], **a["target"]}
-                        for a in self.arrivals if a.get("target")],
+                        for a in self.arrivals if a.get("target")]
+            # A PAIR FILE'S TARGET, keyed by its delivery AND filename
+            # (REQ-GEN-196 criterion 19), on the day its extract is for.
+            + [{"date": a["date"], "at": f["at"], "delivery": a.get("delivery"),
+                "filename": f["filename"], "day": f["built_for"], **f["target"]}
+               for a in self.arrivals for f in (a.get("files") or []) if f.get("target")],
         }
 
 
@@ -268,7 +329,43 @@ FILE_SHAPES: dict[str, str] = {
     "columns_reordered":
         "cp_carers.csv arrives with its first two columns swapped, header and rows "
         "alike - the same data, laid out differently by an upstream export.",
+    # PER FILE (REQ-GEN-196's named-shapes NFR): applied to whichever file a
+    # pair names, never hardwired to one filename.
+    "unreadable_file":
+        "the file goes ragged partway - a row with more fields than its header - so "
+        "the load refuses it (TS-12's shape, for any one file).",
+    "stray_test_rows":
+        "a well-formed file with the dataset's real columns whose rows are plainly "
+        "test data - every registrant and parent named TEST - a test file that "
+        "should never have been sent.",
 }
+
+#: The shapes a single file of a pair may take (REQ-GEN-196).
+FILE_SHAPES_PER_FILE = ("unreadable_file", "stray_test_rows")
+#: The name columns a stray test file fills with TEST.
+_TEST_NAME_COLUMNS = ("child_given_names", "child_family_name",
+                      "registering_parent_1_name", "registering_parent_2_name")
+
+
+def shape_file(shape: str | None, content: str) -> str:
+    """One file's bytes, as the named per-file shape wants them. An unknown
+    name raises, as apply_file_shape's does."""
+    if shape is None:
+        return content
+    if shape not in FILE_SHAPES_PER_FILE:
+        raise CannotPlace(f"unknown per-file shape {shape!r} - known shapes are "
+                          f"{', '.join(FILE_SHAPES_PER_FILE)}")
+    if shape == "unreadable_file":
+        return unreadable(content)
+    import io
+
+    import pandas as pd
+
+    df = pd.read_csv(io.StringIO(content), dtype=str, keep_default_na=False)
+    for column in _TEST_NAME_COLUMNS:
+        if column in df.columns:
+            df[column] = df[column].where(df[column] == "", "TEST")
+    return df.to_csv(index=False)
 
 def unreadable(content: str) -> str:
     """The same extract, gone wrong partway through - ragged rows.
@@ -320,10 +417,10 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
     """
     if shape is None:
         return files
-    if shape not in FILE_SHAPES:
+    if shape not in FILE_SHAPES or shape in FILE_SHAPES_PER_FILE:
         raise CannotPlace(
             f"unknown file shape {shape!r} - known shapes are "
-            f"{', '.join(sorted(FILE_SHAPES))}")
+            f"{', '.join(sorted(set(FILE_SHAPES) - set(FILE_SHAPES_PER_FILE)))}")
     out = dict(files)
     if shape == "one_file_unreadable":
         out["cp_clients.csv"] = unreadable(files["cp_clients.csv"])
@@ -397,10 +494,13 @@ def resolve(injection: Injection, periods: Sequence,
                     f"lead-in period(s) before {anchor.name}, and the generated history "
                     f"starts too late for them")
             lead_in.append(periods[index - k].name)
+    # NO GREEN FOLLOW WHERE THE NEXT DAY IS SUPPRESSED (REQ-GEN-196
+    # criterion 19): it is filled only by a re-filed file.
+    if (injection.is_targeted or injection.green_follow) and 1 not in injection.suppress:
         if index + 1 >= len(periods):
             raise CannotPlace(
-                f"{injection.scenario_id}: its targeted supply needs the period after "
-                f"{anchor.name} generated green, and the history ends there")
+                f"{injection.scenario_id}: it needs the period after {anchor.name} "
+                f"generated green, and the history ends there")
         follow.append(periods[index + 1].name)
 
     arrivals = []
@@ -417,6 +517,14 @@ def resolve(injection: Injection, periods: Sequence,
             # intended counts filled in once the rows are built. Never a
             # verdict, never a value from a row.
             "target": extra.target.as_record() if extra.target is not None else None,
+            # A PAIR'S FILES, each by its real name and receipt (REQ-GEN-196).
+            "files": [{"filename": f.filename(anchor.date + timedelta(days=extra.day_offset)),
+                       "at": f.at, "content": f.content, "severity": f.severity,
+                       "shapes": list(f.shapes), "note": f.note,
+                       "built_for": (anchor.date + timedelta(
+                           days=extra.day_offset + f.built_for)).isoformat(),
+                       "target": f.target.as_record() if f.target is not None else None}
+                      for f in extra.files],
         })
     placement = Placement(
         scenario_id=injection.scenario_id,
@@ -855,6 +963,12 @@ _ALSO: dict[str, tuple[str, ...]] = {}
 #: read on each period's own date - so what remains is REQ-GEN-044's
 #: criteria 8 to 11: the generated history stating its eras as such
 #: versions.
+#: The configuration every two-file pair (REQ-GEN-196) is placed under.
+_PAIR_CONFIG = ("daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window - the "
+                "configuration in force from 2026-07-05. One delivery carries two files "
+                "for one table, each with its own receipt; a person settles the pair at "
+                "11:00 the next day.")
+
 INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-1",
@@ -1074,6 +1188,146 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(-20, "10:00", None,
                           "the whole collection, twenty days early - before its window"),
         ),
+    ),
+    # TWO FILES FOR ONE TABLE (REQ-GEN-196), one pair per way a person can
+    # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two
+    # files carry their own receipts, settled by a scripted person at 11:00
+    # the next day (contract/scripted_decisions.yaml), so the arrival day
+    # reads contested and the day after reads settled. Placed in August:
+    # after the July days REQ-GEN-196 criterion 20 added, which is where the
+    # ordinary reds move to (_reds_clear_of_scenarios), and before TS-78's
+    # late-August days. Only a file the
+    # script makes a supply is targeted (criterion 19).
+    Injection(
+        scenario_id="TS-68",
+        dataset_id="birth-registrations",
+        anchor=-49,
+        config=_PAIR_CONFIG + " A duplicate send: the same extract twice, ten minutes "
+               "apart, the duplicate's name sorting before the original's.",
+        arrivals=(
+            ExtraArrival(0, "13:40", note="one delivery, the day's extract sent twice",
+                          files=(
+                PairFile("13:40", "birth_registrations_{D}.csv",
+                         target=Target("green"), note="the day's extract"),
+                PairFile("13:50", "birth_registrations_{D}-1.csv", content="duplicate",
+                         note="the same bytes again - kept, superseded"),
+            )),
+        ),
+        lead_in=1,
+    ),
+    Injection(
+        scenario_id="TS-69",
+        dataset_id="birth-registrations",
+        anchor=-46,
+        config=_PAIR_CONFIG + " The next day's extract is sent early, in the same "
+               "delivery as today's; the next day has no supply of its own.",
+        arrivals=(
+            ExtraArrival(0, "13:30", note="one delivery, today's extract and tomorrow's",
+                          files=(
+                PairFile("13:30", "birth_registrations_{D}.csv",
+                         target=Target("green"), note="the day's extract"),
+                PairFile("13:45", "birth_registrations_{D+1}.csv", content="next_day",
+                         target=Target("green"),
+                         note="the next day's extract, sent early - re-filed to it"),
+            )),
+        ),
+        suppress=(1,),
+        lead_in=1,
+    ),
+    Injection(
+        scenario_id="TS-70",
+        dataset_id="birth-registrations",
+        anchor=-43,
+        config=_PAIR_CONFIG + " The day's extract arrives on time with a fault, and a "
+               "corrected re-export follows at 16:30 - after the grace, before the next "
+               "day's window - named to sort first.",
+        arrivals=(
+            ExtraArrival(0, "13:40", note="one delivery, an extract and its correction",
+                          files=(
+                PairFile("13:40", "birth_registrations_{D}.csv", severity="red",
+                         note="the day's extract, with a planted fault - rejected"),
+                PairFile("16:30", "birth_registrations_{D}-resend.csv", content="corrected",
+                         target=Target("green"),
+                         note="the same extract with the fault fixed - the supply, late"),
+            )),
+        ),
+        lead_in=1,
+    ),
+    Injection(
+        scenario_id="TS-71",
+        dataset_id="birth-registrations",
+        anchor=-40,
+        config=_PAIR_CONFIG + " A stray test file that loads arrives before the day's "
+               "real extract.",
+        arrivals=(
+            ExtraArrival(0, "13:20", note="one delivery, a test file and the real extract",
+                          files=(
+                PairFile("13:20", "birth_registrations_{D}_TEST.csv",
+                         shapes=("stray_test_rows",),
+                         note="test rows that should never have been sent - rejected"),
+                PairFile("13:40", "birth_registrations_{D}.csv",
+                         target=Target("green"), note="the day's extract"),
+            )),
+        ),
+        lead_in=1,
+    ),
+    Injection(
+        scenario_id="TS-72",
+        dataset_id="birth-registrations",
+        anchor=-37,
+        config=_PAIR_CONFIG + " The day's extract, then a stray test file the load "
+               "refuses - named to sort first by bytes, second by the database's "
+               "collation.",
+        arrivals=(
+            ExtraArrival(0, "13:30", note="one delivery, the real extract and a broken test file",
+                          files=(
+                PairFile("13:30", "birth_registrations_{D}.csv",
+                         target=Target("green"), note="the day's extract"),
+                PairFile("13:35", "birth_registrations_{D}-test.csv",
+                         shapes=("stray_test_rows", "unreadable_file"),
+                         note="test rows, ragged partway - never loads, rejected"),
+            )),
+        ),
+        lead_in=1,
+    ),
+    Injection(
+        scenario_id="TS-73",
+        dataset_id="birth-registrations",
+        anchor=-34,
+        config=_PAIR_CONFIG + " A faulty extract and a stray test file; a person "
+               "rejects both, and the day stays owed.",
+        arrivals=(
+            ExtraArrival(0, "13:20", note="one delivery, neither file usable",
+                          files=(
+                PairFile("13:20", "birth_registrations_{D}.csv", severity="red",
+                         note="the day's extract, with a planted fault - rejected"),
+                PairFile("13:40", "birth_registrations_{D}_TEST.csv",
+                         shapes=("stray_test_rows",),
+                         note="test rows - rejected"),
+            )),
+        ),
+        green_follow=True,
+    ),
+    Injection(
+        scenario_id="TS-74",
+        dataset_id="birth-registrations",
+        anchor=-30,
+        config=_PAIR_CONFIG + " Tomorrow's extract sent early beside a stray test file, "
+               "and nothing for today: the early file is re-filed, the test file "
+               "rejected, and today stays owed.",
+        arrivals=(
+            ExtraArrival(0, "13:30", note="one delivery, tomorrow's extract and a test file",
+                          files=(
+                PairFile("13:30", "birth_registrations_{D+1}.csv", content="next_day",
+                         target=Target("green"),
+                         note="the next day's extract, sent early - re-filed to it"),
+                PairFile("13:45", "birth_registrations_{D}_TEST.csv",
+                         shapes=("stray_test_rows",),
+                         note="test rows - rejected"),
+            )),
+        ),
+        suppress=(1,),
+        lead_in=1,
     ),
 )
 

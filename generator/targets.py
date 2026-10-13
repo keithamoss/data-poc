@@ -45,6 +45,9 @@ class Built:
     #: The day it was built for - its trial is checked on it, so freshness
     #: reads the supply as the replay will.
     day: str | None = None
+    #: One file of a two-file delivery (REQ-GEN-196 criterion 19): a pair's
+    #: two supplies share a delivery, so the file is part of the key.
+    filename: str | None = None
 
 
 def _read(path: Path) -> dict:
@@ -85,6 +88,15 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
                              _only(by_period, period, scenario)["delivery"], "green",
                              scenario=scenario, day=period))
         for target in record["targets"]:
+            if target.get("filename"):
+                # A PAIR'S FILE, keyed by its delivery and filename, on the
+                # day its extract is for (REQ-GEN-196 criterion 19).
+                out.append(Built(f"{scenario}'s {target['filename']}", BDM_DATASET,
+                                 target["delivery"], target["built_to"],
+                                 rules=tuple(target.get("rules") or ()), scenario=scenario,
+                                 reference=reference, injected=True, day=target["day"],
+                                 filename=target["filename"]))
+                continue
             entry = _arriving_at(by_period, target["date"], target["at"], scenario)
             out.append(Built(f"{scenario}'s {target['date']} {target['at']} arrival",
                              BDM_DATASET, entry["delivery"], target["built_to"],
@@ -129,9 +141,17 @@ def _arriving_at(by_period: dict, day: str, at: str, scenario: str) -> dict:
                      f"{day} {at}, where its placement says one was built")
 
 
-def csv_of(delivery_name: str, deliveries_dir: Path | None = None) -> Path:
-    """A Birth Registrations delivery's one file."""
-    files = sorted(Path(deliveries_dir or delivery.DELIVERIES_DIR, delivery_name).glob("*.csv"))
+def csv_of(delivery_name: str, deliveries_dir: Path | None = None,
+           filename: str | None = None) -> Path:
+    """A Birth Registrations delivery's one file - or, for one file of a
+    two-file delivery (REQ-GEN-196), the file named."""
+    folder = Path(deliveries_dir or delivery.DELIVERIES_DIR, delivery_name)
+    if filename is not None:
+        path = folder / filename
+        if not path.is_file():
+            raise ValueError(f"delivery {delivery_name} holds no file {filename}")
+        return path
+    files = sorted(folder.glob("*.csv"))
     if len(files) != 1:
         raise ValueError(f"delivery {delivery_name} holds {len(files)} CSV files, not one")
     return files[0]

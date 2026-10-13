@@ -618,3 +618,23 @@ class TestTheEarlyChildProtectionSupplies:
                 assert acts[-1][0] == "reject" and acts[-1][3] == "person", acts
             else:
                 assert ("refile", "2023-Q3", "2023-Q4", "person") in acts, (ds, acts)
+
+
+def test_a_pair_targets_only_the_files_its_script_makes_supplies():
+    """REQ-GEN-196 criterion 19: a file the script settles as rejected or
+    kept but superseded is not targeted - nobody checks it, so it has no
+    verdict to compare - and a file it makes a supply is."""
+    from generator import scenario_injection as si
+    from qa_tools.common import scripted_decisions as sd
+
+    scripts = {s.scenario: s for s in sd.load() if s.operation == sd.CHOOSE_FILE}
+    pairs = [i for i in si.INJECTIONS if any(a.files for a in i.arrivals)]
+    assert len(pairs) == 7, [i.scenario_id for i in pairs]
+    for injection in pairs:
+        (arrival,) = [a for a in injection.arrivals if a.files]
+        outcomes = scripts[injection.scenario_id].files
+        for position, (f, outcome) in enumerate(zip(arrival.files, outcomes), start=1):
+            makes_a_supply = outcome == "supply" or outcome.startswith("refile")
+            assert (f.target is not None) == makes_a_supply, (
+                f"{injection.scenario_id} file {position} is {outcome} and "
+                f"{'not ' if f.target is None else ''}targeted")

@@ -655,3 +655,25 @@ class TestAScriptedSettlement:
         assert choose["effective_at"] == _at(nxt, "11:00")
         assert filing.filing_for(DS, p.second)["slot"] == nxt.isoformat()
         assert len(ran) == 2, "both supplies' re-checks run, in order"
+
+    def test_a_refused_files_outcome_other_than_reject_stops_the_replay(self, conn, day,
+                                                                         monkeypatch):
+        """Criterion 16 (REQ-PIPE-193 criterion 7): TS-72's script giving the
+        file the load refused anything but 'reject' stops the replay, naming
+        the scenario - its settlement is never recorded."""
+        from qa_tools.common import load_log, scenario_map, scripted_decisions as sd
+
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{day}-test.csv", _at(day, "13:35"))])
+        load_log.record(p.delivery, DS, p.table[p.files[1][0]], load_log.FAILED,
+                        _at(day, "13:35").isoformat(), reason="ragged")
+        placements = {"TS-72": scenario_map.Placement(
+            scenario_id="TS-72", dataset=DS, period=p.period, in_place_on=p.period,
+            supplies=(supply_files.arrival_run_id_of(DS, p.pair),))}
+        player = sd.Player("civil-registration", placements=placements, scripts=[
+            self._script(scenario="TS-72", files=("reject", "supply"))])
+        monkeypatch.setattr(sd, "_run_the_re_check_it_owed", lambda t, owed: None)
+        with pytest.raises(sd.ScriptRefused, match="TS-72") as refused:
+            player.finish()
+        assert "never loaded" in str(refused.value)
+        assert not [d for d in _entries(conn, p.pair) if d["action"] == "choose-file"]

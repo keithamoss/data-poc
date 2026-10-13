@@ -137,6 +137,18 @@ calendars:
       # rather than moving the 2026-08-24 one, which has governed filings and
       # may only change by a declared correction (REQ-PIPE-173). Nothing was
       # judged against these days, so adding them changes no verdict.
+      # FORTY EARLIER DAYS (REQ-GEN-196 criterion 20, Keith, 2026-10-13): the
+      # same reasoning as the version after it - an earlier version, never a
+      # moved one - so the history can grow to 80 daily supplies at its OLD end.
+      - effective_from: "2026-07-05"
+        changelog:
+          - date: "2026-10-13"
+            author: REQ-GEN-196
+            change: >-
+              Forty days of daily supply before 2026-08-14, because the synthetic history grows from 40 daily supplies to 80 (Keith's call) to fit seven contested-pair scenarios, TS-78's six days and every existing scenario. Added at the old end so every existing scenario keeps its date. The same rule and claim window as the versions after it.
+        claim_window: 4h
+        cadence:
+          rule: daily
       - effective_from: "2026-08-14"
         changelog:
           - date: "2026-10-11"
@@ -198,6 +210,17 @@ datasets:
   - id: birth-registrations
     participation:
       versions:
+        # FORTY MORE, AS AN EARLIER VERSION AGAIN (REQ-GEN-196 criterion 20).
+        - effective_from: "2026-07-05"
+          expected_time: "14:00"
+          grace: 1h
+          changelog:
+            - date: "2026-10-13"
+              author: REQ-GEN-196
+              change: >-
+                Birth Registrations owes a supply from 2026-07-05, forty days earlier -
+                the synthetic history is 80 days now. The same due time and grace
+                as the versions after it.
         # TEN EARLIER DAYS, AS AN EARLIER VERSION (REQ-GEN-185) - see the daily
         # calendar above for why not by moving the 2026-08-24 one.
         - effective_from: "2026-08-14"

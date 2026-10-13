@@ -153,7 +153,7 @@ def try_targets(say=None) -> int:
                 ("it has no lead-in to be measured against",)))
             continue
         results, _filed = run_check_local_file(
-            str(targets.csv_of(built.delivery, written_to)),
+            str(targets.csv_of(built.delivery, written_to, built.filename)),
             str(targets.csv_of(built.reference, written_to)),
             "target-trial", keep=False, run_date=built.day)
         disagreement = target_agreement.compare(built.dataset_id, results, built.target,

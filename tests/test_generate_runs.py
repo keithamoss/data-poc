@@ -361,7 +361,14 @@ class TestTheInjectedScenariosAreReallyThere:
     def test_the_outage_left_two_days_with_nothing_at_all(self, manifest):
         """TS-2, and the half that is an ABSENCE - the easiest thing in
         this requirement to stop generating without anyone noticing."""
-        _, suppressed = _injected_periods()
+        from generator import scenario_injection as si
+        from generator.anchor_date import get_anchor_date
+        from qa_tools.common import schedule
+
+        periods = schedule.periods_for_dataset(
+            "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+        ts2 = next(i for i in si.INJECTIONS if i.scenario_id == "TS-2")
+        suppressed = set(si.resolve(ts2, periods).suppressed)
         assert len(suppressed) == 2, sorted(suppressed)
         present = {e["period"] for e in manifest}
         assert not (present & suppressed), sorted(present & suppressed)

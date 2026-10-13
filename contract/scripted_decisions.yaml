@@ -84,3 +84,65 @@ decisions:
     supply: 0
     after_hours: 216
     reason: "Part of the supplier's 2023-Q4 extract, sent early; case workers are not delivered for 2023-Q4, so this table is not a supply for any period."
+  # REQ-GEN-196: each two-file pair (TS-68 to TS-74) is settled by a person
+  # with one choose-file decision at 11:00 the NEXT day on the asset's clock -
+  # a later asset day than both receipts, so the arrival day reads contested,
+  # and before that day's own 14:30 supply. Files are named by POSITION in
+  # receipt order (1 = the earlier), resolved to filenames at play time;
+  # `refile:+1` is the day after the placement.
+  - scenario: TS-68
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, supersede]
+    reason: "The supplier sent the same file twice; the first is the day's supply and the copy is kept but superseded."
+  - scenario: TS-69
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, "refile:+1"]
+    reason: "The second file is the next day's extract, sent early; it belongs to the next day."
+  - scenario: TS-70
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The supplier re-exported the day's extract with the fault fixed; the corrected file is the day's supply."
+  - scenario: TS-71
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The first file is the supplier's test data, sent by mistake; the real extract is the day's supply."
+  - scenario: TS-72
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [supply, reject]
+    reason: "The second file is the supplier's test data and never loaded; the real extract is the day's supply."
+  - scenario: TS-73
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, reject]
+    reason: "Neither file is usable: the extract is faulty and the other is test data. The supplier will resend."
+  - scenario: TS-74
+    operation: choose-file
+    dataset: birth-registrations
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: ["refile:+1", reject]
+    reason: "The first file is the next day's extract, sent early, and the second is test data; nothing came for this day."

@@ -114,14 +114,21 @@ def recorded_results(conn, run_key: str) -> list[dict]:
 def after_replay(conn, built: Sequence) -> list[Disagreement]:
     """Every targeted supply's recorded verdict against its target
     (criterion 3). `built` is generator/targets.py's list - anything with
-    label, dataset_id, delivery, target and rules."""
+    label, dataset_id, delivery, target and rules, and a pair's file its
+    filename."""
     from qa_tools.common import delivery_log, promotion, qa_store
 
     reads = promotion._declared_reads()
-    supplies = delivery_log.supply_ids(sorted({b.delivery for b in built}), conn)
+    deliveries = sorted({b.delivery for b in built})
+    supplies = delivery_log.supply_ids(deliveries, conn)
+    # ONE FILE OF A PAIR is keyed by its filename too (REQ-GEN-196 criterion
+    # 19): the pair's two supplies share a delivery.
+    by_file = delivery_log.supply_ids_by_file(deliveries, conn)
     out: list[Disagreement] = []
     for b in built:
-        supply = supplies.get((b.delivery, b.dataset_id))
+        filename = getattr(b, "filename", None)
+        supply = (by_file.get((b.delivery, b.dataset_id, filename)) if filename
+                  else supplies.get((b.delivery, b.dataset_id)))
         run = qa_store.current_run(conn, b.dataset_id, supply) if supply else None
         if run is None:
             out.append(Disagreement(b.label, b.dataset_id, b.target, None,

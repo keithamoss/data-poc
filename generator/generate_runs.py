@@ -57,6 +57,7 @@ reading it.
 from __future__ import annotations
 import json
 import os
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -139,7 +140,12 @@ _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_
 # their lead-ins and following days claims nearly every day from 2026-09-03
 # to the anchor, and the ordinary reds' resends need ordinary days to land
 # on. The extra ten are August days, before every scenario.
-N_DELIVERIES = 40
+# 80, NOT 40 (Keith, 2026-10-13, REQ-GEN-196 criterion 20): seven
+# contested-pair scenarios (TS-68 to TS-74), TS-78's six days and every
+# existing scenario, with every ordinary red and amber still drawn. The
+# extra forty are added at the OLD end (from 2026-07-05), so every existing
+# negative anchor keeps its calendar date.
+N_DELIVERIES = 80
 
 
 # The clean/amber/red mix across the scheduled deliveries. Named rather
@@ -525,6 +531,11 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
         if n:
             payload = provider.churn(payload, seed=seed + 900 + n, run_date=period.date,
                                       id_offset=id_offset + (n + 1) * (ID_BLOCK // 10))
+        if extra.files:
+            deliveries.append(_pair_delivery(provider, injection, extra, n, payload, period,
+                                             seed, id_offset, n_rows, previous_row_count,
+                                             placement))
+            continue
         this = payload
         if extra.target is not None:
             # BUILT TO A TARGET, NEVER THE PRESET (REQ-GEN-184 criterion 1),
@@ -545,6 +556,64 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
             received_date=period.date + timedelta(days=extra.day_offset),
             severity=extra.severity, payload=this))
     return deliveries
+
+
+@dataclass
+class PairDelivery:
+    """ONE DELIVERY CARRYING TWO FILES for one table (REQ-GEN-196), each with
+    its own bytes and receipt. `payload` is the supply-shaped file, which
+    sizes the day after - never a stray test file (the requirement's NFR)."""
+
+    received_date: date
+    severity: str | None
+    payload: pd.DataFrame
+    #: filename -> (CSV text, wall-clock receipt on received_date)
+    files: dict
+
+
+def _pair_delivery(provider, injection, extra, n: int, base, period, seed: int,
+                   id_offset: int, n_rows: int, previous_row_count, placement):
+    """A pair's two files, built as the injection says (REQ-GEN-196): each
+    file's content, then its target or severity, then its named shape. A
+    SHAPE, NEVER A VERDICT - the pipeline decides what each file reads as."""
+    day = period.date + timedelta(days=extra.day_offset)
+    where = f"{injection.scenario_id}, its {extra.at} delivery"
+    files: dict[str, tuple[str, str]] = {}
+    supply_shaped = None
+    previous_csv = None
+    for k, f in enumerate(extra.files):
+        if f.content == "duplicate":
+            if previous_csv is None:
+                raise scenario_injection.CannotPlace(
+                    f"{where}: file {k + 1} is a duplicate of nothing - a duplicate "
+                    f"follows the file it copies")
+            csv = previous_csv
+        else:
+            if f.content == "next_day":
+                df = provider.generate(day + timedelta(days=1), seed=seed + 60 + k,
+                                       n_rows=n_rows,
+                                       id_offset=id_offset + (k + 5) * (ID_BLOCK // 10))
+            else:  # extract, corrected - the day's own extract, as built
+                df = base.copy()
+            if f.target is not None:
+                df, moved = targeting.bdm_target(
+                    df, f.target, seed=seed + 810 + k, where=f"{where}, file {k + 1}",
+                    rows=previous_row_count)
+                if placement is not None:
+                    placement.arrivals[n]["files"][k]["target"]["moved"] = moved
+            elif f.severity:
+                df = provider.dirty(df, severity=f.severity, seed=seed + 820 + k,
+                                    previous_row_count=previous_row_count)
+            if supply_shaped is None and not f.shapes:
+                supply_shaped = df
+            csv = df.to_csv(index=False)
+            for shape in f.shapes:
+                csv = scenario_injection.shape_file(shape, csv)
+        files[f.filename(day)] = (csv, f.at)
+        previous_csv = csv
+    return PairDelivery(received_date=day, severity=extra.severity,
+                        payload=supply_shaped if supply_shaped is not None else base,
+                        files=files)
 
 
 def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str],
@@ -647,8 +716,8 @@ def _plan_injections(periods):
 
     for injection in mine:
         for extra in injection.arrivals:
-            if extra.target is not None:
-                targeting.check_target(extra.target, injection.dataset_id,
+            for target in extra.targets:
+                targeting.check_target(target, injection.dataset_id,
                                        f"{injection.scenario_id}, its {extra.at} arrival")
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
@@ -713,7 +782,12 @@ def main() -> None:
         [p.date for p, sev in zip(periods, severities) if sev == "amber"]
         + [p.date for p in periods if p.name in green_periods]
         + [p.date for p in periods if p.name in injected_by_period and any(
-            x.target is not None for x in injected_by_period[p.name][0].arrivals)])
+            x.targets for x in injected_by_period[p.name][0].arrivals)]
+        # THE NEXT DAY'S EXTRACT A PAIR SENDS EARLY is built to a target too
+        # (REQ-GEN-196): never stale either.
+        + [p.date + timedelta(days=1) for p in periods if p.name in injected_by_period
+           and any(f.target is not None and f.content == "next_day"
+                   for x in injected_by_period[p.name][0].arrivals for f in x.files)])
 
     for i, ((drawn_rows, _drawn), severity, period) in enumerate(
             zip(RUN_PLAN, severities, periods), start=1):
@@ -755,7 +829,7 @@ def main() -> None:
                 where=f"the green period {period.name}", rows=previous_row_count)
             deliveries = [Delivery(received_date=slot_date, severity=None, payload=payload)]
         elif injected is not None:
-            if any(x.target is not None for x in injected[0].arrivals) \
+            if any(x.targets for x in injected[0].arrivals) \
                     and previous_row_count:
                 n_rows = previous_row_count  # asked at that size, trimmed exactly
             deliveries = _injected_chain(provider, injected[0], period, seed,
@@ -831,11 +905,19 @@ def main() -> None:
                 # resolved from recognition below - observed rather than
                 # predicted.
                 injected[1].arrivals[n - 1]["delivery"] = name
+            if isinstance(delivery_obj, PairDelivery):
+                files = {fn: csv for fn, (csv, _at) in delivery_obj.files.items()}
+                # EACH FILE'S OWN RECEIPT (REQ-GEN-196): the pair is two
+                # arrivals' worth of evidence in one delivery.
+                received = {fn: asset_time.wall_clock(delivery_obj.received_date, at)
+                            for fn, (_csv, at) in delivery_obj.files.items()}
+            else:
+                files = {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
+                         delivery_obj.payload.to_csv(index=False)}
+                received = asset_time.parse_instant(entry["received_at"], entry["run_id"])
             delivery.write_delivery(
-                name,
-                {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
-                    delivery_obj.payload.to_csv(index=False)},
-                received_at=asset_time.parse_instant(entry["received_at"], entry["run_id"]),
+                name, files,
+                received_at=received,
                 deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
                 # STORAGE, because in this PoC the generator IS storage
                 # (REQ-PIPE-105 criterion 4). It is standing in for the

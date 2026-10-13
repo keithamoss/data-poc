@@ -3034,6 +3034,60 @@ about - and "have it refiled to Q4 by a synthetic human making a decision".
 **Breaks as**: assigned 2023-Q4 by the RULE because it was obviously meant
 for it; or 2023-Q4 left empty once the person has re-filed it.
 
+**TWO FILES FOR ONE TABLE (REQ-GEN-196).** Seven Birth Registrations
+deliveries, each carrying two files for one table with their own receipts,
+one per way a person can settle a pair through REQ-PIPE-193's choose-file
+decision. Shared config for all seven: *daily, due 14:00 AWST, 60 minutes'
+grace, 4-hour claim window (the version in force from 2026-07-05); a
+scripted person settles each pair at 11:00 the next day, before that day's
+own supply.* Every pair **Expects** to read "Two files for one table" -
+contested, the dataset red - on its arrival day, where its scenario link
+opens, and settled from the next day. Every pair **Breaks as** the
+dashboard still reading contested after the settlement, or the wrong file
+checked. Placed in early August, after the July days that hold the ordinary reds.
+
+**TS-68 `[INJECT]` A duplicate send.** The day's extract at 13:40, the same
+bytes again at 13:50 named `birth_registrations_<D>-1.csv`, which sorts
+first. **Expect**: file one D's supply, on time and promoted; file two kept
+but superseded. **Breaks as**: the duplicate, sorting first, taken as file
+one - the staged ordinal and the supply ordinal disagreeing.
+
+**TS-69 `[INJECT]` Tomorrow's file sent early with today's.** D's extract
+at 13:30, D+1's at 13:45 named by D+1's date; D+1 has no supply of its own.
+**Expect**: file one D's supply; file two re-filed to D+1, checked there,
+and D+1's only supply. **Breaks as**: D+1 left with no supply, or the
+re-filed file checked against D.
+
+**TS-70 `[INJECT]` A faulty file and its corrected re-export.** D's extract
+with a planted fault at 13:40, the corrected re-export at 16:30 - after the
+grace, before D+1's window - named `-resend`, sorting first. **Expect**:
+file one rejected; file two D's supply, its own receipt taken, so D reads
+**late**, 4:30pm; no hold; D+1 unaffected. **Breaks as**: D read on time
+from file one's receipt.
+
+**TS-71 `[INJECT]` A stray test file that loads.** `_TEST.csv` with every
+registrant named TEST at 13:20, the real extract at 13:40. **Expect**: the
+test file rejected; the real one D's supply, on time. **Breaks as**: the
+test rows checked as D's supply.
+
+**TS-72 `[INJECT]` A stray test file the load refuses.** The real extract
+at 13:30, a ragged `-test.csv` at 13:35 - first by bytes, second by the
+database's collation. **Expect**: the test file offered only "rejected",
+named as never loaded; the real file D's supply, checked by the real
+tools, on time and promoted. **Breaks as**: the real file named as the one
+that never loaded.
+
+**TS-73 `[INJECT]` Reject both.** A faulty extract at 13:20 and a stray
+test file at 13:40. **Expect**: each file's rejection its own entry, no QA,
+nothing promoted, D left owed and unfilled with no mark-not-supplied and no
+later supply. **Breaks as**: D read as supplied, or not-supplied by a
+person.
+
+**TS-74 `[INJECT]` Re-file one, reject the other.** D+1's extract at 13:30,
+a stray test file at 13:45; neither D nor D+1 has a supply of its own.
+**Expect**: one QA run, for D+1; D owed and unfilled, no
+mark-not-supplied. **Breaks as**: the early file checked against D.
+
 **TS-10 `[INJECT]` Evening-before daily arrival - two variants.**
 *Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours -
 so Tuesday's window opens 18:00 Monday, and Monday closes then.*

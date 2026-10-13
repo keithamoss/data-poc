@@ -4239,3 +4239,39 @@ class TestASettledPairOnThePage:
         notice = " ".join(page.locator('[data-testid="arrival-notice"]').inner_text().split())
         assert "re-filed file" in notice and "substitution" not in notice
         assert page.locator('[data-testid="arrival-back"]').count() == 1
+
+
+class TestThePlantedPairsOnTheBuiltDashboard:
+    """REQ-GEN-196 criterion 13, on the real bootstrapped history: each
+    planted pair reads 'Two files for one table' on its arrival day - the
+    date its scenario link opens on - and no longer contested from the
+    settlement's asset day, the next."""
+
+    PAIRS = ("TS-68", "TS-69", "TS-70", "TS-71", "TS-72", "TS-73", "TS-74")
+
+    @pytest.mark.parametrize("sid", PAIRS)
+    def test_contested_on_its_arrival_day_and_settled_the_next(self, page, built_dashboard_html,
+                                                                sid):
+        from datetime import date, timedelta
+
+        from qa_tools.common import scenario_map
+
+        placed = scenario_map.read_placements().get(sid)
+        assert placed is not None, f"{sid} is not in the generated history"
+        ds, day = placed.dataset, date.fromisoformat(placed.period)
+        assert placed.in_place_on == str(day), "its link opens on the arrival day"
+        where = TestASettledPairOnThePage()._where(ds)
+        open_on = lambda on: page.evaluate(  # noqa: E731
+            f"() => blockersOpenInPlaceOn('{ds}', '{on}').filter(b => b.kind === 'contested')"
+            ".length")
+
+        _goto(page, built_dashboard_html, state=where, in_place_on=str(day))
+        assert TestASettledPairOnThePage()._blocked(page, ds) == ["contested", "red"]
+        row = page.locator("tr[data-blocker=contested]")
+        assert row.count() == 1 and "Two files for one table" in row.inner_text()
+        assert open_on(day) == 1
+
+        nxt = day + timedelta(days=1)
+        _goto(page, built_dashboard_html, state=where, in_place_on=str(nxt))
+        assert open_on(nxt) == 0
+        assert TestASettledPairOnThePage()._blocked(page, ds)[0] != "contested"

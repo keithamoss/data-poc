@@ -489,3 +489,51 @@ class TestAPeriodScopedDecisionIsPlayed:
         monkeypatch.setattr("qa_tools.common.hierarchy.DATA_ASSET_YAML", asset)
         with pytest.raises(sd.ScriptRefused, match="synthetic"):
             sd.Player("child-protection", scripts=[_period_script()], placements={})
+
+
+class TestThePlantedPairsAreSettled:
+    """REQ-GEN-196 criteria 6 and 13: on the bootstrapped history, each pair
+    (TS-68 to TS-74) carries exactly one choose-file decision, by the
+    synthetic person, with each file's outcome as its script says."""
+
+    #: Each pair's two files, `{D}`/`{D+1}` the placement day and the next,
+    #: and the outcome each was settled with (criterion 6).
+    EXPECTED = {
+        "TS-68": {"{D}.csv": "supply", "{D}-1.csv": "superseded"},
+        "TS-69": {"{D}.csv": "supply", "{D+1}.csv": "refiled"},
+        "TS-70": {"{D}.csv": "rejected", "{D}-resend.csv": "supply"},
+        "TS-71": {"{D}_TEST.csv": "rejected", "{D}.csv": "supply"},
+        "TS-72": {"{D}.csv": "supply", "{D}-test.csv": "rejected"},
+        "TS-73": {"{D}.csv": "rejected", "{D}_TEST.csv": "rejected"},
+        "TS-74": {"{D+1}.csv": "refiled", "{D}_TEST.csv": "rejected"},
+    }
+
+    def test_one_choose_file_each_with_its_scripted_outcomes(self, deployment_history):
+        from datetime import date
+
+        from qa_tools.common import supply_db
+
+        placed = scenario_map.read_placements()
+        missing = sorted(set(self.EXPECTED) - set(placed))
+        assert not missing, f"not placed in the generated history: {missing}"
+        with supply_db.connect(read_only=True, label="test-196") as conn:
+            rows = conn.execute(
+                f"SELECT d.id, f.filename, f.outcome, f.to_slot FROM {dl.TABLE} d "
+                'JOIN "qa".decision_file f ON f.decision_id = d.id '
+                "WHERE d.action = 'choose-file' AND d.actor = ?", [SYNTHETIC]).fetchall()
+        by_file = {name: (decision, outcome, to_slot)
+                   for decision, name, outcome, to_slot in rows}
+        for sid, files in self.EXPECTED.items():
+            day = date.fromisoformat(placed[sid].period)
+            nxt = (day + timedelta(days=1)).isoformat()
+            decisions = set()
+            for template, outcome in files.items():
+                name = "birth_registrations_" + template.replace(
+                    "{D+1}", nxt).replace("{D}", day.isoformat())
+                assert name in by_file, f"{sid}: no settled outcome for {name}"
+                decision, got, to_slot = by_file[name]
+                decisions.add(decision)
+                assert got == outcome, f"{sid}: {name} settled {got}, scripted {outcome}"
+                if outcome == "refiled":
+                    assert to_slot == nxt, f"{sid}: {name} re-filed to {to_slot}"
+            assert len(decisions) == 1, f"{sid}: {len(decisions)} choose-file decisions"
