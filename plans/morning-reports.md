@@ -1270,3 +1270,28 @@ one or more component tags, and a date.
         (r) a supply a correction MOVED carries the same "at the time" note
             and counts in the past-date note - to build.
         ORDER (Keith): the backstop answers (f)-(i) first, then the rest.
+
+4. **[in-progress, 2026-10-13]** **[Docs & process]** **Overnight 2026-10-13 to
+   14: REQ-GEN-199's scenarios, then REQ-PIPE-170 criterion 23.**
+
+      - KEITH'S GO, ~22:50 Perth: "keep building overnight, same policy as the
+        other overnight builds", with a scheduled wake-up (a self check-in every
+        60 minutes via send_later, re-armed each time it fires).
+      - TERMS, overnight #3's unchanged: forks take the recommended option,
+        marked PROVISIONAL and listed here; at most one full rebuild per item;
+        only my own dev/scratch databases upgraded in place; commit and push
+        each finished item after its gate, CI checked at natural pauses;
+        NOTHING UNSIGNED IS BUILT; post-build critics after each build, their
+        fixes in before the next item.
+      - THE PLAN, and one judgement call on order. Keith's order was the
+        calendar close-out (REQ-PIPE-163, 179, 182, the new 202 and 203), then
+        REQ-GEN-199. None of the close-out is signed - it waits on a sign-off
+        walkthrough with three questions still open - so it cannot be built
+        tonight. What is signed and unbuilt:
+        1. REQ-GEN-199 (signed 2026-10-13, 38 criteria) - TS-75 to TS-79.
+        2. REQ-PIPE-170 criterion 23's first half - TS-57 to TS-62 generated
+           into the history. Signed requirement; how the corrections are
+           declared is already answered (contract/calendar.yaml), so it is
+           generator work.
+        Left for Keith: the close-out sign-off; REQ-GEN-136's criteria 3-5,
+        8, 9 and 11 (his call, or REQ-GEN-203 once signed); REQ-GEN-137's.
