@@ -1194,6 +1194,45 @@ to the exact right file/line/folder with zero console errors.
     say which of those a real asset needs instead, and every requirement
     whose decisions say "regenerate, never migrate" (REQ-PIPE-144 and
     others) is touched by the answer.
+    **SCOPING, ROUND 1 (Keith, 2026-10-14 morning, via AskUserQuestion).**
+    Facts first, from the code: qa_store.SCHEMA_VERSION is 40 after 38
+    bumps, about three a day lately; `_refuse_another_version` refuses ANY
+    older database and names reset-synthetic as the only remedy; 21
+    requirements mention the rule (20 built), but REQ-PIPE-144's "ALWAYS
+    WIPE AND REBUILD ON A SCHEMA CHANGE" (Keith, 2026-10-05, over my
+    recommendation to allow additive changes) is the one that decides it.
+    What a real asset cannot regenerate: the append-only decision log,
+    verdicts (recorded facts, REQ-PIPE-168), write-once filings and
+    receipts, and the supply rows themselves - replaying deliveries would
+    re-judge history today. His answers:
+    - MECHANISM: versioned, forward-only migrations - each version bump
+      ships a migration applied in order in a transaction. Rejected:
+      replaying deliveries (re-judges verdicts); additive-only in place
+      (boxes in reshapes).
+    - WHEN: FROM NOW - every bump from version 41 ships a migration and its
+      test. Rejected: waiting for a schema freeze; recording only. This
+      reverses REQ-PIPE-144's 2026-10-05 decision, so that requirement is
+      amended by whatever gets signed.
+    - PROOF: both - each migration tested in CI against a database built
+      at the previous version, AND dry-run on a copy of the real database
+      before production.
+    - SCOPE: the QA metadata schema only. A contract changing a dataset's
+      own columns is a separate item (#94).
+    **ROUND 2, same morning.** BASELINE: version 40 is migration zero; a
+    database older than 40 is still refused with the rebuild message.
+    APPLYING: an explicit `mothman db migrate` that shows what it will apply;
+    everything else refuses an older database and names that command.
+    Rejected: automatic on connect. RESET: reset-synthetic is kept for
+    regenerating a synthetic history, but is no longer the remedy for a
+    schema gap. TOOL: OPEN. Keith leans towards our own runner and is open
+    to Alembic. Researched on his ask: Alembic with alembic_utils (0.8.8)
+    DOES autogenerate views, functions, triggers and policies (my first
+    comparison wrongly said it could not); Django manages triggers through
+    django-pgtrigger and views through django-pgviews-redux, but only by
+    modelling every table. Before choosing, he wants to see what
+    maintaining it looks like in a team and how often it happens in
+    production:
+    docs/drafts/schema-migrations/what-maintaining-it-looks-like.md.
 
 90. **[todo, 2026-10-13]** **[Pipeline & publishing]** **Protect the
     processing loop from a decision made while it is working on the same
@@ -5177,3 +5216,11 @@ could never have computed it), and it belongs with batch 5's check work.
     for it over quoting the terminal, so TS-55 (REQ-GEN-137 criterion 6)
     has a page to point at. Not scoped yet - goes to the scoper as its own
     requirement, and must work at ~30 datasets per period.
+
+94. **[todo, 2026-10-14]** **[QA checks & contract]** **[Pipeline &
+    publishing]** **When a contract changes a dataset's columns, what
+    happens to supplies already recorded under the old shape?** Split out of
+    #89 by Keith, 2026-10-14 ("separate"): #89 is the QA metadata schema;
+    this is schema evolution of the data itself - old supplies keep their
+    shape, and promotion, period views and cross-table checks all read
+    across supplies that may differ. Not scoped.
