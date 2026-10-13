@@ -31633,6 +31633,7 @@ requirements:
     - tests/test_period_overlay.py
     - tests/test_slot_state.py
     - tests/test_filing_queue.py
+    - tests/test_scripted_decisions.py::TestThePlantedPairsAreSettled
     implemented_by:
     - qa_tools/common/settlement.py::plan
     - qa_tools/common/settlement.py::apply
@@ -31648,13 +31649,7 @@ requirements:
     - '2026-10-13: tests/test_choose_file_runs.py settles a REAL two-file Birth Registrations delivery, recognised, staged and run by the per-arrival lifecycle, as supply plus re-file to the next day; both owed runs complete under dbt-core, Soda Core, datacontract-cli and Evidently, each recorded under its own supply''s run id with the arrival''s run_index, and each reads only its own staged table. Mutating the overlay to read the arrival''s tables by key makes it fail.'
     - '2026-10-13: post-build-review #170 fixes, each a failing test first - tests/test_choose_file.py TestCriticFindingsOn193 (runs need no key, re-file over an open pair refused, a rejected file promoted back, own-receipt lookups, displaced versions caused by the settlement, holds by supply) and tests/test_settle_tui.py TestCriticFindingsOn193, TestCriticFindingsOn193Screens, TestTheTargetPrompt, TestAChangedConsequenceIsShownAndAskedAgain.'
     - '2026-10-13: tests/test_choose_file.py covers every decision path on a seeded pair - duplicate send, the later file chosen, the next day''s file sent early, neither, a refused file, the rules of criterion 4, the warning and its recompute, atomicity, the GitHub refusal, criterion 22 and the contest closing - and tests/test_settle_tui.py the screens, Back, the summary and the flag form.'
-    unmet_criteria:
-    - criterion: Criterion 28 - proven end to end on a bootstrapped history by REQ-GEN-196's planted pairs (TS-68 to TS-74).
-      why: The planted pairs are REQ-GEN-196's to generate; each decision path is proven here on a seeded pair and once with the real tools.
-      owner: REQ-GEN-196
-      blocked_by:
-        requirements:
-        - REQ-GEN-196
+    - '2026-10-13: criterion 28 met by REQ-GEN-196''s planted pairs on a history bootstrapped from empty - TS-68 to TS-74 each carry one choose-file decision by the synthetic person with each file''s scripted outcome (tests/test_scripted_decisions.py::TestThePlantedPairsAreSettled), and each reads ''Two files for one table'' on its arrival day and settled from the next (tests/test_dashboard_e2e.py::TestThePlantedPairsOnTheBuiltDashboard, 7 passed).'
     open_questions: []
   - id: REQ-PIPE-194
     title: Every place that tells a person to settle a contested pair says where and how, and the contest reads as resolved only once a person has settled it or it has been set aside
@@ -31942,6 +31937,7 @@ requirements:
     - 'TYPOGRAPHY: criterion 6 quotes ''Latest arrival - promoted into <period>'' with a hyphen; built with the em dash every sibling label in that panel uses (''Latest arrival — not promoted''). Wording otherwise exact.'
     - 'THE HEADING IN CRITERION 6''S CASE IS UNCHANGED (''What is in the warehouse is not the latest file''): the criterion specifies only the arrival cell and the reason. Flagged to Keith at build time as a possible follow-up, since in that case the latest file IS in the warehouse, in its own period.'
     - 'POST-BUILD CRITICS, 2026-10-13 (post-build-review #165, #166). Fixed test-first: an impossible date in in-place-on or from-on (2026-13-45) passed the shape check and broke the page (isRealDateStr); the past-date notice named every decision of the day rather than those about the supplies on show, and missed a late-recorded one behind an earlier change point; the drill link copied unrelated query state; and the e2e verdict/panel test compared a value with itself. Keith''s answers: in criterion 6''s case the verdict line and the panel both stand (REQ-DASH-126''s claim corrected); that case gets its own heading; the date picker''s help and the past-date notice reworded to ''a decision written down after that date still counts if it took effect by then, and one that took effect after it does not''.'
+    - 'SETTLED-AWAY FILES EXCLUDED IN THE ONE SHARED PLACE (2026-10-13, closing the deferral to REQ-PIPE-193): both readers call filing.filings_as_at, so the exclusion lives there once rather than in each reader - the walk is held against the SQL answer, and two exclusions could drift. From the settlement''s effective instant, never before it: on an earlier date the pair is open and both files are what had arrived.'
     open_questions: []
     linked_tests:
     - tests/test_promotion_as_at.py
@@ -31951,6 +31947,7 @@ requirements:
     - tests-js/promotion-split.test.js
     - tests/test_dashboard_e2e.py::TestThePanelAsAtTheDateOnShow
     - tests/test_dashboard_e2e.py::TestArrivedVersusPromoted
+    - tests/test_choose_file.py::TestASettledAwayFileIsNotTheLatestArrival
     implemented_by:
     - pipeline/promotion_timeline.py::for_dataset
     - qa_tools/common/promotion_state.py::state_for
@@ -31964,6 +31961,7 @@ requirements:
     - dashboard/embed_dashboard_data.py::embed
     - pipeline/build_dashboard_data.py::build
     - pipeline/build_cp_dashboard_data.py::build_one_table
+    - qa_tools/common/filing.py::settled_away
     evidence:
     - '2026-10-13: every embedded change point held against the SQL readers (promotion_state.state_for(as_at=end of that day)) on the bootstrapped history - 37 for Birth Registrations, 27 to 32 for each Child Protection dataset, 222 in all - zero disagreements; the newest of each equals state_for() with no instant.
 
@@ -31974,17 +31972,7 @@ requirements:
     - '2026-10-13: criterion 3''s suspected defect was REAL and is fixed test-first - today''s state_for() named an older supply the latest arrival after it was re-filed, because it took the newest filing ROW (post-build-review #163).
 
       '
-    unmet_criteria:
-    - criterion: 'Criterion 2, in part - ''a file a settlement of a contested pair made rejected or kept-but-superseded SHALL NOT count as the latest arrival''.
-
-        '
-      why: 'Settlement (choose-file) does not exist until REQ-PIPE-193 is built, so no file can be settled either way and there is nothing to exclude. Every other part of criterion 2 is built and tested.
-
-        '
-      owner: REQ-PIPE-193's build
-      blocked_by:
-        requirements:
-        - REQ-PIPE-193
+    - '2026-10-13: criterion 2''s last sentence built test-first - both readers (promotion_state.state_for and the timeline walk) named a settled pair''s superseded or rejected #2 as the latest arrival; filing.filings_as_at now drops a file a settlement made rejected or kept-but-superseded from that settlement''s instant (filing.settled_away, read from qa.decision_file). tests/test_choose_file.py, tests/test_promotion_timeline.py, tests/test_promotion_as_at.py and tests/test_filing.py: 96 passed.'
   - id: REQ-DASH-198
     title: The substituted and inherited qualifier names the period that stood in as at the date on show, never the newest one at the build
     date_written: '2026-10-13'

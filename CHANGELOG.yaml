@@ -178,6 +178,13 @@ releases:
               Excusing a late supply no longer stops a dataset showing "Two
               files, choose one". Only rejecting the pair, or a later supply
               replacing it, ends that now.
+          - headline: A settled spare file is never "the latest file"
+            components: ["Dashboard UI"]
+            description: >
+              Once two files for one table are settled, the panel comparing
+              what is promoted with the latest file names the file that became
+              the supply. It used to be able to name the spare copy or the
+              rejected file instead.
           - headline: A past date no longer shows files from its future
             components: ["Dashboard UI"]
             description: >

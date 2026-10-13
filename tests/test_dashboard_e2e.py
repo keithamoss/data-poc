@@ -458,7 +458,7 @@ class TestDarkModeToggle:
             clean_page.evaluate(
                 "t => document.documentElement.setAttribute('data-theme', t)", theme)
             clean_page.wait_for_timeout(250)
-            return clean_page.evaluate("""() => {
+            return clean_page.evaluate(r"""() => {
               const lum = (s) => {
                 const [r, g, b] = s.match(/[\d.]+/g).slice(0, 3).map(Number);
                 const ch = (c) => {

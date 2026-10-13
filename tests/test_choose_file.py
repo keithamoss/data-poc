@@ -677,3 +677,33 @@ class TestAScriptedSettlement:
             player.finish()
         assert "never loaded" in str(refused.value)
         assert not [d for d in _entries(conn, p.pair) if d["action"] == "choose-file"]
+
+
+class TestASettledAwayFileIsNotTheLatestArrival:
+    """REQ-DASH-197 criterion 2's last sentence: a file a settlement made
+    rejected or kept-but-superseded does not count as the latest arrival -
+    in the SQL reader and the timeline walk alike, from the settlement's
+    own instant. Both files are filed, so on first-filed order alone the
+    second could be named the latest arrival."""
+
+    def _outcomes(self, conn, pair):
+        return dict(conn.execute(
+            'SELECT f.outcome, f.supply_id FROM "qa".decision_file f '
+            "JOIN qa.decision d ON d.id = f.decision_id "
+            "WHERE d.dataset_id = ? AND f.filename = ANY(?)",
+            [DS, [name for name, _ in pair.files]]).fetchall())
+
+    @pytest.mark.parametrize("answers", [("supply", "supersede"), ("reject", "supply")])
+    def test_both_readers_name_the_supply(self, conn, actor, day, answers):
+        from pipeline import promotion_timeline
+        from qa_tools.common import promotion_state
+
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
+        (one, _), (two, _) = p.files
+        p.settle(conn, actor, (one, answers[0]), (two, answers[1]))
+        outcomes = self._outcomes(conn, p)
+        after = _at(day + timedelta(days=1), "12:00")
+        sql = promotion_state.state_for(DS, conn, as_at=after).arrived_supply
+        walk = promotion_timeline._History(conn, DS, []).panel(after)[0]["arrived"]["supply"]
+        assert sql == walk == outcomes["supply"], (sql, walk, outcomes)

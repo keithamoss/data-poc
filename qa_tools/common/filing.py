@@ -264,16 +264,35 @@ def filing_history(conn, dataset_id: str) -> list[dict]:
     return out
 
 
-def filings_as_at(history: list[dict], as_at=None) -> list[dict]:
+def settled_away(conn, dataset_id: str) -> dict[str, object]:
+    """Supply id -> the instant a settlement of a contested pair made it
+    rejected or kept-but-superseded (REQ-PIPE-193), for this dataset. Read
+    from qa.decision_file, the one record of each file's outcome."""
+    return {supply: at for supply, at in conn.execute(
+        f'SELECT f.supply_id, d.effective_at FROM "{qa_store.SCHEMA}".decision_file f '
+        f'JOIN "{qa_store.SCHEMA}".decision d ON d.id = f.decision_id '
+        "WHERE d.dataset_id = ? AND f.outcome IN ('rejected', 'superseded')",
+        [dataset_id]).fetchall()}
+
+
+def filings_as_at(history: list[dict], as_at=None, settled: dict | None = None) -> list[dict]:
     """Each supply first filed on or before `as_at`, with the period it was
     filed to AS AT THAT INSTANT, ordered by when it was FIRST filed - so a
     later re-file of an older supply never makes it the newest arrival
     (REQ-DASH-197 criterion 3). `history` is filing_history()'s answer.
+
+    `settled` is settled_away()'s answer: a file a settlement made rejected
+    or kept-but-superseded is not an arrival from that settlement's instant
+    on (REQ-DASH-197 criterion 2) - both of a pair's files are filed, so on
+    first-filed order alone the spare could be named the latest arrival.
     """
     firsts: dict[str, dict] = {}
     slots: dict[str, tuple] = {}
     for row in history:
         if as_at is not None and row["at"] > as_at:
+            continue
+        away = (settled or {}).get(row["supply_id"])
+        if away is not None and (as_at is None or away <= as_at):
             continue
         if row["first"]:
             firsts[row["supply_id"]] = row

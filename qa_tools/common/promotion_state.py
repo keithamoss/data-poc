@@ -344,7 +344,8 @@ def state_for(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
 
     standing = standing_in(conn, dataset_id, as_at)
 
-    filings = filing.filings_as_at(filing.filing_history(conn, dataset_id), as_at)
+    filings = filing.filings_as_at(filing.filing_history(conn, dataset_id), as_at,
+                                   filing.settled_away(conn, dataset_id))
     if not filings:
         return State(dataset_id=dataset_id, promoted_supply=promoted_supply,
                       promoted_period=promoted_period, standing_in=standing)

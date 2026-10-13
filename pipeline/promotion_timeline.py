@@ -56,6 +56,7 @@ class _History:
         self.dataset_id = dataset_id
         self.slots = [{**e, "_at": _instant(e["at"])} for e in timeline]
         self.filings = filing.filing_history(conn, dataset_id)
+        self.settled_away = filing.settled_away(conn, dataset_id)
         self.decisions = [{**d, "_at": _instant(d["effective_at"])}
                           for d in decision_log.decisions_for(conn, dataset_id)]
         self.by_id = {d["id"]: d for d in self.decisions}
@@ -158,7 +159,7 @@ class _History:
     def panel(self, at: datetime) -> tuple[dict, dict[str, dict]]:
         held = self.held(at)
         promoted = self.promoted(held)
-        filed = filing.filings_as_at(self.filings, at)
+        filed = filing.filings_as_at(self.filings, at, self.settled_away)
         answer = {"promoted": None, "arrived": None, "differs": False, "whyNot": None}
         if promoted:
             answer["promoted"] = {**promoted, "runId": self.run_of(promoted["supply"])}
