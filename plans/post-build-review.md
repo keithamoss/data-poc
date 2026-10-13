@@ -8484,3 +8484,61 @@ twice. It deliberately did not re-find the `TypeError`.
       (test and fix in one commit); C16's en_US collation half is proven
       only on CI; the July red cascade (resends filling neighbouring days)
       predates this and remains Keith's call - the reds no longer touch.
+
+173. **[todo, 2026-10-13]** **[Pipeline & publishing]** **A person's
+    PROMOTE checks nothing about the supply's filing or QA - a held, an
+    unfiled, or another period's supply goes into a period unchecked.**
+    SIGNIFICANT, Keith's to sign off. Found by the delivery-architect
+    reviewing REQ-PIPE-163, confirmed by a read-only audit Keith asked for
+    ("there should be no way to move things into a period and then skip
+    doing checks - check nothing else has the same loophole"). Code-read
+    and one existing test; NOT yet reproduced test-first.
+    - **The gap:** `filing_decisions._apply_one(PROMOTE)` ->
+      `promotion.promote` never reads `filing_current`, owed re-checks or
+      completed runs (nor whether the period is on the calendar). So a
+      HELD supply (no data checks at all), an UNFILED staged table, or a
+      supply FILED TO ANOTHER PERIOD can be promoted with no QA for that
+      period and no gate; the hold is quietly resolved and nothing is owed.
+      `tests/test_filing_decisions.py::test_promote_moves_the_tables_and_records_it`
+      already shows an unfiled table promoted into a period on no calendar.
+      The code even ADVISES it: `decision_log.py` ~389 ("places a held
+      supply by promoting it"), `supply_holds.py` ~210 (correction holds:
+      "promote it into the period it belongs to"),
+      `tests/test_correction_apply.py` ~272. It contradicts signed criteria
+      that were only ever enforced for the rule: REQ-PIPE-075 criteria 5, 8
+      and 17, REQ-PIPE-078 criterion 5, REQ-PIPE-064 criterion 3.
+    - **The same gap, other doors:** a GitHub `/promote` (workflow disabled,
+      code live), scripted playback, promote-back of a rejected supply into
+      a period not its filing's.
+    - **L2, the owed-re-check window:** with `decide` now leaving re-checks
+      owed (Keith, 2026-10-13), a person can promote a re-filed or settled
+      supply into its new period before its re-check runs, on old-period
+      verdicts; the re-check later finds the slot filled and does nothing.
+    - **L3, needs a test to know:** the knock-on re-gate reads the
+      period-blind `supply_status.latest_results` and does not skip a supply
+      with a RECHECK owed, so the RULE might promote a re-filed,
+      not-yet-re-checked supply through a re-evaluation.
+    - **Deliberate, not loopholes:** substitution and inheritance show an
+      earlier period's checked supply on a labelled view (REQ-PIPE-084,
+      REQ-PIPE-098); every rule route, re-file, settlement, correction move
+      and schedule-ended re-file files and owes a full re-check first.
+    - **No live harm:** the 8 holds are all outstanding; the one person
+      promotion (TS-43) went into its filed period.
+    - **Proposed fixes (Keith to decide):** (1) a person's promote refused
+      unless the supply's current filing names that period (held -> place
+      or reject; elsewhere -> re-file), in `decision_log._judge` so every
+      door gets it, plus the calendar check; and the three advising texts
+      corrected; (2) promote refused while a re-check is owed or no full run
+      completed since the latest filing; (3) L3 test-first, then knock-on
+      skips a supply with a RECHECK owed, or `latest_results` becomes
+      period-aware. Each failing first.
+    - **Keith, 2026-10-13 ~21:30: ALL THREE APPROVED.** Fix 1 now, ahead
+      of the calendar close-out (until REQ-PIPE-163 lands, a held supply
+      reaches a period only by reject or a calendar correction - accepted);
+      fix 2 yes; fix 3 test first, fix only if it reproduces. Rules for
+      manual promotion as they stand today were summarised to him from the
+      audit: identified person, reason always, supply named; refused for a
+      superseded supply, an inherited period, one file of an open pair, a
+      failed load; promote-over and removing a substitution after a
+      warning; red or amber deliberately allowed - and NO check that any QA
+      ran, which is this item.
