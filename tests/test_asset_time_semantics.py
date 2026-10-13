@@ -147,6 +147,11 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
 
+    RE-CAPTURED AGAIN THE SAME NIGHT for post-build-review #172 (pairs spaced
+    out, 85 days): 117 deliveries, zero `handfiled-*`, rebuilt first; Child
+    Protection identical, the 27 Birth Registrations arrivals in both
+    unchanged, 98 -> 100.
+
     RE-CAPTURED 2026-10-13 FOR REQ-GEN-196 (Birth Registrations' history 80
     days, seven two-file pairs settled by script). The procedure first: 115
     deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
@@ -414,14 +419,21 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         The early ones are mostly the pairs, received before their 14:00 due
         time (Keith chose to word those criteria "early", 2026-10-13); the
         late ones are the ordinary reds' resends and TS-70's 16:30 file.
+
+        THEN 132 / 39 / 29 / 8 over 208 THE SAME NIGHT (post-build-review
+        #172): the pairs spaced out with ordinary days between them, the
+        history 85 days, the ordinary reds kept apart. Procedure first: 117
+        deliveries, zero `handfiled-*`, the dashboard rebuilt. Every Child
+        Protection entry identical; the 27 Birth Registrations arrivals in
+        both captures unchanged; Birth Registrations 70 / 18 / 12 over 100.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 132, "early": 39, "late": 27, "unfiled": 8}
-        assert sum(counts.values()) == 206
+        assert counts == {"on_time": 132, "early": 39, "late": 29, "unfiled": 8}
+        assert sum(counts.values()) == 208
 
 
 class TestTheClassificationBoundaries:

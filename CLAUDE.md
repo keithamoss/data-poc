@@ -874,7 +874,8 @@ Rough layout:
   (TS-67's re-files and their re-checks): 4m42s from empty. Re-measured
   2026-10-13 after REQ-GEN-196 (an 80-day Birth Registrations history,
   seven two-file pairs settled by script): **6m29s** from empty, Birth
-  Registrations 330s and Child Protection 261s in parallel. REQ-GEN-199
+  Registrations 330s and Child Protection 261s in parallel; **6m43s** the
+  same night at 85 days with the pairs spaced out (post-build-review #172). REQ-GEN-199
   will add to it - re-measure after it, rather than estimate.
 
   So a RED IN THE COMMON CASE reports in about SEVEN minutes rather

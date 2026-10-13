@@ -4294,6 +4294,10 @@ class TestThePlantedPairsOnTheBuiltDashboard:
         on = date.fromisoformat(placed.period) + timedelta(days=days_after)
         _goto(page, html, state=TestASettledPairOnThePage()._where(placed.dataset),
               in_place_on=str(on))
+        # THE PAIR'S OWN DAY IS AN OLDER CYCLE by then, behind the toggle.
+        toggle = page.locator("#supply-history-toggle")
+        if toggle.count():
+            toggle.click()
         return " ".join(page.locator("#view").inner_text().split()), date.fromisoformat(placed.period)
 
     def test_ts70_reads_late_from_the_corrected_files_receipt(self, page, built_dashboard_html):

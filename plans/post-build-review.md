@@ -8430,7 +8430,7 @@ twice. It deliberately did not re-find the `TypeError`.
       wording criterion 10 quotes. A refused correction trial on the CLI
       printing the settle form was not verified.
 
-172. **[in-progress, 2026-10-13]** **[Data generation, Pipeline & publishing, Dashboard UI]**
+172. **[done, 2026-10-13]** **[Data generation, Pipeline & publishing, Dashboard UI]**
     **The delivery critic on REQ-GEN-196 as built (6c68fb8), and a defect
     the scoper found on the same evening.** Each claim checked against the
     code and the bootstrapped database first; 17 of 21 criteria met.

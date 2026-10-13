@@ -5128,3 +5128,42 @@ could never have computed it), and it belongs with batch 5's check work.
     163 criteria 35 (refuse where the agreement backstop refuses the
     dataset) and 36 (GitHub reply). Architect + CLI UX + dashboard UX
     reviews started next.
+    **The quarterly runway warning stays (Keith, 2026-10-13):** offered
+    2028's dates (1 Feb/May/Aug/Nov) to clear `mothman check`'s "calendar
+    'quarterly' is low on runway" warning; his answer - "the point of the
+    warning is to demonstrate the proof of concept of what it does". Do not
+    extend the calendar to silence it, and do not propose it again.
+    **CLI and dashboard UX reviews, answered the same evening (Keith):**
+    `mothman supply decide` leaves EVERY decision's checks owed unless
+    --wait, re-file included (an amendment to built REQ-PIPE-141); Ctrl-C
+    while a placement's checks run in the menus returns to the collection's
+    menu, the placement standing and its checks owed; a CP trial's
+    REFERENCE folder is recognised through arrival_pattern too (he asked how
+    the widening works - shown: one arrival_pattern line in
+    contract/data-asset.yaml, cp_clients\.csv -> cp_clients(_[^/]+)?\.csv);
+    owed-nothing rows that recur (cp-case-workers' May/Nov) read a SHORT
+    generated label ("Not owed - outside its agreed months (Feb, Aug)"),
+    the authored reason once on the agreement tile; the current cycle shows
+    its owed-nothing row in place of "No deliveries in the current cycle
+    yet."; the due-before label reads "by 22:00 the day before" (one day) /
+    "by 22:00, N days before each date"; and a reader dataset turned red by
+    ANOTHER table's contest gets a NEW DASHBOARD REQUIREMENT NOW (a top-of-
+    page line naming the contested table), not a later sighting.
+    **Architect review answers, 2026-10-13 ~21:00 (Keith):** PROMOTING A
+    HELD SUPPLY STRAIGHT INTO A PERIOD (skipping filing, its QA run and the
+    gate - found by the architect reading promotion.promote) must be
+    refused, pointing at place: "there should be no way to move things into
+    a period and then skip doing checks" - and he asked for EVERY such route
+    to be audited for the same loophole (audit started), plus a plain
+    account of today's rules for manual promotion within a period; he is
+    open to a combined "move and promote" if it keeps the checks. TS-63's
+    room: GROW the Child Protection history earlier (pre-2023 calendar and
+    participation versions, as Birth Registrations was grown). Still
+    answering: how a placement is recorded (he asked how different place
+    and re-file really are, and what a new log action costs), and held
+    pairs (he asked whether there is really no route for them today).
+    And the last two (Keith, same evening): a placement is RECORDED as a
+    re-file from no period by a person - place and re-file are one act
+    underneath, so no new log action - while the terminal and the page
+    still say "placed"; and placing a HELD PAIR moves both files into the
+    period, still contested, to be settled there.
