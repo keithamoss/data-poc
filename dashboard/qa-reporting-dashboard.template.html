@@ -968,9 +968,9 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
     <div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:16px;">
       Shows, for every dataset, the supply that was in place on the date
       you pick - or the newest one still awaiting a decision - and its
-      results. It uses <b>everything known today</b>, including decisions
-      made since that date: a supply rejected or superseded later is shown
-      that way. To see what this page itself said on a past date, open the
+      results. It uses <b>everything known today</b>: a decision written down
+      after that date still counts if it took effect by then, and one that
+      took effect after it does not. To see what this page itself said on a past date, open the
       <b>snapshot archive</b> (🕐 Past snapshots). A dataset with nothing
       supplied by that date shows as <b>No data</b>, never a misleading
       blank, green, or red. Applies to the whole data asset at once.
@@ -2608,6 +2608,9 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
     : (promotedRunId && (d.runs || []).find(r=> r.run_id === promotedRunId)) || null;
   const verdictOf = {state: verdictState,
     inPlaceRunDate: inPlace && inPlace !== effectiveRun ? inPlace.run_date : null,
+    // ITS RECEIPT INSTANT TOO (#166): two supplies received the same day read
+    // identically when only the day was named.
+    inPlaceReceivedAt: inPlace && inPlace !== effectiveRun ? (inPlace.received_at || null) : null,
     // The run of the supply IN PLACE, for its red-promoted label (REQ-DASH-126).
     inPlaceRunId: inPlace ? inPlace.run_id : null};
   // Phase 5j (plans/qa-pipeline.md, 2026-09-17 - replacing the flat
@@ -2988,10 +2991,18 @@ function defaultInPlaceOn(){
 // current spelling on the first write, so nothing keeps two spellings.
 const IN_PLACE_ON_PARAM = "in-place-on";
 const PREVIOUS_DATE_PARAM = "as" + "of";
+// A REAL CALENDAR DATE, not just the shape of one (post-build-review #165):
+// 2026-13-45 matched the pattern and then rendered "45 undefined 2026" and
+// threw "not an instant". It round-trips through Date or it is not a date.
+function isRealDateStr(v){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v || "")) return false;
+  const d = new Date(v + "T00:00:00Z");
+  return !isNaN(d) && d.toISOString().slice(0, 10) === v;
+}
 function inPlaceOnFromUrl(){
   const params = new URLSearchParams(location.search);
   const v = params.get(IN_PLACE_ON_PARAM) || params.get(PREVIOUS_DATE_PARAM);
-  return /^\d{4}-\d{2}-\d{2}$/.test(v||"") ? v : null;
+  return isRealDateStr(v) ? v : null;
 }
 function setInPlaceOnInUrl(dateStr, defaultDateStr){
   const url = new URL(location.href);
@@ -3041,7 +3052,7 @@ let ARRIVAL_FROM = arrivalFromUrl();
 // then lands on the period left's own date, as it did before.
 function arrivalFromOnUrl(){
   const v = new URLSearchParams(location.search).get("from-on");
-  return /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : null;
+  return isRealDateStr(v) ? v : null;
 }
 let ARRIVAL_FROM_ON = arrivalFromOnUrl();
 let ARRIVAL_VIA = new URLSearchParams(location.search).get("via") || null;
@@ -3730,8 +3741,8 @@ function standingInMarker(d){
   if(!st) return "";
   const from = fmtPeriodName(st.standsOn) || st.standsOn;
   const who = st.byAPerson
-    ? `decided by ${st.decidedBy || "a person"}`
-    : "inherited automatically - no person decided it";
+    ? `Decided by ${st.decidedBy || "a person"}`
+    : "Inherited automatically - no person decided it";
   // A PAST DATE SAYS SO FIRST (REQ-DASH-198 criterion 9): the tooltip opens
   // on that date, then the who-decided sentence unchanged; the pill keeps
   // its existing form.
@@ -3821,7 +3832,13 @@ function standingInDrill(d){
   // the results (REQ-DASH-198 criterion 14), so those results are on the
   // page; the period's own first date only where the build has none.
   const to = st.earnedOn || periodDateFor(d.id, st.standsOn);
-  const said = `<div class="promo-why">The checks on this page ran against
+  // WHEN A NEWER SUPPLY IS AWAITING, the results below are that supply's, as
+  // the verdict line says - so this says so too rather than contradicting it
+  // (Keith, 2026-10-13; post-build-review #166).
+  const awaiting = d.verdictOf && d.verdictOf.state === "awaiting";
+  const said = awaiting
+    ? `<div class="promo-why">${escHtml(String(here))} holds ${escHtml(String(from))}'s supply; the results below are a newer supply awaiting a decision.</div>`
+    : `<div class="promo-why">The checks on this page ran against
     ${escHtml(String(from))}'s supply. They are not
     ${escHtml(String(here))}'s own results.</div>`;
   if(!to) return said;
@@ -3829,12 +3846,13 @@ function standingInDrill(d){
   // date, the period left, the date left and the kind of drill - so a
   // middle-click or a copied address opens the same framing. A plain click
   // is intercepted, as before, so the page does not reload.
-  const params = new URLSearchParams(location.search);
+  // ONLY WHAT THE ARRIVAL NEEDS (post-build-review #165): copying the whole
+  // query carried an open side panel into a middle-clicked tab.
+  const params = new URLSearchParams();
   params.set(IN_PLACE_ON_PARAM, to);
   params.set("from", String(st.period));
   if(d.promotionState.on) params.set("from-on", d.promotionState.on);
   params.set("via", st.kind === "inherited" ? "inheritance" : "substitution");
-  params.delete(PREVIOUS_DATE_PARAM);
   // THE PAGE'S OWN STATE, not location.hash: this renders before navigate()
   // writes the address bar, so the hash would still be the page left.
   const href = `${location.pathname}?${params.toString()}${typeof STATE !== "undefined" && STATE ? stateToHash(STATE) : location.hash}`;
@@ -3903,12 +3921,14 @@ function arrivalBanner(ds){
   // BACK TO EXACTLY THE DATE LEFT (criterion 11), or - with no valid
   // `from-on` - to the period left's own date, as before (criterion 12).
   const back = ARRIVAL_FROM_ON || periodDateFor(ds && ds.id, ARRIVAL_FROM);
+  // THE DATE LEFT, said, so Back's destination is plain (#166).
+  const leftOn = ARRIVAL_FROM_ON ? ` on ${escHtml(fmtDay(ARRIVAL_FROM_ON))}` : "";
   const way = back
     ? `<div class="promo-actions"><button type="button" class="link-btn" data-arrival-back
         data-to="${escAttr(back)}" data-testid="arrival-back">Back to ${escHtml(String(left))}</button></div>`
     : "";
   return `<div class="arrival-notice" role="status" data-testid="arrival-notice" data-via="${escAttr(ARRIVAL_VIA || "")}">
-    <b>You have left ${escHtml(String(left))}.</b>${detail}${way}</div>`;
+    <b>You have left ${escHtml(String(left))}${leftOn}.</b>${detail}${way}</div>`;
 }
 
 // WHAT ARRIVED VERSUS WHAT IS PROMOTED (REQ-DASH-056).
@@ -3961,7 +3981,13 @@ function promotionSplit(ds){
   const arrivedSub = files.length > 1
     ? `<div class="promo-sub">${files.map(f=> `<span class="mono">${escHtml(f)}</span>`).join(" and ")}</div>`
     : `<div class="promo-sub mono">${arrived || "—"}</div>`;
-  const heading = on ? `On ${on} the warehouse did not hold the latest file`
+  // ITS OWN HEADING WHERE THE NEWEST FILE WAS PROMOTED (Keith, 2026-10-13,
+  // amending REQ-DASH-197 criteria 6 and 8): "the warehouse did not hold the
+  // latest file" sat directly above "promoted into <period>" and said the
+  // opposite (post-build-review #166).
+  const heading = intoOwn
+    ? (on ? `On ${on} the newest file was not the newest promotion` : "The newest file is not the newest promotion")
+    : on ? `On ${on} the warehouse did not hold the latest file`
     : "What is in the warehouse is not the latest file";
   return `
     <div class="promo-split" data-testid="promotion-split"${on ? ` data-as-at="${escAttr(st.on)}"` : ""}>
@@ -4976,7 +5002,7 @@ function verdictLine(ds){
     return `<div class="verdict-of" data-verdict-of="promoted" style="font-size:12.5px; color:var(--ink-muted); margin:-6px 0 8px;">The results below are the supply in place, received ${fmtInstant(ds.lastArrival.arrivedAt)}.</div>`;
   }
   const inPlace = v.inPlaceRunDate
-    ? `The supply in place is the one received ${escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
+    ? `The supply in place is the one received ${v.inPlaceReceivedAt ? fmtInstant(v.inPlaceReceivedAt) : escHtml(fmtDay(String(v.inPlaceRunDate).slice(0,10)))}.`
     : "Nothing is in place for this period yet.";
   return `<div class="verdict-of" data-verdict-of="awaiting" style="font-size:12.5px; color:var(--ink); margin:-6px 0 8px;"><b style="display:inline">Awaiting a decision</b> — the results below are the newest supply, received ${fmtInstant(ds.lastArrival.arrivedAt)}, which is not in place yet. ${inPlace}</div>`;
 }
@@ -8115,7 +8141,8 @@ const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   keep:"kept where it was", "excuse-lateness":"excused for lateness",
   "withdraw-excuse":"un-excused", acknowledge:"acknowledged",
   // REQ-DASH-198 criterion 4: a stand-in removed is named in words too.
-  "de-substitute":"no longer substituted", "un-inherit":"no longer carried forward"};
+  "de-substitute":"no longer substituted", "un-inherit":"no longer carried forward",
+  "mark-not-supplied":"marked not supplied", "still-failing":"recorded as still failing"};
 // DECISIONS THAT CHANGED AN EARLIER DATE (REQ-PIPE-081 criterion 6): taking
 // effect on or before the date on show, recorded after it - so the page now
 // shows that date differently from how it could have looked then. The plain
@@ -8152,8 +8179,22 @@ function decisionsChangingDate(onDateStr, inView){
     // (REQ-DASH-197 criterion 9, REQ-DASH-198 criterion 4): named here, in
     // the one existing notice, and only once - a promotion already named by
     // its run above is not named again.
+    // ONLY DECISIONS ABOUT WHAT IS ON SHOW (post-build-review #165): about
+    // the supply the panel names as promoted or as the latest arrival, from
+    // EVERY change point up to the date - a late-recorded promotion behind an
+    // earlier point still shapes it - and the period's own stand-ins. A
+    // day-wide list named refusals about other supplies as changes here.
     const st = promotionStateOn(raw, onDateStr);
-    [...(st.decisions || []), ...(st.standingDecisions || [])].forEach(e=>{
+    const tl = raw.promotionTimeline || {points: [], standing: []};
+    const about = new Set([st.promoted && st.promoted.supply, st.arrived && st.arrived.supply].filter(Boolean));
+    const period = periodNameFor(raw.id, onDateStr);
+    const STANDS = new Set(["substitute", "de-substitute", "inherit", "un-inherit"]);
+    const behind = [
+      ...(tl.points || []).filter(p=> p.on <= onDateStr)
+        .flatMap(p=> (p.decisions || []).filter(e=> about.has(e.supply))),
+      ...(tl.standing || []).filter(e=> e.on <= onDateStr && e.period === period)
+        .flatMap(e=> (e.decisions || []).filter(x=> STANDS.has(x.action)))];
+    behind.forEach(e=>{
       if(!later(e) || named.has(e.id)) return;
       named.add(e.id);
       out.push({datasetName: raw.name || raw.id, action: e.action, at: e.at,
@@ -8211,7 +8252,7 @@ function renderInPlaceOnPastNotice(){
   if(!past){ notice.hidden = true; notice.innerHTML = ""; return; }
   notice.hidden = false;
   notice.innerHTML = `Showing what was <b>in place on ${fmtDay(CURRENT_IN_PLACE_ON)}</b>, using
-    everything known today - decisions made since that date included. The
+    everything known today - including decisions written down since, where they took effect by then. The
     snapshot archive (🕐 Past snapshots) shows what this page itself said then.${changedSinceNote(CURRENT_IN_PLACE_ON)}`;
 }
 function renderInPlaceOnRangeNotice(){
@@ -8248,13 +8289,26 @@ function applyInPlaceOn(dateStr){
 // change at a time). The way back is the banner's own button, which
 // both requirements ask for by name rather than leaving to the browser.
 function drillToPeriod(dateStr, fromPeriod, fromOn, via){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || "")) return;
+  if(!isRealDateStr(dateStr)) return;
   setInPlaceOnQuietly(dateStr);
   ARRIVAL_FROM = fromPeriod || null;
-  ARRIVAL_FROM_ON = fromPeriod && /^\d{4}-\d{2}-\d{2}$/.test(fromOn || "") ? fromOn : null;
+  ARRIVAL_FROM_ON = fromPeriod && isRealDateStr(fromOn) ? fromOn : null;
   ARRIVAL_VIA = fromPeriod ? (via || null) : null;
+  // THE DRILL ADDS A HISTORY ENTRY, so the browser's own Back returns to the
+  // date left (Keith, 2026-10-13; #166); every other date change replaces.
+  if(fromPeriod) history.pushState(STATE, "", location.href);
   setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
   renderFromState();
+  // AND THE READER IS TAKEN TO WHAT CHANGED (#166): the drill left them
+  // mid-page with the banner three screens up.
+  if(fromPeriod){
+    const notice = document.querySelector('[data-testid="arrival-notice"]');
+    if(notice){
+      notice.setAttribute("tabindex", "-1");
+      if(notice.scrollIntoView) notice.scrollIntoView({block: "start"});
+      notice.focus({preventScroll: true});
+    }
+  }
 }
 // THE DATE, AND EVERYTHING THAT SHOWS IT - without writing the address bar
 // or rendering, for a caller that does both itself (a scenario jump, Back).

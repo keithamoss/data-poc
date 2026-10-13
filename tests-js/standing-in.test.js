@@ -68,7 +68,7 @@ describe("standingInMarker", () => {
 
   it("names who decided a substitution in the tooltip", () => {
     const w = load();
-    expect(w.standingInMarker(ds(SUBSTITUTED))).toContain("decided by Keith");
+    expect(w.standingInMarker(ds(SUBSTITUTED))).toContain("Decided by Keith");
   });
 
   it("says an inheritance was automatic, naming nobody", () => {

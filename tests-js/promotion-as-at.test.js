@@ -125,3 +125,67 @@ describe("the qualifier is about the period on show (REQ-DASH-198)", () => {
     expect(w.standingInDetail(ds)).toContain(`Since replaced, as from ${w.fmtDay("2026-06-01")}`);
   });
 });
+
+describe("the past-date notice names only decisions behind what is on show (post-build-review #165)", () => {
+  it("does not name a decision about another supply, nor a raw action code", () => {
+    const w = loadBuilt();
+    const late = {id: 91, action: "promotion-refused", supply: "s9",
+                  at: "2026-08-03T02:00:00+00:00", recordedAt: "2026-09-01T02:00:00+00:00"};
+    const behind = {id: 92, action: "promote", supply: "s1",
+                    at: "2026-05-02T02:00:00+00:00", recordedAt: "2026-09-01T02:00:00+00:00"};
+    const points = [
+      {...POINTS[0], decisions: [behind]},
+      {...POINTS[1], decisions: [late]}];
+    const raw = {id: "cp-carers", name: "Carer Register", runs: [], runStates: {},
+                 promotionTimeline: {points, standing: []}};
+    dashboard.close();
+    dashboard = loadDashboard({ hierarchy: MINIMAL_HIERARCHY, html: builtTemplate()
+      .replace("const REAL_CP_DATA = null;", `const REAL_CP_DATA = ${JSON.stringify({datasets: [raw]})};`) });
+    const found = dashboard.window.decisionsChangingDate("2026-08-10", null);
+    const actions = found.map(d => d.action);
+    // The promotion of s1 - the supply the panel names - recorded after the
+    // date, on an EARLIER change point, is named; the refusal about s9 is not.
+    expect(actions).toEqual(["promote"]);
+  });
+});
+
+describe("Keith's answers on the critics' findings, 2026-10-13", () => {
+  const own = [{on: "2026-08-03", promoted: {supply: "s1", period: "2026-Q2", runId: "r1"},
+    arrived: {supply: "s2", period: "2026-Q3", files: []}, differs: true,
+    whyNot: "promoted-into-its-own-period", decisions: []}];
+
+  it("gives the promoted-into-its-own-period case its own heading, past and present", () => {
+    const w = loadBuilt();
+    const raw = {id: "cp-carers", promotionTimeline: {points: own, standing: []}};
+    const past = w.promotionSplit({promotionState: w.promotionStateOn(raw, "2026-08-10")});
+    expect(past).toContain(`On ${w.fmtDay("2026-08-10")} the newest file was not the newest promotion`);
+    expect(past).not.toContain("did not hold the latest file");
+    const now = w.promotionSplit({promotionState: w.promotionStateOn(raw, "2026-09-20")});
+    expect(now).toContain("The newest file is not the newest promotion");
+  });
+
+  it("the qualifier says the results are a newer supply when one is awaiting", () => {
+    const w = loadBuilt();
+    const st = {kind: "inherited", period: "2026-Q2", standsOn: "2026-Q1", supply: "s0",
+                decidedBy: null, reason: "", byAPerson: false};
+    const ds = {id: "cp-carers", verdictOf: {state: "awaiting"},
+                promotionState: {standingIn: st, on: "2026-06-01", past: true}};
+    const html = w.standingInDrill(ds);
+    expect(html).toContain("2026-Q2 holds 2026-Q1's supply; the results below are a newer supply awaiting a decision.");
+    expect(html).not.toContain("ran against 2026-Q1's supply");
+  });
+
+  it("the tooltip's second sentence starts with a capital", () => {
+    const w = loadBuilt();
+    const st = {kind: "inherited", period: "2026-Q2", standsOn: "2026-Q1", supply: "s0",
+                decidedBy: null, reason: "", byAPerson: false};
+    const html = w.standingInMarker({promotionState: {standingIn: st, on: "2026-06-01", past: true}});
+    expect(html).toContain("came from 2026-Q1. Inherited automatically");
+  });
+
+  it("the picker's help says which later decisions count", () => {
+    const w = loadBuilt();
+    expect(w.document.body.innerHTML.replace(/\s+/g, " ")).toContain(
+      "a decision written down after that date still counts if it took effect by then, and one that took effect after it does not");
+  });
+});

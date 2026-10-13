@@ -252,3 +252,37 @@ describe("wireArrivalContext", () => {
     expect(params.get("from")).toBeNull();
   });
 });
+
+describe("an impossible date in the URL is not a date (post-build-review #165)", () => {
+  it("falls back to the period left's own date for a from-on like 2026-13-45", () => {
+    // REQ-DASH-198 criterion 12: a from-on that is not a VALID date falls
+    // back. The shape alone passed 2026-13-45 through, and Back then showed
+    // "45 undefined 2026" and threw "not an instant: Invalid Date".
+    const w = load("http://localhost/?from=2026-Q3&from-on=2026-13-45");
+    expect(w.arrivalBanner(ds(null))).toContain('data-to="2026-08-01"');
+  });
+
+  it("ignores an impossible in-place-on and opens on the default date", () => {
+    const w = load("http://localhost/?in-place-on=2026-02-30");
+    expect(w.inPlaceOnFromUrl()).toBe(null);
+  });
+});
+
+describe("the drill link carries only what the arrival needs (post-build-review #165)", () => {
+  it("drops unrelated query state such as an open side panel", () => {
+    const w = load("http://localhost/?panel=changelog");
+    const html = w.standingInDrill({ id: "cp-carers", promotionState:
+      { standingIn: {...SUBSTITUTED, earnedOn: "2026-05-03"}, on: "2026-09-14", past: true } });
+    const href = /href="([^"]+)"/.exec(html)[1].replace(/&amp;/g, "&");
+    const params = new URL(href, "http://localhost/").searchParams;
+    expect(params.get("panel")).toBe(null);
+    expect(params.get("in-place-on")).toBe("2026-05-03");
+  });
+});
+
+describe("the banner names the date left (UX polish, #166)", () => {
+  it("says which date Back returns to", () => {
+    const w = load("http://localhost/?from=2026-Q3&from-on=2026-09-14&via=substitution");
+    expect(w.arrivalBanner(ds(null))).toContain(`on ${w.fmtDay("2026-09-14")}`);
+  });
+});

@@ -233,3 +233,42 @@ class TestTheBootstrappedHistoryAgreesWithTheReaders:
                     seen += 1
                     _assert_agrees(c, dataset, got)
             assert seen, "precondition: the bootstrapped history has change points"
+
+
+class TestTheWalkCoversEveryReason:
+    """The critic's coverage gaps (post-build-review #165): an open contest
+    and a supersession, held against the SQL readers like every other point."""
+
+    def test_an_open_contest(self, conn, dataset, periods):
+        from qa_tools.common import filing
+        first, second, _ = periods
+        _file(dataset, f"{dataset}@1", first, _at(1))
+        _promote(conn, dataset, f"{dataset}@1", first, _at(1, 1, 5))
+        when = _at(3)
+        pair = f"{dataset}@{asset_time.arrival_key(when)}#1"
+        delivery = f"pytest-{dataset}-pair"
+        filing_support.ensure_delivery(delivery, dataset, when, filename="a.csv")
+        filing_support.ensure_delivery(delivery, dataset, _at(3, 1, 3), filename="b.csv")
+        filing.record(assignment.Assignment(
+            dataset_id=dataset, supply_id=pair, slot=second, branch=assignment.OPEN_UNFILLED,
+            considered=(second,), received_at=when), delivery)
+        got = _timeline(conn, dataset)
+        _assert_agrees(conn, dataset, got)
+        assert got["points"][-1]["whyNot"] == promotion_state.TWO_FILES
+
+    def test_a_supersession(self, conn, dataset, periods):
+        first, second, _ = periods
+        _file(dataset, f"{dataset}@1", first, _at(1))
+        _promote(conn, dataset, f"{dataset}@1", first, _at(1, 1, 5))
+        _file(dataset, f"{dataset}@2", second, _at(3))
+        # The decision alone, which is all either reader reads: supersession's
+        # own route resolves the dataset in the hierarchy and moves tables.
+        with dl.apply_decision(conn, dl.Decision(
+                agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+                action=dl.SUPERSEDE, supply=f"{dataset}@2", actor="Keith",
+                actor_kind=dl.PERSON, effective_at=_at(4).isoformat(), from_slot=second,
+                reason="set aside")):
+            pass
+        got = _timeline(conn, dataset)
+        _assert_agrees(conn, dataset, got)
+        assert got["points"][-1]["whyNot"] == promotion_state.SUPERSEDED

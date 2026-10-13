@@ -3982,6 +3982,23 @@ class TestTheQualifierAsAtTheDateOnShow:
         assert clean_page.locator('[data-testid="arrival-notice"]').count() == 0
         assert clean_page.locator('[data-testid="standing-in"]').count() >= 1
 
+    def test_the_drill_shows_the_banner_and_browser_back_returns(
+            self, clean_page, built_dashboard_html):
+        """Keith, 2026-10-13 (#166): the drill takes the reader to the banner,
+        and the browser's own Back returns to the date left."""
+        entry = self._standing(clean_page, built_dashboard_html)
+        _goto(clean_page, built_dashboard_html, state=self.WHERE, in_place_on=entry["on"])
+        clean_page.locator('[data-testid="standing-in-drill"]').click()
+        notice = clean_page.locator('[data-testid="arrival-notice"]')
+        assert notice.is_visible()
+        box = notice.bounding_box()
+        assert box and 0 <= box["y"] < clean_page.viewport_size["height"], \
+            "the banner is on screen after the drill"
+        clean_page.go_back()
+        clean_page.wait_for_function(
+            "(on) => new URLSearchParams(location.search).get('in-place-on') === on",
+            arg=entry["on"])
+
 
 @pytest.fixture(scope="class")
 def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
@@ -4102,17 +4119,25 @@ class TestThePanelAsAtTheDateOnShow:
 
     def test_the_verdict_line_and_the_panel_name_the_same_promoted_supply(
             self, clean_page, built_dashboard_html):
-        """Criterion 13, on the real build: wherever the verdict line names
-        a supply in place while awaiting, it is the panel's promoted one."""
+        """Criterion 13, on the real build, compared INDEPENDENTLY
+        (post-build-review #165 - the first version compared a value with
+        itself). On every date the verdict line says a newer supply is
+        awaiting, the RENDERED line must name the receipt of the run whose
+        arrival key is the panel's promoted supply's - found here by key, not
+        through the runId the page used."""
         _goto(clean_page, built_dashboard_html, state=self.WHERE)
         checked = clean_page.evaluate("""() => {
           const d = rawRealDatasets().find(x => x.id === "cp-carers");
           let n = 0, bad = [];
           for (const p of d.promotionTimeline.points) {
             const c = clipDatasetToInPlaceOn(d, p.on);
-            if (!c || c.verdictOf.state !== "awaiting" || !c.verdictOf.inPlaceRunId) continue;
+            if (!c || c.verdictOf.state !== "awaiting" || !p.promoted) continue;
+            const key = p.promoted.supply.split("@")[1].split("#")[0];
+            const run = d.runs.find(r => r.run_id.includes(key));
+            if (!run) continue;
             n += 1;
-            if (c.verdictOf.inPlaceRunId !== (c.promotionState.promoted || {}).runId) bad.push(p.on);
+            const named = run.received_at ? fmtInstant(run.received_at) : fmtDay(run.run_date);
+            if (!verdictLine(c).includes(named)) bad.push(p.on);
           }
           return {n, bad};
         }""")

@@ -35,7 +35,7 @@ describe("the verdict's supply", () => {
     const clipped = w.clipDatasetToInPlaceOn(d, "2026-02-20");
     expect(clipped.runs.map(r=>r.run_id)).toEqual(["r1", "r2"]);
     expect(clipped.verdictOf).toEqual({state: "awaiting", inPlaceRunDate: "2026-01-10",
-                                      inPlaceRunId: "r1"});
+                                      inPlaceReceivedAt: null, inPlaceRunId: "r1"});
   });
 
   it("names the supply most recently PROMOTED, not the newest by receipt", () => {
@@ -53,6 +53,14 @@ describe("the verdict's supply", () => {
     const clipped = w.clipDatasetToInPlaceOn(d, "2026-03-20");
     expect(clipped.verdictOf.state).toBe("awaiting");
     expect(clipped.verdictOf.inPlaceRunId).toBe("r1");
+  });
+
+  it("names the in-place supply's receipt time, not only its day (#166)", () => {
+    const w = loadDashboard().window;
+    const v = {state: "awaiting", inPlaceRunDate: "2026-01-10",
+               inPlaceReceivedAt: "2026-01-10T03:00:00+00:00", inPlaceRunId: "r1"};
+    const html = w.verdictLine({verdictOf: v, lastArrival: {arrivedAt: "2026-02-10T03:00:00+00:00"}});
+    expect(html).toContain(w.fmtInstant("2026-01-10T03:00:00+00:00"));
   });
 
   it("before the withdrawal the newer supply was the verdict", () => {

@@ -8173,3 +8173,53 @@ twice. It deliberately did not re-find the `TypeError`.
     reason MEANS, which is Keith's (a significant change to agreed
     behaviour under the 2026-09-25 rule). Question for Keith: a new reason
     for a resupply awaiting a decision, or reword SUPERSEDED to cover it?
+
+165. **[done, 2026-10-13]** **[Dashboard UI]** **Four defects in REQ-DASH-197
+    and REQ-DASH-198, from the post-build critics.** Each fixed with a test
+    that failed first:
+    - An impossible date in the URL (`from-on=2026-13-45`, `in-place-on=
+      2026-02-30`) matched the date SHAPE, so Back rendered "45 undefined
+      2026" and threw "not an instant". `isRealDateStr` round-trips through
+      Date. tests-js/standing-in-drill.test.js.
+    - The past-date notice named every decision of the change point's day
+      (a refusal about another supply printed as "changed what this date
+      shows"), and missed a late-recorded decision behind an EARLIER change
+      point. It now names decisions about the supplies the panel names, from
+      every point up to the date, plus the period's own stand-ins.
+      tests-js/promotion-as-at.test.js. No live exposure today (0 of 209
+      decisions recorded on a later day than they took effect).
+    - The drill's href copied the whole query, carrying an open side panel
+      into a middle-clicked tab. It now carries only in-place-on, from,
+      from-on and via.
+    - tests/test_dashboard_e2e.py's verdict/panel agreement test compared a
+      value with itself, so it could not fail. It now compares the rendered
+      verdict line against the run found by the panel's supply key.
+    Also: coverage for an open contest and a supersession in the change-point
+    walk (tests/test_promotion_timeline.py `TestTheWalkCoversEveryReason`).
+
+166. **[done, 2026-10-13]** **[Dashboard UI]** **REQ-DASH-197/198 critic
+    findings that were Keith's to decide, and the polish.** Keith's answers:
+    - cp-clients on 1 March 2024: the verdict line names the 2024-Q1 supply
+      (promoted into its own period) while the panel names 2023-Q4 (promoted
+      later). BOTH STAND; REQ-DASH-126's claim that the two can no longer
+      differ is corrected rather than the behaviour changed.
+    - That case gets its own heading - "The newest file is not the newest
+      promotion" / "On <date> the newest file was not the newest promotion" -
+      because criterion 8's heading said the opposite of the cell under it.
+    - A standing-in period with a newer supply awaiting: the qualifier now
+      says "<period> holds <earlier>'s supply; the results below are a newer
+      supply awaiting a decision." rather than contradicting the verdict
+      line.
+    - The drill adds a browser-history entry, so browser Back returns to the
+      date left.
+    - The date picker's help and the past-date notice reworded: "a decision
+      written down after that date still counts if it took effect by then,
+      and one that took effect after it does not."
+    Polish, minor under the 2026-09-25 rule: the drill scrolls to and focuses
+    the arrival banner (it left the reader mid-page with the banner three
+    screens up); the banner names the date left; the tooltip's who-sentence
+    is capitalised; the verdict line gives the in-place supply's receipt
+    time, not only its day. NOT DONE, recorded for later: a single
+    vocabulary for "no slot" across four blocks; the SLA tile ignoring a
+    dataset's own participation; the held card's present tense on a past
+    date; "superseded" naming its specific cause (with #164).
