@@ -224,6 +224,9 @@ def consequences(conn, request: Request) -> Consequences:
     re-checked (criterion 8) is said too - from knock_on.readers(), the
     same answer the re-evaluation it owes will act on.
     """
+    # ONE FILE OF AN OPEN PAIR IS REFUSED BEFORE ANYONE IS ASKED (REQ-PIPE-193
+    # criterion 25): the warning is the first thing every route asks for.
+    _refuse_on_an_open_pair(conn, request)
     lines: list[str] = []
     done: list[str] = []
     if request.operation == PROMOTE and request.period and request.supply:
@@ -572,7 +575,7 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
         # to the warning, so reaching here is that confirmation.
         promotion.promote(
             conn, supply=request.supply, period=request.period,
-            physical_tables=_staged(conn, entry.table, request.supply),
+            physical_tables=_staged(conn, request.dataset_id, request.supply),
             actor_kind=decision_log.PERSON, remove_substitution=True, **common)
     elif request.operation == REJECT:
         rejection.reject(
@@ -581,7 +584,7 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
             # (post-build-review #112): looking only in staging left it there.
             physical_tables=(_promoted_tables(conn, entry.table, request)
                              if _is_promoted(conn, request)
-                             else _staged(conn, entry.table, request.supply)),
+                             else _staged(conn, request.dataset_id, request.supply)),
             promoted=_is_promoted(conn, request), **common)
     elif request.operation == DEMOTE:
         rejection.demote(
@@ -669,15 +672,14 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> int
     return None
 
 
-def _staged(conn, logical: str, supply: str) -> list[str]:
-    """The physical tables this supply has in staging - BOTH files of a
-    contested pair, whose supply id carries `#1` while its staged names do
-    not (2026-10-12: the suffix kept in the key matched neither, so
-    rejecting the pair left both waiting)."""
-    arrival = (supply or "").rsplit("@", 1)[-1].split("#", 1)[0]
-    found = supply_db.candidates_in(
-        conn, supply_db.STAGING_SCHEMA, [logical], arrival=arrival).get(logical) or []
-    return list(found)
+def _staged(conn, dataset_id: str, supply: str) -> list[str]:
+    """The physical tables this supply has in staging, by the one resolver
+    (REQ-PIPE-193 criterion 13): an ordinary supply's one, a settled pair's
+    supply's own file's - never the other file's - and an open pair's both.
+    Only those actually in staging."""
+    from qa_tools.common import supply_files
+
+    return supply_files.tables_in(conn, dataset_id, supply, supply_db.STAGING_SCHEMA)
 
 
 def _promoted_tables(conn, logical: str, request: Request) -> list[str]:
@@ -698,48 +700,63 @@ def _refuse_promoting_what_never_loaded(conn, request: Request) -> None:
     FAILED cannot be promoted, on any route. Promotion moves the tables it
     is given - none - and would record a period filled by a supply nothing
     can read. Refused naming the failed load and its recorded reason, and
-    before anything is written."""
+    before anything is written. ITS OWN FILE'S load (REQ-PIPE-193 criterion
+    13): a refused sibling file says nothing about a settled supply."""
     if request.operation != PROMOTE or "@" not in (request.supply or ""):
         return
-    from qa_tools.common import load_log
+    from qa_tools.common import load_log, supply_files
 
-    key = request.supply.rsplit("@", 1)[1].split("#", 1)[0]
-    try:
-        table = hierarchy.dataset(request.dataset_id).table
-    except hierarchy.UnknownDatasetError:
+    found = supply_files.resolve(conn, request.dataset_id, request.supply)
+    if found is None or not found.refused or found.tables:
         return
-    for physical, record in load_log.latest_by_table(conn=conn).items():
-        parts = supply_db.split_staged(physical)
-        if (parts and parts[0] == table and parts[1] == key
-                and record.dataset_id == request.dataset_id and not record.loaded):
-            why = record.reason or "no reason was recorded"
-            raise decision_log.DecisionRefused(
-                f"{request.supply} could not be loaded ({why}), so there is nothing "
-                f"to promote. Reject it, or fix the fault and reprocess the delivery. "
-                f"Nothing was recorded.")
+    record = load_log.latest_for(found.refused[0], conn=conn)
+    why = (record.reason if record else None) or "no reason was recorded"
+    raise decision_log.DecisionRefused(
+        f"{request.supply} could not be loaded ({why}), so there is nothing "
+        f"to promote. Reject it, or fix the fault and reprocess the delivery. "
+        f"Nothing was recorded.")
 
 
-def _refuse_promoting_a_contested_pair(conn, request: Request) -> None:
-    """REQ-PIPE-128 (exactly one version of each table in a period): a
-    supply whose table still has two staged versions - a contested pair -
-    is not promoted on any route, because promotion would move both and the
-    period would hold two versions of one table (2026-10-13: it did, and
-    the second collided on the base name). Refused before anything is
-    written, naming what can be done today."""
-    if request.operation != PROMOTE or "@" not in (request.supply or ""):
+#: What a person may NOT do to one file of an open pair, on any route: the
+#: pair is settled by saying what each file is (REQ-PIPE-193 criterion 25,
+#: REQ-PIPE-194 criteria 4 and 6). Promoting it would put two versions of
+#: one table into the period (REQ-PIPE-128).
+_NOT_ON_AN_OPEN_PAIR = (PROMOTE, REJECT, SUPERSEDE, REFILE, DEMOTE, ACKNOWLEDGE,
+                        EXCUSE_LATENESS, WITHDRAW_EXCUSE, UN_SUPERSEDE)
+
+
+class OpenPair(decision_log.DecisionRefused):
+    """A plain decision about one file of an open pair (criterion 25). The
+    CLI route prints the settle form with the real filenames below it."""
+
+    def __init__(self, message: str, *, dataset_id: str, period: str | None,
+                 supply: str, files: tuple[str, ...]):
+        super().__init__(message)
+        self.dataset_id, self.period, self.supply, self.files = (
+            dataset_id, period, supply, files)
+
+
+def _refuse_on_an_open_pair(conn, request: Request) -> None:
+    """Refused before anything is written, saying where the pair is settled
+    - judged by the open contest (dataset_blockers), never by the shape of
+    the supply id (REQ-PIPE-194 criterion 8)."""
+    if request.operation not in _NOT_ON_AN_OPEN_PAIR or "@" not in (request.supply or ""):
         return
-    try:
-        table = hierarchy.dataset(request.dataset_id).table
-    except hierarchy.UnknownDatasetError:
+    from qa_tools.common import supply_files
+
+    contest = supply_files.open_contest(conn, request.dataset_id, request.supply)
+    if contest is None:
         return
-    staged = _staged(conn, table, request.supply)
-    if len(staged) > 1:
-        raise decision_log.DecisionRefused(
-            f"{request.supply} is a contested pair: two files claim {table} "
-            f"({', '.join(staged)}) and nothing says which is the supply, so promoting "
-            f"it would put two versions of one table into {request.period}. Reject the "
-            f"pair and ask the supplier to resend; choosing one file is not built yet "
-            f"(REQ-PIPE-193). Nothing was recorded.")
+    name = hierarchy.dataset(request.dataset_id).dataset_name
+    raise OpenPair(
+        f"Two files arrived for {name}'s table ({' and '.join(contest.files)}), and nothing "
+        f"yet says which is the supply, so a {_spoken(request.operation)} of one of them "
+        f"is not recorded. The pair is settled by saying what each file is, at "
+        f"'{supply_files.where_to_settle(request.dataset_id)}' - where 'reject both' "
+        f"rejects each file on its own, so either can be brought back alone. Nothing was "
+        f"recorded.",
+        dataset_id=request.dataset_id, period=request.period, supply=request.supply,
+        files=contest.files)
 
 
 def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
@@ -787,6 +804,7 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         with supply_db.connect(label="mothman:filing-decision") as opened:
             return apply(request, effective_at=effective_at, conn=opened)
 
+    _refuse_on_an_open_pair(conn, request)
     if request.operation == REFILE:
         # REFUSED BEFORE ANYONE IS ASKED TO CONFIRM (decision 13; post-build-
         # review #114, D5): a re-file's refusals - rejected, contested,
@@ -798,7 +816,6 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         _confirmation(request)
 
     _refuse_promoting_what_never_loaded(conn, request)
-    _refuse_promoting_a_contested_pair(conn, request)
     already = _already(conn, request)
     if already is not None:
         return Outcome(operation=request.operation, dataset_id=request.dataset_id,

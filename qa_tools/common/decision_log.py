@@ -179,10 +179,17 @@ WITHDRAW_EXCUSE = "withdraw-excuse"
 #: it ignores acknowledge and the excuse.
 KEEP = "keep"
 
+#: A PERSON SETTLES A CONTESTED PAIR (REQ-PIPE-193): one entry naming the
+#: pair's `#1` supply and its period, with what each file became on
+#: qa.decision_file. Each file's rejection, supersession or re-file is its
+#: own entry naming this one as its cause (criterion 8), so this one
+#: changes nothing a period resolves to and qa.slot_holds ignores it.
+CHOOSE_FILE = "choose-file"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
            MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
-           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP)
+           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP, CHOOSE_FILE)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.

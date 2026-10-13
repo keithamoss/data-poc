@@ -347,12 +347,17 @@ def assess(conn: supply_db.SupplyConnection, dataset_id: str, current_period: st
                       gap=tuple(gap), dealt_with=tuple(dealt))
 
 
-def assess_arrival(dataset_id: str, received_at) -> Assessment | None:
+def assess_arrival(dataset_id: str, received_at, period: str | None = None
+                   ) -> Assessment | None:
     """assess() for the supply an arrival brought - None where it has no
-    period (held, a trial), which the caller reports as no reference."""
+    period (held, a trial), which the caller reports as no reference.
+
+    `period` WHERE THE RUN STATES IT (a re-check, about one supply): a
+    settled pair's supply has its own file's receipt, whose key matches
+    no filing (REQ-PIPE-193 criterion 13)."""
     from qa_tools.common import asset_time, filing
 
-    period = filing.period_of(dataset_id, received_at)
+    period = period or filing.period_of(dataset_id, received_at)
     if not period:
         return None
     at = (received_at if hasattr(received_at, "tzinfo")

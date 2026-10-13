@@ -136,31 +136,30 @@ def _arrival_of(supply: str) -> str:
     return supply_holds.arrival_key_of(supply)
 
 
-#: The decisions that end a contest. Choosing one file joins them when
-#: REQ-PIPE-193 is built.
-_SETTLES_A_CONTEST = frozenset({"reject", "supersede"})
+def _settles_a_contest(action: str, actor_kind: str) -> bool:
+    """THE ONE PLACE A CONTEST'S END IS COUNTED (REQ-PIPE-194 criterion 9):
+    a person's settlement (choose-file, any combination including
+    'neither'), or the RULE's supersession of the pair by a later arrival.
+    Nothing else - a person's plain reject or supersede is refused on an
+    open contest (REQ-PIPE-193 criterion 25), and an excused lateness says
+    nothing about which file is the supply (post-build-review #160)."""
+    from qa_tools.common import decision_log
+
+    return action == decision_log.CHOOSE_FILE or (
+        action == decision_log.SUPERSEDE and actor_kind == decision_log.RULE)
 
 
 def _decided_keys(db) -> dict[tuple[str, str], str]:
     """(dataset, arrival key) -> the earliest instant a decision that
-    settles which file is the supply took effect - a rejection of the pair
-    or its supersession. A refusal the rule recorded, an acknowledgement or
-    an excused lateness says nothing about the files, so none counts."""
+    settles which file is the supply took effect."""
     from qa_tools.common import decision_log
 
     out: dict[tuple[str, str], str] = {}
-    for dataset_id, supply, action, effective_at in db.execute(
-            "SELECT dataset_id, supply, action, effective_at FROM qa.decision "
-            "ORDER BY effective_at, id").fetchall():
-        # A DECISION WITH NO SUPPLY is about a period, not an arrival - a
-        # mark that a period was not supplied (REQ-PIPE-132) - so it
-        # decides nothing about any arrival's files.
-        if action in decision_log.RECORDS_A_REFUSAL or not supply:
-            continue
-        # ONLY A DECISION THAT SETTLES WHICH FILE IS THE SUPPLY ends a
-        # contest (REQ-PIPE-194 criterion 7; 2026-10-13 - an excused
-        # lateness closed it): rejecting the pair, or its supersession.
-        if action not in _SETTLES_A_CONTEST:
+    for dataset_id, supply, action, actor_kind, effective_at in db.execute(
+            "SELECT dataset_id, supply, action, actor_kind, effective_at FROM qa.decision "
+            "WHERE action IN (?, ?) ORDER BY effective_at, id",
+            [decision_log.CHOOSE_FILE, decision_log.SUPERSEDE]).fetchall():
+        if not supply or not _settles_a_contest(action, actor_kind):
             continue
         out.setdefault((dataset_id, _arrival_of(supply)), _iso(effective_at))
     return out

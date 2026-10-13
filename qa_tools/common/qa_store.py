@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 39
+SCHEMA_VERSION = 40
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -765,26 +765,6 @@ CREATE INDEX IF NOT EXISTS filing_dataset
 CREATE INDEX IF NOT EXISTS filing_slot
     ON "{SCHEMA}".filing (dataset_id, slot) WHERE slot IS NOT NULL;
 
--- A SUPPLY'S RECEIPT, DEFINED ONCE (REQ-PIPE-144 criteria 12 and 16).
--- The receipt of the supply's file in its linked delivery. Since
--- REQ-PIPE-105 a supply is one file with one receipt and this simply
--- returns it; only a CONTESTED pair (two files for one dataset in one
--- delivery) has two, and the view takes the earlier by instant then
--- receipt sequence - the same choice the arrival made (REQ-GEN-044
--- criterion 12), so the receipt and the supply id can never disagree.
--- Every "when was this supply received" reads this, and nothing else
--- re-derives the earlier-file rule.
-CREATE OR REPLACE VIEW "{SCHEMA}".supply_receipt AS
-SELECT DISTINCT ON (f.dataset_id, f.supply_id)
-       f.dataset_id, f.supply_id, f.delivery, df.filename,
-       df.received_at, df.received_instant, df.received_from, df.receipt_sequence,
-       -- BESIDE the receipt, never it (REQ-PIPE-103 criterion 19).
-       df.originally_received_stated
-FROM "{SCHEMA}".filing_current f
-JOIN "{SCHEMA}".delivery_file df
-  ON df.delivery = f.delivery AND df.dataset_id = f.dataset_id
-ORDER BY f.dataset_id, f.supply_id, df.received_instant, df.receipt_sequence, df.filename;
-
 -- WHICH DATASETS MATCHED MORE THAN ONE FILE OF A DELIVERY (REQ-PIPE-144
 -- criterion 26), derived from delivery_file rather than stored beside it
 -- (criterion 25). Ordered as delivery_log.records() has always returned
@@ -930,7 +910,14 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
                       'supersede', 'un-supersede', 'still-failing',
                       'promotion-refused', 'excuse-lateness', 'withdraw-excuse',
-                      'keep'));
+                      'keep', 'choose-file'));
+-- A SETTLEMENT OF A CONTESTED PAIR (REQ-PIPE-193 criterion 8, schema 40):
+-- a person's, naming the pair's `#1` supply and the period it was filed
+-- to. What became of each file is on qa.decision_file below.
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_choose_file_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_choose_file_shape
+    CHECK (action <> 'choose-file'
+           OR (actor_kind = 'person' AND from_slot IS NOT NULL AND reason IS NOT NULL));
 -- WHICH NEWER SUPPLY SUPERSEDED THIS ONE (REQ-PIPE-118 criterion 10).
 -- Schema 22, additive. Schema 23 relaxed the shape for a PERSON's
 -- supersession (REQ-PIPE-120), which names no newer supply - shipped first
@@ -1046,6 +1033,76 @@ ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supply_presen
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supply_present
     CHECK (action IN ('inherit-refused', 'mark-not-supplied', 'still-failing')
            OR (supply IS NOT NULL AND supply <> ''));
+
+-- WHAT EACH FILE OF A SETTLED PAIR BECAME (REQ-PIPE-193 criteria 8, 10
+-- and 12; schema 40). One row per file, written in the settlement's own
+-- transaction: the filename it arrived under, the supply it now is (`#1`
+-- for this period's supply, or the earlier file where neither is; `#2`
+-- for the other, whatever its outcome) and its outcome. THE ONE PLACE
+-- "which file is this supply" is stated (REQ-PIPE-144's fact-stated-once
+-- rule): qa.supply_receipt reads its receipt from here, and the supply
+-- resolver (qa_tools/common/supply_files.py) its staged table.
+--
+-- A CHILD TABLE, NOT COLUMNS OR JSON (architect, 2026-10-13): constraints
+-- apply, a three-file delivery fits, and REQ-PIPE-144 removed JSON
+-- documents. APPEND-ONLY, as the decision it belongs to.
+CREATE TABLE IF NOT EXISTS "{SCHEMA}".decision_file (
+    decision_id bigint NOT NULL REFERENCES "{SCHEMA}".decision (id),
+    filename    text NOT NULL,
+    supply_id   text NOT NULL CHECK (supply_id <> ''),
+    outcome     text NOT NULL
+        CHECK (outcome IN ('supply', 'refiled', 'rejected', 'superseded')),
+    to_slot     text,
+    CHECK ((outcome = 'refiled') = (to_slot IS NOT NULL)),
+    PRIMARY KEY (decision_id, filename),
+    UNIQUE (decision_id, supply_id)
+);
+CREATE INDEX IF NOT EXISTS decision_file_supply
+    ON "{SCHEMA}".decision_file (supply_id);
+
+CREATE OR REPLACE FUNCTION "{SCHEMA}".decision_file_is_append_only()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION
+        'qa.decision_file is append-only: a % is not permitted. A settlement is '
+        'changed by later decisions, never by editing it (REQ-PIPE-193)', TG_OP;
+END $$;
+DROP TRIGGER IF EXISTS decision_file_append_only ON "{SCHEMA}".decision_file;
+CREATE TRIGGER decision_file_append_only
+    BEFORE UPDATE OR DELETE ON "{SCHEMA}".decision_file
+    FOR EACH STATEMENT EXECUTE FUNCTION "{SCHEMA}".decision_file_is_append_only();
+
+-- A SUPPLY'S RECEIPT, DEFINED ONCE (REQ-PIPE-144 criteria 12 and 16).
+-- The receipt of the supply's file in its linked delivery. Since
+-- REQ-PIPE-105 a supply is one file with one receipt and this simply
+-- returns it; only a CONTESTED pair (two files for one dataset in one
+-- delivery) has two, and the view takes the earlier by instant then
+-- receipt sequence - the same choice the arrival made (REQ-GEN-044
+-- criterion 12), so the receipt and the supply id can never disagree.
+-- Every "when was this supply received" reads this, and nothing else
+-- re-derives the earlier-file rule.
+--
+-- A SETTLED PAIR'S SUPPLY IS ITS OWN FILE (REQ-PIPE-193 criterion 10;
+-- Keith, 2026-10-04): where qa.decision_file says which file a supply
+-- is, that file's receipt is the supply's - read from there, the one
+-- place it is stated. Defined here, after qa.decision_file, which it
+-- reads (schema 40).
+CREATE OR REPLACE VIEW "{SCHEMA}".supply_receipt AS
+SELECT DISTINCT ON (f.dataset_id, f.supply_id)
+       f.dataset_id, f.supply_id, f.delivery, df.filename,
+       df.received_at, df.received_instant, df.received_from, df.receipt_sequence,
+       -- BESIDE the receipt, never it (REQ-PIPE-103 criterion 19).
+       df.originally_received_stated
+FROM "{SCHEMA}".filing_current f
+JOIN "{SCHEMA}".delivery_file df
+  ON df.delivery = f.delivery AND df.dataset_id = f.dataset_id
+LEFT JOIN LATERAL (
+    SELECT x.filename FROM "{SCHEMA}".decision_file x
+    JOIN "{SCHEMA}".decision d ON d.id = x.decision_id
+    WHERE d.dataset_id = f.dataset_id AND x.supply_id = f.supply_id
+    ORDER BY d.effective_at DESC, d.id DESC LIMIT 1) settled ON true
+WHERE settled.filename IS NULL OR settled.filename = df.filename
+ORDER BY f.dataset_id, f.supply_id, df.received_instant, df.receipt_sequence, df.filename;
 
 --   WHEN A PERIOD WAS OPENED (REQ-PIPE-098 criterion 3). "First
 --   created" has to be a FACT rather than an inference from the schema

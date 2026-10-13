@@ -208,7 +208,9 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # and now makes the drift and volume checks red, the measurement kept.
     assessment = None
     if reference_run_id is None:
-        assessment = drift_reference.assess_arrival(DATASET_ID, entry["received_at"])
+        assessment = drift_reference.assess_arrival(
+            DATASET_ID, entry["received_at"],
+            period=(entry.get("purpose") or {}).get("period"))
         reference_run_id = assessment.run_id if assessment else None
 
     def _dbt() -> list[dict]:

@@ -119,13 +119,12 @@ def owed(conn: supply_db.SupplyConnection, dataset_id: str | None = None) -> lis
 
 
 def first_run_id(dataset_id: str, supply_id: str) -> str:
-    """The run id an arrival gave this supply - its staged table's name."""
-    from qa_tools.common import hierarchy
+    """The run id this supply's own runs are named from - its arrival's, or
+    for a settled pair's supply one of its own (REQ-PIPE-193 criterion 14).
+    An identity only: the supply's TABLE is the resolver's to say."""
+    from qa_tools.common import supply_files
 
-    logical = hierarchy.dataset(dataset_id).table
-    key = supply_id.rsplit("@", 1)[1]
-    head, _, ordinal = key.partition("#")
-    return f"{logical}__{head}" + (f"__{ordinal}" if ordinal else "")
+    return supply_files.run_id_of(dataset_id, supply_id)
 
 
 def _run_index_of(first: str) -> int:
@@ -202,10 +201,19 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     module = importlib.import_module(module_name)
     tables = getattr(importlib.import_module(tables_module), tables_name)
     tables = [tables] if isinstance(tables, str) else list(tables)
+    from qa_tools.common import supply_files
+
     arrival = SimpleNamespace(
         run_id=run_key, received_at=received_at, sequence=0, delivery_name=delivery,
-        files_by_dataset={dataset_id: (supply_id,)})
-    first = first_run_id(dataset_id, supply_id)
+        files_by_dataset={dataset_id: (supply_id,)},
+        # THE SUPPLY IT IS ABOUT, SAID RATHER THAN DERIVED (REQ-PIPE-193
+        # criterion 13): a settled pair's supply has its own file's receipt,
+        # whose key names no table, so nothing downstream may rebuild the
+        # supply, its period or its table from `received_at`.
+        supply_ids={dataset_id: supply_id})
+    # ITS ARRIVAL'S RUN - the one its rows were staged under and whose
+    # run_index it carries (criterion 14). A pair's two supplies share it.
+    first = supply_files.arrival_run_id_of(dataset_id, supply_id)
     entry = {
         "run_id": run_key, "received_at": received_at.isoformat(), "delivery": delivery,
         # ITS PLACE IN THE HISTORY IS ITS ARRIVAL'S (post-build-review #161):

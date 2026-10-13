@@ -193,10 +193,15 @@ def record_load(delivery: str, dataset_id: str, physical: str, outcome: str,
         with db.raw.transaction():
             written = record(delivery, dataset_id, physical, outcome, recorded_at,
                              reason=reason, row_count=row_count, trial=trial, conn=db)
-            parts = supply_db.split_staged(physical)
-            if written is not None and written.id is not None and parts:
-                recheck.owe(db, dataset_id=dataset_id, supply_id=f"{dataset_id}@{parts[1]}",
-                            load_id=written.id)
+            # OWED TO THE SUPPLY THAT OWNS THE TABLE, by the one resolver - a
+            # pair's file is `#1` or `#2`, never the bare key (REQ-PIPE-193
+            # criterion 13).
+            from qa_tools.common import supply_files
+
+            supply = (supply_files.supply_for_table(db, dataset_id, physical)
+                      if written is not None and written.id is not None else None)
+            if supply:
+                recheck.owe(db, dataset_id=dataset_id, supply_id=supply, load_id=written.id)
         return written
 
 

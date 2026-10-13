@@ -115,14 +115,15 @@ class TestOpenFromTheReceiptInstant:
         assert not blocker.open_at(RECEIVED - timedelta(seconds=1))
         assert blocker.open_at(RECEIVED)
 
-    def test_a_contest_closes_when_a_decision_about_its_arrival_takes_effect(self, clean):
+    def test_a_contest_closes_when_its_settlement_takes_effect(self, clean):
+        """REQ-PIPE-194 criterion 9: a person's choose-file settlement."""
         from qa_tools.common import decision_log
 
         _pair()
         decided = RECEIVED + timedelta(days=2)
         with decision_log.apply_decision(clean, decision_log.Decision(
             agency_id="a", collection_id="c", dataset_id=DATASET,
-            action=decision_log.REJECT, supply=f"cp_case_workers__{_key()}__2",
+            action=decision_log.CHOOSE_FILE, supply=f"{DATASET}@{_key()}#1",
             from_slot="2030-Q1",
             actor="person@example.com", actor_kind=decision_log.PERSON,
             reason="the second file was a mistake", effective_at=decided.isoformat())):
@@ -159,6 +160,35 @@ class TestOpenFromTheReceiptInstant:
         (blocker,) = dataset_blockers.all_blockers(clean)
         assert blocker.open_at(decided + timedelta(days=1)), (
             "an excused lateness closed the contest")
+
+    @pytest.mark.parametrize("action, actor_kind", [
+        ("reject", "person"), ("supersede", "person"), ("refile", "person")])
+    def test_no_other_decision_closes_it(self, clean, action, actor_kind):
+        """REQ-PIPE-194 criterion 9: only a settlement or the RULE's
+        supersession by a later arrival - a person's plain reject or
+        supersede is refused on an open contest (REQ-PIPE-193 criterion
+        25), and an older log's would not have said which file."""
+        _pair()
+        decided = RECEIVED + timedelta(days=2)
+        clean.execute(
+            "INSERT INTO qa.decision (agency_id, collection_id, dataset_id, action, supply, "
+            "from_slot, to_slot, actor, actor_kind, reason, effective_at) "
+            "VALUES ('a', 'c', ?, ?, ?, '2030-Q1', '2030-Q2', 'p@example.com', ?, 'r', ?)",
+            [DATASET, action, f"{DATASET}@{_key()}#1", actor_kind, decided.isoformat()])
+        (blocker,) = dataset_blockers.all_blockers(clean)
+        assert blocker.open_at(decided + timedelta(days=1))
+
+    def test_the_rules_supersession_by_a_later_arrival_closes_it(self, clean):
+        _pair()
+        decided = RECEIVED + timedelta(days=2)
+        clean.execute(
+            "INSERT INTO qa.decision (agency_id, collection_id, dataset_id, action, supply, "
+            "from_slot, actor, actor_kind, reason, effective_at, superseded_by) "
+            "VALUES ('a', 'c', ?, 'supersede', ?, '2030-Q1', 'supersession rule', 'rule', "
+            "'newer', ?, 'x@1')",
+            [DATASET, f"{DATASET}@{_key()}#1", decided.isoformat()])
+        (blocker,) = dataset_blockers.all_blockers(clean)
+        assert not blocker.open_at(decided)
 
     def test_the_whole_life_reaches_the_built_record(self, clean):
         _pair()

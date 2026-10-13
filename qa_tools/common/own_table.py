@@ -71,6 +71,16 @@ def why_unreadable(conn, run_id: str, own_table: str, resolution, *,
         return HELD
     if own_table in resolution.ambiguous:
         return CONTESTED
+    # ITS OWN STAGED FILE RESOLVED, SO IT IS READABLE - whatever happened to
+    # another file of its arrival (REQ-PIPE-193 criterion 13). A settled
+    # pair's supply whose sibling the load refused is checked on its own
+    # file; the refusal below is for a run whose own file never loaded, and
+    # whose view fell through to the period instead.
+    physical = resolution.resolved.get(own_table)
+    parts = supply_db.split_staged(physical or "")
+    if (parts and parts[1] == arrival_key
+            and own_table in supply_db.readable_in(conn, run_id)):
+        return None
     # REFUSED WINS OVER A READABLE VIEW TOO, for the same reason (post-build-
     # review #124 D2): the overlay lets a refused table fall through to the
     # period's promoted version, and the tools then recorded 78 verdicts

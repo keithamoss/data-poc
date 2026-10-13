@@ -86,12 +86,16 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
             f"shows how.")
     if from_period == to_period:
         raise decision_log.DecisionRefused(f"{supply} is already filed to {to_period}.")
-    if "#" in supply.rsplit("@", 1)[-1]:
-        # Criterion 11: the contest is per arrival.
+    from qa_tools.common import supply_files
+
+    if supply_files.open_contest(conn, dataset_id, supply) is not None:
+        # Criterion 11: the contest is per arrival. JUDGED BY THE OPEN
+        # CONTEST, not the `#` in the id (REQ-PIPE-194 criteria 6 and 8): a
+        # settled pair's supplies are re-filed like any other.
         raise decision_log.DecisionRefused(
             f"{supply} is one file of a contested pair. The contest is per arrival, so "
-            f"moving one file would not end it - resolve the contest first, by saying "
-            f"which file is the supply.")
+            f"moving one file would not end it - the pair is settled first, by saying "
+            f"what each file is, at '{supply_files.where_to_settle(dataset_id)}'.")
     if supersession._rejected(conn, dataset_id, supply) and not _since_unrejected(
             conn, dataset_id, supply):
         # Criterion 10.
@@ -194,11 +198,11 @@ def _what_it_does(p: Plan) -> tuple:
 
 
 def _tables_in(conn, schema: str, p: Plan) -> list[str]:
-    from qa_tools.common import supply_holds
+    """This supply's own tables in `schema`, by the one resolver - never its
+    pair's other file (REQ-PIPE-193 criterion 13)."""
+    from qa_tools.common import supply_files
 
-    key = supply_holds.arrival_key_of(p.supply)
-    return list(supply_db.candidates_in(conn, schema, [p.table], arrival=key).get(p.table)
-                or [])
+    return supply_files.tables_in(conn, p.dataset_id, p.supply, schema)
 
 
 def _received(conn, dataset_id: str, supply: str) -> str:

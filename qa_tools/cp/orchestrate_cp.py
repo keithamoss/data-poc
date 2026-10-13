@@ -178,7 +178,8 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
         # AND WHAT THE COMPARISON CROSSES (REQ-QAC-108 criteria 8 to 17) -
         # see orchestrate_bdm.py's identical block.
         assessment = drift_reference.assess_arrival(
-            owner[0] if owner else run_evidently_cp.DATASET_ID, entry["received_at"])
+            owner[0] if owner else run_evidently_cp.DATASET_ID, entry["received_at"],
+            period=(entry.get("purpose") or {}).get("period"))
         reference_run_id = assessment.run_id if assessment else None
     else:
         assessment = None
@@ -362,7 +363,17 @@ def _has_scope(entry: dict, run_id: str) -> bool:
     if owner is None:
         return False
     as_at = asset_time.parse_instant(entry["received_at"], f"received_at for {run_id}")
-    return bool(filing.period_of(owner[0], as_at))
+    return bool(_period_of_entry(entry, owner[0], as_at))
+
+
+def _period_of_entry(entry: dict, dataset_id: str, as_at) -> str | None:
+    """The period a run is about: the one its purpose states where it states
+    one (a re-check, about one supply), else its arrival's filing. A settled
+    pair's supply has its own file's receipt, whose key matches no filing,
+    so a re-check never derives its period from the instant (REQ-PIPE-193
+    criterion 13)."""
+    stated = (entry.get("purpose") or {}).get("period")
+    return stated or filing.period_of(dataset_id, as_at)
 
 
 def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str,
@@ -383,7 +394,7 @@ def _unrunnable_results(entry: dict, run_id: str, run_timestamp: str,
         return []
     own_dataset, own_table = owner
     as_at = asset_time.parse_instant(entry["received_at"], f"received_at for {run_id}")
-    period = filing.period_of(own_dataset, as_at)
+    period = _period_of_entry(entry, own_dataset, as_at)
     if not period:
         return []
     with supply_db.connect(read_only=True, label="mothman:unrunnable") as conn:

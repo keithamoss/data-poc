@@ -22,14 +22,19 @@ from __future__ import annotations
 from qa_tools.common import qa_store, supply_db
 
 
-def physical_of(dataset_id: str, supply: str) -> str:
-    """The staged table name a supply arrived as - also its first run id.
-    A supply named by its table already (a hand-staged one) is its own."""
-    from qa_tools.common import recheck
+def _own_tables(conn, dataset_id: str, supply: str) -> list[str]:
+    """The staged tables a supply arrived as, by the one resolver - a
+    settled pair's supply's own file, never `#N` read as `__N` (REQ-PIPE-193
+    criterion 13). A supply named by its table already (a hand-staged one)
+    is its own."""
+    from qa_tools.common import supply_files
 
     if "@" not in supply:
-        return supply
-    return recheck.first_run_id(dataset_id, supply)
+        return [supply]
+    found = supply_files.resolve(conn, dataset_id, supply)
+    if found is not None and found.own:
+        return list(found.own)
+    return [supply_files.run_id_of(dataset_id, supply)]
 
 
 def runs_about(conn, dataset_id: str, supply: str) -> list[str]:
@@ -51,8 +56,8 @@ def runs_about(conn, dataset_id: str, supply: str) -> list[str]:
         f'LEFT JOIN "{qa_store.SCHEMA}".supply_receipt rc '
         "ON rc.dataset_id = r.dataset_id AND rc.supply_id = r.supply_id "
         "WHERE t.logical_table = ? AND (t.supply = ? OR (t.supply IS NULL "
-        "AND t.physical_table = ?)) ORDER BY caused_at, r.run_key",
-        [table, supply, physical_of(dataset_id, supply)]).fetchall()
+        "AND t.physical_table = ANY(?))) ORDER BY caused_at, r.run_key",
+        [table, supply, _own_tables(conn, dataset_id, supply)]).fetchall()
     return [r[0] for r in rows]
 
 

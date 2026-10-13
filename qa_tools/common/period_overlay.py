@@ -56,11 +56,15 @@ def staged_for_period(conn, period: str, logical_names: Sequence[str], *,
     The load-record gate applies as it does everywhere a check's view is
     built (REQ-PIPE-060 criterion 7): `loaded=None` skips it.
     """
-    from qa_tools.common import filing, hierarchy, qa_store
+    from qa_tools.common import filing, hierarchy, qa_store, supply_files
 
     qa_store.ensure_schema(conn)
     wanted = set(logical_names)
-    filed: set[tuple[str, str]] = set()
+    # EACH FILED SUPPLY'S OWN TABLES, by the one resolver (REQ-PIPE-193
+    # criterion 13): a settled pair's two supplies filed to two periods
+    # each own one file, so matching on the arrival key alone gave both
+    # periods both files.
+    filed: set[str] = set()
     for dataset_id, supply_id in conn.execute(
             f"SELECT dataset_id, supply_id FROM {filing.CURRENT} WHERE slot = ?",
             [period]).fetchall():
@@ -70,21 +74,22 @@ def staged_for_period(conn, period: str, logical_names: Sequence[str], *,
             continue
         if logical not in wanted or "@" not in supply_id:
             continue
-        filed.add((logical, supply_id.rsplit("@", 1)[1].split("#", 1)[0]))
+        found_supply = supply_files.resolve(conn, dataset_id, supply_id)
+        filed.update(found_supply.tables if found_supply else ())
 
     found: dict[str, list[str]] = {name: [] for name in wanted}
     for logical, physicals in supply_db.candidates_in(
             conn, staging, sorted(wanted), loaded=loaded).items():
         for physical in physicals:
-            parts = supply_db.split_staged(physical)
-            if parts and (logical, parts[1]) in filed:
+            if physical in filed:
                 found[logical].append(physical)
     return found
 
 
 def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
           tables: Sequence[str], loaded: frozenset[str] | None,
-          held: Collection[str] = ()) -> period_schema.PeriodResolution:
+          held: Collection[str] = (),
+          own_physical: Collection[str] | None = None) -> period_schema.PeriodResolution:
     """Replace this run's view schema with the period overlay, and
     record what it resolved.
 
@@ -108,6 +113,11 @@ def build(conn, run_id: str, *, period: str, own_table: str, arrival_key: str,
     # data, which is the only way it can ever be accepted.
     own = supply_db.candidates_in(conn, staging, [own_table], arrival=arrival_key,
                                    loaded=loaded).get(own_table) or []
+    if own_physical is not None:
+        # A RUN ABOUT ONE SUPPLY reads that supply's own file and nothing
+        # else its arrival carried (REQ-PIPE-193 criterion 13): a settled
+        # pair's supply is one of the two tables.
+        own = [t for t in own if t in set(own_physical)]
     staged[own_table] = sorted(own)
 
     withheld = None
@@ -250,8 +260,23 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
                                   supply_holds, trial)
 
     (dataset_id,) = tuple(arrival.files_by_dataset)
-    period = filing.period_of(dataset_id, arrival.received_at)
     own_table = hierarchy.dataset(dataset_id).table
+    # A RUN THAT SAYS WHICH SUPPLY IT IS ABOUT (a re-check) takes its period,
+    # its own table and its staging key from the one resolver, never from
+    # its receipt - a settled pair's supply has its own file's receipt,
+    # whose key names no table (REQ-PIPE-193 criterion 13).
+    stated = (getattr(arrival, "supply_ids", None) or {}).get(dataset_id)
+    resolved = None
+    if stated:
+        from qa_tools.common import supply_files
+
+        with supply_db.connect(dsn=dsn, label="mothman:period-overlay") as c:
+            resolved = supply_files.resolve(c, dataset_id, stated)
+    if resolved is not None:
+        period, key, own_physical = resolved.period, resolved.staging_key, resolved.tables
+    else:
+        period = filing.period_of(dataset_id, arrival.received_at)
+        key, own_physical = supply_db.arrival_segment(arrival.received_at), None
     if not period:
         _withhold_if_held(arrival, dataset_id, own_table, dsn=dsn)
         return None
@@ -264,10 +289,9 @@ def rebuild_for_arrival(arrival, *, tables: Sequence[str],
     conn = supply_db.connect(dsn=dsn, label="mothman:period-overlay")
     try:
         out = build(conn, arrival.run_id, period=period, own_table=own_table,
-                    arrival_key=supply_db.arrival_segment(arrival.received_at),
-                    tables=agreed, loaded=loaded,
-                    held=supply_holds.held_tables(
-                        conn, arrival_key=supply_db.arrival_segment(arrival.received_at)))
+                    arrival_key=key, tables=agreed, loaded=loaded,
+                    held=supply_holds.held_tables(conn, arrival_key=key),
+                    own_physical=own_physical)
         if sample:
             found = supply_db.candidates_in(conn, sample_data.SCHEMA, sample,
                                              loaded=loaded)

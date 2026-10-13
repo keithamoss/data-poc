@@ -126,7 +126,10 @@ def _refuse_if_not_there(moved, period: str, physical: str, supply: str) -> None
 #: (pipeline/promotion_timeline.py) reads the same list.
 NOT_A_DECISION_ABOUT_ITS_DATA = (
     decision_log.SUPERSEDE, decision_log.UN_SUPERSEDE, decision_log.REFILE,
-    decision_log.EXCUSE_LATENESS, decision_log.WITHDRAW_EXCUSE, decision_log.KEEP)
+    decision_log.EXCUSE_LATENESS, decision_log.WITHDRAW_EXCUSE, decision_log.KEEP,
+    # NOR A SETTLEMENT (REQ-PIPE-193 criterion 22): it says which file to
+    # judge, not whether to accept it.
+    decision_log.CHOOSE_FILE)
 
 
 def decided_by_a_person(conn: supply_db.SupplyConnection,

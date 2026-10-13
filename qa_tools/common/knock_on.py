@@ -106,11 +106,12 @@ def _read_as(conn, run_key: str, table: str) -> str | None:
     physical, supply = rows[0]
     if supply:
         return supply
-    parts = supply_db.split_staged(physical)
-    if not parts:
-        return None
+    # THE ONE RESOLVER'S REVERSE (REQ-PIPE-193 criterion 13): a settled
+    # pair's `__2` may be its `#1`, so `__N` is never read as `#N`.
+    from qa_tools.common import supply_files
+
     dataset_id = hierarchy.dataset_for_table(table).dataset_id
-    return f"{dataset_id}@{parts[1]}" + (f"#{parts[2]}" if parts[2] else "")
+    return supply_files.supply_for_table(conn, dataset_id, physical)
 
 
 def readers(conn, period: str, tables: list[str], reads: dict[str, list[str]]) -> list[Reader]:
@@ -215,15 +216,19 @@ def complete(item, *, run_by: str | None = None, on_step=None):
                 continue  # criterion 6: a promoted reader is shown, never acted on
             ds = hierarchy.dataset(reader.dataset_id)
             results = supply_status.latest_results(conn, reader.dataset_id, reader.supply)
-            key = reader.supply.rsplit("@", 1)[-1]
-            physical = list(supply_db.candidates_in(
-                conn, supply_db.STAGING_SCHEMA, [ds.table],
-                arrival=key.split("#", 1)[0]).get(ds.table) or [])
+            # ITS OWN TABLES, AND CONTESTED ONLY WHILE ITS CONTEST IS OPEN -
+            # both by the one resolver (REQ-PIPE-193 criterion 13; REQ-PIPE-194
+            # criterion 8), never by the `#` in its id.
+            from qa_tools.common import supply_files
+
+            physical = supply_files.tables_in(conn, reader.dataset_id, reader.supply,
+                                              supply_db.STAGING_SCHEMA)
             gated = promotion.after_run(
                 conn, agency_id=ds.agency_id, collection_id=ds.collection_id,
                 supplies=[{"dataset_id": reader.dataset_id, "supply": reader.supply,
                            "period": period, "physical_tables": physical,
-                           "contested": "#" in key}],
+                           "contested": supply_files.open_contest(
+                               conn, reader.dataset_id, reader.supply) is not None}],
                 results=results, reads=reads, actor=promotion.RULE_ACTOR,
                 actor_kind=decision_log.RULE, effective_at=now)
             promotion.report(gated)

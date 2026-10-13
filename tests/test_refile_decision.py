@@ -144,14 +144,37 @@ class TestRefusedWithWhatComesFirst:
             fd.consequences(conn, _request(fd.REFILE, period, a, to_period=target))
 
     def test_one_file_of_a_contested_pair(self, conn, period, target):
+        """Judged by the OPEN CONTEST, never the `#` (REQ-PIPE-194 criteria 6
+        and 8), and says where the pair is settled."""
+        import random
+        from datetime import datetime, timedelta, timezone
+
+        import filing_support
+        from qa_tools.common import asset_time, refiling, supply_files
+
+        received = datetime(2033, 1, 1, tzinfo=timezone.utc) + timedelta(
+            seconds=random.randrange(10_000_000))
+        key = asset_time.arrival_key(received)
+        delivery = f"pytest-refile-pair-{key}"
+        for name in ("cp_carers.csv", "cp_carers_v2.csv"):
+            filing_support.ensure_delivery(delivery, DS, received, filename=name)
+        pair = f"{DS}@{key}#1"
+        filing_support.place(conn, DS, pair, period, delivery)
+        with pytest.raises(dl.DecisionRefused, match="contested pair") as got:
+            refiling.plan(conn, dataset_id=DS, supply=pair, to_period=target)
+        assert supply_files.where_to_settle(DS) in str(got.value)
+
+    def test_a_hash_in_the_id_alone_is_not_a_contest(self, conn, period, target):
+        """REQ-PIPE-194 criterion 8: a settled pair's supplies keep their
+        `#`, and are re-filed like any other."""
         from qa_tools.common import refiling
 
         a, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
         conn.execute(f"INSERT INTO {filing.TABLE} (dataset_id, supply_id, slot, branch, "
-                     "delivery) SELECT dataset_id, supply_id || '#1', slot, branch, delivery "
+                     "delivery) SELECT dataset_id, supply_id || '#2', slot, branch, delivery "
                      f"FROM {filing.CURRENT} WHERE supply_id = ?", [a])
-        with pytest.raises(dl.DecisionRefused, match="contested pair"):
-            refiling.plan(conn, dataset_id=DS, supply=a + "#1", to_period=target)
+        plan = refiling.plan(conn, dataset_id=DS, supply=a + "#2", to_period=target)
+        assert plan.to_period == target
 
     def test_into_an_inherited_period(self, conn, period, target, monkeypatch):
         from qa_tools.common import refiling

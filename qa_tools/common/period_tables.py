@@ -31,12 +31,28 @@ class DependentView(RuntimeError):
     (criterion 10)."""
 
 
-def stamped_name(logical: str, supply: str) -> str:
+def stamped_name(logical: str, supply: str, conn=None) -> str:
     """`<table>__<arrival key>` - the name a supply's table carries outside
-    a period, rebuilt from the decision log's table name and supply id."""
+    a period, rebuilt from the decision log's table name and supply id.
+
+    A SETTLED PAIR'S SUPPLY GETS ITS OWN FILE'S NAME BACK (REQ-PIPE-193
+    criterion 13): its staged table carries an ordinal (`__2`) that its id
+    does not say, so - given a connection - the one resolver answers.
+    Dropping the ordinal lost which file it was the moment it left."""
+    from qa_tools.common import supply_files
+
     if "@" in (supply or ""):
-        key = supply.rsplit("@", 1)[1].split("#", 1)[0]
-        return f"{logical}__{key}"
+        if conn is not None:
+            from qa_tools.common import hierarchy
+
+            try:
+                dataset_id = hierarchy.dataset_for_table(logical).dataset_id
+            except Exception:  # noqa: BLE001 - a table no dataset claims keeps the plain rule
+                dataset_id = None
+            found = supply_files.resolve(conn, dataset_id, supply) if dataset_id else None
+            if found is not None and len(found.tables) == 1:
+                return found.tables[0]
+        return f"{logical}__{supply_files.staging_key_of(supply)}"
     # A decision that named the physical table itself, as some callers do.
     if supply_db.split_staged(supply or ""):
         return supply
@@ -107,7 +123,7 @@ def take_out(conn, *, period: str, logical: str, supply: str, to_schema: str) ->
             f"{schema}.{logical} cannot leave {period}: {', '.join(blocking)} depends on it. "
             f"Clear what stands on it first - each period's view is a substitution or an "
             f"inheritance, removed by de-substitute or un-inherit.")
-    stamped = stamped_name(logical, supply)
+    stamped = stamped_name(logical, supply, conn=conn)
     if stamped != logical:
         conn.execute(f'ALTER TABLE "{schema}"."{supply_db._ident(logical, "table name")}" '
                      f'RENAME TO "{supply_db._ident(stamped, "table name")}"')

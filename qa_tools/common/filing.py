@@ -796,12 +796,15 @@ def supplies_of(conn, arrival) -> list[dict]:
     silence. A supply that arrived and staged nothing is a thing
     somebody should hear about.
     """
-    from qa_tools.common import asset_time, hierarchy, supply_db
+    from qa_tools.common import asset_time, hierarchy, supply_db, supply_files
 
     key = asset_time.arrival_key(arrival.received_at)
+    stated = getattr(arrival, "supply_ids", None) or {}
     out: list[dict] = []
     for dataset_id in sorted(arrival.files_by_dataset):
-        supply_id = _supply_id_for(arrival, dataset_id)
+        # A RUN ABOUT ONE SUPPLY SAYS WHICH (a re-check); an arrival's supply
+        # is the one its arrival mints (REQ-PIPE-193 criterion 13).
+        supply_id = stated.get(dataset_id) or _supply_id_for(arrival, dataset_id)
         try:
             logical = hierarchy.dataset(dataset_id).table
         except hierarchy.UnknownDatasetError:
@@ -810,10 +813,18 @@ def supplies_of(conn, arrival) -> list[dict]:
             # id, and raising inside the step would cost the other
             # twenty-nine their promotions.
             logical = dataset_id
-        staged = supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, [logical], arrival=key).get(logical) or []
-        record = filing_for(dataset_id, supply_id)
-        period = (record or {}).get("slot")
+        resolved = supply_files.resolve(conn, dataset_id, supply_id)
+        if resolved is not None:
+            # ITS OWN TABLES IN STAGING, by the one resolver - a settled
+            # pair's supply is ONE of the two (criterion 13).
+            present = set(supply_db.candidates_in(
+                conn, supply_db.STAGING_SCHEMA, [logical],
+                arrival=resolved.staging_key).get(logical) or [])
+            staged = [t for t in resolved.tables if t in present]
+        else:
+            staged = supply_db.candidates_in(
+                conn, supply_db.STAGING_SCHEMA, [logical], arrival=key).get(logical) or []
+        period = resolved.period if resolved is not None else None
         out.append({
             "dataset_id": dataset_id,
             "supply": supply_id,
@@ -824,6 +835,10 @@ def supplies_of(conn, arrival) -> list[dict]:
             # Both are reported because they can disagree - a file that
             # matched but failed to load leaves one without the other -
             # and either is a reason not to choose.
-            "contested": len(staged) > 1,
+            # AND AN UNSETTLED PAIR stays contested even where the load
+            # refused one of its files - choosing is a person's job, never
+            # the system's because only one file loaded (REQ-PIPE-193
+            # criterion 7).
+            "contested": len(staged) > 1 or bool(resolved and resolved.is_pair),
         })
     return out

@@ -134,13 +134,11 @@ def _filed_to(conn, dataset_id: str, supply: str, period: str) -> bool:
 
 
 def staged_tables(conn, dataset_id: str, supply: str) -> list[str]:
-    """This supply's physical tables in staging."""
-    from qa_tools.common import hierarchy, supply_holds
+    """This supply's physical tables in staging - its own, never its pair's
+    other file (REQ-PIPE-193 criterion 13)."""
+    from qa_tools.common import supply_files
 
-    logical = hierarchy.dataset(dataset_id).table
-    key = supply_holds.arrival_key_of(supply)
-    return list(supply_db.candidates_in(
-        conn, supply_db.STAGING_SCHEMA, [logical], arrival=key).get(logical) or [])
+    return supply_files.tables_in(conn, dataset_id, supply, supply_db.STAGING_SCHEMA)
 
 
 def earlier_unaccepted(conn, dataset_id: str, period: str, newer: str) -> list[str]:
@@ -174,10 +172,10 @@ def supersede_earlier(conn, *, agency_id: str, collection_id: str, dataset_id: s
     build-review #124 D2): it has no table to check, so setting a real
     waiting version aside for it left the period with nothing checkable.
     """
-    from qa_tools.common import own_table
+    from qa_tools.common import supply_files
 
-    key = newer.split("@", 1)[-1].split("#", 1)[0]
-    if own_table.refused_at_load(dataset_id, key, conn=conn):
+    found = supply_files.resolve(conn, dataset_id, newer)
+    if found is not None and found.refused and not found.tables:
         return []
     done = []
     for supply in earlier_unaccepted(conn, dataset_id, period, newer):
@@ -333,7 +331,6 @@ def un_supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, s
     there (criterion 5). Its QA is owed again; the gate then applies as for
     a first arrival (criterion 4)."""
     from qa_tools.common import decision_log as dl
-    from qa_tools.common import hierarchy, supply_holds
 
     if not supply:
         raise dl.DecisionRefused(
@@ -354,9 +351,9 @@ def un_supersede(conn, *, agency_id: str, collection_id: str, dataset_id: str, s
             f"reject --dataset {dataset_id} --period {period} --supply {waiting[0]} "
             f"--reason '<why>'`, or the same with `--operation supersede`.")
     source = superseded_schema(period)
-    logical = hierarchy.dataset(dataset_id).table
-    key = supply_holds.arrival_key_of(supply)
-    tables = list(supply_db.candidates_in(conn, source, [logical], arrival=key).get(logical) or [])
+    from qa_tools.common import supply_files
+
+    tables = supply_files.tables_in(conn, dataset_id, supply, source)
     with dl.apply_decision(conn, dl.Decision(
             agency_id=agency_id, collection_id=collection_id, dataset_id=dataset_id,
             action=dl.UN_SUPERSEDE, supply=supply, actor=actor, actor_kind=dl.PERSON,

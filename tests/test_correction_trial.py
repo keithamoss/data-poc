@@ -142,12 +142,22 @@ class TestWhatCannotMove:
     filing is not overruled by a rule."""
 
     def test_one_of_a_contested_pair_is_blocked_naming_the_remedy(self, conn):
-        _file("s2@1#1", "2023-Q3", RECEIVED + timedelta(minutes=5))
+        """By the OPEN CONTEST (REQ-PIPE-194 criteria 7 and 8): two files of
+        one delivery for one table, filed as `#1` - and the remedy is where
+        the pair is settled."""
+        from qa_tools.common import asset_time, supply_files
+
+        at = RECEIVED + timedelta(minutes=5)
+        pair = f"{DATASET}@{asset_time.arrival_key(at)}#1"
+        _file(pair, "2023-Q3", at)
+        delivery = f"pytest-{DATASET}-{pair}"
+        filing_support.ensure_delivery(delivery, DATASET, at, filename="cp_clients_v2.csv")
         cal, asset = _docs()
         _move_q3(cal, "2023-10-20")
         blocked = {m.supply_id: m.blocked for m in _trial(conn, (cal, asset)).moves}
         assert blocked[SUPPLY] is None
-        assert "contested pair" in blocked["s2@1#1"]
+        assert "contested pair" in blocked[pair]
+        assert supply_files.where_to_settle(DATASET) in blocked[pair]
 
     def test_a_supply_a_person_placed_is_listed_not_proposed(self, conn):
         # Somewhere neither agreement's rule would put it: a person's call.

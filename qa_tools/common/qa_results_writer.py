@@ -134,21 +134,25 @@ def _with_tables_read(verified: list[dict], run_id: str) -> list[dict]:
     try:
         from qa_tools.common import supply_db
 
+        from qa_tools.common import period_tables
+
         conn = supply_db.connect(read_only=True)
         try:
             resolution = supply_db.resolution_for(conn, run_id)
+            # A PERIOD TABLE IS RECORDED BY THE SUPPLY IT HELD (REQ-PIPE-129
+            # criterion 13), as the stamped name that supply's table carries
+            # everywhere but a period - its plain name there says nothing. A
+            # settled pair's supply carries its own file's ordinal, which only
+            # the resolver knows (REQ-PIPE-193 criterion 13), hence the
+            # connection.
+            resolved = {logical: (period_tables.stamped_name(
+                            logical, resolution.supply_of[logical], conn=conn)
+                                  if logical in resolution.supply_of else physical)
+                        for logical, physical in resolution.resolved.items()}
         finally:
             conn.close()
     except Exception:  # noqa: BLE001 - see the docstring on why this is quiet
         return verified
-    from qa_tools.common import period_tables
-
-    # A PERIOD TABLE IS RECORDED BY THE SUPPLY IT HELD (REQ-PIPE-129
-    # criterion 13), as the stamped name that supply's table carries
-    # everywhere but a period - its plain name there says nothing.
-    resolved = {logical: (period_tables.stamped_name(logical, resolution.supply_of[logical])
-                          if logical in resolution.supply_of else physical)
-                for logical, physical in resolution.resolved.items()}
     return tables_read_mod.attach(verified, resolved, declared)
 
 
@@ -354,12 +358,20 @@ def _period_of_run(dataset_id: str, run_id: str) -> str:
     """The period this run's supply was filed to, or "" where that cannot
     be read - it is carried on the plan for the record, and never decides
     what is kept (the run's overlay is already one period)."""
-    from qa_tools.common import filing, supply_db
+    from qa_tools.common import filing, qa_store, supply_db
 
-    parts = supply_db.split_staged(run_id)
-    if parts is None:
-        return ""
     try:
+        # THE PERIOD THE RUN STATES, where it states one - a re-check of a
+        # settled pair's supply is about one of two filings that share an
+        # arrival key (REQ-PIPE-193 criterion 13).
+        with supply_db.connect(read_only=True, label="mothman:run-period") as conn:
+            rows = conn.execute(f'SELECT period FROM "{qa_store.SCHEMA}".run '
+                                "WHERE run_key = ?", [run_id]).fetchall()
+        if rows and rows[0][0]:
+            return rows[0][0]
+        parts = supply_db.split_staged(run_id)
+        if parts is None:
+            return ""
         return filing.period_for_key(dataset_id, parts[1]) or ""
     except Exception:  # noqa: BLE001 - informational only, see above
         return ""

@@ -235,46 +235,48 @@ class TestSevenOfTheEightReallyWork:
             arrival=supply.rsplit("@", 1)[1]).get(dataset.table) or []
         assert physical not in staged, "a rejected supply stays in staging"
 
-    def test_rejecting_a_contested_pair_moves_both_files_out_of_staging(
-            self, conn, dataset, actor, periods):
-        """A defect, 2026-10-12 (found scoping REQ-PIPE-193): a contested
-        pair's supply id carries `#1`, and the staged-table lookup kept it in
-        the arrival key, so it matched neither file - rejecting "neither"
-        recorded the decision and left both files waiting in staging."""
-        first, _ = periods
-        key = uuid.uuid4().hex[:10]
-        one = f"{dataset.table}__{key}"
-        two = f"{one}__2"
-        conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
-        for physical in (one, two):
-            conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+    def _open_pair(self, conn, dataset, period):
+        """A REAL open pair: one delivery, two files for one table, filed as
+        `#1` - so the open-contest judgement (dataset_blockers) finds it."""
+        from datetime import datetime, timedelta, timezone
 
-        fd.apply(_request(dataset, actor, fd.REJECT, period=first,
-                          supply=f"{dataset.dataset_id}@{key}#1"), effective_at=WHEN, conn=conn)
+        import filing_support
 
-        staged = supply_db.candidates_in(
-            conn, supply_db.STAGING_SCHEMA, [dataset.table], arrival=key).get(dataset.table)
-        assert staged == [], "both files of the rejected pair are still in staging"
-
-    def test_promoting_a_contested_pair_is_refused_naming_choose_file(
-            self, conn, dataset, actor, periods):
-        """A defect, 2026-10-13 (found surveying REQ-PIPE-193): promote is
-        offered on a contested pair's `#1`, and the staged-table lookup
-        returns BOTH files, so a person's promote put two versions of one
-        table into the period (REQ-PIPE-128: exactly one version, always).
-        Until the pair is settled, promoting it is refused, naming what can
-        be done today."""
-        first, _ = periods
-        key = uuid.uuid4().hex[:10]
+        received = datetime(2032, 1, 1, tzinfo=timezone.utc) + timedelta(
+            seconds=uuid.uuid4().int % 10_000_000)
+        key = supply_db.arrival_segment(received.isoformat())
+        delivery = f"pytest-pair-{key}"
+        for name in (f"{dataset.table}.csv", f"{dataset.table}_v2.csv"):
+            filing_support.ensure_delivery(delivery, dataset.dataset_id, received, filename=name)
+        supply = f"{dataset.dataset_id}@{key}#1"
+        filing_support.place(conn, dataset.dataset_id, supply, period, delivery)
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
         for physical in (f"{dataset.table}__{key}__1", f"{dataset.table}__{key}__2"):
             conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
+        return supply, key
 
-        with pytest.raises(dl.DecisionRefused, match="contested pair.*Reject the pair"):
-            fd.apply(_request(dataset, actor, fd.PROMOTE, period=first,
-                              supply=f"{dataset.dataset_id}@{key}#1"),
+    @pytest.mark.parametrize("operation", [fd.REJECT, fd.SUPERSEDE, fd.PROMOTE])
+    def test_a_plain_decision_on_an_open_pair_is_refused_naming_where_it_is_settled(
+            self, conn, dataset, actor, periods, operation):
+        """REQ-PIPE-193 criterion 25 (Keith, 2026-10-13): the plain reject and
+        a person's supersede are refused on an open contest - the test that
+        rejecting the pair moves both tables became this refusal test - and
+        promote stays refused (REQ-PIPE-128: one version per period). The
+        refusal says WHERE the pair is settled, and nothing moves."""
+        from qa_tools.common import supply_files
+
+        first, _ = periods
+        supply, key = self._open_pair(conn, dataset, first)
+        with pytest.raises(fd.OpenPair) as got:
+            fd.apply(_request(dataset, actor, operation, period=first, supply=supply),
                      effective_at=WHEN, conn=conn)
-        assert dl.promoted_into(conn, dataset.dataset_id, first) is None
+        assert supply_files.where_to_settle(dataset.dataset_id) in str(got.value)
+        assert got.value.files == (f"{dataset.table}.csv", f"{dataset.table}_v2.csv")
+        assert not [d for d in dl.decisions_for(conn, dataset.dataset_id)
+                    if d["supply"] == supply]
+        staged = supply_db.candidates_in(
+            conn, supply_db.STAGING_SCHEMA, [dataset.table], arrival=key).get(dataset.table)
+        assert sorted(staged) == [f"{dataset.table}__{key}__1", f"{dataset.table}__{key}__2"]
 
     def test_substitute_then_de_substitute(self, conn, dataset, actor, periods):
         first, second = periods

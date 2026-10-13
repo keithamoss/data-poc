@@ -241,9 +241,13 @@ def _blocked(conn, dataset_id: str, supply: str, from_period: str | None,
 
     from qa_tools.common import refiling, supersession
 
-    if "#" in supply.rsplit("@", 1)[-1]:
-        return ("one file of a contested pair - say which file is the supply first, since "
-                "the contest is per arrival")
+    from qa_tools.common import supply_files
+
+    if supply_files.open_contest(conn, dataset_id, supply) is not None:
+        # BY THE OPEN CONTEST, not the `#` (REQ-PIPE-194 criteria 7 and 8).
+        return ("one file of a contested pair - the contest is per arrival, so the pair is "
+                "settled first, by saying what each file is, at "
+                f"'{supply_files.where_to_settle(dataset_id)}'")
     if supersession._rejected(conn, dataset_id, supply) and not refiling._since_unrejected(
             conn, dataset_id, supply):
         # delivery-critic on 169, F3: refiling.plan refuses this too.
