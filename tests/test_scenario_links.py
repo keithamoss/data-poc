@@ -215,3 +215,128 @@ class TestValidateRefusesABadLink:
     def test_the_committed_configuration_passes(self):
         result = CliRunner().invoke(scenarios_cli.scenarios_group, ["validate"])
         assert result.exit_code == 0, result.output
+
+
+class TestAnIndexPastAnUnrecognisedArrivalIsRefused:
+    """post-build-review #169 finding 1 (Keith: refuse at generation): a
+    script's `supply N` indexes the placement's RECORDED supplies, which
+    skip an arrival recognition did not match, so every later index would
+    name a different file than the link's `arrival N`."""
+
+    def _placed(self, recognised_runs):
+        placed = si.resolve(_injection(), _periods())
+        for arrival, run in zip(placed.arrivals, recognised_runs):
+            if run:
+                arrival["run_id"] = run
+        return placed
+
+    def test_a_script_past_the_gap_is_refused_naming_the_scenario(self):
+        placed = self._placed([None, "run_2"])
+        with pytest.raises(si.CannotPlace, match="TS-75a.*arrival 0"):
+            si.check_every_index_has_its_supply(
+                [placed], injections=[_injection()], scripts=[_script(supply_index=1)])
+
+    def test_a_link_past_the_gap_is_refused(self):
+        placed = self._placed(["run_1", None])
+        with pytest.raises(si.CannotPlace, match="TS-75a.*arrival 1"):
+            si.check_every_index_has_its_supply(
+                [placed], injections=[_injection(si.Link("TS-75a", 0, 0, 1))], scripts=[])
+
+    def test_nothing_indexing_past_the_gap_is_fine(self):
+        placed = self._placed(["run_1", None])
+        si.check_every_index_has_its_supply(
+            [placed], injections=[_injection()], scripts=[_script(supply_index=0)])
+
+    def test_every_arrival_recognised_is_fine(self):
+        placed = self._placed(["run_1", "run_2"])
+        si.check_every_index_has_its_supply(
+            [placed], injections=[_injection(si.Link("TS-75a", 0, 0, 1))],
+            scripts=[_script(supply_index=1)])
+
+
+class TestANameIsUniqueAcrossAPlacement:
+    """post-build-review #169 finding 2 (Keith: unique per placement): a
+    link looks names up across every sibling, so validate refuses one name
+    on two siblings' decisions rather than letting a link find two."""
+
+    def test_two_siblings_with_one_name_are_refused_naming_both(self):
+        found = sd.problems([_script(), _script(scenario="TS-75b")],
+                            registered={"TS-75a", "TS-75b"},
+                            placement_of={"TS-75a": "TS-75a", "TS-75b": "TS-75a"})
+        assert any("decisions 1 and 2" in p and "'reject-it'" in p
+                   and "share a placement" in p for p in found), found
+
+    def test_the_committed_placements_group_siblings(self):
+        groups = si.placement_of()
+        for injection in si.INJECTIONS:
+            for also in injection.also_demonstrates:
+                assert groups[also] == groups[injection.scenario_id]
+
+    def test_a_link_still_refuses_an_ambiguous_name(self):
+        inj = _injection(si.Link("TS-75b", 1, 0, "reject-it"))
+        [d] = si.link_dates(inj, si.resolve(_injection(), _periods()),
+                            scripts=[_script(), _script(scenario="TS-75b")])
+        assert "named 'reject-it'" in d.problem and "rename one" in d.problem
+
+
+class TestALinkIsWellFormed:
+    """post-build-review #169 findings 3 and 4."""
+
+    def test_a_fractional_day_count_is_refused(self):
+        [d] = si.link_dates(_injection(si.Link("TS-75a", 0.9, 0, 1)),
+                            si.resolve(_injection(), _periods()), scripts=[])
+        assert "whole number of asset days" in d.problem
+
+    def test_a_bool_event_is_refused_as_neither_kind(self):
+        [d] = si.link_dates(_injection(si.Link("TS-75a", 0, True, 1)),
+                            si.resolve(_injection(), _periods()), scripts=[])
+        assert "an arrival index or a decision name" in d.problem
+
+    def test_an_out_of_window_refusal_says_what_to_change(self):
+        inj = _injection(si.Link("TS-75b", 2, 0, "reject-it"))
+        [d] = si.link_dates(inj, si.resolve(_injection(), _periods()), scripts=[_script()])
+        assert "move the link's date" in d.problem
+
+    def test_a_decision_that_cannot_be_timed_is_refused(self, monkeypatch):
+        monkeypatch.setattr(sd, "_due_at", lambda ds, period: None)
+        inj = _injection(si.Link("TS-75b", 0, 0, "sub"))
+        script = _script(name="sub", operation="substitute", supply_index=None,
+                         scope=sd.PERIOD, stands_on=-1)
+        [d] = si.link_dates(inj, si.resolve(_injection(), _periods()), scripts=[script])
+        assert "cannot be timed" in d.problem
+
+
+class TestTheGeneratedPeriodsAreEachGenerators:
+    """post-build-review #169 finding 5, and the real routing every CLI
+    test above monkeypatches."""
+
+    def test_each_collection_gets_its_own_generators_periods(self):
+        from generator import generate_cp_runs, generate_runs
+
+        assert si.generated_periods("cp-carers") == generate_cp_runs.generated_periods()
+        assert si.generated_periods("birth-registrations") == generate_runs.generated_periods()
+        assert si.generated_periods("cp-carers") != si.generated_periods("birth-registrations")
+
+    def test_a_dataset_no_generator_writes_is_refused(self):
+        with pytest.raises(si.CannotPlace, match="no generator"):
+            si.generated_periods("no-such-dataset")
+
+
+class TestALinkTimesADecisionWhereTheReplayPlaysIt:
+    """Criterion 9's parity, held against the replay's own timing for a
+    period-scoped decision (the critic matched supply-scoped ones against
+    the real history)."""
+
+    def test_period_scoped(self, monkeypatch):
+        from types import SimpleNamespace
+
+        due = _at(ANCHOR, "12:00")
+        monkeypatch.setattr(sd, "_due_at", lambda ds, period: due)
+        monkeypatch.setattr("qa_tools.common.slots.relative_period", lambda *a, **k: "P-1")
+        script = _script(name="sub", operation="substitute", supply_index=None,
+                         scope=sd.PERIOD, stands_on=-1, after_hours=7)
+        placed = si.resolve(_injection(), _periods())
+        [d] = si.link_dates(_injection(si.Link("TS-75b", 0, "sub", 1)), placed,
+                            scripts=[script])
+        timed, _ = sd._timed_by_period(script, SimpleNamespace(period=placed.period))
+        assert d.first[1] == timed.at

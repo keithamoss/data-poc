@@ -467,20 +467,26 @@ def link_dates(injection: Injection, placement: Placement,
         return asset_time.wall_clock(date.fromisoformat(a["date"]), a["at"])
 
     def event(ref) -> tuple[str, datetime | None, str | None]:
-        if isinstance(ref, int) and not isinstance(ref, bool):
+        if isinstance(ref, bool) or not isinstance(ref, (int, str)):
+            return repr(ref), None, (f"{ref!r} is not an arrival index or a decision "
+                                     f"name - give an int arrival index or a decision's "
+                                     f"`name:`")
+        if isinstance(ref, int):
             label = f"arrival {ref}"
             at = arrival_at(ref)
             return label, at, (None if at is not None else
                                f"{label} does not exist - the injection has "
-                               f"{len(placement.arrivals)}")
+                               f"{len(placement.arrivals)}; name one of 0 to "
+                               f"{len(placement.arrivals) - 1}")
         label = f"decision {ref!r}"
         named = [s for s in mine if s.name == ref]
         if not named:
             return label, None, (f"no scripted decision of {', '.join(ours)} is named "
-                                 f"{ref!r}")
+                                 f"{ref!r} - give that decision `name: {ref}` in "
+                                 f"contract/scripted_decisions.yaml, or fix the link")
         if len(named) > 1:
             return label, None, (f"{len(named)} scripted decisions of {', '.join(ours)} "
-                                 f"are named {ref!r}, so it names none of them")
+                                 f"are named {ref!r}, so it names none of them - rename one")
         s = named[0]
         if s.scope == scripted_decisions.PERIOD:
             base = scripted_decisions._due_at(s.dataset_id, placement.period)
@@ -496,10 +502,16 @@ def link_dates(injection: Injection, placement: Placement,
     for link in injection.links:
         where = f"{injection.scenario_id}'s link for {link.scenario_id}"
         first, second = event(link.first), event(link.second)
+        if isinstance(link.days, bool) or not isinstance(link.days, int):
+            out.append(LinkDate(link.scenario_id, None, first[:2], second[:2],
+                                f"{where}: days {link.days!r} is not a whole number of "
+                                f"asset days - give an int, 0 being the first event's day"))
+            continue
         if link.scenario_id not in ours:
             out.append(LinkDate(link.scenario_id, None, first[:2], second[:2],
                                 f"{where}: {link.scenario_id} is not a scenario this "
-                                f"placement demonstrates ({', '.join(ours)})"))
+                                f"placement demonstrates ({', '.join(ours)}) - link one of "
+                                f"those, or add it to also_demonstrates"))
             continue
         broken = next((e[2] for e in (first, second) if e[2]), None)
         if broken:
@@ -512,7 +524,8 @@ def link_dates(injection: Injection, placement: Placement,
         if not first[1] < end < second[1]:
             problem = (f"{where}: the end of {on.isoformat()} ({end.isoformat()}) does not "
                        f"fall strictly between {first[0]} at {first[1].isoformat()} and "
-                       f"{second[0]} at {second[1].isoformat()}")
+                       f"{second[0]} at {second[1].isoformat()} - move the link's date, "
+                       f"or the event that bounds it")
         out.append(LinkDate(link.scenario_id, on, first[:2], second[:2], problem))
     return out
 
@@ -530,7 +543,63 @@ def generated_periods(dataset_id: str) -> list:
         return generate_cp_runs.generated_periods()
     from generator import generate_runs
 
-    return generate_runs.generated_periods()
+    if dataset_id == generate_runs.DATASET_ID:
+        return generate_runs.generated_periods()
+    # REFUSED, NOT DEFAULTED (post-build-review #169): a third collection
+    # silently got Birth Registrations' periods.
+    raise CannotPlace(f"no generator writes {dataset_id}, so it has no generated periods to "
+                      f"place a scenario in")
+
+
+def placement_of() -> dict[str, str]:
+    """Each scenario id -> the id of the placement it shares (its own, or
+    the injection whose also_demonstrates lists it) - the scope a decision's
+    name is unique within (post-build-review #169, Keith 2026-10-13)."""
+    out = {}
+    for injection in INJECTIONS:
+        out[injection.scenario_id] = injection.scenario_id
+        for also in injection.also_demonstrates:
+            out[also] = injection.scenario_id
+    return out
+
+
+def check_every_index_has_its_supply(placements: Sequence[Placement],
+                                     injections: Sequence[Injection] | None = None,
+                                     scripts: Sequence | None = None) -> None:
+    """Refuse a history where a script's `supply N` or a link's `arrival N`
+    would name a different file than configured (post-build-review #169,
+    Keith 2026-10-13: refuse at generation).
+
+    A placement records the supplies RECOGNITION found, and an arrival not
+    recognised for the placement's dataset is left out - so every index
+    from that arrival on names a later file in the replay than it does in
+    link_dates(). Checked once run ids are read back, because recognition
+    is not configuration and validate cannot see it.
+    """
+    from qa_tools.common import scripted_decisions
+
+    if scripts is None:
+        scripts = scripted_decisions.load()
+    by_id = {i.scenario_id: i for i in (injections if injections is not None else INJECTIONS)}
+    for placement in placements:
+        gap = next((n for n, a in enumerate(placement.arrivals) if not a.get("run_id")), None)
+        if gap is None:
+            continue
+        injection = by_id.get(placement.scenario_id)
+        ours = (placement.scenario_id, *(injection.also_demonstrates if injection else ()))
+        used = [(f"scripted decision {s.operation} ({s.scenario})", s.supply_index)
+                for s in scripts if s.scenario in ours and s.supply_index is not None]
+        for link in (injection.links if injection else ()):
+            for ref in (link.first, link.second):
+                if isinstance(ref, int) and not isinstance(ref, bool):
+                    used.append((f"the link for {link.scenario_id}", ref))
+        past = [what for what, index in used if index >= gap]
+        if past:
+            raise CannotPlace(
+                f"{placement.scenario_id}: arrival {gap} was not recognised as a "
+                f"{placement.dataset} supply, so {', '.join(past)} would index a different "
+                f"file than configured. Make that arrival recognisable, or index only "
+                f"arrivals before it.")
 
 
 def link_problems(injections: Sequence[Injection] | None = None,

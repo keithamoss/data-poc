@@ -32162,7 +32162,7 @@ requirements:
     acceptance_criteria:
     - THE SYSTEM SHALL let an Injection in generator/scenario_injection.py declare a LINK for each scenario id its placement demonstrates - its own id and each in also_demonstrates - giving that link's in-place-on date together with the two events of the same placement it must fall between.
     - THE SYSTEM SHALL let a link's bounding event be one of the injection's own arrivals, by the same supply index a scripted decision uses for that placement, or one of the scripted decisions (REQ-GEN-135, REQ-GEN-200) belonging to a scenario id the placement demonstrates, by the name that decision carries.
-    - THE SYSTEM SHALL add to a scripted decision in contract/scripted_decisions.yaml an optional `name:` key, and `mothman scenarios validate` SHALL refuse two decisions carrying the same name within one scenario, naming both.
+    - THE SYSTEM SHALL add to a scripted decision in contract/scripted_decisions.yaml an optional `name:` key, and `mothman scenarios validate` SHALL refuse two decisions carrying the same name within one scenario, or within the scenarios sharing one placement, naming both.
     - THE SYSTEM SHALL express a link's date as a whole number of asset days after the asset day of its first bounding event (0 being that same day), and SHALL read the date as the END of that asset day, as the dashboard reads a bare date.
     - WHEN the generator writes data/scenario_placements.json, THE SYSTEM SHALL write each linked scenario id's own record with its link's resolved date as its in_place_on, in place of the placement's default 'latest day it has anything to show'.
     - THE SYSTEM SHALL keep the default 'latest day it has anything to show' for every scenario id with no declared link, so every existing scenario's coordinates are unchanged.
@@ -32191,6 +32191,8 @@ requirements:
     - 'DECIDED Keith, 2026-10-13: a link names a bounding scripted decision by an optional `name:` key, unique within the scenario - over its position in file order, which an inserted decision would silently move.'
     - 'DECIDED Keith, 2026-10-13: a link''s date counts whole asset days from its FIRST EVENT (0 = that event''s day) - over counting from the placement period like an arrival''s day_offset, so the commonest case - ''the day it arrived'' - is 0 and the window check is about the link alone.'
     - 'FINAL ARCHITECT PASS 2026-10-13: the `name:` key is a criterion of its own (with duplicate names refused), and an arrival is referenced by the same supply index a script uses, so a link and a script never number arrivals differently.'
+    - 'NAMES UNIQUE PER PLACEMENT (Keith, 2026-10-13, post-build-review #169): a link looks a name up across every scenario sharing its placement, so validate refuses one name on two siblings'' decisions - criterion 3 widened to say so. Rejected: a link looking in its own scenario first, which makes the decision a name resolves to depend on which link asks.'
+    - 'AN INDEX PAST AN UNRECOGNISED ARRIVAL IS REFUSED AT GENERATION (Keith, 2026-10-13, post-build-review #169): a placement records only the supplies recognition found, so a script''s supply N and a link''s arrival N would name different files once one arrival goes unrecognised. check_every_index_has_its_supply() refuses that after run ids are read back, since recognition is not configuration. Rejected: recording an empty slot to keep supplies positional, which every reader of the scenario map and panel would have to cope with.'
     open_questions: []
     linked_tests:
     - tests/test_scenario_links.py::TestALinkIsDatedFromItsFirstEvent
@@ -32199,6 +32201,11 @@ requirements:
     - tests/test_scenario_links.py::TestADecisionNameIsUniqueWithinItsScenario
     - tests/test_scenario_links.py::TestThePlacementFileCarriesEachLinkedDate
     - tests/test_scenario_links.py::TestValidateRefusesABadLink
+    - tests/test_scenario_links.py::TestAnIndexPastAnUnrecognisedArrivalIsRefused
+    - tests/test_scenario_links.py::TestANameIsUniqueAcrossAPlacement
+    - tests/test_scenario_links.py::TestALinkIsWellFormed
+    - tests/test_scenario_links.py::TestTheGeneratedPeriodsAreEachGenerators
+    - tests/test_scenario_links.py::TestALinkTimesADecisionWhereTheReplayPlaysIt
     implemented_by:
     - generator/scenario_injection.py::Link
     - generator/scenario_injection.py::link_dates
@@ -32206,6 +32213,8 @@ requirements:
     - generator/scenario_injection.py::resolve
     - generator/scenario_injection.py::write_placements
     - generator/scenario_injection.py::generated_periods
+    - generator/scenario_injection.py::placement_of
+    - generator/scenario_injection.py::check_every_index_has_its_supply
     - qa_tools/common/scripted_decisions.py::problems
     - cli/scenarios.py::validate_command
     evidence:

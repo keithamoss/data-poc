@@ -95,7 +95,8 @@ def validate_command() -> None:
 
     registered = {s.id for s in scenarios.parse_register()}
     script = scripted_decisions.load()
-    found = scripted_decisions.problems(script, registered=registered)
+    found = scripted_decisions.problems(script, registered=registered,
+                                        placement_of=scenario_injection.placement_of())
     # EACH SCENARIO LINK'S DATE BETWEEN ITS EVENTS (REQ-GEN-201), from
     # configuration and the calendar alone.
     found += scenario_injection.link_problems(scripts=script)
@@ -103,8 +104,11 @@ def validate_command() -> None:
         for problem in found:
             console.print(f"  - {problem}", style="red")
         raise click.ClickException(
-            f"scripted decisions FAILED ({len(found)} problem(s)) - see above.")
-    console.print(f"scripted decisions OK - {len(script)} decision(s), zero errors.")
+            f"scripted decisions and scenario links FAILED ({len(found)} problem(s)) - "
+            f"see above.")
+    links = sum(len(i.links) for i in scenario_injection.INJECTIONS)
+    console.print(f"scripted decisions OK - {len(script)} decision(s) and {links} scenario "
+                  f"link(s), zero errors.")
 
 
 @scenarios_group.command("bands")

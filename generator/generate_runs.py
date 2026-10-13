@@ -876,6 +876,7 @@ def main() -> None:
         # be written - see each function's own docstring.
         scenario_injection.check_suppressed_days_are_empty(placed, recognised)
         scenario_injection.resolve_run_ids(placed, recognised)
+        scenario_injection.check_every_index_has_its_supply(placed)
         written = scenario_injection.write_placements(placed, merge=True)
         print(f"Recorded {len(resolved_injections)} injected scenario placement(s) "
               f"-> {written}")

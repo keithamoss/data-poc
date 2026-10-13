@@ -8278,3 +8278,31 @@ twice. It deliberately did not re-find the `TypeError`.
     - The refusals raised at play time do not name the script entry or say
       what to change (NFR 8). Validate already names both for every
       configuration problem.
+
+169. **[done, 2026-10-13]** **[Data Generation]** **The delivery critic on
+    REQ-GEN-201 as built (f16725a).** 9 of 10 criteria met. The critic
+    checked parity against the real history (read-only): all nine
+    committed scripts, each given a name, resolved through link_dates() to
+    exactly their recorded `effective_at`. Keith decided the two design
+    findings:
+    - MEDIUM, latent. A link's `arrival N` and a script's `supply N` are
+      different lists. A placement records only the supplies recognition
+      found, so one unrecognised arrival shifts every later index in the
+      replay but not in the link. Nothing hits this today. Keith chose to
+      REFUSE AT GENERATION: `check_every_index_has_its_supply()` runs once
+      run ids are read back, in both generators. He rejected keeping
+      supplies positional.
+    - LOW-MEDIUM. Names were unique per scenario, but a link looks names
+      up across the whole placement. Keith chose UNIQUE PER PLACEMENT;
+      validate now refuses one name on two siblings' decisions, and
+      criterion 3 was amended to say so.
+    Minor, fixed under the 2026-09-25 rule:
+    - every link refusal now says what to change;
+    - validate's banner names scenario links;
+    - a fractional `days` value or a bool event is refused;
+    - `generated_periods()` refuses a dataset no generator writes, where it
+      used to hand back Birth Registrations' periods.
+    New tests cover:
+    - the real periods routing;
+    - the ambiguity and cannot-be-timed branches;
+    - parity with the replay's period-scoped timing.

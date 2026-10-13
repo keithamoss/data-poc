@@ -121,7 +121,8 @@ def load(path: Path | str | None = None) -> list[Script]:
     return out
 
 
-def problems(scripts: list[Script], *, registered: set[str]) -> list[str]:
+def problems(scripts: list[Script], *, registered: set[str],
+             placement_of: dict[str, str] | None = None) -> list[str]:
     """Criterion 13, against configuration alone: every scenario registered,
     every decision a filing decision, every reason present."""
     from qa_tools.common import filing_decisions, hierarchy
@@ -143,17 +144,24 @@ def problems(scripts: list[Script], *, registered: set[str]) -> list[str]:
         except hierarchy.UnknownDatasetError:
             out.append(f"{where}: no dataset {s.dataset_id!r} in contract/data-asset.yaml")
         out += _scope_problems(s, where)
-    # ONE NAME, ONE DECISION, PER SCENARIO (REQ-GEN-201 criterion 3): a link
-    # naming a decision two carry names neither.
+    # ONE NAME, ONE DECISION, PER PLACEMENT (REQ-GEN-201 criterion 3): a link
+    # looks names up across every scenario sharing its placement, so one
+    # name on two siblings' decisions names neither (Keith, 2026-10-13).
+    # `placement_of` maps a scenario id to its placement's; absent, each
+    # scenario is its own.
+    group = placement_of or {}
     named: dict[tuple[str, str], int] = {}
     for i, s in enumerate(scripts, 1):
         if s.name is None:
             continue
-        first = named.setdefault((s.scenario, s.name), i)
+        first = named.setdefault((group.get(s.scenario, s.scenario), s.name), i)
         if first != i:
+            other = scripts[first - 1].scenario
+            scope = (f"({s.scenario})" if other == s.scenario
+                     else f"({other} and {s.scenario}, which share a placement)")
             out.append(f"contract/scripted_decisions.yaml decisions {first} and {i} "
-                       f"({s.scenario}) are both named {s.name!r} - a name is unique "
-                       f"within its scenario")
+                       f"{scope} are both named {s.name!r} - a name is unique within the "
+                       f"scenarios sharing a placement; rename one")
     return out
 
 
