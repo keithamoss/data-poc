@@ -525,7 +525,7 @@ one when this line suggests it matters.
 - **#3** `in-progress` 2026-10-10 - Overnight 2026-10-10 to 11: two built-code defects, the excuse, the versioned timezone, the asset manager, CI's cached...
   - *touches:* `contract/calendar.yaml`, `tests/test_dbt_worker.py`, `tests/conftest.py`, `contract/people.yaml`, `tests/equiv_support.py`, `qa_tools/common/correction_trial.py`
 - **#4** `in-progress` 2026-10-13 - Overnight 2026-10-13 to 14: REQ-GEN-199's scenarios, then REQ-PIPE-170 criterion 23. - KEITH'S GO, ~22:50 Perth: "keep...
-  - *touches:* `contract/calendar.yaml`
+  - *touches:* `contract/calendar.yaml`, `contract/scripted_decisions.yaml`
 
 ## plans/post-build-review.md
 

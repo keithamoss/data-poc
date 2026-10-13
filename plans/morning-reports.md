@@ -1308,3 +1308,33 @@ one or more component tags, and a date.
         1280x800, and TS-76's after-state is not the red criterion 9 asserts)
         and #175 (two more supplies wait under hold on 8 September - TS-47's
         late file and that day's own).
+      - REQ-PIPE-170 CRITERION 23 (TS-57 to TS-62) - SCOPED, NOT BUILT, and
+        why. The mechanism is all there: a replay stages each correction from
+        its merge date and confirms it at the end (correction_replay), and
+        confirm() already takes keeps with a reason and parks a blocked move.
+        What is missing is how the SCRIPTED manager makes the choices the
+        scenarios are about, and four forks stack up - a wrong guess on the
+        first writes fictional corrections into the real calendar file that
+        every later one builds on, so I stopped at the design rather than
+        take four provisionals in a row:
+        (e) WHERE A KEEP AND "LEAVE IT PENDING" ARE SAID. Recommended: a
+            `confirm-correction` operation in contract/scripted_decisions.yaml
+            naming the correction's change_reference, `keep:` by placement
+            supply index with a reason, and the bootstrap's confirm_due()
+            confirming only corrections with no such script - TS-62's
+            correction then has a script that says `leave: pending`.
+            Rejected: flags on the correction itself (a keep is the manager's
+            decision, not the agreement's).
+        (f) ONE CORRECTION OR SEVERAL. Criterion 23 reads as one correction
+            with a kept, moved, held, blocked and re-judged supply, plus a
+            second left pending. Recommended: two - one Child Protection
+            calendar correction carrying all five shapes, one left pending.
+        (g) WHICH QUARTERS. Recommended: the blocked move on cp-case-workers
+            (a later quarter inherits its supply - TS-79's mechanism), the
+            others on clean quarters; I would place them and show you the
+            dates before any rebuild.
+        (h) WHICH CALENDAR ITEMS the correction edits - a due date moved
+            three days (TS-57), a claim window widened (TS-58/59), one
+            narrowed (TS-60) - each a fictional past edit to contract/
+            calendar.yaml, which you have already said is fine for this
+            synthetic asset.
