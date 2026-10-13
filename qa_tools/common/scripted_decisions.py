@@ -94,6 +94,18 @@ class Script:
     #: (REQ-GEN-201 criterion 3) - unique within its scenario. A name, not
     #: its position in the file, which an inserted decision would move.
     name: str | None = None
+    #: A settlement's outcome for each file of the pair, BY ITS POSITION IN
+    #: RECEIPT ORDER (REQ-GEN-196 criterion 7): `supply`, `reject`,
+    #: `supersede` or `refile:+N` - a period counted from the placement's
+    #: (criterion 8). Never a filename, whose date moves with ANCHOR_DATE.
+    files: tuple[str, ...] = ()
+    #: Timed at a WALL CLOCK on a day counted from the placement period
+    #: (REQ-GEN-196 criterion 10: 11:00 on D+1) rather than hours after a
+    #: receipt - `day_offset` days after it, at `at` on the asset's clock.
+    at: str | None = None
+    day_offset: int = 0
+    #: Whether `after_hours:` was written, so `at:` beside it is refused.
+    after_hours_given: bool = False
 
 
 def load(path: Path | str | None = None) -> list[Script]:
@@ -117,8 +129,73 @@ def load(path: Path | str | None = None) -> list[Script]:
             period_from=str(raw.get("period_from") or "filed"),
             scope=(str(raw["scope"]) if raw.get("scope") is not None else None),
             stands_on=(int(raw["stands_on"]) if raw.get("stands_on") is not None else None),
-            name=(str(raw["name"]) if raw.get("name") is not None else None)))
+            name=(str(raw["name"]) if raw.get("name") is not None else None),
+            files=tuple(str(f) for f in (raw.get("files") or ())),
+            at=(str(raw["at"]) if raw.get("at") is not None else None),
+            day_offset=int(raw.get("day_offset", 0)),
+            after_hours_given="after_hours" in raw))
     return out
+
+
+CHOOSE_FILE = "choose-file"
+
+
+def answers_for(s: Script, filenames: list[str], period_at) -> list:
+    """A scripted settlement's answers, each file's position resolved to its
+    filename and each relative re-file to its period - THE ONE resolution
+    (REQ-GEN-196 criterion 7), called by the replay with the pair's real
+    files in receipt order and by validate with stand-ins. `period_at(n)`
+    names the period `n` after the placement's. Raises ValueError, naming
+    the fault, on a malformed outcome."""
+    from qa_tools.common import settlement
+
+    if len(s.files) != len(filenames):
+        raise ValueError(f"it gives {len(s.files)} file outcome(s) and the pair has "
+                         f"{len(filenames)} files - give exactly one per position, 1 and 2, "
+                         f"in receipt order")
+    out = []
+    for position, (token, filename) in enumerate(zip(s.files, filenames), 1):
+        outcome, _, rest = token.partition(":")
+        if outcome not in settlement.OUTCOMES:
+            raise ValueError(f"file {position}'s outcome {token!r} is not one of supply, "
+                             f"reject, supersede or refile:+N")
+        to = None
+        if outcome == settlement.REFILE:
+            try:
+                offset = int(rest)
+            except ValueError:
+                raise ValueError(f"file {position}'s re-file {token!r} names no period - "
+                                 f"write refile:+N, N periods after the placement's") from None
+            if offset <= 0:
+                raise ValueError(f"file {position}'s re-file {token!r} is not after the "
+                                 f"placement's period - the pair's own period is 'supply'")
+            to = period_at(offset)
+            if to is None:
+                raise ValueError(f"file {position}'s re-file {token!r} names a period the "
+                                 f"dataset does not have")
+        elif rest:
+            raise ValueError(f"file {position}'s outcome {token!r} takes no period")
+        out.append(settlement.Answer(filename, outcome, to))
+    return out
+
+
+def _settlement_problems(s: Script, where: str) -> list[str]:
+    """REQ-GEN-196 criterion 12, from configuration alone: one outcome per
+    position, each well formed, and a combination REQ-PIPE-193 criterion 4
+    allows - judged by the settlement's own rule, on stand-in files."""
+    from qa_tools.common import settlement
+
+    if s.operation != CHOOSE_FILE:
+        return ([f"{where}: `files:` is only for a settlement (choose-file)"]
+                if s.files else [])
+    try:
+        answers = answers_for(s, ["file 1", "file 2"], lambda n: f"the period +{n}")
+    except ValueError as exc:
+        return [f"{where}: {exc}"]
+    files = [settlement.PairFile(a.filename, None, "", False) for a in answers]
+    broken = settlement.rule_broken(None, s.dataset_id, "the placement's period", files,
+                                    answers)
+    return [f"{where}: {broken}"] if broken else []
 
 
 def problems(scripts: list[Script], *, registered: set[str],
@@ -144,6 +221,10 @@ def problems(scripts: list[Script], *, registered: set[str],
         except hierarchy.UnknownDatasetError:
             out.append(f"{where}: no dataset {s.dataset_id!r} in contract/data-asset.yaml")
         out += _scope_problems(s, where)
+        out += _settlement_problems(s, where)
+        if s.at is not None and s.after_hours_given:
+            out.append(f"{where}: give `at:` (with `day_offset:`) or `after_hours:`, not "
+                       f"both - each says when it takes effect")
     # ONE NAME, ONE DECISION, PER PLACEMENT (REQ-GEN-201 criterion 3): a link
     # looks names up across every scenario sharing its placement, so one
     # name on two siblings' decisions names neither (Keith, 2026-10-13).
@@ -221,6 +302,9 @@ class Timed:
     period: str
     #: The period a substitution stands on, resolved (REQ-GEN-200 criterion 3).
     stands_on: str | None = None
+    #: The scenario's placement period, from which a settlement's relative
+    #: re-file is counted (REQ-GEN-196 criterion 8).
+    placement_period: str | None = None
 
 
 class Player:
@@ -285,9 +369,15 @@ class Player:
                     f"SELECT slot FROM {filing.CURRENT} WHERE dataset_id = ? AND supply_id = ?",
                     [s.dataset_id, supply]).fetchall()
             filed_to = (period[0][0] if period else None) or placement.period
-            ready.append(Timed(s, received + timedelta(hours=s.after_hours),
-                               supply if s.names_supply else None,
-                               placement.period if s.period_from == "placement" else filed_to))
+            at = (_wall_clock_after(s, placement.period) if s.at is not None
+                  else received + timedelta(hours=s.after_hours))
+            if at is None:
+                waiting.append((s, f"{s.dataset_id} has no date for {placement.period} to "
+                                   f"time it from"))
+                continue
+            ready.append(Timed(s, at, supply if s.names_supply else None,
+                               placement.period if s.period_from == "placement" else filed_to,
+                               placement_period=placement.period))
         # STABLE, IN FILE ORDER AT ONE INSTANT (REQ-GEN-200 criterion 5):
         # `ready` is built in script order, and sorted() never reorders equal
         # keys - so a de-substitution listed before a mark-not-supplied on the
@@ -347,6 +437,16 @@ def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:
     return Timed(s, due + timedelta(hours=s.after_hours), None, placement.period, stood), ""
 
 
+def _wall_clock_after(s: Script, period: str) -> datetime | None:
+    """`at` on the day `day_offset` after the placement period's date, on
+    the asset's clock (REQ-GEN-196 criterion 10)."""
+    from qa_tools.common import asset_time, schedule
+
+    on = schedule.date_of(period, s.dataset_id)
+    return None if on is None else asset_time.wall_clock(on + timedelta(days=s.day_offset),
+                                                         s.at)
+
+
 def _due_at(dataset_id: str, period: str) -> datetime | None:
     """When this dataset's slot for `period` was due, as the slot schedule
     computes it from configuration (REQ-GEN-200 criterion 1)."""
@@ -357,12 +457,23 @@ def _due_at(dataset_id: str, period: str) -> datetime | None:
 
 
 def _supply_of(dataset_id: str, run_id: str) -> str:
-    from qa_tools.common import supply_db
+    """The FILED supply a recorded run is about (REQ-GEN-196 criterion 9):
+    an arrival that brought two files for one table is filed as
+    `<dataset>@<key>#1`, never the plain id no filing carries - asked of
+    the filings, by the one resolver, not rebuilt from the run id."""
+    from qa_tools.common import filing, supply_db, supply_files
 
     parts = supply_db.split_staged(run_id)
     if not parts:
         raise ScriptRefused(f"{run_id} is not a run id an arrival gives")
-    return f"{dataset_id}@{parts[1]}" + (f"#{parts[2]}" if parts[2] else "")
+    with _connect() as conn:
+        filed = supply_files.supply_for_table(conn, dataset_id, run_id)
+        if filed is None or not supply_files.ordinal_of(filed):
+            pair = f"{dataset_id}@{parts[1]}#1"
+            if conn.execute(f"SELECT 1 FROM {filing.CURRENT} WHERE dataset_id = ? "
+                            "AND supply_id = ?", [dataset_id, pair]).fetchall():
+                return pair
+    return filed or f"{dataset_id}@{parts[1]}"
 
 
 def _connect():
@@ -411,12 +522,26 @@ def _apply(t: Timed) -> None:
                     supply = decision_log.promoted_into(conn, s.dataset_id, t.stands_on,
                                                         t.at.isoformat())
 
+                # A SETTLEMENT'S FILES BY POSITION, resolved now (REQ-GEN-196
+                # criteria 7 and 8): the pair's real files in receipt order,
+                # and each relative re-file counted from the placement.
+                outcomes = ()
+                if s.operation == CHOOSE_FILE:
+                    from qa_tools.common import settlement, slots
+
+                    _delivery, _period, files = settlement.pair_files(conn, s.dataset_id,
+                                                                      supply)
+                    outcomes = tuple(answers_for(
+                        s, [f.filename for f in files],
+                        lambda n: slots.relative_period(
+                            s.dataset_id, t.placement_period or t.period, n)))
+
                 def ask(key=None):
                     return fd.Request(operation=s.operation, dataset_id=s.dataset_id,
                                       actor=actor, reason=s.reason, period=t.period,
                                       supply=supply, to_period=s.to_period,
                                       stands_on=t.stands_on, confirmed=True,
-                                      acknowledged=key)
+                                      acknowledged=key, file_outcomes=outcomes)
                 key = fd.consequences(conn, ask()).key
                 # NO TYPED ENVIRONMENT ID (REQ-PIPE-093 criterion 9): scripted
                 # playback is unattended, and the published PoC is bootstrapped in

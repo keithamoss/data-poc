@@ -579,3 +579,79 @@ class TestCriticFindingsOn194:
         received = filing.received_at_of(DS, p.second)
         assert recorded_arrival.for_run(DS, received, supply=p.second)["slot"] == nxt.isoformat()
         assert recorded_arrival.for_run(DS, received, supply=p.pair)["slot"] == p.period
+
+
+class TestAScriptNamesAPairByItsFiledSupply:
+    """REQ-GEN-196 criterion 9, test-first: a scripted decision naming a
+    contested pair's run resolves to its filed `<dataset>@<key>#1`, never
+    the plain `<dataset>@<key>` no filing carries."""
+
+    def test_the_pairs_run_is_its_hash_one(self, conn, day):
+        from qa_tools.common import scripted_decisions
+
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
+        run_id = supply_files.arrival_run_id_of(DS, p.pair)
+        assert scripted_decisions._supply_of(DS, run_id) == p.pair
+
+    def test_an_ordinary_run_is_its_plain_supply(self, conn):
+        from qa_tools.common import scripted_decisions
+
+        assert scripted_decisions._supply_of(DS, "birth_registrations__20990101000000000001") \
+            == f"{DS}@20990101000000000001"
+
+
+class TestAScriptedSettlement:
+    """REQ-GEN-196 criteria 6, 7, 8, 10 and 12: a scripted person settles a
+    pair by file POSITION, a re-file counted from the placement, at a wall
+    clock on a day after it."""
+
+    def _script(self, **kw):
+        from qa_tools.common import scripted_decisions as sd
+
+        base = dict(scenario="TS-69", operation="choose-file", dataset_id=DS,
+                    reason="the next day's file came early", supply_index=0,
+                    after_hours=0, files=("supply", "refile:+1"), at="11:00",
+                    day_offset=1)
+        base.update(kw)
+        return sd.Script(**base)
+
+    @pytest.mark.parametrize("files, says", [
+        (("supply",), "exactly one per position"),
+        (("supply", "maybe"), "is not one of"),
+        (("supply", "refile"), "names no period"),
+        (("supply", "refile:0"), "is not after the"),
+        (("supply", "supply"), "only one file can be the supply"),
+        (("reject", "supersede"), "spare copy only where"),
+        (("supply", "reject:+1"), "takes no period"),
+    ])
+    def test_validate_refuses_from_configuration_alone(self, files, says):
+        from qa_tools.common import scripted_decisions as sd
+
+        found = sd.problems([self._script(files=files)], registered={"TS-69"})
+        assert any(says in p for p in found), found
+
+    def test_validate_refuses_at_beside_after_hours(self):
+        from qa_tools.common import scripted_decisions as sd
+
+        found = sd.problems([self._script(after_hours_given=True)], registered={"TS-69"})
+        assert any("not both" in p for p in found)
+
+    def test_it_plays_by_position_at_eleven_the_next_day(self, conn, day, monkeypatch):
+        from qa_tools.common import scenario_map, scripted_decisions as sd
+
+        nxt = day + timedelta(days=1)
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{nxt}.csv", _at(day, "13:45"))])
+        placements = {"TS-69": scenario_map.Placement(
+            scenario_id="TS-69", dataset=DS, period=p.period, in_place_on=p.period,
+            supplies=(supply_files.arrival_run_id_of(DS, p.pair),))}
+        player = sd.Player("civil-registration", scripts=[self._script()],
+                           placements=placements)
+        ran = []
+        monkeypatch.setattr(sd, "_run_the_re_check_it_owed", lambda t, owed: ran.append(owed))
+        assert player.finish() == 1
+        (choose,) = [d for d in _entries(conn, p.pair) if d["action"] == "choose-file"]
+        assert choose["effective_at"] == _at(nxt, "11:00")
+        assert filing.filing_for(DS, p.second)["slot"] == nxt.isoformat()
+        assert len(ran) == 2, "both supplies' re-checks run, in order"
