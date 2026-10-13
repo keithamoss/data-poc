@@ -269,7 +269,9 @@ def test_a_correction_hold_says_which_correction_and_what_to_do():
     assert "correction CAB-9 was confirmed" in held.describe()
     assert "dates were wrong" in held.describe()
     assert any("declare a correction" in r for r in held.responses)
-    assert all("re-file" not in r for r in held.responses), "a held supply is promoted"
+    # NEITHER RE-FILE NOR PROMOTE (post-build-review #173): it has no period
+    # to leave, and its data was never checked against one.
+    assert all("re-file" not in r and "promote" not in r for r in held.responses)
 
 
 class TestTheCommands:

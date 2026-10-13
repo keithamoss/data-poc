@@ -387,8 +387,9 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a decision needs at least one slot - which period it acts on")
     # A HELD SUPPLY HAS NO SLOT TO LEAVE - and only the filing rule re-files
-    # one, once dates cover it (REQ-PIPE-154 criterion 7). A person places a
-    # held supply by promoting it.
+    # one, once dates cover it (REQ-PIPE-154 criterion 7). A person may NOT
+    # promote a held supply (post-build-review #173): its data was never
+    # checked against any period. Placing one is REQ-PIPE-163's.
     # AND A FILED SUPPLY IS HELD by a re-file that names only the period it
     # leaves - a confirmed correction whose calendar offers it no period
     # (REQ-PIPE-170 criterion 8), recorded as the rule's since Keith's answer

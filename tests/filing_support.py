@@ -69,3 +69,13 @@ def forget(conn, where: str, params=()) -> None:
     with conn.raw.transaction():
         conn.execute("SET LOCAL session_replication_role = replica")
         conn.execute(f"DELETE FROM {filing.TABLE} WHERE {where}", list(params))
+
+
+def filed(conn, dataset_id: str, supply_id: str, slot: str | None) -> None:
+    """File `supply_id` to `slot` before a test promotes it: a person's promote
+    goes only into the period the supply is filed to (post-build-review
+    #173), so a fixture that promotes as a person files first, as the real
+    pipeline does before any check runs."""
+    delivery = f"pytest-{dataset_id}-{supply_id}"
+    ensure_delivery(delivery, dataset_id, None)
+    place(conn, dataset_id, supply_id, slot, delivery)

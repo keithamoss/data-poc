@@ -69,6 +69,11 @@ class Pair:
                 [self.delivery, name, DS, at.isoformat(), at, n])
         decided = filing.assignment_at(DS, self.pair, first)
         assert filing.record(decided, self.delivery, conn=conn)
+        # THE PERIOD IT IS FILED TO, never the delivery's own day: a daily
+        # delivery covers the day before, and a person promotes a supply only
+        # into its filed period (post-build-review #173).
+        if decided.slot is not None:
+            self.period = decided.slot
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
         ordered = sorted(name for name, _ in files)
         self.table = {}

@@ -250,6 +250,9 @@ def consequences(conn, request: Request) -> Consequences:
     # ONE FILE OF AN OPEN PAIR IS REFUSED BEFORE ANYONE IS ASKED (REQ-PIPE-193
     # criterion 25): the warning is the first thing every route asks for.
     _refuse_on_an_open_pair(conn, request)
+    # NOR A PROMOTE OF WHAT IS NOT FILED TO THIS PERIOD (#173): refused
+    # before the reason is asked, for the same reason.
+    _refuse_promoting_where_it_is_not_filed(conn, request)
     lines: list[str] = []
     done: list[str] = []
     if request.operation == PROMOTE and request.period and request.supply:
@@ -840,6 +843,49 @@ def _is_promoted(conn, request: Request) -> bool:
         conn, request.dataset_id, request.period) == request.supply
 
 
+def _refuse_promoting_where_it_is_not_filed(conn, request: Request) -> None:
+    """A PERSON PROMOTES A SUPPLY ONLY INTO THE PERIOD IT IS FILED TO
+    (post-build-review #173; Keith, 2026-10-13: "there should be no way to
+    move things into a period and then skip doing checks"). A supply's QA
+    runs against the period it is FILED to, so a held supply, one never
+    filed, or one filed elsewhere would go in unchecked for this period.
+
+    Here, in the one implementation every person's route shares - the
+    terminal, the flags, a GitHub comment, scripted playback. The rule's
+    own gate already promotes only into the filed period and refuses a held
+    or unperioded supply (promotion.after_run), so it needs no second check.
+    """
+    if request.operation != PROMOTE or not request.supply or not request.period:
+        return
+    from qa_tools.common import filing
+
+    rows = conn.execute(
+        f"SELECT slot FROM {filing.CURRENT} WHERE dataset_id = ? AND supply_id = ?",
+        [request.dataset_id, request.supply]).fetchall()
+    where = rows[0][0] if rows else None
+    if not rows:
+        raise decision_log.DecisionRefused(
+            f"{request.supply} is not filed to any period, so nothing has checked it "
+            f"against {request.period}. A supply is promoted only into the period it "
+            f"is filed to. Nothing was recorded.")
+    if where is None:
+        raise decision_log.DecisionRefused(
+            f"{request.supply} is held - it arrived when no period of "
+            f"{request.dataset_id} was open - so its data has never been checked against "
+            f"{request.period}, and it cannot be promoted there. Reject it, or correct the "
+            f"calendar if a period should have been open (`mothman schedule "
+            f"draft-correction`) - `mothman supply holds` lists it with what can be done. "
+            f"Nothing was recorded.")
+    if where != request.period:
+        raise decision_log.DecisionRefused(
+            f"{request.supply} is filed to {where}, not {request.period}, so its checks ran "
+            f"against {where}. Promote it there, or re-file it to {request.period} so its "
+            f"checks run against that period first:\n"
+            f"  mothman supply decide --operation refile --dataset {request.dataset_id} "
+            f"--period {where} --supply {request.supply} --to-period {request.period} "
+            f"--reason '<why>'")
+
+
 def _refuse_promoting_what_never_loaded(conn, request: Request) -> None:
     """REQ-PIPE-153 criterion 6: a supply whose current load record is
     FAILED cannot be promoted, on any route. Promotion moves the tables it
@@ -961,6 +1007,7 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
         _confirmation(request)
 
     _refuse_promoting_what_never_loaded(conn, request)
+    _refuse_promoting_where_it_is_not_filed(conn, request)
     already = _already(conn, request)
     if already is not None:
         return Outcome(operation=request.operation, dataset_id=request.dataset_id,

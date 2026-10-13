@@ -166,6 +166,9 @@ class TestANoOpIsNotARefusal:
             operation=request.operation, dataset_id=request.dataset_id,
             period=request.period, changed=False,
             message="already promoted. Nothing to do."))
+        # Its warning too, which a real call reads before applying: the
+        # supply here is a name, never staged or filed (#173).
+        monkeypatch.setattr(fd, "consequences", lambda conn, request: fd.Consequences(()))
 
     def test_it_comes_back_as_an_outcome_not_as_None(self, already, actor):
         out = filing_tui.apply_decision(operation=fd.PROMOTE,
@@ -359,7 +362,9 @@ class TestTheCommandReallyWritesTheLog:
                                  else None)
         return name
 
-    def _stage(self, conn, dataset):
+    def _stage(self, conn, dataset, filed_to=None):
+        """Staged, and filed to `filed_to` first as an arrival would be - a
+        person promotes only into the filed period (#173)."""
         import uuid
 
         arrival = uuid.uuid4().hex[:10]
@@ -367,14 +372,19 @@ class TestTheCommandReallyWritesTheLog:
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
         conn.execute(
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
-        return f"{dataset.dataset_id}@{arrival}"
+        supply = f"{dataset.dataset_id}@{arrival}"
+        if filed_to is not None:
+            import filing_support
+
+            filing_support.filed(conn, dataset.dataset_id, supply, filed_to)
+        return supply
 
     def test_a_promote_from_the_terminal_lands_in_the_decision_log(
             self, conn, period, monkeypatch):
         from qa_tools.common import hierarchy
 
         dataset = hierarchy.dataset("cp-carers")
-        supply = self._stage(conn, dataset)
+        supply = self._stage(conn, dataset, filed_to=period)
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard",
                              lambda: people.person_by_email(REAL_PERSON))
         monkeypatch.setattr(fd, "reconcile_after", lambda *a, **k: None)
@@ -410,7 +420,7 @@ class TestTheCommandReallyWritesTheLog:
         from qa_tools.common import hierarchy
 
         dataset = hierarchy.dataset("cp-carers")
-        supply = self._stage(conn, dataset)
+        supply = self._stage(conn, dataset, filed_to=period)
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard",
                              lambda: people.person_by_email(REAL_PERSON))
         monkeypatch.setattr(fd, "reconcile_after", lambda *a, **k: None)
@@ -434,7 +444,7 @@ class TestTheCommandReallyWritesTheLog:
         from qa_tools.common import hierarchy
 
         dataset = hierarchy.dataset("cp-carers")
-        supply = self._stage(conn, dataset)
+        supply = self._stage(conn, dataset, filed_to=period)
         monkeypatch.setattr(filing_tui, "actor_at_the_keyboard",
                              lambda: people.person_by_email(REAL_PERSON))
         monkeypatch.setattr(fd, "reconcile_after", lambda *a, **k: None)

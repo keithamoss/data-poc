@@ -209,10 +209,11 @@ class Held:
                     "itself on the next processing pass",)
         if self.correction:
             # REQ-PIPE-170 criterion 8: a confirmed correction left it no period.
-            # PROMOTE, not re-file (delivery-critic on 170, D7): a held
-            # supply has no period to leave, so a re-file is refused.
-            return ("promote it into the period it belongs to - or declare a correction "
-                    "adding a date that covers its receipt",)
+            # NOT PROMOTE (post-build-review #173): a held supply's data was
+            # never checked against a period, so promoting it is refused. A
+            # re-file is refused too - it has no period to leave.
+            return ("declare a correction adding a date that covers its receipt",
+                    "reject the supply")
         return RESPONSES.get(self.kind, ())
 
     @property

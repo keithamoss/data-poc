@@ -55,16 +55,23 @@ def periods(monkeypatch):
     return names
 
 
-def _stage(conn, dataset, arrival=None):
+def _stage(conn, dataset, arrival=None, filed_to=None):
     """A real staged supply, whose ID and TABLE are different strings -
     as they are in the real system, and as a test that conflated them
-    hid a defect for an hour on 2026-09-29."""
+    hid a defect for an hour on 2026-09-29. `filed_to` files it there
+    first, as an arrival would - a person promotes only into the filed
+    period (post-build-review #173)."""
     arrival = arrival or uuid.uuid4().hex[:10]
     physical = f"{dataset.table}__{arrival}"
     conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{supply_db.STAGING_SCHEMA}"')
     conn.execute(f'CREATE TABLE "{supply_db.STAGING_SCHEMA}"."{physical}" (id integer)')
     conn.execute(f'INSERT INTO "{supply_db.STAGING_SCHEMA}"."{physical}" VALUES (7)')
-    return f"{dataset.dataset_id}@{arrival}", physical
+    supply = f"{dataset.dataset_id}@{arrival}"
+    if filed_to is not None:
+        import filing_support
+
+        filing_support.filed(conn, dataset.dataset_id, supply, filed_to)
+    return supply, physical
 
 
 def _entry_for(conn, dataset_id, period, action=None):
@@ -135,7 +142,7 @@ class TestWhoMayRaiseOne:
     def test_the_actor_written_to_the_log_is_the_person(
             self, conn, dataset, actor, periods):
         first, _ = periods
-        supply, physical = _stage(conn, dataset)
+        supply, physical = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         entry = _entry_for(conn, dataset.dataset_id, first, dl.PROMOTE)
@@ -195,7 +202,7 @@ class TestSevenOfTheEightReallyWork:
     def test_promote_moves_the_tables_and_records_it(
             self, conn, dataset, actor, periods):
         first, _ = periods
-        supply, physical = _stage(conn, dataset)
+        supply, physical = _stage(conn, dataset, filed_to=first)
 
         got = fd.apply(_request(dataset, actor, fd.PROMOTE, period=first,
                                  supply=supply), effective_at=WHEN, conn=conn)
@@ -210,7 +217,7 @@ class TestSevenOfTheEightReallyWork:
     def test_demote_puts_it_back_and_leaves_the_slot_unfilled(
             self, conn, dataset, actor, periods):
         first, _ = periods
-        supply, _ = _stage(conn, dataset)
+        supply, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
 
@@ -281,7 +288,7 @@ class TestSevenOfTheEightReallyWork:
 
     def test_substitute_then_de_substitute(self, conn, dataset, actor, periods):
         first, second = periods
-        supply, _ = _stage(conn, dataset)
+        supply, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         period_schema.ensure_period_schema(conn, second)
@@ -301,7 +308,7 @@ class TestSevenOfTheEightReallyWork:
         monkeypatch.setattr(
             inheritance.schedule, "not_expected_periods",
             lambda ds: {second: "carers are annual"} if ds == dataset.dataset_id else {})
-        supply, _ = _stage(conn, dataset)
+        supply, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         period_schema.ensure_period_schema(conn, second)
@@ -337,7 +344,7 @@ class TestADecisionThatChangesNothingSaysSo:
 
     def test_promoting_what_is_already_promoted(self, conn, dataset, actor, periods):
         first, _ = periods
-        supply, _ = _stage(conn, dataset)
+        supply, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         before = len(dl.decisions_for(conn, dataset.dataset_id))
@@ -372,7 +379,7 @@ class TestADecisionThatChangesNothingSaysSo:
         operator has asked to undo the wrong one, which is a thing to
         tell them rather than a state that already holds."""
         first, second = periods
-        supply, _ = _stage(conn, dataset)
+        supply, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         period_schema.ensure_period_schema(conn, second)
@@ -398,7 +405,7 @@ class TestTheFilingRulesAreJudgedWhenTheEntryIsAppended:
         monkeypatch.setattr(
             inheritance.schedule, "not_expected_periods",
             lambda ds: {second: "carers are annual"} if ds == dataset.dataset_id else {})
-        supply, _ = _stage(conn, dataset)
+        supply, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         period_schema.ensure_period_schema(conn, second)
@@ -426,7 +433,7 @@ class TestTheFilingRulesAreJudgedWhenTheEntryIsAppended:
         monkeypatch.setattr(
             inheritance.schedule, "not_expected_periods",
             lambda ds: {second: "carers are annual"} if ds == dataset.dataset_id else {})
-        supply, physical = _stage(conn, dataset)
+        supply, physical = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
                   effective_at=WHEN, conn=conn)
         period_schema.ensure_period_schema(conn, second)
@@ -461,7 +468,7 @@ class TestTheFilingRulesAreJudgedWhenTheEntryIsAppended:
             dataset_id=dataset.dataset_id, supply=theirs, period=first,
             physical_tables=[theirs_physical], actor="someone",
             actor_kind=dl.PERSON, effective_at=WHEN)
-        mine, _ = _stage(conn, dataset)
+        mine, _ = _stage(conn, dataset, filed_to=first)
 
         request = fd.Request(operation=fd.PROMOTE, dataset_id=dataset.dataset_id,
                              actor=actor, period=first, supply=mine,
@@ -658,7 +665,7 @@ class TestRejectingAFailedResupplyOfAFilledPeriod:
         from qa_tools.common import load_log
 
         first, _ = periods
-        filled, _ = _stage(conn, dataset)
+        filled, _ = _stage(conn, dataset, filed_to=first)
         fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=filled),
                   effective_at=WHEN, conn=conn)
         arrival = uuid.uuid4().hex[:10]

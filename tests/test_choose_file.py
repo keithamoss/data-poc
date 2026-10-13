@@ -573,8 +573,9 @@ class TestCriticFindingsOn194:
         promote = fd.Request(**{**promote.__dict__,
                                 "acknowledged": fd.consequences(conn, promote).key or None})
         fd.apply(promote, effective_at=_at(day, "12:00").isoformat(), conn=conn)
-        q = Pair(conn, day, [(f"birth_registrations_{day}-again.csv", _at(day, "15:30")),
-                              (f"birth_registrations_{day}-again-1.csv", _at(day, "15:45"))])
+        q = Pair(conn, day, [(f"birth_registrations_{day}-again.csv", _at(day, "09:50")),
+                              (f"birth_registrations_{day}-again-1.csv", _at(day, "09:52"))])
+        assert q.period == p.period, "the second pair lands on the promoted period"
         assert supply_files.open_contest(conn, DS, q.pair) is not None
         return p, q
 
