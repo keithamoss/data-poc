@@ -4,7 +4,7 @@ order and Back, and the flag form.
 """
 from __future__ import annotations
 
-import random
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -12,10 +12,18 @@ from click.testing import CliRunner
 
 from cli import common, settle_tui
 from cli import supply as supply_cli
-from pair_support import DS, Pair, _at
+from pair_support import DS, Pair, _at, free_day
 from qa_tools.common import decision_log, qa_store, settlement, supply_db
 
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
+
+
+def _flat(output: str) -> str:
+    """Output as one string with no styling, box or wrapping - a usage
+    error is a Rich panel, coloured where the terminal is (CI sets
+    FORCE_COLOR) and wrapped at its width."""
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", output)
+    return "".join(ch for ch in plain if ch not in "│╭╮╰╯─ \n")
 
 
 @pytest.fixture
@@ -26,8 +34,10 @@ def conn(supply_dsn):
 
 
 @pytest.fixture
-def day():
-    return date(2026, 11, 1) + timedelta(days=random.randrange(300))
+def day(conn):
+    # WITHIN THE NEXT YEAR: the calendar names periods that far ahead, and a
+    # daily calendar walked decades out is slow. FREE OF OTHER TESTS' PAIRS.
+    return free_day(conn, date(2026, 11, 1))
 
 
 def _files(refused=(False, False)):
@@ -154,7 +164,7 @@ class TestTheFlagForm:
     def test_usage_errors_name_the_flag(self, flags, says):
         got = CliRunner().invoke(supply_cli.supply_group,
                                  ["decide", "--dataset", DS, "--period", "2026-11-02", *flags])
-        assert got.exit_code != 0 and says in got.output
+        assert got.exit_code != 0 and says.replace(" ", "") in _flat(got.output)
 
     def test_a_missing_outcome_without_a_terminal_names_the_form(self, conn, day):
         p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
@@ -164,7 +174,7 @@ class TestTheFlagForm:
             "decide", "--operation", "choose-file", "--dataset", DS, "--period", p.period,
             "--file-outcome", f"{one}=supply", "--reason", "r", "--yes"])
         assert got.exit_code != 0
-        flat = "".join(ch for ch in got.output if ch not in "│╭╮╰╯─ \n")
+        flat = _flat(got.output)
         assert f"--file-outcome'{two}=<supply|refile:<period>|reject|supersede>'" in flat
 
     def test_a_missing_reason_says_so_with_the_real_filenames(self, conn, day):
@@ -176,7 +186,7 @@ class TestTheFlagForm:
             "decide", "--operation", "choose-file", "--dataset", DS, "--period", p.period,
             "--file-outcome", f"{one}=supply", "--file-outcome", f"{two}=reject", "--yes"])
         assert got.exit_code != 0
-        flat = "".join(ch for ch in got.output if ch not in "│╭╮╰╯─ \n")
+        flat = _flat(got.output)
         assert "--reason" in flat and "missing" in flat
         assert f"--file-outcome'{one}=supply'" in flat
 
@@ -320,7 +330,7 @@ class TestTheTargetPrompt:
                             lambda conn, ds, p, besides: (f"{p} has two files of its own"
                                                           if p == first else None))
         assert settle_tui._target(DS, period, "f.csv", None, besides=f"{DS}@1#1") == second
-        assert f"{first} has two files of its own" in capsys.readouterr().out
+        assert f"{first}hastwofilesofitsown" in _flat(capsys.readouterr().out)
 
 
 class TestAChangedConsequenceIsShownAndAskedAgain:

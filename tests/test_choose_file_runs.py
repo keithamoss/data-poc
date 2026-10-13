@@ -33,7 +33,11 @@ def pair(supply_dsn, tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
     monkeypatch.setattr(promotion, "report", lambda outcome: None)
     # INSIDE THE CALENDAR'S REACH (it starts 2026-08-14) and the coming year.
-    day = date(2026, 8, 20) + timedelta(days=random.randrange(300))
+    from pair_support import free_day
+
+    with supply_db.connect(label="test-choose-file-runs") as conn:
+        qa_store.ensure_schema(conn)
+        day = free_day(conn, date(2026, 8, 20))
     received = datetime(day.year, day.month, day.day, 4, tzinfo=timezone.utc) + timedelta(
         seconds=random.randrange(1, 3000), microseconds=random.randrange(1, 999_999))
     chosen, spare = f"birth_registrations_{day}.csv", f"birth_registrations_{day}-1.csv"

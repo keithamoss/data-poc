@@ -7,12 +7,11 @@ so nothing else on the worker shares it.
 """
 from __future__ import annotations
 
-import random
 from datetime import date, timedelta
 
 import pytest
 
-from pair_support import DS, TABLE, Pair, _at
+from pair_support import DS, TABLE, Pair, _at, free_day
 from qa_tools.common import dataset_blockers, decision_log, filing
 from qa_tools.common import filing_decisions as fd
 from qa_tools.common import (people, qa_store, recheck, rejection, settlement,
@@ -34,10 +33,10 @@ def actor():
 
 
 @pytest.fixture
-def day():
+def day(conn):
     # WITHIN THE NEXT YEAR: the calendar names periods that far ahead, and a
-    # daily calendar walked decades out is slow.
-    return date(2026, 11, 1) + timedelta(days=random.randrange(300))
+    # daily calendar walked decades out is slow. FREE OF OTHER TESTS' PAIRS.
+    return free_day(conn, date(2026, 11, 1))
 
 
 def _schema_of(conn, physical):

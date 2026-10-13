@@ -8376,4 +8376,13 @@ twice. It deliberately did not re-find the `TypeError`.
       queue's date format belong to every decision, not to 193. The bare
       `--- <run id> ---` line before each run comes from the orchestrator,
       which every re-check prints.
+    - **CI found two test defects after cbccb0b, both in the tests rather
+      than the product.** Three flag-form tests asserted on a Rich usage
+      panel's raw text, which CI colours (FORCE_COLOR) and wraps - green
+      locally, red on the runner; reproduced with `FORCE_COLOR=1` and fixed
+      by asserting on the unstyled, unwrapped text. And the re-file refusal
+      above made the random-day tests collide with open pairs earlier
+      tests leave in the worker's database (six repeated runs, three
+      failures); `pair_support.free_day` now picks a day whose period and
+      the next two hold none.
 
