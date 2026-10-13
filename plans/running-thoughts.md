@@ -1255,6 +1255,21 @@ to the exact right file/line/folder with zero console errors.
     time"; never recompute verdict-like values for history; record raw
     evidence; version the meaning of append-only facts; expand-verify-
     contract reshapes) - for Keith.
+    **RULE 3 AUDIT (Keith, same morning: "do we have gaps around rule three,
+    recording raw evidence when it happens?")** -
+    docs/drafts/schema-migrations/raw-evidence-audit.md. Yes: three HIGH,
+    six MED, four LOW. HIGH, each checked against the code or database:
+    (H1) recorded evidence can be overwritten - a run's results are
+    deleted and re-inserted and tool output is upserted under an arrival's
+    fixed run key; (H2) no bytes-level identity for a delivered file -
+    qa.delivery_file has no checksum, size or header; (H3) no code or tool
+    versions - run.tool_versions is empty on all 229 runs and no git SHA is
+    recorded anywhere. Also found the OTHER way: the qa schema already
+    holds supply-row values (datacontract failed_samples in 23 tool
+    outputs, failing sample keys, invalid values in dataset_stats), and the
+    publisher role can read all of qa. Two calls for Keith: where delivered
+    files live in production and for how long; whether sample values stay
+    readable by the publisher. Not scoped.
 
 90. **[todo, 2026-10-13]** **[Pipeline & publishing]** **Protect the
     processing loop from a decision made while it is working on the same
