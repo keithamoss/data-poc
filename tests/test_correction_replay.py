@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import filing_support
+from conftest import drop_qa_schema
 from qa_tools.common import (agreement_freeze, asset_time, assignment, correction_apply,
                              correction_replay, people, qa_store, schedule, supply_db)
 from test_correction_apply import _docs, _grace, _move_q3
@@ -123,6 +124,9 @@ class TestEachArrivalIsFiledAsItStood:
 @pytest.fixture
 def conn(supply_dsn):
     with supply_db.connect(label="test-correction-replay") as c:
+        # FROM NOTHING: the decision log is append-only, and the history's
+        # end reads it, so an earlier test's decisions would move it.
+        drop_qa_schema(c)
         qa_store.ensure_schema(c)
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".filing CASCADE')
         c.execute(f'TRUNCATE "{qa_store.SCHEMA}".correction_applied')
@@ -159,3 +163,40 @@ class TestConfirmedAsTheManagerWould:
         correction_replay.confirm_due(conn, effective_at="2026-10-11T00:00:00+08:00",
                                       say=lambda _m: None)
         assert filing.filing_for("cp-clients", "replay-s")["slot"] != "2023-Q3"
+
+
+def _applied_at(conn) -> dict[str, datetime]:
+    return {ref: at for ref, at in conn.execute(
+        f"SELECT change_reference, applied_at FROM {correction_apply.APPLIED}").fetchall()}
+
+
+class TestStampedWhereTheHistoryEnds:
+    """post-build-review #177 (Keith, 2026-10-14, option b): a replay confirms
+    each correction at the later of the replayed history's end and the start
+    of the correction's own date - the same on every bootstrap, and never
+    before the correction existed. It used to be the wall clock."""
+
+    def test_a_correction_dated_after_the_history_is_stamped_on_its_own_date(self, two, conn):
+        end = datetime(2025, 12, 1, 9, tzinfo=PERTH)
+        correction_replay.confirm_due(conn, history_end=end, say=lambda _m: None)
+        at = _applied_at(conn)
+        assert at["CAB-1"] == asset_time.start_of_day(date(2026, 1, 10))
+        assert at["CAB-2"] == asset_time.start_of_day(date(2026, 2, 10))
+
+    def test_a_correction_dated_inside_the_history_is_stamped_at_its_end(self, two, conn):
+        end = datetime(2026, 3, 1, 14, 30, tzinfo=PERTH)
+        correction_replay.confirm_due(conn, history_end=end, say=lambda _m: None)
+        assert set(_applied_at(conn).values()) == {end}
+
+    def test_the_history_ends_at_the_last_instant_it_recorded(self, conn):
+        assert correction_replay.history_end(conn) == datetime(2023, 8, 1, 12, tzinfo=PERTH)
+
+    def test_a_bootstrap_never_stamps_the_wall_clock(self, two, conn, monkeypatch):
+        from qa_tools.common import bootstrap
+
+        monkeypatch.setattr(bootstrap, "_rebuild_results", lambda _short: None)
+        monkeypatch.setattr(asset_time, "now", lambda: datetime(2031, 1, 1, tzinfo=PERTH))
+        bootstrap._confirm_corrections(say=lambda _m: None)
+        at = _applied_at(conn)
+        assert at["CAB-1"] == asset_time.start_of_day(date(2026, 1, 10))
+        assert at["CAB-2"] == asset_time.start_of_day(date(2026, 2, 10))

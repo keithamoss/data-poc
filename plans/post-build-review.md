@@ -8658,7 +8658,7 @@ twice. It deliberately did not re-find the `TypeError`.
       placement" while criterion 19 gives them different quarters - the two
       cannot both hold; the build follows 19. Wording only.
 
-177. **[investigate, 2026-10-14]** **[Pipeline & publishing]** **[Data
+177. **[done, 2026-10-14]** **[Pipeline & publishing]** **[Data
     generation]** **A replayed correction's confirmation is stamped with the
     real clock, and the fix the architect proposed would stamp it before the
     correction was merged.** Found by `delivery-architect` (finding B10)
@@ -8687,3 +8687,18 @@ twice. It deliberately did not re-find the `TypeError`.
     whenever the merge is later, as now. No visible effect today: the
     confirmation moved, placed and held nothing. Needs a failing test first
     once chosen.
+
+    **KEITH'S ANSWER, 2026-10-14 morning (close-out question 28): option (b)**
+    - the later of the history's end and the correction's own date. FIXED
+    the same morning, test-first: `TestStampedWhereTheHistoryEnds` in
+    tests/test_correction_replay.py drove `bootstrap._confirm_corrections`
+    with the wall clock faked to 2031 and got 2031 back before the fix.
+    `correction_replay.history_end` reads the latest receipt or decision
+    taking effect, and `confirm_due(history_end=...)` stamps each correction
+    at the later of that and its own date; a real asset still stamps the
+    wall clock. Recorded on REQ-PIPE-170's decisions. The fixture now
+    rebuilds the qa schema per test, because the decision log is
+    append-only and an earlier test's decisions moved the history's end.
+    This sandbox's `supply` database still carries the old stamp until its
+    next bootstrap from empty. REQ-GEN-205's draft criterion 19 is now
+    built work and comes out of the draft at the next fold.

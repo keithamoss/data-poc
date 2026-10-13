@@ -289,8 +289,15 @@ _LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in t
 def _confirm_corrections(say) -> None:
     from qa_tools.common import correction_replay, replay_clock
 
-    with replay_clock.replaying():
-        done = correction_replay.confirm_due(say=say)
+    # A SYNTHETIC replay stamps where its history ends, not the wall clock
+    # (post-build-review #177); a real asset's confirmation carries when it
+    # was really made.
+    with replay_clock.replaying() as synthetic:
+        end = None
+        if synthetic:
+            with supply_db.connect(label="mothman:bootstrap") as conn:
+                end = correction_replay.history_end(conn)
+        done = correction_replay.confirm_due(history_end=end, say=say)
     if done:
         for short in ("bdm", "cp"):
             _rebuild_results(short)

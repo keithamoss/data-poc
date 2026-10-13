@@ -73,12 +73,38 @@ def for_arrival(arrival):
     return staged(arrival.received_at) or contextlib.nullcontext()
 
 
+def history_end(conn) -> datetime | None:
+    """The last instant the replayed history recorded: its latest receipt or
+    decision taking effect. None for an empty history."""
+    from qa_tools.common import qa_store
+
+    qa_store.ensure_schema(conn)
+    row = conn.execute(
+        f'SELECT max(t) FROM (SELECT received_instant AS t FROM "{_qa()}".supply_receipt '
+        f'UNION ALL SELECT effective_at FROM "{_qa()}".decision) AS instants').fetchone()
+    return row[0] if row else None
+
+
+def _qa() -> str:
+    from qa_tools.common import qa_store
+
+    return qa_store.SCHEMA
+
+
 def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str | None = None,
-                say=print) -> list[str]:
+                history_end: datetime | None = None, say=print) -> list[str]:
     """Confirm every pending correction merged by `until` (default now), the
     oldest first, as the asset manager during playback. Returns the
     references confirmed. A refusal stops here, loudly: a history silently
-    missing a confirmation is what REQ-GEN-044 exists to prevent."""
+    missing a confirmation is what REQ-GEN-044 exists to prevent.
+
+    STAMPED WHERE THE HISTORY ENDS (post-build-review #177; Keith,
+    2026-10-14, option b): given `history_end`, each correction is
+    confirmed at the later of it and the start of the correction's own
+    date - the same on every bootstrap, and never before the correction
+    existed. Rejected: the wall clock (a different stamp every run), and the
+    history's end alone (it confirmed REQ-PIPE-181, dated 2026-10-11, on
+    2026-09-22)."""
     from qa_tools.common import people, replay_clock, supply_db
 
     until = until or asset_time.now()
@@ -96,7 +122,9 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
         for p in correction_apply.pending(db):
             if merge_instant(p) > until:
                 continue
-            applied = correction_apply.confirm(db, p.reference, actor=actor, effective_at=at)
+            stamp = at if history_end is None or effective_at else \
+                max(history_end, merge_instant(p)).isoformat()
+            applied = correction_apply.confirm(db, p.reference, actor=actor, effective_at=stamp)
             done.append(p.reference)
             say(f"Confirmed correction {p.reference} as the data asset's manager: "
                 f"{len(applied.moved)} moved, {len(applied.placed)} placed, "

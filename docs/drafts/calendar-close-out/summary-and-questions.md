@@ -216,3 +216,38 @@ I applied every review finding that was a plain wording or correctness fix with 
 - **REQ-GEN-203's quarter suggestions.** Its -13 collides with TS-67's early filing, and 2023-Q1 is not free either (TS-77a stands on it). REQ-GEN-207's dry run replaces guessing here.
 - **REQ-PIPE-179's open item.** It still has a check to do at build time: whether the agreement backstop already notices a slot that vanished.
 - **REQ-PIPE-163 criterion 26.** It names re-check, which does nothing until REQ-PIPE-164 is built.
+
+## Keith's answers (2026-10-14 morning, via AskUserQuestion)
+
+- Q1: A - REQ-GEN-207 is its own requirement, built first; today's quarters stay byte-identical.
+- Q2: A - Keith's real identity approves the fictional corrections; each reason says it is fictional.
+- Q3: A - REQ-GEN-203 builds Child Protection lead-ins and targeting.
+- Q4: A - TS-63's turn-off correction is dated before the gap.
+- Q5: A - a top-level `corrections:` list in contract/scripted_decisions.yaml.
+- Q6: A - two corrections: one confirmed carrying TS-57 to TS-61, one left pending.
+- Q7: A - TS-62 on Birth Registrations; every correction dated late in the history.
+- Q8: A - each correction edits one grown quarter's date per shape.
+- Q9: A - TS-61 stays parked to the end, a standing item.
+- Q10: A - TS-48 counts as demonstrated by TS-75; TS-49 and TS-51 not planted, Keith's reason recorded.
+- Q11: B (NOT the recommendation) - TS-53 gets a person's promote, and REQ-GEN-137 criterion 2 is amended to match.
+- Q12: A - TS-50 planted in full, in a grown quarter under a short Child Protection green-replacement era.
+- Q13: A - TS-54 rides TS-76.
+- Q14: A - build TS-47's following day green and record why its late file is held.
+- Q15: A - reword REQ-GEN-199 criterion 9 to what was observed (clients amber, carers green).
+- Q16: B (NOT the recommendation) - draft a period-composition view on the dashboard for TS-55; a new requirement to scope.
+- Q17: A - every cross-table cause gets the line.
+- Q18: A - row note, "Affects ..." on the contested banner, and one line on the collection card.
+- Q19: A - page and terminal; a small pipeline requirement drafted now for the terminal queue.
+- Q20: A - REQ-DASH-204 is Must.
+- Q21: A - after "reject both", readers are re-checked via a small pipeline follow-up.
+- Q22: A - the Child Protection Synthetic-mode picker lists a two-file arrival marked, and refuses when picked.
+- Q23: A - the period chooser also replaces the typed period in the settle flow's re-file (amends REQ-PIPE-193).
+- Q24: B (NOT the recommendation) - a scenario jump survives a reload, carried in the URL (REQ-DASH-208).
+- Q25: A - keep REQ-PIPE-163 criteria 35 and 36.
+- Q26: B (NOT the recommendation) - add the "Turning off after <date>" foreshadow marker to REQ-DASH-180.
+- Q27: A - amend REQ-DASH-175 ("Placed in <period>"), presented with REQ-PIPE-163.
+- Q28: A - a replayed correction's confirmation is stamped at the later of the history's end and the correction's own date (post-build-review #177).
+
+Answers are not sign-off: the draft is re-folded with these, the five
+non-recommended answers (Q11, Q16, Q24, Q26, and Q16's new view) get
+criteria drafted, and each requirement then goes to Keith for sign-off.

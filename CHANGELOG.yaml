@@ -109,6 +109,20 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-14"
+    summary: >
+      A fix so a rebuilt demo history dates its corrections the same way
+      every time.
+    changes:
+      - category: Fixed
+        items:
+          - headline: Demo corrections are dated by the history, not the rebuild
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              A calendar correction in the demo history used to show as
+              confirmed on whatever day the history was rebuilt. It now shows
+              as confirmed when the history ends, or on the correction's own
+              date if that is later, so every rebuild reads the same.
   - date: "2026-10-13"
     summary: >
       You can now say what each of two files for one table is. Also fixes
