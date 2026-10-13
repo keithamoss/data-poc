@@ -242,8 +242,9 @@ def arrival_run_id_of(dataset_id: str, supply_id: str) -> str:
 #: that sends a person to settle a pair fills this, and a test asserts no
 #: second copy exists. The TUI drives it (Keith, 2026-10-13), so it names
 #: a place, never a command to paste.
-SETTLE_AT = ("mothman > Filing decisions > {collection} > Supplies waiting on a decision "
-             "(listed first)")
+#: Every step a menu label as shown (Keith, 2026-10-13, #170) - the
+#: collection by its name, as the picker lists it.
+SETTLE_AT = "mothman > Filing decisions > {collection} > Supplies waiting on a decision"
 
 
 def where_to_settle(dataset_id: str) -> str:

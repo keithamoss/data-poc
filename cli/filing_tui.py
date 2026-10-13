@@ -782,7 +782,10 @@ def filing_menu() -> None:
     note warns about: at thirty datasets, one undifferentiated list is
     what people stop reading.
     """
-    collections = _collections()
+    # BY NAME, as every pointer into this menu names them (Keith,
+    # 2026-10-13, post-build-review #170); the id is what the code keeps.
+    by_name = {_collection_name(c): c for c in _collections()}
+    collections = list(by_name)
     # PENDING CORRECTIONS ABOVE THE CHOICE OF COLLECTION (REQ-PIPE-170
     # criterion 13): a correction is asset-wide, so it cannot wait inside one.
     # Its PARKED moves likewise (Keith, 2026-10-11, (p)).
@@ -803,11 +806,11 @@ def filing_menu() -> None:
         if picked and picked.startswith(_MENU_PARKED):
             parked_flow(parked)
             return
-        collection_id = picked
+        collection_id = by_name.get(picked)
     else:
-        collection_id = (collections[0] if len(collections) == 1 else
-                          common.select("Which collection?", collections,
-                                        flag_hint=_FLAG_HINT))
+        picked = (collections[0] if len(collections) == 1 else
+                  common.select("Which collection?", collections, flag_hint=_FLAG_HINT))
+        collection_id = by_name.get(picked)
     if collection_id is None:
         return
     while True:

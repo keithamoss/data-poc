@@ -387,3 +387,26 @@ class _NoRuns:
 class _DS:
     dataset_name = "Birth Registrations"
     collection_id = "civil-registration"
+
+
+class TestThePointerMatchesTheMenus:
+    """#170, Keith 2026-10-13: the menu shows collections by NAME, as the
+    settle pointer names them, and the pointer names a menu item that
+    exists."""
+
+    def test_the_collection_picker_shows_names_and_the_pointer_walks_it(self, monkeypatch):
+        from cli import filing_tui
+        from qa_tools.common import supply_files
+
+        asked = []
+
+        def select(message, choices, **k):
+            asked.append(list(choices))
+            return None
+        monkeypatch.setattr(filing_tui, "_pending_corrections", lambda: [])
+        monkeypatch.setattr(filing_tui, "_parked_moves", lambda: [])
+        monkeypatch.setattr(common, "select", select)
+        filing_tui.filing_menu()
+        pointer = supply_files.where_to_settle(DS).split(" > ")
+        assert pointer[2] in asked[0]
+        assert pointer[3] == filing_tui._MENU_QUEUE

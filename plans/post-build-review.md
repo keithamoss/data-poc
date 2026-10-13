@@ -8369,10 +8369,12 @@ twice. It deliberately did not re-find the `TypeError`.
       settled it and when). F7's file order is fixed by sorting in Python;
       NO FAILING TEST - this sandbox's C collation agrees with byte order,
       so the defect cannot be reproduced here.
-    - **Left, and why.** The pointer's "(listed first)" and collection
-      NAME are signed criterion 16 wording while the collection picker
-      lists ids - which side moves is Keith's call, asked rather than
-      decided. The shared decision messages' "supply/supplies" and the
+    - **The pointer (Keith, 2026-10-13):** the collection picker now lists
+      collections by NAME, as the pointer names them, and "(listed first)"
+      is dropped from the pointer and the criteria quoting it - it
+      described an order, not a label (tests/test_settle_tui.py
+      `TestThePointerMatchesTheMenus`, failing first).
+    - **Left, and why.** The shared decision messages' "supply/supplies" and the
       queue's date format belong to every decision, not to 193. The bare
       `--- <run id> ---` line before each run comes from the orchestrator,
       which every re-check prints.
