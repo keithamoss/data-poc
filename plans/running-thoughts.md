@@ -5288,4 +5288,16 @@ could never have computed it), and it belongs with batch 5's check work.
     overdue. His call: SCOPE IT FIRST with the scoper and architect, and
     decide the re-check question as part of that. REQ-DASH-204, REQ-PIPE-210,
     REQ-PIPE-211 and the still-failing shout (close-out R2) all hang on it.
+    **KEITH'S INPUT FOR THE SCOPER, same morning (in his words, condensed):**
+    "If the cross-table checks can't run against everything, then
+    notifications should shout." Concretely: if clients did not arrive
+    alongside notifications, notifications shouts - "we can't assert that
+    it's complete and actually green"; if clients is then overdue,
+    notifications shouts; if clients is red and not promoted, notifications
+    shouts. He is AGNOSTIC about whether those shouts differ and how detailed
+    the message is: "the fact is that there is no promoted clients", and the
+    reader can go to clients to see whether it is late, overdue, held or
+    anything else. So the shout's trigger is one rule (a cross-table check
+    could not run against everything it reads), and the detail lives on the
+    dependency's own page.
 
