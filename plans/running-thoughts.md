@@ -5167,3 +5167,5 @@ could never have computed it), and it belongs with batch 5's check work.
     underneath, so no new log action - while the terminal and the page
     still say "placed"; and placing a HELD PAIR moves both files into the
     period, still contested, to be settled there.
+
+    **Round 3, overnight 2026-10-13 to 14 (Keith: "draft up some requirements and chuck them to the scoper, the architect, and the UX reviewers, and then come back to me with a final proposed draft for questions"):** the scoper drafted REQ-DASH-204 (a reader dataset red from another table's contest), REQ-GEN-205 (TS-57..62 planted, a scripted confirm-correction with keeps) and REQ-GEN-206 (REQ-GEN-136/137 leftovers, #175); the three answers still outstanding on 163/179 were folded in; the whole batch with REQ-DASH-180 went to the architect, CLI UX and dashboard UX reviewers. Drafts in the session scratchpad, unsigned; the final draft and its questions are in plans/morning-reports.md #4.
