@@ -193,6 +193,16 @@ requirements:
   - 'A PAIR''S ARRIVAL IS LISTED MARKED AND REFUSED ON PICK (Keith, 2026-10-14, close-out Q22, option A, the CLI UX recommendation):
     visible and safe - criterion 13. REJECTED leaving it out of the picker (the arrival would vanish from a list a person
     uses to find it) and listing it unmarked (the refusal would come as a surprise).'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 7) - REQ-GEN-196 a new
+    decision (signed 2026-10-13, built; criterion 12 here). OLD: "(none - decision 1 stays as history; this appends a decision.
+    Decision 1 reads: "BIRTH REGISTRATIONS, NOT CHILD PROTECTION (2026-10-13, carried from REQ-PIPE-193): Child Protection''s
+    arrival patterns are exact filenames and cannot admit two files for one table (TS-34 and TS-42 record why), while birth_registrations_[^/]+\.csv
+    admits two today. No pattern is widened; TS-42 stays not injectable.")" NEW: "SUPERSEDED IN PART BY REQ-PIPE-202 (Keith,
+    2026-10-13; recorded <date built> by REQ-PIPE-202 criterion 12): decision 1''s "No pattern is widened; TS-42 stays not
+    injectable" no longer holds - cp-clients'' arrival pattern is `cp_clients(_[^/]+)?\.csv`, so TS-42 is planted by REQ-GEN-203.
+    Every other Child Protection pattern stays exact, so TS-34 stays not injectable, and this requirement''s own pairs stay
+    on Birth Registrations." WHY: a reader of REQ-GEN-196 must not take "no pattern is widened" as current. BUILT BEHAVIOUR:
+    TEXT ONLY - a decision, no criterion and no code.'
   open_questions: []
 - id: REQ-GEN-203
   title: Child Protection's generated history has a contested Client Register pair that a later file supersedes (TS-42) and
@@ -912,6 +922,121 @@ requirements:
     close-out Q27) to read: ''THE SYSTEM SHALL describe a placement and a re-check in words wherever a past decision is described
     - ''placed in <period>'', ''re-checked'' - recognising a placement as a person''s re-file whose from-period is empty (REQ-PIPE-163
     criterion 2), and SHALL NOT show the raw operation name or describe a placement as a re-file.'''
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 11) - REQ-GHUB-082 criterion
+    1 (signed 2026-09-28, built; criterion 13 here). OLD: "THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute,
+    de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw
+    excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period,
+    per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket''s own identity rather than from anything
+    stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED
+    2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120
+    criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse).
+    Keep, and the confirmation of a calendar correction''s moves, are filing decisions too, offered on the terminal route
+    only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing
+    decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29." NEW:
+    "THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not
+    supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised
+    on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision
+    applies to comes from the ticket''s own identity rather than from anything stated in the body. Every criterion below that
+    says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as
+    not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11
+    by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction''s
+    moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170
+    criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion
+    3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29. Placing a held supply (place) is a filing decision too, offered
+    on the terminal route only (criterion 3) - AMENDED <date built> by REQ-PIPE-163 criterion 13." WHY: place is a new filing
+    decision, terminal only, and the list is meant to be complete. BUILT BEHAVIOUR: BUILT CODE CHANGES (filing_decisions.OPERATIONS
+    gains place); built and tested by REQ-PIPE-163 criteria 1, 13 and 36.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 12) - REQ-GHUB-082 criterion
+    3 (signed 2026-09-28, built; criterion 14 here). OLD: "THE SYSTEM SHALL write an identical decision-log entry whichever
+    route raised the decision, and SHALL NOT give either route an operation the other lacks, except the confirmation of a
+    calendar correction''s moves and the keeps it records, which is offered on the terminal route only (REQ-PIPE-170 criterion
+    10), and settling a contested pair (choose-file), which is offered on the terminal route only (REQ-PIPE-193 criteria 1
+    and 16). AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11, and 2026-10-13 by REQ-PIPE-193 criterion 29.
+
+    " NEW: "THE SYSTEM SHALL write an identical decision-log entry whichever route raised the decision, and SHALL NOT give
+    either route an operation the other lacks, except the confirmation of a calendar correction''s moves and the keeps it
+    records, which is offered on the terminal route only (REQ-PIPE-170 criterion 10), settling a contested pair (choose-file),
+    which is offered on the terminal route only (REQ-PIPE-193 criteria 1 and 16), and placing a held supply (place), which
+    is offered on the terminal route only (REQ-PIPE-163 criteria 14 and 36). AMENDED 2026-10-11 by REQ-PIPE-170 criterion
+    11, 2026-10-13 by REQ-PIPE-193 criterion 29, and <date built> by REQ-PIPE-163 criterion 14.
+
+    " WHY: place is offered on the terminal route only, so it is a third exception to "neither route lacks an operation".
+    BUILT BEHAVIOUR: BUILT CODE CHANGES (the GitHub route replies and records nothing for place); built and tested by REQ-PIPE-163
+    criterion 36.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 18) - REQ-PIPE-074 criterion
+    1 (signed 2026-09-26, built; criterion 13 here). OLD: "THE SYSTEM SHALL record every filing decision - promote, reject,
+    demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep and
+    choose-file - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED
+    2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161
+    criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep
+    it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement,
+    with each file''s rejection, supersession or re-file its own entry naming it as the cause)." NEW: "THE SYSTEM SHALL record
+    every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede,
+    excuse lateness, withdraw excuse, keep, choose-file and place - as an entry in one append-only log, and SHALL NOT keep
+    a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion
+    22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming
+    a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193
+    criterion 29 (choose-file - one entry for a settlement, with each file''s rejection, supersession or re-file its own entry
+    naming it as the cause). And <date built> by REQ-PIPE-163 criterion 13 (place - recorded as a person''s re-file from no
+    period, REQ-PIPE-163 criterion 2, so it adds no decision-log action of its own)." WHY: place is a filing decision and
+    must be in the one log; the note says it is recorded as a re-file so nobody looks for a PLACE action. BUILT BEHAVIOUR:
+    BUILT CODE CHANGES only through REQ-PIPE-163 criterion 2 (no new action); tested there.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 19) - REQ-PIPE-074 criterion
+    9 (signed 2026-09-26, built; criterion 39 here). OLD: "THE SYSTEM SHALL record a re-file as ONE entry carrying a from-slot,
+    a to-slot and one reason, and SHALL NOT express it as a demotion followed by a promotion.
+
+    " NEW: "THE SYSTEM SHALL record a re-file as ONE entry carrying a from-slot, a to-slot and one reason, and SHALL NOT express
+    it as a demotion followed by a promotion; WHERE a re-file places a held supply - by the rule (REQ-PIPE-154 criterion 7,
+    REQ-PIPE-179 criterion 19) or by a person placing a supply with an open assignment-rule hold (REQ-PIPE-163 criterion 2)
+    - it SHALL carry no from-slot, and IF a person''s re-file names no from-slot for any other supply, THEN THE SYSTEM SHALL
+    refuse it, naming place; and WHERE a confirmed correction holds a supply (REQ-PIPE-170 criterion 8), its re-file SHALL
+    carry no to-slot. AMENDED <date built> by REQ-PIPE-163 criterion 39; the rule''s and the correction''s one-slot forms
+    were built 2026-10-06 and 2026-10-11 and are stated here for the first time." WHY: this is the criterion that states the
+    decision log''s re-file rule (qa_tools/common/decision_log.py), which REQ-PIPE-163 criterion 39 relaxes for a person''s
+    placement; it already omitted two one-slot forms the code accepts. BUILT BEHAVIOUR: BUILT CODE CHANGES for the person''s
+    placement only (decision_log.py''s REFILE check); built and tested by REQ-PIPE-163 criterion 39. The rule and correction
+    halves are TEXT CATCH-UP of built behaviour. NOTE: Widens what the text says is accepted, but no guarantee is lost: the
+    code already accepted the two one-slot forms, and a person''s re-file with no from-slot stays refused except for placing.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 20) - REQ-PIPE-076 criterion
+    7 (signed 2026-09-26, built; criterion 24 here). OLD: "WHERE any decision has been recorded against a supply by a person,
+    THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, re-file and an excuse of lateness
+    or its withdrawal, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede
+    undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19). AMENDED 2026-10-05 by REQ-PIPE-120
+    criterion 9 and REQ-PIPE-141 criterion 19, and 2026-10-11 by REQ-PIPE-161 criterion 19." NEW: "WHERE any decision has
+    been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT
+    un-supersede, re-file (a person''s placement of a held supply included, being recorded as a re-file - REQ-PIPE-163 criteria
+    2 and 24) and an excuse of lateness or its withdrawal, the person-decisions after which the gate may still promote automatically,
+    and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19).
+    AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19, 2026-10-11 by REQ-PIPE-161 criterion 19,
+    and <date built> by REQ-PIPE-163 criterion 24." WHY: a placement must not bar the gate, and it is recorded as a re-file,
+    which this criterion already exempts. BUILT BEHAVIOUR: PROBABLY NO CODE CHANGE: rejection.decided_by_a_person already
+    leaves REFILE out (read 2026-10-14), so a placement recorded as a re-file is exempt; REQ-PIPE-163 criterion 24 still needs
+    a test proving it.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 31) - REQ-PIPE-140 new
+    criterion 9 (signed 2026-10-04, built; criterion 31 here). OLD: "(none - criteria 1 to 8 are unchanged; this is a new
+    criterion 9)" NEW: "THE SYSTEM SHALL have every runner of an owed run - the terminal''s filing-decisions door, `mothman
+    supply decide --wait` (REQ-PIPE-163 criterion 25) and the processing pass - claim the run before running it, SHALL release
+    a claim when the process holding it ends, and SHALL have a runner that finds the run claimed skip it and leave it owed,
+    saying that it is being run elsewhere (REQ-PIPE-163 criterion 30). ADDED <date built> by REQ-PIPE-163 criterion 31: the
+    claim was built 2026-10-11 (post-build-review #136, recheck.run''s advisory lock) and is stated here for the first time."
+    WHY: the claim is built and no criterion states it. BUILT BEHAVIOUR: TEXT CATCH-UP for the door and the processing pass
+    (built 2026-10-11); the decide --wait runner is new and is REQ-PIPE-163 criterion 25''s to build.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 32) - REQ-PIPE-141 criterion
+    7 (signed 2026-10-04, built; criterion 25 here). OLD: "THE SYSTEM SHALL then run the re-filed supply''s QA against the
+    target period through REQ-PIPE-140, and SHALL apply the promotion gate to it exactly as for a first arrival, with the
+    amber and replacement settings in force at that instant (REQ-PIPE-122, REQ-PIPE-123), not those in force when it first
+    arrived or was first checked." NEW: "THE SYSTEM SHALL then run the re-filed supply''s QA against the target period through
+    REQ-PIPE-140, and SHALL apply the promotion gate to it exactly as for a first arrival, with the amber and replacement
+    settings in force at that instant (REQ-PIPE-122, REQ-PIPE-123), not those in force when it first arrived or was first
+    checked; WHERE the re-file is recorded through `mothman supply decide --wait`, that run SHALL happen in the foreground
+    straight after the decision commits, ending with REQ-PIPE-163 criterion 26''s shared outcome panel, and WHERE it is recorded
+    through decide without --wait, the run SHALL be left owed (REQ-PIPE-140 criterion 7). AMENDED <date built> by REQ-PIPE-163
+    criterion 25." WHY: decide --wait now covers re-file as well as place and re-check (Keith, round 3 Q1). BUILT BEHAVIOUR:
+    BUILT CODE CHANGES (decide gains --wait); built and tested by REQ-PIPE-163 criteria 25 to 30.'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-154 criterion 7 (signed 2026-10-06, built), which (folded
+    decision, 2026-10-10) here names: no change is needed, because REQ-PIPE-163''s own decision records that amendment as
+    SUPERSEDED by round 3 Q7: schedule-ended holds are never placed or rejected, which REQ-PIPE-163 criterion 22 states. Only
+    REQ-PIPE-179''s amendment to criterion 7 remains.'
   open_questions:
   - Criterion 26 names re-check, which REQ-PIPE-164 (not_started) builds and which depends on this requirement; the re-check
     half is vacuous until 164 lands. Left as is so 164's own criterion 17 keeps pointing at one panel.
@@ -1398,6 +1523,260 @@ requirements:
   - 'KEITH''S REAL IDENTITY APPROVES TS-63''s FICTIONAL CORRECTION (Keith, 2026-10-14, close-out Q2, option A): agreement_freeze''s
     approvers exclude the synthetic identities, and the demo goes through the same gate a real correction does; the reason
     says the correction is fictional. REJECTED extending REQ-PIPE-111''s synthetic exception. One answer for this and REQ-GEN-205.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 13) - REQ-PIPE-053 criterion
+    10 (signed 2026-09-22, built; criterion 32 here). OLD: "WHERE a calendar is an authored date list, THE SYSTEM SHALL warn
+    when fewer than a configured number of future slots remain for a dataset naming it." NEW: "WHERE a calendar is an authored
+    date list, THE SYSTEM SHALL warn when fewer than a configured number of future slots remain for a dataset naming it -
+    counting, for a dataset in a temporary turned-off gap, only the periods it owes once turned back on - and SHALL NOT warn
+    for a dataset turned off for good (REQ-PIPE-179 criterion 25). AMENDED <date built> by REQ-PIPE-179 criterion 32." WHY:
+    Keith''s T6: a supplier turned off for good must not keep the runway warning firing. BUILT BEHAVIOUR: BUILT CODE CHANGES
+    (runway.calendar_runway); built and tested by REQ-PIPE-179 criterion 25.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 14) - REQ-PIPE-053 criterion
+    15 (signed 2026-09-22, built; criterion 32 here). OLD: "WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for
+    that calendar, naming it, its last authored period and how many datasets name it, and SHALL NOT enumerate those datasets."
+    NEW: "WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for that calendar, naming it, its last authored period
+    and how many datasets name it, not counting a dataset turned off for good (REQ-PIPE-179 criterion 25), and SHALL NOT enumerate
+    those datasets. AMENDED <date built> by REQ-PIPE-179 criterion 32." WHY: the per-calendar count must agree with criterion
+    10. BUILT BEHAVIOUR: BUILT CODE CHANGES (the warning''s count); built and tested by REQ-PIPE-179 criterion 25.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 16) - REQ-PIPE-064 criterion
+    5 (signed 2026-09-24, built; criterion 24 here). OLD: "THE SYSTEM SHALL report a held supply as an event needing action,
+    distinguished from an informational one." NEW: "THE SYSTEM SHALL report a held supply as an event needing action, distinguished
+    from an informational one - except a supply held as turned off (REQ-PIPE-179 criterion 24), which SHALL be reported as
+    a quiet count and not as needing action. AMENDED <date built> by REQ-PIPE-179 criterion 24." WHY: Keith''s T3: a supplier
+    still sending files after being asked to stop must not raise a needs-action item each time. BUILT BEHAVIOUR: BUILT CODE
+    CHANGES (every held supply counts as needing action today); built and tested by REQ-PIPE-179 criteria 24 and 34. NOTE:
+    REMOVES A GUARANTEE, deliberately: a turned-off hold is no longer reported as needing action (Keith, T3, 2026-10-10).'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 17) - REQ-PIPE-064 criterion
+    8 (signed 2026-09-24, built; criterion 32 here). OLD: "THE SYSTEM SHALL count and report outstanding holds together, and
+    SHALL NOT present one element per held supply." NEW: "THE SYSTEM SHALL count and report outstanding holds together, by
+    label - turned off, schedule ended or the plain assignment-rule hold, each worked out from the configuration in force
+    when the count is made (REQ-PIPE-179 criterion 18) - and SHALL NOT present one element per held supply. AMENDED <date
+    built> by REQ-PIPE-179 criterion 32." WHY: Keith''s T4: a hold''s label is worked out from current configuration everywhere,
+    counts included. BUILT BEHAVIOUR: BUILT CODE CHANGES (supply_holds.Tally reads the recorded flag today); built and tested
+    by REQ-PIPE-179 criteria 18 and 26.'
+  - "PROPOSED AMENDMENT WORDING, for Keith's approval (delivery-scoper, 2026-10-14; batch amendment 21) - REQ-PIPE-098 criterion\
+    \ 1 (signed 2026-09-28, built; criterion 32 here). OLD: \"WHEN a period's schema is first created, THE SYSTEM SHALL INHERIT,\
+    \ for each dataset the schedule says does not participate in that period, that dataset's most recent promoted supply -\
+    \ creating in the new period's schema a view that resolves the dataset's logical name to it.\n\" NEW: \"WHEN a period's\
+    \ schema is first created, THE SYSTEM SHALL INHERIT, for each dataset the schedule says does not participate in that period\
+    \ or is turned off in it (REQ-PIPE-179 criterion 22), that dataset's most recent promoted supply - creating in the new\
+    \ period's schema a view that resolves the dataset's logical name to it.\n AMENDED <date built> by REQ-PIPE-179 criterion\
+    \ 32.\" WHY: Keith's Q-G: a turned-off period inherits the last promoted supply, so cross-table checks do not read the\
+    \ table as missing. BUILT BEHAVIOUR: BUILT CODE CHANGES (inheritance._does_not_participate via the one helper); built\
+    \ and tested by REQ-PIPE-179 criterion 22."
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 22) - REQ-PIPE-111 criterion
+    2 (signed 2026-10-07, built; criterion 30 here). OLD: "THE SYSTEM SHALL treat each dated calendar entry, each dated entry
+    of a dataset''s own authored dates, calendar version, participation version (including a collection''s default participation),
+    not_expected entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry, the
+    earliest claim-opening instant that EVERY dataset on its calendar would have for that period, participating or not, since
+    that instant also closes each one''s previous period; for a not_expected entry, that dataset''s claim-opening instant
+    for the period; for a version, the earlier of the start of its effective-from date and the earliest claim-opening instant
+    of any period it governs." NEW: "THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset''s own
+    authored dates, calendar version, participation version (including a collection''s default participation), not_expected
+    entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry, the earliest claim-opening
+    instant that EVERY dataset on its calendar would have for that period, participating or not - a dataset turned off in
+    that period (REQ-PIPE-179) counted only where it is the first period of its gap, whose claim-opening instant closes the
+    last owed slot before it (REQ-PIPE-179 criterion 14) - since that instant also closes each one''s previous period; for
+    a not_expected entry, that dataset''s claim-opening instant for the period; for a version, the earlier of the start of
+    its effective-from date and the earliest claim-opening instant of any period it governs; except that a participation version''s
+    effective_to and turned_off_reason are not frozen with their version but on their own, as REQ-PIPE-179 criteria 11 and
+    12 state. AMENDED <date built> by REQ-PIPE-179 criterion 30." WHY: effective_to has its own freeze point (Keith, Q-K),
+    and only the first period of a gap closes a slot, so only it can freeze a dated entry for a turned-off dataset. BUILT
+    BEHAVIOUR: BUILT CODE CHANGES (agreement_freeze); built and tested by REQ-PIPE-179 criteria 11 and 12.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 23) - REQ-PIPE-111 criterion
+    4 (signed 2026-10-07, built; criterion 30 here). OLD: "THE SYSTEM SHALL carry declared corrections in a `corrections:`
+    list on each OWNING ITEM, beside its versions - a calendar''s on that calendar; a dataset''s (its participation, due time,
+    participates, not_expected and own authored dates) on that dataset''s entry; a collection''s participation_defaults on
+    that collection''s entry (amended by REQ-PIPE-181); the zone''s on the timezone - each correction stating change_reference,
+    date, author, approver, reason, and a list of changes each naming the item, its old value and its new value; and SHALL
+    refuse a correction missing any of them." NEW: "THE SYSTEM SHALL carry declared corrections in a `corrections:` list on
+    each OWNING ITEM, beside its versions - a calendar''s on that calendar; a dataset''s (its participation, due time, participates,
+    not_expected, own authored dates, effective_to and turned_off_reason) on that dataset''s entry; a collection''s participation_defaults,
+    their effective_to and turned_off_reason included, on that collection''s entry (amended by REQ-PIPE-181); the zone''s
+    on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each
+    naming the item, its old value and its new value; and SHALL refuse a correction missing any of them. AMENDED <date built>
+    by REQ-PIPE-179 criterion 30." WHY: a correction must be able to carry the two new frozen items. BUILT BEHAVIOUR: BUILT
+    CODE CHANGES (agreement_freeze''s correction matching); built and tested by REQ-PIPE-179 criteria 11, 12 and 39 (TS-63''s
+    correction).'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 24) - REQ-PIPE-111 criterion
+    15 (signed 2026-10-07, built; criterion 30 here). OLD: "WHEN a change is refused, THE SYSTEM SHALL report it as the existing
+    configuration errors do (file, where, problem, fix), grouped by item, saying that nothing was committed, naming the item
+    in exactly the syntax a correction uses, printing a ready-to-paste correction entry with the item, old and new values
+    filled in and reason, approver and change_reference as placeholders, listing who may approve, naming the impact preview
+    command (REQ-PIPE-169), and - for a not_expected entry - naming mark as not supplied (REQ-PIPE-132) as the after-the-fact
+    route." NEW: "WHEN a change is refused, THE SYSTEM SHALL report it as the existing configuration errors do (file, where,
+    problem, fix), grouped by item, saying that nothing was committed, naming the item in exactly the syntax a correction
+    uses, printing a ready-to-paste correction entry with the item, old and new values filled in and reason, approver and
+    change_reference as placeholders, listing who may approve, naming the impact preview command (REQ-PIPE-169), and - for
+    a not_expected entry or an effective_to - naming mark as not supplied (REQ-PIPE-132) as the after-the-fact route. AMENDED
+    <date built> by REQ-PIPE-179 criterion 30." WHY: a missed period before a turn-off is recorded after the fact the same
+    way as one before a not_expected entry. BUILT BEHAVIOUR: BUILT CODE CHANGES (refusal text); NO OTHER CRITERION STATES
+    IT, so REQ-PIPE-179''s build needs its own test for this wording.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 25) - REQ-PIPE-113 criterion
+    2 (signed 2026-10-07, built; criterion 31 here). OLD: "THE SYSTEM SHALL take a slot''s expected time, days before, grace
+    allowance and claim-window override each as the value REQ-PIPE-181 resolves for that period''s own date, from the dataset
+    or its collection, and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181)."
+    NEW: "THE SYSTEM SHALL take a slot''s expected time, days before, grace allowance and claim-window override each as the
+    value REQ-PIPE-181 resolves for that period''s own date, from the dataset or its collection - through the one participation
+    resolution of REQ-PIPE-179 criterion 27, so that a collection inside its own turned-off gap supplies no value (REQ-PIPE-179
+    criterion 7) - and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181,
+    and <date built> by REQ-PIPE-179 criterion 31)." WHY: inside a collection''s gap the collection supplies no values (Keith,
+    T1), so a back-on dataset''s slot takes only its own. BUILT BEHAVIOUR: BUILT CODE CHANGES (slots via the one helper);
+    built and tested by REQ-PIPE-179 criteria 7 and 27.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 26) - REQ-PIPE-113 criterion
+    4 (signed 2026-10-07, built; criterion 31 here). OLD: "THE SYSTEM SHALL compute each slot''s closing instant (REQ-PIPE-131)
+    from the next calendar period''s claim-opening instant as that next period''s own inputs give it, so that a version change
+    takes effect at its own boundary and nowhere before it." NEW: "THE SYSTEM SHALL compute each slot''s closing instant (REQ-PIPE-131)
+    from the next calendar period''s claim-opening instant as that next period''s own inputs give it, so that a version change
+    takes effect at its own boundary and nowhere before it; WHERE the dataset is turned off in that next period, from the
+    claim-opening instant it would have had, each value resolved as if every effective_to on or before its date were absent
+    (REQ-PIPE-179 criterion 14). AMENDED <date built> by REQ-PIPE-179 criterion 31." WHY: a period inside a gap has no slot,
+    so without this the last owed slot before a gap would have no closing instant. BUILT BEHAVIOUR: BUILT CODE CHANGES (slots.py
+    closing instant); built and tested by REQ-PIPE-179 criterion 14.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 28) - REQ-PIPE-131 criterion
+    1 (signed 2026-10-04, built; criterion 31 here). OLD: "THE SYSTEM SHALL treat a dataset''s slot as OPEN from its claim-opening
+    instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the
+    dataset participates in that next period - and as CLOSED from then on." NEW: "THE SYSTEM SHALL treat a dataset''s slot
+    as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF
+    ITS CALENDAR - whether or not the dataset participates in that next period or is turned off in it (REQ-PIPE-179) - and
+    as CLOSED from then on. AMENDED <date built> by REQ-PIPE-179 criterion 31." WHY: the same closing rule applies across
+    a turned-off gap as across a period not participated in. BUILT BEHAVIOUR: BUILT CODE CHANGES with criterion 2 below; built
+    and tested by REQ-PIPE-179 criterion 14.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 29) - REQ-PIPE-131 criterion
+    2 (signed 2026-10-04, built; criterion 31 here). OLD: "THE SYSTEM SHALL compute that next claim-opening instant from the
+    next calendar period''s date with each value as REQ-PIPE-181 resolves it on that next period''s date (amended by REQ-PIPE-181)."
+    NEW: "THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period''s date with each value as
+    REQ-PIPE-181 resolves it on that next period''s date (amended by REQ-PIPE-181) - or, WHERE the dataset is turned off in
+    that next period, as if every effective_to on or before that date were absent (REQ-PIPE-179 criterion 14; AMENDED <date
+    built> by REQ-PIPE-179 criterion 31)." WHY: inside a gap nothing resolves (the collection supplies no values), so the
+    closing instant is computed as if the turn-off were absent. BUILT BEHAVIOUR: BUILT CODE CHANGES (slots.py); built and
+    tested by REQ-PIPE-179 criterion 14.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 30) - REQ-PIPE-134 criterion
+    1 (signed 2026-10-04, built; criterion 31 here). OLD: "THE SYSTEM SHALL require, for every dataset and every pair of consecutive
+    periods of that dataset''s calendar - whether or not the dataset participates in either - that the claim-opening instant
+    the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset
+    would have for the earlier one." NEW: "THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods
+    of that dataset''s calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset
+    would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have
+    for the earlier one; WHERE either period of a pair lies inside a turned-off gap (REQ-PIPE-179), THE SYSTEM SHALL instead
+    check the last owed period before the gap against the closing instant REQ-PIPE-179 criterion 14 gives it and, WHERE the
+    gap is temporary, require the first owed slot after it to open strictly after the last owed slot before it closes, and
+    SHALL NOT check any pair both of whose periods lie inside the gap. AMENDED <date built> by REQ-PIPE-179 criterion 31."
+    WHY: inside a gap a period has no resolved values to check, and the overlap that matters is between the owed slots either
+    side of it. BUILT BEHAVIOUR: BUILT CODE CHANGES (period_overlap / validate_schedule); NO OTHER CRITERION STATES IT, so
+    REQ-PIPE-179''s build needs its own tests for all three clauses.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 33) - REQ-PIPE-141 criterion
+    12 (signed 2026-10-04, built; criterion 20 here). OLD: "IF a person re-files a supply into a period where its dataset''s
+    slot is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name
+    un-inherit as the step that must come first." NEW: "IF a person re-files a supply into a period where its dataset''s slot
+    is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name un-inherit
+    as the step that must come first - except WHERE that period lies inside a turned-off gap (REQ-PIPE-179), when REQ-PIPE-179
+    criterion 20''s refusal SHALL be given in its place. AMENDED <date built> by REQ-PIPE-179 criterion 20." WHY: a gap period
+    inherits (REQ-PIPE-179 criterion 22), so this criterion would advise un-inherit, which does not make a gap period owed
+    - the same narrowing REQ-PIPE-163 criterion 8 makes for a placement. BUILT BEHAVIOUR: BUILT CODE CHANGES (refiling.plan''s
+    refusal); built and tested by REQ-PIPE-179 criterion 20. NOTE: NOT PROMISED BY THE DRAFT - found by reading criterion
+    12 against REQ-PIPE-179 criteria 20 and 22.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 34) - REQ-PIPE-154 criterion
+    1 (signed 2026-10-06, built; criterion 32 here). OLD: "IF a supply arrives after the last slot of its dataset''s authored
+    calendar has closed, THEN THE SYSTEM SHALL hold it for a person under REQ-PIPE-064 with a reason stating that the dataset''s
+    delivery schedule has ended and naming that dataset''s own last authored period." NEW: "IF a supply arrives after the
+    last slot of its dataset''s authored calendar has closed, THEN THE SYSTEM SHALL hold it for a person under REQ-PIPE-064
+    with a reason stating that the dataset''s delivery schedule has ended and naming that dataset''s own last authored period
+    - unless the dataset is turned off for the period whose slot would then be current, when the hold is labelled turned off
+    instead (REQ-PIPE-179 criterion 17). AMENDED <date built> by REQ-PIPE-179 criterion 32." WHY: turned off outranks schedule
+    ended (Keith confirmed, 2026-10-13, set 2 Q7(a)): "add the next dates" would not make a turned-off dataset owe anything.
+    BUILT BEHAVIOUR: BUILT CODE CHANGES (assignment / supply_holds labelling); built and tested by REQ-PIPE-179 criterion
+    17.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 35) - REQ-PIPE-154 criterion
+    2 (signed 2026-10-06, built; criterion 32 here). OLD: "THE SYSTEM SHALL record whether a hold was raised because the schedule
+    ended as a structured field of the hold, and SHALL NOT require any reader to parse the hold''s prose to tell." NEW: "THE
+    SYSTEM SHALL record whether a hold was raised because the schedule ended as a structured field of the hold, kept as history,
+    and SHALL NOT require any reader to parse the hold''s prose to tell; every reader that labels, re-files or counts a hold
+    SHALL take its label from the configuration in force when it reads (REQ-PIPE-179 criterion 18), not from that field. AMENDED
+    <date built> by REQ-PIPE-179 criterion 32." WHY: Keith''s T4: the recorded flag is history; the label shown, re-filed
+    on and counted is worked out from current configuration. BUILT BEHAVIOUR: BUILT CODE CHANGES (readers of the recorded
+    flag); built and tested by REQ-PIPE-179 criterion 18.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 36) - REQ-PIPE-154 criterion
+    6 (signed 2026-10-06, built; criterion 32 here). OLD: "WHEN a processing pass holds one or more supplies because their
+    dataset''s schedule has ended, THE SYSTEM SHALL state in that pass''s own summary how many datasets and how many supplies
+    were held for that reason, separately from any other holds." NEW: "WHEN a processing pass holds one or more supplies because
+    their dataset''s schedule has ended, THE SYSTEM SHALL state in that pass''s own summary how many datasets and how many
+    supplies were held for that reason - the label worked out as REQ-PIPE-179 criterion 18 says - separately from any other
+    holds, turned-off holds included (REQ-PIPE-179 criterion 26). AMENDED <date built> by REQ-PIPE-179 criterion 32." WHY:
+    the pass counts by the worked-out label, and turned-off holds are their own count. BUILT BEHAVIOUR: BUILT CODE CHANGES
+    (the pass summary); built and tested by REQ-PIPE-179 criteria 18 and 26.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 37) - REQ-PIPE-154 criterion
+    7 (signed 2026-10-06, built; criterion 32 here). OLD: "WHEN dates are added to a dataset''s calendar that cover the receipt
+    instant of a supply held because its schedule ended, THE SYSTEM SHALL re-file that supply by the filing rule on the next
+    processing pass, in receipt order with every other supply so held, and SHALL resolve its hold naming the filing that replaced
+    it." NEW: "WHEN configuration later gives an outstanding assignment-rule hold''s receipt instant an open owed slot - dates
+    added to a dataset''s calendar covering a supply held because its schedule ended, or any other change, whatever the hold''s
+    label (REQ-PIPE-179 criterion 19) - THE SYSTEM SHALL re-file that supply by the filing rule on the next processing pass,
+    in receipt order with every other supply so held, and SHALL resolve its hold naming the filing that replaced it. AMENDED
+    <date built> by REQ-PIPE-179 criterion 32." WHY: Keith, round 3 Q8 and set 2 Q6: one re-filer for every hold configuration
+    later covers, not a second one for turned-off holds. BUILT BEHAVIOUR: BUILT CODE CHANGES (schedule_ended.refile_covered
+    widens to every label, including the eight Case Workers holds); built and tested by REQ-PIPE-179 criterion 19. NOTE: WIDENS
+    a built behaviour: plain assignment-rule holds, including holds a correction or a settlement raised, will start being
+    filed by the rule when configuration covers them.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 38) - REQ-PIPE-170 criterion
+    5 (signed 2026-10-07, built; criterion 36 here). OLD: "THE SYSTEM SHALL let the asset manager exclude individual supplies
+    and then confirm every remaining move, across every dataset and agency the correction touches, in one action." NEW: "THE
+    SYSTEM SHALL let the asset manager exclude individual supplies and then confirm every remaining move, across every dataset
+    and agency the correction touches, in one action; IF the corrected configuration makes a supply''s current period one
+    its dataset owes nothing in - by participation, not_expected or a turn-off - THEN THE SYSTEM SHALL NOT offer to exclude
+    (keep) that supply, and SHALL propose moving it to the owed slot the filing rule gives it, or holding it, saying that
+    the period no longer owes a supply. AMENDED <date built> by REQ-PIPE-179 criterion 36." WHY: Keith, round 3 Q9: a supply
+    kept in a period with no slot, which inherits and accepts no placement, would have three rules disagreeing about one period.
+    BUILT BEHAVIOUR: BUILT CODE CHANGES (correction_trial / confirm-correction); REQ-PIPE-179 criterion 36 is the only statement,
+    so its build needs a test of its own. NOTE: REMOVES A GUARANTEE, deliberately: the asset manager can no longer keep such
+    a supply where it is (Keith, round 3 Q9).'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 39) - REQ-PIPE-170 criterion
+    26 (signed 2026-10-07, built; criterion 37 here). OLD: "WHEN a processing pass finds a parked move whose blocker has cleared,
+    THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who confirmed it, before any arrival in that
+    pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173)." NEW: "WHEN a processing pass finds
+    a parked move whose blocker has cleared, THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who
+    confirmed it, before any arrival in that pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173),
+    nor WHERE the confirmed period now lies inside a turned-off gap, when the move stays parked and says so (REQ-PIPE-179
+    criterion 37). AMENDED <date built> by REQ-PIPE-179 criterion 37." WHY: criterion 26 says a cleared parked move SHALL
+    be carried out; REQ-PIPE-179 criterion 37 says one into a turned-off gap stays parked - the two contradict unless 26 is
+    amended. BUILT BEHAVIOUR: BUILT CODE CHANGES (the processing pass''s parked-move step); built and tested by REQ-PIPE-179
+    criteria 20 and 37. NOTE: NOT PROMISED BY THE DRAFT - found by reading criterion 26 against REQ-PIPE-179 criterion 37.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 40) - REQ-PIPE-170 criterion
+    28 (signed 2026-10-07, built; criterion 36 here). OLD: "WHILE a move is parked, THE SYSTEM SHALL let the data asset''s
+    manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman
+    supply confirm-correction --keep on the confirmed reference and from the filing menu." NEW: "WHILE a move is parked, THE
+    SYSTEM SHALL let the data asset''s manager keep the supply where it is instead, with a reason, recorded as a keep against
+    that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu
+    - except WHERE the supply''s current period is one its dataset now owes nothing in, when keep SHALL NOT be offered (criterion
+    5). AMENDED <date built> by REQ-PIPE-179 criterion 36." WHY: the scoper''s reading: keep on a parked move is the same
+    act as keep at confirmation, so the same exception applies. BUILT BEHAVIOUR: BUILT CODE CHANGES (confirm-correction --keep
+    on a parked move); NOT IN REQ-PIPE-179 criterion 36 AS WORDED, which says only "keep is not offered for that supply" -
+    needs a test. NOTE: PROPOSED BY THE SCOPER, not promised by the draft in words - an extension of criterion 36 to the second
+    place keep is offered.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 41) - REQ-PIPE-173 criterion
+    12 (signed 2026-10-07, built; criterion 38 here). OLD: "THE SYSTEM SHALL treat a judged period that a not_expected entry
+    now declares owed nothing as changed, so it refuses the dataset unless a declared correction of that entry accounts for
+    it (added 2026-10-11, Keith''s answer (i))." NEW: "THE SYSTEM SHALL treat a judged period that a not_expected entry, or
+    an effective_to added or moved (REQ-PIPE-179), now declares owed nothing as changed, so it refuses the dataset unless
+    a declared correction of that entry or that effective_to accounts for it (added 2026-10-11, Keith''s answer (i); AMENDED
+    <date built> by REQ-PIPE-179 criterion 38)." WHY: a turn-off removes a judged slot exactly as a not_expected entry does,
+    and the backstop must see either. BUILT BEHAVIOUR: POSSIBLY BUILT CODE CHANGE: whether agreement_drift already flags a
+    vanished slot is REQ-PIPE-179''s open question; test first either way.'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-083 criterion 21 (signed 2026-09-28, built), which criterion
+    24 here names: no change is needed, because its needs-action ticket policy is per SLOT, and a held supply has no slot
+    and so no ticket (REQ-PIPE-083''s own decision, "A HELD SUPPLY HAS NO SLOT AND SO HAS NO TICKET") - so a turned-off hold
+    never raises one. Criterion 24''s "and REQ-PIPE-083 criterion 21" can be dropped.'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-053 criterion 4 (signed 2026-09-22, built), which criterion
+    32 here names: no change is needed, because it says only that such a supply is held, and already gives its labelling to
+    REQ-PIPE-154, whose criterion 1 is amended. A turned-off supply is still held. Criterion 32''s "criteria 4, 10 and 15"
+    can read "criteria 10 and 15".'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-170 its unmet entry for criterion 23 (signed 2026-10-07,
+    built), which criterion 40 here names: no change is needed, because the live register already reads "TS-57 to TS-62 ...
+    TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13)" in both criterion 23 and its unmet entry. Criterion 40 is
+    already met in the register and can be dropped.'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-163 criterion 17 (UNSIGNED, not_started), which (round 3
+    decision) here names: no change is needed, because REQ-PIPE-179''s decision "163 NO LONGER AMENDED HERE" records that
+    163 is written turn-off-aware (Keith, set 1 Q1). REQ-PIPE-163 is unsigned in any case.'
 - id: REQ-DASH-180
   title: 'The dashboard shows a turned-off dataset honestly: its real verdict, a marker, and nothing owed gone quiet'
   date_written: '2026-10-10'
@@ -1594,6 +1973,32 @@ requirements:
     fills exactly the stretch criteria 4 and 25 leave unmarked, and stops the marker appearing years early on a past date
     simply because the configuration now holds an effective_to; the dataset stays in its rollups throughout, being still owed.
     REJECTED (the recommendation) leaving it out.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 1) - REQ-DASH-155 criterion
+    1 (signed 2026-10-06, built; criterion 22 here). OLD: "WHERE the dashboard shows the exhausted-schedule notice, THE SYSTEM
+    SHALL state how many supplies are held because a schedule ended and the receipt date of the earliest of them." NEW: "WHERE
+    the dashboard shows the exhausted-schedule notice, THE SYSTEM SHALL state how many supplies are held because a schedule
+    ended - each hold''s label worked out from the configuration in force on the in-place-on date (REQ-PIPE-179 criterion
+    18), so that a supply held as turned off is not counted - and the receipt date of the earliest of them. AMENDED <date
+    built> by REQ-DASH-180 criterion 22." WHY: the backlog counts only holds that adding dates would file. BUILT BEHAVIOUR:
+    BUILT CODE CHANGES (the notice''s backlog count reads the recorded flag today); NOT STATED ELSEWHERE IN REQ-DASH-180,
+    so its build needs a test of its own.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 15) - REQ-PIPE-053 criterion
+    19 (signed 2026-09-22, built; criterion 22 here). OLD: "THE SYSTEM SHALL evaluate the exhausted-schedule condition against
+    the in-place-on date currently selected, and SHALL NOT report a schedule as exhausted while viewing a date its calendar
+    covers." NEW: "THE SYSTEM SHALL evaluate the exhausted-schedule condition against the in-place-on date currently selected,
+    and SHALL NOT report a schedule as exhausted while viewing a date its calendar covers, nor report a dataset as exhausted
+    on a date it is turned off (REQ-PIPE-179). AMENDED <date built> by REQ-DASH-180 criterion 22." WHY: a turned-off dataset
+    owes nothing, so a run-out schedule is not its problem; criteria 16 to 18 render and count the condition this criterion
+    evaluates, so they need no change of their own. BUILT BEHAVIOUR: BUILT CODE CHANGES (the template''s exhausted condition
+    and dataset_status.py); built and tested by REQ-DASH-180 criterion 17.'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-053 criteria 16, 17 and 18 (signed 2026-09-22, built), which
+    criterion 22 here names: no change is needed, because they render, keep out of the rollup and count the exhausted condition,
+    which criterion 19 evaluates; amending 19 alone carries all three.'
+  - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-DASH-155 criterion 3 (signed 2026-10-06, built), which criterion
+    22 here names: no change is needed, because it is worded on the same test as criterion 1 ("no supply is held because a
+    schedule ended"), so amending 1''s count carries it. One corner is left for the architect: a temporary gap running past
+    the calendar''s last date could leave turned-off holds received after the schedule ended, making "nothing has arrived
+    since the schedule ended" untrue.'
 - id: REQ-DASH-208
   title: A scenario link from the test-scenarios panel lands with what the scenario is about in view
   date_written: '2026-10-14'
@@ -2174,6 +2579,16 @@ requirements:
     present; at thirty datasets the absence of one is what a reader most needs to see.'
   - 'ITS OWN REQUIREMENT, DASH (Keith: ''a new requirement to scope''; docs/components.md: rendering is DASH, the holdings
     PIPE''s and already built).'
+  - "PROPOSED AMENDMENT WORDING, for Keith's approval (delivery-scoper, 2026-10-14; batch amendment 3) - REQ-GEN-045 criterion\
+    \ 1 (signed 2026-09-22, built; criterion 7 here). OLD: \"THE SYSTEM SHALL generate a map naming, for each injected scenario,\
+    \ the dataset, the supplies it produced, the period and the in-place-on date at which that scenario can be seen.\n\" NEW:\
+    \ \"THE SYSTEM SHALL generate a map naming, for each injected scenario, the dataset - or, for a scenario about a whole\
+    \ period of a collection (REQ-DASH-209 criterion 7), the collection - the supplies it produced, the period and the in-place-on\
+    \ date at which that scenario can be seen.\n AMENDED <date built> by REQ-DASH-209 criterion 7.\" WHY: criterion 1 requires\
+    \ every coordinate to name a dataset; a coordinate naming only a collection and a period would break it. BUILT BEHAVIOUR:\
+    \ BUILT CODE CHANGES if needed (the scenario map's coordinate); built and tested by REQ-DASH-209 criterion 7. NOTE: CONTINGENT:\
+    \ needed only if TS-55's coordinate names no dataset. If it keeps naming the substituted dataset and adds the collection-and-period\
+    \ view as its target, no change is needed. REQ-DASH-209 leaves this to the architect."
   open_questions:
   - '1. WHERE THE VIEW IS REACHED FROM. Recommended (A): its own address per collection and period, linked from each period
     row of a dataset''s supply history and from the standing-in drill-down (criterion 6). (B) a panel on the collection page
@@ -2306,6 +2721,21 @@ requirements:
     into or out of a period, and WHEN a settled supply is promoted, THE SYSTEM SHALL owe the knock-on through REQ-PIPE-121''s
     one handler (knock_on), which selects the checks by reevaluation.reading_checks() and the datasets by reevaluation.counts_toward(),
     and SHALL NOT add a settlement-specific path or restate either rule.'''
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 27) - REQ-PIPE-121 criterion
+    1 (signed 2026-10-04, built; criterion 1 here). OLD: "WHEN a table arrives in or leaves a period schema - promoted by
+    a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period
+    only, every cross-table check that declares it reads the moved table, whether it belongs to a supply WAITING in that period
+    or one PROMOTED there, and SHALL NOT re-evaluate any check that does not read a moved table." NEW: "WHEN a table arrives
+    in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - or
+    a contested pair of a table in that period is settled, whatever the outcome (REQ-PIPE-211), THE SYSTEM SHALL re-evaluate,
+    within that period only, every cross-table check that declares it reads the moved or settled table, whether it belongs
+    to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that reads neither. AMENDED
+    <date built> by REQ-PIPE-211 criterion 1." WHY: a "reject both" or a chosen file left waiting moves no table into or out
+    of the period schema, so as worded criterion 1 does not trigger - and its last clause forbids re-evaluating a check that
+    reads no moved table. BUILT BEHAVIOUR: BUILT CODE CHANGES with REQ-PIPE-193 criterion 23 (knock_on gains a trigger); built
+    and tested by REQ-PIPE-211. NOTE: CONTINGENT: REQ-PIPE-211''s own decision proposes amending 193 criterion 23 and NOT
+    121, and leaves 121 criterion 1 as a check for the architect. Read 2026-10-14, the scoper thinks 121 criterion 1 does
+    need it, for the reason given; drafted so Keith can approve exact words if the architect agrees.'
   open_questions:
   - '1. A PAIR ENDED BY A LATER FILE. When a later file supersedes the pair but is not promoted (it waits, or is red), the
     readers keep their ''contested'' result until it is promoted. Recommended (A): include it - the contest ending by supersession

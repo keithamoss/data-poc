@@ -84,7 +84,7 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
 
 **REQ-PIPE-211 (NEW, should, unreviewed): settling a pair re-checks its readers, whatever the outcome.**
 - **Story:** after "reject both" (and any other settlement), the readers' contested results are re-evaluated through the one knock-on handler. Otherwise they stay red for good.
-- It amends REQ-PIPE-193 criterion 23 (amendment 8 below).
+- It amends REQ-PIPE-193 criterion 23 (amendment 43 below), and possibly REQ-PIPE-121 criterion 1 (amendment 27).
 - **Open:**
   - whether a pair ended by a later, unpromoted file counts too;
   - whether the terminal runs the re-check while you wait;
@@ -98,8 +98,8 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
 **REQ-PIPE-163 (must): placing a held supply.**
 - **What changed:**
   - Q25: criteria 35 and 36 are kept.
-  - Q23: criterion 16's period chooser now also picks a settlement's re-file target, and criterion 42 amends REQ-PIPE-193 criterion 19 (amendment 7 below).
-  - Q27: the REQ-DASH-175 amendment, "Placed in <period>", is presented with this requirement (amendment 9 below; REQ-DASH-175 is unsigned).
+  - Q23: criterion 16's period chooser now also picks a settlement's re-file target, and criterion 42 amends REQ-PIPE-193 criterion 19 (amendment 42 below).
+  - Q27: the REQ-DASH-175 amendment, "Placed in <period>", is presented with this requirement (amendment 2 below; REQ-DASH-175 is unsigned).
 - **Open, a note rather than a question:** criterion 26 names re-check, which does nothing until REQ-PIPE-164 is built.
 
 **REQ-PIPE-179 (must): turning a dataset off.**
@@ -116,7 +116,7 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
 - **What changed (Q24, new wording):**
   - The jump now survives a reload. The scenario id rides in a lowercase `scenario` query parameter, and loading that URL repeats the jump.
   - It is dropped when you navigate away, and cleared quietly if it names nothing on the page (criteria 5, 8 and 9).
-  - The REQ-GEN-199 amendment now asserts the text is in view again after a cold reload, and criterion 37 is amended too (amendments 5 and 6 below).
+  - The REQ-GEN-199 amendment now asserts the text is in view again after a cold reload, and criterion 37 is amended too (amendments 9 and 10 below).
 - **Open:** whether the chips become real links (question 10 below).
 
 **REQ-DASH-209 (NEW, should, unreviewed; Q16): the period-composition view.**
@@ -152,61 +152,401 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
   - whether REQ-GEN-136 criterion 4 needs rewording for TS-75's shape (question 13 below);
   - a build-time check on #175's 8 September supply.
 
-## Proposed amendments to other requirements, exact wording
+## Proposed amendments to signed requirements (complete)
 
-Each is also recorded on the requirement that carries it as a "PROPOSED AMENDMENT WORDING" decision. The old text is copied from the live requirements.yaml.
+**43 amendments to 24 requirements**, every one with exact wording: the 9 drafted on the morning of 2026-10-14, plus 34 drafted since. One target, REQ-DASH-175, is unsigned. Each is also recorded on the requirement that carries it, as a "PROPOSED AMENDMENT WORDING" decision. Every OLD text is copied from the live requirements.yaml. `<date built>` is the one placeholder: it is the date the amendment lands, written the way the register already dates its amendments.
 
-**1. REQ-GEN-137 criterion 2** (signed 2026-10-04; close-out Q11 (option B, not the recommendation); carried by REQ-GEN-206 criterion 14)
+Four kinds of entry need you more than the rest:
 
-- Old: "THE SYSTEM SHALL plant Keith's worked un-supersede case: a good file superseded by a bad later one; a person rejects the bad one and un-supersedes the good one, which is re-checked and promoted by the gate (REQ-PIPE-120)."
-- New: "THE SYSTEM SHALL plant Keith's worked un-supersede case: a good file superseded by a bad later one; a person rejects the bad one and un-supersedes the good one, which is re-checked (REQ-PIPE-120), left waiting by the gate, and then promoted by a person."
+- **Not promised by the draft.** Found by reading the targets: REQ-PIPE-141 criterion 12 (amendment 33) and REQ-PIPE-170 criterion 26 (amendment 39). Without them, each contradicts REQ-PIPE-179. REQ-PIPE-170 criterion 28 (amendment 40) stretches REQ-PIPE-179 criterion 36 to the second place keep is offered.
 
-**2. REQ-GEN-199 criterion 9** (signed 2026-10-13; close-out Q15; carried by REQ-GEN-206 criterion 15)
+- **Contingent.** REQ-PIPE-121 criterion 1 (amendment 27) and REQ-GEN-045 criterion 1 (amendment 3) were "check at build" items for the architect. Both are drafted so you can approve exact words if they turn out to be needed.
 
-- Old: "THE SYSTEM SHALL record in TS-76's register entry, as part of what TS-76 shows, the state cp-clients and cp-carers are left in for TS-76's quarter once the substitution is removed - promoted and red, permanently, as the delivery-architect found (H1) - and what cp-clients' and cp-carers' pages read before the substitution, while it stands and after it ends."
-- New: "THE SYSTEM SHALL record in TS-76's register entry, as part of what TS-76 shows, the state cp-clients and cp-carers are left in for TS-76's quarter once the substitution is removed - cp-clients promoted amber and cp-carers green, as the first bootstrapped build showed (post-build-review #174), the cross-table checks reading cp_placements being filed under cp-placements and run for neither in a quarter with no placements supply - and what cp-clients' and cp-carers' pages read before the substitution, while it stands and after it ends."
+- **Removes a guarantee on purpose.** Each is marked below and follows an answer you already gave.
 
-**3. REQ-GEN-136 criterion 5** (signed 2026-10-04; close-out Q10; carried by REQ-GEN-206 criterion 8)
+- **No change needed.** Seven promises turned out to need nothing once the target was read. They are listed at the end.
 
-- Old: "THE SYSTEM SHALL plant a correction whose re-check after its partner's promotion still fails, producing the decision log's large shout (REQ-PIPE-121)."
-- New: "THE SYSTEM SHALL register, and SHALL NOT plant, TS-49 - a correction whose re-check after its partner's promotion still fails, producing the decision log's large shout (REQ-PIPE-121) - which Keith left unplanted (2026-10-11, confirmed 2026-10-14) because it needs named red cross-table targets and referential closure across six tables."
+### REQ-DASH-155 (signed 2026-10-06, built): The exhausted-schedule notice says how many supplies are waiting and since when
 
-**4. REQ-GEN-136 criterion 9** (signed 2026-10-04; close-out Q10; carried by REQ-GEN-206 criterion 8)
+**1. REQ-DASH-155 criterion 1**. Carried by REQ-DASH-180 criterion 22.
 
-- Old: "THE SYSTEM SHALL plant a promoted supply whose cross-table result goes red when a sibling arrives later (REQ-DASH-126)."
-- New: "THE SYSTEM SHALL register, and SHALL NOT plant, TS-51 - a promoted supply whose cross-table result goes red when a sibling arrives later (REQ-DASH-126) - which Keith left unplanted (2026-10-11, confirmed 2026-10-14) because it needs named red cross-table targets and referential closure across six tables."
+- Old: "WHERE the dashboard shows the exhausted-schedule notice, THE SYSTEM SHALL state how many supplies are held because a schedule ended and the receipt date of the earliest of them."
+- New: "WHERE the dashboard shows the exhausted-schedule notice, THE SYSTEM SHALL state how many supplies are held because a schedule ended - each hold's label worked out from the configuration in force on the in-place-on date (REQ-PIPE-179 criterion 18), so that a supply held as turned off is not counted - and the receipt date of the earliest of them. AMENDED <date built> by REQ-DASH-180 criterion 22."
+- Why: the backlog counts only holds that adding dates would file.
+- Built behaviour: BUILT CODE CHANGES (the notice's backlog count reads the recorded flag today); NOT STATED ELSEWHERE IN REQ-DASH-180, so its build needs a test of its own.
 
-**5. REQ-GEN-199 criterion 36** (signed 2026-10-13; close-out Q24 (option B, not the recommendation); carried by REQ-DASH-208 criterion 6)
+### REQ-DASH-175 (UNSIGNED, not_started): The dashboard says when a supply was placed by hand, or re-checked after we fixed a check
 
-- Old: "THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each of this requirement's chips in the test-scenarios panel and asserts that the element holding the text its register Expect quotes is inside the initial viewport without scrolling, then cold-reloads that URL and asserts the same text with zero console errors."
-- New: "THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each of this requirement's chips in the test-scenarios panel and asserts that the element holding the text its register Expect quotes is inside the viewport once the scenario jump (REQ-DASH-208) has brought it there, then cold-reloads that URL and asserts the same text inside the viewport again, with zero console errors."
-
-**6. REQ-GEN-199 criterion 37** (signed 2026-10-13; close-out Q24; carried by REQ-DASH-208 criterion 6)
-
-- Old: "IF the Expect's element is outside the initial 1280x800 viewport, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect."
-- New: "IF the Expect's element is outside the 1280x800 viewport once the scenario jump (REQ-DASH-208) has run, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect."
-
-**7. REQ-PIPE-193 criterion 19** (signed 2026-10-13; close-out Q23; carried by REQ-PIPE-163 criterion 42)
-
-- Old: "IF a re-file target is refused, THEN THE SYSTEM SHALL say why and ask for the period again, before the reason is asked and keeping both files' answers; the target prompt SHALL offer the next period as its default."
-- New: "WHEN a file's outcome is a re-file, THE SYSTEM SHALL ask for its target period through REQ-PIPE-163 criterion 16's period chooser, with the next period as its first choice, and SHALL NOT ask for a typed period; IF a re-file target is refused, THEN THE SYSTEM SHALL say why and offer the chooser again, before the reason is asked and keeping both files' answers."
-
-**8. REQ-PIPE-193 criterion 23** (signed 2026-10-13; close-out Q21; carried by REQ-PIPE-211 criterion 6)
-
-- Old: "WHEN a settlement moves a file into or out of a period, and WHEN a settled supply is promoted, THE SYSTEM SHALL owe the knock-on through REQ-PIPE-121's one handler (knock_on), which selects the checks by reevaluation.reading_checks() and the datasets by reevaluation.counts_toward(), and SHALL NOT add a settlement-specific path or restate either rule."
-- New: "WHEN a pair is settled, whatever its outcome (REQ-PIPE-211), WHEN a settlement moves a file into or out of a period, and WHEN a settled supply is promoted, THE SYSTEM SHALL owe the knock-on through REQ-PIPE-121's one handler (knock_on), which selects the checks by reevaluation.reading_checks() and the datasets by reevaluation.counts_toward(), and SHALL NOT add a settlement-specific path or restate either rule."
-
-**9. REQ-DASH-175 criterion 12** (UNSIGNED; close-out Q27; carried by presented with REQ-PIPE-163)
+**2. REQ-DASH-175 criterion 12** (drafted this morning). Carried by REQ-PIPE-163 presented with it (decision, close-out Q27).
 
 - Old: "THE SYSTEM SHALL describe a placement and a re-check in words wherever a past decision is described - 'placed in <period>', 're-checked' - and SHALL NOT show the raw operation name."
 - New: "THE SYSTEM SHALL describe a placement and a re-check in words wherever a past decision is described - 'placed in <period>', 're-checked' - recognising a placement as a person's re-file whose from-period is empty (REQ-PIPE-163 criterion 2), and SHALL NOT show the raw operation name or describe a placement as a re-file."
+- Why: Keith, close-out Q27: a placement is a re-file underneath, so the page must recognise it.
+- Built behaviour: UNSIGNED and not_started - no built behaviour; it is a redraft rather than an amendment.
 
-**Amendments carried from earlier rounds, wording NOT yet drafted.** REQ-PIPE-163 and REQ-PIPE-179 still say "amend, in the same change" for several signed requirements without exact text:
-- REQ-GHUB-082 criteria 1 and 3, REQ-PIPE-074 criterion 1, REQ-PIPE-076 criterion 7, REQ-PIPE-140 and REQ-PIPE-141 (from 163);
-- REQ-PIPE-111 criteria 2, 4 and 15; REQ-PIPE-113 criteria 2 and 4; REQ-PIPE-131 criteria 1 and 2; REQ-PIPE-134 criterion 1; REQ-PIPE-154 criteria 1, 2, 6 and 7; REQ-PIPE-064 criteria 5 and 8; REQ-PIPE-083 criterion 21; REQ-PIPE-098 criterion 1; REQ-PIPE-053 criteria 4, 10 and 15; REQ-PIPE-170 and REQ-PIPE-173 (from 179);
-- REQ-PIPE-053 criteria 16 to 19 and REQ-DASH-155 criteria 1 and 3 (from 180).
+### REQ-GEN-045 (signed 2026-09-22, built): A generated scenario map says where each scenario can be seen
 
-Their decisions say "that wording comes to Keith at sign-off", and this fold did not draft it. It is still owed, and it is the biggest thing left open in this batch.
+**3. REQ-GEN-045 criterion 1**. Carried by REQ-DASH-209 criterion 7.
+
+- Old: "THE SYSTEM SHALL generate a map naming, for each injected scenario, the dataset, the supplies it produced, the period and the in-place-on date at which that scenario can be seen.
+"
+- New: "THE SYSTEM SHALL generate a map naming, for each injected scenario, the dataset - or, for a scenario about a whole period of a collection (REQ-DASH-209 criterion 7), the collection - the supplies it produced, the period and the in-place-on date at which that scenario can be seen.
+ AMENDED <date built> by REQ-DASH-209 criterion 7."
+- Why: criterion 1 requires every coordinate to name a dataset; a coordinate naming only a collection and a period would break it.
+- Built behaviour: BUILT CODE CHANGES if needed (the scenario map's coordinate); built and tested by REQ-DASH-209 criterion 7.
+- **Note:** CONTINGENT: needed only if TS-55's coordinate names no dataset. If it keeps naming the substituted dataset and adds the collection-and-period view as its target, no change is needed. REQ-DASH-209 leaves this to the architect.
+
+### REQ-GEN-136 (signed 2026-10-04, built): Every arrival-driven shape of the option A and period-closing batch is planted in the synthetic history
+
+**4. REQ-GEN-136 criterion 5** (drafted this morning). Carried by REQ-GEN-206 criterion 8.
+
+- Old: "THE SYSTEM SHALL plant a correction whose re-check after its partner's promotion still fails, producing the decision log's large shout (REQ-PIPE-121)."
+- New: "THE SYSTEM SHALL register, and SHALL NOT plant, TS-49 - a correction whose re-check after its partner's promotion still fails, producing the decision log's large shout (REQ-PIPE-121) - which Keith left unplanted (2026-10-11, confirmed 2026-10-14) because it needs named red cross-table targets and referential closure across six tables."
+- Why: Keith, close-out Q10.
+- Built behaviour: NO BUILT BEHAVIOUR CHANGES: criterion 5 is unmet.
+- **Note:** REMOVES A GUARANTEE, deliberately: TS-49 will not be planted (Keith, Q10).
+
+**5. REQ-GEN-136 criterion 9** (drafted this morning). Carried by REQ-GEN-206 criterion 8.
+
+- Old: "THE SYSTEM SHALL plant a promoted supply whose cross-table result goes red when a sibling arrives later (REQ-DASH-126)."
+- New: "THE SYSTEM SHALL register, and SHALL NOT plant, TS-51 - a promoted supply whose cross-table result goes red when a sibling arrives later (REQ-DASH-126) - which Keith left unplanted (2026-10-11, confirmed 2026-10-14) because it needs named red cross-table targets and referential closure across six tables."
+- Why: Keith, close-out Q10.
+- Built behaviour: NO BUILT BEHAVIOUR CHANGES: criterion 9 is unmet.
+- **Note:** REMOVES A GUARANTEE, deliberately: TS-51 will not be planted (Keith, Q10).
+
+### REQ-GEN-137 (signed 2026-10-04, built): The batch's person decisions, and the _manifest's three kinds of table, are planted in the synthetic history
+
+**6. REQ-GEN-137 criterion 2** (drafted this morning). Carried by REQ-GEN-206 criterion 14.
+
+- Old: "THE SYSTEM SHALL plant Keith's worked un-supersede case: a good file superseded by a bad later one; a person rejects the bad one and un-supersedes the good one, which is re-checked and promoted by the gate (REQ-PIPE-120)."
+- New: "THE SYSTEM SHALL plant Keith's worked un-supersede case: a good file superseded by a bad later one; a person rejects the bad one and un-supersedes the good one, which is re-checked (REQ-PIPE-120), left waiting by the gate, and then promoted by a person."
+- Why: Keith, close-out Q11 (option B): as built, the gate does not promote the un-superseded file without a further decision.
+- Built behaviour: NO BUILT BEHAVIOUR CHANGES: criterion 2 is in REQ-GEN-137's unmet list; REQ-GEN-206 criterion 5 plants it.
+
+### REQ-GEN-196 (signed 2026-10-13, built): Birth Registrations' generated history has a contested pair for every way a settlement can go, each settled by a scripted person - a duplicate send, a next day's file sent early, a later file chosen, a stray test file (one that loads and one that does not), both files rejected, and one file re-filed while the other is rejected
+
+**7. REQ-GEN-196 a new decision**. Carried by REQ-PIPE-202 criterion 12.
+
+- Old: "(none - decision 1 stays as history; this appends a decision. Decision 1 reads: "BIRTH REGISTRATIONS, NOT CHILD PROTECTION (2026-10-13, carried from REQ-PIPE-193): Child Protection's arrival patterns are exact filenames and cannot admit two files for one table (TS-34 and TS-42 record why), while birth_registrations_[^/]+\.csv admits two today. No pattern is widened; TS-42 stays not injectable.")"
+- New: "SUPERSEDED IN PART BY REQ-PIPE-202 (Keith, 2026-10-13; recorded <date built> by REQ-PIPE-202 criterion 12): decision 1's "No pattern is widened; TS-42 stays not injectable" no longer holds - cp-clients' arrival pattern is `cp_clients(_[^/]+)?\.csv`, so TS-42 is planted by REQ-GEN-203. Every other Child Protection pattern stays exact, so TS-34 stays not injectable, and this requirement's own pairs stay on Birth Registrations."
+- Why: a reader of REQ-GEN-196 must not take "no pattern is widened" as current.
+- Built behaviour: TEXT ONLY - a decision, no criterion and no code.
+
+### REQ-GEN-199 (signed 2026-10-13, built): The generated history has a scenario for each way the as-at panel and qualifier can read - awaiting then rejected, a substitution later removed, one later replaced, a supply promoted out of order, and cp-case-workers' inheritance named - each linked from the test-scenarios panel
+
+**8. REQ-GEN-199 criterion 9** (drafted this morning). Carried by REQ-GEN-206 criterion 15.
+
+- Old: "THE SYSTEM SHALL record in TS-76's register entry, as part of what TS-76 shows, the state cp-clients and cp-carers are left in for TS-76's quarter once the substitution is removed - promoted and red, permanently, as the delivery-architect found (H1) - and what cp-clients' and cp-carers' pages read before the substitution, while it stands and after it ends."
+- New: "THE SYSTEM SHALL record in TS-76's register entry, as part of what TS-76 shows, the state cp-clients and cp-carers are left in for TS-76's quarter once the substitution is removed - cp-clients promoted amber and cp-carers green, as the first bootstrapped build showed (post-build-review #174), the cross-table checks reading cp_placements being filed under cp-placements and run for neither in a quarter with no placements supply - and what cp-clients' and cp-carers' pages read before the substitution, while it stands and after it ends."
+- Why: Keith, close-out Q15: record what was observed, not what the architect predicted.
+- Built behaviour: TEXT ONLY: a register entry's wording.
+
+**9. REQ-GEN-199 criterion 36** (drafted this morning). Carried by REQ-DASH-208 criterion 6.
+
+- Old: "THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each of this requirement's chips in the test-scenarios panel and asserts that the element holding the text its register Expect quotes is inside the initial viewport without scrolling, then cold-reloads that URL and asserts the same text with zero console errors."
+- New: "THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each of this requirement's chips in the test-scenarios panel and asserts that the element holding the text its register Expect quotes is inside the viewport once the scenario jump (REQ-DASH-208) has brought it there, then cold-reloads that URL and asserts the same text inside the viewport again, with zero console errors."
+- Why: Keith, close-out Q24: the jump is carried in the URL, so a reload lands on the subject too.
+- Built behaviour: BUILT TEST CHANGES (the strict expected failures naming post-build-review #174 come out as each text comes into view); REQ-DASH-208 criterion 6.
+- **Note:** RELAXES "without scrolling" to "once the jump has brought it there" - Keith chose a page fix that scrolls (Q24); the cold-reload assertion is STRENGTHENED to the viewport.
+
+**10. REQ-GEN-199 criterion 37** (drafted this morning). Carried by REQ-DASH-208 criterion 6.
+
+- Old: "IF the Expect's element is outside the initial 1280x800 viewport, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect."
+- New: "IF the Expect's element is outside the 1280x800 viewport once the scenario jump (REQ-DASH-208) has run, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect."
+- Why: follows criterion 36.
+- Built behaviour: TEXT ONLY beyond criterion 36's test change.
+
+### REQ-GHUB-082 (signed 2026-09-28, built): An operator records a filing decision from GitHub or from the terminal, and both write the same entry
+
+**11. REQ-GHUB-082 criterion 1**. Carried by REQ-PIPE-163 criterion 13.
+
+- Old: "THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29."
+- New: "THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29. Placing a held supply (place) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED <date built> by REQ-PIPE-163 criterion 13."
+- Why: place is a new filing decision, terminal only, and the list is meant to be complete.
+- Built behaviour: BUILT CODE CHANGES (filing_decisions.OPERATIONS gains place); built and tested by REQ-PIPE-163 criteria 1, 13 and 36.
+
+**12. REQ-GHUB-082 criterion 3**. Carried by REQ-PIPE-163 criterion 14.
+
+- Old: "THE SYSTEM SHALL write an identical decision-log entry whichever route raised the decision, and SHALL NOT give either route an operation the other lacks, except the confirmation of a calendar correction's moves and the keeps it records, which is offered on the terminal route only (REQ-PIPE-170 criterion 10), and settling a contested pair (choose-file), which is offered on the terminal route only (REQ-PIPE-193 criteria 1 and 16). AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11, and 2026-10-13 by REQ-PIPE-193 criterion 29.
+"
+- New: "THE SYSTEM SHALL write an identical decision-log entry whichever route raised the decision, and SHALL NOT give either route an operation the other lacks, except the confirmation of a calendar correction's moves and the keeps it records, which is offered on the terminal route only (REQ-PIPE-170 criterion 10), settling a contested pair (choose-file), which is offered on the terminal route only (REQ-PIPE-193 criteria 1 and 16), and placing a held supply (place), which is offered on the terminal route only (REQ-PIPE-163 criteria 14 and 36). AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11, 2026-10-13 by REQ-PIPE-193 criterion 29, and <date built> by REQ-PIPE-163 criterion 14.
+"
+- Why: place is offered on the terminal route only, so it is a third exception to "neither route lacks an operation".
+- Built behaviour: BUILT CODE CHANGES (the GitHub route replies and records nothing for place); built and tested by REQ-PIPE-163 criterion 36.
+
+### REQ-PIPE-053 (signed 2026-09-22, built): A schedule that runs out is loud, and only for its own dataset
+
+**13. REQ-PIPE-053 criterion 10**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "WHERE a calendar is an authored date list, THE SYSTEM SHALL warn when fewer than a configured number of future slots remain for a dataset naming it."
+- New: "WHERE a calendar is an authored date list, THE SYSTEM SHALL warn when fewer than a configured number of future slots remain for a dataset naming it - counting, for a dataset in a temporary turned-off gap, only the periods it owes once turned back on - and SHALL NOT warn for a dataset turned off for good (REQ-PIPE-179 criterion 25). AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: Keith's T6: a supplier turned off for good must not keep the runway warning firing.
+- Built behaviour: BUILT CODE CHANGES (runway.calendar_runway); built and tested by REQ-PIPE-179 criterion 25.
+
+**14. REQ-PIPE-053 criterion 15**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for that calendar, naming it, its last authored period and how many datasets name it, and SHALL NOT enumerate those datasets."
+- New: "WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for that calendar, naming it, its last authored period and how many datasets name it, not counting a dataset turned off for good (REQ-PIPE-179 criterion 25), and SHALL NOT enumerate those datasets. AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: the per-calendar count must agree with criterion 10.
+- Built behaviour: BUILT CODE CHANGES (the warning's count); built and tested by REQ-PIPE-179 criterion 25.
+
+**15. REQ-PIPE-053 criterion 19**. Carried by REQ-DASH-180 criterion 22.
+
+- Old: "THE SYSTEM SHALL evaluate the exhausted-schedule condition against the in-place-on date currently selected, and SHALL NOT report a schedule as exhausted while viewing a date its calendar covers."
+- New: "THE SYSTEM SHALL evaluate the exhausted-schedule condition against the in-place-on date currently selected, and SHALL NOT report a schedule as exhausted while viewing a date its calendar covers, nor report a dataset as exhausted on a date it is turned off (REQ-PIPE-179). AMENDED <date built> by REQ-DASH-180 criterion 22."
+- Why: a turned-off dataset owes nothing, so a run-out schedule is not its problem; criteria 16 to 18 render and count the condition this criterion evaluates, so they need no change of their own.
+- Built behaviour: BUILT CODE CHANGES (the template's exhausted condition and dataset_status.py); built and tested by REQ-DASH-180 criterion 17.
+
+### REQ-PIPE-064 (signed 2026-09-24, built): When nothing is confidently claimable, hold it for a human
+
+**16. REQ-PIPE-064 criterion 5**. Carried by REQ-PIPE-179 criterion 24.
+
+- Old: "THE SYSTEM SHALL report a held supply as an event needing action, distinguished from an informational one."
+- New: "THE SYSTEM SHALL report a held supply as an event needing action, distinguished from an informational one - except a supply held as turned off (REQ-PIPE-179 criterion 24), which SHALL be reported as a quiet count and not as needing action. AMENDED <date built> by REQ-PIPE-179 criterion 24."
+- Why: Keith's T3: a supplier still sending files after being asked to stop must not raise a needs-action item each time.
+- Built behaviour: BUILT CODE CHANGES (every held supply counts as needing action today); built and tested by REQ-PIPE-179 criteria 24 and 34.
+- **Note:** REMOVES A GUARANTEE, deliberately: a turned-off hold is no longer reported as needing action (Keith, T3, 2026-10-10).
+
+**17. REQ-PIPE-064 criterion 8**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "THE SYSTEM SHALL count and report outstanding holds together, and SHALL NOT present one element per held supply."
+- New: "THE SYSTEM SHALL count and report outstanding holds together, by label - turned off, schedule ended or the plain assignment-rule hold, each worked out from the configuration in force when the count is made (REQ-PIPE-179 criterion 18) - and SHALL NOT present one element per held supply. AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: Keith's T4: a hold's label is worked out from current configuration everywhere, counts included.
+- Built behaviour: BUILT CODE CHANGES (supply_holds.Tally reads the recorded flag today); built and tested by REQ-PIPE-179 criteria 18 and 26.
+
+### REQ-PIPE-074 (signed 2026-09-26, built): Every filing decision is recorded once, in one append-only log that refuses an anonymous entry
+
+**18. REQ-PIPE-074 criterion 1**. Carried by REQ-PIPE-163 criterion 13.
+
+- Old: "THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep and choose-file - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause)."
+- New: "THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep, choose-file and place - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause). And <date built> by REQ-PIPE-163 criterion 13 (place - recorded as a person's re-file from no period, REQ-PIPE-163 criterion 2, so it adds no decision-log action of its own)."
+- Why: place is a filing decision and must be in the one log; the note says it is recorded as a re-file so nobody looks for a PLACE action.
+- Built behaviour: BUILT CODE CHANGES only through REQ-PIPE-163 criterion 2 (no new action); tested there.
+
+**19. REQ-PIPE-074 criterion 9**. Carried by REQ-PIPE-163 criterion 39.
+
+- Old: "THE SYSTEM SHALL record a re-file as ONE entry carrying a from-slot, a to-slot and one reason, and SHALL NOT express it as a demotion followed by a promotion.
+"
+- New: "THE SYSTEM SHALL record a re-file as ONE entry carrying a from-slot, a to-slot and one reason, and SHALL NOT express it as a demotion followed by a promotion; WHERE a re-file places a held supply - by the rule (REQ-PIPE-154 criterion 7, REQ-PIPE-179 criterion 19) or by a person placing a supply with an open assignment-rule hold (REQ-PIPE-163 criterion 2) - it SHALL carry no from-slot, and IF a person's re-file names no from-slot for any other supply, THEN THE SYSTEM SHALL refuse it, naming place; and WHERE a confirmed correction holds a supply (REQ-PIPE-170 criterion 8), its re-file SHALL carry no to-slot. AMENDED <date built> by REQ-PIPE-163 criterion 39; the rule's and the correction's one-slot forms were built 2026-10-06 and 2026-10-11 and are stated here for the first time."
+- Why: this is the criterion that states the decision log's re-file rule (qa_tools/common/decision_log.py), which REQ-PIPE-163 criterion 39 relaxes for a person's placement; it already omitted two one-slot forms the code accepts.
+- Built behaviour: BUILT CODE CHANGES for the person's placement only (decision_log.py's REFILE check); built and tested by REQ-PIPE-163 criterion 39. The rule and correction halves are TEXT CATCH-UP of built behaviour.
+- **Note:** Widens what the text says is accepted, but no guarantee is lost: the code already accepted the two one-slot forms, and a person's re-file with no from-slot stays refused except for placing.
+
+### REQ-PIPE-076 (signed 2026-09-26, built): Rejection and un-decide are a person's decisions, and automation defers to a person permanently
+
+**20. REQ-PIPE-076 criterion 7**. Carried by REQ-PIPE-163 criterion 24.
+
+- Old: "WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, re-file and an excuse of lateness or its withdrawal, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19, and 2026-10-11 by REQ-PIPE-161 criterion 19."
+- New: "WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, re-file (a person's placement of a held supply included, being recorded as a re-file - REQ-PIPE-163 criteria 2 and 24) and an excuse of lateness or its withdrawal, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19, 2026-10-11 by REQ-PIPE-161 criterion 19, and <date built> by REQ-PIPE-163 criterion 24."
+- Why: a placement must not bar the gate, and it is recorded as a re-file, which this criterion already exempts.
+- Built behaviour: PROBABLY NO CODE CHANGE: rejection.decided_by_a_person already leaves REFILE out (read 2026-10-14), so a placement recorded as a re-file is exempt; REQ-PIPE-163 criterion 24 still needs a test proving it.
+
+### REQ-PIPE-098 (signed 2026-09-28, built): A dataset that does not participate in a period stands on its most recent supply, by a view created when the period is born
+
+**21. REQ-PIPE-098 criterion 1**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "WHEN a period's schema is first created, THE SYSTEM SHALL INHERIT, for each dataset the schedule says does not participate in that period, that dataset's most recent promoted supply - creating in the new period's schema a view that resolves the dataset's logical name to it.
+"
+- New: "WHEN a period's schema is first created, THE SYSTEM SHALL INHERIT, for each dataset the schedule says does not participate in that period or is turned off in it (REQ-PIPE-179 criterion 22), that dataset's most recent promoted supply - creating in the new period's schema a view that resolves the dataset's logical name to it.
+ AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: Keith's Q-G: a turned-off period inherits the last promoted supply, so cross-table checks do not read the table as missing.
+- Built behaviour: BUILT CODE CHANGES (inheritance._does_not_participate via the one helper); built and tested by REQ-PIPE-179 criterion 22.
+
+### REQ-PIPE-111 (signed 2026-10-07, built): A delivery agreement's past changes only by a declared, approved correction
+
+**22. REQ-PIPE-111 criterion 2**. Carried by REQ-PIPE-179 criterion 30.
+
+- Old: "THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset's own authored dates, calendar version, participation version (including a collection's default participation), not_expected entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry, the earliest claim-opening instant that EVERY dataset on its calendar would have for that period, participating or not, since that instant also closes each one's previous period; for a not_expected entry, that dataset's claim-opening instant for the period; for a version, the earlier of the start of its effective-from date and the earliest claim-opening instant of any period it governs."
+- New: "THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset's own authored dates, calendar version, participation version (including a collection's default participation), not_expected entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry, the earliest claim-opening instant that EVERY dataset on its calendar would have for that period, participating or not - a dataset turned off in that period (REQ-PIPE-179) counted only where it is the first period of its gap, whose claim-opening instant closes the last owed slot before it (REQ-PIPE-179 criterion 14) - since that instant also closes each one's previous period; for a not_expected entry, that dataset's claim-opening instant for the period; for a version, the earlier of the start of its effective-from date and the earliest claim-opening instant of any period it governs; except that a participation version's effective_to and turned_off_reason are not frozen with their version but on their own, as REQ-PIPE-179 criteria 11 and 12 state. AMENDED <date built> by REQ-PIPE-179 criterion 30."
+- Why: effective_to has its own freeze point (Keith, Q-K), and only the first period of a gap closes a slot, so only it can freeze a dated entry for a turned-off dataset.
+- Built behaviour: BUILT CODE CHANGES (agreement_freeze); built and tested by REQ-PIPE-179 criteria 11 and 12.
+
+**23. REQ-PIPE-111 criterion 4**. Carried by REQ-PIPE-179 criterion 30.
+
+- Old: "THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its versions - a calendar's on that calendar; a dataset's (its participation, due time, participates, not_expected and own authored dates) on that dataset's entry; a collection's participation_defaults on that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each naming the item, its old value and its new value; and SHALL refuse a correction missing any of them."
+- New: "THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its versions - a calendar's on that calendar; a dataset's (its participation, due time, participates, not_expected, own authored dates, effective_to and turned_off_reason) on that dataset's entry; a collection's participation_defaults, their effective_to and turned_off_reason included, on that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each naming the item, its old value and its new value; and SHALL refuse a correction missing any of them. AMENDED <date built> by REQ-PIPE-179 criterion 30."
+- Why: a correction must be able to carry the two new frozen items.
+- Built behaviour: BUILT CODE CHANGES (agreement_freeze's correction matching); built and tested by REQ-PIPE-179 criteria 11, 12 and 39 (TS-63's correction).
+
+**24. REQ-PIPE-111 criterion 15**. Carried by REQ-PIPE-179 criterion 30.
+
+- Old: "WHEN a change is refused, THE SYSTEM SHALL report it as the existing configuration errors do (file, where, problem, fix), grouped by item, saying that nothing was committed, naming the item in exactly the syntax a correction uses, printing a ready-to-paste correction entry with the item, old and new values filled in and reason, approver and change_reference as placeholders, listing who may approve, naming the impact preview command (REQ-PIPE-169), and - for a not_expected entry - naming mark as not supplied (REQ-PIPE-132) as the after-the-fact route."
+- New: "WHEN a change is refused, THE SYSTEM SHALL report it as the existing configuration errors do (file, where, problem, fix), grouped by item, saying that nothing was committed, naming the item in exactly the syntax a correction uses, printing a ready-to-paste correction entry with the item, old and new values filled in and reason, approver and change_reference as placeholders, listing who may approve, naming the impact preview command (REQ-PIPE-169), and - for a not_expected entry or an effective_to - naming mark as not supplied (REQ-PIPE-132) as the after-the-fact route. AMENDED <date built> by REQ-PIPE-179 criterion 30."
+- Why: a missed period before a turn-off is recorded after the fact the same way as one before a not_expected entry.
+- Built behaviour: BUILT CODE CHANGES (refusal text); NO OTHER CRITERION STATES IT, so REQ-PIPE-179's build needs its own test for this wording.
+
+### REQ-PIPE-113 (signed 2026-10-07, built): A slot's due instant comes from the participation in force on its period's date, and a later change never moves an earlier slot
+
+**25. REQ-PIPE-113 criterion 2**. Carried by REQ-PIPE-179 criterion 31.
+
+- Old: "THE SYSTEM SHALL take a slot's expected time, days before, grace allowance and claim-window override each as the value REQ-PIPE-181 resolves for that period's own date, from the dataset or its collection, and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181)."
+- New: "THE SYSTEM SHALL take a slot's expected time, days before, grace allowance and claim-window override each as the value REQ-PIPE-181 resolves for that period's own date, from the dataset or its collection - through the one participation resolution of REQ-PIPE-179 criterion 27, so that a collection inside its own turned-off gap supplies no value (REQ-PIPE-179 criterion 7) - and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181, and <date built> by REQ-PIPE-179 criterion 31)."
+- Why: inside a collection's gap the collection supplies no values (Keith, T1), so a back-on dataset's slot takes only its own.
+- Built behaviour: BUILT CODE CHANGES (slots via the one helper); built and tested by REQ-PIPE-179 criteria 7 and 27.
+
+**26. REQ-PIPE-113 criterion 4**. Carried by REQ-PIPE-179 criterion 31.
+
+- Old: "THE SYSTEM SHALL compute each slot's closing instant (REQ-PIPE-131) from the next calendar period's claim-opening instant as that next period's own inputs give it, so that a version change takes effect at its own boundary and nowhere before it."
+- New: "THE SYSTEM SHALL compute each slot's closing instant (REQ-PIPE-131) from the next calendar period's claim-opening instant as that next period's own inputs give it, so that a version change takes effect at its own boundary and nowhere before it; WHERE the dataset is turned off in that next period, from the claim-opening instant it would have had, each value resolved as if every effective_to on or before its date were absent (REQ-PIPE-179 criterion 14). AMENDED <date built> by REQ-PIPE-179 criterion 31."
+- Why: a period inside a gap has no slot, so without this the last owed slot before a gap would have no closing instant.
+- Built behaviour: BUILT CODE CHANGES (slots.py closing instant); built and tested by REQ-PIPE-179 criterion 14.
+
+### REQ-PIPE-121 (signed 2026-10-04, built): A table arriving in or leaving a period re-checks the waiting supplies in that period that read it, and re-applies the gate - through one mechanism
+
+**27. REQ-PIPE-121 criterion 1**. Carried by REQ-PIPE-211 criterion 1.
+
+- Old: "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved table, whether it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that does not read a moved table."
+- New: "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - or a contested pair of a table in that period is settled, whatever the outcome (REQ-PIPE-211), THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved or settled table, whether it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that reads neither. AMENDED <date built> by REQ-PIPE-211 criterion 1."
+- Why: a "reject both" or a chosen file left waiting moves no table into or out of the period schema, so as worded criterion 1 does not trigger - and its last clause forbids re-evaluating a check that reads no moved table.
+- Built behaviour: BUILT CODE CHANGES with REQ-PIPE-193 criterion 23 (knock_on gains a trigger); built and tested by REQ-PIPE-211.
+- **Note:** CONTINGENT: REQ-PIPE-211's own decision proposes amending 193 criterion 23 and NOT 121, and leaves 121 criterion 1 as a check for the architect. Read 2026-10-14, the scoper thinks 121 criterion 1 does need it, for the reason given; drafted so Keith can approve exact words if the architect agrees.
+
+### REQ-PIPE-131 (signed 2026-10-04, built): A period closes once its calendar's next period's claim window opens, so a file is only ever filed to the one open period
+
+**28. REQ-PIPE-131 criterion 1**. Carried by REQ-PIPE-179 criterion 31.
+
+- Old: "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period - and as CLOSED from then on."
+- New: "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period or is turned off in it (REQ-PIPE-179) - and as CLOSED from then on. AMENDED <date built> by REQ-PIPE-179 criterion 31."
+- Why: the same closing rule applies across a turned-off gap as across a period not participated in.
+- Built behaviour: BUILT CODE CHANGES with criterion 2 below; built and tested by REQ-PIPE-179 criterion 14.
+
+**29. REQ-PIPE-131 criterion 2**. Carried by REQ-PIPE-179 criterion 31.
+
+- Old: "THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period's date with each value as REQ-PIPE-181 resolves it on that next period's date (amended by REQ-PIPE-181)."
+- New: "THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period's date with each value as REQ-PIPE-181 resolves it on that next period's date (amended by REQ-PIPE-181) - or, WHERE the dataset is turned off in that next period, as if every effective_to on or before that date were absent (REQ-PIPE-179 criterion 14; AMENDED <date built> by REQ-PIPE-179 criterion 31)."
+- Why: inside a gap nothing resolves (the collection supplies no values), so the closing instant is computed as if the turn-off were absent.
+- Built behaviour: BUILT CODE CHANGES (slots.py); built and tested by REQ-PIPE-179 criterion 14.
+
+### REQ-PIPE-134 (signed 2026-10-04, built): A dataset's periods never overlap - enforced in CI from configuration
+
+**30. REQ-PIPE-134 criterion 1**. Carried by REQ-PIPE-179 criterion 31.
+
+- Old: "THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one."
+- New: "THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one; WHERE either period of a pair lies inside a turned-off gap (REQ-PIPE-179), THE SYSTEM SHALL instead check the last owed period before the gap against the closing instant REQ-PIPE-179 criterion 14 gives it and, WHERE the gap is temporary, require the first owed slot after it to open strictly after the last owed slot before it closes, and SHALL NOT check any pair both of whose periods lie inside the gap. AMENDED <date built> by REQ-PIPE-179 criterion 31."
+- Why: inside a gap a period has no resolved values to check, and the overlap that matters is between the owed slots either side of it.
+- Built behaviour: BUILT CODE CHANGES (period_overlap / validate_schedule); NO OTHER CRITERION STATES IT, so REQ-PIPE-179's build needs its own tests for all three clauses.
+
+### REQ-PIPE-140 (signed 2026-10-04, built): A decision can run a supply's QA again, on demand, as a run of its own that never overwrites the first
+
+**31. REQ-PIPE-140 new criterion 9**. Carried by REQ-PIPE-163 criterion 31.
+
+- Old: "(none - criteria 1 to 8 are unchanged; this is a new criterion 9)"
+- New: "THE SYSTEM SHALL have every runner of an owed run - the terminal's filing-decisions door, `mothman supply decide --wait` (REQ-PIPE-163 criterion 25) and the processing pass - claim the run before running it, SHALL release a claim when the process holding it ends, and SHALL have a runner that finds the run claimed skip it and leave it owed, saying that it is being run elsewhere (REQ-PIPE-163 criterion 30). ADDED <date built> by REQ-PIPE-163 criterion 31: the claim was built 2026-10-11 (post-build-review #136, recheck.run's advisory lock) and is stated here for the first time."
+- Why: the claim is built and no criterion states it.
+- Built behaviour: TEXT CATCH-UP for the door and the processing pass (built 2026-10-11); the decide --wait runner is new and is REQ-PIPE-163 criterion 25's to build.
+
+### REQ-PIPE-141 (signed 2026-10-04, built): Re-filing a supply returns it to staging under a new filing for its new period, where it is checked and the normal gate decides
+
+**32. REQ-PIPE-141 criterion 7**. Carried by REQ-PIPE-163 criterion 25.
+
+- Old: "THE SYSTEM SHALL then run the re-filed supply's QA against the target period through REQ-PIPE-140, and SHALL apply the promotion gate to it exactly as for a first arrival, with the amber and replacement settings in force at that instant (REQ-PIPE-122, REQ-PIPE-123), not those in force when it first arrived or was first checked."
+- New: "THE SYSTEM SHALL then run the re-filed supply's QA against the target period through REQ-PIPE-140, and SHALL apply the promotion gate to it exactly as for a first arrival, with the amber and replacement settings in force at that instant (REQ-PIPE-122, REQ-PIPE-123), not those in force when it first arrived or was first checked; WHERE the re-file is recorded through `mothman supply decide --wait`, that run SHALL happen in the foreground straight after the decision commits, ending with REQ-PIPE-163 criterion 26's shared outcome panel, and WHERE it is recorded through decide without --wait, the run SHALL be left owed (REQ-PIPE-140 criterion 7). AMENDED <date built> by REQ-PIPE-163 criterion 25."
+- Why: decide --wait now covers re-file as well as place and re-check (Keith, round 3 Q1).
+- Built behaviour: BUILT CODE CHANGES (decide gains --wait); built and tested by REQ-PIPE-163 criteria 25 to 30.
+
+**33. REQ-PIPE-141 criterion 12**. Carried by REQ-PIPE-179 criterion 20.
+
+- Old: "IF a person re-files a supply into a period where its dataset's slot is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name un-inherit as the step that must come first."
+- New: "IF a person re-files a supply into a period where its dataset's slot is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name un-inherit as the step that must come first - except WHERE that period lies inside a turned-off gap (REQ-PIPE-179), when REQ-PIPE-179 criterion 20's refusal SHALL be given in its place. AMENDED <date built> by REQ-PIPE-179 criterion 20."
+- Why: a gap period inherits (REQ-PIPE-179 criterion 22), so this criterion would advise un-inherit, which does not make a gap period owed - the same narrowing REQ-PIPE-163 criterion 8 makes for a placement.
+- Built behaviour: BUILT CODE CHANGES (refiling.plan's refusal); built and tested by REQ-PIPE-179 criterion 20.
+- **Note:** NOT PROMISED BY THE DRAFT - found by reading criterion 12 against REQ-PIPE-179 criteria 20 and 22.
+
+### REQ-PIPE-154 (signed 2026-10-06, built): A supply arriving after its dataset's schedule has ended is held as schedule-ended, and says what to edit
+
+**34. REQ-PIPE-154 criterion 1**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "IF a supply arrives after the last slot of its dataset's authored calendar has closed, THEN THE SYSTEM SHALL hold it for a person under REQ-PIPE-064 with a reason stating that the dataset's delivery schedule has ended and naming that dataset's own last authored period."
+- New: "IF a supply arrives after the last slot of its dataset's authored calendar has closed, THEN THE SYSTEM SHALL hold it for a person under REQ-PIPE-064 with a reason stating that the dataset's delivery schedule has ended and naming that dataset's own last authored period - unless the dataset is turned off for the period whose slot would then be current, when the hold is labelled turned off instead (REQ-PIPE-179 criterion 17). AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: turned off outranks schedule ended (Keith confirmed, 2026-10-13, set 2 Q7(a)): "add the next dates" would not make a turned-off dataset owe anything.
+- Built behaviour: BUILT CODE CHANGES (assignment / supply_holds labelling); built and tested by REQ-PIPE-179 criterion 17.
+
+**35. REQ-PIPE-154 criterion 2**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "THE SYSTEM SHALL record whether a hold was raised because the schedule ended as a structured field of the hold, and SHALL NOT require any reader to parse the hold's prose to tell."
+- New: "THE SYSTEM SHALL record whether a hold was raised because the schedule ended as a structured field of the hold, kept as history, and SHALL NOT require any reader to parse the hold's prose to tell; every reader that labels, re-files or counts a hold SHALL take its label from the configuration in force when it reads (REQ-PIPE-179 criterion 18), not from that field. AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: Keith's T4: the recorded flag is history; the label shown, re-filed on and counted is worked out from current configuration.
+- Built behaviour: BUILT CODE CHANGES (readers of the recorded flag); built and tested by REQ-PIPE-179 criterion 18.
+
+**36. REQ-PIPE-154 criterion 6**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "WHEN a processing pass holds one or more supplies because their dataset's schedule has ended, THE SYSTEM SHALL state in that pass's own summary how many datasets and how many supplies were held for that reason, separately from any other holds."
+- New: "WHEN a processing pass holds one or more supplies because their dataset's schedule has ended, THE SYSTEM SHALL state in that pass's own summary how many datasets and how many supplies were held for that reason - the label worked out as REQ-PIPE-179 criterion 18 says - separately from any other holds, turned-off holds included (REQ-PIPE-179 criterion 26). AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: the pass counts by the worked-out label, and turned-off holds are their own count.
+- Built behaviour: BUILT CODE CHANGES (the pass summary); built and tested by REQ-PIPE-179 criteria 18 and 26.
+
+**37. REQ-PIPE-154 criterion 7**. Carried by REQ-PIPE-179 criterion 32.
+
+- Old: "WHEN dates are added to a dataset's calendar that cover the receipt instant of a supply held because its schedule ended, THE SYSTEM SHALL re-file that supply by the filing rule on the next processing pass, in receipt order with every other supply so held, and SHALL resolve its hold naming the filing that replaced it."
+- New: "WHEN configuration later gives an outstanding assignment-rule hold's receipt instant an open owed slot - dates added to a dataset's calendar covering a supply held because its schedule ended, or any other change, whatever the hold's label (REQ-PIPE-179 criterion 19) - THE SYSTEM SHALL re-file that supply by the filing rule on the next processing pass, in receipt order with every other supply so held, and SHALL resolve its hold naming the filing that replaced it. AMENDED <date built> by REQ-PIPE-179 criterion 32."
+- Why: Keith, round 3 Q8 and set 2 Q6: one re-filer for every hold configuration later covers, not a second one for turned-off holds.
+- Built behaviour: BUILT CODE CHANGES (schedule_ended.refile_covered widens to every label, including the eight Case Workers holds); built and tested by REQ-PIPE-179 criterion 19.
+- **Note:** WIDENS a built behaviour: plain assignment-rule holds, including holds a correction or a settlement raised, will start being filed by the rule when configuration covers them.
+
+### REQ-PIPE-170 (signed 2026-10-07, built): After a correction, the data asset's manager confirms the proposed filing moves all at once, and may keep any supply where it is
+
+**38. REQ-PIPE-170 criterion 5**. Carried by REQ-PIPE-179 criterion 36.
+
+- Old: "THE SYSTEM SHALL let the asset manager exclude individual supplies and then confirm every remaining move, across every dataset and agency the correction touches, in one action."
+- New: "THE SYSTEM SHALL let the asset manager exclude individual supplies and then confirm every remaining move, across every dataset and agency the correction touches, in one action; IF the corrected configuration makes a supply's current period one its dataset owes nothing in - by participation, not_expected or a turn-off - THEN THE SYSTEM SHALL NOT offer to exclude (keep) that supply, and SHALL propose moving it to the owed slot the filing rule gives it, or holding it, saying that the period no longer owes a supply. AMENDED <date built> by REQ-PIPE-179 criterion 36."
+- Why: Keith, round 3 Q9: a supply kept in a period with no slot, which inherits and accepts no placement, would have three rules disagreeing about one period.
+- Built behaviour: BUILT CODE CHANGES (correction_trial / confirm-correction); REQ-PIPE-179 criterion 36 is the only statement, so its build needs a test of its own.
+- **Note:** REMOVES A GUARANTEE, deliberately: the asset manager can no longer keep such a supply where it is (Keith, round 3 Q9).
+
+**39. REQ-PIPE-170 criterion 26**. Carried by REQ-PIPE-179 criterion 37.
+
+- Old: "WHEN a processing pass finds a parked move whose blocker has cleared, THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who confirmed it, before any arrival in that pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173)."
+- New: "WHEN a processing pass finds a parked move whose blocker has cleared, THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who confirmed it, before any arrival in that pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173), nor WHERE the confirmed period now lies inside a turned-off gap, when the move stays parked and says so (REQ-PIPE-179 criterion 37). AMENDED <date built> by REQ-PIPE-179 criterion 37."
+- Why: criterion 26 says a cleared parked move SHALL be carried out; REQ-PIPE-179 criterion 37 says one into a turned-off gap stays parked - the two contradict unless 26 is amended.
+- Built behaviour: BUILT CODE CHANGES (the processing pass's parked-move step); built and tested by REQ-PIPE-179 criteria 20 and 37.
+- **Note:** NOT PROMISED BY THE DRAFT - found by reading criterion 26 against REQ-PIPE-179 criterion 37.
+
+**40. REQ-PIPE-170 criterion 28**. Carried by REQ-PIPE-179 criterion 36.
+
+- Old: "WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu."
+- New: "WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu - except WHERE the supply's current period is one its dataset now owes nothing in, when keep SHALL NOT be offered (criterion 5). AMENDED <date built> by REQ-PIPE-179 criterion 36."
+- Why: the scoper's reading: keep on a parked move is the same act as keep at confirmation, so the same exception applies.
+- Built behaviour: BUILT CODE CHANGES (confirm-correction --keep on a parked move); NOT IN REQ-PIPE-179 criterion 36 AS WORDED, which says only "keep is not offered for that supply" - needs a test.
+- **Note:** PROPOSED BY THE SCOPER, not promised by the draft in words - an extension of criterion 36 to the second place keep is offered.
+
+### REQ-PIPE-173 (signed 2026-10-07, built): The pipeline refuses a dataset whose judged past changed without a declared correction
+
+**41. REQ-PIPE-173 criterion 12**. Carried by REQ-PIPE-179 criterion 38.
+
+- Old: "THE SYSTEM SHALL treat a judged period that a not_expected entry now declares owed nothing as changed, so it refuses the dataset unless a declared correction of that entry accounts for it (added 2026-10-11, Keith's answer (i))."
+- New: "THE SYSTEM SHALL treat a judged period that a not_expected entry, or an effective_to added or moved (REQ-PIPE-179), now declares owed nothing as changed, so it refuses the dataset unless a declared correction of that entry or that effective_to accounts for it (added 2026-10-11, Keith's answer (i); AMENDED <date built> by REQ-PIPE-179 criterion 38)."
+- Why: a turn-off removes a judged slot exactly as a not_expected entry does, and the backstop must see either.
+- Built behaviour: POSSIBLY BUILT CODE CHANGE: whether agreement_drift already flags a vanished slot is REQ-PIPE-179's open question; test first either way.
+
+### REQ-PIPE-193 (signed 2026-10-13, built): A person settles a contested pair in the terminal - saying, for EACH of its two files, whether it is this period's supply, is re-filed to another period, is rejected, or is kept but superseded - and each file that becomes a supply is filed, checked and gated on its own receipt
+
+**42. REQ-PIPE-193 criterion 19** (drafted this morning). Carried by REQ-PIPE-163 criterion 42.
+
+- Old: "IF a re-file target is refused, THEN THE SYSTEM SHALL say why and ask for the period again, before the reason is asked and keeping both files' answers; the target prompt SHALL offer the next period as its default."
+- New: "WHEN a file's outcome is a re-file, THE SYSTEM SHALL ask for its target period through REQ-PIPE-163 criterion 16's period chooser, with the next period as its first choice, and SHALL NOT ask for a typed period; IF a re-file target is refused, THEN THE SYSTEM SHALL say why and offer the chooser again, before the reason is asked and keeping both files' answers."
+- Why: Keith, close-out Q23: periods are never typed in the terminal.
+- Built behaviour: BUILT CODE CHANGES (settle_tui's typed prompt becomes the chooser); built and tested by REQ-PIPE-163 criterion 16.
+
+**43. REQ-PIPE-193 criterion 23** (drafted this morning). Carried by REQ-PIPE-211 criterion 6.
+
+- Old: "WHEN a settlement moves a file into or out of a period, and WHEN a settled supply is promoted, THE SYSTEM SHALL owe the knock-on through REQ-PIPE-121's one handler (knock_on), which selects the checks by reevaluation.reading_checks() and the datasets by reevaluation.counts_toward(), and SHALL NOT add a settlement-specific path or restate either rule."
+- New: "WHEN a pair is settled, whatever its outcome (REQ-PIPE-211), WHEN a settlement moves a file into or out of a period, and WHEN a settled supply is promoted, THE SYSTEM SHALL owe the knock-on through REQ-PIPE-121's one handler (knock_on), which selects the checks by reevaluation.reading_checks() and the datasets by reevaluation.counts_toward(), and SHALL NOT add a settlement-specific path or restate either rule."
+- Why: Keith, close-out Q21: after "reject both" the readers would otherwise stay red for good.
+- Built behaviour: BUILT CODE CHANGES (settlement.apply owes a knock-on it does not today); built and tested by REQ-PIPE-211 criteria 1 to 7.
+
+### No change needed
+
+- **REQ-PIPE-083 criterion 21** (named by REQ-PIPE-179 criterion 24): its needs-action ticket policy is per SLOT, and a held supply has no slot and so no ticket (REQ-PIPE-083's own decision, "A HELD SUPPLY HAS NO SLOT AND SO HAS NO TICKET") - so a turned-off hold never raises one. Criterion 24's "and REQ-PIPE-083 criterion 21" can be dropped.
+- **REQ-PIPE-053 criterion 4** (named by REQ-PIPE-179 criterion 32): it says only that such a supply is held, and already gives its labelling to REQ-PIPE-154, whose criterion 1 is amended. A turned-off supply is still held. Criterion 32's "criteria 4, 10 and 15" can read "criteria 10 and 15".
+- **REQ-PIPE-053 criteria 16, 17 and 18** (named by REQ-DASH-180 criterion 22): they render, keep out of the rollup and count the exhausted condition, which criterion 19 evaluates; amending 19 alone carries all three.
+- **REQ-DASH-155 criterion 3** (named by REQ-DASH-180 criterion 22): it is worded on the same test as criterion 1 ("no supply is held because a schedule ended"), so amending 1's count carries it. One corner is left for the architect: a temporary gap running past the calendar's last date could leave turned-off holds received after the schedule ended, making "nothing has arrived since the schedule ended" untrue.
+- **REQ-PIPE-154 criterion 7** (named by REQ-PIPE-163 (folded decision, 2026-10-10)): REQ-PIPE-163's own decision records that amendment as SUPERSEDED by round 3 Q7: schedule-ended holds are never placed or rejected, which REQ-PIPE-163 criterion 22 states. Only REQ-PIPE-179's amendment to criterion 7 remains.
+- **REQ-PIPE-170 its unmet entry for criterion 23** (named by REQ-PIPE-179 criterion 40): the live register already reads "TS-57 to TS-62 ... TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13)" in both criterion 23 and its unmet entry. Criterion 40 is already met in the register and can be dropped.
+- **REQ-PIPE-163 criterion 17** (named by REQ-PIPE-179 (round 3 decision)): REQ-PIPE-179's decision "163 NO LONGER AMENDED HERE" records that 163 is written turn-off-aware (Keith, set 1 Q1). REQ-PIPE-163 is unsigned in any case.
+
+### Register bookkeeping, not amendments
+
+Clearing an unmet entry once its scenario is planted is done when the scenario is built and needs no wording from you: REQ-GEN-136 criterion 3 (REQ-GEN-203 criterion 9), REQ-GEN-136 criteria 4, 5, 8, 9 and 11 and REQ-GEN-137 criteria 2, 5 and 6 (REQ-GEN-206), and REQ-PIPE-170 criterion 23 (REQ-GEN-205). REQ-PIPE-202 criterion 9 changes tests, not a requirement.
 
 ## Still open: questions for you (recommended option first)
 
@@ -320,3 +660,21 @@ Their decisions say "that wording comes to Keith at sign-off", and this fold did
 Answers are not sign-off: the draft is re-folded with these, the five
 non-recommended answers (Q11, Q16, Q24, Q26, and Q16's new view) get
 criteria drafted, and each requirement then goes to Keith for sign-off.
+
+## Keith's answers to the 15 follow-up questions (2026-10-14, via AskUserQuestion)
+
+- F1: A - REQ-DASH-209 has its own address per collection and period, linked from each period row of a dataset's supply history and from the standing-in drill-down.
+- F2: A - every collection, daily ones too.
+- F3: the person's name, as the rest of the page shows ("the rule" where no person decided). Note: the main session presented this as the recommendation, reversing the scoper's order (it recommended "rule"/"person" as _manifest says), for consistency with REQ-DASH-198's stand-in fix.
+- F4: A - datasets holding nothing are listed as "Nothing held" with the slot's state.
+- F5: A - a pair ended by a later file that is not promoted also re-checks the readers.
+- F6: A - a reader listed beneath its cause does NOT count in "Supplies waiting on a decision (N)".
+- F7: A - in the terminal the readers' re-check runs while you wait, with the settlement's own runs.
+- F8: B (NOT the recommendation) - plant a "reject both" Child Protection scenario, at the cost of another grown quarter (REQ-GEN-207's dry run must include it).
+- F9: B (NOT the recommendation) - the "Turning off after <date>" marker shows from the date the turn-off version was authored (its changelog entry date), on any date on show from then.
+- F10: A - a scenario chip becomes a real <a href> link.
+- F11: B (NOT the recommendation) - TS-62's Birth Registrations correction is a new daily version near the end of the history with a different claim window. Consequence to carry: once confirmed it would re-judge every later day, but TS-62 is the correction LEFT PENDING, so its moves show as awaiting confirmation; its effective date must fall after every quoted Birth Registrations scenario day (TS-78 ends 2026-09-01) or REQ-GEN-199's quotes move - REQ-GEN-207's dry run / REQ-GEN-205 should check that.
+- F12: A - TS-53 is on Birth Registrations.
+- F13: A - REQ-GEN-136 criterion 4 keeps its wording; its unmet entry is cleared with evidence naming TS-75.
+- F14: B - REQ-PIPE-211 is must; REQ-DASH-209 and REQ-PIPE-210 are should.
+- F15: A - REQ-DASH-209's page weight is measured before and after and reported, with no budget yet.
