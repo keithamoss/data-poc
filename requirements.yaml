@@ -31661,7 +31661,7 @@ requirements:
     date_written: '2026-10-12'
     story: As someone looking at a dataset that reads 'Two files for one table', I want every message about it to tell me exactly where to settle it, and the dataset to stop reading contested only when the contest has really ended, so that nothing points me at a remedy that does not exist.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: "2026-10-13"
@@ -31711,6 +31711,32 @@ requirements:
     - 194'S BROWSER TEST RUNS ON A FIXTURE HISTORY (Keith, 2026-10-13), since REQ-GEN-196's bootstrapped history depends on this requirement; GEN-196 proves it end to end separately.
     - 'SIGN-OFF REMOVED 2026-10-13 (Keith: ''remove it until re-signed''): the 2026-10-13 signature was given to criteria the architect, UX and third scoping reviews have since changed; nothing reads this as cleared to build until he signs the current text.'
     - 'FINAL REVIEW ROUND 2026-10-13: the full path in every pointer and the CLI form on CLI refusals (Keith, 2026-10-13); a person''s supersede refused like the plain reject, so dataset_blockers counts only choose-file and the rule''s supersession; the supply history on a date before the settlement is NOT clipped - it follows the rest of that section, decided with road-testing #19 (Keith, 2026-10-13); the re-file drill carries `from`, `from-on` and `via` so the banner and Back behave as REQ-DASH-198''s.'
+    - 'BUILT WITH REQ-PIPE-193 (2026-10-13): criteria 3, 5, 6, 7, 8 and 9 shipped in that change because the one resolver made them one change - TWO_FILES replaced HELD, every plain decision on an open pair is refused naming where to settle, and only choose-file or the rule''s supersession closes a contest.'
+    - 'THE BLOCKER CARRIES ITS SETTLEMENT (criteria 10 and 13): dataset_blockers records who settled a pair, when, why and each file''s outcome, receipt, supply id and run id - or the supply that superseded it - from qa.decision, qa.decision_file and qa.delivery_file alone, so the page draws the Settled row and each settled supply''s note without a second source.'
+    - 'THE PAIR''S OWN RUN IS DROPPED IN THE PAGE, not the build (criterion 13): buildSupplyHistory filters a settled pair''s arrival run id, so the build''s runs stay a plain record of what ran and the dashboard decides what a cycle shows.'
+    - 'CRITERION 11 ASSERTS THE CONTEST BY DATE as well as the verdict: on a daily dataset the next day is the next period, so a verdict alone would pass trivially once the period moved on.'
+    linked_tests:
+    - tests/test_choose_file.py
+    - tests/test_dataset_blockers.py
+    - tests/test_ticket_reconciler.py
+    - tests/test_filing_queue.py
+    - tests/test_dashboard_e2e.py
+    - tests-js/settled-pair.test.js
+    - tests-js/blocked-dataset.test.js
+    - tests-js/supply-history.test.js
+    - tests-js/standing-in-drill.test.js
+    implemented_by:
+    - qa_tools/common/outstanding.py::_from_contested_tables
+    - qa_tools/common/ticket_reconciler.py::body_for
+    - qa_tools/common/filing_queue.py::awaiting
+    - qa_tools/common/dataset_blockers.py::_how_it_ended
+    - qa_tools/common/slot_state.py::states_for
+    - dashboard/qa-reporting-dashboard.template.html::settledPairRow
+    - dashboard/qa-reporting-dashboard.template.html::settledNote
+    - dashboard/qa-reporting-dashboard.template.html::refiledFileLink
+    evidence:
+    - '2026-10-13: tests/test_dashboard_e2e.py TestASettledPairOnThePage settles a real two-file Birth Registrations pair in the worker''s own database and splices its real blocker record into the built page: on the receipt''s day the dataset reads red as contested, the contest is open the day before the settlement and closed from its day, the Settled row names both files and their outcomes, and the re-filed file''s link cold-loads framed as a re-filed file with Back.'
+    - '2026-10-13: the outstanding item, the ticket body, the queue order and the blocker record are each asserted against a real pair (tests/test_dataset_blockers.py, test_ticket_reconciler.py, test_filing_queue.py, test_choose_file.py TestTheBlockerRecordsItsSettlement, TestTheSlotNamesItsTwoFiles); the page''s settled row, refile link, notes, dropped run and wording in tests-js.'
     open_questions: []
   - id: REQ-GEN-195
     title: Child Protection's generated history has supplies that arrive early, and one too early

@@ -98,7 +98,7 @@ def why_unreadable(conn, run_id: str, own_table: str, resolution, *,
 def describe(run_id: str, own_table: str, why: str) -> str:
     """One line per run, whatever the number of checks it leaves out."""
     words = {HELD: "its supply is held, waiting for a person to place it",
-             CONTESTED: "two files claim it, waiting for a person to choose one",
+             CONTESTED: "two files for one table, waiting for a person to say what each file is",
              REFUSED: "the load refused the file"}[why]
     return (f"note: {run_id}: {own_table} cannot be read - {words} - so no tool runs "
             f"and nothing is checked; its dataset reads red until that is resolved.")

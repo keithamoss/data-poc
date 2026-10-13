@@ -286,3 +286,13 @@ describe("the banner names the date left (UX polish, #166)", () => {
     expect(w.arrivalBanner(ds(null))).toContain(`on ${w.fmtDay("2026-09-14")}`);
   });
 });
+
+describe("a re-filed file followed out of a settled pair (REQ-PIPE-194 criterion 12)", () => {
+  it("is framed as a re-filed file, never a substitution", () => {
+    const w = load("http://localhost/?from=2026-Q3&from-on=2026-09-14&via=refile");
+    const html = w.arrivalBanner(ds(null));
+    expect(html).toContain("You followed a re-filed file out of");
+    expect(html).not.toContain("a substitution");
+    expect(html).toContain("Back to");
+  });
+});

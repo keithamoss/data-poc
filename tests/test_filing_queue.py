@@ -256,3 +256,18 @@ class TestOnlyTheStatesADecisionProducedSayARuleDecidedThem:
         assert slot_state.AWAITING_DECISION not in filing_queue.FROM_A_DECISION
         assert slot_state.OVERDUE not in filing_queue.FROM_A_DECISION
         assert slot_state.TWO_FILES not in filing_queue.FROM_A_DECISION
+
+
+class TestAnOpenPairLeadsTheQueue:
+    """REQ-PIPE-194 criterion 4: listed ahead of every other item, however
+    much older the others are."""
+
+    def test_it_is_first(self, monkeypatch):
+        older = _state(slot_state.AWAITING_DECISION, period="2020-Q1", supply="cp-carers@1")
+        pair = _state(slot_state.TWO_FILES, dataset_id="cp-clients", period="2030-Q4",
+                      supply="cp-clients@9#1")
+        monkeypatch.setattr(slot_state, "states_for", lambda conn, c, now=None: [older, pair])
+        monkeypatch.setattr(filing_queue, "could_not_load", lambda conn, c: [])
+        monkeypatch.setattr(filing_queue, "waiting_over_promoted", lambda conn, states: [])
+        assert [s.state for s in filing_queue.awaiting(None, "child-protection")] == [
+            slot_state.TWO_FILES, slot_state.AWAITING_DECISION]

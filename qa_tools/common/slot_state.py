@@ -128,6 +128,8 @@ class SlotState:
     #: the next period's claim window has opened and nothing fills this
     #: one, so it can no longer be filled automatically.
     closed: bool = False
+    #: An open pair's two files, as they arrived (REQ-PIPE-194 criterion 2).
+    files: tuple[str, ...] = ()
 
     @property
     def needs_action(self) -> bool:
@@ -234,7 +236,7 @@ def _amber_waiting(conn, dataset_id: str, supply: str | None) -> bool:
 
 def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
              now: datetime, filings: dict, ever_delivered: bool,
-             two_files: bool = False) -> SlotState:
+             two_files: bool | tuple[str, ...] = False) -> SlotState:
     """Where this slot's supply has got to.
 
     `slot` is a slots.Slot; `filings` is {period: filing record} for
@@ -309,7 +311,8 @@ def state_of(conn: supply_db.SupplyConnection, *, dataset_id: str, slot,
     filed = filings.get(slot.name)
     if two_files:
         return SlotState(dataset_id=dataset_id, period=slot.name, state=TWO_FILES,
-                          supply=(filed or {}).get("supply_id"))
+                          supply=(filed or {}).get("supply_id"),
+                          files=two_files if isinstance(two_files, tuple) else ())
     if filed and not _rejected(conn, dataset_id, filed.get("supply_id") or ""):
         # AWAITING A DECISION, closed or not (REQ-PIPE-132 criterion 3): a
         # supply is here, so the period is not unsupplied. Not a superseded
@@ -401,11 +404,10 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
 
     now = now or asset_time.now()
     out: list[SlotState] = []
-    open_pairs: dict[str, frozenset[str]] = {}
+    open_pairs: dict[str, dict[str, tuple[str, ...]]] = {}
     for blocker in dataset_blockers.contests(conn):
         if blocker.is_open:
-            open_pairs[blocker.dataset_id] = open_pairs.get(
-                blocker.dataset_id, frozenset()) | {blocker.supply}
+            open_pairs.setdefault(blocker.dataset_id, {})[blocker.supply] = blocker.files
     for entry in hierarchy.datasets_in_collection(collection_id):
         try:
             # THE SAME BOUND FILING USES (post-build-review #73), and
@@ -428,7 +430,7 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
         filings = filings_by_period(conn, entry.dataset_id, every)
         # AN OPEN CONTEST'S PERIOD, by the one judgement (REQ-PIPE-194
         # criterion 5) - a pair's `#1` filed there whose contest is open.
-        pairs = open_pairs.get(entry.dataset_id, frozenset())
+        pairs = open_pairs.get(entry.dataset_id, {})
         ever = bool(every)
         # A PERIOD A SUPPLY WAS RE-FILED INTO, past the claim horizon
         # (post-build-review #115, D2): a person can file into a future
@@ -443,5 +445,5 @@ def states_for(conn: supply_db.SupplyConnection, collection_id: str, *,
             filed = (filings.get(slot.name) or {}).get("supply_id")
             out.append(state_of(conn, dataset_id=entry.dataset_id, slot=slot,
                                  now=now, filings=filings, ever_delivered=ever,
-                                 two_files=filed in pairs))
+                                 two_files=pairs.get(filed) or False))
     return out

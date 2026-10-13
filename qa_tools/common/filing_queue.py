@@ -154,7 +154,10 @@ def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
               and (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
     over = [s for s in waiting_over_promoted(conn, every)
             if (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
-    return sorted(states + failed + over, key=lambda s: (s.period, s.dataset_id))
+    # AN OPEN PAIR LEADS (REQ-PIPE-194 criterion 4): nothing about the
+    # dataset is checked until it is settled.
+    return sorted(states + failed + over,
+                  key=lambda s: (s.state != slot_state.TWO_FILES, s.period, s.dataset_id))
 
 
 def waiting_over_promoted(conn: supply_db.SupplyConnection,

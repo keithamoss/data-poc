@@ -35,7 +35,7 @@ describe("whether a hold or contest is open, as at the date on show", () => {
   it("says why in words, never by colour alone", () => {
     const w = load();
     expect(w.blockerReasonText(HELD)).toContain("Held");
-    expect(w.blockerReasonText({...HELD, kind: "contested"})).toContain("Two files, choose one");
+    expect(w.blockerReasonText({...HELD, kind: "contested"})).toContain("Two files for one table");
   });
 });
 
@@ -66,7 +66,7 @@ describe("supply history names every held supply and contested pair", () => {
     const html = w.blockerHistoryRows("cp-case-workers", "2026-04-01",
                                       {items: [], blockers: [HELD, contested]});
     expect(html).toContain("Held");
-    expect(html).toContain("Two files, choose one");
+    expect(html).toContain("Two files for one table");
     expect((html.match(/data-blocker=/g) || []).length).toBe(2);
   });
 

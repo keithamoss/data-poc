@@ -3509,7 +3509,7 @@ class TestAHeldOrContestedDatasetReadsRed:
               in_place_on=self.IN_PLACE_ON)
         contested = page.locator("tr[data-blocked=contested]")
         assert contested.count() == 1
-        assert "Two files, choose one" in contested.inner_text()
+        assert "Two files for one table" in contested.inner_text()
         assert contested.locator(".pill.red").count() == 1
         # One reason row: no row count, run date or sparkline beside it.
         assert contested.locator("svg").count() == 0
@@ -4143,3 +4143,99 @@ class TestThePanelAsAtTheDateOnShow:
         }""")
         assert checked["n"], "precondition: a date where the verdict is awaiting"
         assert checked["bad"] == []
+
+
+@pytest.fixture(scope="class")
+def dashboard_html_with_a_settled_pair(built_dashboard_html, supply_dsn, tmp_path_factory):
+    """REQ-PIPE-194 criterion 11: the real built page with Birth
+    Registrations' blockers replaced by the REAL blocker record of a pair
+    settled in this worker's own database - never the deployment's, which
+    REQ-GEN-196 supplies pairs to and which depends on this requirement.
+    File one is the supply; file two is re-filed to the next day; the
+    settlement takes effect three asset days after the receipt."""
+    import sys
+    from datetime import timedelta
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from pair_support import DS, Pair, _at, free_day
+
+    from qa_tools.common import dataset_blockers, people, qa_store, supply_db
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("MOTHMAN_SUPPLY_DSN", supply_dsn)
+        with supply_db.connect(label="e2e-settled-pair") as conn:
+            qa_store.ensure_schema(conn)
+            day = free_day(conn, date(2026, 9, 1), span=18)
+            nxt = day + timedelta(days=1)
+            p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                                  (f"birth_registrations_{nxt}.csv", _at(day, "13:45"))])
+            one, two = (n for n, _ in p.files)
+            actor = people.person_by_email("fpycnkgvmt@privaterelay.appleid.com")
+            p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()),
+                     at=_at(day + timedelta(days=3), "10:00"))
+            (blocker,) = [b.as_record() for b in dataset_blockers.contests(conn)
+                          if b.supply == p.pair]
+    tmp = tmp_path_factory.mktemp("settled_pair")
+    out = _with_blockers(built_dashboard_html, tmp / "dashboard_settled_pair.html", [blocker])
+    return out, day, (one, two), DS
+
+
+class TestASettledPairOnThePage:
+    """REQ-PIPE-194 criteria 10, 11 and 12, in a real browser."""
+
+    def _where(self, ds):
+        from qa_tools.common import hierarchy
+
+        e = hierarchy.dataset(ds)
+        return {"tier": "dataset", "agencyId": e.agency_id, "collectionId": e.collection_id,
+                "datasetId": ds}
+
+    def _blocked(self, page, ds):
+        return page.evaluate(f"""() => {{
+            for (const ag of DATA.agencies) for (const c of ag.collections)
+              for (const d of c.datasets) if (d.id === "{ds}")
+                return [(d.blocked || d.waitingBlocker || {{}}).kind || null, d.status];
+            return "missing";
+        }}""")
+
+    def test_it_reads_contested_until_the_settlement_then_settled(
+            self, page, dashboard_html_with_a_settled_pair):
+        from datetime import timedelta
+
+        html, day, (one, two), ds = dashboard_html_with_a_settled_pair
+        # ON THE RECEIPT'S OWN DAY: a daily dataset's next day is the next
+        # period, which has its own supply in the real history.
+        _goto(page, html, state=self._where(ds), in_place_on=str(day))
+        assert self._blocked(page, ds) == ["contested", "red"]
+        row = page.locator("tr[data-blocker=contested]")
+        assert row.count() == 1 and row.locator("[data-settled-file]").count() == 0
+
+        _goto(page, html, state=self._where(ds), in_place_on=str(day + timedelta(days=3)))
+        assert self._blocked(page, ds)[0] != "contested"
+        # THE CONTEST ITSELF, by date - open the day before the settlement,
+        # closed from its day (a daily dataset's verdict alone would pass
+        # trivially, its period having moved on).
+        open_on = lambda on: page.evaluate(  # noqa: E731
+            f"() => blockersOpenInPlaceOn('{ds}', '{on}').length")
+        assert open_on(day + timedelta(days=2)) == 1
+        assert open_on(day + timedelta(days=3)) == 0
+        settled = page.locator("tr[data-blocker=contested][data-settled]")
+        assert settled.count() == 1
+        text = " ".join(settled.inner_text().split())
+        assert "Settled" in text and one in text and two in text
+        assert "this period's supply" in text and "re-filed to" in text
+
+    def test_the_refiled_files_link_cold_loads_framed_as_a_refile(
+            self, page, dashboard_html_with_a_settled_pair):
+        from datetime import timedelta
+
+        html, day, _files, ds = dashboard_html_with_a_settled_pair
+        _goto(page, html, state=self._where(ds), in_place_on=str(day + timedelta(days=4)))
+        href = page.locator('[data-testid="refiled-file-link"]').get_attribute("href")
+        assert "via=refile" in href and f"from-on={day + timedelta(days=4)}" in href
+        query, fragment = href.split("?", 1)[1].split("#", 1)
+        page.goto(f"file://{html.resolve()}?{query}#{fragment}")
+        page.wait_for_selector('[data-testid="arrival-notice"]')
+        notice = " ".join(page.locator('[data-testid="arrival-notice"]').inner_text().split())
+        assert "re-filed file" in notice and "substitution" not in notice
+        assert page.locator('[data-testid="arrival-back"]').count() == 1

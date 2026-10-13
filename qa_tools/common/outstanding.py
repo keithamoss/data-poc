@@ -372,26 +372,47 @@ def _from_holds(conn=None) -> list[Item]:
     return items
 
 
-def _from_contested_tables(blockers) -> list[Item]:
+def _from_contested_tables(blockers, conn=None) -> list[Item]:
     """REQ-PIPE-115 criterion 8: a table two files claim, one item per
     open pair, naming both files - and, criterion 27, carrying any load
-    the pair's files failed rather than raising a second item for it."""
-    from qa_tools.common import dataset_blockers
+    the pair's files failed rather than raising a second item for it.
+
+    WORDED AS REQ-PIPE-194 criteria 1 and 15: 'Two files for one table',
+    each file with its receipt, settled by saying what each file is, and
+    WHERE - the terminal drives it, so the item names the place and hands
+    over no command. Actionable: the step exists now (REQ-PIPE-193)."""
+    from qa_tools.common import dataset_blockers, display_time, supply_files
 
     items = []
-    for blocker in blockers:
-        if blocker.kind != dataset_blockers.CONTESTED or not blocker.is_open:
-            continue
+    open_ones = [b for b in blockers
+                 if b.kind == dataset_blockers.CONTESTED and b.is_open]
+    receipts: dict[tuple[str, str], dict[str, object]] = {}
+    if open_ones:
+        with delivery_log._db(conn) as db:
+            for b in open_ones:
+                receipts[(b.dataset_id, b.delivery)] = dict(db.execute(
+                    "SELECT filename, received_instant FROM qa.delivery_file "
+                    "WHERE delivery = ? AND dataset_id = ? "
+                    "ORDER BY received_instant, receipt_sequence, filename",
+                    [b.delivery, b.dataset_id]).fetchall())
+    for blocker in open_ones:
         agency, collection = _scope_of(blocker.dataset_id)
+        got = receipts.get((blocker.dataset_id, blocker.delivery)) or {}
+        files = "; ".join(
+            f"{name}, received {display_time.format_instant(got[name])}" if got.get(name)
+            else name for name in (list(got) or list(blocker.files)))
+        refused = " ".join(f"{name} could not be loaded ({why})."
+                           for name, why in blocker.load_failures)
         items.append(Item(
             kind=CONTESTED_TABLE, severity=NEEDS_ACTION, blocking=True,
-            headline=(f"{blocker.dataset_id}: two files claim one table - "
-                      f"waiting for a person to choose one"),
-            detail=blocker.reason,
+            headline=f"{_name_of(blocker.dataset_id)}: Two files for one table",
+            detail=(f"Two files arrived for its table: {files}. Nothing is checked until "
+                    f"a person says what each file is." + (f" {refused}" if refused else "")),
             agency_id=agency, collection_id=collection, dataset_id=blocker.dataset_id,
             observed_at=blocker.opened_at,
-            responses=("choose which file is the supply",
-                        "reject both and ask the supplier to resend")))
+            responses=(f"say what each file is, at "
+                       f"'{supply_files.where_to_settle(blocker.dataset_id)}'",),
+            actionable=True))
     return items
 
 
@@ -679,7 +700,7 @@ def survey(conn=None, observations_dir: Path | None = None) -> Outstanding:
     blockers = dataset_blockers.all_blockers(conn)
     items = (_from_deliveries(conn)
               + _from_holds(conn)
-              + _from_contested_tables(blockers)
+              + _from_contested_tables(blockers, conn)
               + _from_loads(dataset_blockers.refused_in_a_contest(conn))
               + _from_inheritance_refusals()
               + _from_awaiting_decisions(conn)

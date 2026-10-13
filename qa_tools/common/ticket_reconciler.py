@@ -127,7 +127,17 @@ def body_for(state: slot_state.SlotState) -> str:
     if state.closed and state.state != slot_state.NOT_SUPPLIED_ACCEPTED:
         # REQ-PIPE-132 criteria 1 and 12: closed, and what that means.
         lines.append(f"This period has closed: {slot_state.CLOSED_NOTE}.")
-    if state.supply:
+    if state.state == slot_state.TWO_FILES:
+        # REQ-PIPE-194 criterion 2: a decision with several choices, made in
+        # the terminal - named, with where, and never a command here.
+        from qa_tools.common import supply_files
+
+        files = " and ".join(f"`{f}`" for f in state.files) or "two files"
+        lines += ["", f"Two files arrived for one table: {files}. A decision with several "
+                  f"choices is waiting for this dataset - what each file is - and it is "
+                  f"made in the terminal, not on GitHub, at "
+                  f"'{supply_files.where_to_settle(state.dataset_id)}'."]
+    elif state.supply:
         lines.append(f"Supply: `{state.supply}`")
     if state.stands_on:
         lines.append(f"Stands on: {display_time.format_period(state.stands_on)}")

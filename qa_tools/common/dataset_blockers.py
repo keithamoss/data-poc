@@ -63,6 +63,14 @@ class Blocker:
     #: (REQ-PIPE-173) - the refusal's own hold, never "another blocker"
     #: beside it (delivery-critic on (f)-(i), finding 1).
     agreement_refused: bool = False
+    #: How a contested pair was settled (REQ-PIPE-194 criteria 10 and 13):
+    #: {"actor", "at", "reason", "arrivalRunId", "files": [{"filename",
+    #: "receivedAt", "outcome", "toPeriod", "supplyId", "runId"}]}, files in
+    #: receipt order - or None.
+    settlement: dict | None = None
+    #: Where a later arrival's supply superseded the pair instead
+    #: (criterion 10): {"supply", "receivedAt"}.
+    superseded_by: dict | None = None
 
     @property
     def is_open(self) -> bool:
@@ -83,7 +91,8 @@ class Blocker:
                 "loadFailures": [{"file": f, "why": w} for f, w in self.load_failures],
                 "delivery": self.delivery, "rejected": self.rejected,
                 "scheduleEnded": self.schedule_ended,
-                "agreementRefused": self.agreement_refused}
+                "agreementRefused": self.agreement_refused,
+                "settlement": self.settlement, "supersededBy": self.superseded_by}
 
 
 def _iso(value) -> str | None:
@@ -149,26 +158,60 @@ def _settles_a_contest(action: str, actor_kind: str) -> bool:
         action == decision_log.SUPERSEDE and actor_kind == decision_log.RULE)
 
 
-def _decided_keys(db) -> dict[tuple[str, str], str]:
-    """(dataset, arrival key) -> the earliest instant a decision that
-    settles which file is the supply took effect."""
+def _deciding(db) -> dict[tuple[str, str], dict]:
+    """(dataset, arrival key) -> the FIRST decision that ended the contest:
+    {"id", "action", "at", "actor", "reason", "superseded_by"}."""
     from qa_tools.common import decision_log
 
-    out: dict[tuple[str, str], str] = {}
-    for dataset_id, supply, action, actor_kind, effective_at in db.execute(
-            "SELECT dataset_id, supply, action, actor_kind, effective_at FROM qa.decision "
-            "WHERE action IN (?, ?) ORDER BY effective_at, id",
+    out: dict[tuple[str, str], dict] = {}
+    for (decision_id, dataset_id, supply, action, actor_kind, effective_at, actor, reason,
+         superseded_by) in db.execute(
+            "SELECT id, dataset_id, supply, action, actor_kind, effective_at, actor, reason, "
+            "superseded_by FROM qa.decision WHERE action IN (?, ?) ORDER BY effective_at, id",
             [decision_log.CHOOSE_FILE, decision_log.SUPERSEDE]).fetchall():
         if not supply or not _settles_a_contest(action, actor_kind):
             continue
-        out.setdefault((dataset_id, _arrival_of(supply)), _iso(effective_at))
+        out.setdefault((dataset_id, _arrival_of(supply)), {
+            "id": decision_id, "action": action, "at": _iso(effective_at), "actor": actor,
+            "reason": reason, "superseded_by": superseded_by})
     return out
+
+
+def _how_it_ended(db, dataset_id: str, pair: str, delivery: str,
+                  decided: dict | None) -> tuple[dict | None, dict | None]:
+    """(settlement, superseded_by) for a resolved contest - from qa.decision,
+    qa.decision_file and qa.delivery_file only (REQ-PIPE-194's NFR)."""
+    from qa_tools.common import decision_log, supply_files
+
+    if decided is None:
+        return None, None
+    if decided["action"] != decision_log.CHOOSE_FILE:
+        by = decided["superseded_by"]
+        received = db.execute(
+            "SELECT received_at FROM qa.supply_receipt WHERE dataset_id = ? AND supply_id = ?",
+            [dataset_id, by]).fetchall() if by else []
+        return None, {"supply": by, "receivedAt": _iso(received[0][0]) if received else None}
+    receipts = {name: _iso(at) for name, at in db.execute(
+        "SELECT filename, received_at FROM qa.delivery_file WHERE delivery = ? "
+        "AND dataset_id = ? ORDER BY received_instant, receipt_sequence, filename",
+        [delivery, dataset_id]).fetchall()}
+    rows = {name: (supply_id, outcome, to_slot) for name, supply_id, outcome, to_slot in
+            db.execute("SELECT filename, supply_id, outcome, to_slot FROM qa.decision_file "
+                       "WHERE decision_id = ?", [decided["id"]]).fetchall()}
+    files = [{"filename": name, "receivedAt": receipts.get(name),
+              "outcome": rows[name][1], "toPeriod": rows[name][2],
+              "supplyId": rows[name][0],
+              "runId": supply_files.run_id_of(dataset_id, rows[name][0])}
+             for name in list(receipts) + sorted(set(rows) - set(receipts)) if name in rows]
+    return {"actor": decided["actor"], "at": decided["at"], "reason": decided["reason"],
+            "arrivalRunId": supply_files.arrival_run_id_of(dataset_id, pair),
+            "files": files}, None
 
 
 def _contested(db) -> list[Blocker]:
     from qa_tools.common import asset_time, load_log, supply_db
 
-    decided = _decided_keys(db)
+    decided = _deciding(db)
     failures = load_log.failures(conn=db)
     out = []
     for delivery, dataset_id, files, received_at in db.execute(
@@ -198,14 +241,18 @@ def _contested(db) -> list[Blocker]:
             refused.append((name, record.reason or "the load failed"))
         listed = " and ".join(files)
         reason = (f"Two files claim this dataset's table in delivery {delivery!r}: "
-                  f"{listed}. Nothing is checked until a person chooses one.")
+                  f"{listed}. Nothing is checked until a person says what each file is.")
         if refused:
             reason += " " + " ".join(f"{name} could not be loaded ({why})."
                                      for name, why in refused)
+        pair = f"{dataset_id}@{key}#1"
+        ended = decided.get((dataset_id, key))
+        settlement, superseded_by = _how_it_ended(db, dataset_id, pair, delivery, ended)
         out.append(Blocker(
-            kind=CONTESTED, dataset_id=dataset_id, supply=f"{dataset_id}@{key}#1",
-            opened_at=received_at, resolved_at=decided.get((dataset_id, key)),
-            reason=reason, files=files, load_failures=tuple(refused), delivery=delivery))
+            kind=CONTESTED, dataset_id=dataset_id, supply=pair,
+            opened_at=received_at, resolved_at=ended["at"] if ended else None,
+            reason=reason, files=files, load_failures=tuple(refused), delivery=delivery,
+            settlement=settlement, superseded_by=superseded_by))
     return out
 
 

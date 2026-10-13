@@ -125,6 +125,14 @@ releases:
               is the period's supply, belongs to another period, is wrong,
               or is a spare copy. Each file that becomes a supply is then
               checked on its own, and the dataset stops reading "two files".
+          - headline: Two files for one table, on the page and the ticket
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A dataset with two files for one table now says so in those
+              words, names both files and tells you where to settle them. Once
+              settled, its supply history shows who settled the pair and what
+              each file turned out to be, and a re-filed file links to the
+              period it went to.
       - category: Fixed
         items:
           - headline: Two files for one table can no longer both be promoted

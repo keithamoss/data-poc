@@ -278,6 +278,20 @@ class TestWhatTheTicketSays:
         # REQ-PIPE-194 criteria 4 and 15: the one phrase for what to do.
         assert "say what each file is" in body
 
+    def test_two_files_say_the_decision_is_made_in_the_terminal(self):
+        """REQ-PIPE-194 criterion 2: several choices, made in the terminal,
+        both files as code, where in the TUI - and no GitHub command."""
+        body = tr.body_for(a_slot(slot_state.TWO_FILES, dataset="birth-registrations",
+                                   period="2026-11-02",
+                                   files=("birth_registrations_2026-11-02.csv",
+                                          "birth_registrations_2026-11-02-1.csv")))
+        assert "`birth_registrations_2026-11-02.csv`" in body
+        assert "`birth_registrations_2026-11-02-1.csv`" in body
+        assert "several choices" in body and "terminal" in body
+        assert ("mothman > Filing decisions > Civil Registration > Supplies waiting on a "
+                "decision") in body
+        assert "\n/" not in body and "choose-file" not in body
+
     def test_a_daily_period_is_written_in_words(self):
         body = tr.body_for(a_slot(period="2026-08-27"))
         assert "2026-08-27" not in body

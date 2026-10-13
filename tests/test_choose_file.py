@@ -485,3 +485,46 @@ class TestCriticFindingsOn193:
                                                      supply=p.second)
         assert TABLE in supply_holds.held_tables(conn, arrival_key=p.key, supply=p.pair)
         assert TABLE in supply_holds.held_tables(conn, arrival_key=p.key)
+
+
+class TestTheSlotNamesItsTwoFiles:
+    """REQ-PIPE-194 criterion 2: the slot state the ticket reads carries
+    the pair's files, from the same open-contest judgement."""
+
+    def test_states_for_carries_the_files(self, conn, day):
+        from qa_tools.common import slot_state
+
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:40")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:50"))])
+        (state,) = [s for s in slot_state.states_for(conn, "civil-registration")
+                    if s.dataset_id == DS and s.period == p.period]
+        assert state.state == slot_state.TWO_FILES
+        assert set(state.files) == {n for n, _ in p.files}
+
+
+class TestTheBlockerRecordsItsSettlement:
+    """REQ-PIPE-194 criteria 10 and 13: what the page draws the settled row
+    and each settled supply's note from - recorded metadata only."""
+
+    def test_who_when_why_and_each_file_in_receipt_order(self, conn, actor, day):
+        nxt = day + timedelta(days=1)
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{nxt}.csv", _at(day, "13:45"))])
+        one, two = (n for n, _ in p.files)
+        p.settle(conn, actor, (one, "supply"), (two, "refile", nxt.isoformat()))
+        (blocker,) = [b for b in dataset_blockers.contests(conn) if b.supply == p.pair]
+        got = blocker.as_record()["settlement"]
+        assert got["actor"] and got["reason"] == "the supplier sent it twice"
+        assert got["at"] == blocker.resolved_at
+        assert [(f["filename"], f["outcome"], f["toPeriod"]) for f in got["files"]] == [
+            (one, "supply", None), (two, "refiled", nxt.isoformat())]
+        assert [f["supplyId"] for f in got["files"]] == [p.pair, p.second]
+        assert got["files"][1]["runId"] == supply_files.run_id_of(DS, p.second)
+        assert got["arrivalRunId"] == supply_files.arrival_run_id_of(DS, p.pair)
+        assert all(f["receivedAt"] for f in got["files"])
+
+    def test_an_open_pair_has_none(self, conn, day):
+        p = Pair(conn, day, [(f"birth_registrations_{day}.csv", _at(day, "13:30")),
+                              (f"birth_registrations_{day}-1.csv", _at(day, "13:45"))])
+        (blocker,) = [b for b in dataset_blockers.contests(conn) if b.supply == p.pair]
+        assert blocker.as_record()["settlement"] is None

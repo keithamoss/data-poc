@@ -389,3 +389,19 @@ describe("the cycle tables line up (#121 D3)", () => {
     expect(tables.every((t) => t.classList.contains("supply-cycle-table"))).toBe(true);
   });
 });
+
+describe("a settled pair in the supply history (REQ-PIPE-194 criterion 13)", () => {
+  it("drops the pair's 'could not run' run, so the settled supply is no resupply", () => {
+    const w = load();
+    const d = datasetWithStatuses([
+      ["bdm__k", "2026-01-01", "red"],
+      ["bdm__k__1__r1", "2026-01-03", "green"],
+    ]);
+    w.blockersFor = () => [{kind: "contested", datasetId: d.id, settlement: {
+      arrivalRunId: "bdm__k", files: []}}];
+    const history = w.buildSupplyHistory(d);
+    const ids = history.flatMap((c) => c.entries.map((e) => e.run_id));
+    expect(ids).toEqual(["bdm__k__1__r1"]);
+    expect(history[0].entries[0].isResupply).toBe(false);
+  });
+});

@@ -2414,7 +2414,12 @@ function buildSupplyHistory(d){
   const cadence = d.sla.cadence;
   const arrivalByRun = d.arrivalByRun || {};
   const statusByRun = datasetStatusByRun(d);
+  // A SETTLED PAIR'S 'could not run' RUN HAS NO ROW (REQ-PIPE-194
+  // criterion 13): each file that became a supply has its own, and the
+  // pair's run would otherwise make the first of them read as a resupply.
+  const settledArrivals = new Set(settledPairs(d.id).map(b=> b.settlement.arrivalRunId));
   const runsChronological = [...(d.runs || [])]
+    .filter(r=> !settledArrivals.has(r.run_id))
     .sort((a,b)=> a.run_date.localeCompare(b.run_date) || a.run_id.localeCompare(b.run_id));
 
   const chains = []; // {cycleStart, period, entries[], open}
@@ -3908,11 +3913,18 @@ function arrivalBanner(ds){
   // period left - by then it may have ended, or never existed - so it is
   // never read here.
   const what = ARRIVAL_VIA === "inheritance" ? "an inherited period"
-    : ARRIVAL_VIA === "substitution" ? "a substitution" : null;
+    : ARRIVAL_VIA === "substitution" ? "a substitution"
+    : ARRIVAL_VIA === "refile" ? "a re-filed file" : null;
   const nowOn = periodNameFor(ds && ds.id, CURRENT_IN_PLACE_ON);
   const here = nowOn ? (fmtPeriodName(nowOn) || nowOn) : null;
   const followed = what ? `You followed ${what} out of` : "You followed a link out of";
-  const detail = here
+  // A RE-FILED FILE WENT HERE; it is not a supply the period left stood on
+  // (REQ-PIPE-194 criterion 12).
+  const detail = here && ARRIVAL_VIA === "refile"
+    ? `${followed} <b style="display:inline">${escHtml(String(left))}</b>.
+       What you are looking at now is ${escHtml(String(here))} — the period that file was
+       re-filed to.`
+    : here
     ? `${followed} <b style="display:inline">${escHtml(String(left))}</b>.
        What you are looking at now is ${escHtml(String(here))} — the period whose supply
        ${escHtml(String(left))} stood on.`
@@ -4752,7 +4764,7 @@ function eventSeverityPill(severity, size){
 // loudly; the kind is what a person actually recognises.
 const OUTSTANDING_KIND_LABEL = {
   "held-supply":"Held supply", "failed-load":"Could not be loaded",
-  "contested-file":"Contested file", "contested-table":"Two files, choose one", "unrecognised-file":"Unrecognised file",
+  "contested-file":"Contested file", "contested-table":"Two files for one table", "unrecognised-file":"Unrecognised file",
   "in-flight-delivery":"Still arriving",
   "closed-unfilled-slot":"No supply", "awaiting-decision":"Awaiting a decision",
   "inheritance-refused":"No earlier supply to stand on",
@@ -4770,13 +4782,13 @@ function outstandingKindLabel(kind){ return OUTSTANDING_KIND_LABEL[kind] || kind
 // RECEIPT until the decision that ended it took effect, so the as-of
 // view reproduces what a reader saw then (criterion 12). Both ends are
 // read on the asset's clock, the same day boundary the as-of picker uses.
-const BLOCKER_LABEL = {held:"Held", contested:"Two files, choose one",
+const BLOCKER_LABEL = {held:"Held", contested:"Two files for one table",
   refused:"Could not be loaded",
   // REQ-PIPE-173: OURS, NOT THE SUPPLIER'S - worded as a configuration problem.
   "agreement-refused":"Refused: the delivery agreement changed"};
 const BLOCKER_SAYS = {
   held:"no open period to file it to; waiting for a person",
-  contested:"two files claim its table, waiting for a person to choose one",
+  contested:"two files for one table, waiting for a person to say what each file is",
   refused:"its supply arrived and could not be loaded",
   "agreement-refused":"a configuration problem on our side - its recorded judgements no longer match the agreement and no declared correction accounts for it"};
 function assetDateStrOf(value){
@@ -5598,6 +5610,34 @@ function excuseNote(datasetId, runId, inPlaceOnDateStr){
 // supply kept against a correction's move, that it was kept and why. ON
 // EVERY DATE, past ones included (criterion 3): the corrected verdict is the
 // answer, and what the page said then is the snapshot archive's.
+// THE PAIRS A PERSON SETTLED (REQ-PIPE-194), whatever the date on show -
+// the cycle tables are not clipped (criterion 14).
+function settledPairs(datasetId){
+  return blockersFor(datasetId).filter(b=> b.kind === "contested" && b.settlement);
+}
+// The pair's own period: where its arrival was filed, else its receipt's day.
+function settledPairPeriod(datasetId, b){
+  const raw = rawRealDatasetById(datasetId);
+  const filed = raw && (raw.arrivalByRun || {})[b.settlement.arrivalRunId];
+  return (filed && filed.slot) || periodNameFor(datasetId, assetDateStrOf(b.openedAt));
+}
+// ONE NOTE on each settled supply's row (criterion 13): it came from two
+// files for one table, who settled them and when - and, re-filed, the
+// period it was received for, in correctionNote's 'moved to' shape.
+function settledNote(datasetId, runId){
+  for(const b of settledPairs(datasetId)){
+    const f = (b.settlement.files || []).find(f=> f.runId && (runId === f.runId
+      || String(runId).startsWith(f.runId + "__r")));
+    if(!f) continue;
+    const s = b.settlement;
+    const from = settledPairPeriod(datasetId, b);
+    const moved = f.outcome === "refiled" && f.toPeriod
+      ? ` · received for ${escHtml(fmtPeriodName(from) || from || "")} · moved to ${escHtml(fmtPeriodName(f.toPeriod) || f.toPeriod)}`
+      : "";
+    return `<div class="changed-by" data-settled-from style="color:var(--ink-muted); font-size:12px;">From two files for one table, settled by ${escHtml(s.actor || "a person")} ${escHtml(fmtDay(assetDateStrOf(s.at)))}${moved}</div>`;
+  }
+  return "";
+}
 function correctionNote(datasetId, runId){
   const raw = rawRealDatasetById(datasetId);
   const c = raw && raw.corrections;
@@ -5811,11 +5851,11 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     const arrivalCell = e.isResupply
       ? excusedResupply + (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
-          : "") + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id)
+          : "") + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id) + settledNote(datasetId, e.run_id)
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillFor(datasetId, e.run_id, e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${waitedChip(e)} ${filedNote(e)}${excuseNote(datasetId, e.run_id)}${correctionNote(datasetId, e.run_id)}`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillFor(datasetId, e.run_id, e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${waitedChip(e)} ${filedNote(e)}${excuseNote(datasetId, e.run_id)}${correctionNote(datasetId, e.run_id)}${settledNote(datasetId, e.run_id)}`;
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
@@ -5858,18 +5898,60 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
         <thead><tr><th>Arrived</th><th>Status</th><th>Why</th></tr></thead>
         <tbody>${rows.map(b=>{
           const resolved = b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr;
+          if(resolved && b.settlement) return settledPairRow(b, datasetId, inPlaceOnDateStr);
           return `<tr data-blocker="${b.kind}">
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
             <td><b>${escHtml(blockerLabel(b))}</b>${resolved
               ? (b.rejected
                   ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
+                  : b.supersededBy
+                  ? ` <span style="color:var(--ink-faint);">— superseded by the supply received ${b.supersededBy.receivedAt ? fmtInstant(b.supersededBy.receivedAt) : "later"}</span>`
                   : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`)
               : ""}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>
     </div>`;
+}
+// A SETTLED PAIR (REQ-PIPE-194 criterion 10): ONE row, a Settled tag pill
+// in the accepted gap's style, who settled it, when on the asset's clock
+// and why - and beneath it one line per file, in receipt order, with what
+// it turned out to be. A re-filed file is a real link to the period it went
+// to (criterion 12), framed as a re-filed file on arrival.
+const SETTLED_SAID = {supply:"this period's supply", rejected:"rejected",
+  superseded:"a spare copy - kept, can be brought back"};
+function settledPairRow(b, datasetId, inPlaceOnDateStr){
+  const s = b.settlement;
+  const period = settledPairPeriod(datasetId, b);
+  const files = (s.files || []).map(f=>{
+    const said = f.outcome === "refiled"
+      ? refiledFileLink(datasetId, f.toPeriod, period, inPlaceOnDateStr)
+      : escHtml(SETTLED_SAID[f.outcome] || f.outcome);
+    return `<div data-settled-file="${escAttr(f.outcome)}"><span class="mono">${escHtml(f.filename)}</span>${f.receivedAt ? `, received ${fmtInstant(f.receivedAt)}` : ""} — ${said}</div>`;
+  }).join("");
+  return `<tr data-blocker="${b.kind}" data-settled>
+    <td>${fmtInstant(b.openedAt)}</td>
+    <td><span class="pill tag sm"><span class="ico"></span>Settled</span></td>
+    <td><b>${escHtml(blockerLabel(b))}</b> <span style="color:var(--ink-faint);">— settled by ${escHtml(s.actor || "a person")}, ${fmtInstant(s.at)}</span>${s.reason ? `<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(s.reason)}</div>` : ""}
+      <div style="font-size:12px; margin-top:4px;">${files}</div></td>
+  </tr>`;
+}
+// THE SAME ARRIVAL CONTEXT REQ-DASH-198 USES, with via=refile, so the
+// banner never reads a re-filed file as a substitution.
+function refiledFileLink(datasetId, toPeriod, fromPeriod, fromOn){
+  const label = `re-filed to ${escHtml(fmtPeriodOrDay(toPeriod))}`;
+  const to = periodDateFor(datasetId, toPeriod);
+  if(!to) return label;
+  const params = new URLSearchParams();
+  params.set(IN_PLACE_ON_PARAM, to);
+  if(fromPeriod) params.set("from", String(fromPeriod));
+  if(fromOn) params.set("from-on", fromOn);
+  params.set("via", "refile");
+  const href = `${location.pathname}?${params.toString()}${typeof STATE !== "undefined" && STATE ? stateToHash(STATE) : location.hash}`;
+  return `<a href="${escAttr(href)}" data-standing-drill data-to="${escAttr(to)}"
+    data-from="${escAttr(String(fromPeriod || ""))}" data-from-on="${escAttr(fromOn || "")}"
+    data-via="refile" data-testid="refiled-file-link">${label}</a>`;
 }
 // EVERY CLOSED UNFILLED PERIOD, MARKED OR NOT (REQ-DASH-133 criterion
 // 8), in the supply history whatever cycle is on show - an old gap is
@@ -8142,7 +8224,9 @@ const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   "withdraw-excuse":"un-excused", acknowledge:"acknowledged",
   // REQ-DASH-198 criterion 4: a stand-in removed is named in words too.
   "de-substitute":"no longer substituted", "un-inherit":"no longer carried forward",
-  "mark-not-supplied":"marked not supplied", "still-failing":"recorded as still failing"};
+  "mark-not-supplied":"marked not supplied", "still-failing":"recorded as still failing",
+  // REQ-PIPE-194 criterion 16: a settlement of two files for one table.
+  "choose-file":"settled"};
 // DECISIONS THAT CHANGED AN EARLIER DATE (REQ-PIPE-081 criterion 6): taking
 // effect on or before the date on show, recorded after it - so the page now
 // shows that date differently from how it could have looked then. The plain

@@ -62,7 +62,23 @@ class TestATableTwoFilesClaimRaisesOneDatasetItem:
         item = items[0]
         assert item.dataset_id == DATASET and item.blocking
         assert "cp_case_workers.csv" in item.detail and "cp_case_workers_v2.csv" in item.detail
-        assert "choose" in item.headline
+
+    def test_it_says_what_to_do_and_where_never_a_command(self, clean):
+        """REQ-PIPE-194 criteria 1 and 15: 'Two files for one table', each
+        file with its receipt, settled by saying what each file is, at the
+        TUI's place - no command to paste, no 'not yet possible'."""
+        from qa_tools.common import display_time, supply_files
+
+        _pair()
+        (item,) = [i for i in outstanding.survey(clean).items
+                   if i.kind == outstanding.CONTESTED_TABLE]
+        assert "Two files for one table" in item.headline
+        assert display_time.format_instant(RECEIVED) in item.detail
+        said = " ".join(item.responses)
+        assert "say what each file is" in said
+        assert supply_files.where_to_settle(DATASET) in said
+        assert item.actionable
+        assert "mothman supply" not in said and "choose" not in item.headline
 
     def test_it_is_not_the_contested_file_kind(self, clean):
         """The opposite case - one file claimed by several datasets - keeps

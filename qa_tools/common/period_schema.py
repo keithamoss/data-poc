@@ -527,7 +527,7 @@ class Unrunnable:
             return (f"could not run - {listed} arrived and could not be loaded")
         if self.reason == CONTESTED:
             return (f"could not run - two files claim {listed} for this period, waiting "
-                     f"for a person to choose one")
+                     f"for a person to say what each file is")
         if self.reason == STAGED_AWAITING_DECISION:
             return (f"could not run - a supply for {listed} is staged awaiting a "
                      f"decision, so nothing is promoted for this period yet")
