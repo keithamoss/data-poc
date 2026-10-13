@@ -1174,7 +1174,7 @@ to the exact right file/line/folder with zero console errors.
     2026-10-13: "we'll make a note to come back to that this week. Maybe
     after this next line of things we've got lined up").
 
-89. **[todo, 2026-10-13]** **[Pipeline & publishing]** **SIGNIFICANT: a
+89. **[parked, 2026-10-13]** **[Pipeline & publishing]** **SIGNIFICANT: a
     schema change has no production path - "wipe and rebuild" only works on
     a synthetic asset.** Priority: deal with it this week (Keith,
     2026-10-13: "I'm quite concerned about that database schema thing.
@@ -1270,6 +1270,14 @@ to the exact right file/line/folder with zero console errors.
     publisher role can read all of qa. Two calls for Keith: where delivered
     files live in production and for how long; whether sample values stay
     readable by the publisher. Not scoped.
+    **PARKED, same morning (Keith): "This is a bigger change that we need to
+    think about ... write this all up ... and we'll make a call later on
+    this much wider set of changes."** The whole thread is written up in
+    docs/drafts/schema-migrations/README.md. Two answers given before
+    parking: supply-row samples move supply-side (out of the publisher's
+    reach, qa keeps counts and salted key hashes); delivered files live in a
+    versioned bucket per asset, retention scoped later. Wider distributions
+    may be accepted as a gap and filled by a targeted regenerate later.
 
 90. **[todo, 2026-10-13]** **[Pipeline & publishing]** **Protect the
     processing loop from a decision made while it is working on the same
