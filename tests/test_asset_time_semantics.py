@@ -147,6 +147,14 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     debug capture-arrival-golden` is still the recorded procedure, and
     `ls data/deliveries | wc -l` is the question to ask first.
 
+    RE-CAPTURED 2026-10-13 FOR REQ-GEN-196 (Birth Registrations' history 80
+    days, seven two-file pairs settled by script). The procedure first: 115
+    deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
+    capture. Every Child Protection dataset is identical. Birth Registrations
+    51 arrivals became 98: the 19 present in both are unchanged in instant
+    and verdict; 32 went and 79 came because the new July days now hold the
+    ordinary reds (moved before the scenarios) and August holds the pairs.
+
     RE-CAPTURED 2026-10-12 FOR REQ-GEN-195 (Child Protection arrives early:
     TS-9, TS-65, TS-66, and TS-67 too early). The procedure first: 69
     deliveries, zero `handfiled-*`, `mothman dashboard rebuild` before the
@@ -397,14 +405,23 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         human"). Five of its six move late -> early, judged against the
         quarter they now belong to; cp-case-workers, not delivered in
         2023-Q4, is rejected instead and keeps its late verdict.
+
+        THEN 132 / 39 / 27 / 8 over 206 FOR REQ-GEN-196 (2026-10-13), Birth
+        Registrations' history lengthened to 80 days with seven two-file
+        pairs. Procedure first: 115 deliveries, zero `handfiled-*`, the
+        dashboard rebuilt before the capture. Every Child Protection entry is
+        identical; Birth Registrations alone went 43 / 4 / 4 to 70 / 18 / 10.
+        The early ones are mostly the pairs, received before their 14:00 due
+        time (Keith chose to word those criteria "early", 2026-10-13); the
+        late ones are the ordinary reds' resends and TS-70's 16:30 file.
         """
         golden = json.loads(GOLDEN.read_text())
         counts: dict[str, int] = {}
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        assert counts == {"on_time": 105, "early": 25, "late": 21, "unfiled": 8}
-        assert sum(counts.values()) == 159
+        assert counts == {"on_time": 132, "early": 39, "late": 27, "unfiled": 8}
+        assert sum(counts.values()) == 206
 
 
 class TestTheClassificationBoundaries:
