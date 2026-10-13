@@ -604,7 +604,9 @@ def _pair_delivery(provider, injection, extra, n: int, base, period, seed: int,
             elif f.severity:
                 df = provider.dirty(df, severity=f.severity, seed=seed + 820 + k,
                                     previous_row_count=previous_row_count)
-            if supply_shaped is None and not f.shapes:
+            # THE PAYLOAD IS A CLEAN FILE: it sizes the next green day, so a
+            # file with a planted fault - a third of its rows gone - never is.
+            if supply_shaped is None and not f.shapes and not f.severity:
                 supply_shaped = df
             csv = df.to_csv(index=False)
             for shape in f.shapes:

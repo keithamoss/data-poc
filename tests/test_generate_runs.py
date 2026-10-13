@@ -472,3 +472,28 @@ def test_every_lead_in_and_following_supply_arrives_on_time(manifest):
             due = slots.slot_instants("birth-registrations", d.fromisoformat(entry["period"]))
             got = asset_time.parse_instant(entry["received_at"], "received_at")
             assert due.due_at <= got <= due.due_at + due.grace, (entry["period"], got)
+
+
+class TestAPairsPayloadIsItsCleanFile:
+    """REQ-GEN-196, found on the first bootstrap: a pair's PAYLOAD - the size
+    the next green day is built to - was its first unshaped file, which for
+    TS-70 and TS-73 is the extract with a planted fault, a third of its rows
+    gone. Every green day after it shrank to match and read red on row-count
+    growth: thirteen targeted supplies disagreed with what they were built to."""
+
+    @pytest.mark.parametrize("sid", ["TS-70", "TS-73"])
+    def test_a_faulty_first_file_does_not_set_the_size(self, sid):
+        from datetime import date
+        from types import SimpleNamespace
+
+        from generator import scenario_injection as si
+
+        injection = next(i for i in si.INJECTIONS if i.scenario_id == sid)
+        (extra,) = [a for a in injection.arrivals if a.files]
+        provider = generate_runs.BirthRegistrationsProvider()
+        day = date(2026, 8, 11)
+        base = provider.generate(day, seed=7, n_rows=1800, id_offset=0)
+        pair = generate_runs._pair_delivery(
+            provider, injection, extra, 0, base, SimpleNamespace(date=day), seed=7,
+            id_offset=0, n_rows=1800, previous_row_count=len(base), placement=None)
+        assert len(pair.payload) == len(base)
