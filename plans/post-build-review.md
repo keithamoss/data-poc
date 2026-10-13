@@ -8657,3 +8657,33 @@ twice. It deliberately did not re-find the `TypeError`.
     - **For Keith**: criterion 22 lists TS-79a/TS-79b as "sharing one
       placement" while criterion 19 gives them different quarters - the two
       cannot both hold; the build follows 19. Wording only.
+
+177. **[investigate, 2026-10-14]** **[Pipeline & publishing]** **[Data
+    generation]** **A replayed correction's confirmation is stamped with the
+    real clock, and the fix the architect proposed would stamp it before the
+    correction was merged.** Found by `delivery-architect` (finding B10)
+    reviewing the close-out batch, verified against the real database rather
+    than taken on trust. `bootstrap._confirm_corrections` opens a fresh
+    `replay_clock.replaying()`, whose anchor is None, so `confirm_due` stamps
+    `asset_time.now()`. The one row in `qa.correction_applied` (REQ-PIPE-181)
+    reads applied 2026-10-13 15:17 UTC - the moment that bootstrap ran -
+    while the replayed history ends at 2026-09-22 14:30 (the latest
+    `qa.supply_receipt`). So the stamp differs on every bootstrap, which
+    breaks "regenerating reproduces the same output", and sits three weeks
+    after the history it confirms.
+
+    **NOT FIXED, on purpose.** The architect's amendment - anchor at the later
+    of both collections' last replayed instants - is wrong for the only
+    correction that exists: REQ-PIPE-181 is dated 2026-10-11, AFTER the
+    history ends, so that anchor would confirm it on 2026-09-22, nineteen
+    days before it was merged. The recorded decision (REQ-PIPE-170's "stamped
+    at the end of the replay rather than on the merge date") assumed a
+    correction merged inside the history and does not say what happens to
+    one merged after it. That is a choice about agreed behaviour, so it is
+    Keith's. The candidates: (a) leave the real clock - honest that the
+    confirmation happened at bootstrap, not reproducible; (b) the later of
+    the replay's end and the correction's merge instant - reproducible,
+    never before the merge (recommended); (c) the replay's end only - wrong
+    whenever the merge is later, as now. No visible effect today: the
+    confirmation moved, placed and held nothing. Needs a failing test first
+    once chosen.
