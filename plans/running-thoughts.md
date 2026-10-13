@@ -1218,6 +1218,26 @@ to the exact right file/line/folder with zero console errors.
     settles), #71 (where QA runs). Priority: this week, worked together
     with Keith.
 
+91. **[parked, 2026-10-13]** **[Testing & dev tooling]** **[Data generation]**
+    **An agent that walks every test scenario like a user and checks it
+    really shows.** Keith, 2026-10-13: "have an agent run through each
+    scenario and make sure what's being done actually shows up on the
+    dashboard and actually is kind of represented in the database. Maybe
+    they kind of like drive it all like a user using the TUI and driving a
+    browser to look at the things linked from the scenarios just to make
+    sure they all make sense." For each registered scenario (the scenario
+    map / plans/supply-model.md register): open the dashboard link the
+    Scenarios tab gives, in a real browser; drive the TUI where the
+    scenario involves a person's decision; query the database for the
+    filing, verdict, decisions and runs the register's "Expect" says should
+    be there; and report anything that does not match or does not make
+    sense to a reader. Why it is worth having, from today alone: TS-67's
+    history looked right by filing and verdict, while its re-checks had
+    never run and two of its supplies stayed red (post-build-review #161) -
+    exactly what walking the scenario as a reader would have caught. Close
+    in spirit to the delivery-*-critic agents, but driven by the scenario
+    register rather than by one requirement. Parked; not scoped.
+
 ## Also flagged, queued separately (not part of the "running thoughts"
 batch above, but landed in the same conversation)
 
