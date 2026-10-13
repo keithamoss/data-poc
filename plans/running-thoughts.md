@@ -1233,6 +1233,24 @@ to the exact right file/line/folder with zero console errors.
     maintaining it looks like in a team and how often it happens in
     production:
     docs/drafts/schema-migrations/what-maintaining-it-looks-like.md.
+    **WHAT THE 38 REAL BUMPS SAY (Keith's question, same morning: could each
+    have been upgraded in place, and would it have needed QA re-run?)** -
+    docs/drafts/schema-migrations/schema-bumps-analysis.md. All 38 could
+    have been migrated in place and NONE needed the check tools re-run; the
+    real risk is re-judging history, not re-running tools. 19 additive, 5
+    SQL backfills from other qa rows, 6 hand-written reshapes (four also
+    needing a one-off import of committed files), 1 recompute from outside
+    qa (v4: the run's original UTC offset was already lost), 1 tool-only
+    value (v29's file checks - fill with NULL, never today's verdict), 1
+    constraint tightening, and 5 SEMANTIC changes (v11, v13, v19, v26, v27)
+    that are honest only with a marker or cut-over. Worst: v26, where old
+    re-file rows would silently read as leaving their target slot empty;
+    v19's DEFAULT 'automated' would have claimed every hand-filing was
+    automated (spot-checked in e01c1fd). The tool choice changes none of
+    it. Five design rules proposed there (NULL means "not recorded at the
+    time"; never recompute verdict-like values for history; record raw
+    evidence; version the meaning of append-only facts; expand-verify-
+    contract reshapes) - for Keith.
 
 90. **[todo, 2026-10-13]** **[Pipeline & publishing]** **Protect the
     processing loop from a decision made while it is working on the same
