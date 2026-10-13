@@ -497,3 +497,24 @@ class TestAPairsPayloadIsItsCleanFile:
             provider, injection, extra, 0, base, SimpleNamespace(date=day), seed=7,
             id_offset=0, n_rows=1800, previous_row_count=len(base), placement=None)
         assert len(pair.payload) == len(base)
+
+
+class TestARefusalNamesTheScenarios:
+    """REQ-GEN-196 criterion 21: an ordinary red or amber with no clean
+    period left because of the scenarios' claims refuses before anything is
+    written, NAMING the scenarios and saying to lengthen the history or move
+    an anchor - it used to name only the drawn day."""
+
+    @pytest.mark.parametrize("severity", ["red", "amber"])
+    def test_it_names_them_and_says_what_to_do(self, monkeypatch, severity):
+        from generator import targeting
+
+        monkeypatch.setattr(generate_runs, "RUN_PLAN",
+                            [(n, severity) for n, _ in generate_runs.RUN_PLAN])
+        periods = generate_runs.generated_periods()
+        _r, by_period, suppressed, _q = generate_runs._plan_injections(periods)
+        with pytest.raises(targeting.TargetError) as refused:
+            generate_runs._ordinary_severities(periods, by_period, suppressed)
+        said = str(refused.value)
+        assert "TS-68" in said and "TS-1" in said, said
+        assert "lengthen the history or move an anchor" in said, said

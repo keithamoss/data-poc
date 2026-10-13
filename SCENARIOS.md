@@ -2147,14 +2147,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
       "day": "2026-08-14",
       "built_to": "green",
       "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 324,
-        "of_rows": 1204
-       }
-      ]
+      "moved": []
      }
     ]
    }
@@ -2232,7 +2225,14 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
       "day": "2026-08-25",
       "built_to": "green",
       "rules": [],
-      "moved": []
+      "moved": [
+       {
+        "rule": "registering_parent_2_name.completeness",
+        "to": "green",
+        "nulls": 491,
+        "of_rows": 1820
+       }
+      ]
      }
     ]
    }

@@ -4267,11 +4267,20 @@ class TestThePlantedPairsOnTheBuiltDashboard:
 
         _goto(page, built_dashboard_html, state=where, in_place_on=str(day))
         assert TestASettledPairOnThePage()._blocked(page, ds) == ["contested", "red"]
-        row = page.locator("tr[data-blocker=contested]")
+        # EARLIER PAIRS STAY LISTED, SETTLED - only this one is open.
+        row = page.locator("tr[data-blocker=contested]:not([data-settled])")
         assert row.count() == 1 and "Two files for one table" in row.inner_text()
         assert open_on(day) == 1
+        settled_before = page.locator("tr[data-blocker=contested][data-settled]").count()
 
         nxt = day + timedelta(days=1)
         _goto(page, built_dashboard_html, state=where, in_place_on=str(nxt))
         assert open_on(nxt) == 0
         assert TestASettledPairOnThePage()._blocked(page, ds)[0] != "contested"
+        assert page.locator("tr[data-blocker=contested]:not([data-settled])").count() == 0
+        settled = page.locator("tr[data-blocker=contested][data-settled]")
+        assert settled.count() == settled_before + 1
+        mine = [t for t in (" ".join(settled.nth(i).inner_text().split())
+                            for i in range(settled.count()))
+                if f"birth_registrations_{day}" in t]
+        assert len(mine) == 1 and "Settled" in mine[0], mine

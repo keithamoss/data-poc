@@ -226,11 +226,20 @@ def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
     unavailable = frozenset(i for i, p in enumerate(periods)
                             if p.name in injected_by_period or p.name in suppressed
                             or p.name in green)
-    drawn = _reds_clear_of_scenarios([s for _n, s in RUN_PLAN[:len(periods)]], unavailable,
-                                     names=[p.name for p in periods])
-    out = targeting.outside_hold(drawn, [p.date for p in periods], DATASET_ID,
-                                 keep_clean=frozenset({0, len(periods) - 1}),
-                                 unavailable=unavailable)
+    try:
+        drawn = _reds_clear_of_scenarios([s for _n, s in RUN_PLAN[:len(periods)]],
+                                         unavailable, names=[p.name for p in periods])
+        out = targeting.outside_hold(drawn, [p.date for p in periods], DATASET_ID,
+                                     keep_clean=frozenset({0, len(periods) - 1}),
+                                     unavailable=unavailable)
+    except targeting.TargetError as exc:
+        # NAMING THE SCENARIOS WHOSE CLAIMS LEFT NO ROOM (REQ-GEN-196
+        # criterion 21), and what to do - never dropping one to fit.
+        claimants = sorted({inj.scenario_id for inj, _p in injected_by_period.values()},
+                           key=lambda sid: (len(sid), sid))
+        raise targeting.TargetError(
+            f"{str(exc).removesuffix(' - lengthen the history')} - the periods are claimed "
+            f"by {', '.join(claimants)}: lengthen the history or move an anchor") from exc
     # A LEAD-IN OR FOLLOWING PERIOD IS GREEN (REQ-GEN-185). Belt and braces:
     # the red and amber drawn there have already been MOVED, not dropped,
     # since both treat it as unavailable.
