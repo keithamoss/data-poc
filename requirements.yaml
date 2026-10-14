@@ -32374,3 +32374,123 @@ requirements:
     evidence:
     - "2026-10-13: tests/test_scenario_links.py, 20 tests with no database. Swapping the end of the day for its start in link_dates() fails five of them, so criterion 4's reading of a bare date is held rather than assumed.\n"
     - "2026-10-13: mothman scenarios validate passes on the committed configuration, which declares no links yet. REQ-GEN-199 is the first requirement to use them.\n"
+  - id: REQ-GEN-207
+    title: The Child Protection history is grown earlier, once, by as many quarters as the batch's planned scenarios need, with
+      every existing quarter unchanged
+    date_written: '2026-10-14'
+    story: As Keith adding scenarios to Child Protection's synthetic history, I want it to start earlier by as many quarters
+      as the planned scenarios need, so that each new scenario has a quarter of its own without moving any scenario already
+      planted and quoted.
+    moscow: must
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-14'
+    source: 'PROPOSED by the round 3 architect review (2026-10-14, Q1 option A), following Keith''s own call of 2026-10-13 to
+      grow the Child Protection history earlier for TS-63 (REQ-PIPE-179). Drafted by delivery-scoper overnight 2026-10-13 to
+      14 while Keith was asleep; not yet reviewed as a requirement of its own. Keith confirmed it, 2026-10-14 (close-out Q1,
+      option A): its own requirement, built first, every existing quarter byte-identical.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL add Child Protection quarters before 2023-Q1 at the old end - dated entries in a NEW, earlier quarterly
+      calendar version taking effect from the first added quarter (as the daily calendar grew), never inserted into the 2023-01-01
+      version, and new, earlier versions of the collection's participation_defaults and of each dataset's participation taking
+      effect from the same quarter - as Birth Registrations' history was grown (REQ-GEN-196), each with a changelog line saying
+      why.
+    - THE SYSTEM SHALL size the growth by a dry run of the generator's collision refusal over every Child Protection scenario
+      this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203),
+      the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth
+      Registrations), TS-63 and its correction (REQ-PIPE-179), and TS-50 with its lead-ins and green-replacement era, TS-55
+      and TS-81, the pair with both files rejected (REQ-GEN-206) - adding the fewest whole years that leave the dry run with
+      no refusal, and SHALL record the count and the dry run's output in this requirement's evidence.
+    - THE SYSTEM SHALL count the period a scenario's substitution stands on (stands_on) as claimed by that scenario under REQ-GEN-044's
+      collision rule, so that 2023-Q1, which TS-77a stands on, is no longer read as free. The existing plan SHALL pass the widened
+      rule unchanged (TS-76 stands on 2024-Q4, TS-77a on 2023-Q1); IF it does not, THEN generation SHALL refuse naming both
+      scenarios, and the case goes to Keith.
+    - THE SYSTEM SHALL leave every existing Child Protection quarter's generated deliveries and receipts byte-identical, drawing
+      the added quarters' run plan, seeds (from a seed range of their own, disjoint from BASE_SEED+1..+15 and every offset derived
+      from them), slot ids, ambers and delivery names separately, generated after the existing fifteen - so that no index counted
+      from the oldest quarter (the seed, slot id, run index, delivery name, amber placement, the run plan's slice of generated_periods
+      and inheritance_placements) moves - and SHALL prove it by a byte comparison of every existing delivery and receipt before
+      and after; every planted scenario, the characterization pin (tests/fixtures/arrival_semantics_golden.json) and every quoted
+      register text stay as they are, or the difference is reported (criterion 10). TS-79b stays on the quarter it names today
+      rather than the new oldest inherited quarter.
+    - THE SYSTEM SHALL add, in the same change, amber_setting and replacement_setting versions taking effect on or before the
+      earliest claim-opening instant of the first added quarter, carrying the values today's 2023-01-01 versions carry, so that
+      no grown supply meets a setting with no version in force.
+    - THE SYSTEM SHALL record, in the register beside the scenarios placed in grown quarters, that checks introduced on 2023-01-15
+      did not exist for supplies before that date, and what the page shows for them there as observed on the first bootstrapped
+      build.
+    - THE SYSTEM SHALL generate the added quarters as ordinary deliveries - the usual six files, whole - and SHALL NOT plant
+      any scenario in them in this change.
+    - THE SYSTEM SHALL land the growth in a change of its own, before any declared correction edits a grown quarter.
+    - THE SYSTEM SHALL measure a bootstrap from empty before and after the growth and log both in CLAUDE.md's running log.
+    - THE SYSTEM SHALL compare every existing Child Protection supply's recorded status, and run every REQ-GEN-199 and REQ-GEN-203
+      quoted-text test, before and after the growth, and SHALL report any difference to Keith as a finding rather than accept
+      it - identical deliveries do not guarantee identical results, because a drift or volume check reaches back to the most
+      recent earlier promoted period, so 2023-Q1 gains a reference for the first time, and TS-77a stands on 2023-Q1.
+    - THE SYSTEM SHALL reword TS-79b's register text, which says its source is the history's first supply with nothing earlier
+      to fall back on, to name 'the oldest of the original fifteen quarters' - the inheritance it shows is unchanged.
+    non_functional_requirements:
+    - 'BOOTSTRAP COST: Child Protection replays about 17s a quarter beside Birth Registrations'' ~330s. The architect counts
+      about seventeen quarters of demand (A3), not the scoper''s eight, which would take Child Protection to roughly 550s and
+      make it the critical path - a bootstrap of about nine to ten minutes (architect E22) against 7m00s on 2026-10-13. The
+      dry run (criterion 2) gives the real count; measure rather than estimate. Round 4 architect estimate, with TS-81''s quarter
+      and lead-ins: roughly 10 to 12 added quarters, Child Protection''s replay about 270s -> 450-480s and the critical path,
+      a bootstrap about 8.5 to 9 minutes.'
+    - 'CONFIGURATION ONLY: calendar, participation and setting versions plus generator configuration; every effect is in the
+      database.'
+    - 'DETERMINISM: seeded, so a regenerate reproduces the grown history; criterion 4 is checked by diffing the existing quarters''
+      deliveries before and after.'
+    - 'NO SILENCED WARNING: growing earlier leaves the quarterly calendar''s forward runway, and its warning, as they are.'
+    dependencies:
+    - REQ-GEN-044
+    - REQ-GEN-196
+    - REQ-PIPE-110
+    - REQ-PIPE-111
+    - REQ-PIPE-122
+    - REQ-PIPE-123
+    decisions:
+    - 'GROW EARLIER, NOT INTO TODAY''S QUARTERS (Keith, 2026-10-13, architect review answers, for TS-63): REQ-GEN-199 found
+      no clean Child Protection quarter left. REJECTED fitting new scenarios among the fifteen.'
+    - 'ITS OWN REQUIREMENT, BUILT FIRST, SIZED BY A DRY RUN (Keith, 2026-10-14, close-out Q1, option A, the architect''s recommendation):
+      four requirements need grown quarters (REQ-GEN-203, REQ-GEN-205, REQ-GEN-206, REQ-PIPE-179), so one owner grows the history
+      once. REJECTED each growing what it needs (three edits to one calendar''s old end), REQ-GEN-205 owning it with the existing
+      quarters redrawn (option B, the scoper''s first recommendation), and this requirement redrawing them (option C).'
+    - 'THE BUDGET WAS UNDER-COUNTED (architect A3): about seventeen quarters of demand, not eight; and the collision rule ignores
+      a substitution''s stood-on period, so 2023-Q1 (TS-77a''s) read as free. Criteria 2 and 3.'
+    - 'A BLOCKER: SETTINGS HAVE NO DEFAULT (architect A1, verified 2026-10-14): amber_setting and replacement_setting in contract/data-asset.yaml
+      start 2023-01-01 and carry no default, so a supply received before then has no setting in force - criterion 5.'
+    - 'A BLOCKER: ''NO EXISTING SCENARIO MOVES'' WAS FALSE AS DRAFTED (architect A2, verified 2026-10-14): generator/generate_cp_runs.py
+      builds RUN_PLAN from N_QUARTERS = 15 and one seeded shuffle, its seeds and slots run from the oldest quarter and the first
+      delivery is kept clean - so adding quarters redraws every existing one, and TS-79b (the oldest inherited quarter) moves.
+      EXISTING QUARTERS STAY BYTE-IDENTICAL (Keith, 2026-10-14, close-out Q1, option A): criterion 4 draws the added quarters
+      separately. REJECTED accepting the redraw and recapturing the golden file and every Child Protection quote (options B
+      and C).'
+    - 'ITS OWN CHANGE, CORRECTIONS LATER (architect A4, verified 2026-10-14): agreement_freeze exempts a newly ADDED version
+      or date on a synthetic asset, but a declared correction that changes nothing is refused - so the growth lands alone and
+      the corrections of REQ-GEN-205 and REQ-PIPE-179 come in later changes against the grown calendar. Criterion 8.'
+    - 'SUGGESTED BUILD ORDER FOR THE WHOLE CLOSE-OUT BATCH (architect, 2026-10-14; the three requirements drafted after Keith''s
+      answers placed by delivery-scoper, 2026-10-14, PROPOSED): this requirement; REQ-PIPE-202; REQ-GEN-203; REQ-DASH-204; REQ-PIPE-210
+      and REQ-PIPE-211 (after REQ-DASH-204, whose per-table codes they read); REQ-DASH-182; REQ-PIPE-163; REQ-PIPE-179; REQ-DASH-180;
+      REQ-DASH-208 and then REQ-DASH-209 (before the first of REQ-GEN-205 and 206''s bootstraps, dashboard UX 14 - TS-55''s
+      chip opens REQ-DASH-209''s view); REQ-GEN-205; REQ-GEN-206.'
+    - 'THE RUNWAY WARNING STAYS (Keith, 2026-10-13): ''the point of the warning is to demonstrate the proof of concept of what
+      it does''. Growth is at the old end only.'
+    - 'THE DRY RUN COUNTS LEAD-INS AND ERAS (delivery-scoper, 2026-10-14, following Keith, 2026-10-14, close-out Q3 and Q12):
+      REQ-GEN-203 now builds Child Protection targeting with lead-in quarters (REQ-GEN-185''s shape), and TS-50 is planted in
+      full under a short green-replacement era, so the demand criterion 2 sizes includes those lead-ins and that era, not only
+      the scenarios'' own quarters.'
+    - 'TS-62 IS NOT IN THE DRY RUN (Keith, 2026-10-14, close-out Q7, option A): it is planted on Birth Registrations, so it
+      claims no Child Protection quarter.'
+    - 'THE DRY RUN COUNTS TS-81 (Keith, 2026-10-14, follow-up F8, option B): criterion 2. Keith chose to plant a ''reject both''
+      Child Protection pair at the cost of another grown quarter; REQ-GEN-206 plants it. TS-53 is on Birth Registrations (follow-up
+      F12) and is not counted.'
+    - 'TS-62''s EFFECTIVE DATE IS CHECKED BY REQ-GEN-205, NOT BY THIS DRY RUN (Keith, 2026-10-14, follow-up F11): this dry run
+      is over Child Protection quarters, and TS-62''s new version is on Birth Registrations'' daily calendar. REQ-GEN-205 criterion
+      25 makes generation refuse an effective date on or before 2026-09-01, which runs on every generation rather than once.'
+    - 'SIGNED OFF by Keith, 2026-10-14, with the round 4 architect''s changes folded in (review4-findings.md H2): criterion
+      1 - a new, earlier calendar version, never inserted into the 2023-01-01 version (the agreement freeze exempts an added
+      date on a synthetic asset only in a new version, agreement_freeze.py); criterion 3 - today''s plan must pass the widened
+      rule; criterion 4 - the seven places generate_cp_runs.py indexes from the oldest quarter, a disjoint seed range and a
+      byte proof; criterion 10 - a before/after results comparison reported as findings; criterion 11 - TS-79b reworded (Keith,
+      2026-10-14, round 4 answer R3).'

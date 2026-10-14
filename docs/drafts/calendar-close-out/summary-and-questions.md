@@ -719,3 +719,7 @@ Folded 2026-10-14. Each answer is a decision citing "Keith, 2026-10-14, follow-u
 - R6 (REQ-DASH-209 at 30 datasets, dashboard UX D1): B (NOT the recommendation) - every row open; no collapsing of rule-promoted-on-green rows.
 - R7 (REQ-DASH-209 "Nothing held", D2): A - split: "Not supplied" (owed: red or waiting) at the top, "Not owed" (turned off, not expected, outside agreed months) at the bottom, each counted.
 - R8 (REQ-DASH-180 marker date, scoper new Q1 + D3): A - the changelog entry setting the turn-off carries `turns_off: true`, checked by validation; where a correction sets it, the correction's own date; validation refuses a turn-off with no such entry.
+
+## Sign-off walk (2026-10-14)
+
+- REQ-GEN-207: SIGNED by Keith, 2026-10-14, with the round 4 architect's changes folded in (a new earlier calendar version; today's plan passes the widened clash rule; the seven oldest-quarter indexes drawn separately with a byte proof; a before/after results comparison reported as findings; TS-79b reworded). Moved out of this draft into requirements.yaml.
