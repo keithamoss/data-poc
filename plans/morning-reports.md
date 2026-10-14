@@ -1425,3 +1425,11 @@ one or more component tags, and a date.
       they hold the requirements under HELD above. Both are conversations with
       him, so they are not built tonight - a priority line now sits on each.
     - **PROGRESS** (a line per push, newest last):
+      - ~22:45 - REQ-PIPE-163 BUILT (sprint 1, first half): place a held supply
+        from the terminal and `supply decide`; one shared placer; `decide`
+        leaves checks owed unless `--wait` (exit 3 when they do not finish);
+        the eight amendments applied in Keith's approved wording. SCHEMA 41
+        (a held supply's reject names no period), so the real `supply`
+        database was rebuilt by reset-synthetic + bootstrap (8m00s). Full gate
+        green: 5,104 passed, 14m42s. Criterion 26's re-check half waits on
+        REQ-PIPE-164 (sprint 3). Critics next, then REQ-GHUB-165.
