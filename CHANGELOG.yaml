@@ -188,6 +188,13 @@ releases:
               Supplies received while a dataset is turned off get their own quiet
               section in its supply history and one line on its page, and its
               SLA tile reads "Turned off — nothing due".
+          - headline: A supply placed by hand says so
+            components: ["Dashboard UI"]
+            description: >
+              A held supply a person placed into a period now carries a "Placed
+              in <period>" tag on its row - who, when and why, and whether that
+              period was closed or not yet open when it arrived - and its hold's
+              row says where it went.
           - headline: "`schedule show` says it is off"
             components: ["Pipeline & publishing"]
             description: >

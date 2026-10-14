@@ -1014,6 +1014,40 @@ class TestTurnedOffOnThePage:
         assert got["out"] is (not got["waiting"])
 
 
+class TestPlacedOnThePage:
+    """REQ-DASH-175 in a real browser. No real supply has been placed by a
+    person, so a placement of one of cp-clients' real runs is added to its
+    embedded data and the page rebuilt from it."""
+
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-clients"}
+
+    def test_the_tag_is_in_the_provenance_cell_not_the_timing_cell(self, page,
+                                                                   built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.DS)
+        run_id = page.evaluate("""() => {
+            const raw = rawRealDatasetById('cp-clients');
+            const run = raw.runs[raw.runs.length - 1];
+            raw.placements = {'cp-clients@x': {period: '2026-Q3', at: run.run_date + 'T00:00:00+00:00',
+              actor: 'Keith Moss', reason: 'placed by hand', when: 'closed', runId: run.run_id}};
+            DATA = buildData(CURRENT_IN_PLACE_ON);
+            render();
+            return run.run_id;
+        }""")
+        if page.locator("#supply-history-toggle").count():
+            page.click("#supply-history-toggle")
+        tag = page.locator("[data-placed]")
+        assert tag.count() == 1
+        row = page.locator("tr", has=tag)
+        cells = row.locator("td")
+        # The last cell says how the row came to be in its cycle; the third is timing.
+        assert cells.last.locator("[data-placed]").count() == 1
+        assert cells.nth(2).locator("[data-placed]").count() == 0
+        assert "placed by hand" in cells.last.inner_text()
+        assert run_id
+
+
 class TestAcknowledgementBadge:
     """REQ-PIPE-122 criterion 21, which replaced REQ-QAC-017's per-run
     /accept badge (retired by criterion 23): a promoted amber supply reads

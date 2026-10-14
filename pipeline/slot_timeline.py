@@ -174,8 +174,11 @@ def supply_states(dataset_id: str,
             return supply_states(dataset_id, conn=opened)
     actions = tuple(_STATE_AFTER)
     out: dict[str, list[dict]] = {}
-    for decision_id, supply, action, at, kind, newer, recorded in conn.execute(
-            f"SELECT id, supply, action, effective_at, actor_kind, superseded_by, recorded_at "
+    from pipeline.placements import placed_in
+
+    for decision_id, supply, action, at, kind, newer, recorded, from_slot, to_slot in conn.execute(
+            f"SELECT id, supply, action, effective_at, actor_kind, superseded_by, recorded_at, "
+            f"from_slot, to_slot "
             f"FROM {decision_log.TABLE} "
             f"WHERE dataset_id = ? AND supply IS NOT NULL AND action IN "
             f"({', '.join('?' * len(actions))}) ORDER BY effective_at, id",
@@ -193,6 +196,10 @@ def supply_states(dataset_id: str,
                  # So the past-date notice names a decision once, however
                  # many readers carry it (REQ-DASH-197 criterion 9).
                  "decisionId": decision_id}
+        # A PERSON'S PLACEMENT is said as one (REQ-DASH-175 criterion 7).
+        placed = placed_in(action, kind, from_slot, to_slot)
+        if placed:
+            entry["placedIn"] = placed
         if action == decision_log.SUPERSEDE:
             entry["supersededBy"] = newer
             setting = _replaced_under(conn, dataset_id, supply)

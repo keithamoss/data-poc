@@ -23,6 +23,15 @@ def _iso(value) -> str | None:
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
 
 
+def placed_in(action: str, actor_kind: str, from_slot, to_slot) -> str | None:
+    """The period a decision PLACED its supply into - a person's re-file from
+    no period (REQ-PIPE-163 criterion 2) - or None for any other decision,
+    the rule's re-file from no period included (REQ-DASH-175 criteria 7, 9)."""
+    if action == decision_log.REFILE and actor_kind == decision_log.PERSON and not from_slot:
+        return to_slot
+    return None
+
+
 def when_received(slot, received_at) -> str | None:
     """'closed' or 'not-yet-open' where the slot was so at `received_at`,
     else None (criterion 2)."""

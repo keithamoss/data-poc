@@ -58,3 +58,23 @@ class TestClosedOrNotYetOpen:
         assert placements.when_received(slot, self.T - timedelta(days=1)) == "not-yet-open"
         assert placements.when_received(slot, self.T + timedelta(days=1)) is None
         assert placements.when_received(None, self.T) is None
+
+
+class TestDecisionsSayPlaced:
+    """Criterion 7: wherever a past decision is described, a placement is
+    'placed in <period>', never a re-file - so the build marks it."""
+
+    def test_the_supplys_states_mark_the_placement(self, conn, period, target):
+        from pipeline import slot_timeline
+
+        supply, _ = _held(conn, period)
+        _place(conn, supply, target)
+        entries = slot_timeline.supply_states(DS, conn)[supply]
+        (placed,) = [e for e in entries if e["action"] == dl.REFILE]
+        assert placed["placedIn"] == target
+
+    def test_only_a_persons_refile_from_no_period(self):
+        assert placements.placed_in(dl.REFILE, dl.PERSON, None, "2025-Q1") == "2025-Q1"
+        assert placements.placed_in(dl.REFILE, dl.RULE, None, "2025-Q1") is None
+        assert placements.placed_in(dl.REFILE, dl.PERSON, "2024-Q4", "2025-Q1") is None
+        assert placements.placed_in(dl.PROMOTE, dl.PERSON, None, "2025-Q1") is None

@@ -1515,6 +1515,12 @@ one or more component tags, and a date.
         supply awaiting a decision let a turned-off dataset leave the rollup,
         and the weekly trend counted what the line left out - both fixed
         test-first, with three wording and style fixes. Q21-Q25.
+      - ~06:00 REQ-DASH-175 BUILT (sprint 4, last): a supply a person placed
+        says so on its row - "Placed in <period>", who, when, why, and
+        whether the period was closed or not yet open when it arrived - and
+        its hold's row says where it went; past decisions read "placed in
+        <period>", never "re-filed". A placed turned-off hold stays in its
+        quiet section, which now lists resolved ones too. Gate in the commit.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose

@@ -180,9 +180,20 @@ class _History:
         """The decisions that took effect on this asset day - what produced a
         change point (criterion 9), each with both instants so the page can
         tell a decision recorded after the date on show."""
-        return [{"id": d["id"], "action": d["action"], "supply": d["supply"],
-                 "at": _iso(d["effective_at"]), "recordedAt": _iso(d["recorded_at"])}
-                for d in self.decisions if asset_time.local_date(d["_at"]) == day]
+        from pipeline.placements import placed_in
+
+        out = []
+        for d in self.decisions:
+            if asset_time.local_date(d["_at"]) != day:
+                continue
+            entry = {"id": d["id"], "action": d["action"], "supply": d["supply"],
+                     "at": _iso(d["effective_at"]), "recordedAt": _iso(d["recorded_at"])}
+            # A PERSON'S PLACEMENT is said as one (REQ-DASH-175 criterion 7).
+            placed = placed_in(d["action"], d["actor_kind"], d["from_slot"], d["to_slot"])
+            if placed:
+                entry["placedIn"] = placed
+            out.append(entry)
+        return out
 
 
 def for_dataset(dataset_id: str, timeline: list[dict],

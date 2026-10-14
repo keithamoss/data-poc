@@ -1641,6 +1641,38 @@ function waitedTitle(e){
 // never as a verdict. An automated delivery says so in the tooltip only,
 // so the common case adds nothing to the row.
 const FILING_ROUTE_LABEL = {file:"one file", folder:"a folder", table:"one table", s3:"S3"};
+// A SUPPLY A PERSON PLACED (REQ-DASH-175): the build sends each placement -
+// who, when, why, the period, and whether it was closed or not yet open when
+// the supply arrived (pipeline/placements.py); the page shows it from the
+// placement's own instant (criterion 5) and only for a person's (9).
+function placementFor(d, key, dateStr, bySupply){
+  const all = (d && d.placements) || {};
+  const p = bySupply ? all[key] : Object.values(all).find(x=> x.runId === key);
+  if(!p) return null;
+  if(dateStr && Date.parse(p.at) > assetEndOfDay(dateStr).getTime()) return null;
+  return p;
+}
+const PLACED_WHEN = {"closed": "closed when it arrived", "not-yet-open": "not yet open when it arrived"};
+function placedTag(d, runId, dateStr){
+  const p = placementFor(d, runId, dateStr, false);
+  if(!p) return "";
+  const when = PLACED_WHEN[p.when] ? `<div style="color:var(--ink-muted); font-size:11.5px;">${escHtml(fmtPeriodOrDay(p.period))} was ${PLACED_WHEN[p.when]}</div>` : "";
+  return `<span class="pill tag sm" data-placed><span class="ico"></span>Placed in ${escHtml(fmtPeriodOrDay(p.period))}</span>
+    <div style="color:var(--ink-faint); font-size:11.5px;">${escHtml(p.actor)}, ${fmtDay(assetDateStrOf(p.at))}</div>
+    ${p.reason ? `<div style="color:var(--ink-muted); font-size:11.5px; max-width:40ch;">${escHtml(p.reason)}</div>` : ""}${when}`;
+}
+// A HOLD RESOLVED BY PLACING, in the rejected row's form (criteria 3 and 10).
+function placedHoldNote(d, supply, dateStr){
+  const p = placementFor(d, supply, dateStr, true);
+  if(!p) return "";
+  return ` <span style="color:var(--ink-faint);" data-placed-hold>— placed in ${escHtml(fmtPeriodOrDay(p.period))} by ${escHtml(p.actor)}, ${fmtInstant(p.at)}${p.reason ? ": "+escHtml(p.reason) : ""}</span>`;
+}
+// A PAST DECISION IN WORDS (criterion 7): a person's re-file from no period
+// is a placement, said as one.
+function decisionWords(d){
+  if(d && d.placedIn) return `placed in ${fmtPeriodOrDay(d.placedIn)}`;
+  return DECISION_DONE[d.action] || d.action;
+}
 function filedNote(e){
   const by = e && e.filedBy;
   if (!by || by.kind !== "person") return "";
@@ -5430,10 +5462,12 @@ function blockersFor(datasetId, source){
 // RECEIVED WHILE TURNED OFF (REQ-DASH-180 criterion 14): quiet - its own
 // section of supply history and one line where the accepted-gaps note sits,
 // counted as at the date on show; never red, never waiting for a person.
+// EVERYTHING RECEIVED WHILE OFF BY THE DATE, resolved ones included: a
+// placed one stays in this section (REQ-DASH-175's decision), and the
+// section would otherwise under-count what was received.
 function receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source){
   return blockersFor(datasetId, source).filter(b=> b.turnedOff
-    && assetDateStrOf(b.openedAt) <= inPlaceOnDateStr
-    && (!b.resolvedAt || assetDateStrOf(b.resolvedAt) > inPlaceOnDateStr))
+    && assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
     .sort((a, b)=> String(a.openedAt).localeCompare(String(b.openedAt)));
 }
 function receivedWhileOffLine(datasetId, inPlaceOnDateStr, source){
@@ -5452,7 +5486,7 @@ function receivedWhileOffSection(datasetId, inPlaceOnDateStr, source){
       <table class="dataset-table supply-cycle-table static-rows">
         <thead><tr><th>Received</th><th>Supply</th></tr></thead>
         <tbody>${found.map(b=> `<tr><td class="mono">${fmtInstant(b.openedAt)}</td>
-          <td class="mono" style="color:var(--ink-muted);">${escHtml(b.supply || "")}</td></tr>`).join("")}</tbody>
+          <td class="mono" style="color:var(--ink-muted);">${escHtml(b.supply || "")}${placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)}</td></tr>`).join("")}</tbody>
       </table>
       </div>
     </div>`;
@@ -6616,7 +6650,7 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
       <td>${arrivalCell}</td>
       <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
       <td>${outcomeCell(datasetId, e.run_id, runsById)}</td>
-      <td>${resupplyBadge}</td>
+      <td>${resupplyBadge}${placedTag(raw, e.run_id, CURRENT_IN_PLACE_ON)}</td>
     </tr>`;
   }).join("");
 }
@@ -6658,12 +6692,14 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
             <td><b>${escHtml(blockerLabel(b))}</b>${resolved
-              ? (b.rejected
+              ? (placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)
+                  ? placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)
+                  : b.rejected
                   ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
                   : b.supersededBy
                   ? ` <span style="color:var(--ink-faint);">— superseded by the supply received ${b.supersededBy.receivedAt ? fmtInstant(b.supersededBy.receivedAt) : "later"}</span>`
                   : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`)
-              : ""}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
+              : (b.kind === "contested" ? placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr) : "")}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>
@@ -6696,7 +6732,7 @@ function settledPairRow(b, datasetId, inPlaceOnDateStr){
   return `<tr data-blocker="${b.kind}" data-settled>
     <td>${fmtInstant(b.openedAt)}</td>
     <td><span class="pill tag sm"><span class="ico"></span>Settled</span></td>
-    <td><b>${escHtml(blockerLabel(b))}</b> <span style="color:var(--ink-faint);">— settled by ${escHtml(s.actor || "a person")}, ${fmtInstant(s.at)}</span>${s.reason ? `<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(s.reason)}</div>` : ""}
+    <td><b>${escHtml(blockerLabel(b))}</b>${placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)} <span style="color:var(--ink-faint);">— settled by ${escHtml(s.actor || "a person")}, ${fmtInstant(s.at)}</span>${s.reason ? `<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(s.reason)}</div>` : ""}
       <div style="font-size:12px; margin-top:4px;">${files}</div></td>
   </tr>`;
 }
@@ -9330,7 +9366,7 @@ function decisionsChangingDate(onDateStr, inView){
     Object.entries(raw.runStates || {}).forEach(([runId, entries])=> (entries || []).forEach(e=>{
       if(!later(e)) return;
       if(e.decisionId != null){ if(named.has(e.decisionId)) return; named.add(e.decisionId); }
-      out.push({datasetName: raw.name || raw.id, action: e.action, at: e.at,
+      out.push({datasetName: raw.name || raw.id, action: e.action, at: e.at, placedIn: e.placedIn,
                 recordedAt: e.recordedAt, run: runs[runId] || null});
     }));
     // THE DECISIONS BEHIND THE PROMOTION PANEL AND THE QUALIFIER ON SHOW
@@ -9355,7 +9391,7 @@ function decisionsChangingDate(onDateStr, inView){
     behind.forEach(e=>{
       if(!later(e) || named.has(e.id)) return;
       named.add(e.id);
-      out.push({datasetName: raw.name || raw.id, action: e.action, at: e.at,
+      out.push({datasetName: raw.name || raw.id, action: e.action, at: e.at, placedIn: e.placedIn,
                 recordedAt: e.recordedAt, run: null});
     });
   });
@@ -9397,7 +9433,7 @@ function changedSinceNote(onDateStr){
     // alone cannot tell two same-day resupplies apart (#132 A5).
     const at = d.run && (d.run.received_at || d.run.arrivedAt);
     const received = d.run ? ` received ${at ? fmtInstant(at) : fmtDay(d.run.run_date)}` : "";
-    return `<li>${escHtml(d.datasetName)}: the supply${received} was ${escHtml(DECISION_DONE[d.action] || d.action)}
+    return `<li>${escHtml(d.datasetName)}: the supply${received} was ${escHtml(decisionWords(d))}
       as from ${fmtDay(assetDateStrOf(d.at))}, a decision made ${fmtDay(assetDateStrOf(d.recordedAt))}</li>`;
   }).join("");
   return `<div data-changed-since style="margin-top:6px;">${found.length} ${pluralize(found.length, "decision")}
