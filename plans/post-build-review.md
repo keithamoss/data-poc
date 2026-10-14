@@ -8702,3 +8702,31 @@ twice. It deliberately did not re-find the `TypeError`.
     This sandbox's `supply` database still carries the old stamp until its
     next bootstrap from empty. REQ-GEN-205's draft criterion 19 is now
     built work and comes out of the draft at the next fold.
+
+178. **[investigate, 2026-10-14]** **[Dashboard UI]** **A supply that arrives
+    inside its claim window but before its period starts reads as "No data"
+    for the whole period, across the collection.** Found checking a claim in
+    REQ-DASH-182's own UX review (docs/drafts/calendar-close-out/
+    review-182-ux.md, finding 1), verified in a real browser against the
+    dashboard rebuilt from this morning's bootstrap. The template's
+    `clipDatasetToInPlaceOn` sets `staleInPlaceOn = effectiveRun.run_date <
+    periodStartDate(d.id, inPlaceOnDateStr)` (template line ~2645): it
+    compares the RUN DATE with the start of the period the date on show falls
+    in, rather than asking which period the supply was filed to. Child
+    Protection's 2025-Q3 delivery was received 2025-07-19, inside the claim
+    window for the 1 August period, filed to 2025-Q3 and promoted by the rule
+    on 2025-07-30 - yet at in-place-on 2025-08-05 and 2025-09-15 every one of
+    the six datasets (checked: cp-clients, cp-placements, cp-case-workers)
+    shows a "No data" pill and "nothing has landed yet in this dataset's
+    current expected cycle". The reviewer's own version of the finding - a
+    period a dataset OWES NOTHING in reading "No data" (cp-case-workers in
+    May) - did NOT reproduce: at 2025-06-15 and 2026-06-15 the page showed
+    neither. What the reviewer did get right, also confirmed: the SLA tile
+    reads "Quarterly (Feb/May/Aug/Nov, day 1), by 09:00" for a dataset owed
+    only in February and August.
+
+    Direction: a false alarm, not a false green - but a whole collection
+    reading "No data" for a quarter is exactly the noise that teaches a
+    reader to ignore "No data". Needs a failing test first (a real-browser
+    e2e on 2025-Q3's early delivery, which exists in the generated history
+    today). Not fixed yet: for Keith (significant defect rule).
