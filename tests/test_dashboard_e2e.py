@@ -888,7 +888,7 @@ class TestAcknowledgementBadge:
     PROMOTED = "2026-09-10T02:00:00+00:00"
     ACKNOWLEDGED = "2026-09-15T02:00:00+00:00"
 
-    def _page(self, built, tmp_path):
+    def _page(self, built, tmp_path, acks=None):
         html = built.read_text()
         start = html.index("const REAL_BIRTH_REG_DATA = ") + len("const REAL_BIRTH_REG_DATA = ")
         end = html.index(";\n", start)
@@ -897,7 +897,7 @@ class TestAcknowledgementBadge:
         record["acknowledgements"] = {run_id: {
             "supply": "birth-registrations@k", "period": "p", "promotedAt": self.PROMOTED,
             "acknowledged": {"actor": "Keith Moss", "reason": "looked", "at": self.ACKNOWLEDGED},
-            "lapsedAt": None}}
+            "lapsedAt": None, **({"acks": acks} if acks is not None else {})}}
         out = tmp_path / "ack.html"
         root = Path(__file__).resolve().parent.parent / "dashboard"
         for name in ("fonts", "vendor"):
@@ -915,6 +915,31 @@ class TestAcknowledgementBadge:
         assert self._badge(page, run_id, "2026-09-05") == ""
         assert "awaiting acknowledgement" in self._badge(page, run_id, "2026-09-12")
         assert "Acknowledged by Keith Moss" in self._badge(page, run_id, "2026-09-20")
+
+    def test_a_withdrawn_one_reads_as_at_the_date_on_show(self, page, tmp_path,
+                                                          built_dashboard_html):
+        """REQ-PIPE-166 criteria 13, 16 and 17 in a real browser
+        (post-build-review #193 F6): standing before the withdrawal with its
+        reason as visible text, awaiting again from it with the withdrawn one
+        beneath, and the newer acknowledgement standing once given."""
+        first = {"actor": "Keith Moss", "reason": "looked", "at": self.ACKNOWLEDGED,
+                 "withdrawn": {"actor": "Ana Lee", "reason": "wrong supply",
+                               "at": "2026-09-18T02:00:00+00:00"}}
+        again = {"actor": "Bo Chen", "reason": "second look",
+                 "at": "2026-09-22T02:00:00+00:00", "withdrawn": None}
+        out, run_id = self._page(built_dashboard_html, tmp_path, acks=[first, again])
+        _goto(page, out)
+        before = self._badge(page, run_id, "2026-09-16")
+        assert "Acknowledged by Keith Moss" in before and "withdrawn" not in before
+        page.set_content(f"<div id=b>{before}</div>")
+        assert page.locator("[data-acknowledgement-reason]").inner_text().strip() == "looked"
+        _goto(page, out)
+        between = self._badge(page, run_id, "2026-09-20")
+        assert "awaiting acknowledgement" in between
+        assert "withdrawn by Ana Lee" in between and "wrong supply" in between
+        after = self._badge(page, run_id, "2026-09-23")
+        assert "Acknowledged by Bo Chen" in after
+        assert "awaiting acknowledgement" not in after
 
 
 class TestDemoTab:

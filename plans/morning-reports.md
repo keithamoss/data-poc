@@ -1485,6 +1485,12 @@ one or more component tags, and a date.
         A test now fails if any decision reaches the page without words;
         inherit-refused had none, now "refused carrying forward". Real
         database rebuilt for schema 43. Gate result in the commit message.
+      - ~03:50 166 pushed (a27deaa). CI green on 707e7b4, so TS-79a's scroll
+        wait and the parity tidy-up both held on the runner. The critic
+        (#193) found the confirmation printing raw UTC and an email, a lapsed
+        acknowledgement said to need a person, and no browser test: fixed
+        test-first. Four questions (Q14-Q17) - the ticket-reopen promise is
+        the one that matters.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
@@ -1533,3 +1539,19 @@ one or more component tags, and a date.
           re-check that is still red lists it again, because "worse" is
           measured against the verdict it was promoted on. Keep that, or measure
           against the last acknowledged verdict?
+      14. (#193 F1) Withdrawing a mark as not supplied returns the slot to
+          exactly what its ticket last said, so under the default needs-action
+          policy a ticket a person closed stays closed and a GitHub-route
+          withdrawal gets no reply - yet the confirmation says "its ticket
+          reopens" (criterion 14). Should the ticket pass reopen a closed ticket
+          whose slot needs action again, or should the wording stop promising it?
+      15. (#193 F4) A withdrawn mark shows in its period's row of "Periods with
+          no supply", but not in the accepted-gaps list, which lists only
+          periods still accepted. Enough for criterion 15, or should the list
+          (or the red no-supply notice) also carry it?
+      16. (#193 F5) The NFR "one history reader, not three" asked for the
+          excuse history reader to be generalised; I added a second pairing
+          reader instead. Generalise it now, or record that departure?
+      17. (#193 F7) `mothman supply decisions` prints raw action names
+          (withdraw-not-supplied, and every other action). Does criterion 12's
+          "no raw operation name" cover the terminal list, or the page only?

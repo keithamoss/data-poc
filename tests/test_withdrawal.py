@@ -9,7 +9,7 @@ import pytest
 import test_door_flag_parity as parity
 from qa_tools.common import decision_log as dl
 from qa_tools.common import filing_decisions as fd
-from qa_tools.common import slot_state, slots
+from qa_tools.common import people, slot_state, slots
 from test_door_flag_parity import (DS, _actor, _forget_its_filings, _iso, _now, _person,
                                    minted, quiet)
 
@@ -178,6 +178,8 @@ class TestTheRoutes:
         filing_tui.apply_decision(operation=fd.WITHDRAW_NOT_SUPPLIED, dataset_id=DS,
                                   period=state.period, actor=_actor())
         assert asked and "published" in asked[0] and "dashboard" in asked[0]
+        # A MARK HAS NO SUPPLY (#193 F8): its reason is shown in the period's row.
+        assert "beside the supply" not in asked[0] and "period" in asked[0]
 
     def test_confirming_a_mark_withdrawal_names_it_and_what_follows(self, conn, minted, quiet):
         state, _ = parity.ex_not_supplied_accepted(conn, minted)
@@ -185,7 +187,7 @@ class TestTheRoutes:
             operation=fd.WITHDRAW_NOT_SUPPLIED, dataset_id=DS, actor=_actor(), reason="r",
             period=state.period))
         said = " ".join(found.notes)
-        assert "seeding" in said and "fpycnkgvmt" in said
+        assert "seeding" in said and people.display_name(parity.REAL_PERSON) in said
         assert "overdue or never supplied again" in said and "ticket reopens" in said
         assert "can be recorded again" in said
         assert not found.lines, "no --acknowledge key on the flag route"
@@ -274,3 +276,47 @@ def test_the_page_has_words_for_every_decision():
     named = set(re.findall(r'"?([a-z][a-z-]*)"?\s*:\s*"', block.group(1)))
     assert dl.ACTIONS, "the log admits no actions - nothing to check"
     assert set(dl.ACTIONS) <= named, sorted(set(dl.ACTIONS) - named)
+
+
+class TestCriticFindingsOn193:
+    """post-build-review #193: what a person is told when withdrawing."""
+
+    def test_a_marks_confirmation_gives_the_asset_clock_and_a_name(self, conn, minted, quiet):
+        """F2: the mark's instant was printed as raw UTC, and both
+        confirmations printed the recorded email rather than a name."""
+        state, _ = parity.ex_not_supplied_accepted(conn, minted)
+        said = " ".join(fd.consequences(conn, fd.Request(
+            operation=fd.WITHDRAW_NOT_SUPPLIED, dataset_id=DS, actor=_actor(), reason="r",
+            period=state.period)).notes)
+        assert "+00:00" not in said and "T" not in said.split("recorded ")[1][:12]
+        assert parity.REAL_PERSON not in said, said
+
+    def test_an_acknowledgements_confirmation_gives_a_name(self, conn, minted, quiet):
+        state, supply = parity.ex_awaiting_acknowledgement(conn, minted)
+        _person(conn, fd.ACKNOWLEDGE, period=state.period, supply=supply)
+        said = " ".join(fd.consequences(conn, fd.Request(
+            operation=fd.WITHDRAW_ACKNOWLEDGEMENT, dataset_id=DS, actor=_actor(), reason="r",
+            period=state.period, supply=supply)).notes)
+        assert parity.REAL_PERSON not in said, said
+
+    def test_a_lapsed_acknowledgement_is_not_said_to_need_a_person(self, conn, minted, quiet):
+        """F3: once the supply has left its period nothing is owed, so the
+        confirmation must not promise it awaits acknowledgement again."""
+        from qa_tools.common import acknowledgement
+
+        state, supply = parity.ex_awaiting_acknowledgement(conn, minted)
+        _person(conn, fd.ACKNOWLEDGE, period=state.period, supply=supply)
+        _person(conn, fd.DEMOTE, period=state.period, supply=supply)
+        said = " ".join(fd.consequences(conn, fd.Request(
+            operation=fd.WITHDRAW_ACKNOWLEDGEMENT, dataset_id=DS, actor=_actor(), reason="r",
+            period=state.period, supply=supply)).notes)
+        assert "needs a person again" not in said
+        assert "no longer" in said and state.period in said
+        _withdraw(conn, fd.WITHDRAW_ACKNOWLEDGEMENT, state.period, supply)
+        assert acknowledgement.owed(conn, DS, state.period) is None
+
+    def test_withdrawing_an_acknowledgement_without_a_supply_says_so(self, conn, minted, quiet):
+        """F9: the refusal named a blank supply and blamed the record."""
+        state, _ = parity.ex_awaiting_acknowledgement(conn, minted)
+        with pytest.raises(dl.DecisionRefused, match="names no supply"):
+            _withdraw(conn, fd.WITHDRAW_ACKNOWLEDGEMENT, state.period, None)

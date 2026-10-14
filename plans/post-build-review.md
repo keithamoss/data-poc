@@ -9265,3 +9265,59 @@ twice. It deliberately did not re-find the `TypeError`.
        - **F8.** After a re-checked-red supply is acknowledged, re-checking it
          again with the same red verdict lists it again, because "worse" is
          measured against the promoted-on verdict. Morning report 5, Q13.
+
+193. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **delivery-critic on REQ-PIPE-166 (withdraw an acknowledgement or a mark
+     as not supplied), overnight #5.** Each finding was checked against the
+     code, and each defect fix had a test that failed first
+     (`TestCriticFindingsOn193` in `tests/test_withdrawal.py`). The critic
+     drove the real built page with injected withdrawals and found criteria
+     13, 16 and 17 correct in a real browser.
+     - **FIXED - a mark's confirmation printed raw UTC** (F2). A mark carries
+       its instant as a string, which the formatter passed through untouched:
+       "recorded 2026-10-14T19:42:55+00:00". Both confirmations also printed
+       the recorded email; they now give the person's name and the asset
+       clock.
+     - **FIXED - a lapsed acknowledgement was said to need a person again**
+       (F3). Acknowledge, then demote, then withdraw: the confirmation said
+       the supply "awaits acknowledgement", though nothing was owed. The
+       withdrawal is still allowed (it corrects the record) and now says the
+       supply is no longer in its period and owes nothing.
+     - **FIXED - withdraw-acknowledgement with no supply** (F9) blamed a
+       blank supply's record; it now says the request names no supply.
+     - **FIXED - dead code** (F10): `withdrawal.withdrawal_of` was called by
+       nothing; removed, with its `implemented_by` line.
+     - **FIXED - wording** (F8): the reason prompt for withdrawing a mark said
+       "published beside the supply"; a mark has none, so it now says "in the
+       period's row". The requirement's own decision note said the terminal
+       shows what a withdrawal does BEFORE asking the reason; the code shows
+       it after, as for every decision. The note was wrong and is corrected.
+     - **FIXED - no real-browser test** (F6, an NFR):
+       `TestAcknowledgementBadge::test_a_withdrawn_one_reads_as_at_the_date_on_show`
+       in `tests/test_dashboard_e2e.py`.
+     - **NOTED, not changed** (F11): no synthetic scenario contains a
+       withdrawal, so the built dashboard has only rendered one from injected
+       data. Worth a scripted decision if Keith wants one on show.
+     - **FOR KEITH:**
+       - **F1 (defect against criterion 14's wording).** Under the default
+         `needs-action` ticket policy a mark (accepted) is never posted, so a
+         withdrawal returns the slot to exactly what the ticket last said.
+         The pass sees no change: a ticket a person closed stays closed, and
+         a GitHub-route withdrawal gets no reply - yet the confirmation says
+         "its ticket reopens". Reproduced by the critic with the real
+         reconciler. Either the pass reopens a closed ticket whose slot needs
+         action again, or the wording stops promising it. Morning report 5,
+         Q14.
+       - **F4 (criterion 15).** A withdrawn mark shows in the period's row of
+         "Periods with no supply", but the accepted-gaps list only lists
+         periods still accepted, so the withdrawal never appears there unless
+         the period is marked again. Q15.
+       - **F5 (an NFR not met).** "One history reader, not three" asked for
+         `excuse.history`/`pipeline/excuses.py` to be generalised; the build
+         added a second pairing reader (`closed_slots.withdrawals`) instead,
+         and no decision recorded the departure. Generalise, or record why
+         not. Q16.
+       - **F7 (criterion 12's scope).** `mothman supply decisions` prints
+         every action's raw name, withdrawals included, and does not show
+         which entry a withdrawal names. Does criterion 12 cover the
+         terminal list? Q17.

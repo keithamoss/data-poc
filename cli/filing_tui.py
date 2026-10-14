@@ -323,7 +323,9 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
     if reason is None:
         reason = common.text_prompt(
             f"Why are you recording this {_NOUN.get(operation, operation)}?"
-            + (" It is published beside the supply on the dashboard."
+            + ((" It is published on the dashboard, in the period's row."
+                if operation in filing_decisions.PERIOD_SCOPED else
+                " It is published beside the supply on the dashboard.")
                if operation in _PUBLISHED_REASON else ""),
             flag_hint=_FLAG_HINT)
         if reason is None:

@@ -26827,7 +26827,7 @@ requirements:
     - 'THE BUILDERS CARRY THE WITHDRAWAL''S INSTANT, THE PAGE COMPARES IT (built 2026-10-15): pipeline/closed_slots.py and pipeline/acknowledgements.py attach each withdrawal - who by name, when, why - to the mark or acknowledgement it withdrew, and the page decides what stands as at the date on show. The same decision REQ-DASH-133 records for closed slots. REJECTED having the builders drop withdrawn entries: the page could then not show an annotation on a date before it was withdrawn (criterion 13).'
     - 'AN ACKNOWLEDGEMENT TRAVELS AS A LIST, acks, each with its withdrawal (built 2026-10-15). The single acknowledged field stays and now carries the one standing NOW, newest not withdrawn, for any reader wanting only that; the page reads acks and falls back to acknowledged for data built before. It used to carry the FIRST acknowledgement, which after a withdrawal and a second acknowledgement would have been the wrong one.'
     - 'THE MANIFEST VIEW HONOURS A WITHDRAWAL TOO (built 2026-10-15, found enumerating readers for criterion 11): qa.manifest_for''s acknowledged column read any acknowledge row as standing. It now excludes one with a withdraw-acknowledgement naming it, in schema 43 alongside the new constraints, so a period schema''s _manifest says false again once the acknowledgement is withdrawn.'
-    - 'CONFIRMATION ON THE FLAG ROUTE NEEDS NO --acknowledge KEY (built 2026-10-15): a withdrawal moves no supply, so consequences() returns the entry withdrawn and what follows as notes rather than consequence lines, and the flag route applies it on the reason alone - as withdraw-excuse does. The terminal still shows the notes before asking for the reason.'
+    - 'CONFIRMATION ON THE FLAG ROUTE NEEDS NO --acknowledge KEY (built 2026-10-15): a withdrawal moves no supply, so consequences() returns the entry withdrawn and what follows as notes rather than consequence lines, and the flag route applies it on the reason alone - as withdraw-excuse does. The terminal shows the notes after the reason and before the confirmation, as for every other decision (corrected 2026-10-15, post-build-review #193 F8 - this note first said before the reason, which the code never did).'
     - 'CRITERION 18''S TEST NAMES NO EXCEPTIONS (built 2026-10-15): every action decision_log admits now has page wording, including inherit-refused (''refused carrying forward'', added here) - the one that had none. A rule''s refusal reaches the page only if its entry is in a run''s states, but wording it costs nothing and keeps the test exception-free.'
     linked_tests:
     - 'tests/test_withdrawal.py::TestTheOperations'
@@ -26837,12 +26837,13 @@ requirements:
     - 'tests/test_withdrawal.py::TestTheDashboardData'
     - 'tests/test_withdrawal.py::test_the_page_has_words_for_every_decision'
     - 'tests/test_manifest.py::TestAcknowledged::test_withdrawn_it_reads_owed_again'
+    - 'tests/test_withdrawal.py::TestCriticFindingsOn193'
+    - 'tests/test_dashboard_e2e.py::TestAcknowledgementBadge::test_a_withdrawn_one_reads_as_at_the_date_on_show'
     - 'tests/test_door_flag_parity.py::test_the_door_offers_what_the_flags_would_record'
     - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_nineteen_of_them'
     - 'tests-js/withdrawal.test.js'
     implemented_by:
     - 'qa_tools/common/withdrawal.py::not_withdrawn'
-    - 'qa_tools/common/withdrawal.py::withdrawal_of'
     - 'qa_tools/common/withdrawal.py::standing_acknowledgement'
     - 'qa_tools/common/withdrawal.py::target'
     - 'qa_tools/common/withdrawal.py::why_not'
