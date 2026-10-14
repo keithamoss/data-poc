@@ -26868,7 +26868,6 @@ requirements:
     - 'dashboard/qa-reporting-dashboard.template.html::closedGapsInPlaceOn'
     - 'dashboard/qa-reporting-dashboard.template.html::markWithdrawalNotes'
     - 'dashboard/qa-reporting-dashboard.template.html::acknowledgementBadge'
-    - 'dashboard/qa-reporting-dashboard.template.html::DECISION_DONE'
     evidence:
     - '2026-10-15 overnight: tests/test_withdrawal.py (21 tests) and tests-js/withdrawal.test.js (6 tests). The dashboard-data tests in TestTheDashboardData were written after the builder change, so were NOT seen to fail first. The criterion 18 coverage test was mutation-checked by deleting the withdraw-not-supplied wording, and failed. A run of test_withdrawal, test_manifest, test_door_flag_parity, test_recheck_decision, test_filing_decisions and test_not_supplied after the last code change: 190 passed; tests-js/withdrawal.test.js 6 passed. No plans prose to delete: plans/*.md only names REQ-PIPE-166 in sprint lists and reports.'
 

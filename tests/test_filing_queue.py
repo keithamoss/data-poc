@@ -91,6 +91,7 @@ class TestWhatASlotOffers:
                               (slot_state.PROMOTED, False), (slot_state.REJECTED, False),
                               (slot_state.SUBSTITUTED, False), (slot_state.INHERITED, False),
                               (slot_state.OVERDUE, False), (slot_state.OVERDUE, True),
+                              (slot_state.NOT_SUPPLIED_ACCEPTED, True),
                               # REQ-PIPE-194 criterion 4: an open pair offers the
                               # settlement, and nothing else.
                               (slot_state.TWO_FILES, False)):
@@ -101,9 +102,12 @@ class TestWhatASlotOffers:
         # criterion 10) - tests/test_place_held_supply.py covers it. And
         # UN-SUPERSEDE comes from supersede_offers, wherever a superseded
         # version could come back (REQ-GHUB-165 criterion 1) -
-        # tests/test_door_flag_parity.py covers both.
+        # tests/test_door_flag_parity.py covers both. WITHDRAW-ACKNOWLEDGEMENT
+        # comes from acknowledgement_offers, where one is recorded as standing
+        # (REQ-PIPE-166 criterion 6) - tests/test_withdrawal.py covers it.
         assert offered == set(fd.OPERATIONS) - {fd.EXCUSE_LATENESS, fd.WITHDRAW_EXCUSE,
-                                                fd.PLACE, fd.UN_SUPERSEDE}
+                                                fd.PLACE, fd.UN_SUPERSEDE,
+                                                fd.WITHDRAW_ACKNOWLEDGEMENT}
 
     def test_the_queue_half_is_only_ever_supply_scoped(self):
         """Criterion 31 made mechanical: whatever a slot is in, the first

@@ -480,7 +480,8 @@ class TestEveryOperationIsReachableFromSomeDoor:
     reach it.
     """
 
-    def _offered_by(self, flow, state, monkeypatch, excuse_offers=(), supersede_offers=()):
+    def _offered_by(self, flow, state, monkeypatch, excuse_offers=(), supersede_offers=(),
+                    acknowledgement_offers=()):
         """What this door would put in front of somebody, for this slot.
         `excuse_offers` stands in for the recorded punctuality the excuse
         offer reads (REQ-PIPE-161 criterion 10), which needs a database."""
@@ -490,6 +491,9 @@ class TestEveryOperationIsReachableFromSomeDoor:
         monkeypatch.setattr(filing_queue, "excuse_offers", lambda conn, s: excuse_offers)
         monkeypatch.setattr(filing_queue, "supersede_offers",
                             lambda conn, s: supersede_offers)
+        # A standing acknowledgement is recorded too (REQ-PIPE-166).
+        monkeypatch.setattr(filing_queue, "acknowledgement_offers",
+                            lambda conn, s: acknowledgement_offers)
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
@@ -535,6 +539,7 @@ class TestEveryOperationIsReachableFromSomeDoor:
                 (filing_tui.period_flow, [(slot_state.PROMOTED, False),
                                            (slot_state.OVERDUE, False),
                                            (slot_state.OVERDUE, True),
+                                           (slot_state.NOT_SUPPLIED_ACCEPTED, True),
                                            (slot_state.SUBSTITUTED, False),
                                            (slot_state.INHERITED, False)])):
             for name, closed in states:
@@ -550,6 +555,11 @@ class TestEveryOperationIsReachableFromSomeDoor:
             filing_tui.queue_flow,
             _state(slot_state.AWAITING_DECISION, supply="cp-carers@1"), monkeypatch,
             supersede_offers=(fd.UN_SUPERSEDE,))
+        # WITHDRAW-ACKNOWLEDGEMENT where one stands (REQ-PIPE-166 criterion 6).
+        reachable |= self._offered_by(
+            filing_tui.period_flow,
+            _state(slot_state.PROMOTED, supply="cp-carers@1"), monkeypatch,
+            acknowledgement_offers=(fd.WITHDRAW_ACKNOWLEDGEMENT,))
         # PLACE IS REACHED FROM A HELD SUPPLY'S ROW (REQ-PIPE-163 criterion 10).
         reachable |= self._held_offers(monkeypatch)
         assert reachable == set(fd.OPERATIONS)
