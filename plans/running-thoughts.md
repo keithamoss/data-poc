@@ -5366,3 +5366,16 @@ could never have computed it), and it belongs with batch 5's check work.
     every count and trend meanwhile. Needs scoping with Keith - starting from
     what a reader at the agency card, the dataset list and the dataset page
     should learn about a file that warned or was refused.
+
+97. **[todo, 2026-10-15]** **[Data generation]** **[Pipeline & publishing]**
+    **A calendar with a second version, to stress-test what follows a
+    calendar's history.** Keith, 2026-10-15, answering morning report 5
+    Q20 (the SLA tile follows participation versions but not calendar
+    versions, and no calendar has a second version today): "Wait and let's
+    discuss building a calendar with a second version to stress test this
+    and other things." So nothing reads a calendar change in anger yet - the
+    SLA tile, slot instants, claim windows, runway and the as-of picker all
+    have only ever seen one calendar version. Needs a conversation first:
+    which calendar, what changes in its second version (anchor months, claim
+    window, day of month), when it takes effect inside the synthetic
+    history, and which scenarios it should exercise.

@@ -1609,3 +1609,71 @@ one or more component tags, and a date.
           asks for more dates. Suppress it once the turn-off is authored?
       25. (#195) Criterion 19's "provenance cell" doesn't exist; the note sits
           in the Timing cell. Accept that, or wait for the cell split?
+    - **KEITH'S ANSWERS, 2026-10-15 morning** (asked four at a time):
+      1. Allow it - `supply decide` may reject a held supply whose schedule
+         ended. No change.
+      2. Keep the split - the flags leave the check owed unless `--wait`; the
+         screen waits. No change.
+      3. Keep undo-first on the screen. No change.
+      4. WAIT FOR CONFIRMATION - the re-filer must not file a held supply that
+         a declared but unconfirmed correction covers. To build.
+      5. Keep as built. A dataset naming a calendar other than its
+         collection's takes nothing from the collection, its turn-off
+         included; turn it off with its own effective_to. Asked first, and
+         answered from agreement.py: a dataset that only tweaks a value (say
+         its claim window) still takes the rest per value AND is turned off
+         with its collection - only a different calendar, or a version of its
+         own dated inside the gap, keeps it on. Nothing else is held at
+         collection level: the calendar and the five participation values come
+         down; not_expected, contracts and checks are per dataset.
+      6. REFUSE ON THE FLAGS too - substituting over a period holding an open
+         contested pair. To build.
+      7. LIST EVERY FILED SUPPLY in a period on its door. To build; needs a
+         requirement and sign-off.
+      8. Yes - keep warning until the last owed period before a future
+         for-good turn-off. No change.
+      9. HOLD IT AS TURNED OFF - a correction that turns off a period holds a
+         person-filed supply there too, as a turned-off hold, and the trial's
+         preview names it. To build.
+      10. REWORD - REQ-PIPE-179 criterion 28's line becomes, exactly: "Edit
+          calendar.yaml to change this until <date time>, when the first
+          period's claim window opens. After that it needs a declared
+          correction." To amend and build.
+      11. YES - `_manifest` carries the re-checked-worse acknowledgement as a
+          column the build fills, written when the re-check is recorded. To
+          build.
+      12. NO - a re-check owes its own checks only; unchanged data moves a
+          cross-table result only if that check changes, which the knock-on
+          re-evaluation already covers. Record against the architect's NFR.
+      13. KEEP - "worse" stays measured against the verdict the supply was
+          promoted on, so a still-red re-check asks again after an
+          acknowledgement. No change.
+      14. CHANGE THE WORDING - closed tickets stay closed; the confirmation
+          says the period is owed again and promises nothing about the ticket.
+          Amends REQ-PIPE-166 criterion 14 (exact sentence to be shown to Keith
+          with the amendment).
+      15. ENOUGH AS IS - the period's row and its history carry the withdrawal.
+          No change.
+      16. GENERALISE NOW - one history reader for excuses and pairings, as the
+          NFR says; a refactor with no change in behaviour. To build.
+      17. TERMINAL TOO - `mothman supply decisions` uses the page's wording
+          from one shared table; JSON output keeps raw names. To build.
+      18. ONE BLOCK - a supply in a period owed nothing carries "Not owed -
+          <reason>" as its cycle's subheading. To build.
+      19. ADD THE TILE, CHANGE THE PILL - "Not owed yet - owes from <date>",
+          and the pill reads "Not owed yet". To build.
+      20. WAIT - and discuss building a calendar with a second version to
+          stress-test this and other things: plans/running-thoughts.md #97.
+      21. GATE ON THE AUTHORED DATE - "nothing more owed" and leaving the
+          rollup wait for the turn-off's authored date, as criterion 27's
+          marker does. To build.
+      22. ADD THE LINE - the asset level carries "N datasets not counted in
+          this status" as the collection level does. To build.
+      23. RESTYLE - 'Not counted' takes the turn-off marker's style, as
+          criterion 12 says. To build.
+      24. REWORD ONCE AUTHORED - the runway warning stays (Q8) but stops
+          asking for dates once the turn-off is written; exact text to be
+          shown to Keith with the amendment. To build.
+      25. SPLIT IT NOW - a mini requirement to scope a provenance cell split
+          out of the Timing cell, so criterion 19's note lands where it says.
+          To scope (with Q7's every-supply door).
