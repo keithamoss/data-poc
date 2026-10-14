@@ -5278,6 +5278,16 @@ could never have computed it), and it belongs with batch 5's check work.
     REQ-PIPE-166 (withdraw a mark/acknowledgement), REQ-PIPE-177/178 (bulk
     re-check), and REQ-QAC-176 (a fingerprint of each check's definition
     on every result - the rule 3 audit's M4 gap, already drafted).
+    **STEP 3 DONE AND STEP 4 SCOPED, 2026-10-14 afternoon.** The seven older
+    drafts were triaged (none overtaken; docs/drafts/unsigned-triage/), re-scoped
+    and reviewed; the "we heard / we built" Feedback tab was scoped as REQ-DOCS-219
+    (cards in road-testing.md + a gate), REQ-DASH-220 (the tab) and REQ-DASH-222
+    (a requirement's own address). Keith signed eleven: 219, 220, 222, QAC-223,
+    DASH-175, PIPE-164, PIPE-166, GHUB-165, and PIPE-177/178 + DASH-221 (build
+    waiting on REQ-QAC-176, which stays unsigned behind #89). Found and fixed on
+    the way: post-build-review #180 (closing a side panel opened from a link left
+    the dashboard). Still to do in step 4: build the Feedback tab, then scope
+    road-testing sprints 1, 3 and 4.
 
 
 93. **[todo, 2026-10-14]** **[Dashboard UI]** **A period-composition view
