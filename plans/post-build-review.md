@@ -9056,6 +9056,11 @@ twice. It deliberately did not re-find the `TypeError`.
        chooser offered the supply's own period - shown, not selectable, "it is
        filed here now"; the chooser said "accepted" where the period list one
        screen earlier says "promoted".
+     - **FIXED - CI went red on 1e6fffb, green locally**: two new tests matched
+       phrases in CLI output, and CI forces colour on, so ANSI codes broke the
+       phrases. Reproduced with `FORCE_COLOR=1`; the test helpers strip colour
+       codes now. A test reading rich output must strip them - worth knowing
+       before reading the next CI-only red of this shape as a regression.
      - **NOT CHANGED, pre-existing - Back from a held supply's or a slot's menu
        goes to the collection menu, not "Which one?"** (cli-ux L7). Same for slot
        rows before this change; a separate piece of polish.

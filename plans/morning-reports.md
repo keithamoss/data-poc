@@ -1440,7 +1440,9 @@ one or more component tags, and a date.
         reason. The two critics on REQ-PIPE-163 (post-build-review #188): a
         BLOCKER - "place" crashed the terminal for every held supply in today's
         queue (a None default matching an owes-nothing row) - fixed test-first,
-        with D1-D10 and the CLI UX findings. Gate and push follow this line.
+        with D1-D10 and the CLI UX findings. CI was red on 1e6fffb (two tests
+        broke on CI's coloured output) - fixed here. Full gate green on this
+        tree: 5,160 passed, 16m40s.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
