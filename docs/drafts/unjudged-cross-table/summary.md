@@ -321,3 +321,21 @@ same thing true of re-files?
   requirements it depends on but does not contain.
 - I read the file back. All six requirements parse, and every prose item is
   a string.
+
+## Keith's answers so far (2026-10-14, ~midday)
+
+- Shape (Q1): "Red with nuance and pills?" - not yet settled. Followed up:
+  a red-looking status with an "Incomplete: no promoted <table>" pill that
+  still promotes itself, vs a truly red one the gate holds, vs red in the data
+  with a flag. PARKED by Keith: "Let's come back to this later today."
+- Promote itself (Q2): YES - option B, "because a person can unpromote": an
+  incomplete supply promotes itself as "Incomplete promoted" and is re-checked
+  when the missing table arrives. NOTE: with self-promotion the architect's B1
+  deadlock largely disappears (early arrivals promote, the period opens,
+  inheritance runs, and the existing knock-on re-checks them when the table is
+  promoted) - but it conflicts with a TRULY red status, which never promotes
+  itself; that is the parked shape question.
+- A staged dependency counts as checked (Q4 / architect A2): YES (A).
+- Re-gate on a staged arrival - amend REQ-PIPE-121's "a file landing in
+  staging stays outside this mechanism" (architect A1): reminded of the
+  decision's wording; PARKED with the shape question ("see previous").
