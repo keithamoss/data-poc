@@ -842,6 +842,12 @@ Folded 2026-10-14. Each answer is a decision citing "Keith, 2026-10-14, follow-u
 - REQ-DASH-208: SIGNED by Keith, 2026-10-14. Moved into requirements.yaml; removed from this draft.
 - REQ-GEN-205: SIGNED by Keith, 2026-10-14. Moved into requirements.yaml; removed from this draft. Amendment 47 (re-pointing its criterion 10 at REQ-GEN-218) is proposed against the signed text.
 - REQ-GEN-206: HELD by Keith, 2026-10-14, until running-thoughts #95's shape is settled.
+- REQ-DASH-182: SIGNED as is by Keith, 2026-10-14, after its own UX review and the H1-H3 fold. Replaced its older entry in requirements.yaml; removed from this draft.
+- REQ-PIPE-179: SIGNED by Keith, 2026-10-14, with the own-pass answers Q1-Q4 folded and its 22 amendments approved in their exact drafted wording (13, 14, 16, 17, 21-26, 28-30, 33-41), to be applied when it is built. Its provisional choices (N counts supplies; the newest correction or entry wins; a turns_off entry with no effective_to is accepted and read by nothing) stand as signed. Replaced its older entry in requirements.yaml; removed from this draft.
+- REQ-GEN-218: SIGNED by Keith, 2026-10-14, with TS-63's links answered as option A (two lettered links, criterion 8; built after REQ-GEN-205), cp-carers and must as drafted. Amendments 45 to 47 applied to requirements.yaml in the same change, as its criterion 7 requires. Added to requirements.yaml; removed from this draft.
+- REQ-DASH-209: SIGNED as is by Keith, 2026-10-14. Added to requirements.yaml; removed from this draft.
+- REQ-DASH-180: SIGNED by Keith, 2026-10-14, with R8 folded into criterion 27 (the marker starts from REQ-PIPE-179 criterion 41's authored date: the newest correction setting effective_to, otherwise the turns_off: true entry), criterion 22 narrowed to the two amendments that change text, and amendments 1 and 15 approved in their drafted wording, applied when it is built. Replaced its older entry in requirements.yaml; removed from this draft.
+- LEFT IN THIS DRAFT, all waiting on running-thoughts #95's shape: REQ-DASH-204, REQ-PIPE-210, REQ-PIPE-211 and REQ-GEN-206 (held).
 
 ## Keith's answers to the round 4 fold's questions (2026-10-14)
 
