@@ -224,3 +224,39 @@ describe("the panel's reason and the history toggle's count", () => {
     expect(later).toContain("Show all history (3 cycles)");
   });
 });
+
+describe("post-build-review #194", () => {
+  it("F1: a current owed-nothing period is not lost when a supply also falls in it", () => {
+    const raw = dataset();
+    raw.runs.push({ run_id: "r3", run_date: "2026-05-01" });
+    const w = withRaw(load(), raw);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
+    const html = w.renderSupplyHistorySection(raw, w.buildSupplyHistory(raw), "2026-05-01");
+    const doc = new w.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+    const owed = [...doc.querySelectorAll("[data-owed-nothing]")];
+    expect(owed.map((e) => e.textContent).join(" ")).toContain("Not owed — outside its agreed months");
+    expect(owed[0].closest("#supply-history-older")).toBeNull();
+  });
+
+  it("F2: a dataset with nothing supplied yet still shows its owed-nothing rows", () => {
+    const raw = dataset({ runs: [] });
+    const w = withRaw(load(), raw);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
+    const wrap = w.document.createElement("div");
+    wrap.id = "supply-history-wrap";
+    w.document.body.appendChild(wrap);
+    w.renderBlockedSupplyHistoryOnly(raw);
+    expect(wrap.textContent).toContain("Not owed — outside its agreed months (Feb, Aug)");
+  });
+
+  it("F4: a daily run is counted in days", () => {
+    const w = load();
+    const off = (d) => ({ period: d, date: d, kind: "turned_off", reason: "paused", months: null });
+    const raw = dataset({ id: "birth-registrations",
+                          owedNothing: [off("2026-03-01"), off("2026-03-02"), off("2026-03-03")] });
+    const runs = w.owedNothingRuns(raw, "2026-03-10");
+    expect(runs).toHaveLength(1);
+    expect(runs[0].text).toMatch(/\(3 days\)$/);
+    expect(w.owedNothingRuns(raw, "2026-03-03")[0].text).toMatch(/\(3 days so far\)$/);
+  });
+});

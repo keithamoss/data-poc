@@ -920,12 +920,39 @@ class TestOwedNothingPeriods:
     def test_the_period_is_a_quiet_row_and_the_tile_names_its_own_months(self, page,
                                                                          built_dashboard_html):
         _goto(page, built_dashboard_html, state=self.DS, in_place_on=self.ON)
-        row = page.locator("[data-owed-nothing]").first
+        # THE VISIBLE CURRENT ROW, not the first match, which may be a hidden
+        # older one (post-build-review #194 F1).
+        row = page.locator(".supply-history > [data-owed-nothing]")
+        assert row.count() == 1 and row.is_visible()
         assert "Not owed — outside its agreed months (Feb, Aug)" in row.inner_text()
+        assert "Current cycle" in row.inner_text()
         assert row.locator(".pill:not(.tag)").count() == 0
         tile = page.locator(".sla-tile", has_text="SLA").first.inner_text()
         assert "Twice a year (Feb, Aug, day 1), by 09:00" in tile
         assert "staffing register" in tile
+
+    def test_rows_show_before_anything_is_supplied(self, page, built_dashboard_html):
+        """post-build-review #194 F2 (criterion 1, 'even where the dataset has
+        no supply cycles yet'): the never-supplied branch drew no history.
+        The real data has no such dataset, so one is made from cp-case-workers
+        by dropping its early runs and adding a not_expected first period."""
+        _goto(page, built_dashboard_html, state=self.DS, in_place_on="2023-03-15")
+        page.evaluate("""() => {
+            const raw = rawRealDatasetById('cp-case-workers');
+            raw.runs = raw.runs.filter(r => r.run_date >= '2023-04-01');
+            raw.owedNothing = [{period: '2023-Q1', date: '2023-02-01', kind: 'not_expected',
+                                reason: 'System migration', months: null}, ...(raw.owedNothing || [])];
+            DATA = buildData(CURRENT_IN_PLACE_ON);
+            render();
+        }""")
+        assert page.evaluate("""() => {
+            const raw = rawRealDatasetById('cp-case-workers');
+            return !raw.runs.some(r => r.run_date <= '2023-03-15')
+                && raw.owedNothing.some(e => e.period === periodNameFor('cp-case-workers', '2023-03-15'));
+        }"""), "precondition: nothing supplied, and the date is owed nothing"
+        rows = page.locator("[data-owed-nothing]")
+        assert rows.count() >= 1
+        assert "Not expected — System migration" in rows.first.inner_text()
 
 
 class TestAcknowledgementBadge:

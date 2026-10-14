@@ -1499,6 +1499,10 @@ one or more component tags, and a date.
         not_expected period between deliveries read "nothing has landed yet";
         fixed test-first. Two built labels reworded as signed (commas between
         months; "by 09:00, 60 days before each date"). Gate in the commit.
+      - ~04:40 182 pushed (67c26c8, full gate green). Critic (#194): a
+        current "Not owed" row vanished when a supply also fell in its period
+        (cp-case-workers every May), and the never-supplied branch drew no
+        history - both fixed test-first. Q18-Q20.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
@@ -1563,3 +1567,14 @@ one or more component tags, and a date.
       17. (#193 F7) `mothman supply decisions` prints raw action names
           (withdraw-not-supplied, and every other action). Does criterion 12's
           "no raw operation name" cover the terminal list, or the page only?
+      18. (#194 F1/F6) A supply that lands in a period the dataset owes nothing
+          in (cp-case-workers' unfiled May files) shows as two blocks for that
+          period: the "Not owed" row and the supply's cycle. Keep two, or one
+          block with the label as its subheading?
+      19. (#194 F3) Before a dataset's first participation version the page
+          has no SLA tile, so "Not owed yet" appears only as the notice's
+          heading, beside a "No data" pill. Add the tile there and change the
+          pill, or amend criterion 3 so the heading alone meets it?
+      20. (#194 F5) The SLA tile follows participation versions by date, not
+          calendar versions (no calendar has a second version today). Follow
+          both now, or wait until one does?

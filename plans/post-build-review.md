@@ -9321,3 +9321,45 @@ twice. It deliberately did not re-find the `TypeError`.
          every action's raw name, withdrawals included, and does not show
          which entry a withdrawal names. Does criterion 12 cover the
          terminal list? Q17.
+
+194. **[in-progress, 2026-10-15]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-182 (periods owed nothing; the delivery time in force),
+     overnight #5.** Each finding was checked against the code. The critic
+     drove the real built page for cp-case-workers at nine dates and built
+     the not_expected, turned-off and markup cases in the browser.
+     - **FIXED - a current owed-nothing row vanished when a supply also fell
+       in its period** (F1, criterion 1). The history picked ONE current
+       block and dropped every current one from the older list, so
+       cp-case-workers' unfiled May supply hid the May "Not owed" row on most
+       May-quarter dates - the requirement's own showcase. Every current block
+       is now shown, the owed-nothing row first. Test-first in
+       `tests-js/owed-nothing.test.js` ("post-build-review #194"); the e2e
+       row test now asserts on the visible current row, where it used to take
+       the first match, which could be a hidden older one.
+     - **FIXED - no rows when nothing had been supplied yet** (F2, criterion
+       1). The never-supplied branch drew no supply history at all, so a
+       dataset whose first period is owed nothing read only "Nothing had been
+       supplied". It now draws the history section. Test-first in the real
+       browser (`TestOwedNothingPeriods::test_rows_show_before_anything_is_supplied`,
+       with the data made in the page; the real data has no such dataset).
+     - **FIXED - tests and tidy-ups**: a daily run's "(3 days)" and
+       "(3 days so far)" now tested (F4); parentheses on an expression that
+       read ambiguously (F8).
+     - **NOTED, not changed**: F7 (history mixes in supply cycles after the
+       date on show - existing behaviour, and the count is honest); F9 (one
+       embedded entry per owed-nothing period, collapsed in the browser - the
+       scale NFR is about rows on the page and is met; a daily dataset turned
+       off for a year embeds ~365 small entries); F10 (the not_expected
+       staleness test checks the flag; the critic checked the rendered text).
+     - **FOR KEITH:**
+       - **F1/F6.** A supply in a period the dataset owes nothing in (the
+         unfiled May files) now shows as two blocks for that period - the
+         owed-nothing row and the supply cycle. One block with the label as
+         its subheading instead? Morning report 5, Q18.
+       - **F3 (criterion 3).** Before the first participation version the
+         page has no SLA tile, so "Not owed yet" shows only as the notice's
+         heading - beside a "No data" pill. Add the tile there (and change
+         the pill), or amend the criterion? Q19.
+       - **F5.** The tile follows participation versions by date but not
+         calendar versions (none differ today). Follow both now, or wait for
+         a second calendar version? Q20.

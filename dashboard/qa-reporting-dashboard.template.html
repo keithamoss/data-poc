@@ -6699,9 +6699,13 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
     || c.entries.reduce((newest, e)=> e.run_date > newest ? e.run_date : newest, "");
   const items = [
     ...cycles.map(c=> ({key: sortKey(c), current: isCurrent(c), html: ()=> cycleBlock(c)})),
-    ...owed.map(r=> ({key: r.firstDate, current: r.current, html: ()=> owedBlock(r)})),
+    ...owed.map(r=> ({key: r.firstDate, current: r.current, owed: true, html: ()=> owedBlock(r)})),
   ].sort((a, b)=> b.key.localeCompare(a.key));
-  const current = items.find(i=> i.current);
+  // EVERY CURRENT BLOCK (post-build-review #194 F1): a supply can land in
+  // a period the dataset owes nothing in, so the current owed-nothing row and
+  // the current supply cycle are both shown - the owed-nothing row first, as
+  // criterion 10 makes it the current-cycle block. Picking one lost the other.
+  const current = items.filter(i=> i.current).sort((a, b)=> (b.owed ? 1 : 0) - (a.owed ? 1 : 0));
   const older = items.filter(i=> !i.current);
   return `
     <div class="supply-history">
@@ -6710,7 +6714,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
         ${older.length ? `<button class="link-btn" id="supply-history-toggle" type="button">Show all history (${older.length} ${pluralize(older.length, "cycle")})</button>` : ""}
       </div>
       ${waiting}
-      ${current ? current.html() : `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`}
+      ${current.length ? current.map(i=> i.html()).join("") : `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`}
       ${older.length ? `<div id="supply-history-older" hidden>${older.map(i=> i.html()).join("")}</div>` : ""}
     </div>
   `;
@@ -6907,7 +6911,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>
       ${arrivalBanner(ds)}
       ${neverSuppliedNotice(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
+      <div id="supply-history-wrap"></div>
     `;
+    // OWED-NOTHING ROWS WITH NOTHING SUPPLIED YET (REQ-DASH-182 criterion 1;
+    // post-build-review #194 F2): this branch drew no history at all.
+    renderBlockedSupplyHistoryOnly(ds);
     // THE WAY BACK HAS TO EXIST ON THIS BRANCH TOO, and this is the
     // branch that needs it most: drilling back to the period that
     // earned some results can legitimately land on a date this dataset

@@ -83,5 +83,5 @@ def sla_timeline(dataset_id: str, agreement=None) -> dict:
         if version.days_before:
             cadence["days_before"] = version.days_before
         versions.append({"from": version.effective_from.isoformat(), "cadence": cadence,
-                         "reason": (version.reason or "").strip() or None if partial else None})
+                         "reason": ((version.reason or "").strip() or None) if partial else None})
     return {"owesFrom": begins.isoformat() if begins else None, "versions": versions}
