@@ -8969,3 +8969,40 @@ twice. It deliberately did not re-find the `TypeError`.
        distinct `new Date()` instant per render, not continuously; the e2e
        parity test skips where no trend drew, and checks M with the page's
        own predicate - the red and amber split is the independent part.
+
+187. **[done, 2026-10-14]** **[Dashboard UI]** **[Docs & process]**
+     **delivery-critic on REQ-DOCS-219 and REQ-DASH-220 (42dc2a2).** Each
+     finding checked against the code; each fix's test seen failing first.
+     - **FIXED - card text was not escaped (REQ-DASH-220 criterion 12), and on
+       the public site that ran script.** `feedbackInline()` handed card text
+       to `renderPlansMarkdown()`, which escapes nothing because the rest of
+       the page trusts committed repo content; the critic fired a real
+       `alert()` from an `<img onerror>` in a card line, which the gate
+       accepted. It also rendered "1. " and "- " lines as lists. Card text is
+       now escaped first, then given bold and inline code only.
+       `tests-js/feedback-cards.test.js`.
+     - **FIXED - an embedded const could close its own `<script>`**:
+       `_replace_const` wrote `json.dumps` output as is, and a literal
+       `</script>` in any embedded string - plans prose included - ends the
+       element. "</" is now written "<\/", the same string to JavaScript.
+       Pre-existing, wider than this change.
+     - **FIXED - links the page would follow differently from a new tab**: a
+       query parameter other than `in-place-on` (`?panel=changelog`) passed the
+       gate but a plain click dropped it; `REQ=` slipped past the `req=` rule;
+       an impossible date (`2023-02-30`) and a repeated `in-place-on` passed;
+       malformed %-encoding threw in the page. All refused by the shared
+       parser now.
+     - **FIXED - the build silently derived 'Heard' for a card citing an
+       unknown requirement**; it now refuses, as for a bad href.
+     - **FIXED - #27 was dated 2026-10-04** (its blocked date); first raised
+       2026-10-02 (1c4f562). **#25's card** said configuration is checked
+       before a run; it is checked in CI.
+     - **FIXED - the 'built' predicate was restated, not shared**:
+       `sprint_state.requirement_met()` is the one predicate now and
+       `card_status` calls it. Status derivation, never unit-tested before,
+       has seven cases of its own.
+     - **AMENDED WITH KEITH'S APPROVAL, 2026-10-14**: the introduction's older
+       sentence now says an entry's prose comes out when it lands and its card
+       stays; the card paragraph says a card never names, describes or quotes
+       the reviewer; REQ-DASH-220 NFR 8 now says card text is escaped first,
+       its old premise (renderPlansMarkdown's own escaping) having been false.

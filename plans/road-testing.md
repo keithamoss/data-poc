@@ -23,9 +23,9 @@ Same conventions as every other numbered-item plans file: a closed
 status (`todo` / `investigate` / `in-progress` / `parked` / `done` /
 `superseded`), one or more component tags, and a date. Per `CLAUDE.md`,
 anything here that turns into real build work becomes a requirement in
-`requirements.yaml`, and the entry comes out when it lands.
+`requirements.yaml`, and the entry's prose comes out when it lands - its feedback card stays (below).
 
-**EVERY ENTRY CARRIES A FEEDBACK CARD** (REQ-DOCS-219). Directly after its opening paragraph, each numbered entry carries a short labelled list: `You told us:` (something a reviewer raised) or `We noticed:` (something we found ourselves), `What we heard:` (our reading, in our own words), `What we built:` once something is (or, for a parked, won't-do or not-reproduced card, why not), `Evidence:` (requirement ids, `sprint <n>`, or relative dashboard links) and, where needed, `Card status:`. A new sighting is filed with at least its first line and `What we heard`. When an entry lands, its title line and its card stay, its status goes to `done`, and the rest of its prose goes as for any other plans entry. A card never names or describes the reviewer. The date in an entry's `[status, date]` tag is the date it was first raised, and does not change when its status does. `mothman dashboard validate-feedback` checks every card; the dashboard's Feedback tab shows them.
+**EVERY ENTRY CARRIES A FEEDBACK CARD** (REQ-DOCS-219). Directly after its opening paragraph, each numbered entry carries a short labelled list: `You told us:` (something a reviewer raised) or `We noticed:` (something we found ourselves), `What we heard:` (our reading, in our own words), `What we built:` once something is (or, for a parked, won't-do or not-reproduced card, why not), `Evidence:` (requirement ids, `sprint <n>`, or relative dashboard links) and, where needed, `Card status:`. A new sighting is filed with at least its first line and `What we heard`. When an entry lands, its title line and its card stay, its status goes to `done`, and the rest of its prose goes as for any other plans entry. A card never names, describes or quotes the reviewer. The date in an entry's `[status, date]` tag is the date it was first raised, and does not change when its status does. `mothman dashboard validate-feedback` checks every card; the dashboard's Feedback tab shows them.
 
 **SECOND SWEEP, 2026-10-12** (the same method). Tags tidied the same
 night at Keith's go-ahead: #12 to parked, #16 to blocked (built, waiting
@@ -1780,7 +1780,7 @@ restored here under new numbers, each saying the number it had.
 
 - **We noticed:** A Soda check with a configuration mistake passed instead of failing.
 - **What we heard:** Soda logs a bad check and carries on, so its errors have to be read rather than its results trusted.
-- **What we built:** A check Soda could not run shows red as 'could not be evaluated', and configuration is checked before a run.
+- **What we built:** A check Soda could not run shows red as 'could not be evaluated', and every Soda check's configuration is checked in CI.
 - **Evidence:** REQ-QAC-001; REQ-QAC-002
 
 26. **[done, 2026-09-24]** **[QA checks & contract]** **Soda Core cannot run a change-over-time check (was #13).**
@@ -1790,7 +1790,7 @@ restored here under new numbers, each saying the number it had.
 - **What we built:** Drift and volume are computed by us, against the last supply actually promoted.
 - **Evidence:** REQ-QAC-108
 
-27. **[done, 2026-10-04]** **[Pipeline & publishing]** **A forced bootstrap no longer reproduced the same content (was #15).**
+27. **[done, 2026-10-02]** **[Pipeline & publishing]** **A forced bootstrap no longer reproduced the same content (was #15).**
 
 - **We noticed:** Re-running the bootstrap over a populated database gave different results from a clean run.
 - **What we heard:** Recorded decisions outlive a re-run, so running again on top of history stacks a second history on the first.

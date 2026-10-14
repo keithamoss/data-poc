@@ -56,6 +56,8 @@ full-CommonMark) markdown-to-HTML pass at render time, not this module.
 """
 from __future__ import annotations
 import re
+from datetime import date
+from urllib.parse import unquote_to_bytes
 
 from dashboard.markdown_text import join_wrapped
 from pathlib import Path
@@ -274,13 +276,35 @@ def _evidence_item(raw: str) -> tuple[dict | None, str | None]:
         return None, (f"evidence link {item!r} must be a relative dashboard address "
                       "beginning '?' or '#/'")
     query = target.split("#", 1)[0].lstrip("?")
-    params = dict(p.split("=", 1) if "=" in p else (p, "") for p in query.split("&") if p)
-    if "req" in params:
+    pairs = [p.split("=", 1) if "=" in p else (p, "") for p in query.split("&") if p]
+    keys = [k.lower() for k, _ in pairs]
+    if "req" in keys:
         return None, (f"evidence link {item!r} names a requirement through req= - "
-                      f"write the bare id {params['req']!r} instead")
-    if "in-place-on" in params and not _DATE_RE.match(params["in-place-on"]):
-        return None, f"evidence link {item!r} has in-place-on={params['in-place-on']!r}, not a YYYY-MM-DD date"
+                      f"write the bare id {dict((k.lower(), v) for k, v in pairs)['req']!r} instead")
+    # ONLY in-place-on, ONCE, A REAL DATE (post-build-review #187): the page
+    # follows a link by its route and its date and nothing else, so any other
+    # parameter would act on a new tab but not on a plain click; and a
+    # repeated one is read first-wins by a browser and last-wins here.
+    if any(k != "in-place-on" for k in keys):
+        return None, f"evidence link {item!r} may carry only in-place-on= in its query"
+    if len(keys) > 1:
+        return None, f"evidence link {item!r} carries in-place-on= more than once"
+    params = dict(pairs)
+    if "in-place-on" in params:
+        when = params["in-place-on"]
+        if not _DATE_RE.match(when):
+            return None, f"evidence link {item!r} has in-place-on={when!r}, not a YYYY-MM-DD date"
+        try:
+            date.fromisoformat(when)
+        except ValueError:
+            return None, f"evidence link {item!r} has in-place-on={when!r}, not a real date"
     path = target.split("#", 1)[1] if "#" in target else ""
+    try:
+        unquote_to_bytes(path).decode("utf-8")
+        if re.search(r"%(?![0-9A-Fa-f]{2})", path):
+            raise ValueError
+    except ValueError:
+        return None, f"evidence link {item!r} has malformed %-encoding in its route"
     return {"kind": "link", "label": label, "href": target, "path": path,
             "inPlaceOn": params.get("in-place-on")}, None
 
@@ -399,8 +423,8 @@ def card_status(card: dict, reqs: dict) -> str:
         return _OVERRIDE_LABEL[card["cardStatus"]]
     cited = [reqs[i["id"]] for i in card["evidence"] if i["kind"] == "req" and i["id"] in reqs]
     if cited:
-        done = [r.get("status") == "built" and not r.get("unmet_criteria") for r in cited]
-        if all(done):
+        from qa_tools.common.sprint_state import requirement_met
+        if all(requirement_met(r) for r in cited):
             return "Built"
         if all(r.get("status") == "not_started" for r in cited):
             return "Planned"
@@ -424,6 +448,12 @@ def feedback_data(plans_dir: str | Path, requirements_path: str | Path) -> dict:
                          "`mothman dashboard validate-feedback`:\n  " + "\n  ".join(errors))
     reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements_path).read_text()) or {}).get("requirements", [])}
     sprints = road_testing_sprints(path.read_text())
+    unknown = sorted({i["id"] for c in cards for i in c["evidence"]
+                      if i["kind"] == "req" and i["id"] not in reqs})
+    if unknown:
+        # A card citing a requirement the register lacks would derive the
+        # wrong status in silence (post-build-review #187).
+        raise ValueError(f"feedback cards cite requirements not in requirements.yaml: {', '.join(unknown)}")
     out = []
     for c in cards:
         evidence = []

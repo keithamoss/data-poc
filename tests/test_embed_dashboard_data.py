@@ -476,3 +476,13 @@ def test_applied_corrections_are_listed_outside_the_cap(monkeypatch):
     feed = edd._build_changelog_feed()
     assert [e.get("reference") for e in feed if e.get("kind") == "correction"] == ["CAB-1"]
     assert len([e for e in feed if e.get("kind") != "correction"]) == edd.CHANGELOG_DEPTH
+
+
+def test_an_embedded_const_cannot_close_its_script_element():
+    """post-build-review #187: json.dumps leaves '</script>' as it is, and
+    inside a <script> that ends the element - every const was exposed."""
+    from dashboard.embed_dashboard_data import _replace_const
+    html = _replace_const("<script>\nconst X = null;\n</script>", "X",
+                          json.dumps({"t": "</script><img src=x onerror=alert(1)>"}))
+    assert html.count("</script>") == 1
+    assert "<\\/script>" in html

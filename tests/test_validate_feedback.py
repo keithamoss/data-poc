@@ -164,3 +164,47 @@ def test_the_committed_file_passes():
     assert cards, "precondition: plans/road-testing.md has cards"
     assert errors == []
     assert {c["firstLabel"] for c in cards} == {"You told us", "We noticed"}
+
+
+# post-build-review #187 (delivery-critic on REQ-DOCS-219/220).
+@pytest.mark.parametrize("item,needle", [
+    ("[x](?panel=changelog)", "only in-place-on"),
+    ("[x](?REQ=REQ-DASH-001)", "write the bare id 'REQ-DASH-001'"),
+    ("[x](?in-place-on=2023-02-30#/)", "not a real date"),
+    ("[x](?in-place-on=garbage&in-place-on=2023-08-05#/)", "more than once"),
+    ("[x](#/agency/%E0%A4%A)", "malformed"),
+])
+def test_a_link_carries_nothing_the_page_would_drop_or_misread(repo, item, needle):
+    card = f"- **You told us:** a\n- **What we heard:** b\n- **Evidence:** {item}"
+    _, errors = repo(_entry(card=card))
+    _only(errors, needle)
+
+
+@pytest.mark.parametrize("reqs,evidence,override,expected", [
+    ([{"id": "R", "status": "built"}], ["R"], None, "Built"),
+    ([{"id": "R", "status": "built", "unmet_criteria": [{"criterion": "x"}]}], ["R"], None, "In progress"),
+    ([{"id": "R", "status": "in_progress"}], ["R"], None, "In progress"),
+    ([{"id": "R", "status": "built"}, {"id": "S", "status": "not_started"}], ["R", "S"], None, "In progress"),
+    ([{"id": "R", "status": "not_started"}], ["R"], None, "Planned"),
+    ([], [], None, "Heard"),
+    ([{"id": "R", "status": "built"}], ["R"], "parked", "Parked"),
+])
+def test_a_cards_status_is_derived_from_what_it_cites(reqs, evidence, override, expected):
+    from dashboard.plans_md import card_status
+    by_id = {r["id"]: r for r in reqs}
+    card = {"cardStatus": override, "evidence": [{"kind": "req", "id": i} for i in evidence]}
+    assert card_status(card, by_id) == expected
+
+
+def test_a_sprint_alone_derives_planned():
+    from dashboard.plans_md import card_status
+    assert card_status({"cardStatus": None, "evidence": [{"kind": "sprint", "n": 3}]}, {}) == "Planned"
+
+
+def test_the_build_refuses_a_card_citing_an_unknown_requirement(tmp_path):
+    from dashboard.plans_md import feedback_data
+    (tmp_path / "road-testing.md").write_text(INTRO + "\n" + _entry(
+        card="- **You told us:** a\n- **What we heard:** b\n- **Evidence:** REQ-DASH-404"))
+    (tmp_path / "r.yaml").write_text("requirements: []\n")
+    with pytest.raises(ValueError, match="REQ-DASH-404"):
+        feedback_data(tmp_path, tmp_path / "r.yaml")

@@ -8671,7 +8671,11 @@ const FEEDBACK_WHY_NOT = new Set(["Parked", "Won't do", "Couldn't reproduce"]);
 const FEEDBACK_STATUS_ORDER = ["Built", "Fixed", "In progress", "Planned", "Heard", "Parked", "Won't do", "Couldn't reproduce"];
 // Card text escaped and marked up the Plans tab's way - bold and inline
 // code only - without its paragraph wrapper (criterion 12).
-function feedbackInline(md){ return renderPlansMarkdown(md).replace(/^<p>/, "").replace(/<\/p>$/, ""); }
+// ESCAPED FIRST, THEN BOLD AND CODE ONLY (post-build-review #187): this went
+// through renderPlansMarkdown, which escapes nothing - the rest of the page
+// trusts committed repo content - so a card line holding an <img onerror>
+// ran script on the public site, and a "1. " line became a list.
+function feedbackInline(md){ return inlinePlansMd(escHtml(md || "")); }
 function feedbackEvidence(item){
   if(item.kind === "req"){
     // Id, title and status in words, no pill of its own (criteria 9, 17).

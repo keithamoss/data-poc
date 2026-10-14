@@ -253,6 +253,10 @@ def _build_changelog_feed() -> list[dict]:
 
 
 def _replace_const(html: str, const_name: str, value_json: str) -> str:
+    # "</" written as "<\/" (post-build-review #187): json.dumps leaves a
+    # literal "</script>" alone, and inside a <script> that ends the element.
+    # The same string to JavaScript; inert to the HTML parser.
+    value_json = value_json.replace("</", "<\\/")
     new_line = f"const {const_name} = {value_json};\n"
     pattern = re.compile(rf"const {const_name} = .*?;\n")
     # a lambda replacement (not a plain string) so backslash sequences

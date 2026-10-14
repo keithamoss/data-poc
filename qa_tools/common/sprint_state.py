@@ -239,6 +239,13 @@ def owning_sprints(sprints_file: Path | str = SPRINTS_FILE) -> dict[str, tuple[i
     return {q: tuple(ns) for q, ns in out.items()}
 
 
+def requirement_met(req: dict) -> bool:
+    """Whether a requirement counts as delivered: built, with nothing left in
+    unmet_criteria. The one predicate the sprint survey and the Feedback
+    tab's card status (REQ-DASH-220 NFR 8) both use."""
+    return req.get("status") == "built" and not req.get("unmet_criteria")
+
+
 def survey(sprints_file: Path | str = SPRINTS_FILE,
             requirements_file: Path | str = REQUIREMENTS_FILE) -> list[Sprint]:
     """Every sprint, with its criteria counted against the register."""
