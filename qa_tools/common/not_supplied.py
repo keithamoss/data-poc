@@ -56,12 +56,17 @@ def marked(conn: supply_db.SupplyConnection, dataset_id: str, period: str,
     substitution, say - is history, and the slot reads as that decision
     says.
     """
+    # NOT ONE WITHDRAWN AS AT THE INSTANT (REQ-PIPE-166 criteria 3 and 13).
+    from qa_tools.common import withdrawal
+
     rows = conn.execute(
-        f"SELECT id, actor, reason, effective_at FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND action = ? AND to_slot = ? "
-        "AND (CAST(? AS timestamptz) IS NULL OR effective_at <= CAST(? AS timestamptz)) "
-        "ORDER BY effective_at DESC, id DESC LIMIT 1",
-        [dataset_id, decision_log.MARK_NOT_SUPPLIED, period, as_at, as_at]).fetchall()
+        f"SELECT d.id, d.actor, d.reason, d.effective_at FROM {decision_log.TABLE} d "
+        "WHERE d.dataset_id = ? AND d.action = ? AND d.to_slot = ? "
+        "AND (CAST(? AS timestamptz) IS NULL OR d.effective_at <= CAST(? AS timestamptz)) "
+        f"AND {withdrawal.not_withdrawn('d')} "
+        "ORDER BY d.effective_at DESC, d.id DESC LIMIT 1",
+        [dataset_id, decision_log.MARK_NOT_SUPPLIED, period, as_at, as_at,
+         as_at, as_at]).fetchall()
     if not rows:
         return None
     decision_id, actor, reason, effective_at = rows[0]

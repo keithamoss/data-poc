@@ -418,6 +418,14 @@ def ov_superseded_under_promoted(conn, mint):
     return _state(conn, mint.now, s, filed=newer), newer
 
 
+def ov_acknowledged(conn, mint):
+    """Promoted under promote-and-acknowledge, and acknowledged - so
+    withdraw-acknowledgement applies (REQ-PIPE-166)."""
+    state, supply = ex_awaiting_acknowledgement(conn, mint)
+    _person(conn, fd.ACKNOWLEDGE, period=state.period, supply=supply)
+    return state, supply
+
+
 #: STATES OVERLAID WITH WHAT THE LOG HOLDS (post-build-review #189 F1): the
 #: three operations offered from recorded facts rather than from a slot's state
 #: - excuse-lateness, withdraw-excuse and un-supersede - had no example the
@@ -427,6 +435,7 @@ OVERLAYS = {
     "late": (ov_late, fd.EXCUSE_LATENESS),
     "excused": (ov_excused, fd.WITHDRAW_EXCUSE),
     "superseded-under-promoted": (ov_superseded_under_promoted, fd.UN_SUPERSEDE),
+    "acknowledged": (ov_acknowledged, fd.WITHDRAW_ACKNOWLEDGEMENT),
 }
 
 
@@ -476,6 +485,7 @@ def _door_offers(conn, state) -> set[str]:
     supply_scoped, period_scoped = filing_queue.operations_for(state)
     return (set(supply_scoped) | set(period_scoped)
             | set(filing_queue.excuse_offers(conn, state))
+            | set(filing_queue.acknowledgement_offers(conn, state))
             | set(filing_queue.supersede_offers(conn, state)))
 
 

@@ -115,13 +115,13 @@ class TestTheEightAreOneList:
                 continue
             assert operation in dl.ACTIONS, operation
 
-    def test_there_are_seventeen_of_them(self):
+    def test_there_are_nineteen_of_them(self):
         """Eight, REQ-PIPE-132's mark as not supplied (2026-10-05),
         REQ-PIPE-161's excuse lateness and withdraw excuse (2026-10-11),
         REQ-PIPE-193's settlement of a pair (2026-10-13), REQ-PIPE-163's
-        placement of a held supply (2026-10-14) and REQ-PIPE-164's re-check
-        (2026-10-15)."""
-        assert len(set(fd.OPERATIONS)) == 17
+        placement of a held supply (2026-10-14), REQ-PIPE-164's re-check
+        (2026-10-15) and REQ-PIPE-166's two withdrawals (2026-10-15)."""
+        assert len(set(fd.OPERATIONS)) == 19
         assert fd.MARK_NOT_SUPPLIED in fd.PERIOD_SCOPED
 
     def test_supply_scoped_and_period_scoped_partition_them(self):

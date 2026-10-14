@@ -12253,7 +12253,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep, choose-file, place and re-check - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause). And 2026-10-14 by REQ-PIPE-163 criterion 13 (place - recorded as a person's re-file from no period, REQ-PIPE-163 criterion 2, so it adds no decision-log action of its own). And 2026-10-15 by REQ-PIPE-164 criterion 12 (re-check - one entry for each supply re-checked, a bulk re-check (REQ-PIPE-177) writing one for each supply it covers).
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep, choose-file, place, re-check, withdraw acknowledgement and withdraw not-supplied - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause). And 2026-10-14 by REQ-PIPE-163 criterion 13 (place - recorded as a person's re-file from no period, REQ-PIPE-163 criterion 2, so it adds no decision-log action of its own). And 2026-10-15 by REQ-PIPE-164 criterion 12 (re-check - one entry for each supply re-checked, a bulk re-check (REQ-PIPE-177) writing one for each supply it covers), and 2026-10-15 by REQ-PIPE-166 criterion 7 (withdraw acknowledgement, withdraw not-supplied - each naming the entry it withdraws).
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -14872,7 +14872,7 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse and re-check as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fifteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse), and 2026-10-15 by REQ-PIPE-164 criterion 12 (re-check). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29. Placing a held supply (place) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-14 by REQ-PIPE-163 criterion 13.
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, re-check, withdraw acknowledgement and withdraw not-supplied as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those seventeen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse), 2026-10-15 by REQ-PIPE-164 criterion 12 (re-check) and 2026-10-15 by REQ-PIPE-166 criterion 7 (withdraw acknowledgement, withdraw not-supplied). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29. Placing a held supply (place) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-14 by REQ-PIPE-163 criterion 13.
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -15004,22 +15004,8 @@ requirements:
         GitHub, so that the terminal route needs no GitHub
         reachability and the ticket is updated by whatever already has
         it.
-      - >
-        THE SYSTEM SHALL reach substitute, de-substitute, inherit,
-        un-inherit and mark as not supplied per period and dataset rather
-        than from the supply queue, because none of them answers "what
-        do I do with this arriving supply" - each is a decision about
-        how a period is filled, or accepted as unfilled, when a supply
-        for it never arrives. AMENDED 2026-10-05 by REQ-PIPE-132
-        criterion 13.
-      - >
-        THE SYSTEM SHALL record substitute, de-substitute, inherit,
-        un-inherit and mark as not supplied in the decision log on the same
-        terms as every other filing decision - actor, reason, allowlist,
-        refusal, GitHub parity - so that the un-inherit an operator
-        performs to unblock a refused demotion is as accountable as the
-        demotion itself. AMENDED 2026-10-05 by REQ-PIPE-132 criterion
-        13.
+      - 'THE SYSTEM SHALL reach substitute, de-substitute, inherit, un-inherit, mark as not supplied and withdraw not-supplied per period and dataset rather than from the supply queue, because none of them answers "what do I do with this arriving supply" - each is a decision about how a period is filled, or accepted as unfilled, when a supply for it never arrives. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, and 2026-10-15 by REQ-PIPE-166 criterion 7.'
+      - 'THE SYSTEM SHALL record substitute, de-substitute, inherit, un-inherit, mark as not supplied and withdraw not-supplied in the decision log on the same terms as every other filing decision - actor, reason, allowlist, refusal, GitHub parity - so that the un-inherit an operator performs to unblock a refused demotion is as accountable as the demotion itself. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, and 2026-10-15 by REQ-PIPE-166 criterion 7.'
       - >
         WHERE a period schema is created automatically by an arriving
         supply, THE SYSTEM SHALL perform the inheritance the cadence
@@ -26427,7 +26413,7 @@ requirements:
     - 'tests/test_recheck_decision.py::TestThroughTheRealExecutor'
     - 'tests/test_recheck.py::TestTwoRunnersNeverRunOneOwedItem'
     - 'tests/test_door_flag_parity.py::test_the_door_offers_what_the_flags_would_record'
-    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_seventeen_of_them'
+    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_nineteen_of_them'
     implemented_by:
     - 'qa_tools/common/rechecking.py::standing'
     - 'qa_tools/common/rechecking.py::refuse_a_backstopped_dataset'
@@ -26786,7 +26772,7 @@ requirements:
     date_written: '2026-10-07'
     story: "As a person who recorded an annotation on the wrong slot, or before the facts were in, I want to withdraw it with a reason, so that the record reads what is true without my having to stage some other decision just to paper over the first."
     moscow: could
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -26838,6 +26824,53 @@ requirements:
     - "REVIEWS FOLDED, 2026-10-14 (delivery-architect; delivery-cli-ux M4; delivery-dashboard-ux M4 to M6): criteria 1 to 13 keep their numbers. Changed in place: 2 (the entry withdrawn named by id, caused_by_decision - architect), 11 (the reader list, which the architect found incomplete), 12 (REQ-DASH-198's 'no longer ...' wording - dashboard-ux M6), 13 (a mark's withdrawal shown where criterion 15 says). Added: 14 (the confirmation names the entry and its public consequence - cli-ux M4), 15 (a withdrawn mark in the cycle-table cell and the accepted-gaps list - dashboard-ux M4), 16 (the awaiting tag returns and the reason is visible - dashboard-ux M5), 17 (a second acknowledgement after a withdrawal is the standing one - architect, acknowledged_by's LIMIT 1), 18 (DECISION_DONE tied to decision_log.ACTIONS by a test - architect LOW). The schema NFR and REQ-PIPE-076 decision are unchanged."
     - "A WITHDRAWAL NAMES ITS ENTRY BY ID (delivery-architect, 2026-10-14): the decision table's caused_by_decision column already links an entry to the one it acts on, so a withdrawal uses it. REJECTED naming it by position ('the latest acknowledgement of this supply'): after a withdrawal and a second acknowledgement, position points at the wrong one."
     - "'NO LONGER ACKNOWLEDGED', NOT 'ACKNOWLEDGEMENT WITHDRAWN' (delivery-dashboard-ux M6, 2026-10-14): the page already words de-substitute and un-inherit as 'no longer substituted' and 'no longer carried forward' (REQ-DASH-198 criterion 4), so a reader sees one pattern for an undone annotation. REJECTED the earlier draft's 'acknowledgement withdrawn' wording: a second pattern for the same kind of act."
+    - 'THE BUILDERS CARRY THE WITHDRAWAL''S INSTANT, THE PAGE COMPARES IT (built 2026-10-15): pipeline/closed_slots.py and pipeline/acknowledgements.py attach each withdrawal - who by name, when, why - to the mark or acknowledgement it withdrew, and the page decides what stands as at the date on show. The same decision REQ-DASH-133 records for closed slots. REJECTED having the builders drop withdrawn entries: the page could then not show an annotation on a date before it was withdrawn (criterion 13).'
+    - 'AN ACKNOWLEDGEMENT TRAVELS AS A LIST, acks, each with its withdrawal (built 2026-10-15). The single acknowledged field stays and now carries the one standing NOW, newest not withdrawn, for any reader wanting only that; the page reads acks and falls back to acknowledged for data built before. It used to carry the FIRST acknowledgement, which after a withdrawal and a second acknowledgement would have been the wrong one.'
+    - 'THE MANIFEST VIEW HONOURS A WITHDRAWAL TOO (built 2026-10-15, found enumerating readers for criterion 11): qa.manifest_for''s acknowledged column read any acknowledge row as standing. It now excludes one with a withdraw-acknowledgement naming it, in schema 43 alongside the new constraints, so a period schema''s _manifest says false again once the acknowledgement is withdrawn.'
+    - 'CONFIRMATION ON THE FLAG ROUTE NEEDS NO --acknowledge KEY (built 2026-10-15): a withdrawal moves no supply, so consequences() returns the entry withdrawn and what follows as notes rather than consequence lines, and the flag route applies it on the reason alone - as withdraw-excuse does. The terminal still shows the notes before asking for the reason.'
+    - 'CRITERION 18''S TEST NAMES NO EXCEPTIONS (built 2026-10-15): every action decision_log admits now has page wording, including inherit-refused (''refused carrying forward'', added here) - the one that had none. A rule''s refusal reaches the page only if its entry is in a run''s states, but wording it costs nothing and keeps the test exception-free.'
+    linked_tests:
+    - 'tests/test_withdrawal.py::TestTheOperations'
+    - 'tests/test_withdrawal.py::TestWithdrawingAMark'
+    - 'tests/test_withdrawal.py::TestWithdrawingAnAcknowledgement'
+    - 'tests/test_withdrawal.py::TestTheRoutes'
+    - 'tests/test_withdrawal.py::TestTheDashboardData'
+    - 'tests/test_withdrawal.py::test_the_page_has_words_for_every_decision'
+    - 'tests/test_manifest.py::TestAcknowledged::test_withdrawn_it_reads_owed_again'
+    - 'tests/test_door_flag_parity.py::test_the_door_offers_what_the_flags_would_record'
+    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_nineteen_of_them'
+    - 'tests-js/withdrawal.test.js'
+    implemented_by:
+    - 'qa_tools/common/withdrawal.py::not_withdrawn'
+    - 'qa_tools/common/withdrawal.py::withdrawal_of'
+    - 'qa_tools/common/withdrawal.py::standing_acknowledgement'
+    - 'qa_tools/common/withdrawal.py::target'
+    - 'qa_tools/common/withdrawal.py::why_not'
+    - 'qa_tools/common/withdrawal.py::record'
+    - 'qa_tools/common/withdrawal.py::consequence_words'
+    - 'qa_tools/common/decision_log.py::WITHDRAW_ACKNOWLEDGEMENT'
+    - 'qa_tools/common/decision_log.py::WITHDRAW_NOT_SUPPLIED'
+    - 'qa_tools/common/decision_log.py::WITHDRAWS'
+    - 'qa_tools/common/qa_store.py::SCHEMA_VERSION'
+    - 'qa_tools/common/not_supplied.py::marked'
+    - 'qa_tools/common/acknowledgement.py::acknowledged_by'
+    - 'qa_tools/common/rechecking.py::worse_than_promoted'
+    - 'qa_tools/common/filing_decisions.py::WITHDRAW_ACKNOWLEDGEMENT'
+    - 'qa_tools/common/filing_decisions.py::WITHDRAW_NOT_SUPPLIED'
+    - 'qa_tools/common/filing_decisions.py::consequences'
+    - 'qa_tools/common/filing_decisions.py::_apply_one'
+    - 'qa_tools/common/filing_queue.py::acknowledgement_offers'
+    - 'qa_tools/common/filing_queue.py::operations_for'
+    - 'cli/filing_tui.py::apply_decision'
+    - 'pipeline/closed_slots.py::withdrawals'
+    - 'pipeline/closed_slots.py::for_dataset'
+    - 'pipeline/acknowledgements.py::for_dataset'
+    - 'dashboard/qa-reporting-dashboard.template.html::closedGapsInPlaceOn'
+    - 'dashboard/qa-reporting-dashboard.template.html::markWithdrawalNotes'
+    - 'dashboard/qa-reporting-dashboard.template.html::acknowledgementBadge'
+    - 'dashboard/qa-reporting-dashboard.template.html::DECISION_DONE'
+    evidence:
+    - '2026-10-15 overnight: tests/test_withdrawal.py (21 tests) and tests-js/withdrawal.test.js (6 tests). The dashboard-data tests in TestTheDashboardData were written after the builder change, so were NOT seen to fail first. The criterion 18 coverage test was mutation-checked by deleting the withdraw-not-supplied wording, and failed. A run of test_withdrawal, test_manifest, test_door_flag_parity, test_recheck_decision, test_filing_decisions and test_not_supplied after the last code change: 190 passed; tests-js/withdrawal.test.js 6 passed. No plans prose to delete: plans/*.md only names REQ-PIPE-166 in sprint lists and reports.'
 
   - id: REQ-PIPE-167
     title: A dataset whose supplies are for the following period says so in its participation

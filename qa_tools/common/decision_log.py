@@ -193,14 +193,23 @@ CHOOSE_FILE = "choose-file"
 #: supply's data (criterion 20, rejection.NOT_A_DECISION_ABOUT_ITS_DATA).
 RECHECK = "re-check"
 
+#: A PERSON WITHDRAWS AN ACKNOWLEDGEMENT, OR A MARK AS NOT SUPPLIED
+#: (REQ-PIPE-166), naming the entry withdrawn in `caused_by_decision` - never
+#: deleting or altering it. Each changes nothing a period resolves to, so
+#: qa.slot_holds ignores both; the readers of the annotation honour them.
+WITHDRAW_ACKNOWLEDGEMENT = "withdraw-acknowledgement"
+WITHDRAW_NOT_SUPPLIED = "withdraw-not-supplied"
+WITHDRAWS = {WITHDRAW_ACKNOWLEDGEMENT: ACKNOWLEDGE, WITHDRAW_NOT_SUPPLIED: MARK_NOT_SUPPLIED}
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
            MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
-           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP, CHOOSE_FILE, RECHECK)
+           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP, CHOOSE_FILE, RECHECK,
+           WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.
-NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED, STILL_FAILING)
+NO_SUPPLY = (INHERIT_REFUSED, MARK_NOT_SUPPLIED, STILL_FAILING, WITHDRAW_NOT_SUPPLIED)
 
 #: The actions a RULE may take. Everything else is a person's, and
 #: rejection.py and substitution.py enforce that by not offering an
@@ -712,6 +721,15 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
                                               decision.to_slot)
             if why:
                 raise DecisionRefused(f"nothing to withdraw: {why}.")
+
+    if decision.action in WITHDRAWS:
+        # REQ-PIPE-166 criteria 2 and 5: only a standing entry, named by its
+        # id, judged inside the transaction.
+        from qa_tools.common import withdrawal
+
+        why = withdrawal.why_not(conn, decision)
+        if why:
+            raise DecisionRefused(why)
 
     if decision.action == ACKNOWLEDGE:
         # REQ-PIPE-122 criterion 14: only a supply that OWES one, and the

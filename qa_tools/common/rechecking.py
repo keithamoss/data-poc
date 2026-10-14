@@ -166,9 +166,14 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
             "AND cleared_at IS NOT NULL LIMIT 1", [recheck_id]).fetchall()
         if not ran:
             continue
+        # A STANDING ACKNOWLEDGEMENT SINCE (REQ-PIPE-166 criterion 9): one
+        # withdrawn lists it again.
+        from qa_tools.common import withdrawal
+
         acknowledged = conn.execute(
-            f"SELECT 1 FROM {decision_log.TABLE} WHERE action = ? AND dataset_id = ? "
-            "AND supply = ? AND to_slot = ? AND id > ? LIMIT 1",
+            f"SELECT 1 FROM {decision_log.TABLE} d WHERE d.action = ? AND d.dataset_id = ? "
+            f"AND d.supply = ? AND d.to_slot = ? AND d.id > ? AND "
+            f"{withdrawal.not_withdrawn('d', as_at_param=False)} LIMIT 1",
             [decision_log.ACKNOWLEDGE, ds, held_supply, period, recheck_id]).fetchall()
         if acknowledged:
             continue

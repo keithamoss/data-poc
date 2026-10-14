@@ -5378,13 +5378,25 @@ function closedGapsInPlaceOn(slots, inPlaceOnDateStr){
     // A supply filed here and rejected LATER was still waiting on this date.
     if(s.rejected && by(s.rejected.receivedAt) && !by(s.rejected.at)) return;
     // A MARK STANDS ONLY UNTIL THE SLOT NEXT CHANGES.
+    // NOR ONCE IT IS WITHDRAWN (REQ-PIPE-166 criterion 13): up to the
+    // withdrawal's instant and not from it.
     const marks = (s.marks || []).filter(m=> by(m.at)
-      && (!last || new Date(m.at) >= new Date(last.at)));
+      && (!last || new Date(m.at) >= new Date(last.at))
+      && !(m.withdrawn && by(m.withdrawn.at)));
     const mark = marks[marks.length-1];
     if(mark) accepted.push({...s, mark});
     else open.push(s);
   });
   return {open, accepted};
+}
+// A WITHDRAWN MARK IN WORDS (REQ-PIPE-166 criterion 15), in the shape
+// excuseNote() gives a withdrawn excuse - for each mark withdrawn by the
+// date on show.
+function markWithdrawalNotes(marks, inPlaceOnDateStr){
+  const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  const by = v => v && (!on || assetDateStrOf(v) <= on);
+  return (marks || []).filter(m=> m.withdrawn && by(m.withdrawn.at)).map(m=>
+    `<div class="excuse-note" data-mark-withdrawn>Not supplied (accepted) — ${escHtml(m.actor)}, ${fmtInstant(m.at)}: ${escHtml(m.reason)} · withdrawn by ${escHtml(m.withdrawn.actor)}, ${fmtInstant(m.withdrawn.at)}: ${escHtml(m.withdrawn.reason)}</div>`).join("");
 }
 // CONSECUTIVE GAPS ARE ONE ITEM (criterion 7), by the slot's position in
 // the dataset's own schedule.
@@ -5396,8 +5408,10 @@ function groupGaps(slots){
     // periods where nothing came cannot.
     const last = groups[groups.length-1];
     if(last && !last.rejected && !s.rejected && s.index === last.lastIndex + 1){ last.periods.push(s.period); last.lastIndex = s.index; }
-    else groups.push({periods:[s.period], lastIndex:s.index, marks:[], rejected:s.rejected || null});
+    else groups.push({periods:[s.period], lastIndex:s.index, marks:[], allMarks:[], rejected:s.rejected || null});
     if(s.mark) groups[groups.length-1].marks.push(s.mark);
+    // EVERY MARK, withdrawn ones too, for the words (REQ-PIPE-166 criterion 15).
+    groups[groups.length-1].allMarks.push(...(s.marks || []));
   });
   return groups;
 }
@@ -6185,11 +6199,20 @@ function acknowledgementBadge(datasetId, runId, inPlaceOnDateStr){
   const on = inPlaceOnDateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   const by = v => !on || (v && assetDateStrOf(v) <= on);
   if(!by(a.promotedAt)) return "";
-  if(a.acknowledged && by(a.acknowledged.at)){
-    return `<span class="pill tag sm" data-acknowledged title="${escHtml(a.acknowledged.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(a.acknowledged.actor)}, ${fmtInstant(a.acknowledged.at)}</span>`;
+  // EVERY ACKNOWLEDGEMENT, each with its withdrawal (REQ-PIPE-166 criteria
+  // 13, 16 and 17): the newest not withdrawn by the date on show stands.
+  const acks = (a.acks || (a.acknowledged ? [{...a.acknowledged, withdrawn: null}] : []))
+    .filter(k=> by(k.at));
+  const gone = k => k.withdrawn && by(k.withdrawn.at);
+  const standing = [...acks].reverse().find(k=> !gone(k));
+  const withdrawn = acks.filter(gone).map(k=>
+    `<div class="excuse-note" data-acknowledgement-withdrawn>Acknowledged by ${escHtml(k.actor)}, ${fmtInstant(k.at)}: ${escHtml(k.reason)} · withdrawn by ${escHtml(k.withdrawn.actor)}, ${fmtInstant(k.withdrawn.at)}: ${escHtml(k.withdrawn.reason)}</div>`).join("");
+  if(standing){
+    // THE REASON AS VISIBLE TEXT, not only a title (criterion 16).
+    return `<span class="pill tag sm" data-acknowledged title="${escHtml(standing.reason)}"><span class="ico"></span>✓ Acknowledged by ${escHtml(standing.actor)}, ${fmtInstant(standing.at)}</span><div class="excuse-note" data-acknowledgement-reason>${escHtml(standing.reason)}</div>${withdrawn}`;
   }
   if(a.lapsedAt && by(a.lapsedAt)) return "";
-  return `<span class="pill tag sm" data-awaiting-acknowledgement><span class="ico"></span>Amber, promoted - awaiting acknowledgement</span>`;
+  return `<span class="pill tag sm" data-awaiting-acknowledgement><span class="ico"></span>Amber, promoted - awaiting acknowledgement</span>${withdrawn}`;
 }
 // EACH SUPPLY'S OUTCOME ON THE DATE ON SHOW (REQ-DASH-127 criteria 1, 3 and
 // 4): promoted, rejected, superseded or waiting - read from the decision
@@ -6481,7 +6504,7 @@ function gapHistoryRows(ds, inPlaceOnDateStr){
             <td>${g.accepted ? `<span class="pill tag sm"><span class="ico"></span>Accepted</span>` : pill("red","sm")}</td>
             <td>${g.accepted
               ? `<b>Not supplied (accepted)</b>${mark ? ` <span style="color:var(--ink-faint);">— ${escHtml(mark.actor)}, ${fmtInstant(mark.at)}</span><div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(mark.reason)}</div>` : ""}`
-              : `<b>No supply</b> <span style="color:var(--ink-faint);">— ${escHtml(gapText(g))}; waiting for a person</span>`}</td>
+              : `<b>No supply</b> <span style="color:var(--ink-faint);">— ${escHtml(gapText(g))}; waiting for a person</span>`}${markWithdrawalNotes(g.allMarks, inPlaceOnDateStr)}</td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>
@@ -6665,7 +6688,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       </div>` : "";
   const acceptedGapsNote = ds.acceptedGaps ? `
       <div class="accepted-gaps-note" style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">
-        ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${escHtml(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}</div>`).join("")}
+        ${ds.acceptedGaps.map(g=>`<div>Not supplied (accepted) — ${escHtml(gapText(g).replace(" with no supply", ""))}${g.marks.length ? `: “${escHtml(g.marks[g.marks.length-1].reason)}”, ${escHtml(g.marks[g.marks.length-1].actor)}, ${fmtInstant(g.marks[g.marks.length-1].at)}` : ""}${markWithdrawalNotes(g.allMarks)}</div>`).join("")}
       </div>` : "";
   if(ds.noDataInPlaceOn && !ds.columns.length){
     if(noSupplyShown(ds)){
@@ -8915,7 +8938,8 @@ function rawRealDatasets(){
 }
 const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   supersede:"superseded", "un-supersede":"restored", refile:"re-filed",
-  substitute:"substituted", inherit:"carried forward", "promotion-withheld":"held back",
+  substitute:"substituted", inherit:"carried forward", "inherit-refused":"refused carrying forward",
+  "promotion-withheld":"held back",
   "promotion-refused":"refused promotion",
   // REQ-DASH-172 criterion 10: every action the calendar batch added.
   keep:"kept where it was", "excuse-lateness":"excused for lateness",
@@ -8925,6 +8949,9 @@ const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   "mark-not-supplied":"marked not supplied", "still-failing":"recorded as still failing",
   // REQ-PIPE-194 criterion 16: a settlement of two files for one table.
   "choose-file":"settled",
+  // REQ-PIPE-166 criterion 12: as de-substitute and un-inherit are worded.
+  "withdraw-acknowledgement":"no longer acknowledged",
+  "withdraw-not-supplied":"no longer marked not supplied",
   // REQ-PIPE-164: a person asked for its checks to run again where it is.
   "re-check":"re-checked"};
 // DECISIONS THAT CHANGED AN EARLIER DATE (REQ-PIPE-081 criterion 6): taking

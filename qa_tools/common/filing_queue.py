@@ -349,6 +349,19 @@ def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     return ()
 
 
+def acknowledgement_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
+    """Withdraw the acknowledgement where this slot's supply carries one
+    standing (REQ-PIPE-166 criterion 6) - read from the recorded decisions,
+    as excuse_offers reads an excuse."""
+    from qa_tools.common import withdrawal
+
+    if not state.supply or not state.period:
+        return ()
+    found = withdrawal.standing_acknowledgement(conn, state.dataset_id, state.supply,
+                                                state.period)
+    return (filing_decisions.WITHDRAW_ACKNOWLEDGEMENT,) if found else ()
+
+
 def supersede_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     """Un-supersede wherever filing_decisions.apply would accept it
     (REQ-GHUB-165 criterion 1): a superseded version of the dataset's table
@@ -527,7 +540,9 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
     if state.state == slot_state.NOT_SUPPLIED_ACCEPTED:
         # Accepted - and a late file can still be re-filed in, or an
         # earlier supply stood on, either of which supersedes the mark.
-        period_scoped: tuple[str, ...] = (filing_decisions.SUBSTITUTE,)
+        # Or the mark withdrawn, beside it (REQ-PIPE-166 criterion 6).
+        period_scoped: tuple[str, ...] = (filing_decisions.SUBSTITUTE,
+                                          filing_decisions.WITHDRAW_NOT_SUPPLIED)
     elif state.closed:
         # A CLOSED, UNFILLED PERIOD (REQ-PIPE-132 criteria 5 and 12):
         # substitute it, or accept it as not supplied. A late file is

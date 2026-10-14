@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 42
+SCHEMA_VERSION = 43
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1040,8 +1040,17 @@ CREATE INDEX IF NOT EXISTS decision_stands_on
 ALTER TABLE "{SCHEMA}".decision ALTER COLUMN supply DROP NOT NULL;
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_supply_present;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_supply_present
-    CHECK (action IN ('inherit-refused', 'mark-not-supplied', 'still-failing')
+    CHECK (action IN ('inherit-refused', 'mark-not-supplied', 'still-failing',
+                      -- SCHEMA 43 (REQ-PIPE-166): a withdrawn mark had no supply.
+                      'withdraw-not-supplied')
            OR (supply IS NOT NULL AND supply <> ''));
+-- A WITHDRAWAL IS A PERSON'S, WITH A REASON, NAMING THE ENTRY IT WITHDRAWS
+-- BY ITS ID (REQ-PIPE-166 criterion 2; schema 43).
+ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_withdrawal_shape;
+ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_withdrawal_shape
+    CHECK (action NOT IN ('withdraw-acknowledgement', 'withdraw-not-supplied')
+           OR (actor_kind = 'person' AND caused_by_decision IS NOT NULL
+               AND to_slot IS NOT NULL AND reason IS NOT NULL));
 
 -- WHAT EACH FILE OF A SETTLED PAIR BECAME (REQ-PIPE-193 criteria 8, 10
 -- and 12; schema 40). One row per file, written in the settlement's own
@@ -1479,7 +1488,12 @@ SELECT p.table_name, h.dataset_id, h.held_as, h.holder, r.received_instant,
        CASE WHEN pr.acknowledgement_owed THEN EXISTS (
            SELECT 1 FROM "{SCHEMA}".decision a
            WHERE a.action = 'acknowledge' AND a.dataset_id = h.dataset_id
-             AND a.supply = h.holder AND a.to_slot = pr.to_slot) END,
+             AND a.supply = h.holder AND a.to_slot = pr.to_slot
+             -- A WITHDRAWN acknowledgement no longer stands (REQ-PIPE-166
+             -- criterion 11; schema 43).
+             AND NOT EXISTS (SELECT 1 FROM "{SCHEMA}".decision w
+                             WHERE w.caused_by_decision = a.id
+                               AND w.action = 'withdraw-acknowledgement')) END,
        h.reason, pr.promoted_status
 FROM present p
 LEFT JOIN held h ON h.table_name = p.table_name

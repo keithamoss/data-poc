@@ -107,6 +107,11 @@ _WHAT_IT_DOES = {
     # WHAT IT DOES AND WHAT IT COSTS (REQ-PIPE-164 criterion 26).
     filing_decisions.RECHECK: ("Re-check: run its checks again where it is (about a "
                                "minute; recorded and published)"),
+    # REQ-PIPE-166: each takes back an annotation, and can be recorded again.
+    filing_decisions.WITHDRAW_ACKNOWLEDGEMENT: ("withdraw the acknowledgement - it needs a "
+                                                "person again, and stays in its history"),
+    filing_decisions.WITHDRAW_NOT_SUPPLIED: ("withdraw the mark as not supplied - the "
+                                             "period reads missed again"),
 }
 
 #: The same operations on ANOTHER VERSION WAITING in a promoted period
@@ -128,7 +133,7 @@ _NAMES_THE_SUPPLY = (filing_decisions.PROMOTE, filing_decisions.REJECT,
                      filing_decisions.UN_SUPERSEDE, filing_decisions.ACKNOWLEDGE,
                      filing_decisions.REFILE, filing_decisions.EXCUSE_LATENESS,
                      filing_decisions.WITHDRAW_EXCUSE, filing_decisions.PLACE,
-                     filing_decisions.RECHECK)
+                     filing_decisions.RECHECK, filing_decisions.WITHDRAW_ACKNOWLEDGEMENT)
 
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
 #: the verb doing a noun's job (#107).
@@ -136,14 +141,19 @@ _NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement", filing_decisions.REFIL
          filing_decisions.PLACE: "placement",
          filing_decisions.EXCUSE_LATENESS: "excuse",
          filing_decisions.WITHDRAW_EXCUSE: "withdrawal of the excuse",
-         filing_decisions.RECHECK: "re-check"}
+         filing_decisions.RECHECK: "re-check",
+         filing_decisions.WITHDRAW_ACKNOWLEDGEMENT: "withdrawal of the acknowledgement",
+         filing_decisions.WITHDRAW_NOT_SUPPLIED: "withdrawal of the mark as not supplied"}
 
 #: Decisions whose reason is PUBLISHED beside the supply on the dashboard
 #: (REQ-PIPE-161 criterion 18), said when the reason is asked for.
 _PUBLISHED_REASON = (filing_decisions.EXCUSE_LATENESS, filing_decisions.WITHDRAW_EXCUSE,
                      filing_decisions.PLACE,
                      # REQ-PIPE-164 criterion 14.
-                     filing_decisions.RECHECK)
+                     filing_decisions.RECHECK,
+                     # REQ-PIPE-166 criterion 10.
+                     filing_decisions.WITHDRAW_ACKNOWLEDGEMENT,
+                     filing_decisions.WITHDRAW_NOT_SUPPLIED)
 
 _HOW_IT_READS = {
     slot_state.NOT_YET_DUE: "[dim]not yet due[/dim]",
@@ -356,6 +366,10 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
                         console.print(f"  [bold]{line.split(chr(10))[0]}[/bold]")
             _show("\n".join(f"- {line}" for line in shown.lines),
                   title="This decision also does", style="yellow")
+        if shown.notes and not previous:
+            # WHAT IT TAKES BACK AND WHAT FOLLOWS (REQ-PIPE-166 criterion 14) -
+            # said before the one confirmation, never keyed.
+            _show("\n".join(shown.notes), title="What this does", style="blue")
         # THE FIRST CONFIRMATION OF THE FLOW is the one where a production
         # change is typed (REQ-PIPE-093 criterion 4); a second pass here only
         # re-confirms consequences that changed underneath it, and asking for
@@ -667,7 +681,10 @@ def _excuse_offers(state: slot_state.SlotState) -> tuple[str, ...]:
     current supply is late - read from the log, so it needs a connection."""
     try:
         with open_log() as conn:
-            return filing_queue.excuse_offers(conn, state)
+            # AND THE ACKNOWLEDGEMENT'S WITHDRAWAL (REQ-PIPE-166 criterion 6),
+            # read from the log the same way.
+            return (filing_queue.excuse_offers(conn, state)
+                    + filing_queue.acknowledgement_offers(conn, state))
     except filing_queue.LogUnreachable:
         return ()
 

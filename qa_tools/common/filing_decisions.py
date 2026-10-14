@@ -85,9 +85,16 @@ PLACE = "place"
 #: it moves nothing, and owes a re-check run (rechecking.record).
 RECHECK = decision_log.RECHECK
 
+#: The eighteenth and nineteenth (REQ-PIPE-166): withdraw an acknowledgement
+#: (supply-scoped) or a mark as not supplied (period-scoped), each naming
+#: the entry withdrawn. Person only, reason required, both routes.
+WITHDRAW_ACKNOWLEDGEMENT = decision_log.WITHDRAW_ACKNOWLEDGEMENT
+WITHDRAW_NOT_SUPPLIED = decision_log.WITHDRAW_NOT_SUPPLIED
+
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
               INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK)
+              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK,
+              WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED)
 
 #: Offered on the terminal and never on GitHub (REQ-PIPE-193 criteria 1 and
 #: 16; Keith, 2026-10-13: "given the complexity of this, the choices and the
@@ -99,12 +106,14 @@ TERMINAL_ONLY = (CHOOSE_FILE, PLACE)
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
 SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK)
+                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK,
+                 WITHDRAW_ACKNOWLEDGEMENT)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
 #: which is why criterion 31 puts them somewhere else entirely.
-PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED)
+PERIOD_SCOPED = (SUBSTITUTE, DE_SUBSTITUTE, INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED,
+                 WITHDRAW_NOT_SUPPLIED)
 
 #: Which operations destroy something a reader depends on, and so need
 #: an explicit confirmation on every route (criteria 9 and 28, and
@@ -275,6 +284,13 @@ def consequences(conn, request: Request) -> Consequences:
 
         rechecking.standing(conn, request.dataset_id, request.supply, request.period)
         rechecking.refuse_a_backstopped_dataset(conn, request.dataset_id)
+    if request.operation in (WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED):
+        # WHAT IS WITHDRAWN AND WHAT FOLLOWS (REQ-PIPE-166 criterion 14), shown
+        # and said back but never keyed - confirming it adds nothing to confirm.
+        from qa_tools.common import withdrawal
+
+        words = withdrawal.consequence_words(conn, request)
+        return Consequences(lines=(), done=tuple(words), notes=tuple(words))
     lines: list[str] = []
     done: list[str] = []
     if request.operation == PROMOTE and request.period and request.supply:
@@ -871,6 +887,16 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> tup
         return placing.apply(conn, place_plan(conn, request), agency_id=entry.agency_id,
                              collection_id=entry.collection_id, actor=request.actor_name,
                              reason=reason, effective_at=effective_at)
+    elif request.operation in (WITHDRAW_ACKNOWLEDGEMENT, WITHDRAW_NOT_SUPPLIED):
+        # REQ-PIPE-166: one entry naming the standing one by its id; nothing
+        # moved, nothing re-run.
+        from qa_tools.common import withdrawal
+
+        withdrawal.record(conn, operation=request.operation, agency_id=entry.agency_id,
+                          collection_id=entry.collection_id, dataset_id=request.dataset_id,
+                          period=request.period, supply=request.supply,
+                          actor=request.actor_name, reason=reason,
+                          effective_at=effective_at)
     elif request.operation == RECHECK:
         # REQ-PIPE-164: the decision and its owed re-check, nothing run here
         # (criterion 3) - the route runs it after the commit, or leaves it owed.

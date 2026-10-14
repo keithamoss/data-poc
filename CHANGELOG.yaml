@@ -113,7 +113,8 @@ releases:
     summary: >
       A dataset, or a whole collection, can now be turned off for a while or
       for good, without losing its configuration or anything it still owed.
-      And a supply's checks can be run again where it is filed.
+      A supply's checks can be run again where it is filed, and a mistaken
+      acknowledgement or not-supplied mark can be withdrawn.
     changes:
       - category: New
         items:
@@ -152,6 +153,13 @@ releases:
               A promoted supply is never taken out by a re-check. If it comes
               back worse than it was promoted on, it is listed as "Promoted, then
               re-checked" until someone demotes it or acknowledges the new verdict.
+          - headline: Withdraw a mistaken acknowledgement or not-supplied mark
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Recorded one on the wrong slot? Withdraw it with a reason, from
+              Filing decisions or `mothman supply decide`. The period reads
+              overdue again, or the supply awaits acknowledgement again, and the
+              dashboard shows what was withdrawn, by whom and why.
           - headline: "`schedule show` says it is off"
             components: ["Pipeline & publishing"]
             description: >

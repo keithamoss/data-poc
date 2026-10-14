@@ -47,6 +47,21 @@ def _decision_entry(at, actor: str | None, reason: str | None) -> dict:
     return {"at": _iso(at), "actor": people.display_name(actor), "reason": reason or ""}
 
 
+def withdrawals(conn, dataset_id: str) -> dict[int, dict]:
+    """{id of the entry withdrawn: its withdrawal as the page shows it}
+    for every acknowledgement or mark as not supplied withdrawn in this
+    dataset (REQ-PIPE-166). The first withdrawal of an entry is the one -
+    the log refuses a second while nothing stands."""
+    out: dict[int, dict] = {}
+    for withdrawn_id, at, actor, reason in conn.execute(
+            f"SELECT caused_by_decision, effective_at, actor, reason FROM {decision_log.TABLE} "
+            "WHERE dataset_id = ? AND action IN (?, ?) ORDER BY effective_at, id",
+            [dataset_id, decision_log.WITHDRAW_ACKNOWLEDGEMENT,
+             decision_log.WITHDRAW_NOT_SUPPLIED]).fetchall():
+        out.setdefault(withdrawn_id, _decision_entry(at, actor, reason))
+    return out
+
+
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
                 now: datetime | None = None) -> list[dict]:
     """[{period, index, closesAt, changes, filedAt, marks, rejected}] for
@@ -91,15 +106,21 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,
     rejected: dict[str, dict] = {}
     superseded: set[str] = set()
     marks: dict[str, list[dict]] = {}
-    for action, to_slot, effective_at, actor, reason, supply in conn.execute(
-            f"SELECT action, to_slot, effective_at, actor, reason, supply "
+    withdrawn = withdrawals(conn, dataset_id)
+    for mark_id, action, to_slot, effective_at, actor, reason, supply in conn.execute(
+            f"SELECT id, action, to_slot, effective_at, actor, reason, supply "
             f"FROM {decision_log.TABLE} WHERE dataset_id = ? AND action IN (?, ?) "
             "ORDER BY effective_at, id",
             [dataset_id, decision_log.REJECT, decision_log.MARK_NOT_SUPPLIED]).fetchall():
         if action == decision_log.REJECT and supply:
             rejected.setdefault(supply, _decision_entry(effective_at, actor, reason))
         elif action == decision_log.MARK_NOT_SUPPLIED and to_slot:
-            marks.setdefault(to_slot, []).append(_decision_entry(effective_at, actor, reason))
+            # A WITHDRAWN MARK travels with its withdrawal's instant, and the
+            # page reads it as standing only before it (REQ-PIPE-166
+            # criteria 13 and 15).
+            marks.setdefault(to_slot, []).append(
+                {**_decision_entry(effective_at, actor, reason),
+                 "withdrawn": withdrawn.get(mark_id)})
     # A SUPERSEDED SUPPLY IS NOT WAITING (REQ-PIPE-118): the newer version
     # that superseded it is filed to the same period and is what waits.
     from qa_tools.common import supersession

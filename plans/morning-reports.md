@@ -1476,6 +1476,15 @@ one or more component tags, and a date.
         (made worse by my #189 overlays), now forgotten after each test; and
         TS-79a off-screen on CI only, changed to wait for the page's scroll -
         a hypothesis CI will confirm. REQ-PIPE-166 next.
+      - ~03:15 REQ-PIPE-166 BUILT: withdraw an acknowledgement or a mark as
+        not supplied, each its own decision naming the entry by id (schema
+        43). Every reader honours it - slot states, queue, needs-action,
+        re-checked-worse list, and the period manifest, which I found still
+        counting a withdrawn acknowledgement. The dashboard shows the
+        annotation up to the withdrawal and the withdrawal beside it after.
+        A test now fails if any decision reaches the page without words;
+        inherit-refused had none, now "refused carrying forward". Real
+        database rebuilt for schema 43. Gate result in the commit message.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose

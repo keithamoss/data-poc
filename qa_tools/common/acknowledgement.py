@@ -34,17 +34,15 @@ def _promotion(conn, dataset_id: str, supply: str, slot: str, as_at: str | None)
 
 def acknowledged_by(conn, dataset_id: str, supply: str, slot: str,
                     as_at: str | None = None) -> dict | None:
-    """The acknowledgement this promotion has, or None."""
-    rows = conn.execute(
-        f"SELECT actor, reason, effective_at FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND action = ? AND supply = ? AND to_slot = ? "
-        "AND (CAST(? AS timestamptz) IS NULL OR effective_at <= CAST(? AS timestamptz)) "
-        "ORDER BY effective_at, id LIMIT 1",
-        [dataset_id, decision_log.ACKNOWLEDGE, supply, slot, as_at, as_at]).fetchall()
-    if not rows:
+    """The acknowledgement standing for this promotion, or None - the newest
+    not withdrawn (REQ-PIPE-166 criteria 4 and 17)."""
+    from qa_tools.common import withdrawal
+
+    found = withdrawal.standing_acknowledgement(conn, dataset_id, supply, slot, as_at)
+    if found is None:
         return None
-    actor, reason, at = rows[0]
-    return {"actor": actor, "reason": reason or "",
+    ack_id, actor, reason, at = found
+    return {"id": ack_id, "actor": actor, "reason": reason or "",
             "at": at.isoformat() if hasattr(at, "isoformat") else str(at)}
 
 

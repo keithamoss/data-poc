@@ -35,7 +35,7 @@ def _acknowledged(row) -> dict:
 
 def for_dataset(dataset_id: str,
                 conn: supply_db.SupplyConnection | None = None) -> dict[str, dict]:
-    """{run_id: {supply, period, promotedAt, acknowledged, lapsedAt}}."""
+    """{run_id: {supply, period, promotedAt, acknowledged, acks, lapsedAt}}."""
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:acknowledgements") as opened:
             return for_dataset(dataset_id, opened)
@@ -49,15 +49,23 @@ def for_dataset(dataset_id: str,
     if not promotions:
         return out
     timeline = slot_timeline.for_dataset(dataset_id, conn)
+    from pipeline.closed_slots import withdrawals
+
+    withdrawn = withdrawals(conn, dataset_id)
     for supply, slot, promoted_at in promotions:
         run_id = slot_timeline._run_for(conn, dataset_id, supply)
         if not run_id:
             continue
-        ack = conn.execute(
-            f"SELECT actor, reason, effective_at FROM {decision_log.TABLE} "
-            "WHERE dataset_id = ? AND action = ? AND supply = ? AND to_slot = ? "
-            "ORDER BY effective_at, id LIMIT 1",
-            [dataset_id, decision_log.ACKNOWLEDGE, supply, slot]).fetchall()
+        # EVERY acknowledgement, each with its withdrawal if any: the page
+        # shows the newest not withdrawn as at the date on show, and the
+        # withdrawn ones beneath it (REQ-PIPE-166 criteria 13, 16 and 17).
+        acks = [{**_acknowledged((actor, reason, at)), "withdrawn": withdrawn.get(ack_id)}
+                for ack_id, actor, reason, at in conn.execute(
+                    f"SELECT id, actor, reason, effective_at FROM {decision_log.TABLE} "
+                    "WHERE dataset_id = ? AND action = ? AND supply = ? AND to_slot = ? "
+                    "ORDER BY effective_at, id",
+                    [dataset_id, decision_log.ACKNOWLEDGE, supply, slot]).fetchall()]
+        standing = [a for a in acks if a["withdrawn"] is None]
         promoted = _iso(promoted_at)
         # WHEN IT LEFT ITS PERIOD: the first change to the slot after this
         # promotion that no longer names this supply.
@@ -66,7 +74,10 @@ def for_dataset(dataset_id: str,
                        and e["supply"] != supply), None)
         out[run_id] = {
             "supply": supply, "period": slot, "promotedAt": promoted,
-            "acknowledged": _acknowledged(ack[0]) if ack else None,
+            # The one standing now, kept for readers that want only that.
+            "acknowledged": ({k: v for k, v in standing[-1].items() if k != "withdrawn"}
+                             if standing else None),
+            "acks": acks,
             "lapsedAt": lapsed,
         }
     return out

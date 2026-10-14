@@ -105,6 +105,26 @@ class TestAcknowledged:
                 pass
         assert _manifest(conn, period)[0]["acknowledged"] is True
 
+    def test_withdrawn_it_reads_owed_again(self, conn, period):
+        """REQ-PIPE-166 criterion 11: every reader honours the withdrawal."""
+        from qa_tools.common import withdrawal
+
+        a, a_table = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        owed = amber_setting.Resolved(value=amber_setting.PROMOTE_AND_ACKNOWLEDGE,
+                                      level=amber_setting.ASSET, version="2023-01-01")
+        _promote(conn, a, a_table, period, status="amber", amber=owed)
+        with conn.raw.transaction():
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id=AG, collection_id=COL, dataset_id=DS, action=dl.ACKNOWLEDGE,
+                    supply=a, actor=REAL_PERSON, actor_kind=dl.PERSON, effective_at=WHEN,
+                    to_slot=period, reason="looked")):
+                pass
+        with conn.raw.transaction():
+            withdrawal.record(conn, operation=dl.WITHDRAW_ACKNOWLEDGEMENT, agency_id=AG,
+                              collection_id=COL, dataset_id=DS, period=period, supply=a,
+                              actor=REAL_PERSON, reason="wrong supply", effective_at=WHEN)
+        assert _manifest(conn, period)[0]["acknowledged"] is False
+
 
 class TestTheLogCarriesWhatTheManifestReads:
     """Criteria 10 and 11."""
