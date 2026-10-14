@@ -236,3 +236,11 @@ Appended to `plans/running-thoughts.md` #92, which owns the idea:
    a separate requirement of its own, which REQ-DASH-220's cards then use.
 7. Naming the reviewer: **never** (A).
 8. Label and route: **"Feedback", `#/feedback`** (A).
+
+## Keith's answers to RQ1-RQ3 (2026-10-14 afternoon)
+
+- RQ1: **A** - "We noticed:" on entries the project found itself, "You told
+  us:" on the reviewer's; the gate requires exactly one of the two.
+- RQ2: **A** - all eleven deleted entries come back as cards, with a
+  "Couldn't reproduce" status added for #17.
+- RQ3: **A** - `?panel=requirements&req=<id>`.
