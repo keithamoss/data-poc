@@ -571,6 +571,142 @@ class TestRequirementsPanel:
         assert body.inner_text() == everything
 
 
+class TestARequirementHasItsOwnAddress:
+    """REQ-DASH-222: `?panel=requirements&req=<id>` opens the Requirements
+    panel at one requirement - cold-loaded, followed as a link, and
+    stepped through with Back and Forward."""
+
+    def _url(self, html_path, query):
+        return f"file://{html_path.resolve()}?{query}"
+
+    def _load(self, page, html_path, query):
+        page.goto("about:blank")
+        page.goto(self._url(html_path, query))
+        page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+
+    def _ids(self, page):
+        ids = page.evaluate("() => REQUIREMENTS.map(r => [r.id, r.status])")
+        assert ids, "precondition: the built dashboard embeds the register"
+        return ids
+
+    def _linked(self, page):
+        return page.evaluate("""() => {
+            const row = document.querySelector('#requirements-panel-body .req-linked');
+            return row ? row.dataset.reqId : null; }""")
+
+    def _add_link(self, page, rid):
+        page.evaluate("""(id) => {
+            const a = document.createElement('a');
+            a.href = requirementHref(id); a.dataset.reqLink = id; a.id = 'e2e-req-link';
+            a.textContent = id; document.getElementById('view').prepend(a); }""", rid)
+
+    def _add_card_link(self, page, rid):
+        """A link the view re-renders on Back, as a Feedback card's is: the
+        page must find it again by the requirement it names."""
+        page.evaluate("""(id) => {
+            const original = window.render;
+            window.render = function(){ original();
+              const a = document.createElement('a');
+              a.href = requirementHref(id); a.dataset.reqLink = id; a.className = 'e2e-card-link';
+              a.textContent = id; document.getElementById('view').prepend(a); };
+            window.render(); }""", rid)
+
+    def test_a_cold_loaded_address_opens_the_panel_at_that_requirement(self, clean_page,
+                                                                       built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=requirements")
+        rid = self._ids(clean_page)[-1][0]
+        self._load(clean_page, built_dashboard_html, f"panel=requirements&req={rid}")
+        assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "false"
+        assert self._linked(clean_page) == rid
+        focused = clean_page.evaluate(
+            "() => document.activeElement.closest('[data-req-id]')?.dataset.reqId || null")
+        assert focused == rid
+        assert "Linked here" in clean_page.locator(".req-linked").inner_text()
+
+    def test_every_row_carries_a_link_to_its_own_address(self, clean_page, built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=requirements")
+        ids = self._ids(clean_page)
+        hrefs = clean_page.evaluate("""() => [...document.querySelectorAll(
+            '#requirements-panel-body [data-req-id] a[data-req-link]')].map(a => a.getAttribute('href'))""")
+        assert len(hrefs) == len(ids)
+        assert all("panel=requirements" in h and "req=" in h for h in hrefs)
+
+    def test_following_a_link_pushes_one_entry_that_back_and_forward_step_through(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        rid = self._ids(clean_page)[0][0]
+        self._add_card_link(clean_page, rid)
+        before = clean_page.evaluate("() => history.length")
+        clean_page.locator(".e2e-card-link").click()
+        assert clean_page.evaluate("() => history.length") == before + 1
+        assert f"req={rid}" in clean_page.url and self._linked(clean_page) == rid
+        clean_page.go_back()
+        clean_page.wait_for_function("() => !STATE.panel")
+        assert "req=" not in clean_page.url
+        assert clean_page.evaluate("() => document.activeElement.className") == "e2e-card-link"
+        clean_page.go_forward()
+        clean_page.wait_for_function("() => STATE.panel === 'requirements'")
+        assert self._linked(clean_page) == rid
+
+    def test_a_requirement_hidden_by_the_status_filter_resets_it(self, clean_page,
+                                                                 built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        ids = self._ids(clean_page)
+        hidden = next(i for i, st in ids if st != "built")
+        clean_page.locator("#requirements-btn").click()
+        clean_page.locator('#requirements-panel-body [data-req-status="built"]').click()
+        clean_page.locator("#requirements-panel-close").click()
+        clean_page.wait_for_function("() => !STATE.panel")
+        self._add_link(clean_page, hidden)
+        clean_page.locator("#e2e-req-link").click()
+        assert self._linked(clean_page) == hidden
+        assert clean_page.evaluate("() => REQ_STATUS_FILTER") == "all"
+
+    def test_an_unknown_id_opens_at_the_top_with_the_stale_notice(self, clean_page,
+                                                                  built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=requirements&req=REQ-NOPE-999")
+        notice = clean_page.locator("#requirements-panel-body .stale-link-notice")
+        assert notice.count() == 1 and notice.get_attribute("role") == "status"
+        assert "REQ-NOPE-999" in notice.inner_text()
+        assert "req=" not in clean_page.url and "panel=requirements" in clean_page.url
+        assert self._linked(clean_page) is None
+
+    def test_req_beside_another_panel_is_dropped(self, clean_page, built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=activity&req=REQ-DASH-222")
+        assert clean_page.locator("#activity-panel").get_attribute("aria-hidden") == "false"
+        assert "req=" not in clean_page.url
+
+    def test_closing_a_cold_loaded_one_drops_both_parameters(self, clean_page,
+                                                             built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=requirements")
+        rid = self._ids(clean_page)[0][0]
+        self._load(clean_page, built_dashboard_html, f"panel=requirements&req={rid}")
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_function("() => !STATE.panel")
+        assert "qa-reporting-dashboard" in clean_page.url
+        assert "req=" not in clean_page.url and "panel=" not in clean_page.url
+
+    def test_the_header_button_opens_at_the_top_without_req(self, clean_page,
+                                                            built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        rid = self._ids(clean_page)[-1][0]
+        self._add_link(clean_page, rid)
+        clean_page.locator("#e2e-req-link").click()
+        clean_page.locator("#requirements-panel-close").click()
+        clean_page.wait_for_function("() => !STATE.panel")
+        clean_page.locator("#requirements-btn").click()
+        assert "panel=requirements" in clean_page.url and "req=" not in clean_page.url
+        assert self._linked(clean_page) is None
+
+    def test_navigating_away_does_not_carry_the_panel_or_req(self, clean_page,
+                                                             built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=requirements")
+        rid = self._ids(clean_page)[0][0]
+        self._load(clean_page, built_dashboard_html, f"panel=requirements&req={rid}")
+        clean_page.evaluate("() => navigate({tier:'exec'})")
+        assert "req=" not in clean_page.url and "panel=" not in clean_page.url
+
+
 class TestReleaseNotesPanel:
     def test_it_reads_as_a_whats_new_page_not_an_engineering_log(self, clean_page, built_dashboard_html):
         """Rewritten 2026-09-20 when CHANGELOG.md became CHANGELOG.yaml.

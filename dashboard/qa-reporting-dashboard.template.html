@@ -556,6 +556,11 @@ button{font:inherit; color:inherit;}
   border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13.5px;
   color:var(--ink); background:var(--surface); max-width:72ch;}
 .arrival-notice b{display:block; margin-bottom:4px;}
+/* A REQUIREMENT OPENED BY ITS OWN ADDRESS (REQ-DASH-222 criterion 2) wears
+   the arrival notice's left accent bar, and says so in words beside its id
+   so the mark is not colour alone. */
+.req-linked{border-left:3px solid var(--accent); padding-left:10px;}
+.req-linked-label{font-size:11px; color:var(--accent-ink); background:var(--accent-soft); border-radius:4px; padding:1px 6px;}
 .supply-history{margin-block:8px 30px;}
 .supply-cycle-table{table-layout:fixed; width:100%; min-width:760px;}
 .supply-cycle-table td{overflow-wrap:anywhere;}
@@ -4431,6 +4436,11 @@ function stateToHash(state){ return "#" + stateToPath(state); }
 function navUrl({dropArrival = true} = {}){
   const url = new URL(location.href);
   if(dropArrival){ url.searchParams.delete("from"); url.searchParams.delete("from-on"); url.searchParams.delete("via"); }
+  // A NAVIGATION LEAVES THE PANEL BEHIND (REQ-DASH-222 criterion 14):
+  // navigate() closes every panel, so an address carrying one would reopen
+  // it on reload.
+  if(!STATE.req) url.searchParams.delete("req");
+  if(!STATE.panel) url.searchParams.delete("panel");
   return url.pathname + url.search + stateToHash(STATE);
 }
 function hashToState(){
@@ -4447,6 +4457,20 @@ const SIDE_PANELS = ["activity","changelog","requirements","snapshots","leaderbo
 function panelFromUrl(){
   const v = new URLSearchParams(location.search).get("panel");
   return SIDE_PANELS.includes(v) ? v : undefined;
+}
+// A REQUIREMENT'S OWN ADDRESS (REQ-DASH-222): `req=` means something only
+// beside `panel=requirements`, and is dropped anywhere else (criterion 8).
+function reqFromUrl(){
+  const p = new URLSearchParams(location.search);
+  return p.get("panel") === "requirements" ? (p.get("req") || undefined) : undefined;
+}
+// The one place a requirement's address is built (criterion 1): the page
+// the reader is on, with the Requirements panel open at that requirement.
+function requirementHref(id){
+  const url = new URL(location.href);
+  url.searchParams.set("panel", "requirements");
+  url.searchParams.set("req", id);
+  return url.pathname + url.search + url.hash;
 }
 function cmpFromUrl(){
   const v = new URLSearchParams(location.search).get("cmp");
@@ -4466,7 +4490,9 @@ function stateFromLocation(){
   const base = hashToState() || {tier:"exec"};
   const panel = panelFromUrl();
   const cmp = cmpFromUrl();
-  return {...base, ...(panel!==undefined ? {panel} : {}), ...(cmp!==undefined ? {compareIdx:cmp} : {})};
+  const req = reqFromUrl();
+  return {...base, ...(panel!==undefined ? {panel} : {}), ...(cmp!==undefined ? {compareIdx:cmp} : {}),
+          ...(req!==undefined ? {req} : {})};
 }
 
 let STATE = stateFromLocation();
@@ -4567,6 +4593,7 @@ window.addEventListener("popstate", (e)=>{
     setInPlaceOnQuietly(STATE.scenarioJump.to);
   }
   renderFromState();
+  if(leaving && leaving.panel === "requirements" && !(STATE && STATE.panel)) returnFocusToRequirementOpener();
 });
 
 // WHAT VIEW AM I ON - in the title, and out loud (post-build-review
@@ -7268,17 +7295,21 @@ function hidePanelDom(name){
 function hideAllPanelsDom(){ SIDE_PANELS.forEach(hidePanelDom); }
 function openPanel(name, opts){
   const pushHistory = !opts || opts.pushHistory !== false;
-  PANEL_RENDER[name]();
-  hideAllPanelsDom();
-  showPanelDom(name);
   if(pushHistory){
     // sidePanelPushed: THIS entry is ours, so Close may step back over it
     // (post-build-review #180, as closeCheckPanel()'s panelPushed).
-    STATE = {...STATE, panel:name, sidePanelPushed:true};
+    // Opened from its header button, a panel opens at the top: any `req=`
+    // is dropped (REQ-DASH-222 criterion 13).
+    STATE = {...STATE, panel:name, sidePanelPushed:true, req:undefined};
     const url = new URL(location.href);
     url.searchParams.set("panel", name);
+    url.searchParams.delete("req");
     history.pushState(STATE, "", url.pathname + url.search + location.hash);
   }
+  PANEL_RENDER[name]();
+  hideAllPanelsDom();
+  showPanelDom(name);
+  if(name === "requirements" && STATE.req) showRequirement(STATE.req);
 }
 // User-initiated close (X, backdrop, Escape): same back()-not-hide()
 // pattern closeDrawer()/closeCheckPanel() already use, for the same
@@ -7294,11 +7325,10 @@ function openPanel(name, opts){
 function closePanel(){
   if(!(STATE && STATE.panel)) return hideAllPanelsDom();
   if(STATE.sidePanelPushed) return history.back();
-  STATE = {...STATE, panel:undefined, sidePanelPushed:undefined};
-  const url = new URL(navUrl({dropArrival:false}), location.href);
-  url.searchParams.delete("panel");
-  history.replaceState(STATE, "", url.pathname + url.search + url.hash);
+  STATE = {...STATE, panel:undefined, sidePanelPushed:undefined, req:undefined};
+  history.replaceState(STATE, "", navUrl({dropArrival:false}));
   hideAllPanelsDom();
+  returnFocusToRequirementOpener();
 }
 document.getElementById("snapshots-btn").addEventListener("click", ()=> openPanel("snapshots"));
 document.getElementById("snapshots-backdrop").addEventListener("click", closePanel);
@@ -7610,10 +7640,10 @@ function renderRequirementsPanel(){
           <ul style="margin:4px 0 0; padding-left:18px; line-height:1.5;">${r.evidence.map(e=>`<li>${e}</li>`).join("")}</ul>
         </div>` : "";
     return `
-      <div data-req-row-status="${r.status}" style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line);">
+      <div data-req-row-status="${r.status}" data-req-id="${escAttr(r.id)}" style="margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line);">
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-          <span class="mono" style="font-size:11.5px; color:var(--ink-faint);">${r.id}</span>
-          <b style="font-size:14px;">${r.title}</b>
+          <a class="mono req-self-link" href="${escAttr(requirementHref(r.id))}" data-req-link="${escAttr(r.id)}" title="A link to this requirement" style="font-size:11.5px; color:var(--ink-faint);">${r.id}</a>
+          <b class="req-title" tabindex="-1" style="font-size:14px;">${r.title}</b>
           ${dateWritten}
         </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">${moscowPill(r.moscow)}${requirementStatusPill(r.status)}${signedOff}</div>
@@ -7636,6 +7666,66 @@ function renderRequirementsPanel(){
     renderRequirementsPanel();
   }));
 }
+// OPEN THE PANEL AT ONE REQUIREMENT (REQ-DASH-222). The row is found by
+// comparing each row's data-req-id with the id - never by a selector built
+// from the address (criterion 16) - and an id the register does not hold
+// opens the panel at the top with the stale-link notice (criterion 7).
+let REQ_OPENER = null;
+function showRequirement(id){
+  const body = document.getElementById("requirements-panel-body");
+  const known = REQUIREMENTS.find(r=> r.id === id);
+  if(!known){
+    STATE = {...STATE, req:undefined};
+    history.replaceState(STATE, "", navUrl({dropArrival:false}));
+    const notice = document.createElement("div");
+    notice.className = "stale-link-notice";
+    notice.setAttribute("role", "status");
+    notice.innerHTML = `This link names a requirement the register does not hold, <code>${escHtml(id)}</code>. The list below is every requirement there is.`;
+    body.prepend(notice);
+    body.scrollTop = 0;
+    return;
+  }
+  if(REQ_STATUS_FILTER !== "all" && REQ_STATUS_FILTER !== known.status){
+    REQ_STATUS_FILTER = "all";
+    renderRequirementsPanel();
+  }
+  const row = [...body.querySelectorAll("[data-req-id]")].find(el=> el.dataset.reqId === id);
+  if(!row) return;
+  row.classList.add("req-linked");
+  const label = document.createElement("span");
+  label.className = "req-linked-label";
+  label.textContent = "Linked here";
+  row.querySelector(".req-title").after(label);
+  row.scrollIntoView({block:"start"});
+  row.querySelector(".req-title").focus({preventScroll:true});
+}
+// FOCUS GOES BACK TO THE LINK THAT OPENED IT (criterion 15). Back
+// re-renders the view, so the element itself is usually gone by then: the
+// same link is found again in the new view by the requirement it names.
+function returnFocusToRequirementOpener(){
+  const opener = REQ_OPENER;
+  REQ_OPENER = null;
+  if(!opener) return;
+  const target = document.contains(opener.el) ? opener.el
+    : [...document.querySelectorAll("#view a[data-req-link]")].find(a=> a.dataset.reqLink === opener.id);
+  if(target) target.focus({preventScroll:true});
+}
+// FOLLOWING A LINK TO A REQUIREMENT (criterion 4): a plain primary click
+// opens the panel at it and pushes one history entry; anything else -
+// a modified or middle click - is the browser's.
+document.addEventListener("click", (e)=>{
+  const a = e.target.closest && e.target.closest("a[data-req-link]");
+  if(!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  const id = a.dataset.reqLink;
+  if(!a.closest("#requirements-panel")) REQ_OPENER = {el:a, id};
+  STATE = {...STATE, panel:"requirements", req:id, sidePanelPushed:true};
+  history.pushState(STATE, "", requirementHref(id));
+  PANEL_RENDER.requirements();
+  hideAllPanelsDom();
+  showPanelDom("requirements");
+  showRequirement(id);
+});
 document.getElementById("requirements-btn").addEventListener("click", ()=> openPanel("requirements"));
 
 /* ---- Scenarios (REQ-DASH-046) ---------------------------------------
@@ -8618,6 +8708,7 @@ renderBuildStamp();
 // rewritten, or it would take over every later reload and copied link.
 const INITIAL_URL = new URL(location.href);
 if(INITIAL_URL.searchParams.get("panel") === "scenarios") INITIAL_URL.searchParams.delete("panel");
+if(INITIAL_URL.searchParams.has("req") && INITIAL_URL.searchParams.get("panel") !== "requirements") INITIAL_URL.searchParams.delete("req");
 history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
 </script>

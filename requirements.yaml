@@ -35150,7 +35150,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As someone reading or discussing the PoC's requirements, I want a link that opens the dashboard's Requirements panel at one particular requirement, so that I can point a person, a feedback card or a note straight at the requirement I mean instead of telling them to open the panel and scroll for its id among two hundred."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35192,6 +35192,21 @@ requirements:
     - "THE GENERAL CLOSE FIX IS post-build-review #180, NOT THIS REQUIREMENT (Keith, 2026-10-14, review-architect Q1 and review-dashboard-ux Q4, option A both): the main session confirmed the defect in a browser - a cold-loaded `?panel=requirements` closed with Escape stepped Back to about:blank, and in a truly fresh tab the panel could not be closed at all - and it affects all five SIDE_PANELS. It is being fixed now, test-first, for all five, as #180. So criterion 9 adds only what is this requirement's own - dropping `req=` with `panel=` - and relies on #180's guard for closing in place, and criterion 12's cold-load close test checks that `req=` goes too. REJECTED fixing it here for the Requirements panel alone (option B of both questions): the other four panels would keep the defect."
     - "THE MARK, THE NOTICE AND THE ROWS REUSE WHAT THE PAGE HAS (delivery-dashboard-ux and delivery-architect low findings, 2026-10-14): .arrival-notice's left accent bar for the linked-to mark; .stale-link-notice with role=status for an unknown id, not forgetStaleSegment(); rows found by data-req-id by iteration; the header button opens at the top; focus returns to the opening link. navUrl carries panel= and req= across navigate() today; criterion 14 drops both for the Requirements panel, and whether other panels should drop panel= on navigation is left to #180."
     - "REVIEWS FOLDED, 2026-10-14: changed in place 1 (no longer provisional), 2 (the accent bar), 3 (tabindex=-1), 7 (.stale-link-notice, role=status), 9 (drops req=, relies on #180); added 13 to 16 (header button at the top, navigation drops req=, focus back to the link, data-req-id rows)."
+    - 'BUILT 2026-10-14. The click handler is document-level and keyed on a[data-req-link], so any view - the Feedback tab''s cards, a requirement''s own copy link - gets the behaviour by carrying the attribute; nothing hand-builds the address (requirementHref is the one builder). Focus return finds the opener again by the requirement it names when Back has re-rendered the view, since the original element is gone by then. navUrl drops panel= whenever STATE has no panel, which also stops a stale panel= riding into a navigation for the other four panels - the architect''s navUrl finding, fixed at the source rather than for the Requirements panel alone.'
+    linked_tests:
+    - 'tests/test_dashboard_e2e.py::TestARequirementHasItsOwnAddress'
+    - 'tests/test_dashboard_e2e.py::TestClosingASidePanelReachedByItsUrl'
+    implemented_by:
+    - 'dashboard/qa-reporting-dashboard.template.html::requirementHref'
+    - 'dashboard/qa-reporting-dashboard.template.html::reqFromUrl'
+    - 'dashboard/qa-reporting-dashboard.template.html::showRequirement'
+    - 'dashboard/qa-reporting-dashboard.template.html::returnFocusToRequirementOpener'
+    - 'dashboard/qa-reporting-dashboard.template.html::renderRequirementsPanel'
+    - 'dashboard/qa-reporting-dashboard.template.html::openPanel'
+    - 'dashboard/qa-reporting-dashboard.template.html::closePanel'
+    - 'dashboard/qa-reporting-dashboard.template.html::navUrl'
+    evidence:
+    - 'tests/test_dashboard_e2e.py::TestARequirementHasItsOwnAddress (9 tests, run 2026-10-14 against the real built dashboard from file://): a cold-loaded address opens the panel at the requirement, marked ''Linked here'' with the accent bar and focused; every row carries its own address; a followed link pushes one entry that Back and Forward step through, focus returning to a re-rendered card link found again by its id; a requirement hidden by the status filter resets it to All; an unknown id opens at the top with the stale-link notice (role=status) and drops req= with no console error; req= beside another panel is dropped; closing a cold-loaded one drops both parameters (post-build-review #180''s guard); the header button opens at the top without req=; navigating away carries neither parameter.'
   - id: REQ-QAC-223
     title: "The changelog gate sees a change to a check's expression, SQL, macro or Evidently settings"
     date_written: '2026-10-14'

@@ -1,0 +1,179 @@
+# DRAFT - road-testing sprint 1, "where do I put my effort?" (plans/road-testing.md
+# #1 and #2), scoped by delivery-scoper 2026-10-14 from the sprint line, entries
+# #1 and #2 in full, and Keith's answers of 2026-10-06 and 2026-10-13.
+# A PROPOSAL for Keith's sign-off, not a settled requirement. Nothing here is in
+# requirements.yaml. Criteria marked PROVISIONAL turn on a question in summary.md.
+requirements:
+  - id: REQ-DASH-224
+    title: "A check counts as not green only on an amber or red verdict, decided in one function that every count and trend line uses"
+    date_written: "2026-10-14"
+    story: "As a data team leader reading any count or trend of failing checks, I want 'not green' to mean a check that came back amber or red, counted the same way everywhere, so that a column with no rule, or a check not run for the period, never makes a healthy dataset's trend look as though it is failing."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/road-testing.md #1 (a trend drawn in two places measuring two different things, neither labelled) and #2 (Tier 1 and Tier 2 say whether there is a problem, never how big), road-testing sprint 1; his answers of 2026-10-06 and 2026-10-13. Drafted by delivery-scoper 2026-10-14. The defect in decision 1 was found while scoping, not reported by Keith."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL decide, in one function in the dashboard page, how each check in a given set of columns counts on a given QA run or on the date on show: a non-retired check whose verdict is amber or red SHALL count as not green, one whose verdict is green SHALL count as green, and any other check - inactive ('No rule defined') or no data ('not run for this period') - SHALL count as neither and SHALL be left out of the total."
+      - "THE SYSTEM SHALL count a check by the verdict its tool recorded, so that a check recorded red because it could not be evaluated counts as red."
+      - "THE SYSTEM SHALL draw every aggregate trend line - at every tier where one is shown - from that function, so that a QA run's point is the share of that run's counted checks or columns that were amber or red."
+      - "IF no check in scope has a verdict on a QA run, THEN THE SYSTEM SHALL leave that run out of the line, and SHALL NOT plot it as 0% or as 100%."
+      - "THE SYSTEM SHALL compute every 'not green' count that REQ-DASH-225, REQ-DASH-226 and REQ-DASH-227 add from the same function, so that a count and the line beside it cannot disagree about which checks are not green."
+      - "IF a check carries a status the page does not recognise, THEN THE SYSTEM SHALL refuse it as recognisedStatus() already does, and SHALL NOT count it either way."
+      - "THE SYSTEM SHALL have a tests-js test, written first and seen to fail against today's aggregateFailureSeries(), in which a QA run with one green and one inactive check gives a share of 0, and a run with one green, one amber and one no-data check gives a share of 0.5."
+      - "THE SYSTEM SHALL have a real-browser test against the built dashboard which, at the build's own date, finds a real dataset whose column tiles are all green and asserts its trend's latest point is 0 - asserting first that such a dataset exists, so that the test cannot pass with nothing to check."
+      - "THE SYSTEM SHALL compute all of this in the page from the check histories the build already embeds, SHALL add nothing to the embedded data, and SHALL NOT read supply rows."
+    non_functional_requirements:
+      - "THE BUILD RULE: a build may read recorded QA results, never actual data, and never anything else. Everything here is computed in the browser from histories already embedded."
+      - "ONE ANSWER: one counting function in the page. plans/qa-pipeline.md item 74 found four status implementations that had drifted, one of which rendered a check with 14 violations green. A second counter per tier would recreate that."
+      - "TEST-FIRST: criterion 7 is a defect test and must be seen red against today's code before the fix lands (CLAUDE.md's bug rule)."
+      - "PERFORMANCE: one pass over each in-scope check's history per render. At about 30 datasets with about 50 columns of about 5 checks each, that is tens of thousands of entries, well inside the 400ms Doherty threshold (docs/hci-ux-psychology.md). Measure it once on the built page rather than assume."
+      - "MAINTAINABILITY: no Python twin. qa_tools/common/dataset_status.py mirrors the status vocabulary because Python consumers need it. Nothing in Python shows these counts."
+    dependencies: []
+    decisions:
+      - "A DEFECT FOUND WHILE SCOPING (delivery-scoper, 2026-10-14, checked against reports/child_protection_dashboard.json and the template). aggregateFailureSeries() counts every status other than 'green' as failing, so the 13 inactive placeholder checks and every recorded 'nodata' entry count as failures. On the latest run, every Child Protection dataset plots a non-zero share while recording no amber or red verdict at all. For example cp-notifications plots 2 of 45 against 0 of 43 verdicts. The line is scaled to its own maximum with a 0.05 floor, so a flat 4% sits near the top of its box and reads as failing. The endpoint dot stays green, because STATUS_ORDER has no inactive. Under the page's own rule, rollupStatuses() leaves inactive and nodata out of every rollup (post-build-review #4), so this is a defect and is written test-first."
+      - "RATE, NOT RAW COUNT, IN THE LINE STANDS (Keith, 2026-09-17, plans/qa-pipeline.md #60, recorded in aggregateFailureSeries()'s own comment). Checks get introduced and retired, so the denominator moves. This requirement changes only which checks are in the numerator and the denominator."
+      - "ONE FUNCTION, NOT ONE COUNTER PER SURFACE (proposed by delivery-scoper). REJECTED a counting helper per tier, on item 74's lesson."
+      - "ITS OWN REQUIREMENT, NOT A QUIET BUG FIX (proposed by delivery-scoper). Under post-build-review's standing rule this could pass as a minor bug. It goes to Keith with the rest because it changes what a chart means, and REQ-DASH-225 to 227 all depend on its definition. REJECTED fixing it silently ahead of the sprint."
+      - "NO PYTHON TWIN (proposed by delivery-scoper). If a Python consumer ever shows these counts, the rule joins status-cases.json's parity cases then. REJECTED adding a twin speculatively."
+    open_questions: []
+
+  - id: REQ-DASH-225
+    title: "The dataset list says how many columns are not green, how many red and how many amber, where Trend sits now, with a small labelled trend beside it"
+    date_written: "2026-10-14"
+    story: "As a data team leader with about thirty datasets on the quarterly asset, I want each row of a collection's dataset list to say how many of its columns are not green, and how many of those are red and how many amber, beside a small trend that says what it plots, so that I can rank the red datasets and see which way each is heading without opening them one at a time."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/road-testing.md #2 and #1, road-testing sprint 1. His 2026-10-06 answer to #2: 'the dataset list counts failing COLUMNS, in its own column where Trend sits today'. His 2026-10-13 answer on where Trend goes: 'a small labelled one kept in the dataset list beside the count' (commit 6f35083). Drafted by delivery-scoper 2026-10-14."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL replace the agency tier's dataset-list column headed 'Trend' with a column headed 'Columns not green', in the same position. The wording is PROVISIONAL and for Keith's approval."
+      - "WHILE a dataset's row is its ordinary row - not one of the single reason rows for a blocked dataset, a period closed with no supply, an ended schedule or no QA run within tolerance - THE SYSTEM SHALL show in that column '<N> of <M> columns not green'. M SHALL be the dataset's columns (realColumns) holding at least one check that REQ-DASH-224 counts on the date on show, and N SHALL be those whose status is amber or red."
+      - "WHERE N is above 0, THE SYSTEM SHALL say in words beneath the count how many of those columns are red and how many amber, for example '2 red, 1 amber'. Each column SHALL count once, at its own worst-of status, so that a column with one amber and one red check counts as one red column. PROVISIONAL on question Q2."
+      - "WHERE N is 0, THE SYSTEM SHALL read 'All <M> columns green', and SHALL NOT show a bare 0."
+      - "WHERE any of the dataset's supply-level, table-level, file or cross-table checks is amber or red on the date on show, THE SYSTEM SHALL add one line naming each such section and its worst status, for example 'Supply-level checks: red', so that a dataset that is red only from checks belonging to no column never reads 'All 14 columns green' with nothing to explain the red. PROVISIONAL on question Q3."
+      - "WHERE a dataset is red or amber for a reason other than its checks - a supply waiting for a person, or a period closed with no supply - THE SYSTEM SHALL keep that reason in words on the same row, as noSupplyNote() does today, so that the count is never the only text beside a red it does not explain."
+      - "THE SYSTEM SHALL show beside the count a small trend of the same measure: the share of the dataset's counted columns that were not green on each QA run up to the date on show. It SHALL NOT show a line of a different measure beside the count. PROVISIONAL on question Q1."
+      - "THE SYSTEM SHALL take the trend's latest point from the same QA run whose verdict the row's status pill and count show, so that the line ends where the count stands."
+      - "THE SYSTEM SHALL label the trend visibly: a second line in the column header reading 'and its trend, each QA run' (PROVISIONAL wording), and an accessible name that states what the line plots, its date range and its latest value in words, for example 'Share of columns not green on each QA run, 12 runs from 1 Feb 2023 to 1 Aug 2026; latest 3 of 14'. That name SHALL replace today's 'aggregate failing-check trend sparkline'."
+      - "THE SYSTEM SHALL draw every row's trend on the same fixed scale, 0% to 100% of columns, so that two rows' lines can be compared, and SHALL NOT use a floor that makes an all-green history look like a low, non-zero value. PROVISIONAL on question Q6."
+      - "THE SYSTEM SHALL keep the trend's endpoint dot coloured by the latest QA run's worst status, and quiet while the dataset is in a quiet state (post-build-review #57)."
+      - "THE SYSTEM SHALL compute the count and the trend as at the date on show (the in-place-on date), from the same column statuses the row's pill rolls up, so that choosing a different date changes them and a cold-loaded link to a past date shows that date's figures."
+      - "WHILE a dataset is turned off (REQ-DASH-180), or the current period is one it owes nothing in (REQ-DASH-182), THE SYSTEM SHALL show the count and trend for the supply in place, just as its pill shows that supply's verdict."
+      - "THE SYSTEM SHALL have tests-js tests, written first and seen to fail, covering four cases: a column with one amber and one red check counts as one red column; a column whose only check is inactive is left out of M; a dataset whose only red is a supply-level check shows the section line; and a dataset whose column tiles are all green reads 'All <M> columns green'."
+      - "THE SYSTEM SHALL have a real-browser test against the built dashboard. For every real dataset on an ordinary row, at the build's own date and at one earlier date, the test SHALL check that N equals the number of column tiles on the dataset's page whose pill is amber or red, and that M equals the number of tiles showing one of the three verdicts. It SHALL assert first that at least one dataset has N above 0, so that it cannot pass with every count at zero."
+    non_functional_requirements:
+      - "SCALE (CLAUDE.md, about 30 datasets on the quarterly asset). This is the requirement that makes the list rankable: one count per row, red and amber stated, and lines on one shared scale so that the eye can compare thirty of them. A line auto-scaled per row would let 3% and 90% look the same height."
+      - "ACCESSIBILITY, NEVER COLOUR ALONE (REQ-DASH-070 criterion 6). Red and amber are stated in words. The trend has a text alternative that states its latest value, and the dataset page's 'View as table' (REQ-DASH-227) carries the full series."
+      - "THE BUILD RULE: computed in the page from recorded results the build already embeds, with no supply rows and no new embedded data."
+      - "AS-OF CORRECTNESS: every figure is judged on the date on show, like the pill beside it. A test at a past date is required (criterion 15), not just at the build's own date."
+      - "COMPATIBILITY: no new asset, so file:// and offline viewing are unaffected. A phone is not a target (post-build-review #16), and the column should be no wider than the Trend column it replaces plus one line of text."
+      - "PERFORMANCE: no new embedded data, and the count is one pass over the dataset's checks. The built page's load and agency-tier render time should not move measurably. Check once, not budgeted."
+      - "OBSERVABILITY: CHANGELOG.yaml-worthy - a visible change to the main triage table."
+    dependencies:
+      - REQ-DASH-224
+      - REQ-DASH-180
+      - REQ-DASH-182
+      - REQ-DASH-070
+    decisions:
+      - "COLUMNS, NOT CHECKS, IN THE DATASET LIST (Keith, 2026-10-06, answering #2). #2's own reasoning: a single bad column can carry several failing checks, so a check count overstates how many things are actually wrong."
+      - "IN ITS OWN COLUMN, WHERE TREND SITS TODAY (Keith, 2026-10-06, answering #2). REJECTED #2's other options, the count beside the pill or the count inside the pill."
+      - "A SMALL LABELLED TREND STAYS IN THE LIST BESIDE THE COUNT (Keith, 2026-10-13, commit 6f35083). This refines his 2026-10-06 answer to #1, which had the dataset list show the count 'instead' of the sparkline. REJECTED removing the list's trend entirely."
+      - "NAMED IN PLACE, NOT A DIFFERENT TREATMENT. #1 left open whether the aggregate line is named in place or replaced by something else at 30 datasets. Keith's 2026-10-13 answer keeps the line in the list, labelled, and that is read here as choosing 'named in place'. What makes thirty lines readable is that each states its measure and all share one scale (criteria 9 and 10), not a different chart."
+      - "THE LINE MEASURES WHAT THE COUNT BESIDE IT COUNTS (proposed by delivery-scoper; Q1). #2 warned that adding a number beside the unlabelled trend 'risks two unexplained figures instead of one'. A columns count beside a checks line would be exactly two figures in two different units. REJECTED keeping today's share-of-checks line beside a columns count."
+      - "A ROW'S TOTAL OF RED AND AMBER IS SAID IN WORDS (proposed; Q2). Keith's own words in #2 asked for 'how many amber, how many red'. Each column counts once, at its worst status, consistent with how the column tile's pill already rolls up."
+      - "THE LINE IS PER QA RUN, AS TODAY (proposed by delivery-scoper, not asked). Each point is a supply that was checked, including resupplies and supplies later withdrawn. The label says 'each QA run' so that the line is not read as one point per period. REJECTED plotting one point per period's supply in place in this sprint, which would be a different series rather than a labelling change. Keith may reverse this at sign-off."
+      - "FOUND WHILE SCOPING: the 0.05 floor in aggregateSparkline() exists to avoid dividing by zero on an all-green history, and it pins that history near the bottom as a low, non-zero-looking line (#1's own unverified worry, confirmed by reading the code). A fixed 0-100% scale removes the need for the floor."
+    open_questions:
+      - "At about 30 datasets, should the dataset list be sortable, or sorted by default by red count? Out of this sprint as drafted - Keith asked for counts, not ordering - but a count invites a sort. Raise it for a later sprint or decline it."
+
+  - id: REQ-DASH-226
+    title: "Agency cards, and each collection heading on the agency tier, say how many checks are not green, how many red and how many amber"
+    date_written: "2026-10-14"
+    story: "As a data team leader landing on the Agencies page, I want each agency card to say how many of its checks are not green, split into red and amber, so that I can tell an agency whose red is one check from one whose red is forty before I open either."
+    moscow: must
+    status: not_started
+    source: "Keith, plans/road-testing.md #2 and #1, road-testing sprint 1. His 2026-10-06 answer to #1: 'the overview cards and dataset list show N of M checks not green instead'. His 2026-10-13 answer: 'Tier 1 ROLLS THE COUNT UP onto agency cards' (commit 1ac13eb). Drafted by delivery-scoper 2026-10-14."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL show on each agency card on the Agencies tier a line reading '<N> of <M> checks not green' and, where N is above 0, '<r> red, <a> amber' in words. M SHALL be the checks REQ-DASH-224 counts across the agency's counted datasets on the date on show, and N those that are amber or red."
+      - "THE SYSTEM SHALL show the same line, worked out over that collection's counted datasets, beneath each collection's heading on the agency tier. PROVISIONAL - Keith named agency cards only. See open question 1."
+      - "THE SYSTEM SHALL count only the datasets that the card's own colour rollup counts on the date on show (rollup()). A dataset left out of the rollup - turned off with nothing owed (REQ-DASH-180 criterion 7), no schedule agreed, schedule ended, no data - SHALL add nothing to N or M, and the existing 'N datasets not counted' line (REQ-DASH-180 criterion 10) SHALL remain where they are said. PROVISIONAL on question Q4."
+      - "THE SYSTEM SHALL count a cross-table check once per card, by its check_id, however many of the card's datasets carry it, as collectionCrossTableChecks() already dedupes them."
+      - "THE SYSTEM SHALL count supply-level, table-level and file checks like any other check."
+      - "WHERE a card's status is red or amber and N is 0, THE SYSTEM SHALL keep on the same card the marker that already says why (the outstanding and no-supply markers), so that the count is never the only text beside a red it does not explain."
+      - "WHERE a group's status is 'Turned off' or 'Not counted' (REQ-DASH-180 criteria 8 and 9), THE SYSTEM SHALL show no count line, and SHALL NOT show '0 of 0 checks not green'."
+      - "THE SYSTEM SHALL remove the aggregate sparkline from the agency card, putting the count in its place. PROVISIONAL on question Q5."
+      - "THE SYSTEM SHALL compute every count as at the date on show, from the same check statuses the card's pill rolls up."
+      - "THE SYSTEM SHALL have a tests-js test, written first and seen to fail, in which a cross-table check carried by two datasets of one collection is counted once on the collection's line and once on the agency's card."
+      - "THE SYSTEM SHALL have a real-browser test against the built dashboard which, at the build's own date, checks each agency card's N and M against the checks shown on its counted datasets' pages, with cross-table checks deduplicated. It SHALL assert first that some agency card has N above 0."
+    non_functional_requirements:
+      - "SCALE: at about 30 datasets an agency card carries one line of counts, never a list of dataset names - the same aggregation rule REQ-DASH-180's NFR 1 and REQ-DASH-070's NFR 2 hold the cards to."
+      - "ACCESSIBILITY: red and amber are said in words, never by colour alone (REQ-DASH-070 criterion 6)."
+      - "MULTI-AGENCY: each card counts only its own agency's datasets. A deployment is one asset, so nothing crosses an asset boundary."
+      - "THE BUILD RULE: computed in the page from recorded results. No new embedded data."
+      - "CONSISTENCY: the count and the pill on one card are judged over the same datasets on the same date (criteria 3 and 9). A card whose count includes a dataset its pill leaves out is a card arguing with itself."
+    dependencies:
+      - REQ-DASH-224
+      - REQ-DASH-180
+      - REQ-DASH-070
+    decisions:
+      - "CHECKS, NOT COLUMNS, ON THE CARDS (Keith, 2026-10-06, answering #1). REJECTED, for now, a count of datasets not green on the card. That is still a reasonable reading of 'where do I put my effort' at agency level, and is offered again as an option in Q4's companion note in summary.md."
+      - "TIER 1 ROLLS THE COUNT UP (Keith, 2026-10-13, answering the sprint plan's open question)."
+      - "THE COUNT REPLACES THE AGENCY CARD'S SPARKLINE (Keith, 2026-10-06, answering #1 - 'instead'). His 2026-10-13 answer kept a small trend in the dataset LIST only, so read literally the card loses its line. Asked again as Q5 because the two answers came a week apart. PROVISIONAL."
+      - "CROSS-TABLE CHECKS COUNTED ONCE (proposed by delivery-scoper). REQ-QAC-037 shares one record between the datasets it reads, and 'Client reference' nine times over is the failure #14 recorded. REJECTED summing per-dataset counts, which would count one disagreement once for each table it touches."
+      - "ONLY ROLLUP-COUNTED DATASETS (proposed by delivery-scoper; Q4). The card's pill and its count describe the same set. Datasets outside it already have their own line (REQ-DASH-180 criterion 10). REJECTED counting every dataset whatever the rollup says, which would put a turned-off dataset's red checks in a count beside a pill that leaves them out."
+    open_questions:
+      - "Does the collection heading on the agency tier get the same count line (criterion 2)? Keith named agency cards. The collection heading is the card one level down, and it is where thirty datasets would sit. Drafted in, PROVISIONAL."
+
+  - id: REQ-DASH-227
+    title: "The dataset page and each column's panel show a trend that says in words what it plots"
+    date_written: "2026-10-14"
+    story: "As an agency's data owner asked whether a dataset is getting better or worse, I want the dataset page and each column's panel to show a trend that says what it measures and over which runs, so that I can answer without guessing whether a falling line is good news."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/road-testing.md #1, road-testing sprint 1. His 2026-10-06 answer: 'trend sparklines labelled on the dataset and column pages', repeated on 2026-10-13 ('labelled sparklines on the dataset and column pages'). Drafted by delivery-scoper 2026-10-14."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL show on each dataset page, above the column grid, a trend titled 'Columns not green, each QA run'. It SHALL plot the share of the dataset's counted columns (REQ-DASH-224) that were not green on each QA run up to the date on show, with a y-axis titled '% of columns' from 0% to 100%, and dated first, middle and last x-axis labels. PROVISIONAL on question Q7."
+      - "THE SYSTEM SHALL show in each column's panel (openColumnDrawer) a trend titled 'Checks on this column not green, each QA run', on the same scale and with a y-axis titled '% of checks'."
+      - "THE SYSTEM SHALL give each of those two trends a 'View as table' listing, newest first: the run date, the count as '<N> of <M>', and how many were red and how many amber."
+      - "THE SYSTEM SHALL label the column grid's small per-column trends once, in a line above the grid reading 'Each column's line: share of its checks not green, each QA run' (PROVISIONAL wording), and SHALL give each one an accessible name stating the same thing and its latest value in words. PROVISIONAL on question Q7."
+      - "THE SYSTEM SHALL end each trend at the QA run whose verdict the page shows on the date on show, and SHALL plot nothing after that date."
+      - "WHILE a dataset is blocked, THE SYSTEM SHALL show neither trend nor the column tiles' trends, as the tiles already show none today (REQ-PIPE-115 criterion 26)."
+      - "THE SYSTEM SHALL draw both trends from REQ-DASH-224's function, so that the dataset page's latest point equals the count on that dataset's row in the dataset list (REQ-DASH-225) on the same date."
+      - "THE SYSTEM SHALL have a real-browser test against the built dashboard which, for a real dataset with a column that is not green at the build's own date, checks three things: the dataset page's trend title and y-axis title are visible text; its 'View as table' latest row reads the same '<N> of <M>' as the dataset list; and the column panel's latest row matches the number of not-green checks listed in that panel. It SHALL assert first that the dataset has such a column."
+    non_functional_requirements:
+      - "ACCESSIBILITY: every trend has a text equivalent - 'View as table' on the two larger trends, an accessible name with the latest value on the small ones - and the axis titles are text rather than colour or position alone."
+      - "CONSISTENCY: one trend vocabulary across the page - 'not green', 'each QA run', a 0-100% scale - so that what a reader learns on the dataset list carries correctly to the dataset page. #1's whole complaint is two adjacent trends that read alike and mean different things."
+      - "THE BUILD RULE: computed in the page from the embedded check histories. No new embedded data."
+      - "SCALE: a dataset with many columns gets one dataset-level trend, not one larger chart per column. The per-column lines stay tile-sized."
+    dependencies:
+      - REQ-DASH-224
+      - REQ-DASH-225
+      - REQ-PIPE-115
+    decisions:
+      - "LABELLED TRENDS ON THE DATASET AND COLUMN PAGES (Keith, 2026-10-06 and 2026-10-13)."
+      - "THE COLUMN PAGE IS THE COLUMN PANEL (delivery-scoper's reading). The dashboard has no column route of its own. A column opens in the drawer (openColumnDrawer), which today carries no trend at all, only row counts and the list of checks."
+      - "A DATASET-LEVEL TREND IS NEW (proposed; Q7). Today the dataset page has only the per-column tile lines, so 'a labelled sparkline on the dataset page' reads either as labelling those tiles or as adding a dataset-level trend. Drafted as both. REJECTED labelling the tiles alone, which would leave the dataset page as the one level with no answer to 'is this dataset getting better'."
+      - "COLUMNS AT DATASET LEVEL, CHECKS AT COLUMN LEVEL (proposed, following Q1). The dataset page speaks the dataset list's unit, so its trend ends at the list's count. The column panel can only count checks."
+    open_questions: []
+
+  - id: REQ-DASH-228
+    title: "A check's own trend chart names what it measures on its axis and in its table"
+    date_written: "2026-10-14"
+    story: "As anyone opening a check's panel, I want its trend chart to say what quantity it plots and in what unit, so that a row count, a failing-row count and a percentage do not appear under identical labelling, and a falling line is read the right way."
+    moscow: should
+    status: not_started
+    source: "Keith, plans/road-testing.md #1, second bullet (the per-check chart's y-axis has no title, and its 'View as table' header is the bare word 'Value'), road-testing sprint 1. Drafted by delivery-scoper 2026-10-14."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL title the y-axis of every check's trend chart (trendChart()) with what the check measures and its unit, for example 'Rows with no value (count)', 'Rows (count)', 'Invalid values (%)' or 'Drift score (PSI)'."
+      - "THE SYSTEM SHALL head the value column of that chart's 'View as table' listing with the same words, and SHALL NOT head it with the bare word 'Value'."
+      - "THE SYSTEM SHALL work out what a check measures from its declared rule kind (its tool_ref kind, e.g. dbt:not_null), using one mapping. WHERE the kind is not in the mapping, it SHALL fall back to the unit alone ('Value (count)'), and SHALL NOT guess. PROVISIONAL on question Q8."
+      - "THE SYSTEM SHALL have a test that fails naming every rule kind present in the built dashboard's recorded results that has no entry in the mapping, so that a new kind is noticed rather than left falling back silently. It SHALL assert first that the recorded results hold at least one rule kind."
+      - "THE SYSTEM SHALL have a real-browser test which opens one check of each of three units (count, %, PSI) on the built dashboard and asserts that the y-axis title and the table header are visible text naming the measure and the unit."
+    non_functional_requirements:
+      - "MAINTAINABILITY: a new rule kind added to a contract needs one entry in the mapping. Criterion 4 makes forgetting it a red test rather than a silent fallback."
+      - "AUTHORING STANDARD UNTOUCHED: the mapping is generated wording, not a hand-authored check field, so docs/check-authoring-rules.md does not change and its approval rule does not apply. If Keith prefers an authored field (Q8 option C), that rule applies and the wording comes to him first."
+      - "ACCESSIBILITY: the measure is said in text on the axis and in the table header, not left for the reader to infer from the line's shape."
+      - "THE BUILD RULE: wording only, from recorded check metadata. No supply rows."
+    dependencies: []
+    decisions:
+      - "#1's SECOND HALF IS IN THIS SPRINT (delivery-scoper). The sprint line names only the aggregate trends, but #1 records both charts as one problem: 'the two are adjacent in the same UI and one is a RATE while the other is a RAW METRIC'. Labelling one without the other leaves the misreading #1 describes. Kept as a small, separate requirement so that Keith can drop it without touching the rest."
+      - "DERIVED FROM THE DECLARED RULE (proposed; Q8). This matches the direction of sprint 3, whose breakdown is 'derived from each check's declared rule' (Keith, 2026-10-13). The recorded results hold 45 rule kinds across 263 checks, which fall into a handful of measures (rows failing, rows, percent invalid or missing, percent growth, drift score). REJECTED the unit alone, which is today's ambiguity with a word added: 'count' is a failing-row count for not_null and a row count for rowCount."
+    open_questions: []

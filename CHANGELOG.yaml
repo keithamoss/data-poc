@@ -111,10 +111,19 @@ intro: >
 releases:
   - date: "2026-10-14"
     summary: >
-      Fixes for a supply that arrives early reading as missing, for how a
-      rebuilt demo history dates its corrections, and for side panels opened
-      from a shared link.
+      Every requirement now has a link of its own. Also fixes for a supply
+      that arrives early reading as missing, for how a rebuilt demo history
+      dates its corrections, and for side panels opened from a shared link.
     changes:
+      - category: New
+        items:
+          - headline: Link straight to one requirement
+            components: ["Dashboard UI"]
+            description: >
+              Each requirement in the Requirements panel now has its own link,
+              on its id. Share it and the panel opens at that requirement,
+              marked "Linked here"; Back and Forward step through it like any
+              other page.
       - category: Fixed
         items:
           - headline: An early supply no longer reads as "No data"
