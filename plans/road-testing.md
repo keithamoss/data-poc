@@ -49,7 +49,7 @@ CONFIRMED by Keith 2026-10-13. Still none of sprints 1, 3 or 4 has a requirement
 each goes through delivery-scoper and his sign-off before anything is
 built. Ordered by value to a busy data-team leader at the dashboard.
 
-- **Sprint 1 - "where do I put my effort?" (#1, #2; M).** The overview and
+- **Sprint 1 - "where do I put my effort?" (#1, #2; M).** SCOPED AND SIGNED 2026-10-14 as REQ-DASH-224 to REQ-DASH-228 (docs/drafts/road-testing-sprint-1/ holds the reviews and Keith's answers); the turned-off part is REQ-DASH-180 criterion 29. Not built yet. Its decisions are on those requirements, and this bullet goes when they are built. The overview and
   dataset list say how big each problem is and what each trend measures:
   labelled sparklines on dataset and column pages, "N of M checks not
   green" on cards, a failing-COLUMNS count where Trend sits now (Keith's
