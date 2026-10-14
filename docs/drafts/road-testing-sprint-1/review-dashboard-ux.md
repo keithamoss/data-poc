@@ -52,3 +52,10 @@ Advisory; recorded by the main session. Read as if the ~17:15 answers were folde
 3. Card trend grid: A weekly / B per period.
 4. Key: A .legend-key line above each table / B in the column header.
 5. Card wording when some not counted: A "2 of 5 counted datasets not green" + the not-counted line under it / B as drafted.
+
+## Keith's answers (2026-10-14 evening)
+1. **A** - "3 of 15" bold + "2 red, 1 amber" beneath; the unit "Columns not green" only in the header; all-green "All 15 green"; lines right of the text.
+2. **A** - amber dotted (round caps); red solid.
+3. **A** - agency card trend on a weekly grid, labelled "each week".
+4. **A** - the key as a .legend-key line above each collection table (and under the dataset page trend's title).
+5. **A** - "2 of 8 datasets not green" when none left out; "2 of 5 counted datasets not green" with REQ-DASH-180's not-counted line directly beneath when some are.
