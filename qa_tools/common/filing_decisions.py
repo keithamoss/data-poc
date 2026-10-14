@@ -268,6 +268,13 @@ def consequences(conn, request: Request) -> Consequences:
     # NOR A PROMOTE OF WHAT IS NOT FILED TO THIS PERIOD (#173): refused
     # before the reason is asked, for the same reason.
     _refuse_promoting_where_it_is_not_filed(conn, request)
+    if request.operation == RECHECK and request.supply:
+        # ITS REFUSALS BEFORE THE REASON IS ASKED (post-build-review #192 F4),
+        # as every other decision's are.
+        from qa_tools.common import rechecking
+
+        rechecking.standing(conn, request.dataset_id, request.supply, request.period)
+        rechecking.refuse_a_backstopped_dataset(conn, request.dataset_id)
     lines: list[str] = []
     done: list[str] = []
     if request.operation == PROMOTE and request.period and request.supply:

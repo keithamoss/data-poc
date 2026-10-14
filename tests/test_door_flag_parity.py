@@ -316,7 +316,10 @@ def ex_rechecked_worse(conn, mint):
 
     with mock.patch.object(supply_status, "status", return_value="green"):
         st, supply = ex_promoted(conn, mint)
-        _person(conn, fd.RECHECK, period=st.period, supply=supply)
+        got = _person(conn, fd.RECHECK, period=st.period, supply=supply)
+        from qa_tools.common import recheck
+
+        recheck.clear(got.owed[0], "rk")   # its re-check ran (#192 F2)
     with mock.patch.object(supply_status, "status", return_value="red"):
         (item,) = filing_queue._rechecked_worse(
             conn, COL, [replace(st, state=slot_state.AWAITING_ACKNOWLEDGEMENT)])

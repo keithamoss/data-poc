@@ -57,6 +57,7 @@ import rich_click as click
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.markup import escape
 from rich.table import Table
 from rich.text import Text
 
@@ -637,7 +638,10 @@ def queue_table(states) -> Table:
     for s in states:
         table.add_row(s.period, s.dataset_id,
                        arrived(s.supply) if s.supply else "[dim]-[/dim]",
-                       _HOW_IT_READS.get(s.state, s.state))
+                       # ITS OWN HEADING WITH BOTH VERDICTS AND THE RE-CHECK
+                       # (REQ-PIPE-164 criterion 15; post-build-review #192 F1).
+                       escape(s.reason) if s.state == filing_queue.RECHECKED_WORSE
+                       and s.reason else _HOW_IT_READS.get(s.state, s.state))
     return table
 
 

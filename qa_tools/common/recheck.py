@@ -353,6 +353,11 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
         return Outcome(item.id, run_key, False,
                        f"the re-check of {item.supply_id} did not complete ({message}); its "
                        f"earlier verdict stands and the re-check is still owed")
+    # READ AFTER THE RUN (post-build-review #192 F7): a person may have
+    # demoted it while it ran, and then the gate applies.
+    with supply_db.connect(label="mothman:recheck") as conn:
+        promoted_here = (decision_log.promoted_into(conn, item.dataset_id, period)
+                         == item.supply_id)
     if promoted_here:
         return _promoted_outcome(item, run_key, period, before)
     # THE GATE, AS FOR AN ARRIVAL (REQ-PIPE-141 criterion 7) - under the

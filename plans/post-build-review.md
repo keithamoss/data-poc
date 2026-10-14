@@ -9226,3 +9226,42 @@ twice. It deliberately did not re-find the `TypeError`.
        It now waits for `window.scrollY` to reach 0 (10s timeout) before
        measuring. If CI is still red on TS-79a, the cause is elsewhere and
        this is reopened.
+
+192. **[done, 2026-10-15]** **[Pipeline & publishing]** **delivery-critic on
+     REQ-PIPE-164 (re-check a supply), overnight #5.** Each finding was checked
+     against the code, and each defect fix had a test that failed first
+     (`TestCriticFindingsOn192` in `tests/test_recheck_decision.py`).
+     - **FIXED - the queue table never showed the verdicts** (F1). Criterion
+       15's heading, both verdicts and the re-check were on the picker label
+       only. `mothman supply queue` and the door's table printed "Promoted,
+       then re-checked worse". The table now prints the row's own reason.
+     - **FIXED - listed before its re-check had run** (F2). A supply made worse
+       some other way (a knock-on re-evaluation, say) and then re-checked
+       without --wait was listed straight away, as "the re-check ... came back
+       red" before that run happened, and owed an acknowledgement for it. It is
+       listed only once the owed re-check that decision caused has cleared.
+       The test fixture had hidden this by never running its re-check.
+     - **FIXED - the backstop refused after the reason and the confirmation**
+       (F4). Re-check's refusals now run in `consequences()`, before the reason
+       is asked, as every other decision's do.
+     - **FIXED - `decide` on a held supply gave "--period is required"** (F5).
+       A re-check names its supply, so --period is optional, as for a held
+       supply's reject. It now gives the hold's own responses.
+     - **FIXED - "promoted?" was decided before the run** (F7). A supply
+       demoted while its re-check ran skipped the gate. Promotion is now read
+       after the run.
+     - **FIXED - performance** (F6). Each queue render read the whole asset's
+       re-checked-worse list as well as each slot's own. It now asks only about
+       the slots awaiting acknowledgement. Measured by the critic on the real
+       database with no re-checks: no change in cost.
+     - **FIXED - tidy-ups** (F9): an unused property removed; `decide`'s
+       docstring names every operation --wait covers; acknowledge's refusal
+       names the re-checked case.
+     - **FOR KEITH:**
+       - **F3.** A re-check owes a run of the supply's own checks only.
+         Another dataset's checks that read its table are not re-run, though
+         the architect's NFR names `_readers_rechecked` as the way to find
+         them. Morning report 5, Q12.
+       - **F8.** After a re-checked-red supply is acknowledged, re-checking it
+         again with the same red verdict lists it again, because "worse" is
+         measured against the promoted-on verdict. Morning report 5, Q13.

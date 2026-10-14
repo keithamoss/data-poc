@@ -76,7 +76,8 @@ def why_not_owed(conn: supply_db.SupplyConnection, dataset_id: str, supply: str,
 
         collection = hierarchy.dataset(dataset_id).collection_id
         return (f"it is not the supply promoted into {slot} - an acknowledgement is "
-                f"for a promoted amber supply, and only while it is still in its period. "
+                f"for a promoted amber supply, or one re-checked worse than it was "
+                f"promoted on, and only while it is still in its period. "
                 f"`mothman supply slots --collection {collection} --dataset {dataset_id}` "
                 f"shows what {slot} holds")
     _, _, owed, setting = found

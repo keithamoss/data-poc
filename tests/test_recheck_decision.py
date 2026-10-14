@@ -226,7 +226,9 @@ class TestPromotedThenRecheckedWorse:
         verdict = {"now": "green"}
         monkeypatch.setattr(supply_status, "status", lambda c, ds, s, **k: verdict["now"])
         state, supply = parity.ex_promoted(conn, minted)
-        _recheck(conn, state.period, supply)
+        got = _recheck(conn, state.period, supply)
+        # ITS RE-CHECK RAN (post-build-review #192 F2): listed only after.
+        recheck.clear(got.owed[0], "rk")
         verdict["now"] = "red"
         return state, supply, verdict
 
@@ -459,3 +461,95 @@ class TestDecideWait:
         said = _said(got.output)
         assert "re-check stands" in said and "still owed" in said
         assert "\nmothman pipeline process" in got.output
+
+
+class TestCriticFindingsOn192:
+    """delivery-critic on REQ-PIPE-164 (post-build-review #192). Each failed
+    before its fix."""
+
+    def test_f1_the_queue_table_shows_the_verdicts(self):
+        from rich.console import Console
+
+        from cli import filing_tui
+        from qa_tools.common import filing_queue, slot_state
+
+        st = slot_state.SlotState(
+            dataset_id=DS, period="2099-x", state=filing_queue.RECHECKED_WORSE,
+            supply=f"{DS}@1", reason="Promoted, then re-checked red: promoted on green, "
+                                     "found by the re-check of 2026-10-15 (decision 4).")
+        console = Console(record=True, width=300)
+        console.print(filing_tui.queue_table([st]))
+        said = console.export_text()
+        assert "Promoted, then re-checked red" in said
+        assert "promoted on green" in said and "decision 4" in said
+
+    def test_f2_not_listed_while_its_recheck_is_still_owed(self, conn, minted, quiet,
+                                                           monkeypatch):
+        from qa_tools.common import rechecking, supply_status
+
+        verdict = {"now": "green"}
+        monkeypatch.setattr(supply_status, "status", lambda c, ds, s, **k: verdict["now"])
+        state, supply = parity.ex_promoted(conn, minted)
+        verdict["now"] = "red"     # worse some other way, before any re-check
+        got = _recheck(conn, state.period, supply)
+        assert supply not in {w.supply for w in rechecking.worse_than_promoted(conn, DS)}, (
+            "listed as re-checked worse before its re-check ran")
+        recheck.clear(got.owed[0], "rk")
+        assert supply in {w.supply for w in rechecking.worse_than_promoted(conn, DS)}
+
+    def test_f4_a_refused_dataset_is_refused_before_the_reason_is_asked(
+            self, conn, minted, quiet, monkeypatch):
+        from cli import common, filing_tui
+        from qa_tools.common import agreement_drift
+
+        class Refusal:
+            def message(self):
+                return "FINDING"
+
+        monkeypatch.setattr(agreement_drift, "refusal_for", lambda c, ds, **k: Refusal())
+        asked = []
+        monkeypatch.setattr(common, "text_prompt",
+                            lambda message, **k: asked.append(message) or "r")
+        state, supply = parity.ex_awaiting_decision(conn, minted)
+        assert filing_tui.apply_decision(operation=fd.RECHECK, dataset_id=DS,
+                                         period=state.period, supply=supply,
+                                         actor=_actor()) is None
+        assert asked == [], "the reason was asked before the refusal"
+
+    def test_f5_decide_on_a_held_supply_gives_the_holds_responses(self, conn, minted, cli):
+        import filing_support
+
+        period = minted("due").name
+        supply, _ = _filed(conn, period, _iso(_now() - timedelta(days=1)))
+        (delivery,) = conn.execute("SELECT delivery FROM qa.filing_current WHERE "
+                                   "supply_id = ?", [supply]).fetchall()[0]
+        filing_support.place(conn, DS, supply, None, delivery)
+        supply_holds.raise_hold(conn, dataset_id=DS, supply_id=supply,
+                                kind=supply_holds.ASSIGNMENT_RULE,
+                                reason={"unavailable": [], "considered": []},
+                                raised_by="pytest")
+        got = cli(["decide", "--operation", "re-check", "--dataset", DS, "--supply", supply,
+                   "--reason", "r", "--yes"])
+        assert "--period is required" not in got.output
+        assert "--operation place" in got.output
+
+    def test_f7_promoted_is_read_after_the_run(self, conn, minted, quiet, monkeypatch):
+        """Demoted while its re-check ran: the gate applies to it then."""
+        from qa_tools.common import promotion
+
+        state, supply = parity.ex_promoted(conn, minted)
+        got = _recheck(conn, state.period, supply)
+
+        def run_and_demote(**k):
+            from qa_tools.common import supply_db
+
+            with supply_db.connect(label="test-f7") as c:
+                _person(c, fd.DEMOTE, period=state.period, supply=supply)
+            return object(), []
+        asked = []
+        monkeypatch.setattr(recheck, "execute", run_and_demote)
+        monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: asked.append(1) or
+                            promotion.AfterRun(promoted=(), refused={}, failed={}))
+        monkeypatch.setattr(promotion, "report", lambda o: None)
+        done = recheck.run(got.owed[0], run_by="pytest@example.org")
+        assert asked == [1] and not done.stays_promoted

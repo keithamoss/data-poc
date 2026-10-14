@@ -27,10 +27,6 @@ class Standing:
     period: str
     state: str
 
-    @property
-    def promoted(self) -> bool:
-        return self.state == PROMOTED
-
 
 def _flag(operation: str, dataset_id: str, period: str, supply: str) -> str:
     return (f"  mothman supply decide --operation {operation} --dataset {dataset_id} "
@@ -145,7 +141,7 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
     requirement's criterion 21) or demoted - in which case the period no
     longer holds it. One query for the candidates: only supplies a person
     has ever re-checked can be on the list."""
-    from qa_tools.common import supply_status
+    from qa_tools.common import recheck, supply_status
 
     rows = conn.execute(
         f"SELECT DISTINCT ON (dataset_id, supply) dataset_id, supply, to_slot, id, "
@@ -162,6 +158,13 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
             f"SELECT id, promoted_status FROM {decision_log.TABLE} WHERE id = ?",
             [holds.decision_id]).fetchall()
         if promoted_on not in _RANK or promote_id > recheck_id:
+            continue
+        # ONLY ONCE THAT RE-CHECK HAS RUN (post-build-review #192 F2): until
+        # then its verdict is from before it, whatever made it worse.
+        ran = conn.execute(
+            f"SELECT 1 FROM {recheck.TABLE} WHERE caused_by_decision = ? "
+            "AND cleared_at IS NOT NULL LIMIT 1", [recheck_id]).fetchall()
+        if not ran:
             continue
         acknowledged = conn.execute(
             f"SELECT 1 FROM {decision_log.TABLE} WHERE action = ? AND dataset_id = ? "

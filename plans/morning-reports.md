@@ -1515,3 +1515,12 @@ one or more component tags, and a date.
           re-checked case needs the supply's current verdict, which that SQL
           view cannot compute. Built that way, PROVISIONAL. Should `_manifest`
           carry it too, as a column the build fills?
+      12. (#192 F3) A re-check re-runs the supply's own checks only, not other
+          datasets' cross-table checks that read its table. The data is
+          unchanged, so those would differ only if their own check changed - but
+          the architect's NFR named the re-file's reader-finding. Should a
+          re-check owe its readers' re-evaluation too?
+      13. (#192 F8) Once a re-checked-red supply is acknowledged, a later
+          re-check that is still red lists it again, because "worse" is
+          measured against the verdict it was promoted on. Keep that, or measure
+          against the last acknowledged verdict?

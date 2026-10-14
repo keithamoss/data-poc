@@ -174,19 +174,19 @@ def _rechecked_worse(conn, collection_id: str,
     new one and the re-check that found it."""
     from dataclasses import replace
 
-    from qa_tools.common import hierarchy, rechecking
+    from qa_tools.common import rechecking
 
     # ONLY A SLOT AWAITING ACKNOWLEDGEMENT CAN BE ONE (acknowledgement.owed),
     # so with none there is nothing to read.
     if not any(s.state == slot_state.AWAITING_ACKNOWLEDGEMENT for s in states):
         return states
-    ours = {d.dataset_id for d in hierarchy.all_datasets() if d.collection_id == collection_id}
-    worse = {(w.dataset_id, w.supply, w.period): w
-             for w in rechecking.worse_than_promoted(conn) if w.dataset_id in ours}
+    # ASKED ONLY ABOUT THE SLOTS IT COULD BE (post-build-review #192 F6) -
+    # never the whole asset's list on every render.
     out = []
     for s in states:
-        w = worse.get((s.dataset_id, s.supply, s.period))
-        if w is None or s.state != slot_state.AWAITING_ACKNOWLEDGEMENT:
+        w = (rechecking.worse_for(conn, s.dataset_id, s.supply, s.period)
+             if s.state == slot_state.AWAITING_ACKNOWLEDGEMENT and s.supply else None)
+        if w is None:
             out.append(s)
             continue
         out.append(replace(s, state=RECHECKED_WORSE, reason=(

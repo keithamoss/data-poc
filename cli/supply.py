@@ -1032,8 +1032,8 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
 
     It leaves a decision's checks owed unless --wait is given: `mothman
     pipeline process` runs every owed QA run. --wait runs them now, for a
-    place or a re-file, and exits 3 where the decision stands but its checks
-    did not finish.
+    place, a re-file, an un-supersede or a re-check, and exits 3 where the
+    decision stands but its checks did not finish.
 
     \b
     A held supply - one the filing rule could not file to any period - is
@@ -1111,7 +1111,8 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
         if outcome is None:
             raise SystemExit(1)
         return
-    if period is None and not (operation == filing_decisions.REJECT and supply):
+    if period is None and not (operation in (filing_decisions.REJECT,
+                                             filing_decisions.RECHECK) and supply):
         # A HELD SUPPLY HAS NO PERIOD (REQ-PIPE-163 criterion 11): it is
         # rejected by --supply alone, and the log refuses one that is not held.
         raise click.UsageError("--period is required.")
