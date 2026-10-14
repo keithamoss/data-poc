@@ -4241,12 +4241,12 @@ class TestDatasetsNotGreenOnCardsAndHeadings:
         import re
         if not text:
             return None
-        m = re.match(r"(\d+) of (\d+) (?:counted )?datasets not green (\d+) red, (\d+) amber", text)
+        m = re.match(r"(\d+) of (\d+) (?:counted )?datasets? not green (\d+) red, (\d+) amber", text)
         if m:
             n, total, red, amber = map(int, m.groups())
             assert n == red + amber, text
             return [red, amber, total]
-        m = re.match(r"All (\d+) (?:counted )?datasets green", text)
+        m = re.match(r"All (\d+) (?:counted )?datasets? green", text)
         assert m, text
         return [0, 0, int(m.group(1))]
 

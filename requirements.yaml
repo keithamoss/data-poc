@@ -35287,7 +35287,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As Keith going back to the person who road-tested the PoC, I want every entry in plans/road-testing.md to carry a four-line plain-language card saying what was raised, what we took it to mean, what we built and where to see it, kept after the work lands, so that I can talk them through how each piece of feedback was handled without re-reading the analysis or digging through git."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35342,14 +35342,28 @@ requirements:
     - "THE RELATIVE-ADDRESS CHECK LIVES IN THE SHARED PARSER (delivery-architect, 2026-10-14, a security finding on a public site): a check only in the validator is a check only in the gate, and the build would publish whatever href a card held if the gate were skipped. Criterion 22 puts it where the build reads cards too; REQ-DASH-220 criterion 21 refuses the build."
     - "THE REVIEWER IS NEVER NAMED (Keith, 2026-10-14, Q7, option A). No name, role, agency or verbatim quote anywhere; cards say 'you'. REJECTED: a first name with their agreement."
     - "#3 IS A CURRENT ENTRY, NOT A RESTORED ONE. It was deleted on 2026-10-12 (03cb93e) as fixed by REQ-PIPE-167 and reopened by Keith the same evening (35edcab) as a different concept, so it gets an ordinary card in place. Its card names REQ-PIPE-167 only if the card says plainly that REQ-PIPE-167 is the half that was built - otherwise its derived status would read Built for something still unscoped."
+    - 'BUILT 2026-10-14. The approved intro paragraph and CLAUDE.md exception went in word for word (Keith, 2026-10-14). #1 and #2, deleted at road-testing sprint 1''s close after this requirement was signed, came back as card-only entries under their own numbers (Keith, 2026-10-14) - 21 cards, as NFR 7 expected. The two old #14s'' first lines were settled with Keith: ''Arrived at'' is We noticed, ''Client reference'' is You told us. #3 carries no evidence, per the decision that it names REQ-PIPE-167 only if the card says that is the half built, which would derive Built for something still unscoped. Building the parser found that plans_md joined a paragraph after a list onto the list''s last bullet (post-build-review #185), fixed first. road_testing_sprints() lives in plans_md so the build and the gate read the sprint list the same way.'
     open_questions:
     - "If a second person road-tests the PoC, do their cards share this file and tab (which would need a 'who' grouping without naming anyone)? Out of scope for this draft and not asked now; recorded so it is asked rather than assumed."
+    linked_tests:
+    - 'tests/test_validate_feedback.py'
+    - 'tests/test_plans_md.py::test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet'
+    implemented_by:
+    - 'dashboard/plans_md.py::parse_feedback_cards'
+    - 'dashboard/plans_md.py::road_testing_sprints'
+    - 'qa_tools/common/validate_feedback.py::problems'
+    - 'qa_tools/common/validate_feedback.py::route_problem'
+    - 'qa_tools/common/validate_feedback.py::main'
+    - 'cli/dashboard.py::validate_feedback_command'
+    evidence:
+    - 'tests/test_validate_feedback.py (28 tests, run 2026-10-14): a well-formed card parses with its first label, date and three kinds of evidence; an entry with no card fails naming it; ''What we heard'' is required; labels come once each and in order with exactly one first label; a card with nothing built needs no placeholder; a build claim needs evidence; absolute, javascript:, bare and req= items are refused (req= naming the bare id), as is a malformed in-place-on date, and a well-formed past date is accepted; the shared parser itself refuses a non-relative target; unknown and retired requirements (naming the replacement), unlisted sprints and routes the hierarchy does not hold are refused; Card status values and their rules; a missing or empty file fails; the committed file passes with 21 cards.'
+    - '`mothman dashboard validate-feedback` passes on the committed plans/road-testing.md (21 cards: 10 current, 11 restored) and runs as the ''feedback'' gate of `mothman check` and a step of validate-config.yml.'
   - id: REQ-DASH-220
     title: "A Feedback tab shows one card per road-testing entry - what was raised, what we heard, what we built, the evidence - with a status derived from the requirements"
     date_written: "2026-10-14"
     story: "As Keith sitting beside the person who road-tested the PoC, I want a top-level dashboard tab with one card per road-testing entry, each saying in plain words what we heard and what we built, with a link straight to the place on the dashboard or the requirement where they can see it, so that I can walk them through how their feedback was handled in a few minutes, on the real dashboard rather than from notes."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35407,8 +35421,23 @@ requirements:
     - "A SPRINT IS TEXT, NOT A LINK (main session, low stakes, 2026-10-14): a road-testing sprint has no dashboard address of its own, and a link into the Plans tab would point the reviewer at planning prose. Keith's Q2 answer lets a card cite its sprint (REQ-DOCS-219); criterion 20 shows it among the evidence without an href."
     - "NO ENTRY NUMBERS, AN h2, A REAL HEADER LINK (delivery-dashboard-ux low findings, 2026-10-14): the numbers are the file's bookkeeping and have been reused once (the two #14s); the tab is a page with a heading like its siblings, and its header entry is a real link so it can be opened in a new tab."
     - "REVIEWS FOLDED, 2026-10-14: changed in place 1 (h2, header link), 3 (no longer provisional), 4 (two groups, 'Where to see it', no entry number), 6 (sprint derives Planned; Couldn't reproduce), 8 (counts per group), 9 (requirement status in words, no pill); added 17 to 22 (one pill, 'Why not', past-date landing, sprint as text, the build refuses a bad href, focus back to the link)."
+    - 'BUILT 2026-10-14. Status is derived in Python at build time (card_status) with sprint_state''s predicate for built - built and nothing in unmet_criteria - so the page holds no status logic of its own. A past-date link reuses the Scenarios jump (a scenarioJump with no scenario id, whose bar then drops ''for <id>''), so Back and the way to today behave exactly as there. Requirement links carry data-req-link and so take REQ-DASH-222''s own click handler and focus return. Dashboard links resolve their #/ route through pathToState and navigate in the page; an unresolvable one lands where any stale link does. The header entry is an <a> beside the siblings'' buttons, styled to match.'
     open_questions:
     - "Does the tab show on every deployment of this codebase, or only on this PoC's own site? Today every tab is on every build; a real deployment for an asset team would not want a tab about one reviewer of the PoC. Recommended: no switch now (the tab is ephemeral and there is only one deployment); not asked now, recorded so it is not forgotten."
+    linked_tests:
+    - 'tests/test_dashboard_e2e.py::TestTheFeedbackTab'
+    implemented_by:
+    - 'dashboard/plans_md.py::feedback_data'
+    - 'dashboard/plans_md.py::card_status'
+    - 'dashboard/embed_dashboard_data.py::embed'
+    - 'dashboard/qa-reporting-dashboard.template.html::renderFeedback'
+    - 'dashboard/qa-reporting-dashboard.template.html::feedbackCard'
+    - 'dashboard/qa-reporting-dashboard.template.html::feedbackEvidence'
+    - 'dashboard/qa-reporting-dashboard.template.html::feedbackSummary'
+    - 'dashboard/qa-reporting-dashboard.template.html::scenarioJumpBar'
+    evidence:
+    - 'tests/test_dashboard_e2e.py::TestTheFeedbackTab (4 tests, run 2026-10-14 on the real built dashboard from file://): the tab shows exactly the parsed cards (asserted non-empty first) with their derived statuses, one feedback-palette pill each and no red/amber/green, and no reviewer name or entry number; the header entry is a real link to #/feedback and Back and Forward step through the route; a requirement link opens the Requirements panel at that requirement and closing it returns focus to the link on the Feedback tab; a past-date link lands as a jump to 5 Aug 2023 with a neutral ''Viewing ... not today'' bar and Back returns to the tab at today''s date.'
+    - 'Rendered with no console errors: 21 cards, summary ''You told us 12 things - 4 built, 1 fixed, 1 in progress, 4 planned, 1 heard, 1 parked. We noticed 9 things - 7 built, 1 heard, 1 couldn''t reproduce.'''
   - id: REQ-DASH-221
     title: "The dashboard says when a supply was re-checked after we fixed a check, and shows very clearly a promoted supply that came back worse"
     date_written: '2026-10-14'
