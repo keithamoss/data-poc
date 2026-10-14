@@ -36077,3 +36077,111 @@ requirements:
     evidence:
       - 'tests/test_check_measures.py (4 tests, run 2026-10-14): the committed configuration declares 48 rule kinds across its active checks and every one has a measure; deleting dbt:unique from MEASURES makes the completeness test fail naming it; an unmapped kind reads ''Value (%)''. Reads collect_checks(None), so it runs with no deployment.'
       - 'tests/test_dashboard_e2e.py::TestAChecksChartNamesWhatItMeasures (3 tests, run 2026-10-14 against the real built dashboard): a dbt:not_null check reads ''Rows with no value (count)'', a soda:invalid_percent check ''Invalid values (%)'' and an evidently:drift_psi check ''Drift score (PSI)'', both above the plot and as the ''View as table'' column header.'
+
+  - id: REQ-GHUB-229
+    title: The terminal's period door and Filing decisions queue list every supply filed to a period, each with its own state and verdict
+    date_written: '2026-10-15'
+    story: As a person deciding about a period in the terminal, I want to see every supply filed to that period, each with where it stands, so that a good supply waiting behind a failed resupply (or a failed load behind a good one) is never hidden from every door.
+    moscow: should
+    status: not_started
+    source: 'Keith, morning report 5 (plans/morning-reports.md), answer 7, 2026-10-15: ''LIST EVERY FILED SUPPLY in a period on its door. To build; needs a requirement and sign-off.'' Raised by the delivery-critic on REQ-GHUB-165, plans/post-build-review.md #189 F3 and F4. Drafted by delivery-scoper 2026-10-15 against cli/filing_tui.py (period_flow, _pick_slot, _decide_on), qa_tools/common/filing_queue.py (slots_of, awaiting, could_not_load, operations_for, waiting_over_promoted) and qa_tools/common/slot_state.py (filings_by_period, state_of).'
+    acceptance_criteria:
+    - WHEN a person picks a dataset and a period in the terminal's 'Decide about a period' door and more than one supply is filed to that period, THE SYSTEM SHALL list every supply filed to it (every row of qa.filing_current for that dataset and period) before offering any decision, and SHALL let the person choose which supply the decision is about.
+    - WHERE exactly one supply, or none, is filed to the chosen period, THE SYSTEM SHALL go straight to the period's decisions as it does today, with no extra step.
+    - THE SYSTEM SHALL keep the door's period picker at one line per period, and WHERE a period holds more than one filed supply, SHALL say how many on that period's line (for example '3 supplies').
+    - THE SYSTEM SHALL show, on each listed supply's line, when it arrived (as filing_tui.arrived() gives it), its state in words, and its verdict (green, amber or red, from the recorded QA results, or 'no verdict recorded' where no check read it).
+    - THE SYSTEM SHALL word each listed supply's state as one of - in place (promoted), awaiting acknowledgement, waiting on a decision, amber and held for a person, waiting behind the promoted supply, could not be loaded (with the recorded reason), rejected (with who and when), superseded (with what superseded it), or one file of an open pair - and SHALL NOT show a raw state or operation name.
+    - WHERE the period stands on another period's supply (substituted or inherited), THE SYSTEM SHALL say so above the list, naming that period, since the supply in place is not one filed to this period.
+    - WHEN a person chooses one listed supply, THE SYSTEM SHALL offer exactly the decisions that supply's own state offers through filing_queue.operations_for, plus the excuse, acknowledgement and un-supersede offers read from the log as _offers() reads them today, so that a failed load is offered what the queue offers it (REQ-PIPE-153 criteria 5 and 6) and a version waiting behind the promoted supply is offered what the queue's another-version-waiting entry offers.
+    - WHERE the period-scoped decisions (substitute, inherit, mark as not supplied, and their undoing) apply to the chosen period, THE SYSTEM SHALL offer them once for the period, as a separate choice beside the listed supplies, and SHALL NOT repeat them under each supply.
+    - WHILE the period holds an open pair (REQ-PIPE-194), THE SYSTEM SHALL list the pair as one entry naming both files and offering only settle and reject both, SHALL still list every other filed supply with its state and verdict, and SHALL say that nothing else in the period can be decided until the pair is settled.
+    - IF the decision log cannot be read, THEN THE SYSTEM SHALL say so and list nothing (REQ-GHUB-082 criterion 19).
+    - IF a listed supply's verdict cannot be read, THEN THE SYSTEM SHALL say 'verdict could not be read' on that supply's line and still list it, and SHALL NOT omit the supply or show a verdict it did not read.
+    - THE SYSTEM SHALL work out each listed supply's state with one function, given the caller's connection, that the door and the REQ-GHUB-165 parity test both call.
+    - THE SYSTEM SHALL extend the REQ-GHUB-165 parity test with an example period holding more than one filed supply - at least a failed load and a loadable supply waiting together, and a promoted supply with another version waiting - so that every listed supply's state appears among the states the test checks against the flag route.
+    - THE SYSTEM SHALL list, in the Filing decisions queue, every supply waiting in a period - a loadable supply filed earlier than a failed resupply included - each as its own entry with its own state, so that no waiting supply is in no queue entry.
+    - THE SYSTEM SHALL show, in 'Where every period stands' (`mothman supply slots`), the same count as the door's period picker on a period holding more than one filed supply.
+    - THE SYSTEM SHALL be covered by a test that builds a period holding a failed resupply and an earlier good supply waiting, in the test's own database, and asserts that the door lists both, each with its own state, offers promote on the good one and only reject on the failed one, and that the Filing decisions queue lists both.
+    - THE SYSTEM SHALL read only the decision log, the filings, the load log and recorded QA results to build the list, and SHALL NOT read supply rows.
+    non_functional_requirements:
+    - 'SCALE: the picker stays one line per period because Birth Registrations is daily and a real deployment carries about thirty datasets on one asset; a supply per line in the picker would multiply a long list. Per-supply verdicts are read only for the period chosen, never for every period in the picker.'
+    - 'RESPONSIVENESS: listing a chosen period''s supplies should feel immediate - one read of that period''s filings plus one verdict lookup per filed supply - with no QA run and no scan of other periods.'
+    - 'PARITY BY TEST, NOT BY CARE (REQ-GHUB-165): the door may offer only what the flag route records, and the extended parity test is what keeps it so as new states arrive.'
+    - 'NO WIDENING: no new operation and no new permission. filing_decisions.apply still decides at the instant of appending whether a decision is allowed; the list changes what is shown and which supply a decision names.'
+    - 'THE TICKET MODEL IS UNTOUCHED: slot_state keeps one supply per slot, because tickets are keyed per dataset and period (REQ-PIPE-083) and the queue, the standing view and the dashboard read it. The list is an additional reader, not a change to slot_state.'
+    - 'TERMINAL WIDTH: one line per supply, naming its receipt rather than its full id (filing_tui.arrived()), so the list stays readable on a narrow terminal.'
+    - 'DATA SENSITIVITY: no supply rows are read (filing_queue''s own rule); the verdict comes from recorded QA results, so the list would hold for a real production extract.'
+    - 'NOT APPLICABLE, judged: cost (no new compute, storage or API call), compliance and retention (nothing new recorded), and auditability beyond what exists (every decision is already logged with its actor; this changes which supply a decision names, not how it is recorded).'
+    dependencies:
+    - REQ-GHUB-082
+    - REQ-GHUB-165
+    - REQ-PIPE-153
+    - REQ-PIPE-194
+    - REQ-PIPE-120
+    decisions:
+    - LIST EVERY FILED SUPPLY ON THE PERIOD DOOR (Keith, 2026-10-15, morning report 5, answer 7). Not re-asked here.
+    - 'WHAT IS HIDDEN TODAY, AND WHY (delivery-scoper, read in code 2026-10-15): slot_state.filings_by_period keeps ONE filing per period - the latest one not rejected or superseded - and state_of builds the slot''s state from it. A failed load is filed like any supply and is not ''rejected'', so a failed resupply becomes the slot''s supply and the earlier good supply waiting in the same period is listed nowhere: the period door shows the failed one as ''waiting on a decision'', and the standing queue drops it because its supply is in the could-not-load list, which names only the failed one. In the reverse order, the period door shows the good supply and the failed load is reachable only from the queue. filing_queue.waiting_over_promoted already lists other versions in a PROMOTED period; nothing does so in a period that is not promoted.'
+    - 'REJECTED changing filings_by_period to prefer a loadable supply over a failed one: it fixes one direction and hides the other, and still shows one supply where there are several.'
+    - 'REJECTED making slot_state carry every supply in a slot: it ripples into the ticket pass (one ticket per dataset and period, REQ-PIPE-083), the queue, the standing view and the dashboard builders, for a problem that is only about what the door shows.'
+    - 'REJECTED one picker line per supply: a daily dataset already has a long picker, and at thirty datasets the picker must stay one line per period. The count on the period''s line tells a person there is more than one before they pick.'
+    - 'A FAILED LOAD IS OFFERED REJECT ONLY, IN THE DOOR AS IN THE QUEUE (Keith, 2026-10-15, signing off): removes the door/queue difference REQ-GHUB-165 named as hidden (post-build-review #189 F3); the door stops offering re-file and supersede on a failed load. REJECTED keeping them.'
+    - 'REJECTED AND SUPERSEDED SUPPLIES ARE LISTED WITH THE REST, after the supplies still in play (Keith, 2026-10-15). REJECTED collapsing them behind a ''show decided'' choice: the point of the change is that nothing filed to a period is hidden.'
+    - 'THE QUEUE IS FIXED HERE TOO (Keith, 2026-10-15): it has the same blind spot, a good supply waiting behind a failed resupply, and one blind spot is fixed in one change. REJECTED a separate requirement, and leaving the queue.'
+    - '`mothman supply slots` SHOWS THE SAME COUNT (Keith, 2026-10-15), so the two views of a period agree.'
+    - MoSCoW should, confirmed at sign-off.
+    open_questions: []
+    linked_tests: []
+    implemented_by: []
+    evidence: []
+    signed_off: &id001
+      by: Keith
+      date: '2026-10-15'
+  - id: REQ-DASH-230
+    title: The supply-history row's last column becomes a cell headed 'How it got here', and the Timing cell keeps punctuality only
+    date_written: '2026-10-15'
+    story: As someone reading a dataset's supply history, I want how a supply came to be in its cycle (placed, filed by hand, settled from two files, moved by a correction, still owed after a turn-off) in its own labelled cell, apart from whether it was on time, so that I can read punctuality at a glance and the cell REQ-DASH-175 and REQ-DASH-180 already promise exists.
+    moscow: could
+    status: not_started
+    source: 'Keith, morning report 5 (plans/morning-reports.md), answer 25, 2026-10-15: ''SPLIT IT NOW - a mini requirement to scope a provenance cell split out of the Timing cell, so criterion 19''s note lands where it says.'' Raised by the delivery-critic on REQ-DASH-180, plans/post-build-review.md #195. Drafted by delivery-scoper 2026-10-15 against dashboard/qa-reporting-dashboard.template.html (renderSupplyCycleRows, SUPPLY_CYCLE_COLS, filedNote, stillOwedNote, excuseNote, correctionNote, settledNote, placedTag, waitedChip).'
+    acceptance_criteria:
+    - THE SYSTEM SHALL give the supply-history cycle table's last column the visible heading 'How it got here' - the provenance cell REQ-DASH-175 and REQ-DASH-180 refer to - so that every column of that table is headed.
+    - THE SYSTEM SHALL keep that column as the table's last column, and SHALL NOT add a column or change the position of the other five.
+    - THE SYSTEM SHALL show in the Timing cell only punctuality - the arrival pill (on time, late, late (excused)), the receipt instant, the time waited for a decision, a resupply's days since the previous supply, any excuse and its withdrawal or lapse (REQ-DASH-162), a correction's re-judging of the verdict in place (REQ-DASH-172 criterion 7), the 'Late at the time' of a supply a correction moved, and a stated original arrival beside the receipt (REQ-PIPE-103 criterion 19).
+    - THE SYSTEM SHALL show in the provenance cell how the supply came to be in its cycle - the resupply badge, the 'Placed in <period>' tag (REQ-DASH-175), who filed it by hand (REQ-PIPE-147 criterion 7), the note that it came from two files and who settled them (REQ-PIPE-194 criterion 13), a correction's move to another period (without its 'Late at the time', which stays in Timing) or a supply kept against a correction (REQ-DASH-172 criterion 5), and the note that its period was still owed after a turn-off (REQ-DASH-180 criterion 19).
+    - THE SYSTEM SHALL show no line from criterion 4 in the Timing cell, and no line from criterion 3 in the provenance cell.
+    - WHERE a supply was filed by hand and its filer stated an original arrival, THE SYSTEM SHALL show who filed it in the provenance cell and the stated original arrival in the Timing cell beside the receipt, labelled as stated.
+    - WHERE nothing in criterion 4 applies to a supply - an automated first arrival - THE SYSTEM SHALL leave its provenance cell empty, with no dash or placeholder text.
+    - THE SYSTEM SHALL keep the first two columns' widths equal to the blocker and gap tables' first two columns (#121 D3), and SHALL NOT raise the cycle table's minimum width above today's 760px.
+    - THE SYSTEM SHALL change no wording, pill, date or condition of any note it moves; only the cell it sits in changes.
+    - THE SYSTEM SHALL be covered by a test of the page's own row rendering that, for a supply carrying each note in criteria 3 and 4, finds each note in the cell under the right heading, located by that heading's text rather than by column position, and asserts it is absent from the other cell.
+    - THE SYSTEM SHALL record on REQ-DASH-175 and REQ-DASH-180, in the same change, a decision pointing here, so that 175's built decision 'the page has no column named provenance' is not read as still true.
+    non_functional_requirements:
+    - 'NO NEW DATA AND NO BUILD CHANGE: every note moved is already embedded; this is a re-arrangement in the template. The build rule (recorded QA results only, never supply rows) is unaffected.'
+    - 'PHONE WIDTH: the cycle table already scrolls sideways under a 760px minimum width, and Keith''s standing call on mobile is to smooth rough edges rather than redesign for it (template CSS, post-build-review #57). The split stays inside that minimum and adds no stacking layout.'
+    - 'SCALE: the table is per dataset, so thirty datasets do not lengthen it; what grows is a dataset''s supply count. Moving notes out of the Timing cell must not add a row or lengthen the common row - criterion 7 keeps an automated first arrival as short as it is today.'
+    - 'ACCESSIBILITY: an unheaded column gives a screen reader no name for its cells. Heading it is part of the point, and the test in criterion 10 finds cells by heading for the same reason.'
+    - 'TEST COST: the row rendering is testable in the JavaScript suite against a fixture dataset (tests-js), so the test needs no deployment and runs in CI''s fast half.'
+    - 'NOT APPLICABLE, judged: performance (no new computation), reliability, security, privacy (no new field shown), compliance, cost, and auditability (nothing recorded).'
+    dependencies:
+    - REQ-DASH-175
+    - REQ-DASH-180
+    - REQ-DASH-162
+    - REQ-DASH-172
+    - REQ-PIPE-194
+    - REQ-PIPE-103
+    - REQ-PIPE-147
+    decisions:
+    - 'SPLIT THE CELL NOW (Keith, 2026-10-15, morning report 5, answer 25). Not re-asked here. REJECTED by Keith: accepting the note in the Timing cell and amending REQ-DASH-180 criterion 19 to match.'
+    - 'WHAT EXISTS TODAY (delivery-scoper, read in the template 2026-10-15): the cycle table has six columns - Arrived, Status, Timing, Rows, Outcome and an UNHEADED sixth. The sixth already holds the resupply badge and, since REQ-DASH-175 was built, the ''Placed in'' tag; 175''s own decision calls it the column that says how the row came to be in its cycle. The Timing cell holds the arrival pill, receipt, waited chip, filedNote, stillOwedNote, excuseNote, correctionNote and settledNote.'
+    - 'THE PROVENANCE CELL IS THE EXISTING SIXTH COLUMN, HEADED, NOT A NEW ONE (delivery-scoper): REQ-DASH-175 already put provenance there, and e2e tests find cells by position (td:nth-child(5) for Outcome), so a new column in the middle would shift them. REJECTED a seventh column: the table is already at its minimum width on a laptop.'
+    - THE LINE IS PUNCTUALITY VERSUS HOW IT GOT HERE (delivery-scoper), the same line REQ-DASH-175 criterion 4 draws between an excuse and a placement. An excuse is about punctuality, so it stays. A correction that re-judged a supply in place changes its punctuality verdict, so that line stays; a correction that MOVED a supply, or a supply kept against one, is about which cycle it is in, so it moves - and a moved supply's 'Late at the time' stays in Timing, split from the move (Keith, 2026-10-15).
+    - 'filedNote IS SPLIT, NOT MOVED WHOLE: REQ-PIPE-103 criterion 19 requires a stated original arrival ''beside the receipt'', so who filed it moves and the stated original stays in Timing.'
+    - 'AN EMPTY PROVENANCE CELL STAYS EMPTY: filedNote already shows nothing for an automated delivery so that the common case adds nothing to the row; a dash in every ordinary row would be noise.'
+    - THE HEADING IS 'How it got here' (Keith, 2026-10-15). REJECTED 'Provenance' (jargon to a data team leader reading at a glance) and 'Filed' (undersells corrections and resupplies).
+    - 'A SUPPLY A CORRECTION MOVED IS SPLIT (Keith, 2026-10-15): ''Late at the time'' stays in Timing as punctuality, the move goes to ''How it got here''. REJECTED moving the whole line.'
+    - COLUMN WIDTHS ARE LEFT TO THE BUILD, within criterion 8 (Keith, 2026-10-15). MoSCoW could, confirmed at sign-off.
+    open_questions: []
+    linked_tests: []
+    implemented_by: []
+    evidence: []
+    signed_off: *id001

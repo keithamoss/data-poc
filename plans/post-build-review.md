@@ -9403,3 +9403,44 @@ twice. It deliberately did not re-find the `TypeError`.
        marker's style as criterion 12 reads, or amend it (F8); suppress the
        runway warning once a for-good turn-off is authored; criterion 19's
        note in the Timing cell, there being no separate provenance cell.
+
+196. **[in-progress, 2026-10-15]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-175 (a supply a person placed says so), built in 2c71710.** The
+     real database holds no placement, so the critic injected placements into
+     the built page and drove it with Python Playwright (the Playwright MCP
+     server did not connect this session). Each finding is still to be
+     checked against the code before it is fixed; defects get a failing test
+     first.
+     - **F1, DEFECT (criteria 3, 10)**: `blockerHistoryRows` checks
+       `placedHoldNote()` before `rejected`/`supersededBy`, so a contested pair
+       placed whole and later superseded or rejected reads "placed in ..." and
+       hides how it actually ended. `placedHoldNote` is also called twice per
+       row.
+     - **F2, CHANGED SIGNED BEHAVIOUR (REQ-DASH-180 c14)**: to keep a placed
+       hold listed, the build made "Received while turned off" list and count
+       every turned-off hold however it was resolved, with no note for one
+       rejected, superseded or filed by the rule - while the build's own
+       decision said nothing signed changed. Put to Keith 2026-10-15: keep
+       everything, each resolved row with a note saying how it ended, and the
+       line saying how many are still held. Criterion 14 amended with his
+       exact wording (morning report 5).
+     - **F3, DEFECT (criterion 5)**: before the placement instant the row
+       already sits in the target period's cycle, judged against it, because
+       `arrivalByRun[run].slot` comes from the current filing with no as-of.
+       Criterion 5 says the supply shows as held on any earlier date. Found
+       by reading the code.
+     - **F4, DEFECT (criterion 1)**: a supply placed into Q3 and later re-filed
+       to Q4 by a person keeps saying "Placed in Q3" - nothing drops a
+       placement a later decision has overtaken. From reading the code.
+     - **F5, POLISH (REQ-DASH-071)**: the tag shows a date (`fmtDay`), the hold
+       note the same placement's instant (`fmtInstant`).
+     - **F6, POLISH**: `pipeline/placements.py` swallows every exception from
+       `slots.slot_named` into `slot=None`; narrow it to the unknown-period
+       case.
+     - **F7, TEST GAPS**: the `promotion_timeline.decisions_on` placedIn path;
+       `blockerHistoryRows`/`settledPairRow` with a placement (criterion 10,
+       which is why F1 was not caught); `changedSinceNote` carrying placedIn; a
+       placement and an excuse on one row (criterion 4); the Outcome cell
+       (criterion 6); and that the builders embed `placements` at all.
+     - Verified met: c1, c2, c6, c7, c8, c9; c3 for hold rows; the
+       thirty-dataset NFR.

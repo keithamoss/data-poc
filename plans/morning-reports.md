@@ -1677,3 +1677,69 @@ one or more component tags, and a date.
       25. SPLIT IT NOW - a mini requirement to scope a provenance cell split
           out of the Timing cell, so criterion 19's note lands where it says.
           To scope (with Q7's every-supply door).
+    - **EXACT WORDING APPROVED BY KEITH, 2026-10-15 morning** - each applied
+      to the register in the commit that builds it, so the register never
+      claims behaviour the code does not have yet:
+      - Q4, REQ-PIPE-179 c19, appended: "...; and WHERE what gives the hold's
+        receipt instant an open owed slot is a declared correction
+        (REQ-PIPE-111) that has not been confirmed (REQ-PIPE-170), SHALL leave
+        the hold where it is until that correction is confirmed."
+      - Q6, new REQ-PIPE-194 criterion: "IF `mothman supply decide` is asked to
+        substitute into a period whose pair's contest is open, THEN THE SYSTEM
+        SHALL refuse before asking for a reason, saying that two files arrived
+        for that period and nobody has said what each file is, and printing
+        the command that settles the pair on a line of its own."
+      - Q9, REQ-PIPE-179 c35, appended after "a turned-off hold": " - one a
+        person filed or placed there included, which the impact preview
+        (REQ-PIPE-169) names as becoming a turned-off hold."
+      - Q10, REQ-PIPE-179 c28, its end "...and the instant until which the
+        turn-off can be changed by an ordinary edit" becomes "...and the
+        instant until which the turn-off can be changed by editing
+        contract/calendar.yaml, worded 'Edit calendar.yaml to change this
+        until <instant>, when the first period's claim window opens. After
+        that it needs a declared correction.'"
+      - Q11, REQ-PIPE-130 c12, appended: "; except that its acknowledged
+        column SHALL cover a promoted supply re-checked worse (REQ-PIPE-164)
+        as it covers one promoted amber, from a value recorded when the
+        re-check is recorded rather than computed in the view."
+      - Q14, REQ-PIPE-166 c14: "for a mark, that the period reads overdue or
+        never supplied again and its ticket reopens" becomes "for a mark, that
+        the period is owed again and reads overdue or never supplied again".
+      - Q18, REQ-DASH-182 c12, appended: "; and WHERE a supply cycle falls in a
+        period the dataset owes nothing in, SHALL show that period once, as
+        the supply cycle's block with its kind label - 'Not owed - <reason>' -
+        as the block's subheading, and not as a separate label-only block."
+      - Q19, REQ-DASH-182 c3, added to its not-yet-owing clause: "...and SHALL
+        show its status pill, on its page and in its collection table, as 'Not
+        owed yet' in place of 'No data'." (The missing SLA tile is a fix
+        against c3 as signed.)
+      - Q21, REQ-DASH-180 c25 becomes: "WHILE a dataset's last owed slot
+        before a turn-off has closed, its turn-off has been authored on or
+        before the date on show (criterion 27's authored date), and its
+        effective_to has not yet passed, THE SYSTEM SHALL show the marker
+        'Turning off after <effective_to> - nothing more owed', and SHALL
+        apply criterion 7 from the later of that close and that authored
+        date."
+      - Q24, REQ-DASH-180 c17, appended: "; and WHERE the dataset a calendar's
+        low-runway warning runs out first for has a for-good turn-off
+        authored on or before the date on show, THE SYSTEM SHALL word its line
+        'It runs out first for <dataset>, which turns off for good after
+        <date> - no more dates are needed for it.', and SHALL drop the
+        instruction to add dates where every line is worded so; the gate's
+        warning likewise."
+      - REQ-DASH-175 critic (#196 F2), REQ-DASH-180 c14, appended: "; the
+        section SHALL list every supply held as turned off up to the date on
+        show - one still held described 'held, and owed by nobody', one
+        resolved with a note saying how it ended (placed in <period>, filed by
+        the rule once <period> was owed again, rejected or superseded), by
+        whom and when - and the quiet line SHALL count them all, saying how
+        many are still held."
+      - Fixes against criteria as signed, no wording needed: Q16 (one history
+        reader, REQ-PIPE-166 NFR 5), Q17 (terminal wording, REQ-PIPE-166 c12),
+        Q19's SLA tile (REQ-DASH-182 c3), Q22 (REQ-DASH-180 c10 already names
+        the executive tier), Q23 (REQ-DASH-180 c12).
+      - Q7 and Q25 SCOPED AND SIGNED as REQ-GHUB-229 (the door and the queue
+        list every supply filed to a period; failed load offered reject only;
+        decided supplies listed too; `supply slots` shows the count) and
+        REQ-DASH-230 (the supply-history last column headed 'How it got
+        here'; a moved supply's 'Late at the time' stays in Timing).
