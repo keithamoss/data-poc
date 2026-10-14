@@ -33145,3 +33145,130 @@ requirements:
     open_questions:
     - Criterion 26 names re-check, which REQ-PIPE-164 (not_started) builds and which depends on this requirement; the re-check
       half is vacuous until 164 lands. Left as is so 164's own criterion 17 keeps pointing at one panel.
+  - id: REQ-DASH-208
+    title: A scenario link from the test-scenarios panel lands with what the scenario is about in view
+    date_written: '2026-10-14'
+    story: As Keith showing someone a scenario from the test-scenarios panel, I want its link to land with the thing the scenario
+      is about on screen, so that I am not scrolling below the fold to find the quoted text while they watch.
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-14'
+    source: 'plans/post-build-review.md #174 (REQ-GEN-199''s first bootstrapped build, overnight 2026-10-13: six quoted texts
+      open below the fold at 1280x800 - TS-75a, TS-75b, TS-77b and TS-78a in the as-at panel, TS-76 and TS-77a in the substitution
+      drill-down). PROPOSED by the round 3 dashboard UX review (finding 14, option A) and drafted by delivery-scoper overnight
+      2026-10-13 to 14 while Keith was asleep; not yet reviewed as a requirement of its own.'
+    acceptance_criteria:
+    - WHEN a scenario link (REQ-GEN-201) is followed from the test-scenarios panel, THE SYSTEM SHALL scroll the page so that
+      the element the scenario is about is in the viewport, and SHALL then move focus to it without scrolling again (focus with
+      preventScroll), as drillToPeriod brings a period into view.
+    - THE SYSTEM SHALL name each scenario's subject semantically in its placement record - the as-at panel, the verdict line,
+      the substitution drill-down, the standing-in pill, a supply-history row, or the period-composition view's table once REQ-DASH-209
+      adds it (REQ-DASH-209 criterion 7) - and SHALL NOT name it by a CSS selector or a pixel offset.
+    - WHERE the subject is inside a collapsed section of supply history, THE SYSTEM SHALL expand that section before scrolling
+      to it.
+    - THE SYSTEM SHALL mark the subject with a static left rule in the accent colour, as the arrival notice (.arrival-notice)
+      carries, and a text label reading '<scenario id> · in place on <date>', kept until the reader navigates away or changes
+      the date on show; SHALL NOT mark it with the 2px accent outline, which is this page's focus ring, nor animate it; and
+      SHALL scroll instantly where the reader's system asks for reduced motion.
+    - WHEN a scenario jump is made, THE SYSTEM SHALL carry the scenario's id in the URL of the history entry the jump creates,
+      as a query parameter named scenario holding the id in lowercase (docs/spa-best-practices.md section A), and WHEN a page
+      is loaded or reloaded with that parameter, SHALL repeat the jump once the page has rendered - expanding, scrolling to,
+      focusing and marking the subject as criteria 1 to 4 say - and SHALL show the scenario jump bar. (NEW WORDING - for Keith's
+      approval.)
+    - 'THE SYSTEM SHALL amend, in the same change, REQ-GEN-199 criteria 36 and 37 so that each quoted text is asserted inside
+      the viewport once the jump has brought it there, and again after a cold reload of the jump''s URL, rather than inside
+      the initial viewport without scrolling, and SHALL remove each strict expected failure naming post-build-review #174 as
+      its text comes into view.'
+    - IF a scenario's subject is not on the page on its link's date, THEN THE SYSTEM SHALL leave the page at the top, SHALL
+      say so in one line in the page's stale-link notice (.stale-link-notice, as forgetStaleSegment does for a link segment
+      that no longer resolves), naming the scenario and the date, and SHALL NOT scroll to a different element.
+    - WHEN the reader navigates from the page a jump landed on, changes the date on show by any means, or chooses 'Back to today'
+      on the scenario jump bar, THE SYSTEM SHALL leave the scenario parameter out of the new URL and SHALL clear the jump from
+      the page's state - its jump bar and its mark - so that the jump does not follow the reader to another page or another
+      date.
+    - IF the scenario parameter names a scenario the test-scenarios panel does not hold, or one whose subject is not on the
+      page at the date in the URL, THEN THE SYSTEM SHALL open the page at the top, show no jump bar for it, say so in one line
+      in the stale-link notice as criterion 7 does, remove the parameter with replaceState, and log no console error.
+    - THE SYSTEM SHALL make each scenario chip in the test-scenarios panel a real link (<a href>) whose address carries the
+      scenario's date as the existing in-place-on parameter and its id as the scenario parameter (criterion 5); WHEN a chip
+      is clicked with the primary button and no modifier key, THE SYSTEM SHALL make the jump in the page without a full reload,
+      as clicking the chip does today, and SHALL leave every other click - a modifier key held, a middle click - to the browser,
+      so that open in a new tab and copy link work (docs/spa-best-practices.md section D).
+    - THE SYSTEM SHALL read the scenario parameter's name case-insensitively, SHALL match its value case-insensitively against
+      the ids the test-scenarios panel holds before any use, and SHALL NOT use an unmatched value in a selector, a lookup or
+      the page's markup.
+    - WHEN the reader returns by Back or Forward to a history entry a scenario jump created, THE SYSTEM SHALL restore that entry's
+      date on show, and SHALL NOT scroll the page or move focus again.
+    non_functional_requirements:
+    - 'ORDER: built before REQ-GEN-205''s and REQ-GEN-206''s bootstraps, so their new chips are written against a jump that
+      works (dashboard UX 14).'
+    - 'SCALE: the subject is named per scenario, so the panel''s growth (thirty-odd scenarios today) adds records, not code
+      paths.'
+    - 'ACCESSIBILITY: focus moves to the subject without a second scroll, so a keyboard or screen-reader user lands where a
+      sighted one does; the mark is a labelled rule rather than colour alone, and is never the focus ring; no animation (criteria
+      1 and 4).'
+    - 'NO NEW ASSET: template JavaScript and CSS only; the file:// and offline viewing paths are unaffected.'
+    - 'URL HYGIENE (docs/spa-best-practices.md sections A to C): one optional, order-independent query parameter, read case-insensitively,
+      beside the existing in-place-on parameter; the jump''s own history entry is pushed as today, any navigation or date change
+      drops it, and corrections to the URL on a stale parameter use replaceState so Back is not polluted.'
+    - 'ROBUSTNESS: a URL is input from whoever sends the link, so the parameter is matched against the panel''s own ids before
+      any use, and only the matched record is used (criterion 11).'
+    dependencies:
+    - REQ-GEN-201
+    - REQ-GEN-199
+    - REQ-GEN-045
+    decisions:
+    - 'A PAGE FIX, NOT A LOOSER TEST (REQ-GEN-199 criterion 37; post-build-review #174): the six below-the-fold texts are findings
+      against the page, carried as strict expected failures. REJECTED accepting below-the-fold and loosening the assertion.'
+    - 'THE CRITERION NUMBER IS 36, NOT 34 (delivery-scoper, 2026-10-14): post-build-review #174 cites REQ-GEN-199 ''criterion
+      34''; in the register the viewport assertion is criterion 36 and its ''a finding against the page'' rule is criterion
+      37 (34 is the as-at test''s date source).'
+    - 'THE SHAPE (dashboard UX 14): subject named semantically (a), collapsed history expanded (b), a static accent border with
+      no animation (c), REQ-GEN-199''s assertion reworded (e). Its (d), a reload landing at the top with the jump state in history.state,
+      was SUPERSEDED by Keith''s answer below.'
+    - 'A SCENARIO JUMP SURVIVES A RELOAD, CARRIED IN THE URL (Keith, 2026-10-14, close-out Q24, option B, against the recommendation):
+      criteria 5, 8 and 9. A reloaded or shared link lands on the subject too, and REQ-GEN-199''s cold-reload assertion can
+      check the same viewport again. ACCEPTED COST: one more query parameter every link builder must carry or drop. REJECTED
+      (the recommendation) a reload opening at the top with the jump kept in history.state only. The parameter''s name and lowercase
+      form are the scoper''s, from docs/spa-best-practices.md.'
+    - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-GEN-199 criterion 36 (signed; criterion
+      6 here) to read: ''THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each
+      of this requirement''s chips in the test-scenarios panel and asserts that the element holding the text its register Expect
+      quotes is inside the viewport once the scenario jump (REQ-DASH-208) has brought it there, then cold-reloads that URL and
+      asserts the same text inside the viewport again, with zero console errors.'''
+    - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-GEN-199 criterion 37 (signed; criterion
+      6 here) to read: ''IF the Expect''s element is outside the 1280x800 viewport once the scenario jump (REQ-DASH-208) has
+      run, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or
+      the Expect.'''
+    - 'A SCENARIO CHIP IS A REAL LINK (Keith, 2026-10-14, follow-up F10, option A, the recommendation): criterion 10. Now that
+      the jump lives in the URL, the chip carries it, so middle-click and ''copy link'' work as docs/spa-best-practices.md section
+      D asks. REJECTED keeping the chip a button and copying a shared link from the address bar after the jump. No signed criterion
+      says the chip is a button (checked 2026-10-14), so nothing is amended.'
+    - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answer F10): criterion 10 added; no open question left.'
+    - 'A LINK THAT LEADS NOWHERE SAYS SO (round 4 dashboard UX 1, HIGH): criteria 7 and 9 - one line in the existing .stale-link-notice,
+      the pattern forgetStaleSegment uses for a stale column or check segment. REJECTED landing silently at the top, which reads
+      as a broken jump.'
+    - 'ANY DATE CHANGE DROPS THE JUMP (round 4 dashboard UX 2, HIGH): criterion 8. Changing the date by hand after a jump left
+      scenario= in the URL and the jump in the page''s state, so a reload or a shared link would jump again to a date the reader
+      had left.'
+    - 'A LABELLED LEFT RULE, NOT THE FOCUS OUTLINE (round 4 dashboard UX 3, HIGH): criterion 4. The 2px accent outline is this
+      page''s focus ring (.card:focus-visible), so a mark drawn the same way reads as focus; the arrival notice''s left rule
+      is the page''s existing ''you were brought here'' mark, and the label says why. SUPERSEDES the round 3 shape''s (c), ''a
+      static accent border''. REJECTED ''until the reader next scrolls'', because the jump''s own scroll would remove the mark.'
+    - 'A REAL LINK BEHAVES AS ONE (round 4 dashboard UX 7, MED; round 4 architect M6): criteria 1, 10, 11 and 12 - focus without
+      a second scroll, a plain click intercepted and every other click left to the browser, Back and Forward restoring the date
+      without scrolling again, the parameter read case-insensitively. Criterion 10 already carried both parameters (follow-up
+      F10), which is what M6 asked for.'
+    - 'THE PARAMETER IS MATCHED BEFORE IT IS USED (round 4 architect L1): criterion 11. REJECTED using the raw value to find
+      the subject and treating a miss as the not-found case.'
+    - 'THE COMPOSITION VIEW IS A SUBJECT (round 4 architect H3 and M6): criterion 2 names REQ-DASH-209''s table, so TS-55''s
+      chip lands on it. REQ-DASH-209 is built after this requirement (round 4 H5 order), so the subject joins the vocabulary
+      when REQ-DASH-209 criterion 7 is built, not here; REQ-DASH-209 is deliberately NOT a dependency, since it already depends
+      on this requirement.'
+    - 'FOLDED 2026-10-14 (delivery-scoper, round 4 reviews): criteria 1, 2, 4, 7, 8, 9 and 10 reworded; criteria 11 and 12 added;
+      NFRs 3 and 5 reworded and a ROBUSTNESS NFR added. The wording of criteria 4, 7, 11 and 12 is the scoper''s, for Keith''s
+      approval.'
+    - SIGNED OFF by Keith, 2026-10-14, with the mark's label '<scenario id> · in place on <date>' and the exact wording of close-out
+      amendments 9 and 10 (REQ-GEN-199 criteria 36 and 37), which apply to their targets when this requirement is built.
