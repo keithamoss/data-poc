@@ -1,188 +1,347 @@
 # Draft: road-testing sprint 1, "where do I put my effort?" (plans/road-testing.md #1, #2)
 
-Scoped by delivery-scoper on 2026-10-14 (Perth), and **revised the same day
-(~17:00) to fold in Keith's answers to Q1-Q8** (at the end of this file).
-**This is still a proposal for Keith's sign-off.** Nothing here is in
-`requirements.yaml` or `plans/`. Criteria marked PROVISIONAL now depend only
-on the three NEW questions below (NQ1-NQ3).
+Scoped by delivery-scoper on 2026-10-14 (Perth). Revised ~17:00 to fold in
+Keith's answers to Q1-Q8, and again ~17:30 to fold in his answers to NQ1-NQ3,
+the **delivery-dashboard-ux** review (`review-dashboard-ux.md`) and the
+**delivery-architect** review (`review-architect.md`), with his answers to both.
+Revised once more on the evening of 2026-10-14 to fold in his answers at the
+sign-off readiness check (last section). **Still a proposal until Keith signs
+the batch.** Nothing here is in `requirements.yaml` or `plans/`. No criterion is
+PROVISIONAL and no open question remains; see "Ready for sign-off".
 
 Requirements: `docs/drafts/road-testing-sprint-1/requirements-draft.yaml`
 
 | Id | What | MoSCoW | Depends on |
 |---|---|---|---|
-| **REQ-DASH-224** | One function decides red / amber / green / not counted, per check, per column (worst check) and per check section, returning red and amber separately. Builds on the Trend defect fix (post-build-review #181). | must | - |
-| **REQ-DASH-225** | Dataset list: "N of M columns not green", "2 red, 1 amber", sections counted as columns and named, with two small trend lines (red solid, amber dashed) on a fixed 0-100% scale. | must | 224 |
-| **REQ-DASH-226** | Agency cards (and collection headings, provisionally): "N of M datasets not green", red and amber in words, plus a small labelled trend of datasets not green. | must | 224, 225 |
-| **REQ-DASH-227** | Dataset page: a new two-line red/amber trend with axis titles, key and "View as table"; the same style in the column panel and on the column tiles. | should | 224, 225 |
-| **REQ-DASH-228** | A check's own chart names its measure, from its rule kind through one mapping. | should | - |
+| **REQ-DASH-224** | Two counting functions, one per unit: `unitCounts` decides red / amber / green / not counted per check, per column (worst check) and per check section, per **checked** QA run, keyed by run; `datasetStatusesOn(date)`, taken out of `buildData()`, gives every dataset's full status as of a date. File checks are out. Builds on post-build-review #181 (commit cf060e9). | must | - |
+| **REQ-DASH-225** | Dataset list: "Columns not green" header; bold "3 of 15", "2 red, 1 amber · incl. Supply-level checks" beneath; two small lines to the right (red solid, amber dotted) on a fixed 0-100% scale over a neutral baseline; one key line above each collection table. | must | 224 |
+| **REQ-DASH-226** | Agency cards: "2 of 8 datasets not green" (or "2 of 5 counted datasets not green"), red and amber in words, and a two-line trend of each dataset's full status on a weekly grid, labelled "Datasets red and amber, each week", under a 400ms budget for the tier. Collection headings on the agency tier get the same count line and the same two-line weekly trend. | must | 224, 225 |
+| **REQ-DASH-227** | Dataset page: a new two-line red/amber trend with axis titles, the key under its title and "View as table"; the same style in the column panel and on the ~16px column tiles. | should | 224, 225 |
+| **REQ-DASH-228** | A check's own chart names its measure, as horizontal text, from its rule kind through one mapping, with a completeness test reading committed configuration. | should | - |
 
-## What changed, per requirement, after Keith's answers
+Plus a **proposed amendment to signed REQ-DASH-180** (below), which takes the
+turned-off clauses out of 225 and 226.
 
-- **REQ-DASH-224.** No longer the defect fix - Keith chose to fix that now,
-  test-first, as **post-build-review #181**, and this builds on it. Still "one
-  function decides not green", now also deciding a column's status (worst
-  counted check, Q2), treating each check section as a column (Q3), and
-  returning red and amber counts separately (Q2's two lines). Its test is
-  new: the red/amber split and the section-as-column cases.
-- **REQ-DASH-225.** Two lines, red solid and amber dashed, one key in the
-  column header, no endpoint dot, neutral ink in a quiet state (Q2). Sections
-  count as columns; a header note says so, and a red/amber section is named in
-  the row's "2 red (one is Supply-level checks), 1 amber" line (Q3). The
-  separate section line is gone. Q1 and Q6 confirmed and recorded.
-- **REQ-DASH-226.** Counts **datasets** by their own pill, not checks (Q4).
-  M stays "the datasets the card's rollup counts" - Keith's choice changed the
-  unit, not the set, so that recommendation stands and is recorded. The
-  cross-table de-duplication criterion and test are gone (a dataset counts
-  once whatever it shares). The card **keeps** a small labelled trend of
-  datasets not green (Q5), drafted as two lines (NQ3).
-- **REQ-DASH-227.** The dataset-page trend is two lines with a key and a
-  two-series "View as table" (run date, red, amber, N of M) (Q7). I also made
-  the column panel and the tile lines two-line, for one vocabulary per page -
-  my call, not asked; say if you would rather the tiles stay single.
-- **REQ-DASH-228.** Q8 confirmed; PROVISIONAL marks removed.
+## Reviews folded, per requirement
 
-## How the two lines work at sparkline size (REQ-DASH-225, reused by 226 and 227)
+Every finding went into a criterion, an NFR or a decision. Where a review
+offered wording and it was sound, that wording was used. Numbering was kept:
+a criterion that changed meaning was rewritten in place, and new ones were
+appended.
 
-- Today's box is about 180 x 28 px. Red is a solid line, amber a dashed one,
-  on a fixed 0-100% scale. Because each column counts once at its worst
-  check, red + amber never exceeds 100%.
-- Colour is never alone: line style distinguishes the two; the header carries
-  one key in words; each row's accessible name gives the latest red and amber
-  of M; the dataset page's "View as table" gives both full series.
-- The cost of a fixed scale at this height is that one column in fifteen sits
-  about 2 px off the baseline. That is accepted (Q6) - the count beside it
-  carries the exact figure.
-- The endpoint dot goes: with two coloured lines it would be a third mark
-  repeating the count. In a quiet state (post-build-review #57) both lines draw
-  in neutral ink, told apart by dash alone.
+### REQ-DASH-224 (13 criteria, was 11)
+- **NQ1 (Keith: neither, split out).** c5 rewritten: reads `ds.columns` only,
+  never `fileChecks` (architect L1). Decision records both rejected options and
+  points at plans/running-thoughts.md #96. REQ-DASH-097 untouched.
+- **Architect Q2 (Keith: only checked runs are points).** c1 now says a check
+  with no entry on a run is not counted on it, with no carry-forward; c8 says a
+  held, never-checked arrival adds no point. Decision cites the real figure:
+  10 of 208 runs never checked (9 Child Protection, 8 of them cp-case-workers
+  in months it owes nothing in; 1 Birth Registrations).
+- **H1 (count vs last point).** Not adopted as carry-forward (Keith's Q2 answer).
+  A decision explains why the two agree today: a never-checked run's only
+  entries are always-inactive "No rule defined" placeholders, and **no check in
+  the built reports has a gap between checked runs (0, both collections)**. The
+  real-browser tests in 225 c18 and 226 c12 now assert the last point equals the
+  count, so a future gap goes red rather than drifting.
+- **H2 (two functions).** c7 rewritten: columns and checks through the unit
+  counter, datasets through `datasetStatusesOn(date)` out of `buildData()`.
+  Rejected: a Python precompute, or a second dataset-status routine.
+- **M1** - new c12: points come from the runs in place or awaiting, as the pill
+  clips them. **M2** - c6 keys by run_id, not date. **M3 / Keith Q3 (A)** -
+  new c13 excludes retired checks from past points; the divergence from
+  `datasetStatusByRun` / `status_by_run` is recorded as a decision.
+  **M4** - c10 gains a test that drives the list row's real drawn trend
+  (50% red / 0% amber where today plots 2 of 3 failing), so it fails on
+  behaviour. **L2** - c4 finds sections by `scope`. **L6** - no Python twin,
+  confirmed. Code shape (unitCounts, twoLineSparkline, datasetStatusesOn, the
+  named rollup predicate, removing the floor and the dot) is a decision marked
+  advisory.
 
-## How "columns" includes the check sections (Q3)
+### REQ-DASH-225 (23 criteria, was 18)
+- **UX Q1 (A).** c1 header "Columns not green", unit only there; c3 bold
+  "<N> of <M>"; c4 "2 red, 1 amber" beneath; c5 "· incl. Supply-level checks";
+  c6 "All <M> green"; c8 lines to the right of the text.
+- **UX Q2 (A) / G1.** c9 amber dotted with round caps (1.5,2.5), red solid, in
+  --bad and --warn. Dashed is taken on the check chart (thresholds, "did not
+  report").
+- **UX Q4 (A) / G4.** c2 is now the key line above each collection table, with
+  the review's sentence (minus file checks). Replaces the header note.
+- **S1** - new c19, neutral baseline, colour only above 0%; c17 gains a test
+  that an all-green history draws no red or amber stroke. **S2 / L3** - new c20,
+  non-scaling stroke at least 1.5px. **S3** - new c21 "No column has a verdict on
+  this date"; **declined** its "no lines" where history exists, citing Keith's
+  #57 words. **G2** - new CONTRAST NFR (--warn, 3:1 in both themes, greyscale).
+  **Minors** - new c22 ("One QA run so far" / no lines under two runs), c23
+  (reason rows keep spanning the column), REUSE NFR, cold-load in c15.
+- **B1 (b).** c16 keeps only the owes-nothing case, which REQ-DASH-182 c15 says
+  already holds today; the turned-off case moves to REQ-DASH-180. REQ-DASH-180
+  and 182 leave this requirement's dependencies.
+- **M1** - the "per QA run" decision no longer says "including supplies later
+  withdrawn". **M5** - c13 removes tests-js/sparkline-endpoint.test.js's dot
+  assertions in the same change, keeping its `statusColorVar()` guard.
+- **Sorting by red count** - out of sprint 1, recorded as a decision (not
+  trivial: it changes what a row position means in links, tests and
+  screenshots). The open question is gone. A plans/running-thoughts.md entry is
+  drafted below for the main session to apply.
 
-- Each section with at least one counted check is one unit, named by the
-  heading the dataset page already shows: **Supply-level checks**,
-  **Table-level checks**, **Cross-table checks**, and (NQ1) **File checks**.
-- The list's header carries one line: "Supply, table, cross-table and file
-  checks each count as one". Any section that is red or amber is named in the
-  row.
-- **A cross-table section counts once per dataset it is filed under.** It
-  already sits in each participating dataset's columns and already turns each
-  one red (Keith, 2026-09-26, "counts against both"), so the count follows
-  the pill. Since the agency card now counts datasets, no figure spans
-  datasets at check level, so no de-duplication is needed anywhere.
+### REQ-DASH-226 (13 criteria, was 12)
+- **NQ2 (B) + UX Q3 (A) + G6.** c9 is a weekly grid anchored on the date on
+  show, each dataset's full status through `datasetStatusesOn`, as a share of
+  that date's counted datasets, so the last point is the count. c8 label
+  "Datasets red and amber, each week" with an accessible name.
+- **NQ3 (A).** c7 two lines, no longer provisional.
+- **UX Q5 (A) / G5.** c1 and c4 say "counted" when the rollup leaves some out;
+  c3 puts the count line directly above the not-counted line. A decision records
+  the interim gap until REQ-DASH-180 c10's partial line exists.
+- **B1 (b).** c3 and c6 lose "turned off"; c11's test uses a no-schedule-agreed
+  dataset and now reads "2 of 3 counted datasets not green". c3 uses rollup()'s
+  filter lifted into one named predicate (architect code note).
+- **H3 + G6.** New c13: the tier renders in under 400ms; trends may draw after
+  first paint, one `datasetStatusesOn` per grid date for all cards, cached by
+  date. NFR: memoise `datasetTile()` first (it is quadratic today) and measure
+  with a 30-dataset fixture; if over budget, raise it with Keith. **Declined**
+  the architect's "at most N points" cap, since it shortens history silently
+  (decision).
+- **L4 / UX minors.** c6: a quiet or "Not counted" card shows no count but keeps
+  its trend, neutral, with its label. Cold-load in c10 and an NFR.
+- **Collection headings (Keith, sign-off readiness check: count AND trend).**
+  c5 rewritten: each collection heading gets the count line and the same
+  two-line weekly trend as the card, over the collection's counted datasets.
+  c6, c11, c12 and c13 now cover headings too. The performance NFR and c13 put
+  card and heading trends under the one 400ms budget; headings share the cards'
+  grid dates, so one `datasetStatusesOn(date)` per grid point serves all of
+  them. The decision records the rejected count-only proposal. The open
+  question is gone.
 
-## NEW questions for Keith (one set, recommended option first)
+### REQ-DASH-227 (11 criteria, was 9)
+- **UX Q4 (A).** c1 puts the key line under the trend's title, in the same
+  sentence as the list's key.
+- **UX Q2 (A).** c2 and c5 now say dotted.
+- **Tiles call (Keith: two lines everywhere).** The decision is now confirmed,
+  not "not asked".
+- **S2.** New c10: tiles about 16px with non-scaling stroke, and no lines
+  without a counted check or two checked runs. LEGIBILITY AT TILE SIZE NFR.
+- **UX minors.** New c11 cold-load; c4 reuses the existing View-as-table toggle.
+  c6 ends at the newest checked run (224 c12).
 
-**NQ1. File checks: one of the "columns", or left out?** Your Q3 answer named
-file checks. But **REQ-DASH-097 criterion 2** (signed and built) says "THE
-SYSTEM SHALL NOT fold a file check's verdict into any data check's status,
-count or trend", and its criterion 7 says a file-check warning does not
-change the dataset's status. A refused file already turns the row into a
-single reason row with no count (REQ-DASH-148), so in practice a file unit
-would only add amber warnings, and these would show beside a green pill
-("1 of 15 not green, 1 amber" on a green dataset). File checks are also
-recorded per load attempt, not per QA run.
-- **A (recommended): leave file checks out.** Supply, table and cross-table
-  sections count; the file section stays on its own, as REQ-DASH-097 decided.
-  The count and the pill always agree.
-- B: count them as "File checks", as drafted now. This is what you said, but it
-  amends REQ-DASH-097 criterion 2 (a signed requirement) and accepts an amber
-  count beside a green pill for a file warning.
+### REQ-DASH-228 (5 criteria)
+- **UX minor.** c1: the measure is horizontal text above the plot's top-left,
+  not rotated.
+- **L5.** c4's completeness test reads rule kinds from committed configuration,
+  not recorded results, so it runs in CI's fast half. A decision notes that the
+  criterion 3 fallback covers a kind found only in old history.
 
-**NQ2. What does the agency card's trend plot at each point?** A dataset's full
-status on a past date (outstanding supply, period closed with no supply)
-depends on cadence logic, and doing that for 30 datasets at every point is
-the heaviest thing on the page.
-- **A (recommended, drafted): check verdicts only.** One point per date on
-  which any counted dataset had a QA run, each dataset judged by its latest QA
-  run's verdict through REQ-DASH-224. This is cheap, but the line can end
-  below the card's count when a dataset is red only for a missing supply. The
-  label would say "by check results".
-- B: full status as of each date. The line always ends at the card's count,
-  but render time must be measured, and points need a date grid (per period or
-  per week) since datasets run on different cadences.
+## Amendment to REQ-DASH-180 (signed 2026-10-14, not started) - APPROVED (Keith, 2026-10-14)
 
-**NQ3. Is the agency card's trend two lines, red and amber, like the list?**
-- **A (recommended, drafted): two lines.** One vocabulary across tiers.
-- B: one "datasets not green" line. Quieter on a card that already has a pill,
-  a count and markers.
+Keith's answer to architect B1 was (b): the turned-off clauses leave sprint 1
+and become part of REQ-DASH-180. Since that requirement is signed, this
+amendment needed his approval in its own right. **He approved it as worded
+below at the sign-off readiness check, 2026-10-14. It is to be applied to
+`requirements.yaml` when this batch is signed, not before.** The wording below
+is unchanged.
 
-## Still open from the first pass (not among Q1-Q8)
+**Criterion 29 (new, appended).** OLD: none. REQ-DASH-180 ends at criterion 28,
+which reads in the live file:
 
-- Collection headings on the agency tier get the same datasets count as the
-  agency card (REQ-DASH-226 criterion 5, PROVISIONAL).
-- Sorting the dataset list by red count is not in this sprint (REQ-DASH-225
-  open question).
-- Wording for your approval at sign-off: the "Columns not green" header, its
-  section note, and the grid label on the dataset page.
+> IF a turn-off was authored after its effective_to, THEN THE SYSTEM SHALL show
+> no 'Turning off after' marker for it on any date, and criteria 4 and 25 SHALL
+> apply on their own terms.
+
+NEW criterion 29:
+
+> THE SYSTEM SHALL treat a turned-off dataset in REQ-DASH-225's and
+> REQ-DASH-226's counts as criterion 7 treats it in the rollup: WHILE it is left
+> out of its group's rollup, SHALL leave it out of the '<N> of <M>' on its agency
+> card and collection heading (REQ-DASH-226 criterion 3); SHALL show on its
+> dataset-list row the count and trend lines for the supply in place, just as
+> its pill shows that supply's verdict (REQ-DASH-225); WHERE a group's status is
+> 'Turned off', SHALL show no count line on it, never '0 of 0 datasets not
+> green', and SHALL draw its trend in neutral ink with its label (REQ-DASH-226
+> criterion 6); and SHALL extend REQ-DASH-226 criterion 11's tests-js test with a
+> turned-off dataset owing nothing, written first and seen to fail, under which
+> the agency still reads '2 of 3 counted datasets not green'.
+
+**Dependencies.** OLD:
+
+> REQ-PIPE-179, REQ-PIPE-110, REQ-DASH-182, REQ-DASH-071, REQ-DASH-155,
+> REQ-PIPE-053, REQ-PIPE-181, REQ-PIPE-164, REQ-DASH-162, REQ-PIPE-115
+
+NEW: the same list followed by **REQ-DASH-225, REQ-DASH-226**.
+
+**Decision to add to REQ-DASH-180:**
+
+> "SPRINT 1'S TURNED-OFF CLAUSES LIVE HERE (Keith, 2026-10-14, delivery-architect
+> review of road-testing sprint 1, B1, option b). 'Turned off' did not exist in
+> the page when REQ-DASH-225 and REQ-DASH-226 were scoped, so a criterion about
+> it there could be neither built nor seen failing first. REJECTED holding
+> sprint 1 until this requirement was built (option a)."
+
+Nothing else in REQ-DASH-180 changes. Criterion 10's not-counted line is left as
+it is. REQ-DASH-226 c3 only says where the count line sits relative to it.
+
+## Build order (from the architect review, adjusted for B1)
+
+0. **Groundwork, no visible change:** memoise each feed's dataset build so that
+   `datasetTile()` stops rebuilding every Child Protection dataset per dataset,
+   and lift `rollup()`'s live filter into a named predicate. Both serve 226 and
+   are cheapest with nothing else moving.
+1. **REQ-DASH-228**, which is independent and small.
+2. **REQ-DASH-224**, the counting functions with their failing-first tests.
+   `datasetStatusesOn` can wait until step 5 if that is simpler, but it belongs
+   to this requirement.
+3. **REQ-DASH-225**, the dataset list. The endpoint-dot test goes in this step.
+4. **REQ-DASH-227**, the dataset page, column panel and tiles.
+5. **REQ-DASH-226**, the cards. Measure the 400ms budget here, and stop and
+   raise it if the budget is missed.
+6. **The REQ-DASH-180 amendment**, built as part of REQ-DASH-180, not sprint 1.
+
+## Ready for sign-off
+
+**Nothing remains open.** Every open question is answered, the wording is
+approved, the REQ-DASH-180 amendment is approved and the four judgement calls
+are confirmed (Keith, 2026-10-14, sign-off readiness check). What is left is
+Keith's own sign-off of the batch itself, which is his to give.
+
+How each answer landed:
+
+1. **Collection headings: count and trend.** REQ-DASH-226 c5 rewritten; c6,
+   c11, c12, c13, the performance NFR and the budget decision extended to
+   headings; a new decision records the rejected count-only option. Its open
+   question is removed.
+2. **Wording approved, zero parts kept.** REQ-DASH-225 c4 now always gives both
+   numbers ("2 red, 0 amber"), and c17's test expects "1 red, 0 amber · incl.
+   Supply-level checks". REQ-DASH-226's "<r> red, <a> amber" follows c4. A new
+   REQ-DASH-225 decision records it, with the rejected omit-a-zero rule. The
+   "proposed exact text" notes in 225 c2 and c5, 226 c8 and 227 c5 now read
+   "Wording approved by Keith, 2026-10-14". The approved wording:
+   - The key line (225 c2, also 227 c1): "Columns not green — [solid] red ·
+     [dotted] amber, share of columns on each QA run. Supply-level, table-level
+     and cross-table checks each count as one column."
+   - The row's second line (225 c4/c5): "2 red, 1 amber · incl. Supply-level
+     checks", and "2 red, 0 amber" where there is no amber.
+   - Empty and short states (225 c21, c22): "No column has a verdict on this
+     date"; "One QA run so far".
+   - Card and heading trend label and accessible name (226 c8): "Datasets red
+     and amber, each week".
+   - Dataset page (227 c1, c3, c5): "Columns red and amber, each QA run" / y-axis
+     "% of columns"; panel "Checks on this column red and amber, each QA run" /
+     "% of checks"; grid label "Each column's lines: share of its checks red
+     (solid) and amber (dotted), each QA run".
+3. **The REQ-DASH-180 amendment: approved**, marked so above, to be applied
+   when the batch is signed.
+4. **The four judgement calls: confirmed.** Each decision now ends "Confirmed
+   by Keith, 2026-10-14, at the sign-off readiness check":
+   - No carry-forward for a check missing from a checked run (224, "WHY THE
+     COUNT AND THE LAST POINT AGREE").
+   - The architect's point cap declined (226, "THE TIER HAS A BUDGET").
+   - S3's "no lines" declined where history exists (225, "NOTHING TO COUNT
+     READS AS NOTHING TO COUNT").
+   - The interim gap until REQ-DASH-180 c10 (226, "'COUNTED' IN THE WORDS").
 
 ## Non-functional angles: what I settled and what I ruled out
 
-- **Settled myself:**
+- **Settled myself, now with the reviews folded in:**
   - **Scale.** One count per row, one shared scale, and cards carry counts
     rather than names.
-  - **Accessibility.** Red and amber in words and by line style, every trend
-    with a text equivalent, axis titles as text (REQ-DASH-070 criterion 6).
-  - **Performance.** No new embedded data, one pass over the checks. The
-    agency card's trend is now the largest series on the page, so measure it
-    once (and NQ2 B would raise this).
+  - **Accessibility and contrast.** Red and amber are given in words and by
+    line style (solid vs dotted), with --warn reaching 3:1 in both themes and
+    the two readable in greyscale. Every trend has a text equivalent, and axis
+    titles are horizontal text.
+  - **Performance.** The unit counter is one pass. The card trend now has a real
+    budget: under 400ms for the tier, memoised builds, trends after first paint,
+    measured on a 30-dataset fixture, covering card and collection-heading
+    trends together.
   - **The build rule.** Everything is computed in the page from embedded
-    recorded results, with no supply rows.
+    recorded results, with no supply rows and no Python precompute.
   - **As-of correctness.** Every figure is judged on the date on show, with
-    tests at a past date as well as the build's own date.
+    tests at a past date and cold-loaded links.
   - **Compatibility.** No new assets, so file:// and offline viewing are
     unaffected. A phone is not a target.
-  - **Maintainability.** One counting function, no Python twin. The rule-kind
-    mapping is guarded by a test.
-  - **Test-first claims that can fail.** Every browser test asserts its
-    subject exists first.
+  - **Maintainability.** Two counting functions, one per unit, with no Python
+    twin. The rule-kind mapping is guarded by a fast-half test, and the
+    obsolete endpoint-dot test goes in the same change as the dot.
+  - **Test-first claims that can fail.** Every browser test asserts its subject
+    exists first, and one unit test fails on behaviour, not just on a missing
+    name.
   - **Observability.** These changes are CHANGELOG.yaml-worthy.
-- **Ruled out as not applying:**
-  - Security, privacy, compliance and retention, and cost - as in the first
-    pass: counts only, nothing new stored or computed server-side.
-  - Reliability: these are pure page computations, with no network.
+- **Ruled out as not applying:** security, privacy, compliance and retention,
+  and cost (counts only, nothing new stored or computed server-side). Also
+  reliability, since these are pure page computations with no network.
 
-## Carry-over check (the source threads against the draft)
+## Carry-over check (the source threads and both reviews against the draft)
 
-- #1, the Trend column plots a rate: REQ-DASH-224, decision "rate in the line stands".
-- #1, the endpoint dot is the run's worst status: REQ-DASH-225, decision "no endpoint dot" (replaced, not lost).
-- #1, the aria-label is the only text: REQ-DASH-225, the accessible-name criterion.
-- #1, the per-check chart's missing y-axis title and its "Value" header: REQ-DASH-228.
-- #1, "a falling line means different things": REQ-DASH-227 NFR CONSISTENCY and REQ-DASH-228.
-- #1, the 0.05 floor: REQ-DASH-225, decision "one fixed 0-100% scale".
-- #1, named in place or a different treatment: REQ-DASH-225, decision "named in place".
+- #1, the Trend column plots a rate: REQ-DASH-224, "rate in the line stands".
+- #1, the endpoint dot is the run's worst status: REQ-DASH-225, "no endpoint dot", plus c13 (the test goes too).
+- #1, the aria-label is the only text: REQ-DASH-225 c12.
+- #1, the per-check chart's missing y-axis title and "Value" header: REQ-DASH-228.
+- #1, "a falling line means different things": REQ-DASH-227 CONSISTENCY NFR and REQ-DASH-228.
+- #1, the 0.05 floor: REQ-DASH-225, "one fixed 0-100% scale".
+- #1, named in place or a different treatment: REQ-DASH-225, "named in place".
 - #1, "Rows, latest run" read as the same series: not needed as its own criterion, as before.
-- #2, worst-of is deliberate: REQ-DASH-226, decision "the pill stays worst-of".
-- #2, checks or columns: REQ-DASH-225 decisions (Q1) and REQ-DASH-226 (Q4, datasets).
-- #2, what Tier 1 shows: REQ-DASH-226.
-- #2, where the count sits: REQ-DASH-225, decision "in its own column".
-- #2, "how many amber, how many red": REQ-DASH-225, decision "red and amber as two lines", and the words criterion.
-- The sprint line's "every red looking the same stops triage at 30": scale NFRs on 225 and 226.
-- The Trend defect: post-build-review #181 (Keith's call), cited by REQ-DASH-224.
+- #2, worst-of is deliberate: REQ-DASH-226, "the pill stays worst-of".
+- #2, checks or columns: REQ-DASH-225 (Q1) and REQ-DASH-226 (Q4, datasets).
+- #2, what Tier 1 shows / where the count sits / how many amber and red: REQ-DASH-225 and 226, as before.
+- "Every red looking the same stops triage at 30": scale NFRs on 225 and 226.
+- The Trend defect: post-build-review #181, cited by REQ-DASH-224.
+- UX review S1-S3, G1-G6, minors, Q1-Q5: all placed, as listed under "Reviews folded". One part declined, with a decision: S3's "no lines" where history exists.
+- Architect review B1, H1-H3, M1-M5, L1-L6, code notes, build order, Q1-Q3: all placed. Declined with decisions: H1's carry-forward (Keith's Q2) and H3's point cap.
 
 ## Draft entry for plans/road-testing.md (for a human to apply, replacing the Sprint 1 bullet)
 
 ```
 - **Sprint 1 - "where do I put my effort?" (#1, #2; M).** SCOPED 2026-10-14 by
-  delivery-scoper as REQ-DASH-224 to 228, Keith's Q1-Q8 answers folded in the
-  same day, awaiting his sign-off (docs/drafts/road-testing-sprint-1/). The
-  Trend defect found while scoping (inactive and no-data checks counted as
-  failing) is fixed separately first, post-build-review #181. 224 is the one
-  red/amber counting function; 225 the dataset list's columns count with red
-  and amber trend lines; 226 the agency cards' datasets count and trend; 227
-  the dataset page's and column panel's labelled trends; 228 a check chart's
-  axis named. Three questions are open (NQ1-NQ3 in the draft's summary).
+  delivery-scoper as REQ-DASH-224 to 228, with Keith's Q1-Q8 and NQ1-NQ3 answers,
+  the delivery-dashboard-ux and delivery-architect reviews and his answers to
+  both folded in the same day. Awaiting his sign-off
+  (docs/drafts/road-testing-sprint-1/), together with a proposed amendment to
+  REQ-DASH-180 that takes over the turned-off clauses. The Trend defect found
+  while scoping was fixed separately first (post-build-review #181). 224 is the
+  counting (columns per checked run, and datasets' full status per date); 225
+  the dataset list's count and red/amber lines; 226 the agency cards' datasets
+  count and weekly trend; 227 the dataset page's, column panel's and tiles'
+  labelled trends; 228 a check chart's named axis. File checks are out of every
+  count (plans/running-thoughts.md #96).
 ```
 
 Entries #1 and #2 stay until their requirements are built.
 
-## Validation (re-run after the revision)
+## Draft entry for plans/running-thoughts.md (for a human to apply)
+
+```
+NN. **[todo, 2026-10-14]** **[Dashboard UI]** **Sort the dataset list by red
+    count?** Raised while scoping road-testing sprint 1 (REQ-DASH-225): once each
+    row says "3 of 15" with "2 red, 1 amber", a sort by red count (or one by
+    default) is the obvious next step at about thirty datasets. Left out of
+    sprint 1 because it is not trivial: the list's order is the hierarchy's
+    today, and a sort changes what a row position means in links, tests and
+    screenshots. Not yet put to Keith.
+```
+
+## Validation (re-run after this revision)
+
+Re-run 2026-10-14 (17:31 Perth) after folding in the sign-off readiness answers:
 
 - `uv run mothman dashboard validate-requirements --draft docs/drafts/road-testing-sprint-1/requirements-draft.yaml`
-  reports only the expected cross-reference errors (REQ-DASH-070, 180 and 182,
-  and REQ-PIPE-115, which the draft does not contain).
-- The draft appended to a copy of `requirements.yaml` (scratchpad
-  `requirements-merged.yaml`): `requirements validation OK - 213 requirements,
-  zero errors`.
+  reports only the 3 expected cross-reference errors: REQ-DASH-070 (from 225 and
+  226) and REQ-PIPE-115 (from 227), which the draft does not contain.
+- The live `requirements.yaml` validates on its own (208 requirements, zero
+  errors), so the earlier evidently-work errors below are gone.
+- With the draft appended to a fresh copy of it (scratchpad
+  `requirements-merged.yaml`, 213 requirements): **OK, zero errors.**
+
+### Earlier run, before the sign-off readiness answers
+
+- `uv run mothman dashboard validate-requirements --draft docs/drafts/road-testing-sprint-1/requirements-draft.yaml`
+  reports only the expected cross-reference errors: REQ-DASH-070 (from 225 and
+  226) and REQ-PIPE-115 (from 227), which the draft does not contain.
+- With the draft appended to a copy of `requirements.yaml` (scratchpad
+  `requirements-merged.yaml`, 213 requirements), the check reports **5 errors,
+  none of them in this draft**. All 5 are in REQ-QAC-108 and REQ-QAC-223
+  `implemented_by`, and an unmodified copy of the live `requirements.yaml`
+  reports the same 5. They come from uncommitted evidently work in the working
+  tree (`qa_tools/*/evidently_*`, `run_evidently_*`), not from this draft. On
+  2026-10-14 earlier the same merge reported zero errors.
 
 ## Keith's answers (2026-10-14, ~17:00)
 
@@ -219,3 +378,21 @@ Entries #1 and #2 stay until their requirements are built.
 - NQ3: **A** - the agency card trend is two lines, red and amber.
 - Column tiles and column panel: **two lines everywhere** (the scoper's call,
   confirmed).
+
+## Keith's answers to the two reviews (2026-10-14 evening)
+
+Recorded in full at the end of `review-dashboard-ux.md` (Q1-Q5, all A) and
+`review-architect.md` (B1 option b; Q2 only checked runs are points; Q3 retired
+checks excluded). Each one is a decision in the draft, citing "Keith,
+2026-10-14, <review> Q<n>", with the option he rejected.
+
+## Keith's answers at the sign-off readiness check (2026-10-14 evening)
+
+1. Collection headings: **count AND trend** (not the recommendation of count
+   only) - each collection heading on the agency tier gets "N of M datasets not
+   green" and the same small two-line weekly trend as the agency card.
+2. Wording: **approved, but KEEP ZERO PARTS** - "2 red, 0 amber", always both
+   (not the drafted "leave a zero part out"). Everything else as drafted.
+3. The REQ-DASH-180 amendment (criterion 29, dependencies, decision):
+   **approved**, applied when this batch is signed.
+4. The four judgement calls: **all fine**.
