@@ -131,6 +131,13 @@ releases:
               Soda check's expression, a drift check's thresholds - now fails
               the build until the check's changelog says why. Before, only
               changes to a check's settings were caught.
+          - headline: A check's chart says what it measures
+            components: ["Dashboard UI"]
+            description: >
+              Each check's trend chart now names its line above the plot and
+              in its table - "Rows with no value (count)", "Rows (count)",
+              "Drift score (PSI)" - instead of a bare "Value", so a falling
+              row count is not read as an improving failure count.
       - category: Fixed
         items:
           - headline: Trend lines no longer count unjudged checks as failing

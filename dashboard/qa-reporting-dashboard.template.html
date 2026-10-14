@@ -779,6 +779,7 @@ table.file-history th, table.file-history td{text-align:left; padding:6px 6px; b
 .compare-run-select:disabled{cursor:default; opacity:.7;}
 
 .chart-wrap{position:relative;}
+.chart-axis-title{font-size:11px;font-weight:600;color:var(--ink-muted);margin:0 0 4px;text-align:left;}
 .chart-tooltip{
   /* Deliberately theme-invariant (always a dark chip with light text),
      not var(--accent-ink)/#fff - --accent-ink flips to a near-white blue
@@ -3413,6 +3414,11 @@ function computeChangeMarkers(history, changelog){
 function trendChart(check, compareIdx, onPointClick, datasetRuns){
   const id = "chart"+(chartSeq++);
   const history = check.history, warn=check.warn, fail=check.fail, unit=check.unit;
+  // REQ-DASH-228: what the line measures, in words, on the axis and in the
+  // table header. Built from the check's declared rule kind
+  // (pipeline/dashboard_check_labels.py MEASURES); a check without one
+  // falls back to its unit alone rather than a guess.
+  const measureLabel = check.measure || (unit ? `Value (${unit})` : "Value");
   const W=480,H=180, padL=42,padR=16,padT=14,padB=26;
   const vals = history.map(r=>r.value);
   const plotted = i => history[i].value != null && !notEvaluated(history[i]);
@@ -3541,6 +3547,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
 
   const svg = `
   <div class="chart-wrap">
+    <div class="chart-axis-title">${escHtml(measureLabel)}</div>
     <svg viewBox="0 0 ${W} ${H+2}" width="100%" style="overflow:visible;display:block;" id="${id}">
       ${warnY==null ? "" : `<line x1="${padL}" y1="${warnY}" x2="${W-padR}" y2="${warnY}" stroke="var(--warn-fill)" stroke-dasharray="3,3" stroke-width="1"/>`}
       ${failY==null ? "" : `<line x1="${padL}" y1="${failY}" x2="${W-padR}" y2="${failY}" stroke="var(--bad)" stroke-dasharray="3,3" stroke-width="1"/>`}
@@ -3567,7 +3574,7 @@ function trendChart(check, compareIdx, onPointClick, datasetRuns){
   </div>
   <div class="trend-scroll" id="${id}-table" hidden>
     <table class="trend-table">
-      <thead><tr><th>Run date</th><th>Value</th><th>Status</th></tr></thead>
+      <thead><tr><th>Run date</th><th>${escHtml(measureLabel)}</th><th>Status</th></tr></thead>
       <tbody>
         ${history.slice().reverse().map(r=>{
           const st=historyStatus(r, {warn, fail});

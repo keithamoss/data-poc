@@ -35674,7 +35674,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As anyone opening a check's panel, I want its trend chart to say what quantity it plots and in what unit, so that a row count, a failing-row count and a percentage do not appear under identical labelling, and a falling line is read the right way."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35696,4 +35696,17 @@ requirements:
       - "DERIVED FROM THE DECLARED RULE KIND THROUGH ONE MAPPING (Keith, 2026-10-14, sprint-1 Q8). Matches sprint 3's 'derived from each check's declared rule' (Keith, 2026-10-13). The recorded results hold 45 rule kinds across 263 checks, which fall into a handful of measures. REJECTED the unit alone, which keeps the ambiguity ('count' is a failing-row count for not_null and a row count for rowCount), and REJECTED a new hand-authored field, which would change docs/check-authoring-rules.md and need 263 checks written up."
       - "THE COMPLETENESS TEST READS CONFIGURATION, NOT RESULTS (delivery-architect review L5). The first draft read rule kinds from the built dashboard's recorded results, which puts the test in CI's slow deployment half behind a full bootstrap. The kinds are declared in committed configuration, so the test belongs in the fast half. A kind present only in old history - a check since removed from the contract - is covered by criterion 3's fallback rather than by this test."
       - "THE MEASURE READS HORIZONTALLY, TOP-LEFT (delivery-dashboard-ux review, minors). REJECTED a rotated y-axis title."
+      - 'BUILT 2026-10-14. The mapping holds the PHRASE only and the unit comes from the check''s own recorded unit, because one kind is reported in two units (datacontract:nullValues and invalidValues are a count on some checks and a percentage on others); keying on kind plus unit would double the table for no gain. Keyed on tool_ref()''s full ''tool:kind'' rather than the bare kind, since the same bare name means different things across tools (soda:range_check vs dbt:accepted_range read alike, but a future tool''s kind of the same name need not). File-check kinds are mapped too although the dashboard does not chart them yet (running-thoughts #96), because criterion 4 is over every declared kind. The title is an HTML line above the SVG rather than SVG text, so it is selectable and read by a screen reader in order; the table header uses the same string.'
     open_questions: []
+    linked_tests:
+      - 'tests/test_check_measures.py'
+      - 'tests/test_dashboard_e2e.py::TestAChecksChartNamesWhatItMeasures'
+    implemented_by:
+      - 'pipeline/dashboard_check_labels.py::MEASURES'
+      - 'pipeline/dashboard_check_labels.py::measure'
+      - 'pipeline/build_dashboard_data.py::build'
+      - 'pipeline/build_cp_dashboard_data.py::build'
+      - 'dashboard/qa-reporting-dashboard.template.html::trendChart'
+    evidence:
+      - 'tests/test_check_measures.py (4 tests, run 2026-10-14): the committed configuration declares 48 rule kinds across its active checks and every one has a measure; deleting dbt:unique from MEASURES makes the completeness test fail naming it; an unmapped kind reads ''Value (%)''. Reads collect_checks(None), so it runs with no deployment.'
+      - 'tests/test_dashboard_e2e.py::TestAChecksChartNamesWhatItMeasures (3 tests, run 2026-10-14 against the real built dashboard): a dbt:not_null check reads ''Rows with no value (count)'', a soda:invalid_percent check ''Invalid values (%)'' and an evidently:drift_psi check ''Drift score (PSI)'', both above the plot and as the ''View as table'' column header.'

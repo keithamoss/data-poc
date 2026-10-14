@@ -3997,6 +3997,42 @@ class TestSampleFinePrint:
         assert text and "Soda returns up to 100 of the failing rows" in text
 
 
+class TestAChecksChartNamesWhatItMeasures:
+    """REQ-DASH-228: a check's trend chart says what quantity it plots and
+    in what unit, above the plot and as the table's column header - one
+    check of each unit, count, % and PSI, on the real built dashboard."""
+
+    @pytest.mark.parametrize("kind,expected", [
+        ("dbt:not_null", "Rows with no value (count)"),
+        ("soda:invalid_percent", "Invalid values (%)"),
+        ("evidently:drift_psi", "Drift score (PSI)"),
+    ])
+    def test_axis_title_and_table_header_name_the_measure(
+            self, clean_page, built_dashboard_html, kind, expected):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        found = clean_page.evaluate("""(kind) => {
+          const ctx = resolveContext(STATE);
+          for (const col of ctx.ds.columns) {
+            const ck = (col.checks || []).find(c => c.tool_ref === kind);
+            if (ck) {
+              openColumnDrawer(ctx.ag, ctx.col, ctx.ds, col);
+              openCheckPanel(ctx.ag, ctx.col, ctx.ds, col, ck);
+              return true;
+            }
+          }
+          return false;
+        }""", kind)
+        assert found, f"no {kind} check on the Birth Registrations page"
+        body = clean_page.locator("#check-panel-body")
+        title = body.locator(".chart-axis-title")
+        assert title.is_visible()
+        assert title.inner_text().strip() == expected
+        body.locator("[data-toggle-table]").first.click()
+        header = body.locator(".trend-table thead th").nth(1)
+        assert header.is_visible()
+        assert header.inner_text().strip() == expected
+
+
 class TestClosingASidePanelReachedByItsUrl:
     """post-build-review #180 (2026-10-14): the side-panel twin of
     road-testing #8. closePanel() always called history.back(), which is

@@ -223,3 +223,80 @@ def tool_ref(check_id: str) -> str:
         if key.endswith(suffix) and len(key) > len(suffix):
             return f"{tool}:{key[:-len(suffix)]}"
     return key
+
+
+# REQ-DASH-228: what each declared rule kind MEASURES, keyed on tool_ref()'s
+# "tool:kind". The unit is not here - it comes from the check's own recorded
+# unit, because one kind can be reported in two (datacontract's nullValues is
+# a count on some checks and a percentage on others). The point of naming the
+# measure at all is the ambiguity a unit alone keeps: 'count' is a FAILING-row
+# count for not_null and a TOTAL row count for rowCount, and the two lines
+# read in opposite directions. tests/test_check_measures.py fails on any kind
+# declared in committed configuration that is missing here.
+MEASURES: dict[str, str] = {
+    # Rows with no value
+    "dbt:not_null": "Rows with no value",
+    "soda:missing_count": "Rows with no value",
+    "soda:missing_percent": "Rows with no value",
+    "datacontract:nullValues": "Rows with no value",
+    # Values outside what is allowed
+    "dbt:accepted_values": "Invalid values",
+    "dbt:matches_regex": "Invalid values",
+    "soda:invalid_percent": "Invalid values",
+    "soda:invalid_percent_recent": "Invalid values in recent rows",
+    "datacontract:invalidValues": "Invalid values",
+    "dbt:accepted_range": "Values out of range",
+    "soda:range_check": "Values out of range",
+    "datacontract:range_check": "Values out of range",
+    # Duplicates and references
+    "dbt:unique": "Duplicate values",
+    "soda:duplicate_count": "Duplicate values",
+    "datacontract:duplicateValues": "Duplicate values",
+    "dbt:relationships": "Rows with no matching record",
+    "soda:relationships": "Rows with no matching record",
+    "datacontract:relationships": "Rows with no matching record",
+    # Volume and drift - totals and scores, not failures
+    "soda:row_count": "Rows",
+    "datacontract:rowCount": "Rows",
+    "evidently:row_count_growth": "Drop in rows since last supply",
+    "evidently:drift_psi": "Drift score",
+    # Timeliness
+    "dbt:recency": "Freshness failures",
+    "soda:freshness": "Freshness failures",
+    "datacontract:freshness": "Freshness failures",
+    # Business rules - each a count of the rows breaking it
+    "dbt:expression_is_true": "Rows breaking the rule",
+    "soda:date_ordering": "Rows with dates out of order",
+    "datacontract:date_ordering": "Rows with dates out of order",
+    "soda:timestamp_ordering": "Rows with times out of order",
+    "datacontract:timestamp_ordering": "Rows with times out of order",
+    "dbt:multiple_birth_sibling": "Siblings that disagree",
+    "soda:sibling_match": "Siblings that disagree",
+    "datacontract:sibling_match": "Siblings that disagree",
+    "dbt:closed_case_investigation_hygiene": "Closed cases breaking the rule",
+    "soda:closed_case_hygiene": "Closed cases breaking the rule",
+    "datacontract:closed_case_hygiene": "Closed cases breaking the rule",
+    "dbt:escalation_completeness": "Escalations missing a step",
+    "soda:escalation_completeness": "Escalations missing a step",
+    "datacontract:escalation_completeness": "Escalations missing a step",
+    "dbt:placement_carer_approval": "Placements with an unapproved carer",
+    "soda:approval_compliance": "Placements with an unapproved carer",
+    "datacontract:approval_compliance": "Placements with an unapproved carer",
+    # File checks - declared, though the dashboard does not chart them yet
+    # (plans/running-thoughts.md #96)
+    "file:column_order": "Columns out of order",
+    "file:delimiter": "Delimiter problems",
+    "file:encoding": "Encoding problems",
+    "file:fields_per_row": "Rows with the wrong number of fields",
+    "file:header_names_unique": "Repeated column names",
+    "file:header_row": "Header row problems",
+}
+
+
+def measure(check_id: str, unit: str | None) -> str:
+    """The y-axis title and table header for a check's trend chart:
+    'Rows with no value (count)'. A kind missing from MEASURES falls back
+    to the unit alone, 'Value (count)', rather than guessing (REQ-DASH-228
+    criterion 3)."""
+    phrase = MEASURES.get(tool_ref(check_id), "Value")
+    return f"{phrase} ({unit})" if unit else phrase

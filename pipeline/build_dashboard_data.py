@@ -37,7 +37,7 @@ from qa_tools.common import agreement
 from qa_tools.common import asset_time
 from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel, recorded_arrival,
                       promotion_timeline, red_promoted, slot_timeline)
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, measure, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
@@ -303,6 +303,8 @@ def build() -> dict:
                 "tool_ref": tool_ref(slot["check_id"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
+                # REQ-DASH-228: the chart's axis title and table header.
+                "measure": measure(slot["check_id"], slot["unit"]),
                 # item 74 Bug A: None stays None - it means "this check has
                 # no bound of that kind" (e.g. rowCount's two-sided
                 # mustBeBetween range), NOT "zero tolerance". Substituting

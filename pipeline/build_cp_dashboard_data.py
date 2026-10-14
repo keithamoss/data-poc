@@ -39,7 +39,7 @@ from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from qa_tools.common import agreement
 from qa_tools.common import asset_time
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, pooled_url_key, tool_ref, url_key
+from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, measure, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
@@ -423,6 +423,8 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
                 "tool_ref": tool_ref(slot["check_id"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
+                # REQ-DASH-228: the chart's axis title and table header.
+                "measure": measure(slot["check_id"], slot["unit"]),
                 # item 74 Bug A: None stays None - it means "this check has
                 # no bound of that kind" (e.g. rowCount's two-sided
                 # mustBeBetween range), NOT "zero tolerance". Substituting
