@@ -145,6 +145,13 @@ releases:
               dataset's columns are red or amber on its latest QA run - "1 of
               11", then "0 red, 1 amber" - with two small lines for the red and
               amber share on each run. A check section counts as one column.
+          - headline: A Feedback tab shows what was raised and what came of it
+            components: ["Dashboard UI", "Docs & process"]
+            description: >
+              A new Feedback tab lists everything raised while road-testing the
+              dashboard - by you or by us - with what we heard, what we built,
+              and links to see it. Each card's status comes from the
+              requirements it points at, so it is never out of date.
           - headline: Agency cards count datasets that are not green
             components: ["Dashboard UI"]
             description: >

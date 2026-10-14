@@ -156,6 +156,8 @@ def _state_to_path(state: dict) -> str:
         return "/"
     if state.get("tier") == "demo":
         return "/demo"
+    if state.get("tier") == "feedback":
+        return "/feedback"
     quoted = {k: urllib.parse.quote(str(v), safe="") for k, v in state.items()}
     if state["tier"] == "agency":
         return f"/agency/{quoted['agencyId']}"
@@ -4305,6 +4307,69 @@ class TestDatasetsNotGreenOnCardsAndHeadings:
                         assert self._latest(col["label"]) == col_said, col
             _goto(clean_page, built_dashboard_html, {"tier": "exec"}, in_place_on)
             self._wait_trends(clean_page)
+
+
+class TestTheFeedbackTab:
+    """REQ-DASH-220: one card per road-testing entry, with the status derived
+    from the requirements it cites, reached at #/feedback."""
+
+    def _cards(self):
+        from dashboard.plans_md import feedback_data
+        cards = feedback_data(ROOT / "plans", ROOT / "requirements.yaml")["cards"]
+        assert cards, "precondition: plans/road-testing.md has cards"
+        return cards
+
+    def test_it_shows_every_card_with_its_derived_status(self, clean_page, built_dashboard_html):
+        cards = self._cards()
+        _goto(clean_page, built_dashboard_html, {"tier": "feedback"})
+        assert clean_page.locator("#view h2").inner_text().strip() == "Feedback"
+        shown = clean_page.locator(".fb-card")
+        assert shown.count() == len(cards)
+        statuses = sorted(clean_page.evaluate(
+            "() => [...document.querySelectorAll('.fb-card')].map(c => c.dataset.fbStatus)"))
+        assert statuses == sorted(c["status"] for c in cards)
+        # One pill per card, never a data verdict's colour (criteria 7, 17).
+        assert clean_page.locator(".fb-card .pill").count() == len(cards)
+        assert clean_page.locator(".fb-card .pill.red, .fb-card .pill.amber, .fb-card .pill.green").count() == 0
+        # The reviewer is never named, and no entry number is shown (4, 13).
+        text = clean_page.locator("#view").inner_text()
+        assert "Keith" not in text and "#1" not in text
+
+    def test_the_header_entry_is_a_real_link_and_the_route_survives_back(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        link = clean_page.locator("a#feedback-btn")
+        assert link.get_attribute("href") == "#/feedback"
+        link.click()
+        clean_page.wait_for_function("() => STATE.tier === 'feedback'")
+        assert clean_page.url.endswith("#/feedback")
+        clean_page.go_back()
+        clean_page.wait_for_function("() => STATE.tier === 'exec'")
+        clean_page.go_forward()
+        clean_page.wait_for_function("() => STATE.tier === 'feedback'")
+
+    def test_a_requirement_link_opens_the_panel_there_and_focus_comes_back(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "feedback"})
+        link = clean_page.locator(".fb-card a[data-req-link]").first
+        rid = link.get_attribute("data-req-link")
+        link.click()
+        clean_page.wait_for_function("(r) => STATE.panel === 'requirements' && STATE.req === r", arg=rid)
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_function("() => !STATE.panel && STATE.tier === 'feedback'")
+        assert clean_page.evaluate("() => document.activeElement.dataset.reqLink") == rid
+
+    def test_a_past_date_link_lands_as_a_jump_and_back_returns(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, {"tier": "feedback"})
+        today = clean_page.evaluate("() => CURRENT_IN_PLACE_ON")
+        link = clean_page.locator('.fb-card a[data-fb-link*="2023-08-05"]').first
+        assert link.count() == 1, "precondition: a card cites a past date"
+        link.click()
+        clean_page.wait_for_function("() => STATE.tier === 'dataset'")
+        assert clean_page.evaluate("() => CURRENT_IN_PLACE_ON") == "2023-08-05"
+        bar = clean_page.locator('[data-testid="scenario-jump-bar"]').inner_text()
+        assert "Viewing" in bar and "not today" in bar and " for " not in bar
+        clean_page.go_back()
+        clean_page.wait_for_function("() => STATE.tier === 'feedback'")
+        assert clean_page.evaluate("() => CURRENT_IN_PLACE_ON") == today
 
 
 class TestClosingASidePanelReachedByItsUrl:

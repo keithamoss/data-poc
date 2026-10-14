@@ -146,6 +146,7 @@ def _parse_numbered_items(text: str, file_key: str) -> list[dict]:
         components = _COMPONENT_RE.findall(m.group(4))
         blocks: list[str] = []
         cur_words = m.group(5).split()
+        after_blank = False
         i += 1
         while i < n and not _ITEM_RE.match(lines[i]) and not _HEADING_RE.match(lines[i]):
             stripped = lines[i].strip()
@@ -153,15 +154,22 @@ def _parse_numbered_items(text: str, file_key: str) -> list[dict]:
                 if cur_words:
                     blocks.append(join_wrapped(cur_words))
                     cur_words = []
-            elif _LIST_MARKER_RE.match(stripped):
+                after_blank = True
+                i += 1
+                continue
+            if _LIST_MARKER_RE.match(stripped):
                 if cur_words:
                     blocks.append(join_wrapped(cur_words))
                     cur_words = []
                 blocks.append(stripped)
-            elif blocks and _LIST_MARKER_RE.match(blocks[-1]) and not cur_words:
+            # A wrapped bullet's continuation - but never across a blank
+            # line, where it is a new paragraph after the list
+            # (post-build-review #185).
+            elif blocks and _LIST_MARKER_RE.match(blocks[-1]) and not cur_words and not after_blank:
                 blocks[-1] = join_wrapped([blocks[-1], stripped])
             else:
                 cur_words.extend(stripped.split())
+            after_blank = False
             i += 1
         if cur_words:
             blocks.append(join_wrapped(cur_words))
@@ -220,3 +228,216 @@ def parse_plans(plans_dir: str | Path) -> dict:
         items.extend(_parse_numbered_items(text, path.stem))
         threads.extend(_parse_threads(text, path.stem))
     return {"items": items, "threads": threads}
+
+
+# ---------------------------------------------------------------------------
+# FEEDBACK CARDS (REQ-DOCS-219). Every numbered entry of plans/road-testing.md
+# carries a short labelled bullet list directly after its opening paragraph:
+# what was raised, what we heard, what we built, where to see it. This one
+# parser serves both the gate (`mothman dashboard validate-feedback`) and the
+# dashboard build (REQ-DASH-220's Feedback tab), so the two can never
+# disagree about what a card is.
+#
+# Unlike the rest of this module it FAILS LOUDLY (NFR 3): skipping what does
+# not match is right for historical prose and wrong here, where a silently
+# dropped card is a piece of feedback nobody sees answered. The relative-
+# address check on Evidence links lives here rather than only in the gate
+# (criterion 22), so a card cannot put an absolute or javascript: href on
+# the public page even if the gate were skipped.
+# ---------------------------------------------------------------------------
+FEEDBACK_FILE = "road-testing.md"
+CARD_FIRST_LABELS = ("You told us", "We noticed")
+CARD_LABELS = ("You told us", "We noticed", "What we heard", "What we built", "Evidence", "Card status")
+CARD_STATUSES = ("fixed", "parked", "wont-do", "not-reproduced")
+_CARD_LINE_RE = re.compile(r"^- \*\*(%s):\*\*\s*(.*)$" % "|".join(re.escape(x) for x in CARD_LABELS))
+_CARD_ANY_LABEL_RE = re.compile(r"^- \*\*([^*:]+):\*\*")
+_EVIDENCE_LINK_RE = re.compile(r"^\[([^\]]+)\]\(([^)\s]+)\)$")
+_REQ_ID_RE = re.compile(r"^REQ-[A-Z]+-\d{3}$")
+_SPRINT_ITEM_RE = re.compile(r"^sprint (\d+)$")
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _evidence_item(raw: str) -> tuple[dict | None, str | None]:
+    """One Evidence item, or the reason it is refused (criteria 7, 8, 21)."""
+    item = raw.strip()
+    if _REQ_ID_RE.match(item):
+        return {"kind": "req", "id": item}, None
+    m = _SPRINT_ITEM_RE.match(item)
+    if m:
+        return {"kind": "sprint", "n": int(m.group(1))}, None
+    m = _EVIDENCE_LINK_RE.match(item)
+    if not m:
+        return None, (f"evidence item {item!r} is not a requirement id (REQ-XXX-NNN), "
+                      "'sprint <n>', or a [label](link)")
+    label, target = m.group(1), m.group(2)
+    if not (target.startswith("?") or target.startswith("#/")):
+        return None, (f"evidence link {item!r} must be a relative dashboard address "
+                      "beginning '?' or '#/'")
+    query = target.split("#", 1)[0].lstrip("?")
+    params = dict(p.split("=", 1) if "=" in p else (p, "") for p in query.split("&") if p)
+    if "req" in params:
+        return None, (f"evidence link {item!r} names a requirement through req= - "
+                      f"write the bare id {params['req']!r} instead")
+    if "in-place-on" in params and not _DATE_RE.match(params["in-place-on"]):
+        return None, f"evidence link {item!r} has in-place-on={params['in-place-on']!r}, not a YYYY-MM-DD date"
+    path = target.split("#", 1)[1] if "#" in target else ""
+    return {"kind": "link", "label": label, "href": target, "path": path,
+            "inPlaceOn": params.get("in-place-on")}, None
+
+
+def parse_feedback_cards(path: str | Path) -> tuple[list[dict], list[str]]:
+    """Every entry's card in plans/road-testing.md, and every structural error
+    found (criteria 1-7, 11-13, 21, 22). Cross-checks against requirements.yaml,
+    the sprint list and the hierarchy are the validator's."""
+    path = Path(path)
+    if not path.is_file():
+        return [], [f"{path} is missing"]
+    entries = _parse_numbered_items(path.read_text(), path.stem)
+    if not entries:
+        return [], [f"{path} holds no numbered entry"]
+    cards: list[dict] = []
+    errors: list[str] = []
+    for e in entries:
+        where = f"entry #{e['number']}"
+        chunks = e["text"].split("\n\n")
+        title = chunks[0] if chunks else ""
+        lines = chunks[1].split("\n") if len(chunks) > 1 else []
+        if not lines or not _CARD_ANY_LABEL_RE.match(lines[0]):
+            errors.append(f"{where} has no feedback card directly after its opening paragraph")
+            continue
+        fields: dict[str, str] = {}
+        order: list[str] = []
+        bad = False
+        for ln in lines:
+            m = _CARD_LINE_RE.match(ln)
+            if not m:
+                errors.append(f"{where}: {ln[:60]!r} is not a card line")
+                bad = True
+                continue
+            label, value = m.group(1), m.group(2).strip()
+            if label in fields:
+                errors.append(f"{where}: label {label!r} appears twice")
+                bad = True
+                continue
+            fields[label] = value
+            order.append(label)
+        firsts = [x for x in order if x in CARD_FIRST_LABELS]
+        if len(firsts) != 1 or order[0] not in CARD_FIRST_LABELS:
+            errors.append(f"{where}: a card begins with exactly one of 'You told us' or 'We noticed'")
+            bad = True
+        if "What we heard" not in fields:
+            errors.append(f"{where}: label 'What we heard' is missing")
+            bad = True
+        rank = {"You told us": 0, "We noticed": 0, "What we heard": 1, "What we built": 2,
+                "Evidence": 3, "Card status": 4}
+        for a, b in zip(order, order[1:]):
+            if rank[b] < rank[a]:
+                errors.append(f"{where}: label {b!r} is out of order")
+                bad = True
+        status = fields.get("Card status")
+        if status is not None and status not in CARD_STATUSES:
+            errors.append(f"{where}: Card status {status!r} is not one of {', '.join(CARD_STATUSES)}")
+            bad = True
+        evidence: list[dict] = []
+        for raw in (fields.get("Evidence") or "").split(";"):
+            if not raw.strip():
+                continue
+            item, why = _evidence_item(raw)
+            if why:
+                errors.append(f"{where}: {why}")
+                bad = True
+            else:
+                evidence.append(item)
+        if "What we built" in fields and not evidence and status not in ("parked", "wont-do", "not-reproduced"):
+            errors.append(f"{where}: a card saying what we built needs Evidence to point at")
+            bad = True
+        if status == "fixed" and any(i["kind"] == "req" for i in evidence):
+            errors.append(f"{where}: Card status 'fixed' is for a fix with no requirement - "
+                          "a card citing a requirement takes its status from it")
+            bad = True
+        if status in ("parked", "wont-do", "not-reproduced") and "What we built" not in fields:
+            errors.append(f"{where}: a {status} card says why in its 'What we built' line")
+            bad = True
+        if bad:
+            continue
+        first = firsts[0]
+        cards.append({
+            "number": e["number"], "status": e["status"], "date": e["date"], "title": title,
+            "firstLabel": first, "first": fields[first], "heard": fields["What we heard"],
+            "built": fields.get("What we built"), "evidence": evidence, "cardStatus": status,
+        })
+    return cards, errors
+
+
+_SPRINT_LINE_RE = re.compile(r"^- \*\*Sprint (\d+) - (.+?)\s*\(")
+
+
+def road_testing_sprints(text: str) -> dict[int, str]:
+    """The proposed sprints listed in plans/road-testing.md's introduction,
+    number -> title (REQ-DOCS-219 criterion 20)."""
+    out: dict[int, str] = {}
+    for line in text.splitlines():
+        m = _SPRINT_LINE_RE.match(line)
+        if m:
+            out[int(m.group(1))] = m.group(2).strip().strip('"')
+    return out
+
+
+# What a card's derived status is called on the page (REQ-DASH-220 criterion 6).
+_OVERRIDE_LABEL = {"fixed": "Fixed", "parked": "Parked", "wont-do": "Won't do",
+                   "not-reproduced": "Couldn't reproduce"}
+_REQ_STATUS_WORDS = {"built": "built", "in_progress": "in progress", "not_started": "not started",
+                     "retired": "retired"}
+
+
+def card_status(card: dict, reqs: dict) -> str:
+    """A card's status, derived from the requirements its evidence names, or
+    its own Card status override (REQ-DASH-220 criterion 6). 'Built' is
+    sprint_state's own predicate for a met requirement: built, with nothing
+    in unmet_criteria (NFR 8)."""
+    if card.get("cardStatus"):
+        return _OVERRIDE_LABEL[card["cardStatus"]]
+    cited = [reqs[i["id"]] for i in card["evidence"] if i["kind"] == "req" and i["id"] in reqs]
+    if cited:
+        done = [r.get("status") == "built" and not r.get("unmet_criteria") for r in cited]
+        if all(done):
+            return "Built"
+        if all(r.get("status") == "not_started" for r in cited):
+            return "Planned"
+        return "In progress"
+    if any(i["kind"] == "sprint" for i in card["evidence"]):
+        return "Planned"
+    return "Heard"
+
+
+def feedback_data(plans_dir: str | Path, requirements_path: str | Path) -> dict:
+    """The Feedback tab's embedded data (REQ-DASH-220 criterion 2), from the
+    same parser the gate uses. REFUSES TO BUILD on any card error
+    (criterion 21): a card the gate would reject never reaches the public
+    page, whether or not the gate ran."""
+    import yaml
+
+    path = Path(plans_dir) / FEEDBACK_FILE
+    cards, errors = parse_feedback_cards(path)
+    if errors:
+        raise ValueError("plans/road-testing.md has feedback card errors - run "
+                         "`mothman dashboard validate-feedback`:\n  " + "\n  ".join(errors))
+    reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements_path).read_text()) or {}).get("requirements", [])}
+    sprints = road_testing_sprints(path.read_text())
+    out = []
+    for c in cards:
+        evidence = []
+        for i in c["evidence"]:
+            if i["kind"] == "req":
+                r = reqs.get(i["id"], {})
+                evidence.append({"kind": "req", "id": i["id"], "title": r.get("title", ""),
+                                 "status": _REQ_STATUS_WORDS.get(r.get("status"), r.get("status", ""))})
+            elif i["kind"] == "sprint":
+                evidence.append({"kind": "sprint", "n": i["n"], "title": sprints.get(i["n"], "")})
+            else:
+                evidence.append({"kind": "link", "label": i["label"], "href": i["href"],
+                                 "inPlaceOn": i["inPlaceOn"]})
+        out.append({"firstLabel": c["firstLabel"], "first": c["first"], "heard": c["heard"],
+                    "built": c["built"], "date": c["date"], "number": c["number"],
+                    "status": card_status(c, reqs), "evidence": evidence})
+    return {"cards": out}

@@ -250,3 +250,18 @@ def test_the_generated_index_is_not_parsed_as_planning_content(tmp_path):
     result = parse_plans(tmp_path)
     assert {i["file"] for i in result["items"]} == {"real"}
     assert not [t for t in result["threads"] if t["file"] == "INDEX"]
+
+
+def test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet():
+    """post-build-review #185 (found building REQ-DOCS-219): after a blank
+    line, a paragraph following a bullet list was joined onto the list's
+    last bullet as though it were a wrapped continuation, so the Plans tab
+    rendered the paragraph inside that bullet - and a feedback card's last
+    line swallowed the prose after it."""
+    from dashboard.plans_md import _parse_numbered_items
+    text = ("1. **[todo, 2026-01-01]** **[Dashboard UI]** Title.\n\n"
+            "- a bullet\n"
+            "  wrapped onto two lines\n\n"
+            "    A paragraph after the list.\n")
+    (item,) = _parse_numbered_items(text, "x")
+    assert item["text"] == "Title.\n\n- a bullet wrapped onto two lines\n\nA paragraph after the list."

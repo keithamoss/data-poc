@@ -111,6 +111,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "a sprint's written status matches what its criteria say", True),
     ("changelog", ["uv", "run", "mothman", "dashboard", "validate-changelog"],
      "CHANGELOG.yaml's schema and component tags", False),
+    # REQ-DOCS-219. Every road-testing entry carries a card the Feedback
+    # tab shows; a missing or malformed one fails here rather than vanishing.
+    ("feedback", ["uv", "run", "mothman", "dashboard", "validate-feedback"],
+     "every road-testing entry carries a well-formed feedback card", False),
     ("scenarios", ["uv", "run", "mothman", "scenarios", "validate"],
      "every scripted decision names a registered scenario and a real decision", True),
     # REQ-GHUB-082 criterion 29. A person without a `github:` is shown

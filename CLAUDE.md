@@ -1372,6 +1372,14 @@ Rough layout:
   2026-09-20 on, so a change does not add to the pile while that is
   pending.
 
+  One exception: a road-testing entry's feedback card stays (REQ-DOCS-219,
+  Keith 2026-10-14). When a plans/road-testing.md entry lands, its numbered
+  title line and its card are kept and only the rest of its prose goes. The
+  card is a few short lines and a pointer at the requirement, and its status
+  on the Feedback tab is derived from that requirement rather than typed, so
+  it cannot become a second record that disagrees with the first. It stays so
+  that someone who gave feedback can see what came of it.
+
 - **When a body of design work is scoped into requirements, carry the
   DECISIONS across at DRAFTING time, and delete the prose only when its
   last dependent batch is built.** Keith's own standing instruction,

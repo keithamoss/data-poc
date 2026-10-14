@@ -409,6 +409,29 @@ button{font:inherit; color:inherit;}
 .legend-key i.exhausted{background:var(--ink-muted); border-radius:2px;}
 /* MoSCoW priority - one hue at four weights, deliberately NOT the
    status palette (post-build-review #56). A scale, not a verdict. */
+a.snapshots-btn{text-decoration:none; color:inherit;}
+.fb-summary{font-size:13.5px; color:var(--ink); margin:4px 0 16px;}
+.fb-list{list-style:none; padding:0; margin:0 0 24px; display:grid; gap:12px; max-width:760px;}
+.fb-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px;}
+.fb-head{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+.fb-label{font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-muted);}
+.fb-first{margin:6px 0 10px; font-size:14.5px; color:var(--ink);}
+.fb-lines{margin:0; display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; font-size:13px;}
+.fb-lines dt{color:var(--ink-muted); font-weight:600;}
+.fb-lines dd{margin:0; color:var(--ink);}
+.fb-evidence{margin:0; padding-left:16px;}
+.fb-date{margin-top:10px; font-size:11.5px; color:var(--ink-faint);}
+.fb-group{margin:8px 0 10px;}
+.pill.fb-built{background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent);}
+.pill.fb-built .ico{background:var(--accent);}
+.pill.fb-progress{background:var(--accent-soft); color:var(--accent-ink); border:1px dashed var(--accent);}
+.pill.fb-progress .ico{background:var(--accent); opacity:.65;}
+.pill.fb-planned{background:var(--surface-alt); color:var(--ink-muted); border:1px solid var(--accent-soft-line);}
+.pill.fb-planned .ico{background:var(--accent-soft-line);}
+.pill.fb-heard{background:var(--surface-alt); color:var(--ink-muted); border:1px dashed var(--line-strong);}
+.pill.fb-heard .ico{background:var(--line-strong);}
+.pill.fb-quiet{background:var(--surface-alt); color:var(--ink-faint); border:1px solid var(--line);}
+.pill.fb-quiet .ico{background:var(--ink-faint);}
 .pill.prio-1{background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent);}
 .pill.prio-1 .ico{background:var(--accent);}
 .pill.prio-2{background:var(--accent-soft); color:var(--accent-ink); border:1px solid var(--accent-soft-line);}
@@ -900,6 +923,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
       <button class="snapshots-btn" id="changelog-btn" type="button">🗒 Release notes</button>
       <button class="snapshots-btn" id="requirements-btn" type="button">📐 Requirements</button>
       <button class="snapshots-btn" id="scenarios-btn" type="button">🎬 Scenarios</button>
+      <a class="snapshots-btn" id="feedback-btn" href="#/feedback">💬 Feedback</a>
       <button class="snapshots-btn" id="leaderboard-btn" type="button">🏆 Leaderboard</button>
       <button class="snapshots-btn" id="plans-btn" type="button">🗂 Plans</button>
       <button class="snapshots-btn" id="demo-btn" type="button">▶ Demo</button>
@@ -2094,6 +2118,13 @@ const LEADERBOARD = [];
 // content volume (100+ items/threads/notes) doesn't fit a cramped
 // drawer.
 const PLANS = {items:[], threads:[]};
+
+// FEEDBACK - REQ-DASH-220's cards, one per plans/road-testing.md entry,
+// embedded by dashboard/embed_dashboard_data.py through the same parser
+// `mothman dashboard validate-feedback` uses (REQ-DOCS-219). Each card's
+// status is derived at build time from the requirements it cites. Empty
+// here, real data only in the built output.
+const FEEDBACK = {cards:[]};
 
 // SPRINT_DEPENDENCIES — REQ-DOCS-073's dependency view: which delivery
 // sprint is waiting on which, derived from each deferred acceptance
@@ -3576,7 +3607,8 @@ function datasetsNotGreenLine(datasets, groupStatus){
   if(groupStatus === "notcounted") return "";
   const c = datasetsNotGreen(datasets);
   if(!c.counted) return "";
-  const noun = c.someLeftOut ? "counted datasets" : "datasets";
+  // Singular for one (Keith, 2026-10-14, post-build-review #186).
+  const noun = (c.someLeftOut ? "counted " : "") + pluralize(c.counted, "dataset");
   const n = c.red + c.amber;
   const said = n ? `<b>${n} of ${c.counted} ${noun} not green</b><div class="not-green-split">${c.red} red, ${c.amber} amber</div>`
     : `All ${c.counted} ${noun} green`;
@@ -3605,13 +3637,20 @@ function groupWeeklySeries(datasetIds, firstRunDateStr, onDateStr, statusesOn){
       if(got.status === "amber") p.amber++;
     });
     return p;
-  });
+  // A WEEK WITH NOTHING COUNTED IS A GAP, NOT A 0% (Keith, 2026-10-14,
+  // post-build-review #186), as REQ-DASH-224 criterion 8 says for columns:
+  // 0 of 0 would draw as a green week nobody judged.
+  }).filter(p=> p.counted > 0);
 }
 function datasetsTrendHtml(series, quiet){
   if(!series || series.length < 2) return "";
   const svg = twoLineSparkline(series, {quiet: !!quiet, w: 180, h: 28, label: ser=>{
     const last = ser[ser.length-1];
-    return `Datasets red and amber each week, ${ser.length} weeks from ${shortDay(ser[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+    const span = `Datasets red and amber each week, ${ser.length} weeks from ${shortDay(ser[0].date)} to ${shortDay(last.date)}`;
+    // A quiet trend claims no latest count (post-build-review #186, as #184
+    // for the dataset row): the visible line says there is none.
+    return quiet ? `${span}; no dataset has a verdict on this date`
+      : `${span}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
   }});
   return `<div class="datasets-trend"><div class="datasets-trend-label">Datasets red and amber, each week</div>${svg}</div>`;
 }
@@ -4517,6 +4556,7 @@ function stateToPath(state){
   if(state.tier==="plans") return "/plans";
   if(state.tier==="demo") return "/demo";
   if(state.tier==="scenarios") return "/scenarios";
+  if(state.tier==="feedback") return "/feedback";
   if(state.tier==="agency") return `/agency/${pathSegment(state.agencyId)}`;
   if(state.tier==="dataset"){
     let p = `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/dataset/${pathSegment(state.datasetId)}`;
@@ -4534,6 +4574,7 @@ function pathToState(raw){
   if(parts[0]==="plans") return {tier:"plans"};
   if(parts[0]==="demo") return {tier:"demo"};
   if(parts[0]==="scenarios") return {tier:"scenarios"};
+  if(parts[0]==="feedback") return {tier:"feedback"};
   if(parts[0]!=="agency" || !parts[1]) return null;
   const state = {tier:"agency", agencyId:parts[1]};
   if(parts[2]==="collection" && parts[3] && parts[4]==="dataset" && parts[5]){
@@ -4981,6 +5022,7 @@ function render(){
   if(STATE.tier==="plans"){ PLANS_FILTER = plansFilterFromUrl(); return done(renderPlans(view)); }
   if(STATE.tier==="demo") return done(renderDemo(view));
   if(STATE.tier==="scenarios") return done(renderScenarios(view));
+  if(STATE.tier==="feedback") return done(renderFeedback(view));
   if(STATE.tier==="agency") return done(renderAgency(view, STATE.agencyId));
   if(STATE.tier==="dataset") return done(renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId));
 }
@@ -8164,7 +8206,7 @@ function scenarioJumpBar(){
   const jump = STATE && STATE.scenarioJump;
   if(!jump || jump.to === DEFAULT_IN_PLACE_ON) return "";
   return `<div class="arrival-notice" role="status" data-testid="scenario-jump-bar">
-    <b>Viewing ${escHtml(fmtDay(jump.to))} for ${escHtml(jump.id)}.</b>
+    <b>Viewing ${escHtml(fmtDay(jump.to))}${jump.id ? ` for ${escHtml(jump.id)}` : ""}.</b>
     The whole dashboard is showing that date, not today.
     <div class="promo-actions"><button type="button" class="link-btn" data-scenario-back>Back to today</button></div></div>`;
 }
@@ -8615,6 +8657,93 @@ function renderSprintDependencies(){
     ${stale}
   </details>`;
 }
+
+/* ---- Feedback (REQ-DASH-220) ----------------------------------------
+   One card per road-testing entry: what was raised (by a reviewer, or by
+   us), what we heard, what we built, and where to see it. Status is
+   derived at build time from the cited requirements; its pill uses a
+   palette of its own, never a data verdict's red, amber or green. Nothing
+   on a card names the person who gave the feedback. */
+const FEEDBACK_STATUS_CLASS = {"Built":"fb-built", "In progress":"fb-progress", "Planned":"fb-planned",
+  "Heard":"fb-heard", "Fixed":"fb-built", "Parked":"fb-quiet", "Won't do":"fb-quiet",
+  "Couldn't reproduce":"fb-quiet"};
+const FEEDBACK_WHY_NOT = new Set(["Parked", "Won't do", "Couldn't reproduce"]);
+const FEEDBACK_STATUS_ORDER = ["Built", "Fixed", "In progress", "Planned", "Heard", "Parked", "Won't do", "Couldn't reproduce"];
+// Card text escaped and marked up the Plans tab's way - bold and inline
+// code only - without its paragraph wrapper (criterion 12).
+function feedbackInline(md){ return renderPlansMarkdown(md).replace(/^<p>/, "").replace(/<\/p>$/, ""); }
+function feedbackEvidence(item){
+  if(item.kind === "req"){
+    // Id, title and status in words, no pill of its own (criteria 9, 17).
+    return `<a href="${escAttr(requirementHref(item.id))}" data-req-link="${escAttr(item.id)}">${escHtml(item.id)} — ${escHtml(item.title)} (${escHtml(item.status)})</a>`;
+  }
+  if(item.kind === "sprint"){
+    return `<span>Road-testing sprint ${item.n}${item.title ? ` — ${escHtml(item.title)}` : ""}</span>`;
+  }
+  return `<a href="${escAttr(item.href)}" data-fb-link="${escAttr(JSON.stringify({href:item.href, inPlaceOn:item.inPlaceOn || null}))}">${escHtml(item.label)}</a>`;
+}
+function feedbackCard(card){
+  const why = FEEDBACK_WHY_NOT.has(card.status);
+  return `<li class="fb-card" data-fb-status="${escAttr(card.status)}">
+    <div class="fb-head"><span class="fb-label">${escHtml(card.firstLabel)}</span>
+      <span class="pill sm ${FEEDBACK_STATUS_CLASS[card.status] || "fb-heard"}"><span class="ico"></span>${escHtml(card.status)}</span></div>
+    <p class="fb-first">${feedbackInline(card.first)}</p>
+    <dl class="fb-lines">
+      <dt>What we heard</dt><dd>${feedbackInline(card.heard)}</dd>
+      <dt>${why ? "Why not" : "What we built"}</dt><dd>${card.built ? feedbackInline(card.built) : `<span class="muted">Not built yet</span>`}</dd>
+      ${card.evidence.length ? `<dt>Where to see it</dt><dd><ul class="fb-evidence">${card.evidence.map(i=> `<li>${feedbackEvidence(i)}</li>`).join("")}</ul></dd>` : ""}
+    </dl>
+    <div class="fb-date">First raised ${escHtml(fmtDay(card.date))}</div>
+  </li>`;
+}
+function feedbackSummary(cards, lead){
+  if(!cards.length) return "";
+  const by = {};
+  cards.forEach(c=> by[c.status] = (by[c.status] || 0) + 1);
+  const parts = FEEDBACK_STATUS_ORDER.filter(s=> by[s]).map(s=> `${by[s]} ${s.toLowerCase()}`);
+  return `${lead} ${cards.length} ${pluralize(cards.length, "thing")} - ${parts.join(", ")}.`;
+}
+function renderFeedback(view){
+  setRail([{tier:"Tier 1", label:"Feedback", nav:{tier:"feedback"}}]);
+  const byRaised = (a,b)=> (a.date < b.date ? -1 : a.date > b.date ? 1 : a.number - b.number);
+  const told = FEEDBACK.cards.filter(c=> c.firstLabel === "You told us").sort(byRaised);
+  const noticed = FEEDBACK.cards.filter(c=> c.firstLabel === "We noticed").sort(byRaised);
+  const summary = [feedbackSummary(told, "You told us"), feedbackSummary(noticed, "We noticed")].filter(Boolean).join(" ");
+  view.innerHTML = `
+    <div class="view-head">
+      <div>
+        <h2>Feedback</h2>
+        <div class="view-sub">What someone road-testing this proof of concept raised, and what we noticed ourselves while using it - and what came of each.</div>
+      </div>
+    </div>
+    ${FEEDBACK.cards.length ? `
+    <p class="fb-summary">${escHtml(summary)}</p>
+    ${told.length ? `<ul class="fb-list">${told.map(feedbackCard).join("")}</ul>` : ""}
+    ${noticed.length ? `<h3 class="fb-group">We noticed</h3><ul class="fb-list">${noticed.map(feedbackCard).join("")}</ul>` : ""}`
+    : `<p class="muted">No feedback has been recorded yet.</p>`}`;
+}
+// A dashboard link on a card navigates in the page on a plain primary
+// click, and leaves every other click to the browser (criterion 10). One
+// carrying a date lands as a Scenarios jump does: the date set quietly, a
+// neutral bar, and Back returns to the Feedback tab at its date (19).
+document.addEventListener("click", e=>{
+  const a = e.target.closest && e.target.closest("a[data-fb-link]");
+  if(!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  const {href, inPlaceOn} = JSON.parse(a.dataset.fbLink);
+  const hash = href.indexOf("#") === -1 ? "" : href.slice(href.indexOf("#") + 1);
+  const nav = pathToState(hash) || {tier:"exec"};
+  if(!inPlaceOn) return navigate(nav);
+  const from = CURRENT_IN_PLACE_ON;
+  if(inPlaceOn !== from) setInPlaceOnQuietly(inPlaceOn);
+  navigate({...nav, scenarioJump: {id: null, from, to: inPlaceOn}});
+  if(inPlaceOn !== from) setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+});
+document.getElementById("feedback-btn").addEventListener("click", e=>{
+  if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  navigate({tier:"feedback"});
+});
 
 function renderPlans(view){
   setRail([{tier:"Tier 1", label:"Plans", nav:{tier:"plans"}}]);

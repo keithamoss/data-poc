@@ -172,7 +172,7 @@ import os
 import re
 
 from dashboard.changelog_yaml import parse_changelog
-from dashboard.plans_md import parse_plans
+from dashboard.plans_md import feedback_data, parse_plans
 from qa_tools.common.sprint_state import dependency_data
 from dashboard.requirements_yaml import parse_requirements
 from qa_tools.common import asset_time
@@ -612,6 +612,12 @@ def embed() -> None:
     html = _replace_const(html, "PLANS", json.dumps(plans, separators=(",", ":")))
     print(f"Re-embedded PLANS = {len(plans['items'])} items, "
           f"{len(plans['threads'])} threads")
+
+    # REQ-DASH-220. The Feedback tab's cards, through the same parser the
+    # validate-feedback gate uses; a card error refuses the build.
+    feedback = feedback_data(PLANS_DIR, REQUIREMENTS_YAML)
+    html = _replace_const(html, "FEEDBACK", json.dumps(feedback, separators=(",", ":")))
+    print(f"Re-embedded FEEDBACK = {len(feedback['cards'])} card(s)")
 
     # REQ-DOCS-073. Computed by the same function `mothman plans
     # dependencies` renders, never re-derived in the page's own JS -

@@ -25,6 +25,8 @@ status (`todo` / `investigate` / `in-progress` / `parked` / `done` /
 anything here that turns into real build work becomes a requirement in
 `requirements.yaml`, and the entry comes out when it lands.
 
+**EVERY ENTRY CARRIES A FEEDBACK CARD** (REQ-DOCS-219). Directly after its opening paragraph, each numbered entry carries a short labelled list: `You told us:` (something a reviewer raised) or `We noticed:` (something we found ourselves), `What we heard:` (our reading, in our own words), `What we built:` once something is (or, for a parked, won't-do or not-reproduced card, why not), `Evidence:` (requirement ids, `sprint <n>`, or relative dashboard links) and, where needed, `Card status:`. A new sighting is filed with at least its first line and `What we heard`. When an entry lands, its title line and its card stay, its status goes to `done`, and the rest of its prose goes as for any other plans entry. A card never names or describes the reviewer. The date in an entry's `[status, date]` tag is the date it was first raised, and does not change when its status does. `mothman dashboard validate-feedback` checks every card; the dashboard's Feedback tab shows them.
+
 **SECOND SWEEP, 2026-10-12** (the same method). Tags tidied the same
 night at Keith's go-ahead: #12 to parked, #16 to blocked (built, waiting
 on its decisions moving into requirements), #5 (done, REQ-DASH-071)
@@ -53,7 +55,7 @@ built. Ordered by value to a busy data-team leader at the dashboard.
   as REQ-DASH-224 to REQ-DASH-228: columns not green on the dataset list,
   datasets not green on agency cards and collection headings, red and
   amber trends on the dataset and column pages, and each check's chart
-  naming its measure. Entries #1 and #2 deleted with the build; their
+  naming its measure. Entries #1 and #2 are kept as cards only; their
   decisions are on those requirements. The turned-off part is
   REQ-DASH-180 criterion 29, built with that requirement.
 - **Sprint 2 - "don't mislead me" (S).** BUILT 2026-10-13 as REQ-DASH-197
@@ -121,6 +123,9 @@ Still to settle by driving the page: #8 and #17 - both since closed
    January does not fill Q1 - it fills **Q2**. Operational reality is
    that some datasets deliver for the current period and some for the
    next, and this is a per-dataset property.
+
+- **You told us:** Some datasets deliver for the following period - data arriving in January fills Q2, not Q1.
+- **What we heard:** Whether a supply is for this period or the next is a property of the dataset, not a one-off.
 
    **The DESIGN QUESTION is settled; the WORK is not, and is
    deliberately not in these sprints.** Corrected 2026-09-24 after this
@@ -205,6 +210,10 @@ Still to settle by driving the page: #8 and #17 - both since closed
    over the COUNT of distinct values - "we don't really care what the
    values are".
 
+- **You told us:** Watch how many distinct values a column has - a few new suburbs is normal, fifty at once is a question.
+- **What we heard:** A drift check on the count of distinct values, with amber and red bands, separate from today's proportion drift.
+- **Evidence:** sprint 4
+
    **This is a genuinely different check from the drift we have**, which
    matters because the obvious move is to point the existing one at
    suburb and call it done. Today's drift check
@@ -270,6 +279,10 @@ Still to settle by driving the page: #8 and #17 - both since closed
    and then a tolerance on how many rows may carry one, in bands:
    roughly 1% acceptable, 2% amber, above 3% red.
 
+- **You told us:** Some bad dates of birth are known - name them, and tolerate them up to a percentage before going amber or red.
+- **What we heard:** A declared list of known-bad dates and ranges with tiered percentage bands, beside the check that tolerates no unknown bad date.
+- **Evidence:** sprint 4
+
    **The semantics to hold on to, because the wording cuts both ways.**
    These are values known to be BAD, and we TOLERATE them up to a
    threshold. That is a different check from the plausible-range one
@@ -333,6 +346,10 @@ Still to settle by driving the page: #8 and #17 - both since closed
    supply, side by side, so a reader gets an immediate visual sense of
    how much has shifted.
 
+- **You told us:** Show a column's values this supply beside last supply, so you can see at a glance how much has shifted.
+- **What we heard:** A side-by-side distribution in the drill-down - a picture for reassurance, not another check to configure.
+- **Evidence:** sprint 3
+
    **His own framing of why, and it is the part worth keeping**: this is
    a HUMAN COMFORT feature, not a check. Drift detection will exist for
    the variables that warrant it, but we will not want a drift check on
@@ -373,6 +390,10 @@ Still to settle by driving the page: #8 and #17 - both since closed
     columns out of everything.** Keith's own ask, 2026-09-24: a table, a
     histogram, a bar chart, whatever - just be clear what was wrong and
     how much of it there was.
+
+- **You told us:** When values are invalid, say which values they were and how many of each.
+- **What we heard:** The breakdown already exists for six columns; every check that can have one should, and a check that cannot should say so.
+- **Evidence:** sprint 3
 
     **It already exists, which reframes this from "build it" to "why did
     you not see it".** `aggregateValuesBlock()` in the template renders,
@@ -446,6 +467,11 @@ Still to settle by driving the page: #8 and #17 - both since closed
     event per ABS census year, so one geocoding event generates six
     rows for six census years. Anything that violates that, we want to
     know about.
+
+- **You told us:** In a tall dataset every event should have exactly one row per expected category - one per census year, say.
+- **What we heard:** A check that every key has exactly one row for each member of a declared set, reporting missing, duplicate and unexpected members separately.
+- **What we built:** Nothing yet - parked until the 30-dataset asset is closer and holds a real tall dataset to build it against.
+- **Card status:** parked
 
     **The generalisable rule underneath it**, which is what makes this
     worth building rather than one bespoke query: *for every key, there
@@ -533,6 +559,11 @@ Still to settle by driving the page: #8 and #17 - both since closed
 16. **[blocked, 2026-10-03]** **[Pipeline & publishing]** **A clean
     resupply cannot get through once a quarter has two undecided
     versions of anything.**
+
+- **We noticed:** A clean resupply could not get through once a quarter had two undecided versions of anything.
+- **What we heard:** Each resupply added another waiting version, and nothing reading a table with two of them could be checked until a person cleared the stale ones.
+- **What we built:** A newer file now supersedes every earlier undecided one for its table and period, so only one version waits at a time.
+- **Evidence:** REQ-PIPE-118
 
     Seen in the first regenerate with REQ-PIPE-105 criterion 13 wired, in
     Child Protection 2026-Q2. The 05-01 delivery had real failures in
@@ -1684,3 +1715,105 @@ Still to settle by driving the page: #8 and #17 - both since closed
     supplies. Keith, 2026-10-13: log it as its own sighting rather than
     settle it as by design inside REQ-DASH-197. A sighting, not a decision -
     whether it should clip, mark later rows, or stay as is is still open.
+
+- **We noticed:** On a past date, the supply history still lists supplies that arrived after it.
+- **What we heard:** Whether the history should stop at the date on show, mark later rows, or stay as it is, is still open.
+- **Evidence:** [Client Register on 5 Aug 2023](?in-place-on=2023-08-05#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
+
+## Landed entries, kept as feedback cards (REQ-DOCS-219)
+
+Card-only entries: what was raised and what came of it. #1 and #2 landed
+with road-testing sprint 1; the others were deleted as they landed and are
+restored here under new numbers, each saying the number it had.
+
+1. **[done, 2026-09-24]** **[Dashboard UI]** **A trend was drawn in two places, measuring two different things, and neither said which.**
+
+- **You told us:** It wasn't clear what a trend line plotted - row counts, failures, supplies, something else?
+- **What we heard:** Every trend should say what it measures in words, and a check's own chart should name its unit.
+- **What we built:** The dataset list, dataset page and column panel chart the share of columns or checks red and amber, with titled axes and a key; a check's chart names its measure, such as 'Rows with no value (count)'.
+- **Evidence:** REQ-DASH-225; REQ-DASH-227; REQ-DASH-228
+
+2. **[done, 2026-09-24]** **[Dashboard UI]** **The overview said whether there was a problem, never how big it was.**
+
+- **You told us:** You could see that something was wrong, but not how much - how many checks red, how many amber.
+- **What we heard:** A count where you triage, so you can see where to put your effort without opening every dataset.
+- **What we built:** The dataset list counts columns not green, and agency cards and collection headings count datasets not green, each with red and amber trend lines.
+- **Evidence:** REQ-DASH-224; REQ-DASH-225; REQ-DASH-226; [Child Protection's datasets](#/agency/child-protection-family-support)
+
+20. **[done, 2026-09-24]** **[Dashboard UI]** **Times were shown in UTC, not Perth time (was #5).**
+
+- **You told us:** Times on the dashboard were in UTC rather than Perth time.
+- **What we heard:** Show the asset's own clock everywhere, with no zone label, since there is only one clock.
+- **What we built:** Every date and time on the page now goes through one formatter, on the asset's own clock.
+- **Evidence:** REQ-DASH-071
+
+21. **[done, 2026-09-24]** **[Dashboard UI]** **Closing a check panel jumped back two levels (was #8).**
+
+- **You told us:** Closing a check panel landed on the agency view instead of the dataset you were on.
+- **What we heard:** Closing should return you to the page you were looking at.
+- **What we built:** Close now steps back only over a page the dashboard itself opened, and otherwise closes in place.
+- **Evidence:** [Client Register](#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
+- **Card status:** fixed
+
+22. **[done, 2026-09-24]** **[Dashboard UI]** **Supply history columns did not line up, and its dates were raw (was #11).**
+
+- **You told us:** In the supply history, columns didn't line up from one cycle to the next, and the dates were raw.
+- **What we heard:** One set of column widths for the whole history, and dates written the way the rest of the page writes them.
+- **What we built:** The dates use the page's one date format, and every cycle's table shares the same column widths.
+- **Evidence:** REQ-DASH-071; [Client Register's supply history](#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)
+
+23. **[done, 2026-09-28]** **[Dashboard UI]** **"Arrived at" was the earliest row in the file, not when the supply arrived (was #14).**
+
+- **We noticed:** 'Arrived at' showed the earliest row in the file rather than the moment the supply was received.
+- **What we heard:** The two had only agreed by coincidence, and a lateness verdict needs the real time of receipt.
+- **What we built:** Arrival times come from the recorded receipt of each supply.
+- **Evidence:** REQ-PIPE-080
+
+24. **[done, 2026-09-26]** **[Dashboard UI]** **"Client reference" three times in a row, with nothing to tell them apart (was #14).**
+
+- **You told us:** The cross-table section showed 'Client reference' three times in a row with nothing to tell the rows apart.
+- **What we heard:** Each row needs to say which tables, column and tool it is about.
+- **What we built:** A cross-table check's row names its tables, its column and its tool.
+- **Evidence:** REQ-QAC-037
+
+25. **[done, 2026-09-24]** **[QA checks & contract]** **A misconfigured Soda check passed silently (was #7).**
+
+- **We noticed:** A Soda check with a configuration mistake passed instead of failing.
+- **What we heard:** Soda logs a bad check and carries on, so its errors have to be read rather than its results trusted.
+- **What we built:** A check Soda could not run shows red as 'could not be evaluated', and configuration is checked before a run.
+- **Evidence:** REQ-QAC-001; REQ-QAC-002
+
+26. **[done, 2026-09-24]** **[QA checks & contract]** **Soda Core cannot run a change-over-time check (was #13).**
+
+- **We noticed:** Soda Core has no way to express a check that compares this supply with an earlier one.
+- **What we heard:** Any change-over-time check has to be computed by us.
+- **What we built:** Drift and volume are computed by us, against the last supply actually promoted.
+- **Evidence:** REQ-QAC-108
+
+27. **[done, 2026-10-04]** **[Pipeline & publishing]** **A forced bootstrap no longer reproduced the same content (was #15).**
+
+- **We noticed:** Re-running the bootstrap over a populated database gave different results from a clean run.
+- **What we heard:** Recorded decisions outlive a re-run, so running again on top of history stacks a second history on the first.
+- **What we built:** The bootstrap refuses to run over recorded QA history; starting again is an explicit reset first.
+- **Evidence:** REQ-PIPE-144
+
+28. **[done, 2026-09-28]** **[Dashboard UI]** **Seventeen "missing supply" items for one daily dataset, on one page (was unnumbered).**
+
+- **We noticed:** One daily dataset's page listed seventeen separate 'missing supply' items, one for every day skipped.
+- **What we heard:** At thirty datasets, that many items about one fact becomes noise people learn to ignore.
+- **What we built:** A period closed with no supply is shown clearly and grouped, rather than as one line per missing day.
+- **Evidence:** REQ-DASH-133
+
+29. **[done, 2026-10-05]** **[Pipeline & publishing]** **The same trial gave different verdicts once (was #17).**
+
+- **We noticed:** One trial run on a file gave different verdicts from four runs after it.
+- **What we heard:** A trial should give the same answer every time it is run on the same file.
+- **What we built:** It never happened again in four more runs, so there was nothing left to trace.
+- **Card status:** not-reproduced
+
+30. **[done, 2026-10-07]** **[Dashboard UI]** **A past date showed a warning about files received years later (was #18).**
+
+- **We noticed:** On a past date, a dataset warned about files that arrived years after it.
+- **What we heard:** A past date must show what was known then, not today's latest file.
+- **What we built:** The 'not the latest file' panel and the stand-in qualifier read as at the date on show.
+- **Evidence:** REQ-DASH-197; REQ-DASH-198; [Client Register on 5 Aug 2023](?in-place-on=2023-08-05#/agency/child-protection-family-support/collection/child-protection/dataset/cp-clients)

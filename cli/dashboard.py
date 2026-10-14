@@ -145,6 +145,18 @@ def validate_changelog_command() -> None:
     _validate_changelog()
 
 
+def _validate_feedback() -> None:
+    from qa_tools.common.validate_feedback import main as validate_main
+    if validate_main() != 0:
+        raise click.ClickException("feedback validation failed - see output above.")
+
+
+@dashboard_group.command("validate-feedback")
+def validate_feedback_command() -> None:
+    """Gate: every road-testing entry carries a well-formed feedback card (REQ-DOCS-219)."""
+    _validate_feedback()
+
+
 INDEX_PATH = "plans/INDEX.md"
 
 

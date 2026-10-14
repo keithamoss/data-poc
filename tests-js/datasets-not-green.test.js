@@ -37,8 +37,10 @@ describe("the datasets-not-green line", () => {
   it("drops 'counted' when the rollup leaves nothing out, and never shows a bare 0", () => {
     const w = load();
     expect(text(w, w.datasetsNotGreenLine(FOUR.slice(0, 3), "red"))).toContain("2 of 3 datasets not green");
-    expect(text(w, w.datasetsNotGreenLine([FOUR[2]], "green"))).toBe("All 1 datasets green");
-    expect(text(w, w.datasetsNotGreenLine([FOUR[2], FOUR[3]], "green"))).toBe("All 1 counted datasets green");
+    // Singular for one (Keith, 2026-10-14, post-build-review #186).
+    expect(text(w, w.datasetsNotGreenLine([FOUR[2]], "green"))).toBe("All 1 dataset green");
+    expect(text(w, w.datasetsNotGreenLine([FOUR[2], FOUR[3]], "green"))).toBe("All 1 counted dataset green");
+    expect(text(w, w.datasetsNotGreenLine([FOUR[0]], "red"))).toContain("1 of 1 dataset not green");
   });
 
   it("shows nothing for a group whose status is Not counted", () => {
@@ -78,5 +80,26 @@ describe("the weekly trend", () => {
     const html = w.datasetsTrendHtml(series);
     expect(text(w, html)).toContain("Datasets red and amber, each week");
     expect(html).toContain('aria-label="Datasets red and amber each week, 5 weeks from 10 Feb 2026 to 10 Mar 2026; latest 1 red and 1 amber of 3"');
+  });
+
+  it("does not claim a count in a quiet trend's name (post-build-review #186)", () => {
+    const w = load();
+    const series = w.groupWeeklySeries(["a", "b", "c", "d"], "2026-02-10", "2026-03-10", on);
+    const html = w.datasetsTrendHtml(series, true);
+    const label = html.match(/aria-label="([^"]+)"/)[1];
+    expect(label).toContain("no dataset has a verdict on this date");
+    expect(label).not.toMatch(/latest \d+ red/);
+  });
+
+  it("leaves out a week in which no dataset was counted (post-build-review #186)", () => {
+    // Keith, 2026-10-14: a week with nothing counted is a gap, not a 0% -
+    // as REQ-DASH-224 criterion 8 already says for the column lines.
+    const w = load();
+    const gap = (dateStr) => new Map([
+      ["a", { status: "red", inRollup: dateStr !== "2026-02-24" }],
+    ]);
+    const series = w.groupWeeklySeries(["a"], "2026-02-10", "2026-03-10", gap);
+    expect(series.map((p) => p.dateStr)).toEqual(["2026-02-10", "2026-02-17", "2026-03-03", "2026-03-10"]);
+    expect(series.every((p) => p.counted === 1 && p.red === 1)).toBe(true);
   });
 });

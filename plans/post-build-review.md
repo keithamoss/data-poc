@@ -8934,3 +8934,38 @@ twice. It deliberately did not re-find the `TypeError`.
        not a criterion); unitTrendBlock interpolates its own constant titles
        unescaped. Untested by automation: REQ-DASH-227 criteria 7 and 10 and
        REQ-DASH-225 criterion 16 - checked live by the critic.
+
+185. **[done, 2026-10-14]** **[Dashboard UI]** **[Docs & process]** **A
+     paragraph after a list was glued onto the list's last bullet.** Found by
+     the main session building REQ-DOCS-219: `dashboard/plans_md.py` treated
+     any line after a bullet as that bullet's wrapped continuation, even
+     across a blank line, so on the Plans tab a paragraph following a list
+     rendered inside its last bullet - and a feedback card's last line
+     swallowed the entry's prose after it. A minor display defect, fixed
+     without sign-off. **FIXED**: a continuation joins its bullet only when no
+     blank line comes between them.
+     `test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet`
+     failed first.
+
+186. **[done, 2026-10-14]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-226 and REQ-DASH-224's dataset half (c51ccf0, 146a9d7).** The
+     two performance changes were confirmed pure caches: `buildData` hashed
+     identically before and after at 474 dates, and `datasetStatusesOn`
+     agreed with `buildData` at 692. Each fix's test seen failing first.
+     - **FIXED - a quiet weekly trend's accessible name claimed a count**
+       ("latest 0 red and 0 amber of 0"), the class #184 fixed for the
+       dataset row. It now says no dataset has a verdict on the date.
+     - **FIXED (Keith, 2026-10-14: "leave them out") - a week with no dataset
+       counted plotted as 0%**, reading as a green week nobody judged. Such
+       weeks are left out, as REQ-DASH-224 criterion 8 already does for column
+       lines. Never reached in today's data; reachable at 30 datasets.
+       REQ-DASH-226 criterion 9 amended with his approval.
+     - **FIXED (Keith, 2026-10-14) - "All 1 datasets green"**: singular for
+       one. Criterion 1 amended with his approval.
+     - **NOTED, no change**: the count line reads `DATA` (buildData, so the same
+       code) while only the trend calls `datasetStatusesOn()` - the letter of
+       criterion 2, not its substance; the trend fill is one task of about
+       0.6s at 31 datasets, not chunked; `_ASSET_PARTS` grows by one entry per
+       distinct `new Date()` instant per render, not continuously; the e2e
+       parity test skips where no trend drew, and checks M with the page's
+       own predicate - the red and amber split is the independent part.

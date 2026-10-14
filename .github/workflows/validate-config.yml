@@ -101,6 +101,9 @@ jobs:
       - name: Validate CHANGELOG.yaml (schema + component tags)
         run: uv run mothman dashboard validate-changelog
 
+      - name: Every road-testing entry carries a feedback card (REQ-DOCS-219)
+        run: uv run mothman dashboard validate-feedback
+
       # plans/INDEX.md is generated from plans/*.md but committed, so it
       # can drift the moment anyone edits a plans file without
       # regenerating. A committed generated artifact nobody checks is
