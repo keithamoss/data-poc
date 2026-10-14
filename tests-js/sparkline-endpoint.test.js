@@ -1,5 +1,9 @@
 // post-build-review #57's last open item, signed off 2026-09-25
-// ("yep, fix it").
+// ("yep, fix it"). REWRITTEN for REQ-DASH-225 criteria 13 and 14: the
+// endpoint dot is gone - the count beside the lines states where a dataset
+// stands - so its assertions went with it. What still guards live code is
+// kept: statusColorVar() never defaults to green, and a quiet state draws
+// its history without colour.
 //
 // THE ONLY RED PIXEL IN THE VIEWPORT SAT UNDER A PILL SAYING THERE IS
 // NO DATA. Where history exists but none of it is current, the card
@@ -30,21 +34,16 @@ function load() {
   return dashboard.window;
 }
 
-// Two columns whose history ends badly, which is what makes the
-// endpoint red in the first place. `date` is a real Date because
-// aggregateFailureSeries() keys on h.date.getTime() - the first draft
-// of this fixture used run ids, which threw inside jsdom and took the
-// rest of the file down with it (see this file's own note at the end).
 const d = (iso) => new Date(iso + "T00:00:00Z");
+const h = (run_id, date, status) => ({ run_id, date: d(date), status });
 const COLS = [
   { name: "a", checks: [{ history: [
-      { date: d("2026-01-01"), status: "green" },
-      { date: d("2026-01-02"), status: "green" },
-      { date: d("2026-01-03"), status: "red" }] }] },
+      h("r1", "2026-01-01", "green"), h("r2", "2026-01-02", "amber"), h("r3", "2026-01-03", "red")] }] },
   { name: "b", checks: [{ history: [
-      { date: d("2026-01-01"), status: "green" },
-      { date: d("2026-01-02"), status: "red" },
-      { date: d("2026-01-03"), status: "red" }] }] },
+      h("r1", "2026-01-01", "green"), h("r2", "2026-01-02", "red"), h("r3", "2026-01-03", "red")] }] },
+];
+const GREEN = [
+  { name: "a", checks: [{ history: [h("r1", "2026-01-01", "green"), h("r2", "2026-01-02", "green")] }] },
 ];
 
 describe("statusColorVar", () => {
@@ -64,44 +63,46 @@ describe("statusColorVar", () => {
   });
 });
 
-describe("the sparkline endpoint under a quiet state", () => {
-  it("does not assert a red verdict when nothing is current", () => {
+describe("the two trend lines", () => {
+  it("draw red solid and amber dotted, with no endpoint dot", () => {
     const w = load();
-    const svg = w.aggregateSparkline(COLS, "nodata");
-    expect(svg).toContain("<circle");
+    const svg = w.aggregateSparkline(COLS);
+    expect(svg).toContain('stroke="var(--bad)"');
+    expect(svg).toMatch(/stroke="var\(--warn-fill\)"[^>]*stroke-dasharray="1.5,2.5"/);
+    expect(svg).not.toContain("<circle");
+  });
+
+  it("draw no red or amber pixel for a history green on every run", () => {
+    const w = load();
+    const svg = w.aggregateSparkline(GREEN);
+    expect(svg).toContain("<line"); // the neutral baseline
     expect(svg).not.toContain("var(--bad)");
+    expect(svg).not.toContain("var(--warn-fill)");
   });
 
-  it("does not assert a healthy one either", () => {
+  it("keep every stroke the same width however the box stretches", () => {
     const w = load();
-    const svg = w.aggregateSparkline(COLS, "nodata");
-    expect(svg).not.toContain("var(--good)");
+    const svg = w.aggregateSparkline(COLS);
+    const strokes = [...svg.matchAll(/<(path|line)\b[^>]*>/g)].map((m) => m[0]);
+    expect(strokes.length).toBeGreaterThan(2);
+    for (const s of strokes) expect(s).toContain('vector-effect="non-scaling-stroke"');
   });
+});
 
-  it("treats every quiet state the same way", () => {
-    const w = load();
-    for (const quiet of ["nodata", "exhausted", "inactive"]) {
-      const svg = w.aggregateSparkline(COLS, quiet);
-      expect(svg, quiet).not.toContain("var(--bad)");
-      expect(svg, quiet).not.toContain("var(--good)");
-    }
-  });
-
-  it("still draws the history itself - the line is not the problem", () => {
+describe("the lines under a quiet state", () => {
+  it("still draw the history, in neutral ink, told apart by style alone", () => {
     // Keith, on the quiet states generally: "no red amber and greens...
     // but I should still be able to see the historical graphs and
     // comparison stuff."
     const w = load();
-    const quiet = w.aggregateSparkline(COLS, "nodata");
-    const normal = w.aggregateSparkline(COLS);
-    const pathOf = (svg) => (svg.match(/ d="([^"]+)"/) || [])[1];
-    expect(pathOf(quiet)).toBe(pathOf(normal));
-    expect(pathOf(quiet)).toBeTruthy();
-  });
-
-  it("leaves an ordinary dataset's endpoint exactly as it was", () => {
-    // The must-not-change half.
-    const w = load();
-    expect(w.aggregateSparkline(COLS)).toContain("var(--bad)");
+    for (const quiet of ["nodata", "exhausted", "inactive"]) {
+      const svg = w.aggregateSparkline(COLS, quiet);
+      expect(svg, quiet).not.toContain("var(--bad)");
+      expect(svg, quiet).not.toContain("var(--warn-fill)");
+      expect(svg, quiet).not.toContain("var(--good)");
+      expect(svg, quiet).toContain('data-series="red"');
+      expect(svg, quiet).toMatch(/data-series="amber"/);
+      expect(svg, quiet).toContain('stroke-dasharray="1.5,2.5"');
+    }
   });
 });

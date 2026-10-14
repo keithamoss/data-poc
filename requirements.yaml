@@ -35465,7 +35465,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As a data team leader reading any count or trend of what is not green, I want red and amber counted the same way everywhere - per check, per column and per check section - so that a count and the line beside it never disagree, and red and amber can be told apart in every one of them."
     moscow: must
-    status: not_started
+    status: in_progress
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35514,7 +35514,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As a data team leader with about thirty datasets on the quarterly asset, I want each row of a collection's dataset list to say how many of its columns are not green, how many of those are red and how many amber, beside small red and amber lines that say what they plot, so that I can rank the red datasets and see which way each is heading without opening them one at a time."
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35578,7 +35578,24 @@ requirements:
       - "THE LINES ARE PER CHECKED QA RUN (delivery-scoper, not asked, unchallenged at Keith's 2026-10-14 answers; corrected by the delivery-architect review M1 and Keith's answer to its Q2). Each point is a checked supply among the runs in place or awaiting on the date on show, resupplies included; a supply withdrawn by that date, or never checked, is not a point. The key says 'each QA run'. REJECTED plotting one point per period's supply in place in this sprint, which would be a different series rather than a labelling change. SUPERSEDES the first draft's 'including supplies later withdrawn'."
       - "THE TURNED-OFF CLAUSE MOVES TO REQ-DASH-180 (Keith, 2026-10-14, delivery-architect review B1, option b). 'Turned off' does not exist in the page yet - REQ-DASH-180 is signed but not built - so a criterion about it here could be neither built nor seen failing first. The owes-nothing half of the old criterion 16 stays, because REQ-DASH-182 criterion 15 already holds on today's page. REJECTED option a, building sprint 1 after REQ-DASH-180. REQ-DASH-180 and REQ-DASH-182 leave this requirement's dependencies accordingly."
       - "SORTING BY RED COUNT IS NOT IN SPRINT 1 (delivery-scoper, 2026-10-14, at the main session's direction to leave it out unless trivial). It is not trivial: the dataset list's order today is the hierarchy's, and a sort changes what 'the third row' means in every link, test and screenshot. A count invites a sort, so it is worth raising again - suggested as a plans/running-thoughts.md entry for a later sprint."
+      - 'BUILT 2026-10-14. The cell is one function over one series, so the count and the lines'' last point cannot disagree. A STALE DATASET READS ''No column has a verdict on this date'' (criterion 21): on a date with nothing in its current period its tiles roll up to ''No data'' (Phase 5g), so no column holds a verdict to count, while the history stays drawn in neutral ink - found when the parity test compared Birth Registrations'' row (''All 14 green'' off a September run) with its page (13 ''No data'' tiles). The section head pill was found saying green there too and was fixed as post-build-review #183. Amber is drawn in --warn-fill, the amber every pill and key on the page already uses; the criterion''s ''--warn'' named the colour, not a variable. The header cell keeps the old Trend column''s place, so the reason rows'' colspan is unchanged.'
     open_questions: []
+    linked_tests:
+      - 'tests-js/columns-not-green.test.js'
+      - 'tests-js/sparkline-endpoint.test.js'
+      - 'tests-js/unit-counts.test.js'
+      - 'tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage'
+      - 'tests/test_dashboard_e2e.py::TestAStaleDatasetsSectionsSayNoData'
+    implemented_by:
+      - 'dashboard/qa-reporting-dashboard.template.html::columnsNotGreenCell'
+      - 'dashboard/qa-reporting-dashboard.template.html::columnsNotGreenKey'
+      - 'dashboard/qa-reporting-dashboard.template.html::twoLineSparkline'
+      - 'dashboard/qa-reporting-dashboard.template.html::aggregateSparkline'
+      - 'dashboard/qa-reporting-dashboard.template.html::unitCounts'
+    evidence:
+      - 'tests-js/columns-not-green.test.js (6 tests, run 2026-10-14, all seen failing first): a red supply-level section reads ''1 of 3'' and ''1 red, 0 amber · incl. Supply-level checks''; an all-green dataset reads ''All 2 green''; the drawn lines sit at 25%/0% red and 0%/50% amber for a two-run history on the fixed scale; a green history draws no red or amber stroke; a date with nothing in the current period reads ''No column has a verdict on this date'' over neutral lines; one run reads ''One QA run so far''.'
+      - 'tests-js/sparkline-endpoint.test.js rewritten (criterion 13): no endpoint dot, red solid and amber dotted 1.5,2.5, non-scaling strokes, quiet states drawn neutral and told apart by style; statusColorVar''s never-green default kept.'
+      - 'tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage (run 2026-10-14 on the real built dashboard, at the build''s own date and 2025-06-15): every ordinary row''s red, amber and counted equal the red, amber and verdict-bearing column tiles plus check-section heads on that dataset''s page, and the lines'' accessible name states the same latest values; at least one dataset (Client Register, 1 of 11) is not all green.'
   - id: REQ-DASH-226
     title: "Agency cards, and each collection heading on the agency tier, say how many datasets are not green, how many red and how many amber, with small red and amber trend lines on both"
     date_written: "2026-10-14"
@@ -35636,7 +35653,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As an agency's data owner asked whether a dataset is getting better or worse, I want the dataset page and each column's panel to show red and amber trends that say what they measure and over which runs, so that I can answer without guessing whether a falling line is good news."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35672,7 +35689,21 @@ requirements:
       - "AMBER DOTTED (Keith, 2026-10-14, delivery-dashboard-ux review Q2). SUPERSEDES the first draft's 'dashed' in criteria 2 and 5; see REQ-DASH-225's decision for why dashed was taken."
       - "THE COLUMN PAGE IS THE COLUMN PANEL (delivery-scoper's reading). The dashboard has no column route of its own. A column opens in the drawer (openColumnDrawer), which today carries no trend at all."
       - "COLUMNS AT DATASET LEVEL, CHECKS AT COLUMN LEVEL (Keith, 2026-10-14, following sprint-1 Q1). The dataset page speaks the dataset list's unit, so its trend ends at the list's count. The column panel can only count checks."
+      - 'BUILT 2026-10-14. One block, unitTrendBlock(), draws both large trends - the dataset page over its columns and sections, the column panel over that column''s checks wrapped one per unit (checksAsUnits) - from the same unitCounts() series as the dataset list''s row, so the dataset page''s latest point and the row are the same numbers by construction. The y-axis title is the same HTML line above the plot that REQ-DASH-228 put on a check''s chart, so the three charts read alike. The end x-axis labels anchor inward so the last date is not clipped. A stale dataset''s trends are drawn neutral, as its row''s are; a blocked dataset shows neither trend nor tile lines (criterion 7). The tables use their own toggle (data-toggle-unit-table, wired once at document level) because the check panel''s existing toggle is wired inside that panel only.'
     open_questions: []
+    linked_tests:
+      - 'tests/test_dashboard_e2e.py::TestTheDatasetPageSaysWhatItsTrendPlots'
+      - 'tests-js/unit-counts.test.js'
+      - 'tests-js/sparkline-endpoint.test.js'
+    implemented_by:
+      - 'dashboard/qa-reporting-dashboard.template.html::unitTrendBlock'
+      - 'dashboard/qa-reporting-dashboard.template.html::twoLinePaths'
+      - 'dashboard/qa-reporting-dashboard.template.html::checksAsUnits'
+      - 'dashboard/qa-reporting-dashboard.template.html::openColumnDrawer'
+      - 'dashboard/qa-reporting-dashboard.template.html::unitCounts'
+    evidence:
+      - 'tests/test_dashboard_e2e.py::TestTheDatasetPageSaysWhatItsTrendPlots (run 2026-10-14 on the real built dashboard): Client Register, the Child Protection dataset with a unit not green, shows ''Columns red and amber, each QA run'' with its key and a ''% of columns'' axis; its table''s newest row gives the same red, amber and ''N of M not green'' as its row in the dataset list; the postcode column''s panel shows ''Checks on this column red and amber, each QA run'' with ''% of checks'', and its newest row matches the red and amber check cards listed in that panel.'
+      - 'Full tests/test_dashboard_e2e.py, 268 passed (run 2026-10-14 on this tree).'
   - id: REQ-DASH-228
     title: "A check's own trend chart names what it measures on its axis and in its table"
     date_written: "2026-10-14"

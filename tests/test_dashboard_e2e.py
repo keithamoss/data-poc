@@ -4083,6 +4083,139 @@ class TestAChecksChartNamesWhatItMeasures:
         assert header.inner_text().strip() == expected
 
 
+class TestAStaleDatasetsSectionsSayNoData:
+    """post-build-review #183: on a date a dataset has nothing in its current
+    period, its column tiles roll up to 'No data' (Phase 5g) but its check
+    sections' head pills still rolled up the old run's verdicts - a green
+    claim about a period nothing was checked for. Found building REQ-DASH-225,
+    whose row count is checked against exactly these pills."""
+
+    def test_section_heads_go_quiet_with_the_tiles(self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, _BDM)
+        seen = clean_page.evaluate("""() => ({
+          stale: !!resolveContext(STATE).ds.noDataInPlaceOn,
+          tiles: [...document.querySelectorAll('.col-tile')].map(b => b.dataset.status),
+          heads: [...document.querySelectorAll('.scope-section .head .pill')].map(p => p.className)})""")
+        assert seen["stale"], "precondition: Birth Registrations is daily and stale on the build's own date"
+        assert seen["tiles"] and set(seen["tiles"]) == {"nodata"}
+        assert seen["heads"], "precondition: it has a check section"
+        assert all("nodata" in c for c in seen["heads"]), seen["heads"]
+
+
+class TestColumnsNotGreenMatchesTheDatasetPage:
+    """REQ-DASH-225 criterion 18: each ordinary row's 'Columns not green'
+    count says what the dataset's own page shows - its red and amber column
+    tiles and check sections, of those with a verdict - and the lines' last
+    point (their accessible name) says the same, at the build's own date and
+    at an earlier one."""
+
+    _AGENCIES = ["registry-services", "child-protection-family-support"]
+
+    def _rows(self, page):
+        return page.evaluate("""() => [...document.querySelectorAll('tr[data-nav]')]
+          .filter(tr => tr.querySelector('.not-green-td'))
+          .map(tr => {
+            const td = tr.querySelector('.not-green-td');
+            const svg = td.querySelector('svg.spark');
+            return {nav: JSON.parse(tr.dataset.nav), text: td.innerText.replace(/\\s+/g, ' ').trim(),
+                    label: svg ? svg.getAttribute('aria-label') : null};
+          })""")
+
+    def _page_counts(self, page):
+        return page.evaluate("""() => {
+          const st = [...document.querySelectorAll('.col-tile')].map(b => b.dataset.status)
+            .concat([...document.querySelectorAll('.scope-section .head .pill')]
+              .map(p => ['red','amber','green'].find(s => p.classList.contains(s)) || 'other'));
+          return {red: st.filter(s => s === 'red').length, amber: st.filter(s => s === 'amber').length,
+                  counted: st.filter(s => ['red','amber','green'].includes(s)).length};
+        }""")
+
+    @staticmethod
+    def _parse(text):
+        import re
+        m = re.match(r"(\d+) of (\d+) (\d+) red, (\d+) amber", text)
+        if m:
+            n, total, red, amber = map(int, m.groups())
+            assert n == red + amber, text
+            return {"red": red, "amber": amber, "counted": total}
+        m = re.match(r"All (\d+) green", text)
+        assert m, f"unexpected cell text {text!r}"
+        return {"red": 0, "amber": 0, "counted": int(m.group(1))}
+
+    @pytest.mark.parametrize("in_place_on", [None, "2025-06-15"])
+    def test_each_rows_count_matches_its_dataset_page(self, clean_page, built_dashboard_html, in_place_on):
+        import re
+        checked, not_green = 0, 0
+        for agency in self._AGENCIES:
+            _goto(clean_page, built_dashboard_html, {"tier": "agency", "agencyId": agency}, in_place_on)
+            for row in self._rows(clean_page):
+                if row["text"].startswith("No column has a verdict"):
+                    _goto(clean_page, built_dashboard_html, row["nav"], in_place_on)
+                    assert self._page_counts(clean_page)["counted"] == 0, row
+                    _goto(clean_page, built_dashboard_html, {"tier": "agency", "agencyId": agency}, in_place_on)
+                    continue
+                said = self._parse(row["text"])
+                if row["label"]:
+                    m = re.search(r"latest (\d+) red and (\d+) amber of (\d+)", row["label"])
+                    assert m and list(map(int, m.groups())) == [said["red"], said["amber"], said["counted"]], row
+                _goto(clean_page, built_dashboard_html, row["nav"], in_place_on)
+                shown = self._page_counts(clean_page)
+                assert shown == said, (row["nav"]["datasetId"], in_place_on, said, shown)
+                checked += 1
+                not_green += said["red"] + said["amber"] > 0
+                _goto(clean_page, built_dashboard_html, {"tier": "agency", "agencyId": agency}, in_place_on)
+        assert checked >= 5, "precondition: most real datasets have an ordinary row"
+        if in_place_on is None:
+            assert not_green, "precondition: at least one dataset is not all green, or this proves nothing"
+
+
+class TestTheDatasetPageSaysWhatItsTrendPlots:
+    """REQ-DASH-227 criterion 9: on a real dataset with a unit that is not
+    green at the build's own date, the dataset page's trend says what it
+    plots in words, its table's latest row agrees with the dataset list, and
+    the column panel's latest row agrees with the checks listed in it."""
+
+    _CP = {"tier": "agency", "agencyId": "child-protection-family-support"}
+
+    def test_trend_title_axis_and_table_agree_with_the_list_and_the_panel(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, self._CP)
+        row = clean_page.evaluate("""() => [...document.querySelectorAll('tr[data-nav]')]
+          .map(tr => ({nav: JSON.parse(tr.dataset.nav), td: tr.querySelector('.not-green-td')}))
+          .filter(r => r.td && /\\d+ red, \\d+ amber/.test(r.td.innerText))
+          .map(r => ({nav: r.nav, text: r.td.innerText.replace(/\\s+/g, ' ').trim()}))[0] || null""")
+        assert row, "precondition: a Child Protection dataset has a unit that is not green"
+        import re
+        n, m, red, amber = map(int, re.match(r"(\d+) of (\d+) (\d+) red, (\d+) amber", row["text"]).groups())
+
+        _goto(clean_page, built_dashboard_html, row["nav"])
+        trend = clean_page.locator('[data-unit-trend="dataset"]')
+        assert trend.locator(".unit-trend-title").inner_text().strip() == "Columns red and amber, each QA run"
+        assert trend.locator(".chart-axis-title").inner_text().strip() == "% of columns"
+        assert trend.locator(".legend-key").is_visible()
+        trend.locator("[data-toggle-unit-table]").click()
+        latest = trend.locator(".trend-table tbody tr").first.locator("td").all_inner_texts()
+        assert [int(latest[1]), int(latest[2])] == [red, amber]
+        assert latest[3] == f"{n} of {m} not green"
+
+        tile = clean_page.locator('.col-tile[data-status="red"], .col-tile[data-status="amber"]').first
+        if tile.count() == 0:
+            tile = clean_page.locator(".col-tile").first
+        tile.click()
+        panel = clean_page.locator('[data-unit-trend="column"]')
+        assert panel.locator(".unit-trend-title").inner_text().strip() == "Checks on this column red and amber, each QA run"
+        assert panel.locator(".chart-axis-title").inner_text().strip() == "% of checks"
+        panel.locator("[data-toggle-unit-table]").click()
+        cells = panel.locator(".trend-table tbody tr").first.locator("td").all_inner_texts()
+        listed = clean_page.evaluate("""() => {
+          const pills = [...document.querySelectorAll('#drawer-body .check-card:not(.is-retired) .pill')];
+          const has = s => pills.filter(p => p.classList.contains(s)).length;
+          return {red: has('red'), amber: has('amber'), counted: has('red') + has('amber') + has('green')};
+        }""")
+        assert [int(cells[1]), int(cells[2])] == [listed["red"], listed["amber"]]
+        assert cells[3].endswith(f"of {listed['counted']} not green")
+
+
 class TestClosingASidePanelReachedByItsUrl:
     """post-build-review #180 (2026-10-14): the side-panel twin of
     road-testing #8. closePanel() always called history.back(), which is

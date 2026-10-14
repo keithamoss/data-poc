@@ -138,6 +138,20 @@ releases:
               in its table - "Rows with no value (count)", "Rows (count)",
               "Drift score (PSI)" - instead of a bare "Value", so a falling
               row count is not read as an improving failure count.
+          - headline: The dataset list counts columns that are not green
+            components: ["Dashboard UI"]
+            description: >
+              The Trend column is now "Columns not green": how many of a
+              dataset's columns are red or amber on its latest QA run - "1 of
+              11", then "0 red, 1 amber" - with two small lines for the red and
+              amber share on each run. A check section counts as one column.
+          - headline: Dataset and column pages chart red and amber
+            components: ["Dashboard UI"]
+            description: >
+              Each dataset page now charts the share of its columns red and
+              amber on every QA run, and each column's panel does the same for
+              its checks - with titled axes and a "View as table" listing.
+              Column tiles show the same two small lines.
       - category: Fixed
         items:
           - headline: Trend lines no longer count unjudged checks as failing
@@ -153,6 +167,12 @@ releases:
               A dbt macro or test kept in a subfolder now needs a changelog
               note when it changes, like one at the top level. Drift checks
               also read their column from the check's own entry now.
+          - headline: Check sections say No data when their columns do
+            components: ["Dashboard UI"]
+            description: >
+              On a date with nothing yet in a dataset's current period, its
+              Supply-level, Table-level and Cross-table sections now read "No
+              data" like its columns, instead of green from an earlier run.
           - headline: Close shuts the Requirements panel in one press
             components: ["Dashboard UI"]
             description: >

@@ -386,6 +386,20 @@ button{font:inherit; color:inherit;}
    Square rather than round, matching their own pills' markers, so the
    legend reads as the same vocabulary the page uses rather than as
    three colours plus two footnotes. */
+.not-green-key{display:block; margin-block:6px 8px;}
+.unit-trend{margin:4px 0 18px; max-width:560px;}
+.unit-trend-title{font-weight:600; font-size:13.5px; color:var(--ink); margin-bottom:2px;}
+.unit-trend .legend-key{margin-block:4px 8px;}
+.tile-lines-key{font-size:12px; color:var(--ink-muted); margin:6px 0 8px;}
+.not-green-key svg{vertical-align:middle;}
+.not-green-td{min-width:200px;}
+.not-green-cell{display:flex; align-items:center; gap:10px;}
+.not-green-text{min-width:72px; font-size:12.5px;}
+.not-green-count{font-weight:600; color:var(--ink);}
+.not-green-count.all-green{font-weight:500;}
+.not-green-split{color:var(--ink-muted); font-size:11.5px; margin-top:1px;}
+.not-green-faint{color:var(--ink-faint); font-size:12px;}
+.not-green-lines{flex:1; min-width:90px;}
 .legend-key i.nodata{background:var(--ink-faint); border-radius:2px;}
 .legend-key i.exhausted{background:var(--ink-muted); border-radius:2px;}
 /* MoSCoW priority - one hue at four weights, deliberately NOT the
@@ -3253,79 +3267,204 @@ function statusColorVar(s){
   return _QUIET_COLOUR;
 }
 
-// Phase 5e (plans/qa-pipeline.md #60), replacing the earlier
-// pickRepresentativeCheck()/sparkline() pair (one representative check's
-// own raw value - history holds that design if it's ever needed again):
-// Keith's redesign call, 2026-09-17 - the sparkline should show the
-// AGGREGATE FAILING-CHECK TREND across every non-retired check in scope,
-// not one check's own metric. `cols` is whatever set of columns the
-// calling tier already has in hand - the whole agency's columns at
-// Tier 1, one dataset's at Tier 2, a single column's (wrapped in an
-// array) at Tier 3 - so the same two functions serve all three, each
-// aggregating only over its own scope (Keith's own answer when asked).
+// HOW A UNIT STANDS ON EACH QA RUN (REQ-DASH-224) - the one counter behind
+// every count and trend line of columns or checks on this page.
 //
-// Grouped by run DATE (a Map, not array index or raw count): a check
-// introduced or retired mid-history changes how many checks are even
-// applicable at a given run, so "N of M failing" only stays comparable
-// run to run as a RATE (failing/applicable that run), never a raw count
-// that could rise or fall just because the denominator moved (Keith's
-// own follow-up concern, also answered: rate, not raw count). Point
-// color is the same worst-of rule used everywhere else in this
-// dashboard (any red check that run makes the run red, else any amber
-// makes it amber) - the rate drives the line's SHAPE, worst-of drives
-// its endpoint COLOR, one combined signal rather than separate
-// amber/red lines (Keith's third answer).
-function aggregateFailureSeries(cols){
-  const checks = cols.flatMap(c=>c.checks.filter(ck=>!ck.retired));
-  const byDate = new Map();
-  checks.forEach(ck=>{
-    ck.history.forEach(h=>{
-      const status = historyStatus(h, ck);
-      const key = h.date.getTime();
-      if(!byDate.has(key)) byDate.set(key, {date:h.date, total:0, failing:0, worst:"green"});
-      const e = byDate.get(key);
-      // ONLY A VERDICT COUNTS (post-build-review #181): amber and red are
-      // "not green"; a check nobody judged that run - inactive, or nodata -
-      // is in neither the count nor the total. Counting them drew every
-      // Child Protection dataset as failing under a green dot.
-      if(status==="green" || status==="amber" || status==="red") e.total++;
-      if(status==="amber" || status==="red") e.failing++;
-      if(STATUS_ORDER[status]>STATUS_ORDER[e.worst]) e.worst=status;
+// A UNIT is anything with `checks`: a column, a check section counted as one
+// column (Supply-level, Table-level, Cross-table - each already sits in
+// ds.columns under its own `scope`, so it counts by the same rule without
+// being found by name), or one check wrapped as {name, checks:[ck]} where a
+// column's own checks are the units (its panel and its tile). File checks
+// live in ds.fileChecks and never reach here (REQ-DASH-097 criterion 2).
+//
+// A check counts on a run by the verdict recorded for it ON THAT RUN - red,
+// amber or green - and is in neither the count nor the total otherwise:
+// inactive, nodata, or no entry at all. Nothing is carried forward from an
+// earlier run. Retired checks count on no run, past ones included, as the
+// column pills already leave them out. A unit takes its worst counted check;
+// a unit with none counted that run is not counted. A run with nothing
+// counted is no point at all - a supply received and never checked does not
+// plot as 0% (criterion 8; Keith, "how could it have no result?").
+//
+// Keyed by run_id, not by date (criterion 6): a resupply on the day of its
+// original is two points, which is exactly the case worth seeing. Red and
+// amber come back separately because they are drawn as two lines.
+// historyStatus() refuses a status it does not recognise (criterion 9).
+function unitCounts(units){
+  const byRun = new Map();
+  (units || []).forEach(u=>{
+    const worst = new Map();
+    (u.checks || []).forEach(ck=>{
+      if(ck.retired) return;
+      ck.history.forEach(h=>{
+        const s = historyStatus(h, ck);
+        if(s !== "red" && s !== "amber" && s !== "green") return;
+        if(!byRun.has(h.run_id)) byRun.set(h.run_id, {runId:h.run_id, date:h.date, counted:0, red:0, amber:0, redNames:[], amberNames:[], sectionNames:[]});
+        const was = worst.get(h.run_id);
+        if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(h.run_id, s);
+      });
+    });
+    worst.forEach((s, runId)=>{
+      const e = byRun.get(runId);
+      e.counted++;
+      if(s === "red"){ e.red++; e.redNames.push(u.name); }
+      if(s === "amber"){ e.amber++; e.amberNames.push(u.name); }
+      if(u.scope && (s === "red" || s === "amber")) e.sectionNames.push(u.name);
     });
   });
-  return [...byDate.values()].sort((a,b)=>a.date-b.date)
-    .map(e=>({date:e.date, rate:e.total ? e.failing/e.total : 0, status:e.worst}));
+  return [...byRun.values()]
+    .sort((a,b)=> (a.date - b.date) || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0));
 }
+// One check as its own unit, for the tiers that count checks rather than
+// columns (a column's panel and tile, REQ-DASH-227).
+function checksAsUnits(checks){ return (checks || []).map(ck=> ({name: ck.name || ck.key, checks:[ck]})); }
 
-// `quietStatus` is the DATASET's own state where it has one that is not
-// a verdict - nodata, exhausted, inactive. Where history exists but none
-// of it is current, the card used to paint the full series ending in a
-// red endpoint dot, under a pill saying there is no data: the only red
-// pixel in that viewport, asserting "and this is where it stands now",
-// which is the one thing a quiet state means nobody can say
-// (post-build-review #57).
+// TWO SMALL LINES, RED AND AMBER (REQ-DASH-225 criteria 8-14, 19, 20) -
+// replacing one neutral "failing share" line with a status-coloured endpoint
+// dot (Phase 5e, plans/qa-pipeline.md #60). Each is the share of that run's
+// counted units, so the denominator can move as units come and go (#60's
+// rate rule stands). Both on one fixed 0-100% scale so rows compare, with no
+// floor. Red solid, amber dotted with round caps, so colour is never the only
+// difference (REQ-DASH-070 criterion 6). A neutral 0% baseline sits under
+// both, and a series is coloured only along stretches where it is above 0%,
+// so a history green on every run shows no red or amber pixel. No endpoint
+// dot: the count beside the lines says where the unit stands now.
 //
-// The LINE is untouched and deliberately so - Keith, on the quiet states
-// generally: "no red amber and greens... but I should still be able to
-// see the historical graphs and comparison stuff." Only the endpoint
-// makes a claim about the present, so only the endpoint goes quiet.
-function aggregateSparkline(cols, quietStatus){
-  const points = aggregateFailureSeries(cols);
-  if(points.length<2) return "";
-  const w=180,h=28,pad=2;
-  // 0.05 floor (not 0): an all-green run of history should still draw a
-  // flat line pinned near the bottom, not divide-by-zero into a NaN path.
-  const max = Math.max(...points.map(p=>p.rate), 0.05);
-  const n = points.length;
-  const x=i=> pad + i*(w-2*pad)/(n-1);
-  const y=v=> h-pad - (v/max)*(h-2*pad);
-  let d="";
-  points.forEach((p,i)=>{ d += (i===0?"M":"L")+x(i).toFixed(1)+","+y(p.rate).toFixed(1)+" "; });
-  const last = points[points.length-1];
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="aggregate failing-check trend sparkline">
-    <path d="${d}" fill="none" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="${x(n-1).toFixed(1)}" cy="${y(last.rate).toFixed(1)}" r="2.6" fill="${statusColorVar(quietStatus || last.status)}"/>
+// `quietStatus` is the unit's own non-verdict state (nodata, exhausted,
+// inactive - post-build-review #57). The history is still drawn, in neutral
+// ink and told apart by line style alone, since colour would make a claim
+// about the present that nobody can make.
+//
+// `.spark` stretches to its box (preserveAspectRatio none), so every stroke
+// is non-scaling or the dots would smear.
+const SPARK_DOTS = "1.5,2.5";
+function twoLineSparkline(series, opts){
+  const o = opts || {};
+  if(!series || series.length < 2) return "";
+  const w = o.w || 180, h = o.h || 28, pad = 2;
+  const n = series.length;
+  const x = i=> pad + i*(w-2*pad)/(n-1);
+  const y = v=> h-pad - v*(h-2*pad);
+  const last = series[n-1];
+  const unit = o.unitWord || "Columns";
+  const label = `${unit} red and amber on each QA run, ${n} runs from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+  return `<svg class="spark${o.cls ? " "+o.cls : ""}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escAttr(label)}">
+    <line x1="${pad}" y1="${y(0).toFixed(1)}" x2="${w-pad}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+    ${twoLinePaths(series, x, y, !!o.quiet)}
   </svg>`;
+}
+// '1 Feb 2023': accessible names are read out, so dates in them are short.
+function shortDay(dt){ return dt.toLocaleDateString("en-AU", {day:"numeric", month:"short", year:"numeric", timeZone:"UTC"}); }
+// The red and amber series as paths, in whatever box x() and y() map to:
+// each coloured only along stretches above 0% (criterion 19), red solid and
+// amber dotted, non-scaling so a stretched box keeps the pattern.
+function twoLinePaths(series, x, y, quiet){
+  const share = (p, key)=> p.counted ? p[key]/p.counted : 0;
+  const line = (key, colour, dashed)=>{
+    let paths = "";
+    for(let i=0;i<series.length-1;i++){
+      const a = share(series[i], key), b = share(series[i+1], key);
+      if(a <= 0 && b <= 0) continue;
+      paths += `<path d="M${x(i).toFixed(1)},${y(a).toFixed(1)} L${x(i+1).toFixed(1)},${y(b).toFixed(1)}" fill="none" stroke="${colour}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"${dashed ? ` stroke-dasharray="${SPARK_DOTS}"` : ""} data-series="${key}"/>`;
+    }
+    return paths;
+  };
+  return line("red", quiet ? _QUIET_COLOUR : "var(--bad)", false)
+    + line("amber", quiet ? _QUIET_COLOUR : "var(--warn-fill)", true);
+}
+// THE DATASET LIST'S 'COLUMNS NOT GREEN' CELL (REQ-DASH-225 criteria 3-6,
+// 8, 21, 22): the newest checked run's count in words, then the two lines.
+// Both come from one series, so the last point and the count say the same
+// thing (criterion 11). Both numbers always, a zero included ('2 red, 0
+// amber'), and a section among them named, so a reader can tell that a
+// supply-level check - not a table column - is what is red (criterion 5).
+//
+// `noVerdict`: nothing is in the dataset's current period on the date on
+// show, so its tiles and sections all read "No data" and no column holds a
+// verdict to count (criterion 21) - the history is still drawn, neutral.
+function columnsNotGreenCell(units, quietStatus, noVerdict){
+  const series = unitCounts(units);
+  const faint = t=> `<span class="not-green-faint">${t}</span>`;
+  if(!series.length) return faint("No column has a verdict on this date");
+  if(noVerdict){
+    const lines = series.length < 2 ? "" : twoLineSparkline(series, {quiet: true, unitWord: "Columns", w: 120, h: 28});
+    return `<div class="not-green-cell"><div class="not-green-text">${faint("No column has a verdict on this date")}</div><div class="not-green-lines">${lines}</div></div>`;
+  }
+  const last = series[series.length-1];
+  const n = last.red + last.amber, m = last.counted;
+  const count = n
+    ? `<b class="not-green-count">${n} of ${m}</b><div class="not-green-split">${last.red} red, ${last.amber} amber${last.sectionNames.length ? ` · incl. ${escHtml(last.sectionNames.join(", "))}` : ""}</div>`
+    : `<span class="not-green-count all-green">All ${m} green</span>`;
+  const lines = series.length < 2 ? faint("One QA run so far")
+    : twoLineSparkline(series, {quiet: !!quietStatus, unitWord: "Columns", w: 120, h: 28});
+  return `<div class="not-green-cell"><div class="not-green-text">${count}</div><div class="not-green-lines">${lines}</div></div>`;
+}
+// The key, once above each collection's table rather than on every row
+// (criteria 2 and 9). Wording approved by Keith, 2026-10-14.
+function lineSample(colour, dashed){
+  return `<svg width="18" height="6" aria-hidden="true"><line x1="1" y1="3" x2="17" y2="3" stroke="${colour}" stroke-width="1.5" stroke-linecap="round"${dashed ? ` stroke-dasharray="${SPARK_DOTS}"` : ""}/></svg>`;
+}
+function columnsNotGreenKey(){
+  return `<div class="legend-key not-green-key">Columns not green — ${lineSample("var(--bad)", false)} red · ${lineSample("var(--warn-fill)", true)} amber, share of columns on each QA run. Supply-level, table-level and cross-table checks each count as one column.</div>`;
+}
+// A DATASET'S OR A COLUMN'S RED AND AMBER, LARGE (REQ-DASH-227 criteria
+// 1-4, 6): the same series and the same two lines as the dataset list's row,
+// with what they plot said in words - a title, a y-axis titled as a share of
+// columns or checks from 0% to 100%, dated first, middle and last x labels -
+// and a 'View as table' listing newest first. Drawn from unitCounts(), so
+// the dataset page's latest point and its row in the dataset list are the
+// same numbers (criterion 8).
+function unitTrendBlock(series, o){
+  const id = "utrend"+(chartSeq++);
+  const n = series.length;
+  const head = `<div class="unit-trend-title">${o.title}</div>${o.key || ""}`;
+  if(!n) return `<div class="unit-trend" data-unit-trend="${o.kind}">${head}<div class="not-green-faint">No ${o.noun} has a verdict on this date</div></div>`;
+  const W=480, H=150, padL=40, padR=12, padT=8, padB=22;
+  const x = i=> n===1 ? padL + (W-padL-padR)/2 : padL + i*(W-padL-padR)/(n-1);
+  const y = v=> H-padB - v*(H-padT-padB);
+  const quiet = !!o.quiet;
+  const plot = n < 2 ? "" : twoLinePaths(series, x, y, quiet);
+  const yLabels = [0, 0.5, 1].map(v=> `<text x="${padL-6}" y="${(y(v)+3).toFixed(1)}" font-size="9.5" text-anchor="end" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${Math.round(v*100)}%</text>`).join("");
+  const tickIdx = [0, Math.floor((n-1)/2), n-1].filter((v,i,a)=> a.indexOf(v)===i);
+  // The end labels anchor inward so the last date is not clipped at the edge.
+  const anchor = i=> n===1 ? "middle" : i===0 ? "start" : i===n-1 ? "end" : "middle";
+  const xLabels = tickIdx.map(i=> `<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="${anchor(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${shortDay(series[i].date)}</text>`).join("");
+  const last = series[n-1];
+  const label = `${o.unitWord} red and amber on each QA run, ${n} ${pluralize(n, "run")} from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+  return `<div class="unit-trend" data-unit-trend="${o.kind}">
+    ${head}
+    <div class="chart-axis-title">${o.yTitle}</div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block; overflow:visible;" role="img" aria-label="${escAttr(label)}">
+      <line x1="${padL}" y1="${y(1).toFixed(1)}" x2="${W-padR}" y2="${y(1).toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="2,3"/>
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${y(0).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+      <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W-padR}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1"/>
+      ${plot}
+      ${yLabels}${xLabels}
+    </svg>
+    ${n < 2 ? `<div class="not-green-faint">One QA run so far</div>` : ""}
+    <div class="chart-toolbar"><button class="link-btn" data-toggle-unit-table="${id}">View as table</button></div>
+    <div class="trend-scroll" id="${id}-table" hidden>
+      <table class="trend-table">
+        <thead><tr><th>Run date</th><th>Red</th><th>Amber</th><th>Not green</th></tr></thead>
+        <tbody>${series.slice().reverse().map(p=> `<tr data-run="${escAttr(p.runId)}"><td>${fmtDate(p.date)}</td><td class="num">${p.red}</td><td class="num">${p.amber}</td><td class="num">${p.red+p.amber} of ${p.counted} not green</td></tr>`).join("")}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+// The toggle for those tables, wherever the block lands (the dataset page,
+// the column panel) - the check panel's own trend has its own wiring.
+document.addEventListener("click", e=>{
+  const btn = e.target.closest && e.target.closest("[data-toggle-unit-table]");
+  if(!btn) return;
+  const t = document.getElementById(btn.dataset.toggleUnitTable+"-table");
+  if(!t) return;
+  t.hidden = !t.hidden;
+  btn.textContent = t.hidden ? "View as table" : "Hide table";
+});
+
+// The row and tile entry point: the units' series, drawn.
+function aggregateSparkline(units, quietStatus, opts){
+  return twoLineSparkline(unitCounts(units), {...(opts||{}), quiet: !!quietStatus});
 }
 
 let chartSeq=0;
@@ -5552,9 +5691,10 @@ function renderAgency(view, agencyId){
       ${redPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
       ${collectionCrossTableSection(ag, col)}
+      ${columnsNotGreenKey()}
       <div class="overflow-x">
       <table class="dataset-table">
-        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Trend</th></tr></thead>
+        <thead><tr><th>Dataset</th><th>Status</th><th>Latest arrival</th><th>Rows, latest run</th><th>Last QA run</th><th>Columns not green</th></tr></thead>
         <tbody>
         ${col.datasets.map(ds=>{
           // REQ-PIPE-053, checked BEFORE the no-data row. Both render
@@ -5606,18 +5746,18 @@ function renderAgency(view, agencyId){
           }
           const arrivalPillHtml = arrivalPillFor(ds.id, ds.lastArrival.run_id,
                                                  ds.lastArrival.arrivalStatus, "sm");
-          // Item 57 brought the Executive tier's sparkline down to Tier 2;
-          // Phase 5e (#60) redesigned what it shows - see
-          // aggregateSparkline()'s own comment - scoped here to just this
-          // one dataset's own columns.
-          const dsSpark = aggregateSparkline(ds.columns, quietOf(ds.status));
+          // REQ-DASH-225: how many of this dataset's columns - check
+          // sections counted as columns - are not green on its newest
+          // checked run, and the red and amber shares on each run before.
+          // ds is already clipped to the date on show, so both are as at it.
+          const dsSpark = columnsNotGreenCell(ds.columns, quietOf(ds.status), !!ds.noDataInPlaceOn);
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
             <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")}${noSupplyNote(ds)}</td>
             <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
-            <td style="min-width:100px;">${dsSpark}</td>
+            <td class="not-green-td">${dsSpark}</td>
           </tr>`;
         }).join("")}
         </tbody>
@@ -6399,8 +6539,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
       <span><i class="green"></i>Green</span><span><i class="amber"></i>Amber</span><span><i class="red"></i>Red</span>
       <span style="color:var(--ink-faint);">— click a column for the full check-by-check breakdown, run-over-run comparison, and history</span>
     </div>
+    ${ds.blocked ? "" : unitTrendBlock(unitCounts(ds.columns), {kind:"dataset", title:"Columns red and amber, each QA run",
+        key: columnsNotGreenKey(), yTitle:"% of columns", unitWord:"Columns", noun:"column", quiet: !!ds.noDataInPlaceOn})}
     <div id="file-section-wrap"></div>
     <div id="scope-sections"></div>
+    ${ds.blocked ? "" : `<div class="tile-lines-key">Each column's lines: share of its checks red (solid) and amber (dotted), each QA run</div>`}
     <div class="col-grid" id="col-grid"></div>
     <div id="supply-history-wrap"></div>
   `;
@@ -6413,7 +6556,12 @@ function renderDataset(view, agencyId, collectionId, datasetId){
   grid.innerHTML = realColumns(ds).map(c=> {
     // No sparkline while blocked: an earlier supply's trend beside this
     // period's "No data" is the carried-forward picture criterion 26 forbids.
-    const colSpark = ds.blocked ? "" : aggregateSparkline([c], quietOf(c.status));
+    // REQ-DASH-227 criteria 5 and 10: the share of THIS column's checks red
+    // and amber on each run, at the tile's own height; none on a tile with
+    // no verdict on the date on show.
+    const hasVerdict = ["red","amber","green"].indexOf(c.status) !== -1;
+    const colSpark = ds.blocked || !hasVerdict ? ""
+      : aggregateSparkline(checksAsUnits(c.checks), undefined, {unitWord: `Checks on ${c.name}`, h: 16, cls: "tile-spark"});
     return `
     <button class="col-tile" data-status="${c.status}" data-col="${c.name}">
       <div class="name">${c.name}</div>
@@ -6450,7 +6598,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // arithmetic and never picked the fix up (found 2026-09-26, when
     // REQ-QAC-037 moved cp-placements' last two table-level rules into
     // the cross-table section and left the section empty).
-    const worst = rollupStatuses(checks.map(checkStatus));
+    // GOES QUIET WITH THE TILES (post-build-review #183): on a date with
+    // nothing in the current period the column tiles roll up to "No data"
+    // (Phase 5g), and a section head is a rolled-up pill like a tile. Its
+    // rows keep each check's own last verdict, as a column's panel does.
+    const worst = ds.noDataInPlaceOn ? "nodata" : rollupStatuses(checks.map(checkStatus));
     const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
         <span class="label"><span class="nm"></span><span class="tr"></span><span class="ds"></span></span>
@@ -6710,7 +6862,11 @@ function openColumnDrawer(ag, col, ds, column, opts){
       <div style="font-size:11px; color:var(--ink-faint); margin-top:6px;">Click any check below for its own current-vs-previous comparison, trend, and row-level detail.</div>
     </div>`;
 
-  body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">${column.description||""}</div>` + statsBlock + summaryBlock + checksBlock;
+  // REQ-DASH-227 criteria 3 and 4: this column's checks, red and amber.
+  const columnTrend = ds.blocked ? "" : `<div class="drawer-section">${unitTrendBlock(unitCounts(checksAsUnits(column.checks)), {kind:"column",
+    title:"Checks on this column red and amber, each QA run", yTitle:"% of checks", unitWord:"Checks", noun:"check",
+    quiet: !!ds.noDataInPlaceOn})}</div>`;
+  body.innerHTML = `<div style="font-size:13px; color:var(--ink-muted); margin-bottom:18px;">${column.description||""}</div>` + statsBlock + summaryBlock + columnTrend + checksBlock;
   document.getElementById("backdrop").classList.add("open");
   document.getElementById("drawer").classList.add("open");
   setDrawerHidden("drawer", false);

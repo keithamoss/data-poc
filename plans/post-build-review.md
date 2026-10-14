@@ -8875,3 +8875,17 @@ twice. It deliberately did not re-find the `TypeError`.
        evidence cites runs, while its commit was a checkpoint with no test
        claims - the full `mothman check` ran before that push, but nothing
        records whether an edit landed between, so the tie is not proven.
+
+183. **[done, 2026-10-14]** **[Dashboard UI]** **A check section's head
+     pill read green on a date nothing was checked.** Found by the main
+     session building REQ-DASH-225, whose browser test compares each dataset
+     row's count with the pills on that dataset's page. On a date with
+     nothing in a dataset's current period, Phase 5g rolls its column tiles
+     up to "No data", but the Supply-level, Table-level and Cross-table
+     section heads rolled up each check's last verdict, so Birth
+     Registrations on 14 October showed thirteen "No data" tiles beside a
+     green "Supply-level checks" - a claim about a period nobody had
+     checked. A minor display defect, fixed without sign-off under the
+     standing rule. **FIXED**: a section head goes quiet with the tiles; its
+     rows keep each check's own last verdict, as a column's panel does.
+     `TestAStaleDatasetsSectionsSayNoData` failed first.
