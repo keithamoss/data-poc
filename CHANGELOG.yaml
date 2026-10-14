@@ -111,11 +111,18 @@ intro: >
 releases:
   - date: "2026-10-14"
     summary: >
-      A fix so a rebuilt demo history dates its corrections the same way
-      every time.
+      Fixes for a supply that arrives early reading as missing, and for how a
+      rebuilt demo history dates its corrections.
     changes:
       - category: Fixed
         items:
+          - headline: An early supply no longer reads as "No data"
+            components: ["Dashboard UI"]
+            description: >
+              A supply that arrives inside its claim window but before its
+              period starts now counts as that period's supply. Before, a
+              whole collection could read "No data" for the quarter even
+              though its supply had arrived and been accepted.
           - headline: Demo corrections are dated by the history, not the rebuild
             components: ["Data generation", "Pipeline & publishing"]
             description: >

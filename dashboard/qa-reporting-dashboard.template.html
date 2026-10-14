@@ -2642,7 +2642,15 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // the checks' own real current/previous values or their historical
   // trend charts. Only a genuinely EMPTY eligibleRuns (checked above,
   // still returns null) has nothing at all worth passing through.
-  const staleInPlaceOn = effectiveRun.run_date < periodStartDate(d.id, inPlaceOnDateStr);
+  // JUDGED BY THE PERIOD THE SUPPLY WAS FILED TO, where its arrival records
+  // one (post-build-review #178): a supply received inside its claim window
+  // but before its period starts - Child Protection's 2025-Q3 delivery, 19
+  // July for the 1 August period - is that period's supply, and comparing its
+  // run date with the period's start read the whole collection "No data"
+  // for the quarter. Without a recorded period, the run date stands in.
+  const filedSlot = ((d.arrivalByRun || {})[effectiveRun.run_id] || {}).slot;
+  const filedPeriodDate = filedSlot != null ? periodDateNamed(d.id, filedSlot) : null;
+  const staleInPlaceOn = (filedPeriodDate || effectiveRun.run_date) < periodStartDate(d.id, inPlaceOnDateStr);
   const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));

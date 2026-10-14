@@ -8703,7 +8703,7 @@ twice. It deliberately did not re-find the `TypeError`.
     next bootstrap from empty. REQ-GEN-205's draft criterion 19 is now
     built work and comes out of the draft at the next fold.
 
-178. **[investigate, 2026-10-14]** **[Dashboard UI]** **A supply that arrives
+178. **[done, 2026-10-14]** **[Dashboard UI]** **A supply that arrives
     inside its claim window but before its period starts reads as "No data"
     for the whole period, across the collection.** Found checking a claim in
     REQ-DASH-182's own UX review (docs/drafts/calendar-close-out/
@@ -8729,4 +8729,17 @@ twice. It deliberately did not re-find the `TypeError`.
     reading "No data" for a quarter is exactly the noise that teaches a
     reader to ignore "No data". Needs a failing test first (a real-browser
     e2e on 2025-Q3's early delivery, which exists in the generated history
-    today). Not fixed yet: for Keith (significant defect rule).
+    today). **FIXED the same morning, test-first, at Keith's call ("fix now,
+    test-first")**: staleness is now judged by the start of the period the
+    supply was FILED to (`arrivalByRun[run].slot` through
+    `periodDateNamed`), the run date standing in only where none is
+    recorded. tests-js/per-dataset-arrivals.test.js's new describe block
+    failed first on the early-arrival case and passes now, with two control
+    cases (filed to the previous period - still stale; no period recorded -
+    the old rule). Verified in a real browser on the rebuilt page:
+    cp-clients, cp-placements and cp-case-workers no longer read "No data"
+    at 2025-08-05 or 2025-09-15. A consequence, intended: a late supply filed
+    to the PREVIOUS period now reads stale in the current one. Recorded on
+    REQ-DASH-054. The "No data" still seen on cp-clients at 2025-06-15 is a
+    cross-table check that could not be judged (identical before and after
+    the fix) - running-thoughts #95's subject, not this one.

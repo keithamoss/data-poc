@@ -8637,6 +8637,7 @@ requirements:
       - dashboard/qa-reporting-dashboard.template.html::buildSupplyHistory
       - dashboard/qa-reporting-dashboard.template.html::cycleLabel
     linked_tests:
+      - tests-js/per-dataset-arrivals.test.js
       - tests/test_embed_dashboard_data.py::test_the_embed_carries_every_named_calendar_and_which_one_each_dataset_follows
       - tests/test_embed_dashboard_data.py::test_a_dataset_with_no_calendar_is_recorded_as_having_none
       - tests/test_embed_dashboard_data.py::test_the_embedded_dates_come_from_the_authored_calendar_rather_than_a_rule
@@ -8776,6 +8777,15 @@ requirements:
         which looks like no data rather than like a bug.
     dependencies: [REQ-PIPE-051, REQ-DASH-041]
     decisions:
+      - 'THE CURRENT CYCLE IS THE PERIOD A SUPPLY WAS FILED TO (post-build-review #178, 2026-10-14, Keith: fix now, test-first):
+        clipDatasetToInPlaceOn judged a dataset stale - "No data", "nothing has landed yet in this dataset''s current expected
+        cycle" - by comparing the supply''s RUN DATE with the start of the period on show, so a supply received inside its claim
+        window but before its period starts read stale for that whole period. Child Protection''s 2025-Q3 delivery (received
+        2025-07-19, filed and promoted to the 1 August period) read "No data" on all six datasets through the quarter. It now
+        compares the start of the period the supply was FILED to (arrivalByRun[run].slot, through periodDateNamed); the run
+        date stands in only where no period is recorded. A consequence, intended: a late supply filed to the PREVIOUS period now
+        reads stale in the current one, which is what "nothing has landed in the current cycle" says. tests-js/per-dataset-arrivals.test.js
+        failed first.'
       - >
         NO FUTURE DATES ARE EMBEDDED OR PICKABLE, and the reasoning is
         Keith's own question rather than a rule inherited from anywhere

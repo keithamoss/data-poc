@@ -204,3 +204,35 @@ describe("a collection arriving on six different schedules is not a bug", () => 
     expect(resolved.every(Boolean)).toBe(true);
   });
 });
+
+// post-build-review #178: a supply received inside its claim window but
+// BEFORE its period starts - filed to that period and promoted there - read
+// "No data" for the whole period, because staleness compared the RUN DATE
+// with the period's start rather than asking which period the supply was
+// filed to. Child Protection's 2025-Q3 delivery (received 2025-07-19, filed
+// to the 1 August period) did exactly this on the real dashboard.
+describe("a supply is current for the period it was FILED to, whenever it arrived", () => {
+  function filed(id, dates, slots) {
+    const d = datasetArrivingOn(id, dates);
+    d.runs.forEach((r, i) => { d.arrivalByRun[r.run_id].slot = slots[i]; });
+    return d;
+  }
+
+  it("an early arrival filed to the period on show is not stale", () => {
+    const w = load();
+    const d = filed("cp-clients", ["2026-02-01", "2026-04-20"], ["2026-Q1", "2026-Q2"]);
+    expect(w.clipDatasetToInPlaceOn(d, "2026-05-15").staleInPlaceOn).toBe(false);
+  });
+
+  it("the same arrival filed to the PREVIOUS period still is", () => {
+    const w = load();
+    const d = filed("cp-clients", ["2026-02-01", "2026-04-20"], ["2026-Q1", "2026-Q1"]);
+    expect(w.clipDatasetToInPlaceOn(d, "2026-05-15").staleInPlaceOn).toBe(true);
+  });
+
+  it("an arrival with no recorded period keeps the run-date rule", () => {
+    const w = load();
+    const d = datasetArrivingOn("cp-clients", ["2026-02-01", "2026-04-20"]);
+    expect(w.clipDatasetToInPlaceOn(d, "2026-05-15").staleInPlaceOn).toBe(true);
+  });
+});
