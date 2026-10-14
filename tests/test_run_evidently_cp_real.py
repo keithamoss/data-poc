@@ -99,14 +99,15 @@ class TestARelativeVolumeCheckOnEveryDataset:
 
     def test_each_one_carries_both_bands(self, monkeypatch, cp_duckdb_dir):
         """A warn band and a fail band, in the criterion's own words -
-        and the same two Birth Registrations uses, read from the one
-        place both collections now get them from."""
-        from qa_tools.common import evidently_common
+        read from each check's own CHECK_LIFECYCLE entry (REQ-QAC-223
+        criterion 3), the same values Birth Registrations uses."""
+        from qa_tools.cp.evidently_check_lifecycle import CHECK_LIFECYCLE
 
         for r in _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z")):
-            assert r["warn_threshold"] == round(evidently_common.WARN_ROW_DROP * 100, 2)
-            assert r["fail_threshold"] == round(evidently_common.FAIL_ROW_DROP * 100, 2)
+            entry = CHECK_LIFECYCLE[r["check_id"]]
+            assert r["warn_threshold"] == round(entry["warn_threshold"] * 100, 2)
+            assert r["fail_threshold"] == round(entry["fail_threshold"] * 100, 2)
             assert r["warn_threshold"] < r["fail_threshold"]
 
     def _against(self, monkeypatch, counts):

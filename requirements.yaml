@@ -599,8 +599,7 @@ requirements:
     acceptance_criteria:
       - Every real check across all 4 tools carries a globally-unique,
         permanent check_id.
-      - A definition change with no accompanying changelog entry fails
-        CI.
+      - 'A definition change with no accompanying changelog entry fails CI - a definition change being a change to a check''s configuration, its expression or test type, a singular test''s SQL, a project macro its test type or its SQL uses (REQ-QAC-223 criterion 2), or an Evidently check''s column, method or thresholds. AMENDED 2026-10-14 by REQ-QAC-223 criterion 6.'
       - A retired check still shows its full real history behind a
         toggle, never as a hard status.
     linked_tests:
@@ -23511,7 +23510,7 @@ requirements:
     - qa_tools/common/drift_reference.py::reference_run_for_arrival
     - qa_tools/common/drift_reference.py::reference_for
     - qa_tools/common/filing.py::period_of
-    - qa_tools/common/evidently_common.py::status_for_row_drop
+    - qa_tools/common/evidently_common.py::status_for
     - qa_tools/common/evidently_common.py::recorded_row_counts
     - qa_tools/cp/run_evidently_cp.py::_volume_results
     - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
@@ -35212,7 +35211,7 @@ requirements:
     date_written: '2026-10-14'
     story: "As the person who reviews a change to a check, I want CI to refuse any change to what a check actually does - its expression, the SQL or project macro behind it, or an Evidently check's column, method or thresholds - unless it comes with a changelog entry, so that no check's definition changes silently and every fix has a dated record a re-check can later point to."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35249,6 +35248,32 @@ requirements:
     - "AMENDS REQ-QAC-006 CRITERION 2 (summary T8, moved here from REQ-QAC-176 with former criterion 19): the exact wording is in docs/drafts/unsigned-triage/summary.md, now carried by criterion 6 here and no longer held."
     - "REVIEWS FOLDED, 2026-10-14 (delivery-architect: buildable now): three NFRs added - the one reader, not merged with sources_fingerprint, the Evidently bands and their comment. No criterion changed."
     - 'THE BUILD COMMIT TRIPS THE GATE ONCE PER EVIDENTLY CHECK, AND PAYS FOR IT WITH CHANGELOG ENTRIES (Keith, 2026-10-14, option A): criterion 3 starts recording each Evidently check''s column, method and thresholds, so the commit that builds this changes about five definition hashes; it adds one changelog entry to each, ''definition now recorded with the check; behaviour unchanged''. Rejected: a one-off gate exemption for the build commit (Keith''s 2026-10-10 rejection of exemptions stands).'
+    - 'BUILT 2026-10-14. The nine Evidently checks (two Birth Registrations, seven Child Protection) each gained their column, method and bands as literals plus a changelog entry, ''Definition now recorded with the check ... behaviour unchanged'' - nine rather than the ~5 estimated at sign-off; Keith''s answer (one entry each, no exemption) covers the count. The four shared module constants in evidently_common were removed rather than kept beside the entries, and status_for_psi/status_for_row_drop became one status_for(value, entry), so no second source of a band remains; check_bands.evidently_bounds reads the entries too. The definition source is passed to the dbt parser only by the gate (definition=None elsewhere keeps the parser pure); the hash''s NEW inputs - the test type and the Soda expression - apply on every path, which changes no comparison because both sides of the gate''s diff use the same formula.'
+    linked_tests:
+    - 'tests/test_validate_check_lifecycle.py::test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs'
+    - 'tests/test_validate_check_lifecycle.py::test_an_unexplained_singular_sql_edit_fails_naming_that_check_alone'
+    - 'tests/test_validate_check_lifecycle.py::test_a_singular_test_also_covers_the_project_macros_its_sql_uses'
+    - 'tests/test_validate_check_lifecycle.py::test_a_soda_expression_change_fails_without_a_changelog_entry_and_passes_with_one'
+    - 'tests/test_validate_check_lifecycle.py::test_an_evidently_threshold_change_fails_naming_that_check_alone'
+    - 'tests/test_validate_check_lifecycle.py::test_every_real_evidently_check_carries_its_whole_definition'
+    - 'tests/test_validate_check_lifecycle.py::test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry'
+    - 'tests/test_check_bands.py'
+    - 'tests/test_run_evidently_cp_real.py'
+    implemented_by:
+    - 'qa_tools/common/check_lifecycle.py::_with_definition'
+    - 'qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata'
+    - 'qa_tools/common/check_lifecycle.py::_parse_soda_check'
+    - 'qa_tools/common/validate_check_lifecycle.py::_old_file_content'
+    - 'qa_tools/common/validate_check_lifecycle.py::dbt_definitions'
+    - 'qa_tools/common/validate_check_lifecycle.py::_by_source_file'
+    - 'qa_tools/common/evidently_common.py::status_for'
+    - 'qa_tools/common/check_bands.py::evidently_bounds'
+    - 'qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm'
+    - 'qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp'
+    - 'qa_tools/cp/run_evidently_cp.py::_volume_results'
+    evidence:
+    - 'tests/test_validate_check_lifecycle.py (seven new tests, run 2026-10-14; the five gate tests each assert the only failures are changelog ones, so no fixture passes on another gate''s refusal): an unexplained edit to a macro fails naming the file once and every check its test type backs, and no other; a singular test''s SQL edit fails naming that check alone; a singular test covers the project macros its SQL uses; a Soda expression change fails without a changelog entry and passes with one; an Evidently threshold change fails naming that check alone; every real Evidently check carries its column, method and bands; the runners judge by the entry. Four of the five gate tests and both Evidently tests failed on the code before the change.'
+    - 'Run against the real repository on 2026-10-14: 307 checks pass the gate with the new definition hash (the formula applies to both sides of the comparison, so nothing reads as changed), and 11 checks carry project SQL in their hash - matches_regex.sql behind 6. A real one-line edit to dbt_project/macros/matches_regex.sql failed the gate with one message naming the file and its 6 checks; reverted.'
   - id: REQ-DOCS-219
     title: "Every road-testing entry carries a short feedback card - what was raised, what we heard, what we built, evidence - checked by mothman check and kept when the entry lands"
     date_written: "2026-10-14"

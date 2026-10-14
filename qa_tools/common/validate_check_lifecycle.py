@@ -83,13 +83,86 @@ def sources_fingerprint() -> str:
     return digest.hexdigest()
 
 
-def _old_file_content(rel_path: str, ref: str) -> str | None:
-    """The file's content at `ref`, or None if it didn't exist there yet."""
+def _old_file_content(rel_path: str, ref: str | None) -> str | None:
+    """The file's content at `ref`, or None if it didn't exist there yet.
+
+    `ref=None` reads the WORKING TREE - the one reader every source file a
+    definition hash covers goes through, at either side of the comparison
+    (REQ-QAC-223 criterion 4)."""
+    if ref is None:
+        path = ROOT / rel_path
+        return path.read_text() if path.is_file() else None
     result = subprocess.run(["git", "show", f"{ref}:{rel_path}"], cwd=ROOT,
                              capture_output=True, text=True)
     if result.returncode != 0:
         return None
     return result.stdout
+
+
+#: Where the project's own dbt SQL lives (REQ-QAC-223 criterion 2): macros
+#: and custom generic tests, and singular tests. Package macros
+#: (dbt_packages/) and staging models are deliberately NOT covered.
+_DBT_MACRO_DIRS = ("dbt_project/macros", "dbt_project/tests/generic")
+_DBT_SINGULAR_DIR = "dbt_project/tests"
+_MACRO_HEAD = re.compile(r"{%-?\s*(macro|test)\s+(\w+)\s*\(")
+
+
+def _files_in(rel_dir: str, ref: str | None) -> list[str]:
+    """The .sql files directly in `rel_dir`, at `ref` or in the working tree."""
+    if ref is None:
+        d = ROOT / rel_dir
+        return sorted(f"{rel_dir}/{p.name}" for p in d.glob("*.sql")) if d.is_dir() else []
+    result = subprocess.run(["git", "ls-tree", "--name-only", f"{ref}:{rel_dir}"], cwd=ROOT,
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        return []
+    return sorted(f"{rel_dir}/{n}" for n in result.stdout.split() if n.endswith(".sql"))
+
+
+def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
+    """What `parse_dbt_check_metadata(definition=...)` reads at one ref: the
+    project SQL behind each dbt check (REQ-QAC-223 criterion 2).
+
+    The project's macros are scanned ONCE per ref (NFR: not once per check)
+    into {name: (file, text)}; a `{% test x(` names test type `x`, a
+    `{% macro test_x(` does too. A singular test is its own SQL file plus
+    every project macro whose name appears in it, followed transitively. The
+    scan is lexical and errs towards including too much, which can only ask
+    for a changelog entry that was not strictly needed."""
+    macros: dict[str, tuple[str, str]] = {}
+    for rel_dir in _DBT_MACRO_DIRS:
+        for rel in _files_in(rel_dir, ref):
+            text = _old_file_content(rel, ref) or ""
+            for kind, name in _MACRO_HEAD.findall(text):
+                macros[name] = (rel, text)
+                if kind == "macro" and name.startswith("test_"):
+                    macros.setdefault(name[len("test_"):], (rel, text))
+
+    def _with_used_macros(files: list[str], texts: list[str]) -> tuple[str, tuple[str, ...]]:
+        seen = set(files)
+        i = 0
+        while i < len(texts):
+            for name, (rel, text) in macros.items():
+                if rel not in seen and re.search(rf"\b{re.escape(name)}\s*\(", texts[i]):
+                    seen.add(rel)
+                    files.append(rel)
+                    texts.append(text)
+            i += 1
+        return "\n".join(f"-- {f}\n{t}" for f, t in zip(files, texts)), tuple(files)
+
+    def definition(kind: str, name: str):
+        if kind == "singular":
+            rel = f"{_DBT_SINGULAR_DIR}/{name}.sql"
+            text = _old_file_content(rel, ref)
+            if text is None:
+                return None, ()
+            return _with_used_macros([rel], [text])
+        if "." in name or name not in macros:  # dbt's own or a package's
+            return None, ()
+        rel, text = macros[name]
+        return _with_used_macros([rel], [text])
+
+    return definition
 
 
 def _evidently_dict_from_source(source: str, filename: str) -> dict:
@@ -102,6 +175,12 @@ def _evidently_dict_from_source(source: str, filename: str) -> dict:
     namespace: dict = {}
     exec(compile(source, filename, "exec"), namespace)
     return namespace.get("CHECK_LIFECYCLE", {})
+
+
+def _dbt_kwargs(parser, ref: str | None) -> dict:
+    """A dbt parser is given the project SQL as it stood at the SAME ref as
+    the YAML it parses, so both sides of the comparison see their own."""
+    return {"definition": dbt_definitions(ref)} if parser is cl.parse_dbt_check_metadata else {}
 
 
 def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
@@ -117,7 +196,7 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
         if ref is None:
             if not (ROOT / rel_path).exists():
                 continue
-            checks.extend(parser(ROOT / rel_path))
+            checks.extend(parser(ROOT / rel_path, **_dbt_kwargs(parser, None)))
             continue
         content = _old_file_content(rel_path, ref)
         if content is None:
@@ -127,7 +206,7 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
             tmp_path = f.name
         # THE OLD SIDE AS IT WAS: a rule added since applies to the tree now.
         past = {"past": True} if parser is cl.parse_contract_check_metadata else {}
-        checks.extend(parser(tmp_path, **past))
+        checks.extend(parser(tmp_path, **past, **_dbt_kwargs(parser, ref)))
 
     for rel_path in _EVIDENTLY_SOURCES:
         if ref is None:
@@ -232,14 +311,45 @@ def _explanation_errors(checks: list[cl.CheckMetadata]) -> list[str]:
     return errors
 
 
+def _by_source_file(errors: list[str], old_checks, new_checks, base) -> list[str]:
+    """ONE EDITED FILE, ONE FAILURE (REQ-QAC-223 criterion 7). A shared macro
+    backs many checks - matches_regex.sql backs 11 - so an edit to it would
+    otherwise fail the gate once per check. Where an edited project file
+    moved more than one undocumented check, those checks' messages become one
+    naming the file and listing them; a file behind a single check keeps that
+    check's own message."""
+    undocumented = set(cl.find_undocumented_changes(old_checks, new_checks))
+    if not undocumented:
+        return errors
+    files: dict[str, list[str]] = {}
+    for c in new_checks:
+        if c.check_id in undocumented:
+            for f in c.definition_files:
+                files.setdefault(f, []).append(c.check_id)
+    grouped: list[str] = []
+    covered: set[str] = set()
+    for f, ids in sorted(files.items()):
+        ids = sorted(set(ids) - covered)
+        if len(ids) < 2 or _old_file_content(f, base) == _old_file_content(f, None):
+            continue
+        covered |= set(ids)
+        grouped.append(f"{f} changed without a new changelog entry on the {len(ids)} checks it "
+                       "defines: " + ", ".join(repr(i) for i in ids))
+    kept = [e for e in errors
+            if not any(e == f"Check config changed without a new changelog entry: {i!r}" for i in covered)]
+    return grouped + kept
+
+
 def main(require_explanations: bool = False) -> int:
     # Not a literal "HEAD~1" - a push of several commits would then
     # only ever be checked on its last one, and every retroactive edit
     # underneath it would pass unread. See qa_tools/common/diff_base.py
     # (plans/post-build-review.md #44).
-    old_checks = collect_checks(diff_base())
+    base = diff_base()
+    old_checks = collect_checks(base)
     new_checks = collect_checks(None)
-    errors = cl.validate(old_checks, new_checks) + _check_id_errors(new_checks)
+    errors = _by_source_file(cl.validate(old_checks, new_checks), old_checks, new_checks, base)
+    errors += _check_id_errors(new_checks)
     # REQ-GEN-183 criteria 9 and 10: every SQL-bodied check names the
     # columns its SQL reads, in the contract's own table names.
     errors += cl.reads_columns_errors(new_checks, cl.contract_columns())

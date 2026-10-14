@@ -10,7 +10,8 @@ import duckdb
 
 from qa_tools.common.datacontract_common import check_id_from_quality_definition
 from qa_tools.common.dbt_common import failing_sample_keys_direct, failing_sample_keys_via_values
-from qa_tools.common.evidently_common import status_for_psi
+from qa_tools.common.evidently_common import status_for
+from qa_tools.bdm.evidently_check_lifecycle import CHECK_LIFECYCLE as _BDM_EVIDENTLY, PSI_CHECK_ID as _PSI_ID
 from qa_tools.common.soda_common import check_id_from_resource_attributes
 
 
@@ -40,7 +41,7 @@ def test_check_id_from_resource_attributes_finds_the_real_attribute():
 
 
 def test_status_for_psi_below_warn_threshold_is_pass():
-    assert status_for_psi(0.01) == "pass"
+    assert status_for(0.01, _BDM_EVIDENTLY[_PSI_ID]) == "pass"
 
 
 def test_status_for_psi_bands_a_real_value_rather_than_special_casing_a_run():
@@ -49,8 +50,8 @@ def test_status_for_psi_bands_a_real_value_rather_than_special_casing_a_run():
     reachable while the reference was a fixed run the batch chose once.
     A run can never be its own reference now, and "there is no reference
     at all" is answered by NO_REFERENCE before this function is reached."""
-    assert status_for_psi(0.9) == "fail"
-    assert status_for_psi(0.15) == "warn"
+    assert status_for(0.9, _BDM_EVIDENTLY[_PSI_ID]) == "fail"
+    assert status_for(0.15, _BDM_EVIDENTLY[_PSI_ID]) == "warn"
 
 
 def test_failing_sample_keys_direct_returns_empty_on_a_real_query_error():

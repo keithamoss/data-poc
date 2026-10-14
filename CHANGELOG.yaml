@@ -124,6 +124,13 @@ releases:
               on its id. Share it and the panel opens at that requirement,
               marked "Linked here"; Back and Forward step through it like any
               other page.
+          - headline: Every change to what a check does now needs a note
+            components: ["QA checks & contract"]
+            description: >
+              Changing a check's rule - the regex macro behind a dbt test, a
+              Soda check's expression, a drift check's thresholds - now fails
+              the build until the check's changelog says why. Before, only
+              changes to a check's settings were caught.
       - category: Fixed
         items:
           - headline: Trend lines no longer count unjudged checks as failing

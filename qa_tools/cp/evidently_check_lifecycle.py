@@ -60,7 +60,16 @@ CHECK_LIFECYCLE = {
         "introduced_date": "2023-01-15",
         "description": "The spread of values must stay close to the reference supply.",
         "failure_indicates": "self-evident",
-        "changelog": [],
+        # WHAT THE CHECK DOES (REQ-QAC-223 criterion 3): PSI over the
+        # column, tripped on a strict >.
+        "column": "concern_type",
+        "method": "psi",
+        "warn_threshold": 0.10,
+        "fail_threshold": 0.25,
+        "changelog": [{
+            "date": "2026-10-14T00:00:00Z",
+            "description": "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged.",
+        }],
     },
     **{
         check_id: {
@@ -76,7 +85,17 @@ CHECK_LIFECYCLE = {
             "introduced_date": "2026-09-29",
             "description": "The number of rows must not drop sharply against the last promoted supply.",
             "failure_indicates": "self-evident",
-            "changelog": [],
+            # A whole-table count, filed in "Supply-level checks" (column
+            # "(table)", see run_evidently_cp.py); the proportional drop,
+            # tripped on a strict >.
+            "column": None,
+            "method": "row_drop",
+            "warn_threshold": 0.10,
+            "fail_threshold": 0.25,
+            "changelog": [{
+                "date": "2026-10-14T00:00:00Z",
+                "description": "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged.",
+            }],
         }
         for check_id in ROW_COUNT_GROWTH_CHECK_IDS.values()
     },

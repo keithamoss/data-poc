@@ -423,3 +423,212 @@ def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path,
     (repo / "contract.yaml").write_text(today)
 
     assert vcl.main() == 0, capsys.readouterr().out
+
+
+# ---- REQ-QAC-223: the gate sees what a check actually does ------------
+#
+# A check's definition hash used to cover only its YAML configuration, so a
+# change to the macro behind a dbt test, a singular test's SQL, a Soda
+# check's own expression or an Evidently threshold passed the changelog gate
+# unseen - matches_regex.sql backs 11 real checks and editing it tripped
+# nothing.
+
+_BDM = "data-asset-1.registry-services.civil-registration.birth-registrations"
+
+_MATCHES_REGEX = """{% test matches_regex(model, column_name, regex) %}
+select * from {{ model }} where not regexp_like({{ column_name }}, '{{ regex }}')
+{% endtest %}
+"""
+
+
+def _regex_schema(changelog_on_a: str = "[]") -> str:
+    return textwrap.dedent(f"""\
+        models:
+          - name: m
+            columns:
+              - name: a
+                tests:
+                  - matches_regex:
+                      regex: "^[0-9]+$"
+                      meta:
+                        check_id: {_BDM}.a.matches_regex_dbt
+                        category: conformity
+                        changelog: {changelog_on_a}
+              - name: b
+                tests:
+                  - matches_regex:
+                      regex: "^[A-Z]+$"
+                      meta:
+                        check_id: {_BDM}.b.matches_regex_dbt
+                        category: conformity
+                        changelog: []
+                  - not_null:
+                      meta:
+                        check_id: {_BDM}.b.not_null_dbt
+                        category: completeness
+                        changelog: []
+        tests:
+          - name: sibling_rule
+            config:
+              meta:
+                check_id: {_BDM}.b.sibling_rule_dbt
+                category: consistency
+                changelog: []
+                reads_columns: [birth_registrations.date_of_birth]
+        """)
+
+
+def _dbt_repo(tmp_path, monkeypatch):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
+    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    (repo / "dbt_project" / "macros").mkdir(parents=True)
+    (repo / "dbt_project" / "tests").mkdir(parents=True)
+    (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(_MATCHES_REGEX)
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where false\n")
+    (repo / "schema.yml").write_text(_regex_schema())
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "introduce the checks")
+    return repo
+
+
+def _only_changelog_errors(err: str) -> None:
+    """A test about the changelog gate must fail on THAT, not on a fixture
+    some other gate (the check-id grammar, reads_columns) refuses."""
+    lines = [ln for ln in err.splitlines() if ln.startswith("  - ")]
+    assert lines, err
+    assert all("changelog" in ln for ln in lines), err
+
+
+def _commit(repo, message):
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", message)
+
+
+def test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs(
+        tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(
+        _MATCHES_REGEX.replace("regexp_like", "not regexp_like"))
+    _commit(repo, "change the macro, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert err.count("dbt_project/macros/matches_regex.sql") == 1
+    assert f"{_BDM}.a.matches_regex_dbt" in err and f"{_BDM}.b.matches_regex_dbt" in err
+    assert "not_null_dbt" not in err and "sibling_rule_dbt" not in err
+
+
+def test_an_unexplained_singular_sql_edit_fails_naming_that_check_alone(tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
+    _commit(repo, "change the singular test, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert f"{_BDM}.b.sibling_rule_dbt" in err
+    assert "matches_regex_dbt" not in err and "not_null_dbt" not in err
+
+
+def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "macros" / "helper.sql").write_text(
+        "{% macro clean_name(c) %} trim({{ c }}) {% endmacro %}\n")
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text(
+        "select {{ clean_name('x') }} where false\n")
+    _commit(repo, "the singular test starts using a project macro (new check text, so a changelog)")
+    # Re-baseline: the commit above changed the singular test, which the gate
+    # would rightly flag - this test is about the edit AFTER it.
+    (repo / "dbt_project" / "macros" / "helper.sql").write_text(
+        "{% macro clean_name(c) %} lower(trim({{ c }})) {% endmacro %}\n")
+    _commit(repo, "change the helper macro, no changelog")
+
+    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert f"{_BDM}.b.sibling_rule_dbt" in err
+
+
+def test_a_soda_expression_change_fails_without_a_changelog_entry_and_passes_with_one(
+        tmp_path, monkeypatch, capsys):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("soda.yml", vcl.cl.parse_soda_check_metadata)])
+    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    cid = f"{_BDM}.row_count_soda"
+
+    def soda(expr, changelog="[]"):
+        return textwrap.dedent(f"""\
+            checks for m:
+              - {expr}:
+                  attributes:
+                    check_id: {cid}
+                    category: completeness
+                    changelog: {changelog}
+            """)
+    (repo / "soda.yml").write_text(soda("row_count > 0"))
+    _commit(repo, "introduce")
+    (repo / "soda.yml").write_text(soda("row_count > 10"))
+    _commit(repo, "tighten the expression, no changelog")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert cid in err
+
+    (repo / "soda.yml").write_text(soda(
+        "row_count > 10", changelog='[{"date": "2026-10-14", "change": "Tightened to 10."}]'))
+    _commit(repo, "add the changelog entry")
+    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~2")
+    assert vcl.main() == 0
+
+
+def test_an_evidently_threshold_change_fails_naming_that_check_alone(tmp_path, monkeypatch, capsys):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(vcl, "_YAML_SOURCES", [])
+    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", ["ev.py"])
+    a, b = f"{_BDM}.sex.drift_psi_evidently", f"{_BDM}.row_count_growth_evidently"
+
+    def ev(fail):
+        return (f"CHECK_LIFECYCLE = {{\n"
+                f"  {a!r}: {{'category': 'consistency', 'changelog': [], 'column': 'sex',"
+                f" 'method': 'psi', 'warn_threshold': 0.10, 'fail_threshold': {fail}}},\n"
+                f"  {b!r}: {{'category': 'timeliness', 'changelog': [], 'column': None,"
+                f" 'method': 'row_drop', 'warn_threshold': 0.10, 'fail_threshold': 0.25}},\n"
+                f"}}\n")
+    (repo / "ev.py").write_text(ev(0.25))
+    _commit(repo, "introduce")
+    (repo / "ev.py").write_text(ev(0.30))
+    _commit(repo, "loosen one band, no changelog")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert a in err and b not in err
+
+
+def test_every_real_evidently_check_carries_its_whole_definition():
+    """REQ-QAC-223 criterion 3: an Evidently check's column, method and
+    warn/fail bands are literals in its own CHECK_LIFECYCLE entry - where
+    the definition hash sees them - not shared module constants it cannot."""
+    from qa_tools.bdm import evidently_check_lifecycle as bdm
+    from qa_tools.cp import evidently_check_lifecycle as cp
+    entries = {**bdm.CHECK_LIFECYCLE, **cp.CHECK_LIFECYCLE}
+    assert len(entries) >= 9, "precondition: the real registries are not empty"
+    for check_id, meta in entries.items():
+        assert meta.get("method") in ("psi", "row_drop"), check_id
+        assert "column" in meta, check_id
+        assert 0 < meta["warn_threshold"] < meta["fail_threshold"], check_id
+
+
+def test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry():
+    """...and the runners read them from there by check_id, so the band the
+    hash covers is the band a verdict is judged by."""
+    from qa_tools.common import evidently_common as ec
+    entry = {"method": "psi", "column": "sex", "warn_threshold": 0.2, "fail_threshold": 0.4}
+    assert ec.status_for(0.3, entry) == "warn"
+    assert ec.status_for(0.5, entry) == "fail"
+    assert ec.status_for(0.1, entry) == "pass"

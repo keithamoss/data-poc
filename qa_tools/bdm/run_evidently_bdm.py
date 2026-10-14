@@ -26,13 +26,16 @@ import os
 
 from . import bdm_common
 from qa_tools.common.evidently_common import (
-    ENGINE_TAG, WARN_THRESHOLD, FAIL_THRESHOLD, NO_REFERENCE, WARN_ROW_DROP, FAIL_ROW_DROP,
-    status_for_psi, status_for_row_drop, compute_psi,
+    ENGINE_TAG, NO_REFERENCE, status_for, compute_psi,
 )
 from qa_tools.common import asked_for
 from qa_tools.common import drift_reference
 from qa_tools.common.qa_results_writer import write_qa_result
-from .evidently_check_lifecycle import PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
+from .evidently_check_lifecycle import CHECK_LIFECYCLE, PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
+
+# Each check judged by its OWN entry's column and bands (REQ-QAC-223 c3).
+_PSI = CHECK_LIFECYCLE[PSI_CHECK_ID]
+_VOLUME = CHECK_LIFECYCLE[ROW_COUNT_GROWTH_CHECK_ID]
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
@@ -182,8 +185,8 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         psi, psi_snapshot, status = None, None, NO_REFERENCE
     else:
         reference = _reference_frame(reference_run_id)
-        psi, psi_snapshot = compute_psi(current, reference, "sex")
-        status = status_for_psi(psi)
+        psi, psi_snapshot = compute_psi(current, reference, _PSI["column"])
+        status = status_for(psi, _PSI)
     raw_output = {"psi": psi_snapshot}
 
     results = [{
@@ -191,7 +194,7 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         "collection_id": COLLECTION_ID,
         "dataset_id": DATASET_ID,
         "check_id": PSI_CHECK_ID,
-        "column_name": "sex",
+        "column_name": _PSI["column"],
         "check_name": "drift:PSI",
         "dimension": "consistency",
         "label": "Distribution drift",
@@ -199,8 +202,8 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         "run_timestamp": run_timestamp,
         "metric_value": round(psi, 4) if psi is not None else None,
         "unit": "PSI",
-        "warn_threshold": WARN_THRESHOLD,
-        "fail_threshold": FAIL_THRESHOLD,
+        "warn_threshold": _PSI["warn_threshold"],
+        "fail_threshold": _PSI["fail_threshold"],
         "status": status,
         "on_fail_action": "flag",
         "row_count_total": n_total,
@@ -240,7 +243,7 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
             reference_count = _row_count_of(_current_frame(reference_run_id))[0]
         rate_drop = ((reference_count - current_count) / reference_count
                      if reference_count else 0.0)
-        volume_status = status_for_row_drop(rate_drop)
+        volume_status = status_for(rate_drop, _VOLUME)
     results.append({
         "agency_id": AGENCY_ID,
         "collection_id": COLLECTION_ID,
@@ -252,7 +255,7 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         # birth-registrations' dashboard builder silently drops (see
         # pipeline/build_dashboard_data.py; there's no "(table-level
         # checks)" pseudo-column here the way Child Protection has).
-        "column_name": "registration_number",
+        "column_name": _VOLUME["column"],
         "check_name": "evidently:row_count_growth",
         "dimension": "timeliness",
         "label": "Row count vs. last promoted supply",
@@ -260,8 +263,8 @@ def evaluate_evidently_bdm(run_id: str, run_timestamp: str,
         "run_timestamp": run_timestamp,
         "metric_value": None if rate_drop is None else round(rate_drop * 100, 2),
         "unit": "%",
-        "warn_threshold": round(WARN_ROW_DROP * 100, 2),
-        "fail_threshold": round(FAIL_ROW_DROP * 100, 2),
+        "warn_threshold": round(_VOLUME["warn_threshold"] * 100, 2),
+        "fail_threshold": round(_VOLUME["fail_threshold"] * 100, 2),
         "status": volume_status,
         "on_fail_action": "flag",
         "row_count_total": current_count,

@@ -10,13 +10,17 @@ from __future__ import annotations
 
 ENGINE_TAG = "Evidently 0.7"
 
-# same pass/warn/fail bands both existing datasets use, applied to the
-# real PSI value Evidently computes - Evidently's own DataDriftPreset only
-# carries one drift/no-drift threshold (0.1) by default, not a three-way
-# band, so the warn/fail split here is this project's convention, not
-# Evidently's.
-WARN_THRESHOLD = 0.10
-FAIL_THRESHOLD = 0.25
+# THE BANDS LIVE IN EACH CHECK'S OWN ENTRY (REQ-QAC-223 criterion 3).
+# They used to be four module constants shared by every Evidently check,
+# which the changelog gate could not see: a definition hash covers a
+# check's CHECK_LIFECYCLE entry, and a band changed here moved every check's
+# verdicts without changing any of them. Each entry now carries its column,
+# its method and its warn/fail bands as literals - the same values in every
+# entry today (Keith, 2026-09-28: Child Protection mirrors Birth
+# Registrations' bands), duplicated deliberately so that one check's band
+# can change, with its own changelog entry, without moving the others.
+# Evidently's own DataDriftPreset carries one drift/no-drift threshold
+# (0.1); the three-way band is this project's convention.
 
 
 #: What a drift or volume check reports when it has nothing to measure
@@ -33,49 +37,22 @@ FAIL_THRESHOLD = 0.25
 NO_REFERENCE = "nodata"
 
 
-def status_for_psi(psi: float) -> str:
-    """The band this PSI value falls in.
+def status_for(value: float, entry: dict) -> str:
+    """The band `value` falls in under one check's own entry - its
+    `warn_threshold` and `fail_threshold`, each tripped on a strict `>`.
 
-    `is_reference` WAS REMOVED 2026-09-29 with REQ-QAC-108. It returned
-    "pass" when a run was its own reference, which was reachable only
-    because the reference was a fixed run the batch chose once - the
-    thing criterion 4 forbids. The reference is now always an EARLIER
-    period's supply, so a run can never be its own, and the "no
-    reference at all" case is answered by NO_REFERENCE before this
-    function is reached rather than by a parameter inside it.
+    For "psi" the value is the PSI itself. For "row_drop" it is the
+    proportional DROP, (reference - current) / reference: POSITIVE when the
+    supply shrank, so growth never trips it ("some reduction in a daily
+    refresh is fine", Keith, 2026-09-28; only a large fall matters).
+
+    `is_reference` WAS REMOVED 2026-09-29 with REQ-QAC-108: the reference is
+    always an EARLIER period's supply, and "no reference at all" is answered
+    by NO_REFERENCE before this is reached.
     """
-    if psi > FAIL_THRESHOLD:
+    if value > entry["fail_threshold"]:
         return "fail"
-    if psi > WARN_THRESHOLD:
-        return "warn"
-    return "pass"
-
-
-# HOW BOTH COLLECTIONS JUDGE VOLUME (REQ-QAC-108 criterion 1). These
-# were Birth Registrations' own constants; they moved here so Child
-# Protection's six datasets could share them rather than acquire a
-# second convention - which is the criterion's own reason for existing,
-# in its own words, "so that both collections judge volume the same
-# way". Keith's call on the numbers, 2026-09-28: mirror the bands
-# Birth Registrations already had rather than invent a second set.
-#
-# A DROP ONLY, NOT ANY CHANGE. "Some reduction in a daily refresh is
-# fine" (Keith), so only a genuinely large fall trips this - and growth
-# never does, because a supply arriving bigger than the last one is the
-# ordinary state of a table that is accumulating.
-WARN_ROW_DROP = 0.10
-FAIL_ROW_DROP = 0.25
-
-
-def status_for_row_drop(rate_drop: float) -> str:
-    """The band a proportional drop falls in.
-
-    `rate_drop` is (reference - current) / reference, so it is POSITIVE
-    when the supply shrank and negative when it grew.
-    """
-    if rate_drop > FAIL_ROW_DROP:
-        return "fail"
-    if rate_drop > WARN_ROW_DROP:
+    if value > entry["warn_threshold"]:
         return "warn"
     return "pass"
 

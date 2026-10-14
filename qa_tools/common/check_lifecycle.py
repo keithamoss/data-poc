@@ -37,7 +37,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from qa_tools.common import config_yaml
 
@@ -201,6 +201,12 @@ class CheckMetadata:
     # check, a dbt singular, relationships or dbt_utils.expression_is_true
     # test, an ODCS rule of type sql. Derived by each parser, never authored.
     sql_bodied: bool = False
+    # THE PROJECT FILES THIS CHECK'S DEFINITION HASH COVERS beyond its own
+    # YAML (REQ-QAC-223 criterion 2) - the macro defining a dbt test type, a
+    # singular test's SQL and every project macro it uses. Outside the hash
+    # (their TEXT is in it); the gate uses the paths to report one edited
+    # file once rather than once per check (criterion 7).
+    definition_files: tuple[str, ...] = ()
 
 
 #: dbt generic tests whose rule is SQL rather than one column's property.
@@ -301,7 +307,34 @@ _NON_CONFIG_FIELDS = frozenset(_lifecycle_fields({})) | {"category"}
 
 # ---- dbt schema.yml -------------------------------------------------
 
-def _parse_dbt_test(test: Any, source: str, location: str) -> list[CheckMetadata]:
+#: Reads the project source behind a dbt check: called as
+#: `definition(kind, name)` with kind "generic" (name = the test type) or
+#: "singular" (name = the test's file name) and returning `(text, files)` -
+#: the text the definition hash covers and the files it came from - or
+#: `(None, ())` where the project defines nothing (a dbt or package test).
+DbtDefinition = Callable[[str, str], "tuple[str | None, tuple[str, ...]]"]
+
+
+def _with_definition(config: dict, definition: "DbtDefinition | None", kind: str,
+                     name: str) -> tuple[dict, tuple[str, ...]]:
+    """The dict a dbt check's hash covers, and the files behind it.
+
+    THE CHECK'S OWN EXPRESSION IS PART OF WHAT IT DOES (REQ-QAC-223
+    criterion 1): the test type or the singular test's name is hashed, not
+    only its configuration. And where `definition` is given - the changelog
+    gate always gives it, reading each git ref's own files - the project SQL
+    behind the check is hashed too (criterion 2)."""
+    hashed = {"test": name, **config}
+    if definition is None:
+        return hashed, ()
+    text, files = definition(kind, name)
+    if text is not None:
+        hashed["definition_source"] = text
+    return hashed, tuple(files)
+
+
+def _parse_dbt_test(test: Any, source: str, location: str,
+                    definition: "DbtDefinition | None" = None) -> list[CheckMetadata]:
     if isinstance(test, str):
         raise MissingCheckIdError(
             f"{source}: {location}: bare test {test!r} has no meta.check_id "
@@ -316,13 +349,16 @@ def _parse_dbt_test(test: Any, source: str, location: str) -> list[CheckMetadata
     if not check_id:
         raise MissingCheckIdError(f"{source}: {location}: dbt test {test_type!r} has no meta.check_id")
     category = _require_category(meta, f"{source}: {location}: dbt test {test_type!r} (check_id={check_id!r})")
+    hashed, files = _with_definition(test_config, definition, "generic", test_type)
     return [CheckMetadata(
-        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(test_config),
-        source_file=source, sql_bodied=test_type in _SQL_BODIED_DBT, **_lifecycle_fields(meta),
+        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(hashed),
+        source_file=source, sql_bodied=test_type in _SQL_BODIED_DBT, definition_files=files,
+        **_lifecycle_fields(meta),
     )]
 
 
-def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
+def _parse_dbt_singular_test(entry: dict, source: str,
+                             definition: "DbtDefinition | None" = None) -> list[CheckMetadata]:
     """A top-level `tests:` entry (dbt's "data test properties" - config
     keyed by a singular test's own file/function name, not nested under
     a model) - see schema.yml's own comment on that block for why
@@ -337,13 +373,15 @@ def _parse_dbt_singular_test(entry: dict, source: str) -> list[CheckMetadata]:
     if not check_id:
         raise MissingCheckIdError(f"{source}: singular test {name!r} has no config.meta.check_id")
     category = _require_category(meta, f"{source}: singular test {name!r} (check_id={check_id!r})")
+    hashed, files = _with_definition(config, definition, "singular", name)
     return [CheckMetadata(
-        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(config),
-        source_file=source, sql_bodied=True, **_lifecycle_fields(meta),
+        check_id=check_id, category=category, tool="dbt", config_hash=_config_hash(hashed),
+        source_file=source, sql_bodied=True, definition_files=files, **_lifecycle_fields(meta),
     )]
 
 
-def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]:
+def parse_dbt_check_metadata(schema_yml_path: Path | str, *,
+                             definition: "DbtDefinition | None" = None) -> list[CheckMetadata]:
     with open(schema_yml_path) as f:
         doc = config_yaml.parse(f) or {}
     out: list[CheckMetadata] = []
@@ -352,13 +390,14 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]
     for model in doc.get("models", []) or []:
         for test in model.get("tests", []) or []:  # model-level (dbt_utils.expression_is_true etc.)
             try:
-                out.extend(_parse_dbt_test(test, source, f"model {model['name']!r}"))
+                out.extend(_parse_dbt_test(test, source, f"model {model['name']!r}", definition))
             except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                 errors.append(str(e))
         for col in model.get("columns", []) or []:
             for test in col.get("tests", []) or []:
                 try:
-                    out.extend(_parse_dbt_test(test, source, f"model {model['name']!r} column {col['name']!r}"))
+                    out.extend(_parse_dbt_test(test, source, f"model {model['name']!r} column {col['name']!r}",
+                                               definition))
                 except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
                     errors.append(str(e))
     # Singular tests (tests/*.sql) - a real, pre-existing gap until
@@ -370,7 +409,7 @@ def parse_dbt_check_metadata(schema_yml_path: Path | str) -> list[CheckMetadata]
     # plans/qa-pipeline.md's own entry for the full account.
     for entry in doc.get("tests", []) or []:
         try:
-            out.extend(_parse_dbt_singular_test(entry, source))
+            out.extend(_parse_dbt_singular_test(entry, source, definition))
         except (MissingCheckIdError, MissingCategoryError, InvalidCategoryError) as e:
             errors.append(str(e))
     if errors:
@@ -467,8 +506,12 @@ def _parse_soda_check(check: Any, source: str, location: str) -> list[CheckMetad
     # the verdict and the count are the same at any limit. Raised on 71
     # checks at once for post-build-review #129, none of them changed.
     check_config.pop("samples limit", None)
+    # THE EXPRESSION IS WHAT THE CHECK CHECKS (REQ-QAC-223 criterion 1):
+    # "row_count > 0" becoming "row_count > 10" used to change no hash at all,
+    # because the expression is the YAML key and only its value was hashed.
     return [CheckMetadata(
-        check_id=check_id, category=category, tool="soda", config_hash=_config_hash(check_config),
+        check_id=check_id, category=category, tool="soda",
+        config_hash=_config_hash({"check": check_expr, **check_config}),
         source_file=source, sql_bodied=str(check_expr).startswith("failed rows"),
         **_lifecycle_fields(attributes),
     )]

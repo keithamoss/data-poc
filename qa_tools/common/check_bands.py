@@ -398,27 +398,25 @@ def contract_bounds(path: Path) -> dict[str, tuple]:
 
 
 def evidently_bounds(check_ids=None) -> dict[str, tuple]:
-    """Evidently's bands are constants in their own module (Keith, 2026-10-11:
-    read where they live), the PSI ones on a column and the row-drop ones per
-    table, each tripping on a strict `>`. A check of any other kind is
-    refused rather than given the row-drop bands."""
+    """Evidently's bands, read where they live (Keith, 2026-10-11) - since
+    REQ-QAC-223, each check's OWN CHECK_LIFECYCLE entry: its method, and its
+    warn and fail bands, each tripping on a strict `>`. A check whose method
+    is neither psi nor row_drop is refused rather than given some band."""
     from qa_tools.bdm import evidently_check_lifecycle as bdm_ev
-    from qa_tools.common import evidently_common as ec
     from qa_tools.cp import evidently_check_lifecycle as cp_ev
 
+    entries = {**bdm_ev.CHECK_LIFECYCLE, **cp_ev.CHECK_LIFECYCLE}
     if check_ids is None:
-        check_ids = [c for m in (bdm_ev, cp_ev) for c in m.CHECK_LIFECYCLE]
+        check_ids = list(entries)
     out = {}
     for check_id in check_ids:
-        if "drift_psi" in check_id:
-            out[check_id] = ("psi", (Bound(">", ec.WARN_THRESHOLD, RATIO),),
-                             (Bound(">", ec.FAIL_THRESHOLD, RATIO),))
-        elif "row_count_growth" in check_id:
-            out[check_id] = ("row_drop", (Bound(">", ec.WARN_ROW_DROP, DROP),),
-                             (Bound(">", ec.FAIL_ROW_DROP, DROP),))
-        else:
-            raise CatalogueError(f"{check_id}: an Evidently check neither drift_psi nor "
-                                 f"row_count_growth - no band is known for it")
+        entry = entries.get(check_id) or {}
+        unit = {"psi": RATIO, "row_drop": DROP}.get(entry.get("method"))
+        if unit is None:
+            raise CatalogueError(f"{check_id}: an Evidently check whose method is neither psi nor "
+                                 f"row_drop - no band is known for it")
+        out[check_id] = (entry["method"], (Bound(">", entry["warn_threshold"], unit),),
+                         (Bound(">", entry["fail_threshold"], unit),))
     return out
 
 

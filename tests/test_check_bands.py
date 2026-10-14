@@ -57,12 +57,15 @@ class TestTheRealDefinitions:
                and c.dataset_id == "cp-clients" and c.metric == "rowCount"]
         assert c.fail == () and c.warn and not c.single_tier
 
-    def test_evidently_is_read_from_its_own_constants(self, catalogue):
-        from qa_tools.common import evidently_common as ec
+    def test_evidently_is_read_from_its_own_entry(self, catalogue):
+        """Since REQ-QAC-223 each Evidently check's bands live in its own
+        CHECK_LIFECYCLE entry, where the changelog gate sees them."""
+        from qa_tools.bdm import evidently_check_lifecycle as bdm_ev
 
         [psi] = [c for c in catalogue.checks if c.check_id.endswith("sex.drift_psi_evidently")]
-        assert [b.value for b in psi.warn] == [ec.WARN_THRESHOLD]
-        assert [b.value for b in psi.fail] == [ec.FAIL_THRESHOLD]
+        entry = bdm_ev.CHECK_LIFECYCLE[psi.check_id]
+        assert [b.value for b in psi.warn] == [entry["warn_threshold"]]
+        assert [b.value for b in psi.fail] == [entry["fail_threshold"]]
 
     def test_every_dataset_is_catalogued(self, catalogue):
         from qa_tools.common import hierarchy

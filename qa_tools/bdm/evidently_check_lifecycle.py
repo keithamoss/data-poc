@@ -37,7 +37,16 @@ CHECK_LIFECYCLE = {
         "introduced_date": "2026-01-15",
         "description": "The spread of values must stay close to the reference supply.",
         "failure_indicates": "self-evident",
-        "changelog": [],
+        # WHAT THE CHECK DOES (REQ-QAC-223 criterion 3), here where the
+        # definition hash sees it. PSI over the column, tripped on a strict >.
+        "column": "sex",
+        "method": "psi",
+        "warn_threshold": 0.10,
+        "fail_threshold": 0.25,
+        "changelog": [{
+            "date": "2026-10-14T00:00:00Z",
+            "description": "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged.",
+        }],
     },
     ROW_COUNT_GROWTH_CHECK_ID: {
         # Matches this check's own already-existing "dimension": value
@@ -47,6 +56,15 @@ CHECK_LIFECYCLE = {
         "introduced_date": "2026-01-15",
         "description": "The number of rows must not drop sharply against the previous supply.",
         "failure_indicates": "self-evident",
-        "changelog": [],
+        # The proportional drop in rows, tripped on a strict >. The result is
+        # attributed to registration_number (see run_evidently_bdm.py).
+        "column": "registration_number",
+        "method": "row_drop",
+        "warn_threshold": 0.10,
+        "fail_threshold": 0.25,
+        "changelog": [{
+            "date": "2026-10-14T00:00:00Z",
+            "description": "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged.",
+        }],
     },
 }
