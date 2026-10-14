@@ -1719,15 +1719,17 @@ requirements:
     2026-10-13 to 14 while Keith was asleep; not yet reviewed as a requirement of its own.'
   acceptance_criteria:
   - WHEN a scenario link (REQ-GEN-201) is followed from the test-scenarios panel, THE SYSTEM SHALL scroll the page so that
-    the element the scenario is about is in the viewport, and SHALL move focus to it, as drillToPeriod brings a period into
-    view.
+    the element the scenario is about is in the viewport, and SHALL then move focus to it without scrolling again (focus with
+    preventScroll), as drillToPeriod brings a period into view.
   - THE SYSTEM SHALL name each scenario's subject semantically in its placement record - the as-at panel, the verdict line,
-    the substitution drill-down, the standing-in pill or a supply-history row - and SHALL NOT name it by a CSS selector or
-    a pixel offset.
+    the substitution drill-down, the standing-in pill, a supply-history row, or the period-composition view's table once REQ-DASH-209
+    adds it (REQ-DASH-209 criterion 7) - and SHALL NOT name it by a CSS selector or a pixel offset.
   - WHERE the subject is inside a collapsed section of supply history, THE SYSTEM SHALL expand that section before scrolling
     to it.
-  - THE SYSTEM SHALL mark the subject with a static accent border until the reader next scrolls or navigates, and SHALL NOT
-    animate it, scrolling instantly where the reader's system asks for reduced motion.
+  - THE SYSTEM SHALL mark the subject with a static left rule in the accent colour, as the arrival notice (.arrival-notice)
+    carries, and a text label reading '<scenario id> · in place on <date>', kept until the reader navigates away or changes
+    the date on show; SHALL NOT mark it with the 2px accent outline, which is this page's focus ring, nor animate it; and
+    SHALL scroll instantly where the reader's system asks for reduced motion.
   - WHEN a scenario jump is made, THE SYSTEM SHALL carry the scenario's id in the URL of the history entry the jump creates,
     as a query parameter named scenario holding the id in lowercase (docs/spa-best-practices.md section A), and WHEN a page
     is loaded or reloaded with that parameter, SHALL repeat the jump once the page has rendered - expanding, scrolling to,
@@ -1737,28 +1739,40 @@ requirements:
     the viewport once the jump has brought it there, and again after a cold reload of the jump''s URL, rather than inside
     the initial viewport without scrolling, and SHALL remove each strict expected failure naming post-build-review #174 as
     its text comes into view.'
-  - IF a scenario's subject is not on the page on its link's date, THEN THE SYSTEM SHALL leave the page at the top and SHALL
-    NOT scroll to a different element.
-  - WHEN the reader navigates from the page a jump landed on, or chooses 'Back to today' on the scenario jump bar, THE SYSTEM
-    SHALL leave the scenario parameter out of the new URL, so that the jump does not follow the reader to another page.
+  - IF a scenario's subject is not on the page on its link's date, THEN THE SYSTEM SHALL leave the page at the top, SHALL
+    say so in one line in the page's stale-link notice (.stale-link-notice, as forgetStaleSegment does for a link segment
+    that no longer resolves), naming the scenario and the date, and SHALL NOT scroll to a different element.
+  - WHEN the reader navigates from the page a jump landed on, changes the date on show by any means, or chooses 'Back to today'
+    on the scenario jump bar, THE SYSTEM SHALL leave the scenario parameter out of the new URL and SHALL clear the jump from
+    the page's state - its jump bar and its mark - so that the jump does not follow the reader to another page or another
+    date.
   - IF the scenario parameter names a scenario the test-scenarios panel does not hold, or one whose subject is not on the
-    page at the date in the URL, THEN THE SYSTEM SHALL open the page at the top, show no jump bar for it, remove the parameter
-    with replaceState, and log no console error.
+    page at the date in the URL, THEN THE SYSTEM SHALL open the page at the top, show no jump bar for it, say so in one line
+    in the stale-link notice as criterion 7 does, remove the parameter with replaceState, and log no console error.
   - THE SYSTEM SHALL make each scenario chip in the test-scenarios panel a real link (<a href>) whose address carries the
-    scenario's date as the existing as-of parameter and its id as the scenario parameter (criterion 5), so that middle-click,
-    open in a new tab and copy link work (docs/spa-best-practices.md section D); and WHEN a chip is clicked without a modifier
-    key, THE SYSTEM SHALL make the jump in the page without a full reload, as clicking the chip does today.
+    scenario's date as the existing in-place-on parameter and its id as the scenario parameter (criterion 5); WHEN a chip
+    is clicked with the primary button and no modifier key, THE SYSTEM SHALL make the jump in the page without a full reload,
+    as clicking the chip does today, and SHALL leave every other click - a modifier key held, a middle click - to the browser,
+    so that open in a new tab and copy link work (docs/spa-best-practices.md section D).
+  - THE SYSTEM SHALL read the scenario parameter's name case-insensitively, SHALL match its value case-insensitively against
+    the ids the test-scenarios panel holds before any use, and SHALL NOT use an unmatched value in a selector, a lookup or
+    the page's markup.
+  - WHEN the reader returns by Back or Forward to a history entry a scenario jump created, THE SYSTEM SHALL restore that entry's
+    date on show, and SHALL NOT scroll the page or move focus again.
   non_functional_requirements:
   - 'ORDER: built before REQ-GEN-205''s and REQ-GEN-206''s bootstraps, so their new chips are written against a jump that
     works (dashboard UX 14).'
   - 'SCALE: the subject is named per scenario, so the panel''s growth (thirty-odd scenarios today) adds records, not code
     paths.'
-  - 'ACCESSIBILITY: focus moves to the subject so a keyboard or screen-reader user lands where a sighted one does; no animation
-    (criterion 4).'
+  - 'ACCESSIBILITY: focus moves to the subject without a second scroll, so a keyboard or screen-reader user lands where a
+    sighted one does; the mark is a labelled rule rather than colour alone, and is never the focus ring; no animation (criteria
+    1 and 4).'
   - 'NO NEW ASSET: template JavaScript and CSS only; the file:// and offline viewing paths are unaffected.'
-  - 'URL HYGIENE (docs/spa-best-practices.md sections A to C): one optional, order-independent query parameter, lowercase,
-    beside the existing as-of parameter; the jump''s own history entry is pushed as today, and corrections to the URL on a
-    stale parameter use replaceState so Back is not polluted.'
+  - 'URL HYGIENE (docs/spa-best-practices.md sections A to C): one optional, order-independent query parameter, read case-insensitively,
+    beside the existing in-place-on parameter; the jump''s own history entry is pushed as today, any navigation or date change
+    drops it, and corrections to the URL on a stale parameter use replaceState so Back is not polluted.'
+  - 'ROBUSTNESS: a URL is input from whoever sends the link, so the parameter is matched against the panel''s own ids before
+    any use, and only the matched record is used (criterion 11).'
   dependencies:
   - REQ-GEN-201
   - REQ-GEN-199
@@ -1791,6 +1805,29 @@ requirements:
     D asks. REJECTED keeping the chip a button and copying a shared link from the address bar after the jump. No signed criterion
     says the chip is a button (checked 2026-10-14), so nothing is amended.'
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answer F10): criterion 10 added; no open question left.'
+  - 'A LINK THAT LEADS NOWHERE SAYS SO (round 4 dashboard UX 1, HIGH): criteria 7 and 9 - one line in the existing .stale-link-notice,
+    the pattern forgetStaleSegment uses for a stale column or check segment. REJECTED landing silently at the top, which reads
+    as a broken jump.'
+  - 'ANY DATE CHANGE DROPS THE JUMP (round 4 dashboard UX 2, HIGH): criterion 8. Changing the date by hand after a jump left
+    scenario= in the URL and the jump in the page''s state, so a reload or a shared link would jump again to a date the reader
+    had left.'
+  - 'A LABELLED LEFT RULE, NOT THE FOCUS OUTLINE (round 4 dashboard UX 3, HIGH): criterion 4. The 2px accent outline is this
+    page''s focus ring (.card:focus-visible), so a mark drawn the same way reads as focus; the arrival notice''s left rule
+    is the page''s existing ''you were brought here'' mark, and the label says why. SUPERSEDES the round 3 shape''s (c), ''a
+    static accent border''. REJECTED ''until the reader next scrolls'', because the jump''s own scroll would remove the mark.'
+  - 'A REAL LINK BEHAVES AS ONE (round 4 dashboard UX 7, MED; round 4 architect M6): criteria 1, 10, 11 and 12 - focus without
+    a second scroll, a plain click intercepted and every other click left to the browser, Back and Forward restoring the date
+    without scrolling again, the parameter read case-insensitively. Criterion 10 already carried both parameters (follow-up
+    F10), which is what M6 asked for.'
+  - 'THE PARAMETER IS MATCHED BEFORE IT IS USED (round 4 architect L1): criterion 11. REJECTED using the raw value to find
+    the subject and treating a miss as the not-found case.'
+  - 'THE COMPOSITION VIEW IS A SUBJECT (round 4 architect H3 and M6): criterion 2 names REQ-DASH-209''s table, so TS-55''s
+    chip lands on it. REQ-DASH-209 is built after this requirement (round 4 H5 order), so the subject joins the vocabulary
+    when REQ-DASH-209 criterion 7 is built, not here; REQ-DASH-209 is deliberately NOT a dependency, since it already depends
+    on this requirement.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, round 4 reviews): criteria 1, 2, 4, 7, 8, 9 and 10 reworded; criteria 11 and 12 added;
+    NFRs 3 and 5 reworded and a ROBUSTNESS NFR added. The wording of criteria 4, 7, 11 and 12 is the scoper''s, for Keith''s
+    approval.'
   open_questions: []
 - id: REQ-GEN-205
   title: The synthetic history holds the calendar-correction scenarios TS-57 to TS-62 - a correction confirmed by a scripted
@@ -1820,19 +1857,19 @@ requirements:
     it.
   - 'THE SYSTEM SHALL let contract/scripted_decisions.yaml declare a scripted correction confirmation, in a top-level corrections:
     list separate from its decisions: list - naming a declared correction by change_reference, with no dataset of its own,
-    and saying either keep, a list of supplies each named by scenario, dataset and that scenario''s supply index (never a
-    generated id) with one keep_reason covering them, or pending - read only by correction_replay.confirm_due, outside the
-    Player that plays filing decisions and outside filing_decisions'' operation validation, each kept supply resolved to its
-    supply id as scripted decisions resolve theirs (scripted_decisions._supply_of).'
+    and saying either confirm, optionally with a list of supplies kept - each named by scenario, dataset and that scenario''s
+    supply index (never a generated id) - and one keep_reason covering them, or pending - read only by correction_replay.confirm_due,
+    outside the Player that plays filing decisions and outside filing_decisions'' operation validation, each kept supply resolved
+    to its supply id as scripted decisions resolve theirs (scripted_decisions._supply_of).'
   - IF a scripted correction confirmation names an undeclared change reference, an unknown scenario or supply index, a dataset
     that scenario's arrival does not carry, keeps without a keep_reason, a keep_reason without keeps, pending together with
-    keeps, a confirmation with no keeps (which says nothing the default does not), any timing field (after_hours, at, day_offset),
-    or a change reference another confirmation already names, THEN `mothman scenarios validate` SHALL refuse it, naming the
-    entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
-  - WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31), THE SYSTEM SHALL confirm a
-    correction that has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script
-    names, SHALL leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with
-    none as it does today.
+    keeps, any timing field (after_hours, at, day_offset), or a change reference another confirmation already names - or IF
+    a correction declared in contract/calendar.yaml has no scripted confirmation at all - THEN `mothman scenarios validate`
+    SHALL refuse it, naming the entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
+  - WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31) - a bootstrap, a resumed bootstrap
+    or `mothman pipeline run` over both - THE SYSTEM SHALL confirm through correction_apply.confirm only a correction whose
+    scripted confirmation says confirm, with exactly the keeps and reason it names, and SHALL leave every other correction
+    pending, so that TS-62's is never confirmed by default.
   - IF a scripted keep names a supply its correction does not propose to move, or a scripted confirmation is refused for any
     other reason, THEN THE SYSTEM SHALL stop the replay naming the scenario and the change reference, SHALL NOT drop the keep
     or confirm without it, and SHALL list in that message the correction's proposed moves by scenario, dataset and supply
@@ -1850,9 +1887,12 @@ requirements:
     - a new Birth Registrations daily calendar version with a different claim window - with an arrival for a dataset it affects
     received after its date.'
   - THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared
-    change alters together with the period before and the period after it; SHALL check that claim against every injection,
-    every post-generation placement (TS-52, TS-79a, TS-79b) and REQ-PIPE-179's TS-63 correction; and IF it meets a period
-    another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift either or relax the rule.
+    change alters together with the period before and the period after it - except that for a version-level change (TS-62's),
+    only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received
+    before its effective date and for every arrival received on or after it, together with the day before and the day after
+    each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and REQ-PIPE-179's
+    TS-63 correction; and IF it meets a period another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift
+    either or relax the rule.
   - THE SYSTEM SHALL place TS-57 to TS-61 in Child Protection quarters REQ-GEN-207 adds by growing the history earlier, so
     that no existing scenario moves, and TS-62 on Birth Registrations, its correction dated a few days before the end of the
     history and its later arrival the next daily supply.
@@ -1892,12 +1932,24 @@ requirements:
   - THE SYSTEM SHALL leave TS-61's parked move parked to the end of the history, with no scripted keep of it, so that its
     'Correction move waiting' item on cp-case-workers stands, as criterion 15 records.
   - THE SYSTEM SHALL make TS-62's correction add a new version of Birth Registrations' daily calendar, taking effect on a
-    day near the end of the history, whose claim window differs from the version before it - a version-level change, unlike
-    the confirmed correction's dated edits (criterion 22) - and SHALL leave that correction pending (criterion 20), so that
-    the moves it proposes read as awaiting confirmation and are never applied.
-  - THE SYSTEM SHALL make TS-62's new version take effect after 2026-09-01, the last Birth Registrations day REQ-GEN-199's
-    scenarios quote (TS-78b), so that no text REQ-GEN-199 quotes moves; and IF that effective date falls on or before the
-    last day any of REQ-GEN-199's scenario links names, THEN generation SHALL refuse naming TS-62, and SHALL NOT shift it.
+    day near the end of the history, whose claim window is wider than the version before it - about six hours against today's
+    four (Keith, round 4 R1) - a version-level change, unlike the confirmed correction's dated edits (criterion 22), and SHALL
+    leave that correction pending (criterion 20), so that the moves it proposes read as awaiting confirmation and are never
+    applied.
+  - THE SYSTEM SHALL make TS-62's new version take effect after 2026-09-08, TS-47's following day, so that TS-47's four-hour
+    claim window and every text REQ-GEN-199 quotes (the last Birth Registrations one on 2026-09-01, TS-78b) stand under the
+    version before it; and IF that effective date falls on or before 2026-09-08, or on or before the last day any REQ-GEN-199
+    scenario link names, THEN generation SHALL refuse naming TS-62, and SHALL NOT shift it.
+  - THE SYSTEM SHALL check, before the first rebuild, that TS-43 to TS-46's arrivals - TS-46's green following day on 2026-09-22,
+    the history's last day, included - are filed and judged identically under TS-62's new version and the version before it,
+    by the impact preview shown to Keith (NFR 5); and IF any would not be, THEN criterion 10 SHALL refuse generation, and
+    the case SHALL go to Keith rather than the version being moved.
+  - THE SYSTEM SHALL have TS-62's new version pass REQ-PIPE-134's overlap gate in mothman check as any version does, with
+    no exemption.
+  - THE SYSTEM SHALL add, in the same change, a scripted confirmation saying confirm, with no keeps, for every correction
+    already declared in contract/calendar.yaml (today REQ-PIPE-181's), so that the replayed history confirms it exactly as
+    before; and SHALL amend, in the same change, REQ-PIPE-170 criterion 31 so that a replay confirms only the corrections
+    a scripted confirmation says to confirm.
   non_functional_requirements:
   - 'NOISE: a correction that moves a date re-judges every supply of every dataset in the period it alters. Count, in the
     register entries, every period these corrections leave unfilled, red or awaiting confirmation and every outstanding item
@@ -1909,17 +1961,21 @@ requirements:
     only, on an asset that declares itself synthetic (people.require_role, people.playback, scripted_decisions._refuse_unless_synthetic);
     nothing here widens what a person or script may do on a real asset.'
   - 'SCALE: the confirmed correction alters named periods only (criterion 10). TS-62''s correction is a version-level change
-    on purpose (Keith, 2026-10-14, follow-up F11): from its effective date it would re-judge every later day of every dataset
-    on the daily calendar - one dataset today, many more at the target - which is tolerable here only because it is left pending
-    and takes effect near the end of the history.'
+    on purpose (Keith, 2026-10-14, follow-up F11): from its effective date every later Birth Registrations arrival is filed
+    under it at receipt, confirmed or not (round 4 architect M4) - one dataset today, many more at the target - which is tolerable
+    here only because it is left pending, takes effect after 2026-09-08, and widens the window so that ordinary on-time arrivals
+    file as before (round 4 R1).'
   - 'PROCESS: before the first rebuild, the builder shows Keith each correction''s exact edits and its impact preview (REQ-PIPE-169)
-    against the generated history, with the dates - the main session''s own offer on fork (g).'
+    against the generated history, with the dates - the main session''s own offer on fork (g) - including, for TS-62, the
+    proof that TS-43 to TS-46 do not move (criterion 26).'
   - DETERMINISM and loud failure are REQ-GEN-044's, inherited (criteria 3 and 4); configuration only, every effect in the
     database.
   - 'BOOTSTRAP COST: 7m00s from empty on 2026-10-13. The growth is REQ-GEN-207''s to measure; this requirement adds its own
     arrivals plus the post-confirmation runs (criterion 8), which run serially after BOTH replays at about a minute each and
     add to the total directly - so count them in the dry run and measure from empty before and after, logged in CLAUDE.md''s
     running log.'
+  - 'FAIL SAFE: a correction is confirmed in a replay only where the script says so (criterion 6); a correction the script
+    forgot is refused by validation (criterion 5) rather than confirmed by default.'
   dependencies:
   - REQ-PIPE-170
   - REQ-PIPE-111
@@ -1934,6 +1990,7 @@ requirements:
   - REQ-GEN-207
   - REQ-PIPE-140
   - REQ-DASH-208
+  - REQ-PIPE-134
   decisions:
   - 'DECLARED IN contract/calendar.yaml ITSELF (Keith, 2026-10-13): ''this asset is a synthetic data asset for demo purposes,
     so that is fine''. REJECTED a synthetic-only overlay file.'
@@ -2038,22 +2095,59 @@ requirements:
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answer F11): criterion 9 reworded; criteria 24 and 25 added; NFR
     4 reworded. The question F11 answered is replaced by the conflict it exposed (open question 1) and a build-time check
     (open question 2).'
+  - 'TS-62 AFTER 2026-09-08, CLAIM NARROWED TO WHAT ITS PREVIEW MOVES, WIDER WINDOW (Keith, 2026-10-14, round 4 R1, option
+    A, the recommendation; scoper''s question 5 and architect question D): criteria 10, 24, 25 and 26. It takes effect after
+    TS-47''s following day, clear of TS-47''s four-hour window; for a version-level correction criterion 10 claims only the
+    days its impact preview says it would change, plus one either side; TS-46''s last day is checked at build; the window
+    is wider (about six hours) so the default view stays quiet. This resolves ''F11 MEETS CRITERION 10'' above. REJECTED (B)
+    a not_expected entry for one past day and (C) waiving criterion 10 and re-observing TS-43 to TS-47''s Expects.'
+  - 'A PENDING CORRECTION STILL FILES LATER ARRIVALS (round 4 architect M4): every arrival from its date on is filed under
+    the corrected agreement at receipt, confirmed or not (REQ-PIPE-170 criterion 30). So criterion 10''s narrowed claim counts
+    arrivals received on or after the effective date, not only supplies the correction would move, and criterion 26 proves
+    TS-43 to TS-46 unmoved. NOT TAKEN AS WORDED: M4''s ''refuse a TS-62 version taking effect on or before any other Birth
+    Registrations scenario''s dates'' - TS-44 to TS-46 lie after 2026-09-08, so that would refuse what Keith chose in R1;
+    the narrowed claim refuses only where a filing actually changes.'
+  - 'A REPLAY CONFIRMS ONLY WHAT THE SCRIPT SAYS TO (round 4 architect M4; PROVISIONAL on open question 1): criteria 4, 5,
+    6 and 28. Today confirm_due confirms every pending correction (REQ-PIPE-170 criterion 31), so TS-62 stayed pending only
+    if its ''pending'' entry was read on every route that confirms; one missed route, or one missing entry, would confirm
+    it silently. Inverted: confirm is said, pending is the default, and validation refuses a declared correction the script
+    does not mention. COST: REQ-PIPE-181''s correction needs a one-line confirm entry, a confirmation with no keeps is now
+    meaningful (criterion 5 no longer refuses it), and REQ-PIPE-170 criterion 31 is amended. REJECTED, but offered as option
+    B: today''s default with ''pending'' as the only opt-out.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 44, PROVISIONAL on open
+    question 1) - REQ-PIPE-170 criterion 31 (signed 2026-10-07, built; criterion 28 here). OLD: ''WHEN a replay of both collections
+    finishes - a bootstrap, or `mothman pipeline run` over both - THE SYSTEM SHALL confirm every pending correction dated
+    up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager
+    role during playback, and SHALL rebuild both collections'' results if any was confirmed; a replay of one collection SHALL
+    leave them pending.'' NEW: ''WHEN a replay of both collections finishes - a bootstrap, or `mothman pipeline run` over
+    both - THE SYSTEM SHALL confirm every pending correction dated up to now whose scripted confirmation in contract/scripted_decisions.yaml
+    says confirm (REQ-GEN-205 criterion 6), the oldest first, through the same confirmation a person uses, as the synthetic
+    actor holding the asset manager role during playback, SHALL leave every other correction pending, and SHALL rebuild both
+    collections'' results if any was confirmed; a replay of one collection SHALL leave them pending. AMENDED <date built>
+    by REQ-GEN-205 criterion 28.'' BUILT BEHAVIOUR: BUILT CODE CHANGES (correction_replay.confirm_due''s loop); built and
+    tested by REQ-GEN-205 criteria 6, 16 and 28.'
+  - 'THE NEW WINDOW MUST PASS THE OVERLAP GATE (round 4 architect M4): criterion 27, and REQ-PIPE-134 added as a dependency.
+    With Birth Registrations due 14:00 with 1 hour''s grace, a six-hour window opens the next day''s claim at 08:00, after
+    the previous day''s 15:00 late-after instant; the gate checks it rather than this note.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 answer R1 and architect M4): criteria 4, 5, 6, 10, 24 and 25 reworded;
+    criteria 26 to 28 added; NFRs 4 and 5 reworded and a FAIL SAFE NFR added; REQ-PIPE-134 added as a dependency. The old
+    open question 1 is answered; a new open question 1 (confirm only what the script says) is raised by M4.'
   open_questions:
-  - '1. TS-62 AS ANSWERED MEETS CRITERION 10 AND FIVE PLANTED SCENARIOS (follows F11; see the decision ''F11 MEETS CRITERION
-    10''). Birth Registrations'' later days are taken by TS-43 to TS-47, whose requirements (REQ-GEN-136, REQ-GEN-184, REQ-GEN-185)
-    are signed and built. 2026-09-01 protects REQ-GEN-199''s quotes but not theirs, and TS-47''s shape is the claim window
-    itself. Recommended (A): keep the new version; make it take effect after 2026-09-08, TS-47''s following day, rather than
-    after 2026-09-01; and narrow criterion 10, for a version-level correction only, to the periods its impact preview (REQ-PIPE-169)
-    says it would MOVE, plus one either side, so that days it re-judges without moving are not claimed. The preview is shown
-    to Keith before the rebuild (NFR 5), proving TS-43 to TS-46''s filings unmoved. (B) Return to a not_expected entry for
-    one past day in a free stretch before TS-43 (F11''s option A): three days claimed, no exception to criterion 10. (C) Keep
-    the version as answered and accept that TS-43 to TS-47''s register Expects are re-observed after the first bootstrap,
-    with criterion 10 waived for TS-62.'
+  - '1. A REPLAY CONFIRMS ONLY WHAT THE SCRIPT SAYS TO (round 4 architect M4). Recommended (A): confirm_due confirms only
+    a correction whose scripted confirmation says confirm; every other stays pending; `mothman scenarios validate` refuses
+    a declared correction with no entry; REQ-PIPE-181''s correction gets a one-line confirm entry; REQ-PIPE-170 criterion
+    31 is amended (batch amendment 44). Fail-safe: forgetting an entry is refused, never silently confirmed. (B) Keep today''s
+    default - every due correction is confirmed unless its entry says pending - with no amendment; TS-62 stays pending only
+    while every route that confirms reads its entry.'
   - '2. CHECK AT BUILD (architect, not a question for Keith): on a synthetic asset, adding a past-dated calendar version needs
     no correction (REQ-PIPE-111 criterion 9; agreement_freeze skips it). Read 2026-10-14, a declared correction naming the
     added version is matched against the added item and accepted. Confirm that correction_replay then stages it as a pending
     correction, rather than as the synthetic exemption''s undeclared addition, which would make TS-62 a version with no correction
     to leave pending.'
+  - '3. CHECK AT BUILD (architect, not a question for Keith): whether REQ-PIPE-169''s impact preview reports arrivals received
+    on or after a version''s effective date - filed under the new version at receipt rather than moved - as well as supplies
+    it would move. If it does not, criterion 10''s narrowed claim and criterion 26''s proof compute those filings with the
+    same implementation (REQ-PIPE-169 criterion 6), never a second rule.'
 - id: REQ-GEN-206
   title: The last planted scenarios of REQ-GEN-136 and REQ-GEN-137 - Case Workers' held gap arrival, a reader re-checked after
     a replacement, Keith's un-supersede case, a substitution and a three-kind _manifest - a Child Protection pair with both
@@ -2134,9 +2228,12 @@ requirements:
     owes (REQ-PIPE-211) run in the replay at the settlement's instant through the playback hook (REQ-GEN-196 criterion 10),
     as TS-80's runs are (REQ-GEN-203 criterion 11).
   - 'THE SYSTEM SHALL give TS-81 two lettered-sibling scenario links (REQ-GEN-201): ''a'' on its arrival day, where cp-clients
-    reads ''Two files for one table'' and its three readers'' cross-table checks read contested, and ''b'' on the settlement''s
+    reads ''Two files for one table'', its three readers'' cross-table checks read contested, and each reader''s page carries
+    REQ-DASH-204''s line for the contested table in that requirement''s criterion 15 wording; and ''b'' on the settlement''s
     asset day, where the pair''s row reads settled with both files rejected and no reader''s cross-table result reads contested
-    (REQ-PIPE-211 criterion 7), each Expect quoting what the page shows as observed on the first bootstrapped build.'
+    (REQ-PIPE-211 criterion 7); each Expect quoting what the page shows as observed on the first bootstrapped build. What
+    status the readers read on either date, and the wording of REQ-DASH-204''s line, follow plans/running-thoughts.md #95''s
+    outcome, and SHALL NOT be stated here as red.'
   non_functional_requirements:
   - 'BOOTSTRAP COST: TS-52 and TS-54 add nothing generated; TS-55 one delivery; TS-53 one Birth Registrations resupply, one
     resend, one re-check and three scripted decisions; TS-50 one Child Protection resupply with its lead-ins and three reader
@@ -2146,10 +2243,11 @@ requirements:
     count what TS-50''s Child Protection replacement era and TS-53''s era boundary replace or hold, and record it. TS-52''s
     held supply is one of the standing Case Workers holds (eight on 2026-10-13), each counted as needing a person - known,
     not added. TS-81 leaves its quarter''s cp-clients slot with no supply once both files are rejected, so that slot closes
-    unfilled - record what that slot and its readers read at the end of the history.'
+    unfilled - record what that slot and its readers read at the end of the history - the readers'' status following plans/running-thoughts.md
+    #95''s outcome.'
   - 'QUARTER BUDGET: TS-50, TS-55, TS-81 and their lead-ins and era take Child Protection quarters REQ-GEN-207 adds, sized
     by its dry run (close-out Q1; TS-81 by follow-up F8); TS-53 takes Birth Registrations days (follow-up F12), on days before
-    TS-62''s new version takes effect (REQ-GEN-205).'
+    TS-62''s new version takes effect, after 2026-09-08 (REQ-GEN-205 criterion 25).'
   - 'CONFIGURATION ONLY: the injections, the scripts, the setting eras and the register; every effect lives in the database.
     DETERMINISM and loud failure are REQ-GEN-044''s, inherited.'
   - 'SECURITY: every decision plays back through REQ-GEN-135 as the synthetic person, only on an asset declaring itself synthetic;
@@ -2176,6 +2274,7 @@ requirements:
   - REQ-PIPE-211
   - REQ-PIPE-193
   - REQ-PIPE-202
+  - REQ-DASH-204
   decisions:
   - 'BUILT ON THE EXISTING MACHINERY (Keith, 2026-10-04, REQ-GEN-136): the register in plans/supply-model.md, REQ-GEN-044''s
     injection table, REQ-GEN-045''s map and REQ-GEN-135''s scripts. EVERY SHAPE OF THE BATCH GETS A PLANTED SCENARIO (Keith,
@@ -2273,9 +2372,28 @@ requirements:
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answers F8, F12 and F13): title, source and criteria 5 and 8 reworded;
     criteria 16 to 18 added for TS-81; NFRs 1 to 3 updated; REQ-PIPE-211, REQ-PIPE-193 and REQ-PIPE-202 added as dependencies.
     Open questions 1 and 2 answered; the build-time check on #175 is still open.'
+  - 'TS-81 STAYS HERE (round 4 architect M3 and question B, which agree with follow-up F8''s placement): planted by this requirement,
+    built last, after REQ-PIPE-211 (round 4 H5 order: 207, 202, 211, 203, 204, 210, 182, 163, 179, 180, 208, 209, 205, 206).
+    REJECTED REQ-GEN-203, which would need REQ-PIPE-211 and REQ-DASH-204 built first.'
+  - 'THE READERS'' STATUS FOLLOWS #95, AND IS NOT STATED AS RED (Keith, 2026-10-14, round 4 R5; plans/running-thoughts.md
+    #95): criterion 18 and NFR 2. A reader whose cross-table check cannot run against everything it reads is neither green
+    nor red, and #95 is scoping what it reads; REQ-PIPE-202 and REQ-GEN-203 were signed with the same deferral. TS-81''s ''a''
+    Expect quotes REQ-DASH-204 criterion 15''s line, and #95''s draft (docs/drafts/unjudged-cross-table/) proposes replacing
+    that criterion''s per-cause wording with one line, so the quoted text depends on #95 too. This requirement is built after
+    both, so the Expect is written against whatever is signed, as observed.'
+  - 'R2 IS NOT FOLDED HERE (Keith, 2026-10-14, round 4 R2, its follow-up and R5): whether ''reject both'' raises the still-failing
+    shout, and in what words, is #95''s question now (its draft REQ-PIPE-217). TS-81 shows whatever is decided there; nothing
+    here says whether a shout is raised.'
+  - 'R3 IS NOT HERE: TS-79b''s reword to ''the oldest of the original fifteen quarters'' is REQ-GEN-207 criterion 11, signed
+    2026-10-14.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, round 4 reviews and Keith''s round 4 answers): criterion 18 reworded; NFRs 2 and
+    3 updated; REQ-DASH-204 added as a dependency; no criterion changed by R1, R2 or R3.'
   open_questions:
   - 'CHECK AT BUILD (not a question for Keith): whether 8 September''s held supply predates REQ-GEN-199''s row-count chain
     change is unknown and needs one rebuild to settle (post-build-review #175).'
+  - 'WAITS ON #95 (not a question for Keith now): TS-81''s ''a'' Expect quotes REQ-DASH-204 criterion 15, whose wording #95''s
+    draft proposes replacing with ''No promoted <dataset> for <period>''; and what the readers read on either date is #95''s
+    status. Both are settled when #95 is signed, before this requirement is built.'
 - id: REQ-DASH-209
   title: A period-composition view shows, for one period of a collection, what each dataset holds there and how it got there
     - promoted, inherited or substituted
@@ -2293,57 +2411,75 @@ requirements:
   acceptance_criteria:
   - THE SYSTEM SHALL offer, for each period of every collection - daily collections included, one view per day - a period-composition
     view with one row per dataset of that collection, each saying what the dataset holds in that period as at the end of the
-    date on show - 'Promoted', 'Inherited from <period>', 'Substituted from <period>' or 'Nothing held' - and, where nothing
-    is held, the one-word state the dataset's supply history shows for that period.
-  - THE SYSTEM SHALL take every row from REQ-PIPE-130 criterion 8's one view of what a slot holds, read as at the date on
-    show from the QA metadata schema (qa.slot_holds), so that the view agrees with the period's _manifest, and SHALL NOT read
-    the period schema, its catalogue or its _manifest, nor any supply row.
+    date on show - 'Promoted', 'Inherited from <period>', 'Substituted from <period>', 'Not supplied' where the dataset owes
+    the period a supply and none is held there, or 'Not owed' where it owes none (turned off, REQ-PIPE-179; not expected;
+    outside its agreed months) - and, for 'Not supplied' and 'Not owed', the one-word state the dataset's supply history shows
+    for that period.
+  - THE SYSTEM SHALL take every row from the per-dataset timelines the build already embeds (pipeline/slot_timeline.py and
+    pipeline/promotion_timeline.py), looked up by the date on show with the same lookup REQ-DASH-198's standing-in qualifier
+    uses (promotionStateOn), and SHALL NOT work out a second derivation, nor read a period schema, its catalogue, its _manifest
+    or any supply row.
   - THE SYSTEM SHALL show, for each table held, the supply's receipt on the asset's clock, when the decision that put it there
-    took effect, who made it - the person's display name, as the rest of the page names who decided (REQ-DASH-198), or 'the
-    rule' where no person decided - its reason, the status it was promoted on - never its health since (REQ-PIPE-130 criterion
-    12) - and, where an acknowledgement is owed, whether it was given.
-  - 'THE SYSTEM SHALL open the view with one line counting the period''s datasets by kind - for example ''30 datasets: 26
-    promoted, 2 inherited, 1 substituted, 1 nothing held'' - and SHALL list the rows grouped by kind, substituted and nothing
-    held first, then inherited, then promoted, each group in dataset display-name order.'
+    took effect, who made it - worded as the rest of the page words it, 'Decided by <display name>' or 'Applied automatically
+    by the schedule' (REQ-DASH-198), the display name from contract/people.yaml and never an email address - its reason, the
+    status it was promoted on, in a column headed 'Status when promoted' and never its health since (REQ-PIPE-130 criterion
+    12), and, where an acknowledgement is owed, whether it was given.
+  - 'THE SYSTEM SHALL open the view with one line counting the period''s datasets by kind - for example ''30 datasets: 1 not
+    supplied, 1 substituted, 2 inherited, 25 promoted, 1 not owed'' - and SHALL list the rows grouped by kind in that order,
+    ''Not supplied'' first and ''Not owed'' last, each group in dataset display-name order, with every row shown and no group
+    collapsed.'
   - THE SYSTEM SHALL make each dataset's name a real link (<a href>) to that dataset's page at the same date on show, and
     each 'from <period>' a real link to that period's composition view.
-  - THE SYSTEM SHALL give the view its own address in the dashboard's existing routing, the collection and the period as path
-    segments and the as-of date as the existing query parameter (docs/spa-best-practices.md section A), and SHALL link to
-    it, by a real <a href>, from each period row of a dataset's supply history and from the standing-in pill's drill-down
-    (REQ-DASH-198).
-  - THE SYSTEM SHALL let a scenario's coordinates name a collection and a period, so that its chip in the test-scenarios panel
-    opens that period's composition view, and SHALL make the view's table a subject REQ-DASH-208 can name, so that TS-55's
-    chip lands with it in view.
+  - 'THE SYSTEM SHALL give the view its own address in the dashboard''s existing routing - #/agency/<agency>/collection/<collection>/period/<period>,
+    with the date on show as the existing in-place-on query parameter (docs/spa-best-practices.md section A) - and SHALL link
+    to it, by a real <a href>, from each period''s label in a dataset''s supply history and from that history''s gap and owed-nothing
+    rows, never from inside a delivery row, and from the standing-in pill''s drill-down (REQ-DASH-198).'
+  - THE SYSTEM SHALL let TS-55's chip in the test-scenarios panel open its period's composition view, TS-55's coordinate in
+    the scenario map still naming the substituted dataset, with the view as its link's target, so that REQ-GEN-045 criterion
+    1 needs no change; and SHALL add the view's table to REQ-DASH-208 criterion 2's subjects, so that TS-55's chip lands with
+    it in view.
   - WHERE no dataset of the collection holds anything in the period on the date on show, THE SYSTEM SHALL say so in one line
-    in place of an empty table.
-  - THE SYSTEM SHALL compute the view at build time from recorded decisions and receipts only, and SHALL render every name
-    and reason in it as text, never as markup.
+    above the rows; and WHERE the date on show is before the period opened, THE SYSTEM SHALL show '<period> had not opened
+    by <date>' in place of the rows.
+  - 'THE SYSTEM SHALL have the build embed the answers and the page look them up: the build SHALL add to each per-dataset
+    timeline entry the period it stands on (stands_on), and SHALL embed each supply''s receipt, status when promoted and acknowledgements
+    once per supply, not once per period or per day; and THE SYSTEM SHALL render every name and reason in the view as text,
+    never as markup.'
   - 'THE SYSTEM SHALL have a real-browser test, against a dashboard built from a fixture history, written first and seen to
-    fail, in which one period holds a promoted, an inherited and a substituted table: the view''s rows SHALL match that period''s
-    _manifest, queried by the test - a row naming a person matching _manifest''s ''person'', and ''the rule'' its ''rule''
-    - and at a date on show before the substitution SHALL show the composition then.'
+    fail, in which one period holds a promoted, an inherited and a substituted table and one owed dataset holds nothing: at
+    the build''s own date the view''s rows SHALL agree with that period''s _manifest, queried by the test, in both directions
+    - every table _manifest lists is a row of the matching kind, and every row other than ''Not supplied'' and ''Not owed''
+    is a table _manifest lists - with ''Decided by <name>'' matching _manifest''s ''person'' and ''Applied automatically by
+    the schedule'' its ''rule''; and at a date on show before the substitution the view SHALL show the composition then, held
+    against decision_log''s as-at readers at that date as REQ-DASH-198 criterion 13 does, since _manifest answers only for
+    the present.'
   - THE SYSTEM SHALL measure the built dashboard's size before and after this change, from the same recorded history, and
     SHALL report both figures in this requirement's evidence, with no size budget set.
+  - THE SYSTEM SHALL head the view with an h2 reading '<collection> · <period name>' over a sub-line 'What each dataset held
+    at the end of <date on show>', SHALL show the rail as Agencies › <agency> › <collection> › <period name>, SHALL give the
+    table a caption saying the same, and SHALL move focus to the h2 on arrival.
+  - IF the address names an agency, collection or period the dashboard does not hold, THEN THE SYSTEM SHALL show the existing
+    not-found page (renderNotFound) naming what was not found, and SHALL NOT show an empty view.
   non_functional_requirements:
   - 'SCALE (CLAUDE.md''s ~30-datasets rule, Keith''s own condition for this view): one row per dataset with its kind readable
-    without expanding anything, the counting line first, and the unusual kinds (substituted, nothing held) at the top, so
-    that the one dataset standing on another period is not the twenty-eighth row of thirty.'
-  - 'PERFORMANCE AND GROWTH: the view shows one period at a time and is built from the holdings the build already reads through
-    pipeline/slot_timeline.py, not from a second copy of the history embedded per period. The number of periods grows with
-    every year of history, and every collection has the view - daily ones included, one per day (criterion 1) - so the built
-    page''s size is measured before and after and reported (criterion 11), with no budget set (Keith, 2026-10-14, follow-up
-    F15).'
+    without expanding anything, every row shown (Keith, round 4 R6), the counting line first, and ''Not supplied'' at the
+    top, so that the one owed dataset holding nothing is not the twenty-eighth row of thirty.'
+  - 'PERFORMANCE AND GROWTH: the view shows one period at a time and is looked up from the per-dataset timelines the build
+    already embeds, with each supply''s details embedded once per supply (criterion 9), not from a second copy of the history
+    per period. The number of periods grows with every year of history, and every collection has the view - daily ones included,
+    one per day (criterion 1) - so the built page''s size is measured before and after and reported (criterion 11), with no
+    budget set (Keith, 2026-10-14, follow-up F15).'
   - 'THE BUILD RULE: a build may read recorded QA results, never actual data, and never anything else. _manifest itself reads
-    the period schema''s catalogue - a schema that holds supply rows - so the build reads the metadata view _manifest takes
-    its answers from (criterion 2), never _manifest.'
-  - 'ONE ANSWER (REQ-PIPE-130 criterion 9): what a slot holds is answered from qa.slot_holds alone, and this view adds no
-    second derivation from the decision log.'
+    the period schema''s catalogue - a schema that holds supply rows - so the build reads only what it already reads for REQ-DASH-198
+    (qa.slot_holds through slot_timeline, the decision log through promotion_timeline), never _manifest.'
+  - 'ONE ANSWER (REQ-PIPE-130 criterion 9): what a slot holds is answered once, by the timelines REQ-DASH-198''s lookup already
+    reads, and this view adds no second derivation in Python or in the page.'
   - 'MULTI-AGENCY: the view is per collection and lists that collection''s datasets only.'
-  - 'PRIVACY: the view names the person who decided, as the rest of the page already does (REQ-DASH-198), and a person''s
-    reason is already published on the page (REQ-PIPE-163 criterion 21); both are rendered as text. The view publishes nothing
-    about a person that the page does not already show.'
-  - 'ACCESSIBILITY AND PORTABILITY: a real table with column headers, focus moved to the view''s heading on arrival (docs/spa-best-practices.md
-    section F); no new asset, so the file:// and offline viewing paths are unaffected.'
+  - 'PRIVACY: the view names the person who decided by display name, never by email address (round 4 architect M7), as the
+    rest of the page already does (REQ-DASH-198), and a person''s reason is already published on the page (REQ-PIPE-163 criterion
+    21); both are rendered as text. The view publishes nothing about a person that the page does not already show.'
+  - 'ACCESSIBILITY AND PORTABILITY: a real table with a caption and column headers, focus moved to the view''s h2 on arrival
+    (docs/spa-best-practices.md section F, criterion 12); no new asset, so the file:// and offline viewing paths are unaffected.'
   dependencies:
   - REQ-PIPE-130
   - REQ-PIPE-098
@@ -2353,6 +2489,8 @@ requirements:
   - REQ-GEN-045
   - REQ-GEN-137
   - REQ-DASH-071
+  - REQ-DASH-197
+  - REQ-PIPE-179
   decisions:
   - 'A PAGE FOR A PERIOD''S COMPOSITION (Keith, 2026-10-14, close-out Q16, option B, against the recommendation): TS-55 needs
     a page that shows promoted, inherited and substituted tables together, and none does. It must work at about thirty datasets
@@ -2369,16 +2507,17 @@ requirements:
     leaving it out so the view lists exactly what _manifest lists.'
   - 'ITS OWN REQUIREMENT, DASH (Keith: ''a new requirement to scope''; docs/components.md: rendering is DASH, the holdings
     PIPE''s and already built).'
-  - "PROPOSED AMENDMENT WORDING, for Keith's approval (delivery-scoper, 2026-10-14; batch amendment 3) - REQ-GEN-045 criterion\
-    \ 1 (signed 2026-09-22, built; criterion 7 here). OLD: \"THE SYSTEM SHALL generate a map naming, for each injected scenario,\
-    \ the dataset, the supplies it produced, the period and the in-place-on date at which that scenario can be seen.\n\" NEW:\
-    \ \"THE SYSTEM SHALL generate a map naming, for each injected scenario, the dataset - or, for a scenario about a whole\
-    \ period of a collection (REQ-DASH-209 criterion 7), the collection - the supplies it produced, the period and the in-place-on\
-    \ date at which that scenario can be seen.\n AMENDED <date built> by REQ-DASH-209 criterion 7.\" WHY: criterion 1 requires\
-    \ every coordinate to name a dataset; a coordinate naming only a collection and a period would break it. BUILT BEHAVIOUR:\
-    \ BUILT CODE CHANGES if needed (the scenario map's coordinate); built and tested by REQ-DASH-209 criterion 7. NOTE: CONTINGENT:\
-    \ needed only if TS-55's coordinate names no dataset. If it keeps naming the substituted dataset and adds the collection-and-period\
-    \ view as its target, no change is needed. REQ-DASH-209 leaves this to the architect."
+  - "DROPPED (round 4 architect H3, 2026-10-14; see 'AMENDMENT 3 IS DROPPED' below) - PROPOSED AMENDMENT WORDING, for Keith's\
+    \ approval (delivery-scoper, 2026-10-14; batch amendment 3) - REQ-GEN-045 criterion 1 (signed 2026-09-22, built; criterion\
+    \ 7 here). OLD: \"THE SYSTEM SHALL generate a map naming, for each injected scenario, the dataset, the supplies it produced,\
+    \ the period and the in-place-on date at which that scenario can be seen.\n\" NEW: \"THE SYSTEM SHALL generate a map naming,\
+    \ for each injected scenario, the dataset - or, for a scenario about a whole period of a collection (REQ-DASH-209 criterion\
+    \ 7), the collection - the supplies it produced, the period and the in-place-on date at which that scenario can be seen.\n\
+    \ AMENDED <date built> by REQ-DASH-209 criterion 7.\" WHY: criterion 1 requires every coordinate to name a dataset; a\
+    \ coordinate naming only a collection and a period would break it. BUILT BEHAVIOUR: BUILT CODE CHANGES if needed (the\
+    \ scenario map's coordinate); built and tested by REQ-DASH-209 criterion 7. NOTE: CONTINGENT: needed only if TS-55's coordinate\
+    \ names no dataset. If it keeps naming the substituted dataset and adds the collection-and-period view as its target,\
+    \ no change is needed. REQ-DASH-209 leaves this to the architect."
   - 'ITS OWN ADDRESS, LINKED FROM SUPPLY HISTORY AND THE STANDING-IN DRILL-DOWN (Keith, 2026-10-14, follow-up F1, option A,
     the recommendation): criterion 6 - one address per collection and period, linked from each period row of a dataset''s
     supply history and from the standing-in pill''s drill-down. REJECTED a panel on the collection page with a period picker
@@ -2397,9 +2536,51 @@ requirements:
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answers F1 to F4, F14 and F15): criteria 1, 3 and 10 reworded,
     criterion 11 added, NFRs 2 and 6 reworded; open questions 1 to 4 answered. The architect''s check on REQ-GEN-045 (criterion
     7) is still open.'
+  - 'THE ROWS COME FROM THE TIMELINES THE BUILD ALREADY EMBEDS (round 4 architect H3, HIGH): criteria 2 and 9. qa.slot_holds
+    is sufficient, but REQ-DASH-198''s standing-in pill already derives ''Inherited/Substituted from'' per dataset, period
+    and day (pipeline/promotion_timeline.py, slot_timeline.for_dataset, the page''s promotionStateOn), so the view looks those
+    answers up rather than deriving them again. ''At build time'' becomes ''the build embeds the answers; the page looks them
+    up''. The timeline entries gain stands_on, and each supply''s receipt, status when promoted and acknowledgements are embedded
+    once per supply. SUPERSEDES the mechanism in ''BUILT FROM qa.slot_holds, NOT FROM _manifest'' above; its rule, metadata
+    only and never _manifest, stands. REJECTED a per-period derivation for this view, a second rule beside REQ-DASH-198''s.'
+  - 'THE TEST COMPARES WITH _manifest ONLY AT THE PRESENT (round 4 architect H3): criterion 10. _manifest agrees with qa.slot_holds
+    only at the present date, so the two-way comparison is made at the build''s own date, and an earlier date is held against
+    decision_log''s as-at readers, as REQ-DASH-198 criterion 13 does.'
+  - 'AMENDMENT 3 IS DROPPED (round 4 architect H3): REQ-GEN-045 criterion 1 stays as signed. TS-55''s coordinate keeps naming
+    the substituted dataset, with the composition view as its link''s target (criterion 7), which was the contingent amendment''s
+    own no-change case.'
+  - 'DISPLAY NAMES, NEVER AN EMAIL (round 4 architect M7): criterion 3 and the PRIVACY NFR.'
+  - 'EVERY ROW OPEN (Keith, 2026-10-14, round 4 R6, option B, against the recommendation): criterion 4. ACCEPTED COST: at
+    thirty datasets the view is thirty rows, most of them routine. REJECTED (the recommendation, dashboard UX D1) collapsing
+    rule-promoted-on-green rows into one ''N promoted automatically on green'' line.'
+  - '''NOTHING HELD'' IS SPLIT, COUNTED, AT EACH END (Keith, 2026-10-14, round 4 R7, option A; round 4 dashboard UX 4, HIGH):
+    criteria 1 and 4 - ''Not supplied'' (owed, red or waiting) at the top, then Substituted, Inherited and Promoted, then
+    ''Not owed'' (turned off, not expected, outside agreed months) at the bottom, each counted in the opening line. Refines
+    follow-up F4''s ''Nothing held''. REJECTED one ''Nothing held'' group, which lumps a red absence with a quiet one.'
+  - 'THE LINK SITS IN THE PERIOD''S LABEL (round 4 dashboard UX 5, MED-HIGH): criterion 6. Supply history has no period row,
+    so follow-up F1''s ''each period row'' is read as each period''s label, plus the gap and owed-nothing rows, which stand
+    for a period. REJECTED a link inside a delivery row, which is about one supply, not the period.'
+  - 'ROUTE, HEADING AND NOT-FOUND (round 4 dashboard UX 6, MED): criteria 6, 8, 12 and 13 - the #/agency/<a>/collection/<c>/period/<p>
+    route, the h2 and rail, the existing not-found page, and ''<period> had not opened by <date>''. The exact h2, sub-line
+    and rail wording is the scoper''s, for Keith''s approval.'
+  - 'THE PAGE''S OWN WORDS (round 4 dashboard UX 8, MED): criterion 3 - ''Decided by <name>'' and ''Applied automatically
+    by the schedule'', as REQ-DASH-198''s drill-down already says; a column headed ''Status when promoted''; a table caption
+    (criterion 12). This reads follow-up F3''s ''the person''s name, as the rest of the page shows'' as the page''s own sentence,
+    which replaces F3''s literal ''the rule'' - open question 2 asks Keith to confirm. Criterion 10 maps each to _manifest''s
+    ''person'' or ''rule''.'
+  - 'PREVIOUS/NEXT-PERIOD LINKS NOT DECIDED (round 4 dashboard UX 10, question D4): not answered in round 4, so open question
+    1; nothing here builds them.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, round 4 reviews and Keith''s round 4 answers R6 and R7): criteria 1 to 4 and 6 to
+    10 reworded, criteria 12 and 13 added, NFRs 1 to 4, 6 and 7 reworded, REQ-DASH-197 and REQ-PIPE-179 added as dependencies.
+    The architect''s REQ-GEN-045 check is answered (amendment 3 dropped).'
   open_questions:
-  - 'CHECK AT BUILD (architect, not a question for Keith): whether a coordinate naming a collection and period (criterion
-    7) needs REQ-GEN-045''s coordinate shape amended, which is signed (batch amendment 3, contingent).'
+  - '1. PREVIOUS AND NEXT-PERIOD LINKS ON THE VIEW (round 4 dashboard UX 10, D4; not answered in round 4). Recommended (A):
+    not for now - the supply history and the date picker already reach any period, and the view is new. (B) Yes - a ''previous
+    period'' and ''next period'' link beside the h2, each a real <a href> keeping the date on show.'
+  - '2. WHO DECIDED, IN THE PAGE''S WORDS OR F3''S (round 4 dashboard UX 8). Recommended (A): ''Decided by <name>'' and ''Applied
+    automatically by the schedule'', the sentences REQ-DASH-198''s drill-down already uses - which is what F3''s ''as the
+    rest of the page shows'' asked for. (B) The person''s name, or ''the rule'', literally as F3''s answer was worded - a
+    second way of saying the same thing on one page.'
 - id: REQ-PIPE-210
   title: The terminal's queue says a waiting supply turned red only by another table needs nothing decided on it, and lists
     it under that table's own item
