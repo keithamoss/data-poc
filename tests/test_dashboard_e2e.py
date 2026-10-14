@@ -3861,6 +3861,60 @@ class TestSampleFinePrint:
         assert text and "Soda returns up to 100 of the failing rows" in text
 
 
+class TestClosingASidePanelReachedByItsUrl:
+    """post-build-review #180 (2026-10-14): the side-panel twin of
+    road-testing #8. closePanel() always called history.back(), which is
+    right only when the app itself pushed the panel's entry. A panel the
+    page was LOADED with - `?panel=<name>` pasted, shared or opened in a
+    new tab - has whatever came before the dashboard underneath, so X,
+    the backdrop or Escape left the dashboard (and in a tab with no
+    history at all, did nothing, so the panel could not be closed).
+    It now closes in place there, dropping `panel=` from the address."""
+
+    PANELS = ["activity", "changelog", "requirements", "snapshots", "leaderboard"]
+
+    def _cold_load(self, page, html_path, name):
+        page.goto("about:blank")
+        page.goto(f"file://{html_path.resolve()}?panel={name}")
+        page.wait_for_function("() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        assert page.locator(f"#{name}-panel").get_attribute("aria-hidden") == "false", \
+            "precondition: the panel opens from its address"
+
+    def _assert_closed_on_the_dashboard(self, page, name):
+        assert page.url.startswith("file://") and "qa-reporting-dashboard" in page.url, page.url
+        assert f"panel={name}" not in page.url
+        assert page.locator(f"#{name}-panel").get_attribute("aria-hidden") == "true"
+        assert page.evaluate("() => STATE.panel || null") is None
+
+    @pytest.mark.parametrize("name", PANELS)
+    def test_its_close_button_closes_it_and_stays_on_the_dashboard(self, clean_page,
+                                                                   built_dashboard_html, name):
+        self._cold_load(clean_page, built_dashboard_html, name)
+        clean_page.locator(f"#{name}-panel-close").click()
+        clean_page.wait_for_timeout(400)
+        self._assert_closed_on_the_dashboard(clean_page, name)
+
+    def test_escape_closes_it_and_stays_on_the_dashboard(self, clean_page, built_dashboard_html):
+        self._cold_load(clean_page, built_dashboard_html, "requirements")
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_timeout(400)
+        self._assert_closed_on_the_dashboard(clean_page, "requirements")
+
+    def test_a_panel_opened_from_its_button_still_closes_by_stepping_back(self, clean_page,
+                                                                          built_dashboard_html):
+        """The pushed case is unchanged: Close steps back over the entry
+        the app pushed, so Forward reopens it rather than history
+        accumulating a 'closed' entry."""
+        _goto(clean_page, built_dashboard_html)
+        before = clean_page.evaluate("() => history.length")
+        clean_page.locator("#requirements-btn").click()
+        clean_page.locator("#requirements-panel-close").click()
+        clean_page.wait_for_function("() => !STATE.panel")
+        assert clean_page.evaluate("() => history.length") == before + 1
+        clean_page.go_forward()
+        clean_page.wait_for_function("() => STATE.panel === 'requirements'")
+
+
 class TestClosingAPanelReachedByItsUrl:
     """road-testing #8 (Keith, 2026-09-24): closing a check panel landed
     on the AGENCY view. Reproduced 2026-10-12: Close was always

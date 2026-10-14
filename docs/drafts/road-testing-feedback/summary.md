@@ -1,16 +1,17 @@
 # Draft: a "you told us / we built" Feedback tab (plans/running-thoughts.md #92)
 
 Scoped by delivery-scoper on 2026-10-14, and revised the same afternoon
-with Keith's answers to all eight questions (recorded verbatim at the end
-of this file). **Still a proposal for Keith's sign-off.** Nothing here is
-in `requirements.yaml` or `plans/`. Three small questions remain (RQ1-RQ3
-below); anything marked PROVISIONAL in the YAML hangs on one of them, and
-the draft uses the recommended answer.
+with Keith's answers to all eight questions and to RQ1-RQ3 (recorded
+verbatim at the end of this file), then with the delivery-architect and
+delivery-dashboard-ux reviews and Keith's answers to them, all option A
+(see **Reviews folded** near the end). **Still a proposal for Keith's
+sign-off.** Nothing here is in `requirements.yaml` or `plans/`. No
+PROVISIONAL mark is left in the YAML.
 
 Requirements: `docs/drafts/road-testing-feedback/requirements-draft.yaml`
 
 - **REQ-DOCS-219** - the card format in `plans/road-testing.md`, its
-  validator (`mothman plans validate-feedback`), the keep-the-card rule,
+  validator (`mothman dashboard validate-feedback`), the keep-the-card rule,
   and restoring the deleted entries as cards.
 - **REQ-DASH-220** - the Feedback tab at `#/feedback`. Depends on
   REQ-DOCS-219 and REQ-DASH-222.
@@ -75,7 +76,7 @@ The two open questions those answers settled ("which entries are the
 reviewer's", and every PROVISIONAL tied to Q3/Q5/Q7/Q8) are gone from the
 YAML and live on as decisions citing "Keith, 2026-10-14, Q<n>".
 
-## Remaining questions for Keith (one set, recommended option first)
+## Questions RQ1-RQ3 (ANSWERED 2026-10-14, all option A - kept as the record of what was asked)
 
 1. **RQ1 - What does a card say first, for an entry the project found
    itself?** Seven entries were found by sessions, critics or regenerates
@@ -155,6 +156,8 @@ Notes on that table:
 
 Statuses as of the register on 2026-10-14. "First line" is RQ1-A's label.
 
+**After review-dashboard-ux Q2 (A):** #1, #2, #4, #6, #9 and #10 cite their road-testing sprint (`sprint 1`, `sprint 3`, `sprint 4`) in Evidence and so read **Planned**, not Heard. #19 stays Heard (no sprint). The tab shows no entry numbers; they are here for the author only.
+
 | # | First line | Raised (short) | What we built (draft) | Evidence | Status |
 |---|---|---|---|---|---|
 | 1 | You told us | "Trend" lines don't say what they measure | (absent) - sprint 1 | (none yet) | Heard |
@@ -185,7 +188,13 @@ Statuses as of the register on 2026-10-14. "First line" is RQ1-A's label.
 - **Nothing left to Keith on NFRs** beyond RQ1, which is partly a privacy
   and honesty question on a public page.
 
-## Found while scoping REQ-DASH-222 (not verified by driving)
+## Found while scoping REQ-DASH-222 - CONFIRMED, now post-build-review #180
+
+**Update after the reviews:** the main session reproduced this in a browser (a cold-loaded
+`?panel=requirements` closed with Escape went to about:blank; in a truly fresh tab the panel could not be
+closed at all), and it affects all five side panels. Keith chose to fix it now, test-first, for all five,
+as post-build-review #180 (review-architect Q1, review-dashboard-ux Q4). REQ-DASH-222 c9 now only drops
+`req=` and relies on #180. The original note follows.
 
 Reading `closePanel()` in the template: it calls `history.back()` whenever
 `STATE.panel` is set, and `STATE.panel` is set from the address on a cold
@@ -202,17 +211,18 @@ its own road-testing sighting for the other panels.
 Appended to `plans/running-thoughts.md` #92, which owns the idea:
 
 > **Scoped 2026-10-14 by delivery-scoper** as REQ-DOCS-219 (a feedback
-> card on every road-testing entry, `mothman plans validate-feedback`,
+> card on every road-testing entry, `mothman dashboard validate-feedback`,
 > the keep-the-card rule, and restoring deleted entries as cards),
 > REQ-DASH-220 (the Feedback tab at `#/feedback`, status derived from the
 > requirements each card names) and REQ-DASH-222 (each requirement's own
 > dashboard address, which the tab's cards link through). Keith answered
 > all eight scoping questions the same afternoon (every entry gets a
-> card; requirements deep-linked). Draft in
-> `docs/drafts/road-testing-feedback/`, unsigned; three small questions
-> still with Keith: the first line's label for entries the project found
-> itself, which deleted entries are restored, and the requirement
-> address's form.
+> card; requirements deep-linked), then RQ1-RQ3 ("We noticed:" beside
+> "You told us:", all eleven deleted entries restored, and
+> `?panel=requirements&req=<id>`), and the delivery-architect and
+> delivery-dashboard-ux reviews' questions, all option A. Draft in
+> `docs/drafts/road-testing-feedback/`, unsigned. The closePanel() defect
+> found while scoping is post-build-review #180.
 
 ## Keith's answers, set 1 (2026-10-14 afternoon)
 
@@ -244,3 +254,123 @@ Appended to `plans/running-thoughts.md` #92, which owns the idea:
 - RQ2: **A** - all eleven deleted entries come back as cards, with a
   "Couldn't reproduce" status added for #17.
 - RQ3: **A** - `?panel=requirements&req=<id>`.
+
+## Reviews folded (2026-10-14 afternoon)
+
+Sources:
+- `review-dashboard-ux.md` beside this file.
+- The batch-B half of `../unsigned-triage/review-architect.md`.
+- Keith's answers to RQ1-RQ3 above.
+
+How they were folded:
+- Every finding is now in a criterion, an NFR or a decision.
+- Each of Keith's answers is a decision citing "Keith, 2026-10-14, <review> Q<n>" (or "RQ<n>"), with the
+  rejected option named.
+- **No criterion was renumbered**: changes are made in place, and new criteria are appended.
+- Each requirement carries a "REVIEWS FOLDED" decision listing what changed.
+
+**REQ-DOCS-219** (18 -> 22 criteria)
+- RQ1 folded: c1 is no longer provisional, and the gate requires exactly one of `You told us` /
+  `We noticed`.
+- RQ2 folded:
+  - c11 adds `not-reproduced`.
+  - c6 and c12 treat it like parked and won't-do.
+  - c17 is no longer provisional.
+  - A decision lists all eleven restored entries, with the commit each is rebuilt from and what
+    resolved it.
+- The validator is **`mothman dashboard validate-feedback`** (review-architect Q2 A).
+- c7 accepts `sprint <n>` as an Evidence item. A sprint-only card derives Planned in 220
+  (review-dashboard-ux Q2 A).
+- New criteria:
+  - c19: the date first raised is the `[status, date]` tag's date. It is not changed when the status
+    changes, and restored entries carry their original date (architect).
+  - c20: a cited sprint must exist in road-testing.md's sprint list.
+  - c21: `in-place-on=` is allowed with a well-formed date (review-dashboard-ux Q3 A).
+  - c22: the relative-address check sits in the shared parser in `dashboard/plans_md.py`, so the build
+    refuses a bad target and not only CI (architect, a security finding).
+- NFRs:
+  - The parser is built on `_parse_numbered_items`.
+  - The validator sits under `mothman dashboard`.
+  - The scale is twenty-one cards.
+
+**REQ-DASH-220** (16 -> 22 criteria)
+- Changed in place:
+  - c1: an h2 heading, and the header entry is a real link with an emoji, like its siblings.
+  - c3: the intro wording is no longer provisional (RQ1).
+  - c4: the reviewer's `You told us` cards come first by date, then a "We noticed" section
+    (review-dashboard-ux Q1 A). The evidence is labelled "Where to see it" (Q5 A), and no entry number
+    is shown.
+  - c6: a sprint-only card is Planned, and "Couldn't reproduce" is added (RQ2).
+  - c8: the summary line counts each group.
+  - c9: a requirement's status appears as plain words in the link text, with no pill (dashboard-ux H3).
+- New criteria:
+  - c17: exactly one status pill per card, and no use of REQ_STATUS_CLASS on cited requirements (H3).
+  - c18: "Why not" replaces "What we built" for Parked, Won't do and Couldn't reproduce (M2).
+  - c19: a past-date link lands as a Scenarios jump does, with a neutral jump bar, and Back restores the
+    Feedback tab's date (H2, Q3 A).
+  - c20: a sprint is shown as text, not a link.
+  - c21: the build refuses a non-relative href (architect).
+  - c22: focus returns to the card's link when the panel closes, and the list keeps its scroll.
+- NFRs: renderPlansMarkdown's escaping is reused, sprint_state.survey's "built" predicate is shared, and
+  the evidence href is checked at build.
+- The date-order decision is marked as amended by Q1.
+
+**REQ-DASH-222** (12 -> 16 criteria)
+- RQ3 folded: c1 is no longer provisional, and a decision cites Keith, with the bare `?req=` rejected.
+- Changed in place:
+  - c9: the close criterion only drops `req=` with `panel=` and relies on **post-build-review #180**
+    (Keith, review-architect Q1 and review-dashboard-ux Q4, option A). The old cold-load decision is
+    marked superseded, and a new one cites #180.
+  - c2: the linked-to mark is .arrival-notice's left accent bar.
+  - c3: the heading carries tabindex=-1.
+  - c7: the notice is .stale-link-notice with role=status, not forgetStaleSegment().
+- New criteria:
+  - c13: the header button opens the panel at the top and drops `req=`.
+  - c14: navigating away drops `req=` and `panel=requirements` (architect, on navUrl).
+  - c15: focus returns to the link that opened the panel.
+  - c16: rows carry data-req-id and are found by iteration, never by a selector built from the address
+    (architect).
+- NFRs:
+  - The SECURITY NFR now says no selector is built from the value at all.
+  - New: `req` is held in STATE.
+
+**Not adopted as written:**
+- The card's source label in road-testing.md stays `Evidence`, and only the tab shows "Where to see it".
+  This is a decision marked main session, low stakes. Renaming the source label would change
+  REQ-DOCS-219's format for no reader's gain.
+- The dashboard-ux "header link with emoji" finding is adopted. The emoji itself is left to the build,
+  to match whatever its siblings use.
+
+**Validation, 2026-10-14 after folding:**
+- This draft alone validates **OK - 3 requirements, zero errors**.
+- Both drafts merged into a copy of the register validate **OK - 208 requirements, zero errors**. The
+  merge replaced the seven same-id unsigned entries and appended 219-223.
+
+## Ready for sign-off
+
+**All three requirements are ready to walk.**
+- Every question put to Keith is answered.
+- Every PROVISIONAL mark is gone.
+- Two open questions are kept on record without blocking the build. Both say "not asked now", and
+  neither changes what is built:
+  - REQ-DOCS-219: whether a second reviewer's cards would share this file and tab.
+  - REQ-DASH-220: whether the tab shows on every deployment. The recommendation is no switch for now.
+
+**Points worth a glance during the walk** (recommended reading first):
+1. **The two #14s' first line.** Attribution comes from wording and commit messages, not from asking.
+   - The draft gives both `You told us`.
+   - Say if either was the project's own, in which case it reads `We noticed`.
+2. **#13's card** names REQ-QAC-108, which records a finding rather than a build.
+   - Recommended: a "What we built" line saying we compute those checks ourselves, which derives
+     Built.
+3. **The fourth label.** "Where to see it" shows on the tab, and the file keeps `Evidence`. Say if you
+   want the file to read "Where to see it" too.
+
+**Recommended build order** (the architect's, adjusted for the answers):
+1. **post-build-review #180** first. The main session is doing it now.
+2. **REQ-DASH-222.** It is independent and relies on #180's guard.
+3. **REQ-DOCS-219**, including restoring the eleven cards and the CLAUDE.md/road-testing.md wording
+   Keith approves at build.
+4. **REQ-DASH-220.**
+
+For the full order across both batches, see `../unsigned-triage/summary.md`, "Ready for sign-off".

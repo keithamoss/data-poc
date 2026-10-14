@@ -11,12 +11,20 @@ road-testing-feedback draft already uses 219, 220 and 222, and the unjudged-cros
 last section). Each is now a decision citing "Keith, 2026-10-14, <question id>", its open question is
 gone, and its PROVISIONAL marks are removed.
 
+**The three advisory reviews are folded in too** (delivery-architect, delivery-cli-ux, and the dashboard
+UX review's findings on 166/175/221), with Keith's answers to their questions, all option A. See
+**Reviews folded** near the end for what changed per requirement, **T12** for one new amendment to a
+signed requirement, and **Ready for sign-off** for the build order and the few points still to confirm.
+
 **Validation.** `uv run mothman dashboard validate-requirements --draft
 docs/drafts/unsigned-triage/requirements-draft.yaml` reports 54 errors, all of the expected kind: a
 dependency on a requirement that is in the register but not in the draft. There are no others. The drafts
 were also merged into a copy of `requirements.yaml` (seven same-id entries replaced, REQ-DASH-221 and
 REQ-QAC-223 appended), and that copy validates with **OK - 205 requirements, zero errors** (re-run after
-the answers were folded in).
+the answers were folded in). **Re-run after the reviews were folded, 2026-10-14:** this draft alone still
+reports 54 errors, every one "dependencies entry ... does not match any real requirement id in this
+file"; both drafts merged into one copy of the register (the seven same-id unsigned entries replaced;
+219, 220, 221, 222 and 223 appended) validate **OK - 208 requirements, zero errors**.
 
 **Criterion numbers are kept wherever they could be.** Other records cite these criteria by number:
 post-build-review #136 cites 164 c19 and 177 c16, REQ-PIPE-163's open question cites 164 c17, REQ-PIPE-177
@@ -422,7 +430,10 @@ is not repeated here: it is approved, and it is carried word for word as REQ-DAS
 > wrong: REQ-PIPE-177 criterion 24 (the pass's deadline for owed work) is not met; Keith left
 > post-build-review #179 to it. Keith answered all eight questions the same afternoon (all option A).
 > REQ-QAC-176 was split: its changelog-gate half is REQ-QAC-223, signable now, and the stored fingerprint
-> stays held behind #89. Next are the architect, CLI UX and dashboard UX reviews, then the sign-off walk.
+> stays held behind #89. The architect, CLI UX and dashboard UX reviews were folded in the same afternoon
+> (Keith answered their questions, all option A; one new amendment, T12, to REQ-PIPE-163 c35); the
+> closePanel() defect they found is post-build-review #180. REQ-PIPE-177, REQ-PIPE-178 and REQ-DASH-221
+> are effectively held with REQ-QAC-176 behind #89. Next is the sign-off walk.
 
 ## Keith's answers (2026-10-14 afternoon, via AskUserQuestion)
 
@@ -461,7 +472,204 @@ already said what Keith chose, so no criterion text changed for any of them:
 
 **Still open, deliberately:**
 - REQ-QAC-176 c18, and its empty-fingerprint question (mirrored on REQ-PIPE-177). Both are held behind #89.
-- REQ-DASH-175's low-stakes question: does a placed turned-off hold stay in the quiet section? This was
-  never put to Keith.
+- ~~REQ-DASH-175's low-stakes question~~ - settled after the reviews (main session, low stakes): a placed
+  turned-off hold stays in the quiet section. See **Reviews folded**.
 - REQ-QAC-223's handling of the Evidently checks in the build commit. It is drafted as a decision, flagged
-  above, and not yet confirmed.
+  above, and is one of the confirmations in **Ready for sign-off**.
+
+## Reviews folded (2026-10-14 afternoon)
+
+Sources: `review-architect.md` and `review-cli-ux.md` beside this file, and
+`../road-testing-feedback/review-dashboard-ux.md` for 166, 175 and 221. Every finding is in a criterion,
+an NFR or a decision; each of Keith's answers is a decision citing "Keith, 2026-10-14, review-<name>
+Q<n>" with the rejected option. **No criterion was renumbered**: changes are in place, new criteria are
+appended, and each requirement carries a "REVIEWS FOLDED, 2026-10-14" decision listing them.
+
+The closePanel() defect both reviews found is NOT specified here: the main session is fixing it now, for
+all five side panels and test-first, as post-build-review #180 (Keith, review-architect Q1 and
+review-dashboard-ux Q4, option A). It is folded into REQ-DASH-222 in the other draft.
+
+**REQ-PIPE-164** (24 -> 27 criteria)
+- In place:
+  - c5: says nothing runs until the processing pass or that command does (cli-ux L4).
+  - c10: a rejected supply's refusal names promote, and a superseded one's names un-supersede, each
+    with its flag form (cli-ux L2).
+  - c15: "the verdict it was promoted on" is the promote decision's `promoted_status` (architect).
+  - c23: the backstop refusal gives REQ-PIPE-173's own finding and its paste-ready fix
+    (`agreement_freeze.Finding.fix`), and says the re-check can be raised again once declared (cli-ux H3).
+- New:
+  - c25: a test that a promoted supply's re-check appends no gate decision. This is the architect's HIGH:
+    `recheck._run_claimed` calls `promotion.after_runs` on every re-check today.
+  - c26: the door's label, "Re-check: run its checks again where it is (about a minute; recorded and
+    published)", listed after the decisions that settle the supply (cli-ux L1).
+  - c27: carries amendment **T12** to signed REQ-PIPE-163 c35 (cli-ux H3).
+- NFRs: the gate is skipped in the executor; `_readers_rechecked` reused for c2; an action constant of
+  its own, distinct from `recheck.RECHECK`; `promoted_status` as the source for c15.
+- c19's linked test is named for the build (architect LOW).
+
+**REQ-GHUB-165** (6 -> 7 criteria)
+- c1: un-supersede is read through a connection-taking `supersede_offers(conn, state)` beside
+  `excuse_offers`, and the offer carries a count (architect; cli-ux L5).
+- New c7: the parity test seeds its own examples, committed, in the test's own database
+  (`MOTHMAN_TEST_DSN`). Keith chose this: **review-architect Q3, option A**.
+- The 165-A decision is marked partly superseded. Driving the real `apply` stands. The rolled-back
+  transaction goes, because the flag route opens a second connection (`filing_decisions.py` around
+  line 477) that cannot see uncommitted seed rows.
+- NFR 4: the test now runs in the **fast** half of CI, not `needs_deployment`.
+- Decision: built after REQ-PIPE-163.
+
+**REQ-PIPE-166** (13 -> 18 criteria)
+- In place:
+  - c2: the withdrawn entry is named by id, through `caused_by_decision`, never by position (architect).
+  - c11 and the reader NFR: they now name `acknowledgement.acknowledged_by`, `pipeline/slot_timeline.py`,
+    both dashboard-data builders and `DECISION_DONE` (architect).
+  - c12: wording is "no longer acknowledged" / "no longer marked not supplied", following REQ-DASH-198's
+    precedent (dashboard-ux M6).
+  - c13: a mark's withdrawal is shown where c15 says.
+- New:
+  - c14: the confirmation names the entry withdrawn, its public consequence, and that it can be
+    recorded again (cli-ux M4).
+  - c15: a withdrawn mark shows in the cycle-table cell and in the accepted-gaps list, in
+    `excuseNote()`'s shape (dashboard-ux M4).
+  - c16: the awaiting tag returns with the withdrawn line beneath, and the reason is visible text
+    (dashboard-ux M5).
+  - c17: a second acknowledgement after a withdrawal is the one standing. `acknowledged_by` currently
+    takes the EARLIEST (`LIMIT 1`) (architect).
+  - c18: a test ties `DECISION_DONE` to `decision_log.ACTIONS` (architect LOW).
+- NFR: generalise `excuse.history`/`pipeline/excuses.py` rather than add two near-copies.
+
+**REQ-DASH-175** (no criterion changed)
+- Its open question is closed as a decision marked **main session, low stakes**: a placed turned-off hold
+  stays in the quiet "Received while turned off" section. This is what c3 and signed REQ-DASH-180 c14
+  already say together, so it changes nothing Keith signed.
+- The architect found it sound and buildable with REQ-PIPE-163.
+
+**REQ-DASH-221** (no criterion changed)
+- **Effectively held**, now said in its source and in a decision: it depends on REQ-PIPE-177 (and 178),
+  which depend on REQ-QAC-176, held behind #89.
+- The dashboard-ux review made no finding on it.
+
+**REQ-QAC-176**: a "reviewed, no structural issues, stays held" decision. No criterion changed.
+
+**REQ-QAC-223** (no criterion changed), three NFRs:
+- c4's one reader is `validate_check_lifecycle._old_file_content`, extended to `ref=None`.
+- It is not merged with `sources_fingerprint()` (REQ-PIPE-192's digest).
+- The shared `WARN_THRESHOLD`/`FAIL_THRESHOLD` in `evidently_common.py` move into each check, with a
+  comment saying why.
+
+**REQ-PIPE-177** (28 -> 33 criteria). Now marked effectively held in its source.
+- In place:
+  - c13: offered **above the collection choice**, beside calendar corrections, as "Supplies checked
+    before a check changed (N)". Keith: **review-cli-ux Q1, option A** (H1).
+  - c14: progress lines in the shape `[k/N] re-checking <dataset> <period> (received <day>)...`, with
+    elapsed and remaining time, and changed verdicts marked (M1).
+  - c18: the approximate duration is shown as information only (**Q2 A**), with "Hand it to the
+    processing pass" offered first (**Q4 A**). It also says nothing runs until the pass does (L4), and
+    the flag panel says closing the terminal leaves the rest owed (M1).
+  - c19: each collection's queue shows its own count plus "(M more in other collections)" (H1).
+  - c20: `supply queue` prints one paste-ready line per check (H2; see the confirmation below).
+  - c22: the reason is published against each of the N supplies (L3).
+  - c23: nothing runs until the pass does (L4).
+  - c28: the backstop's finding and fix are shown in the panel (H3).
+- New:
+  - c29: one owed line per bulk re-check, "k of N re-checks for <check> still owed (raised <date>)" (H4).
+  - c30: exit codes 0 / 1 / REQ-PIPE-163 c28's code (**Q3 A**, M2).
+  - c31: with no terminal and no `--yes`, the panel is shown and the command refuses with the flag hint
+    (M3).
+  - c32: `--list` (M5).
+  - c33: the panel counts rejected and superseded supplies the run does not cover (L2).
+- NFRs: an `ids=` filter on `run_all_owed`, which also carries c24's deadline; `_say_owed` grouping.
+
+**REQ-PIPE-178** (17 -> 18 criteria): new c18, a trial ends by printing the real run's command and its
+count, and in the TUI returns to the real run's confirmation (cli-ux M6). Its source now says it is
+effectively held.
+
+**Not adopted as written, and why** (each recorded in the requirement's decisions):
+- cli-ux L4's condition "where no pass is scheduled" is written unconditionally. Nothing in the system
+  knows whether a pass is scheduled, and the sentence is true either way.
+- The architect's "drop panel=/req= in navUrl" applies to the Requirements panel only (REQ-DASH-222 c14).
+  Other panels are left to #180.
+
+## Amendment added by the reviews (exact wording; OLD copied from the live requirements.yaml)
+
+**T12. REQ-PIPE-163 criterion 35** (signed 2026-10-14, **not built**). Carried by REQ-PIPE-164 c27. This is
+cli-ux H3: the refusal gives no next step, the same gap 164 c23 and 177 c28 now close.
+
+- Old: "IF the agreement backstop refuses the dataset (REQ-PIPE-173), THEN THE SYSTEM SHALL refuse the placement, saying that the dataset's judged past changed without a declared correction, and SHALL NOT record anything."
+- New: "IF the agreement backstop refuses the dataset (REQ-PIPE-173), THEN THE SYSTEM SHALL refuse the placement, saying that the dataset's judged past changed without a declared correction, giving REQ-PIPE-173's own finding for that dataset with its paste-ready fix, each on a line of its own, and saying that the placement can be made again once the correction is declared, and SHALL NOT record anything. AMENDED <date built> by REQ-PIPE-164 criterion 27."
+- Why: a refusal with no next step strands the person, and REQ-PIPE-173 already computes the fix.
+- Built behaviour: NO CODE YET. 163 is unbuilt, so there is no built behaviour to change.
+- Note: 163 is signed but not built, so Keith has two ways to apply this.
+  - **(a) Recommended:** approve the wording now and apply it to 163 before 163 is built, writing
+    "AMENDED 2026-10-14 by REQ-PIPE-164 criterion 27 (approved before build)". 163 then ships with the
+    next step, and 164 c27 is met on day one.
+  - (b) Let 164 carry it, as the other T amendments do. 163 would then ship without the next step until
+    164 lands.
+
+**The final amendment list for this batch is T1 to T12.** T1 to T11 are unchanged by the reviews. T12 is
+new. REQ-DASH-175 c7 (amendment 2) is carried as before.
+
+## Ready for sign-off
+
+**Recommended build order** is the architect's, adjusted for Keith's answers:
+
+1. **Post-build-review #180**, the closePanel() fix for all five side panels. The main session is
+   doing it now.
+2. **REQ-QAC-223** (changelog gate; no database change) and **REQ-DASH-222** (requirement addresses,
+   relying on #180) - both buildable now, independent of each other.
+3. **REQ-DOCS-219, then REQ-DASH-220** (the Feedback tab; other draft).
+4. **REQ-PIPE-163 with REQ-DASH-175**, then **REQ-PIPE-179**'s remainder as the architect ordered.
+5. **REQ-PIPE-164, then REQ-PIPE-166.** 166 c9 is vacuous until 164 exists.
+6. **REQ-GHUB-165**. It needs 163 built, because held supplies are among its states. It no longer needs
+   a bootstrap.
+7. **Held behind plans/running-thoughts.md #89:** REQ-QAC-176, REQ-PIPE-177, REQ-PIPE-178 and
+   REQ-DASH-221.
+
+**Signable now** (each has had a scoper pass and the reviews; no open question changes what is built):
+
+- REQ-PIPE-164
+- REQ-GHUB-165
+- REQ-PIPE-166
+- REQ-DASH-175
+- REQ-QAC-223
+
+**Signable but not buildable until #89 settles:**
+
+- REQ-PIPE-177
+- REQ-PIPE-178
+- REQ-DASH-221
+
+**Still held, not for sign-off:** REQ-QAC-176. Criterion 18 and its empty-fingerprint question come back
+with #89.
+
+**Three points to confirm at sign-off**, recommended option first:
+
+1. **T12: how REQ-PIPE-163 c35 gets the next step.**
+   - **A (recommended):** approve the wording now and apply it to 163 before 163 is built.
+   - B: let REQ-PIPE-164 c27 carry it later.
+2. **REQ-PIPE-177 c20: `mothman supply queue` prints one line per changed check beneath the count**
+   (cli-ux H2).
+   - **A (recommended):** yes, each line a paste-ready `--check` value.
+   - B: keep the single aggregate line.
+   - Why this is asked rather than assumed: your 2026-10-10 decision rejected one line per check, for
+     the terminal's queue. A is drafted as applying only to the command's printed output, and the TUI
+     keeps your aggregate line and chooser.
+3. **REQ-QAC-223: the build commit adds one changelog entry per Evidently check**, about five,
+   "definition now recorded with the check; behaviour unchanged".
+   - **A (recommended):** yes, following your 2026-10-10 rejection of one-off gate exemptions.
+   - B: some other handling, to be said.
+
+**Also settled by the main session as low stakes, for Keith to overrule if he wants:**
+
+- REQ-DASH-175: a placed turned-off hold stays in the quiet section.
+
+## Keith's answers to the fold's last questions (2026-10-14 afternoon)
+
+- T12: **A** - approved now; applied to REQ-PIPE-163 criterion 35 in the
+  register before 163 is built (164 c27 then records it as already applied).
+- 177 c20: **A** - the printed `mothman supply queue` lists one line per
+  changed check, ready to paste as --check; the terminal menu keeps the
+  aggregate line and chooser (Keith, 2026-10-10).
+- 223: **A** - the build commit adds one changelog entry per Evidently check
+  ("definition now recorded with the check; behaviour unchanged"); no
+  exemption.

@@ -7272,7 +7272,9 @@ function openPanel(name, opts){
   hideAllPanelsDom();
   showPanelDom(name);
   if(pushHistory){
-    STATE = {...STATE, panel:name};
+    // sidePanelPushed: THIS entry is ours, so Close may step back over it
+    // (post-build-review #180, as closeCheckPanel()'s panelPushed).
+    STATE = {...STATE, panel:name, sidePanelPushed:true};
     const url = new URL(location.href);
     url.searchParams.set("panel", name);
     history.pushState(STATE, "", url.pathname + url.search + location.hash);
@@ -7282,9 +7284,21 @@ function openPanel(name, opts){
 // pattern closeDrawer()/closeCheckPanel() already use, for the same
 // reason - keeps forward/back symmetric instead of accumulating extra
 // "closed" entries.
+//
+// ONLY WHEN THE APP PUSHED THE ENTRY (post-build-review #180, 2026-10-14):
+// a panel the page was LOADED with - `?panel=` pasted, shared or opened in
+// a new tab - has whatever came before the dashboard underneath, so Back
+// left the dashboard, and in a tab with no history did nothing at all.
+// There it closes in place, dropping `panel=` from the address - the
+// side-panel twin of closeCheckPanel()'s road-testing #8 fix.
 function closePanel(){
-  if(STATE && STATE.panel) history.back();
-  else hideAllPanelsDom();
+  if(!(STATE && STATE.panel)) return hideAllPanelsDom();
+  if(STATE.sidePanelPushed) return history.back();
+  STATE = {...STATE, panel:undefined, sidePanelPushed:undefined};
+  const url = new URL(navUrl({dropArrival:false}), location.href);
+  url.searchParams.delete("panel");
+  history.replaceState(STATE, "", url.pathname + url.search + url.hash);
+  hideAllPanelsDom();
 }
 document.getElementById("snapshots-btn").addEventListener("click", ()=> openPanel("snapshots"));
 document.getElementById("snapshots-backdrop").addEventListener("click", closePanel);

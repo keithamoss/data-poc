@@ -8768,3 +8768,28 @@ twice. It deliberately did not re-find the `TypeError`.
      bites once bulk re-checks exist, and 177 criterion 24 carries the fix
      (pass the pass's deadline into the owed work, test first). Stays todo
      until 177 is built.
+
+180. **[done, 2026-10-14]** **[Dashboard UI]** **Closing a side panel the
+     page was opened with leaves the dashboard (or cannot close at all).**
+     Found by delivery-architect and delivery-dashboard-ux independently,
+     reviewing REQ-DASH-222 (2026-10-14), and REPRODUCED by the main session
+     in a real browser: cold-load the template with `?panel=requirements`,
+     press Escape, and the tab navigates to the previous page
+     (`about:blank`). `closePanel()` (template :7285) calls
+     `history.back()` whenever `STATE.panel` is set, and a cold load sets it
+     from the address, so Back steps over an entry the app never pushed. In
+     a genuinely fresh tab (history length 1) Back does nothing and the
+     panel cannot be closed at all. Affects all five SIDE_PANELS (activity,
+     changelog, requirements, snapshots, leaderboard). The side-panel twin
+     of road-testing #8, fixed for the check panel by `panelPushed` +
+     `stepUpInPlace()` in `closeCheckPanel()` (:7183) and by `drawerPushed`
+     in `closeDrawer()`. A defect in built behaviour; fix is test-first.
+     **FIXED the same afternoon (Keith: "fix now, all five panels").**
+     `openPanel()` marks the entry it pushes (`sidePanelPushed`), and
+     `closePanel()` steps back only over that; otherwise it closes in
+     place with replaceState, dropping `panel=`.
+     `tests/test_dashboard_e2e.py::TestClosingASidePanelReachedByItsUrl` -
+     each of the five panels cold-loaded and closed by its X, Escape on
+     one, all six seen failing first - plus the pushed case still stepping
+     back (Forward reopens it). REQ-DASH-222's draft relies on this guard
+     rather than re-specifying it.

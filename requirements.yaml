@@ -33888,8 +33888,7 @@ requirements:
       > {collection name} > Supplies waiting on a decision', with the flag form `mothman supply decide --operation <promote|reject>
       --dataset <id> --period <period> --supply <waiting supply> --reason '<why>'` printed on a line of its own; WHERE the waiting
       version is one file of an open contested pair, criterion 33's refusal applies instead.
-    - IF the agreement backstop refuses the dataset (REQ-PIPE-173), THEN THE SYSTEM SHALL refuse the placement, saying that
-      the dataset's judged past changed without a declared correction, and SHALL NOT record anything.
+    - 'IF the agreement backstop refuses the dataset (REQ-PIPE-173), THEN THE SYSTEM SHALL refuse the placement, saying that the dataset''s judged past changed without a declared correction, giving REQ-PIPE-173''s own finding for that dataset with its paste-ready fix, each on a line of its own, and saying that the placement can be made again once the correction is declared, and SHALL NOT record anything. AMENDED 2026-10-14 by REQ-PIPE-164 criterion 27 (approved by Keith before build, amendment T12).'
     - IF a GitHub comment names place, THEN THE SYSTEM SHALL append nothing and SHALL reply that the decision is made in the
       terminal, at 'mothman > Filing decisions > {collection name} > Supplies waiting on a decision', as it does for choose-file
       (REQ-PIPE-193 criterion 16).

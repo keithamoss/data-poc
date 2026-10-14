@@ -111,8 +111,9 @@ intro: >
 releases:
   - date: "2026-10-14"
     summary: >
-      Fixes for a supply that arrives early reading as missing, and for how a
-      rebuilt demo history dates its corrections.
+      Fixes for a supply that arrives early reading as missing, for how a
+      rebuilt demo history dates its corrections, and for side panels opened
+      from a shared link.
     changes:
       - category: Fixed
         items:
@@ -130,6 +131,13 @@ releases:
               confirmed on whatever day the history was rebuilt. It now shows
               as confirmed when the history ends, or on the correction's own
               date if that is later, so every rebuild reads the same.
+          - headline: Closing a shared panel link keeps you on the dashboard
+            components: ["Dashboard UI"]
+            description: >
+              Opening a link straight to the Requirements, Release notes or
+              another side panel, then closing it, used to take you back out of
+              the dashboard - or, in a new tab, would not close at all. It now
+              closes and leaves you where you were.
   - date: "2026-10-13"
     summary: >
       You can now say what each of two files for one table is. Also fixes
