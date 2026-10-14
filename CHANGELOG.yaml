@@ -126,6 +126,13 @@ releases:
               other page.
       - category: Fixed
         items:
+          - headline: Trend lines no longer count unjudged checks as failing
+            components: ["Dashboard UI"]
+            description: >
+              A check with no rule for a period, or not run for it, used to
+              count as failing in the Trend column, so a dataset with nothing
+              wrong could draw a line near the top of its box. Only amber and
+              red count now.
           - headline: An early supply no longer reads as "No data"
             components: ["Dashboard UI"]
             description: >

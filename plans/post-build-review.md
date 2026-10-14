@@ -8793,3 +8793,20 @@ twice. It deliberately did not re-find the `TypeError`.
      one, all six seen failing first - plus the pushed case still stepping
      back (Forward reopens it). REQ-DASH-222's draft relies on this guard
      rather than re-specifying it.
+
+181. **[done, 2026-10-14]** **[Dashboard UI]** **The Trend line counted
+     checks nobody judged as failing.** Found by delivery-scoper while
+     scoping road-testing sprint 1, verified by the main session against the
+     template: `aggregateFailureSeries()` counted every status other than
+     green as a failure, so a check with no rule for the period (`inactive`)
+     or not run for it (`nodata`) pushed the line up. On the real data every
+     Child Protection dataset's latest point plotted a failing share with no
+     amber or red result at all (cp-notifications 2 of 45), and a line scaled
+     to its own maximum drew that near the top of its box under a green dot -
+     a false "failing" on the very surface road-testing #1 is about. A
+     defect, minor enough to fix without sign-off, and Keith said so anyway:
+     "fix now, test-first". **FIXED**: only amber and red count as not green,
+     over the checks that were judged that run; a run with nothing judged
+     reads 0. `tests-js/trend-counts-only-verdicts.test.js`, three tests, all
+     seen failing first. The one implementation (no Python mirror). Road-
+     testing sprint 1's REQ-DASH-224 builds on this rather than being it.

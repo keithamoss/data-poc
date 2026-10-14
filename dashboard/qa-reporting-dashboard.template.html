@@ -3283,13 +3283,17 @@ function aggregateFailureSeries(cols){
       const key = h.date.getTime();
       if(!byDate.has(key)) byDate.set(key, {date:h.date, total:0, failing:0, worst:"green"});
       const e = byDate.get(key);
-      e.total++;
-      if(status!=="green") e.failing++;
+      // ONLY A VERDICT COUNTS (post-build-review #181): amber and red are
+      // "not green"; a check nobody judged that run - inactive, or nodata -
+      // is in neither the count nor the total. Counting them drew every
+      // Child Protection dataset as failing under a green dot.
+      if(status==="green" || status==="amber" || status==="red") e.total++;
+      if(status==="amber" || status==="red") e.failing++;
       if(STATUS_ORDER[status]>STATUS_ORDER[e.worst]) e.worst=status;
     });
   });
   return [...byDate.values()].sort((a,b)=>a.date-b.date)
-    .map(e=>({date:e.date, rate:e.failing/e.total, status:e.worst}));
+    .map(e=>({date:e.date, rate:e.total ? e.failing/e.total : 0, status:e.worst}));
 }
 
 // `quietStatus` is the DATASET's own state where it has one that is not
