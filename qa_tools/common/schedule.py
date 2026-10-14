@@ -663,6 +663,8 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
     Periods the dataset declares not-expected are RETURNED, flagged,
     never dropped - see DatasetPeriod.
     """
+    from qa_tools.common.agreement import TURNED_OFF
+
     cal = calendar_for_dataset(dataset_id, agreement)
     months = delivery_months(dataset_id, agreement=agreement)
     version = cal.current
@@ -681,6 +683,11 @@ def periods_for_dataset(dataset_id: str, until: date | None = None,
         out = []
         for p in periods:
             if begins is not None and p.date < begins:
+                continue
+            # TURNED OFF ON THE PERIOD'S OWN DATE (REQ-PIPE-179 criteria 4, 8
+            # and 13): owes nothing, so no period and no slot - decided from
+            # the period's date, never its due date or a receipt.
+            if _agreement(agreement).standing_on(dataset_id, p.date).state == TURNED_OFF:
                 continue
             on = delivery_months(dataset_id, p.date, agreement)
             if on is not None and _version_in_force(cal, p.date).is_cadence_rule:

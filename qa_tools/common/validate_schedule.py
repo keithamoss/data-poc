@@ -1556,6 +1556,221 @@ def _participation_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigE
     return out
 
 
+# ---- turning a dataset or collection off (REQ-PIPE-179) --------------
+
+def _iso(value) -> date | None:
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _calendar_dates(calendar: dict, after: date, before: date | None) -> list[tuple[str, date]]:
+    """A raw calendar's periods dated strictly between `after` and `before`
+    (None for no end), each version contributing only inside its own period
+    of effect - with a cadence rule, one per day."""
+    from datetime import timedelta
+
+    versions = [(v or {}) for v in (calendar.get("versions") or [])]
+    out: list[tuple[str, date]] = []
+    for version, (start, end) in zip(versions, _version_windows(versions)):
+        v_start, v_end = _iso(start), _iso(end) if end else None
+        if v_start is None:
+            continue
+        if version.get("cadence"):
+            day = max(v_start, after + timedelta(days=1))
+            stop = min(d for d in (v_end, before) if d) if (v_end or before) else None
+            if stop is None or day < stop:
+                out.append((day.isoformat(), day))
+            continue
+        for entry in (version.get("dates") or []):
+            when = _iso((entry or {}).get("date"))
+            if (when and when > after and (before is None or when < before)
+                    and when >= v_start and (v_end is None or when < v_end)):
+                out.append((str((entry or {}).get("period")), when))
+    return sorted(out, key=lambda pd: pd[1])
+
+
+def _paste_entry(effective_to, reason) -> str:
+    """A ready-to-paste changelog entry turning a version off (criterion 40)."""
+    return ("\n    - date: \"YYYY-MM-DD\"\n      author: <your name>\n"
+            f"      change: Turned off after {effective_to} - {reason or '<why>'}.\n"
+            "      turns_off: true")
+
+
+def _turn_off_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]:
+    """REQ-PIPE-179's refusals: the two keys together (criterion 2), a
+    changelog entry saying it turns off (criterion 40), an effective_to
+    that fits its versions and leaves a gap holding a period (criterion 9),
+    never inherited (criterion 10), a dataset back on inside its
+    collection's gap stating what the collection gave it (criterion 7), and
+    no not_expected entry inside a gap (criterion 21)."""
+    out: list[ConfigError] = []
+    file_name = src.calendar_name
+    calendars = {(c or {}).get("name"): (c or {}) for c in (cal_raw.get("calendars") or [])}
+    entries = {(e or {}).get("id"): (e or {}) for e in (cal_raw.get("datasets") or [])}
+    collections = {(c or {}).get("id"): (c or {}) for c in (cal_raw.get("collections") or [])}
+    members: dict = {}
+    for d, c in _walk_datasets(raw):
+        members.setdefault((c or {}).get("id"), []).append((d or {}).get("id"))
+
+    def inheriting(cid) -> list[str]:
+        """The datasets taking cid's defaults - on its calendar (REQ-PIPE-181
+        criterion 9) and with participation of their own to resolve."""
+        coll_cal = collections.get(cid, {}).get("calendar")
+        return [ds for ds in members.get(cid, [])
+                if not (entries.get(ds, {}).get("calendar")
+                        and entries.get(ds, {}).get("calendar") != coll_cal)
+                and not entries.get(ds, {}).get(schedule.NO_CALENDAR_KEY)]
+
+    # Every changelog entry in the file: turns_off is true or absent.
+    def walk(node, where):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "changelog" and isinstance(v, list):
+                    for e in v:
+                        if isinstance(e, dict) and "turns_off" in e and e["turns_off"] is not True:
+                            out.append(ConfigError(
+                                file_name, where,
+                                f"a changelog entry dated {e.get('date')} carries turns_off: "
+                                f"{e['turns_off']!r}.",
+                                "turns_off only ever says true - leave it out of an entry that "
+                                "does not turn a dataset or collection off."))
+                else:
+                    walk(v, where)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, where)
+    for cid, c in collections.items():
+        walk(c, f"collection {cid!r}")
+    for did, e in entries.items():
+        walk(e, f"dataset {did!r}")
+    for c in calendars.values():
+        walk(c, f"calendar {c.get('name')!r}")
+
+    def check_versions(versions: list[dict], scope: str, label_kind: str,
+                       calendars_for_gap: list[dict]) -> list[tuple[date, date | None, str]]:
+        """The rules on one level's versions; returns its gaps as
+        (effective_to, next effective_from or None, reason)."""
+        gaps = []
+        for i, version in enumerate(versions, start=1):
+            start = str(version.get("effective_from"))
+            label = f"{label_kind} version {i} (effective {start})"
+            has_to, has_reason = "effective_to" in version, "turned_off_reason" in version
+            if version.get("turned_off_reason") == _INHERIT:
+                out.append(ConfigError(
+                    file_name, scope, f"{label} writes turned_off_reason: inherit.",
+                    "Write the reason itself. A turn-off belongs to the one version that states "
+                    "it, so it is never taken from another level or version (criterion 10)."))
+            if has_to and not has_reason:
+                hint = (" `reason:` says why only some periods are owed; turned_off_reason is the "
+                        "key for a turn-off." if "reason" in version else "")
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label} states effective_to {version.get('effective_to')} and no "
+                    f"turned_off_reason.",
+                    "Add `turned_off_reason:` saying why it stops owing supplies - a turn-off "
+                    "with no reason is indistinguishable from a mistake." + hint))
+            if has_reason and not has_to:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label} states turned_off_reason and no effective_to.",
+                    "Add `effective_to:` - the last day it owes, as YYYY-MM-DD - or remove the "
+                    "reason. A reason with no date turns nothing off."))
+            to = _iso(version.get("effective_to")) if has_to else None
+            if to is None:
+                continue
+            if not any(isinstance(e, dict) and e.get("turns_off") is True
+                       for e in (version.get("changelog") or [])):
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label} states effective_to {to} and none of its changelog entries says "
+                    f"it turns off.",
+                    "Add an entry carrying `turns_off: true`, so who turned it off, when and "
+                    "why can be found by filtering rather than reading:"
+                    + _paste_entry(to, version.get("turned_off_reason"))))
+            begin = _iso(start)
+            if begin is not None and to < begin:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label}'s effective_to {to} is before its own effective_from {begin}.",
+                    f"Change effective_to to {begin} or later."))
+                continue
+            nxt = _iso(versions[i].get("effective_from")) if i < len(versions) else None
+            if nxt is not None and to >= nxt:
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label}'s effective_to {to} is on or after the next version's "
+                    f"effective_from {nxt}, so the two would govern the same days.",
+                    f"Change effective_to to before {nxt}."))
+                continue
+            if nxt is not None and not any(_calendar_dates(c, to, nxt) for c in calendars_for_gap):
+                out.append(ConfigError(
+                    file_name, scope,
+                    f"{label} turns off after {to} and the next version takes effect {nxt}: "
+                    f"there is no period between them, so the turn-off turns nothing off.",
+                    "Change effective_to to an earlier date, or the next version's "
+                    "effective_from to a later one, so a period falls between."))
+            gaps.append((to, nxt, version.get("turned_off_reason") or ""))
+        return gaps
+
+    collection_gaps: dict = {}
+    for cid, c in collections.items():
+        versions = _raw_versions(c.get("participation_defaults"))
+        cals = [calendars.get(entries.get(ds, {}).get("calendar") or c.get("calendar"), {})
+                for ds in inheriting(cid)] or [calendars.get(c.get("calendar"), {})]
+        gaps = check_versions(versions, f"collection {cid!r}", "participation_defaults", cals)
+        collection_gaps[cid] = [(to, nxt, why, versions) for to, nxt, why in gaps]
+    for d, c in _walk_datasets(raw):
+        ds, cid = (d or {}).get("id"), (c or {}).get("id")
+        entry = entries.get(ds, {})
+        scope = f"dataset {ds!r}"
+        cal = calendars.get(entry.get("calendar") or collections.get(cid, {}).get("calendar"), {})
+        versions = _raw_versions(entry.get("participation"))
+        gaps = [(to, nxt, why, "set for this dataset")
+                for to, nxt, why in check_versions(versions, scope, "participation", [cal])]
+        if ds in inheriting(cid):
+            for to, nxt, why, defaults in collection_gaps.get(cid, []):
+                back = [v for v in versions if (f := _iso(v.get("effective_from")))
+                        and f > to and (nxt is None or f < nxt)]
+                end = min([_iso(v.get("effective_from")) for v in back] + ([nxt] if nxt else []),
+                          default=None)
+                gaps.append((to, end, why, f"set for {collections[cid].get('id')}"))
+                # CRITERION 7: back on inside the gap, stating what the
+                # collection gave it on the day before.
+                last = next((v for v in defaults if _iso(v.get("effective_to")) == to), {})
+                for v in back[:1]:
+                    missing = [k for k in _RESOLVED if _gives(last, k) and not _gives(v, k)]
+                    if missing:
+                        out.append(ConfigError(
+                            file_name, scope,
+                            f"participation version effective {v.get('effective_from')} brings "
+                            f"it back on while {cid} is turned off, and leaves unstated "
+                            + ", ".join(f"{k} ({cid}'s last value {last[k]!r})" for k in missing)
+                            + ".",
+                            "State " + ", ".join(f"`{k}:`" for k in missing) + " on that version. "
+                            "While a collection is turned off it gives no value to any dataset, "
+                            "so a dataset back on states its own."))
+        # CRITERION 21: no not_expected entry inside a gap.
+        if not gaps:
+            continue
+        dated = {name: when for name, when in _calendar_dates(cal, date.min, None)}
+        for item in (entry.get("not_expected") or []):
+            period = (item or {}).get("period")
+            when = dated.get(period)
+            for to, end, why, level in gaps:
+                if when and when > to and (end is None or when < end):
+                    out.append(ConfigError(
+                        file_name, scope,
+                        f"not_expected names {period}, inside a turned-off gap - after {to}, "
+                        + (f"until {end}" if end else "for good")
+                        + f", {level}: {why}.",
+                        "Remove the not_expected entry - a turned-off period already owes "
+                        "nothing - by a declared correction (REQ-PIPE-111) where the entry is "
+                        "already frozen."))
+    return out
+
+
 # ---- the gate -------------------------------------------------------
 
 def validate(src: Source | None = None) -> list[ConfigError]:
@@ -1611,6 +1826,7 @@ def validate(src: Source | None = None) -> list[ConfigError]:
     errors += _dataset_errors(merged, cal_src)
     errors += _participation_errors(cal_raw, raw, src)
     errors += _defaults_errors(cal_raw, raw, src)
+    errors += _turn_off_errors(cal_raw, raw, src)
     errors += _expects_nothing_errors(merged, cal_src)
     errors += _contract_errors(raw, src)
     errors += _freeze_errors(raw, cal_raw, src)

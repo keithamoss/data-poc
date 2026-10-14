@@ -463,7 +463,7 @@ class CalendarVersionConfig(_Strict):
     readably."""
 
     effective_from: str
-    changelog: list["ConfigChangelogEntry"] = Field(min_length=1)
+    changelog: list["AgreementChangelogEntry"] = Field(min_length=1)
     claim_window: str | None = None
     dates: list[CalendarDate] | None = None
     cadence: CadenceRule | None = None
@@ -489,6 +489,14 @@ class ConfigChangelogEntry(_Strict):
     date: str = Field(pattern=_DATE_PATTERN)
     author: NonEmptyStr
     change: NonEmptyStr
+
+
+class AgreementChangelogEntry(ConfigChangelogEntry):
+    """A changelog entry in contract/calendar.yaml, which may also say it
+    turns a dataset or collection off (REQ-PIPE-179 criterion 40). Typed
+    loosely ON PURPOSE: `turns_off: yes` is refused by the gate, which
+    prints a ready-to-paste entry - a schema error could not."""
+    turns_off: object = None
 
 
 class TimezoneVersion(_Strict):
@@ -650,7 +658,12 @@ class ParticipationVersionConfig(_Strict):
     #: A whole number of days before the period's date the supply is due
     #: (REQ-PIPE-113 criterion 1) - zero unless stated.
     days_before: Annotated[StrictInt, Field(ge=0)] | Literal["inherit"] | None = None
-    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
+    #: A turn-off (REQ-PIPE-179 criteria 1 and 2): the last day this version
+    #: governs, inclusive, and why. Never `inherit` (criterion 10) - each
+    #: belongs to the one version that states it.
+    effective_to: str | None = Field(default=None, pattern=_DATE_PATTERN)
+    turned_off_reason: NonEmptyStr | None = None
+    changelog: list[AgreementChangelogEntry] = Field(min_length=1)
 
 
 class CorrectionChange(_Strict):
@@ -680,7 +693,7 @@ class Participation(_Strict):
 
 class OwnDatesVersion(_Strict):
     effective_from: str = Field(pattern=_DATE_PATTERN)
-    changelog: list[ConfigChangelogEntry] = Field(min_length=1)
+    changelog: list[AgreementChangelogEntry] = Field(min_length=1)
     dates: list[CalendarDate] = Field(min_length=1)
 
 

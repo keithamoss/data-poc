@@ -44,6 +44,8 @@ INHERIT = "inherit"
 VALUES = (PARTICIPATES, "expected_time", "grace", "claim_window", "days_before")
 #: Where a resolved value came from.
 DATASET, COLLECTION, FALLBACK = "dataset", "collection", "fallback"
+#: What a dataset is on a date (REQ-PIPE-179 criterion 27).
+NOT_YET_OWING, TURNED_OFF, OWING = "not yet owing", "turned off", "owing"
 
 
 @dataclass(frozen=True)
@@ -71,11 +73,61 @@ class ParticipationVersion:
     #: effective_from or None)} - where each value came from (REQ-PIPE-181
     #: criterion 13). Empty on a version as written.
     sources: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
+    #: The last day this version governs, inclusive, on the asset's clock -
+    #: a turn-off (REQ-PIPE-179 criterion 1). Belongs to this version alone:
+    #: never restated, never inherited (criterion 10).
+    effective_to: date | None = None
+    turned_off_reason: str | None = None
+    #: The dates of this version's changelog entries carrying
+    #: `turns_off: true`, oldest first (criteria 40 and 41).
+    turns_off_logged: tuple[date, ...] = ()
+
+    def off_after(self, on: date) -> bool:
+        """Whether this version, as written, has stopped governing by `on`."""
+        return self.effective_to is not None and self.effective_to < on
 
     def gives(self, key: str) -> bool:
         """Whether this version, as written, supplies `key` itself - stated
         and not `inherit`."""
         return key in self.stated and key not in self.inherits
+
+
+@dataclass(frozen=True)
+class TurnOff:
+    """Why a dataset owes nothing on a date (REQ-PIPE-179 criterion 27)."""
+
+    effective_to: date
+    reason: str
+    #: DATASET or COLLECTION - the level whose version stated it.
+    level: str
+    #: The effective_from of the version that states it.
+    version_from: date
+    #: The effective_from that ends the gap for this dataset, or None for good.
+    until: date | None
+    #: The newest changelog entry carrying turns_off: true (criterion 41);
+    #: a declared correction's date, where there is one, is the freeze's.
+    authored_on: date | None
+
+
+@dataclass(frozen=True)
+class Standing:
+    """What a dataset is on a date - THE ONE ANSWER every consumer of
+    participation reads (REQ-PIPE-179 criterion 27): not yet owing; turned
+    off, with why and the last applying version's resolved timing; or
+    owing, with the values REQ-PIPE-181 resolves for the date."""
+
+    state: str
+    #: The resolved values - for TURNED_OFF, those in force on its last day
+    #: on ('when last on', criterion 29); None while not yet owing.
+    values: "ParticipationVersion | None"
+    turned_off: TurnOff | None = None
+    #: OWING inside its collection's turned-off gap by a version of its own
+    #: (criterion 28's 'its own version brought it back').
+    brought_back: bool = False
+
+    @property
+    def owes(self) -> bool:
+        return self.state == OWING
 
 
 @dataclass(frozen=True)
@@ -139,11 +191,44 @@ class Agreement:
         """The participation in force on a date, each value RESOLVED from the
         dataset or its collection (REQ-PIPE-181 criterion 2) - or None where
         the dataset's first version has not begun: NOT YET OWING
-        (REQ-PIPE-110 criterion 30, REQ-PIPE-181 criterion 3)."""
+        (REQ-PIPE-110 criterion 30, REQ-PIPE-181 criterion 3).
+
+        THE VALUES ONLY, never whether the dataset owes (REQ-PIPE-179): on a
+        turned-off date these are its last applying version's timing, which
+        is what a slot's inputs read; `standing_on` is what says it owes."""
+        return self.standing_on(dataset_id, on).values
+
+    def standing_on(self, dataset_id: str, on: date) -> Standing:
+        """THE ONE HELPER (REQ-PIPE-179 criterion 27): not yet owing, turned
+        off (criteria 3, 5 and 6), or owing with its resolved values.
+
+        A DATASET'S OWN TURN-OFF FIRST: its latest version starting on or
+        before the date ends before it. Then ITS COLLECTION'S, unless a
+        version of its own begins inside the collection's gap - which brings
+        that dataset alone back (criterion 6). A later collection version
+        never ends a dataset's own turn-off, because only the dataset's own
+        latest version is read for it."""
+        from qa_tools.common import in_force
+
         entry = self.dataset(dataset_id)
         if entry is None:
-            return None
-        return resolve(entry.participation, self.defaults_for(dataset_id), on)
+            return Standing(NOT_YET_OWING, None)
+        own = entry.participation
+        defaults = self.defaults_for(dataset_id)
+        mine = in_force.version_on(own, on)
+        if mine is None:
+            return Standing(NOT_YET_OWING, None)
+        if mine.off_after(on):
+            return Standing(TURNED_OFF, resolve(own, defaults, mine.effective_to),
+                            _turn_off(mine, DATASET, own))
+        above = in_force.version_on(defaults, on) if defaults else None
+        if above is not None and above.effective_to is not None:
+            if above.off_after(on) and mine.effective_from <= above.effective_to:
+                return Standing(TURNED_OFF, resolve(own, defaults, above.effective_to),
+                                _turn_off(above, COLLECTION, defaults, own))
+            if above.off_after(on):
+                return Standing(OWING, resolve(own, defaults, on), brought_back=True)
+        return Standing(OWING, resolve(own, defaults, on))
 
     def resolved_versions(self, dataset_id: str) -> tuple[ParticipationVersion, ...]:
         """The resolved participation at every date any of it changes - the
@@ -200,6 +285,10 @@ def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[Participation
     if mine is None:
         return None
     above = in_force.version_on(defaults, on) if defaults else None
+    if above is not None and above.off_after(on):
+        # WHILE A COLLECTION IS TURNED OFF it gives no value to anybody
+        # (REQ-PIPE-179 criterion 7): a dataset back on states its own.
+        above = None
     picked: dict = {}
     sources: dict = {}
     for key in VALUES:
@@ -216,6 +305,34 @@ def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[Participation
                    expected_time=picked["expected_time"], grace=picked["grace"],
                    claim_window=picked["claim_window"], days_before=picked["days_before"],
                    sources=MappingProxyType(sources))
+
+
+def _turn_off(version: ParticipationVersion, level: str,
+              versions: tuple[ParticipationVersion, ...],
+              own: tuple[ParticipationVersion, ...] = ()) -> TurnOff:
+    """A version's turn-off, with what ends it: the next version at the same
+    level - or, for a collection's, the dataset's own version brought back
+    inside it, whichever comes first."""
+    later = [v.effective_from for v in versions if v.effective_from > version.effective_from]
+    later += [v.effective_from for v in own if v.effective_from > version.effective_to]
+    return TurnOff(effective_to=version.effective_to, reason=version.turned_off_reason or "",
+                   level=level, version_from=version.effective_from,
+                   until=min(later) if later else None,
+                   authored_on=version.turns_off_logged[-1] if version.turns_off_logged else None)
+
+
+def _turns_off_logged(raw) -> tuple[date, ...]:
+    """The dates of the changelog entries carrying `turns_off: true`, oldest
+    first - criterion 41's 'newest' is the last. The gate refuses any other
+    value, so only the literal True counts here."""
+    out = []
+    for entry in raw or []:
+        if isinstance(entry, dict) and entry.get("turns_off") is True:
+            try:
+                out.append(date.fromisoformat(str(entry.get("date"))))
+            except ValueError:
+                continue
+    return tuple(sorted(out))
 
 
 def _changelog(raw, where: str) -> tuple[tuple[str, str, str], ...]:
@@ -236,6 +353,12 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
 
     stated = frozenset(k for k in (PARTICIPATES, "reason", "expected_time", "grace", "claim_window",
                                    "days_before") if k in raw)
+    # A TURN-OFF (REQ-PIPE-179 criterion 1). The gate refuses one half
+    # without the other (criterion 2) and `inherit` for either (criterion
+    # 10). A value that is not a date FAILS LOUD here (the requirement's
+    # NFR): read as absent, it would be a dataset silently owing again.
+    effective_to = (schedule._as_date(raw.get("effective_to"), f"{where} effective_to")
+                    if raw.get("effective_to") is not None else None)
     inherits = frozenset(k for k in VALUES if raw.get(k) == INHERIT)
     raw = {k: v for k, v in raw.items() if k not in inherits}
     months = raw.get(PARTICIPATES)
@@ -266,7 +389,11 @@ def _participation_version(raw: dict, where: str) -> ParticipationVersion:
                       if window is not None else None),
         changelog=_changelog(raw.get("changelog"), where),
         days_before=days_before,
-        stated=stated, inherits=inherits)
+        stated=stated, inherits=inherits,
+        effective_to=effective_to,
+        turned_off_reason=(str(raw["turned_off_reason"]).strip()
+                           if raw.get("turned_off_reason") else None),
+        turns_off_logged=_turns_off_logged(raw.get("changelog")))
 
 
 def _own_dates(raw: dict, dataset_id: str):
