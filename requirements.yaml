@@ -32616,3 +32616,123 @@ requirements:
     - 'SIGNED OFF by Keith, 2026-10-14, with criterion 4''s reader status deferred to running-thoughts #95 (it read ''not evaluated,
       red'', which is today''s false red - Keith: a reader whose cross-table check cannot run against everything should shout,
       shape still being scoped). Batch amendment 7 (REQ-GEN-196''s decision superseded) approved with it.'
+  - id: REQ-GEN-203
+    title: Child Protection's generated history has a contested Client Register pair that a later file supersedes (TS-42) and
+      one a scripted person settles (TS-80)
+    date_written: '2026-10-13'
+    story: As Keith showing what a contested table does to a collection with cross-table checks, I want one Child Protection
+      delivery in the synthetic history to carry two Client Register files that a later resend supersedes, and another whose
+      two files a person settles, so that I can show the table read contested, its three readers' cross-table checks read not
+      evaluated for it, and both ways the contest ends clear them - on a real page rather than in a test.
+    moscow: should
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-14'
+    source: Keith, 2026-10-13 (widen one Child Protection pattern so TS-42 can be planted). Drafted by delivery-scoper the same
+      evening as the planting half of that decision, delivering REQ-GEN-136 criterion 3.
+    acceptance_criteria:
+    - THE SYSTEM SHALL generate, as registered scenario TS-42, through REQ-GEN-044's injection mechanism, one Child Protection
+      delivery in a quarter no other scenario claims, carrying the six usual files plus a second Client Register file, `cp_clients_v2.csv`
+      - a re-export whose rows differ from `cp_clients.csv`'s - with the two Client Register files received ten minutes apart,
+      both inside the quarter's claim window and before its due time.
+    - THE SYSTEM SHALL let each file of an injected Child Protection delivery carry its own receipt instant where the scenario
+      states one, as REQ-GEN-196's pairs do for Birth Registrations, and SHALL keep the one shared instant for every injected
+      delivery that states none.
+    - THE SYSTEM SHALL generate, for the same quarter, a later delivery carrying `cp_clients.csv` alone, received after the
+      quarter's due time and before the next quarter's claim window opens, built green (REQ-GEN-184) so the gate's own promotion
+      and the knock-on re-evaluation of its readers can be seen.
+    - THE SYSTEM SHALL extend the Child Protection generator so that an injected supply can be targeted green (REQ-GEN-184),
+      generating the lead-in quarters before it and the quarter after it as REQ-GEN-185 does for Birth Registrations, and SHALL
+      keep refusing a targeted Child Protection supply whose lead-ins cannot be placed, naming the scenario.
+    - THE SYSTEM SHALL place TS-42 and TS-80, with every lead-in and following quarter their targets need, in Child Protection
+      quarters REQ-GEN-207 adds by growing the history earlier, so that no existing scenario's quarter moves.
+    - THE SYSTEM SHALL generate only those arrival shapes, and SHALL NOT generate any contest, supersession, verdict or promotion
+      the scenario expects (REQ-GEN-044 criterion 6).
+    - 'THE SYSTEM SHALL give TS-42 two scenario links (REQ-GEN-201): one on the pair''s arrival day, where cp-clients reads
+      ''Two files for one table'' and its three readers'' cross-table checks read contested, and one on the later file''s asset
+      day, where the pair''s row reads ''superseded by the supply received <instant>'' (REQ-PIPE-194 criterion 10).'
+    - IF TS-42 cannot be placed - its quarter falls outside the generated history or shares a claimed quarter with another scenario
+      - THEN generation SHALL refuse before writing anything, naming the scenario, and SHALL NOT drop, shift or relax it.
+    - THE SYSTEM SHALL update TS-42's register entry in plans/supply-model.md with its configuration, what it expects and how
+      it would break, and SHALL clear REQ-GEN-136's unmet entry for criterion 3, naming this requirement.
+    - THE SYSTEM SHALL generate, as registered scenario TS-80, through REQ-GEN-044's injection mechanism, one Child Protection
+      delivery in a quarter no other scenario claims, carrying the six usual files plus a stray test file, `cp_clients_TEST.csv`
+      - well-formed and loaded, the Client Register's real columns with rows that are plainly test data (every client named
+      'TEST', from a fixed seed) - received at 08:20 on the quarter's due day, and the real `cp_clients.csv` at 08:30, both
+      before the 09:00 due time.
+    - THE SYSTEM SHALL have TS-80's pair settled by a scripted person (REQ-GEN-135) through REQ-PIPE-193's choose-file, at 11:00
+      the following day on the asset's clock, as file one (the test file) rejected and file two (the real extract) this quarter's
+      supply, naming each file by its receipt position as REQ-GEN-196 criterion 7 does, and SHALL have the QA run and promotion
+      gate the settlement owes run in the replay at that instant through the playback hook (REQ-GEN-196 criterion 10).
+    - THE SYSTEM SHALL build TS-80's real extract to green (REQ-GEN-184), keyed by its delivery and filename (REQ-GEN-196 criterion
+      19), and SHALL NOT target the rejected test file.
+    - 'WHEN the synthetic history is bootstrapped, THE SYSTEM SHALL show on the built dashboard, on TS-80''s arrival day, cp-clients
+      reading ''Two files for one table'' and its three readers'' cross-table checks reading contested, and from the settlement''s
+      asset day the pair''s settled row with the test file rejected, the real extract early and promoted, and the readers re-checked
+      by the knock-on (REQ-PIPE-121). What status those readers read while their cross-table checks are not evaluated follows
+      plans/running-thoughts.md #95''s outcome.'
+    non_functional_requirements:
+    - 'BOOTSTRAP COST: three Child Protection deliveries, the lead-in quarters their green targets need, one settlement''s QA
+      run and the knock-on re-checks they cause. Measure a bootstrap from empty before and after (4m42s on 2026-10-13) and log
+      both in CLAUDE.md''s running log, as REQ-GEN-196 did.'
+    - 'NOISE: the pair leaves three readers'' cross-table checks not evaluated (red today; the status follows #95) for one quarter
+      until the later file is promoted; count it in the scenario''s register entry so the red is known rather than discovered
+      by someone reading the dashboard cold.'
+    - DETERMINISM and loud failure are REQ-GEN-044's, inherited (criteria 3 and 4).
+    - 'CONFIGURATION ONLY: the injection and register; every effect lives in the database.'
+    dependencies:
+    - REQ-PIPE-202
+    - REQ-GEN-044
+    - REQ-GEN-136
+    - REQ-GEN-184
+    - REQ-GEN-201
+    - REQ-PIPE-193
+    - REQ-GEN-135
+    - REQ-GEN-196
+    - REQ-GEN-207
+    - REQ-GEN-185
+    decisions:
+    - 'THE PATH NO BIRTH REGISTRATIONS SCENARIO SHOWS (delivery-scoper, 2026-10-13): TS-68 to TS-74 are each settled by a scripted
+      person; none ends by a later arrival. REQ-PIPE-194 criterion 10''s ''superseded by the supply received {instant}'' row,
+      and dataset_blockers counting the rule''s supersession as the end of a contest, have no real page until TS-42 - which
+      is why it is resolved by a later file, as REQ-GEN-136 criterion 3 already says, rather than settled.'
+    - 'ITS OWN REQUIREMENT (DECIDED Keith, 2026-10-13, set 3 Q12, option A), delivering REQ-GEN-136 criterion 3: the Child Protection
+      generator has no per-file receipts for an injected delivery and PairFile is Birth Registrations-only - real generator
+      work criterion 3''s one line does not specify. REJECTED building it under REQ-GEN-136 criterion 3 directly.'
+    - 'TS-42''s FILES: `cp_clients.csv` PLUS A DIFFERING RE-EXPORT `cp_clients_v2.csv`, LATER SUPERSEDED BY A CLEAN `cp_clients.csv`
+      (DECIDED Keith, 2026-10-13, set 4 Q13, option A): two files where nobody can tell which is right and only a later file
+      settles it. REJECTED a byte-identical duplicate (TS-68 already shows a duplicate send) and a split extract (TS-39''s unit
+      test covers that shape).'
+    - 'ONE CHILD PROTECTION PAIR IS ALSO SETTLED BY A SCRIPTED PERSON - TS-80 (DECIDED Keith, 2026-10-13, set 4 Q15, option
+      B, against the scoper''s recommendation): settlement is shown seven ways for Birth Registrations, but only Child Protection
+      has cross-table readers, so only here can a settlement be seen clearing the readers it turned red. TS-80 is the next free
+      scenario id (TS-75 to TS-79 belong to REQ-GEN-199 and its siblings).'
+    - 'PROPOSED, NOT KEITH''S - TS-80''s OUTCOME: a stray test file rejected and the real extract this quarter''s supply (TS-71''s
+      shape). Chosen because it is the commonest real cause of two files - a test extract sent by mistake - and because it makes
+      a supply, so the settlement''s QA run, its gate and the knock-on re-check of all three readers are all on the page. REJECTED
+      a spare copy (TS-68''s duplicate, which a later reader cannot tell from TS-42 at a glance) and ''reject both'' (no supply,
+      so no knock-on to see). The real extract `cp_clients.csv` sorts before `cp_clients_TEST.csv`, so the chosen file is #1
+      by name here; REQ-GEN-196''s TS-68 and TS-70 already exercise the opposite order.'
+    - 'PROPOSED, NOT KEITH''S - QUARTERS (corrected 2026-10-14): after REQ-GEN-199 the claimed Child Protection anchors are
+      -3 to -12, -14 and -15, and -13 too - TS-67''s early delivery files into 2023-Q3 and REQ-GEN-199 criterion 28 makes that
+      a claim, so the earlier suggestion of -13 for TS-42 would be refused. Free today: -15''s neighbourhood none; -2 (2026-Q2)
+      and -1 (current) only, plus 2024-Q3 (-9, a red chain) by the scoper''s count. So TS-42 and TS-80 need the Child Protection
+      history GROWN EARLIER - REQ-GEN-205''s open question proposes growing it once, by about eight quarters, for TS-42, TS-80,
+      TS-63 and TS-57 to TS-61 together.'
+    - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect A5 (REQ-GEN-207 is a dependency - the one
+      growth owner); architect E20 raised as open question 2 rather than amended, being a real fork (Q5).'
+    - 'CHILD PROTECTION IS BUILT GREEN BY TARGETING, WITH LEAD-INS (Keith, 2026-10-14, close-out Q3, option A, the architect''s
+      recommendation): criteria 3 and 12 (numbered after this fold) say ''built green'', which generate_cp_runs.py refuses today
+      for a targeted supply without lead-ins (architect E20); criterion 4 builds the lead-ins and targeting, as REQ-GEN-185
+      did for Birth Registrations. REQ-GEN-206''s TS-50 uses the same targeting. REJECTED ''built clean'', an ordinary clean
+      delivery whose verdict is left to the draw.'
+    - 'QUARTERS COME FROM THE GROWN HISTORY (Keith, 2026-10-14, close-out Q1, option A): criterion 5; the ''PROPOSED, NOT KEITH''S
+      - QUARTERS'' decision above is answered by it. REQ-GEN-207''s dry run sizes the growth for these two scenarios and their
+      lead-ins.'
+    - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s close-out answers): criteria 4 and 5 are new, so the criteria numbered 4
+      to 11 before this fold are now 6 to 13; decisions written before it use the old numbers. TS-80''s outcome (a stray test
+      file rejected, the real extract this quarter''s supply) is still the scoper''s proposal, not put to Keith as a question.'
+    - 'SIGNED OFF by Keith, 2026-10-14, with two edits: the readers'' status is no longer stated as red but deferred to running-thoughts
+      #95 (red is today''s false red); REQ-PIPE-211 a dependency (still a draft, so recorded here and to be added to dependencies when it is signed), because criterion 13''s knock-on re-check after a
+      settlement does not happen until it is built (round 4 architect B1). Build order per round 4 H5: 207, 202, 211, then 203.'

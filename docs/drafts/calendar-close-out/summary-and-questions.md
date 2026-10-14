@@ -724,3 +724,4 @@ Folded 2026-10-14. Each answer is a decision citing "Keith, 2026-10-14, follow-u
 
 - REQ-GEN-207: SIGNED by Keith, 2026-10-14, with the round 4 architect's changes folded in (a new earlier calendar version; today's plan passes the widened clash rule; the seven oldest-quarter indexes drawn separately with a byte proof; a before/after results comparison reported as findings; TS-79b reworded). Moved out of this draft into requirements.yaml.
 - REQ-PIPE-202: SIGNED by Keith, 2026-10-14, criterion 4's reader status deferred to running-thoughts #95; amendment 7 approved with it. Moved into requirements.yaml.
+- REQ-GEN-203: SIGNED by Keith, 2026-10-14, readers' status deferred to running-thoughts #95, REQ-PIPE-211 added as a dependency. Moved into requirements.yaml.
