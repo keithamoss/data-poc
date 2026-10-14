@@ -5253,6 +5253,26 @@ could never have computed it), and it belongs with batch 5's check work.
     period, still contested, to be settled there.
 
     **Round 3, overnight 2026-10-13 to 14 (Keith: "draft up some requirements and chuck them to the scoper, the architect, and the UX reviewers, and then come back to me with a final proposed draft for questions"):** the scoper drafted REQ-DASH-204 (a reader dataset red from another table's contest), REQ-GEN-205 (TS-57..62 planted, a scripted confirm-correction with keeps) and REQ-GEN-206 (REQ-GEN-136/137 leftovers, #175); the three answers still outstanding on 163/179 were folded in; the whole batch with REQ-DASH-180 went to the architect, CLI UX and dashboard UX reviewers. Drafts in the session scratchpad, unsigned; the final draft and its questions are in plans/morning-reports.md #4.
+    **STEPS 1 AND 2 DONE, 2026-10-14 (main session).** (1) The recap from
+    CHANGELOG.yaml, 11 to 14 October: the delivery agreement moved into one
+    file and its past became changeable only by a declared, approved,
+    previewable correction (11th); runs ask their tools only for what they
+    record, halving a rebuild (12th); two files for one table can be settled
+    in the terminal and are shown on the page and ticket, with seven demo
+    pairs and the as-at scenario cases (13th); an early supply no longer
+    reads "No data", and rebuilt corrections date by the history (14th).
+    (2) The calendar audit - every requirement written or signed from 7
+    October: all SIGNED ones are built except the four signed today
+    (REQ-PIPE-163/202, REQ-GEN-203/207, not started by design). Two built
+    ones carry unmet criteria, both known: REQ-GEN-199 (c9, c16, c33 -
+    post-build-review #174/#175, folded into the close-out draft) and
+    REQ-PIPE-170 (c23, TS-57 to TS-62 - REQ-GEN-205). Not yet signed: the
+    close-out batch (REQ-PIPE-179, REQ-DASH-175/180/182) and five older
+    drafts outside it - REQ-PIPE-164 (re-check one supply), REQ-GHUB-165,
+    REQ-PIPE-166 (withdraw a mark/acknowledgement), REQ-PIPE-177/178 (bulk
+    re-check), and REQ-QAC-176 (a fingerprint of each check's definition
+    on every result - the rule 3 audit's M4 gap, already drafted).
+
 
 93. **[todo, 2026-10-14]** **[Dashboard UI]** **A period-composition view
     - Keith's answer to the close-out batch's question 16.** No page
