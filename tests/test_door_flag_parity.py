@@ -40,8 +40,10 @@ PAIRS: dict = {}
 #: Decisions deliberately hidden from the door on a state, with why (criterion 2).
 _QUEUE_ONLY_STATE = (
     "the queue lists a failed load as could-not-be-loaded and offers reject only "
-    "(REQ-PIPE-153 criteria 5 and 6); the period door shows the same slot as awaiting a "
-    "decision, which offers this - so the door does offer it, from the period side")
+    "(REQ-PIPE-153 criteria 5 and 6). WHERE THE FAILED LOAD IS ALONE IN ITS SLOT the period "
+    "door shows that slot as awaiting a decision, which offers this; where another version "
+    "shares the slot, NO door offers it - post-build-review #189 F3/F4, a question for "
+    "Keith (should a door list every filed supply in a period?)")
 HIDDEN: dict[tuple[str, str], str] = {
     (filing_queue.COULD_NOT_LOAD, fd.REFILE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUPERSEDE): _QUEUE_ONLY_STATE,
@@ -56,6 +58,11 @@ HIDDEN: dict[tuple[str, str], str] = {
     (slot_state.INHERITED, fd.SUBSTITUTE): (
         "substituting over an inheritance is un-inherit then substitute in the door - kept "
         "as REQ-GHUB-082 built it, pending Keith"),
+    # REQ-PIPE-194 criterion 4: nothing but settling is offered on an open pair.
+    # The flags record a substitution over one (#189 F2, a question for Keith).
+    (slot_state.TWO_FILES, fd.SUBSTITUTE): (
+        "REQ-PIPE-194 criterion 4: an open pair is settled before anything else is "
+        "decided for its period; whether the flags should refuse this too is Keith's"),
     ("held:agreement-refused", fd.PLACE): (
         "a hold on a dataset the agreement backstop refuses files itself once the "
         "agreement is put right (REQ-PIPE-173; #188 D9), so the door offers nothing to "
@@ -337,6 +344,52 @@ EXAMPLES = {
     "closed-unfilled": ex_closed_unfilled,
 }
 
+def ov_late(conn, mint):
+    """Awaiting a decision, recorded LATE - so excuse-lateness applies."""
+    import filing_support
+    from qa_tools.common import assignment
+
+    s = mint("due")
+    supply = f"{DS}@late{uuid.uuid4().hex[:10]}"
+    filing_support.file(assignment.Assignment(
+        dataset_id=DS, supply_id=supply, slot=s.name, branch=assignment.OPEN_UNFILLED,
+        considered=(s.name,), received_at=s.due_at + timedelta(days=1)))
+    return _state(conn, mint.now, s, filed=supply), supply
+
+
+def ov_excused(conn, mint):
+    """Late, with its lateness excused - so withdraw-excuse applies."""
+    state, supply = ov_late(conn, mint)
+    _person(conn, fd.EXCUSE_LATENESS, period=state.period, supply=supply)
+    return state, supply
+
+
+def ov_superseded_under_promoted(conn, mint):
+    """Promoted, with an earlier version superseded - so un-supersede applies."""
+    from qa_tools.common import supersession
+
+    s = mint("due")
+    older, _ = _filed(conn, s.name, _received_late(s))
+    newer, table = _filed(conn, s.name, _iso(_now() - timedelta(hours=2)))
+    with conn.raw.transaction():
+        supersession.supersede_earlier(conn, agency_id=AG, collection_id=COL, dataset_id=DS,
+                                       period=s.name, newer=newer, effective_at=_iso(_now()))
+    _promote(conn, newer, table, s.name)
+    return _state(conn, mint.now, s, filed=newer), newer
+
+
+#: STATES OVERLAID WITH WHAT THE LOG HOLDS (post-build-review #189 F1): the
+#: three operations offered from recorded facts rather than from a slot's state
+#: - excuse-lateness, withdraw-excuse and un-supersede - had no example the
+#: flags would accept, so the parity loop could not see them go missing. Each
+#: overlay names the operation it exists for, and asserts the flags accept it.
+OVERLAYS = {
+    "late": (ov_late, fd.EXCUSE_LATENESS),
+    "excused": (ov_excused, fd.WITHDRAW_EXCUSE),
+    "superseded-under-promoted": (ov_superseded_under_promoted, fd.UN_SUPERSEDE),
+}
+
+
 #: A held supply of each label (REQ-PIPE-163 criterion 10).
 HOLD_LABELS = {
     "plain": {"unavailable": [], "considered": []},
@@ -345,16 +398,32 @@ HOLD_LABELS = {
     "schedule-ended": {"unavailable": [], "considered": [], "schedule_ended": True,
                        "last_period": "2027-Q4"},
     "agreement-refused": {"unavailable": [], "considered": [], "agreement_refused": True},
+    # REQ-PIPE-179: received while its dataset is turned off.
+    "turned-off": {"unavailable": [], "considered": [],
+                   "turned_off": {"effective_to": "2025-03-31", "reason": "paused",
+                                  "level": "dataset", "version_from": "2023-01-01"}},
 }
+
+#: The label each is worked out as, from configuration as it stands
+#: (REQ-PIPE-179 criterion 18) - set for the test, since a minted period's
+#: receipt is covered by its own open slot whatever the record says.
+_LABEL_AS = {"plain": "held", "correction": "held", "schedule-ended": "schedule ended",
+             "agreement-refused": "held", "turned-off": "turned off"}
 
 
 def _every_state() -> list[str]:
     """Every state the door can show: the ones it has words for
     (filing_tui._HOW_IT_READS), plus the two the queue adds - so a state
     added later without an example fails criterion 5 rather than passing."""
+    import re
+
     from cli import filing_tui
 
-    return sorted(set(filing_tui._HOW_IT_READS)
+    # AND slot_state's own (#189 F6): a state added there with no wording
+    # entry is still a state the door can show.
+    own = {v for k, v in vars(slot_state).items()
+           if k.isupper() and isinstance(v, str) and re.fullmatch(r"[a-z]+(-[a-z]+)*", v)}
+    return sorted(set(filing_tui._HOW_IT_READS) | own
                   | {filing_queue.ANOTHER_VERSION_WAITING, filing_queue.COULD_NOT_LOAD})
 
 
@@ -463,10 +532,35 @@ def test_the_door_offers_what_the_flags_would_record(conn, minted, quiet, name):
         f"them - offer them, or name them in HIDDEN with a reason")
 
 
+@pytest.mark.parametrize("name", sorted(OVERLAYS))
+def test_what_the_log_holds_is_offered_where_the_flags_record_it(conn, minted, quiet, name):
+    """Criteria 2 and 3 for the operations offered from recorded facts
+    (#189 F1): the overlay's own operation is accepted by the flags AND
+    offered by the door, and nothing else the flags record is hidden."""
+    build, own = OVERLAYS[name]
+    state, supply = build(conn, minted)
+    assert own in _door_offers(conn, state), f"{name}: the door does not offer {own}"
+    assert _accepted(conn, _request_for(own, state, supply, minted, conn)), (
+        f"{name}: the flags refuse {own} - the overlay no longer exercises it")
+    hidden_here = []
+    for op in fd.OPERATIONS:
+        state, supply = build(conn, minted)
+        if op in _door_offers(conn, state) or (state.state, op) in HIDDEN:
+            continue
+        if _accepted(conn, _request_for(op, state, supply, minted, conn)):
+            hidden_here.append(op)
+    assert not hidden_here, f"{name}: the flags record {hidden_here}, the door hides them"
+
+
 @pytest.mark.parametrize("label", sorted(HOLD_LABELS))
-def test_a_held_supply_offers_what_the_flags_would_record(conn, minted, quiet, label):
+def test_a_held_supply_offers_what_the_flags_would_record(conn, minted, quiet, label,
+                                                          monkeypatch):
     """Criterion 2's held supplies, one per label."""
     import filing_support
+    from qa_tools.common import turned_off
+
+    monkeypatch.setattr(turned_off, "label_at", lambda ds, at, agreement=None:
+                        turned_off.Label(_LABEL_AS[label]))
 
     hidden_here = []
     # SUPPLY-SCOPED ONLY: a held supply has no period, and the flags take a
@@ -482,6 +576,10 @@ def test_a_held_supply_offers_what_the_flags_would_record(conn, minted, quiet, l
                                 kind=supply_holds.ASSIGNMENT_RULE,
                                 reason=HOLD_LABELS[label], raised_by="pytest")
         (row,) = [r for r in filing_queue.held_in(conn, COL) if r.supply == supply]
+        # THE LABEL TOOK (#189 F5): a renamed reason key would otherwise make
+        # every example a plain hold and still pass.
+        assert (row.schedule_ended, row.agreement_refused, row.turned_off) == (
+            label == "schedule-ended", label == "agreement-refused", label == "turned-off"), label
         offered = set(filing_queue.held_operations(row))
         if op in offered or (f"held:{label}", op) in HIDDEN:
             continue
@@ -555,3 +653,54 @@ class TestUnSupersedeIsOfferedWhereItApplies:
         s, older, newer = self._superseded_then(conn, minted)
         state = _state(conn, minted.now, s, filed=newer)
         assert filing_queue.supersede_offers(conn, state) == ()
+
+
+class TestCriticFindingsOn189:
+    """delivery-critic on REQ-GHUB-165 (post-build-review #189). Each failed
+    before its fix."""
+
+    def test_7_the_after_placing_offer_goes_through_the_one_combiner(self, monkeypatch):
+        """F7: offered after a placement, a late supply's excuse was missing -
+        the offer took the slot's operations alone, not _offers()."""
+        import contextlib
+
+        from cli import filing_tui
+
+        state = slot_state.SlotState(dataset_id=DS, period="2099-x", state=slot_state.AWAITING_DECISION,
+                                     supply="s")
+        monkeypatch.setattr(filing_tui, "open_log", lambda: contextlib.nullcontext(None))
+        monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
+        monkeypatch.setattr(filing_tui.common, "confirm", lambda *a, **k: True)
+        monkeypatch.setattr(filing_tui, "_excuse_offers", lambda s: (fd.EXCUSE_LATENESS,))
+        monkeypatch.setattr(filing_tui, "_supersede_offers", lambda s: ())
+        got = {}
+        monkeypatch.setattr(filing_tui, "_decide_on", lambda s, offer: got.update(offer=offer))
+        filing_tui._offer_next_decision(DS, "2099-x", "s")
+        assert fd.EXCUSE_LATENESS in got["offer"]
+
+    def test_8_the_held_menu_is_what_held_operations_offers(self, monkeypatch):
+        """F8: the menu was hard-coded, so an operation held_operations added
+        would never reach it."""
+        from cli import filing_tui
+
+        row = filing_queue.HeldRow(dataset_id=DS, dataset_name="Carers", supply="s",
+                                   received_at=None, received_text="", why="w",
+                                   schedule_ended=False)
+        monkeypatch.setattr(filing_queue, "held_operations", lambda r: (fd.REJECT,))
+        seen = []
+        monkeypatch.setattr(filing_tui.common, "select",
+                            lambda msg, choices, **k: seen.extend(choices) or None)
+        filing_tui.held_flow(row)
+        assert len(seen) == 1 and seen[0].startswith("reject")
+
+    def test_10_promoting_nothing_does_not_say_none_is_promoted(self, conn, minted, quiet):
+        """F10: a promote naming no supply on an empty period said 'None is
+        already promoted into ...'."""
+        s = minted("due")
+        request = fd.Request(operation=fd.PROMOTE, dataset_id=DS, actor=_actor(),
+                             reason="parity", confirmed=True, period=s.name, supply=None)
+        before = len(dl.decisions_for(conn, DS))
+        with pytest.raises(dl.DecisionRefused) as refused:
+            fd.apply(request, effective_at=_iso(_now()), conn=conn)
+        assert "None" not in str(refused.value) and "--supply" in str(refused.value)
+        assert len(dl.decisions_for(conn, DS)) == before, "nothing was recorded"

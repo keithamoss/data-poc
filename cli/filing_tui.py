@@ -892,7 +892,11 @@ def held_flow(h) -> None:
                       f"contested, to be settled there.", style="dim")
     place = "place - say which period it belongs to"
     reject = "reject - it is not fit for any period"
-    picked = common.select(f"{h.supply}: what now?", [place, reject], flag_hint=(
+    # WHAT held_operations OFFERS, and nothing it does not (#189 F8).
+    words = {filing_decisions.PLACE: place, filing_decisions.REJECT: reject}
+    picked = common.select(f"{h.supply}: what now?",
+                           [words[op] for op in filing_queue.held_operations(h) if op in words],
+                           flag_hint=(
         placing.flag_form(h.dataset_id, h.supply)))
     if picked == place:
         place_flow(h)
@@ -1000,8 +1004,10 @@ def _offer_next_decision(dataset_id: str, period: str, supply: str) -> None:
     except filing_queue.LogUnreachable:
         return
     if states and common.confirm("Decide on it now?", yes=False, default=True):
+        # THROUGH THE ONE COMBINER (#189 F7): the excuse and un-supersede are
+        # read from the log, as every other door adds them.
         supply_scoped, _ = filing_queue.operations_for(states[0])
-        _decide_on(states[0], offer=supply_scoped)
+        _decide_on(states[0], offer=_offers(states[0], supply_scoped))
 
 
 def _receipt_of(dataset_id: str, supply: str | None):

@@ -686,7 +686,10 @@ def _already(conn, request: Request) -> str | None:
     holds = decision_log.held(conn, request.dataset_id, period)
 
     if request.operation == PROMOTE:
-        if decision_log.promoted_into(conn, request.dataset_id, period) == request.supply:
+        # NAMING A SUPPLY (#189 F10): on an empty period nothing and nothing
+        # compared equal, and it said "None is already promoted".
+        if request.supply and \
+                decision_log.promoted_into(conn, request.dataset_id, period) == request.supply:
             return (f"{request.supply} is already promoted into {period}. "
                     f"Nothing to do.")
     elif request.operation == SUBSTITUTE:
@@ -1090,6 +1093,12 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
     if not request.actor:
         raise people.UnknownActor(
             "a filing decision needs an identified person. Nobody raised this.")
+    if request.operation == PROMOTE and not request.supply:
+        # A PROMOTION NAMES WHAT IT PROMOTES (#189 F10): with none, an empty
+        # period's "already promoted" check compared nothing with nothing.
+        raise decision_log.DecisionRefused(
+            f"A promotion names the supply it promotes into {request.period} - pass "
+            f"--supply. `mothman supply queue` lists what is waiting. Nothing was recorded.")
     # THE PLAYBACK LOCK, HERE AS WELL AS AT THE LOOKUP (REQ-GEN-135 NFR 2:
     # each lock refuses on its own). The lookup refused the synthetic actor
     # outside playback, but a caller already holding its record could reach

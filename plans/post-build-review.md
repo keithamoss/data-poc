@@ -9074,3 +9074,47 @@ twice. It deliberately did not re-find the `TypeError`.
           REQ-PIPE-163 criterion 32 says decide leaves a decision's checks owed
           unless --wait is given, and that is what it does now (the door still
           waits). --wait is accepted for it since D1's fix.
+
+189. **[done, 2026-10-15]** **[Pipeline & publishing]** **[Testing & dev
+     tooling]** **delivery-critic on REQ-GHUB-165 (the door offers what the
+     flags record), overnight #5.** Each finding checked against the code
+     first; each fix had a failing test (`tests/test_door_flag_parity.py`,
+     `TestCriticFindingsOn189` and the overlays).
+     - **FIXED - HIGH: the parity test could not see three operations** (F1).
+       Excuse-lateness, withdraw-excuse and un-supersede are offered from
+       recorded facts, not from a slot's state, and no example ever made the
+       flags accept them - so blanking `excuse_offers` and `supersede_offers`
+       passed every case. Three overlays now build a late supply, an excused
+       one and a promoted slot with a superseded version; each asserts its own
+       operation is accepted by the flags AND offered by the door, then runs
+       the full loop. Re-checked by the same mutation: all three fail.
+     - **FIXED - HIGH, NAMED: substitute over an open pair** (F2). The flags
+       record it; the door hides it, which REQ-PIPE-194 criterion 4 requires.
+       Named in HIDDEN with that reason; whether the flags should refuse it
+       too is a question for Keith (morning report 5, Q6).
+     - **FIXED - a HIDDEN reason that was false in general** (F3): it said the
+       period door offers re-file and supersede of a failed load, which holds
+       only when the failed load is alone in its slot. Reworded to say so.
+     - **NOT CHANGED - a waiting supply can be reachable from no door** (F4):
+       the period door shows one supply per slot, so a failed resupply hides a
+       waiting good one, or the reverse. Probed by the critic, not reproduced
+       here; older than REQ-GHUB-165 (slot_state). A question for Keith
+       (morning report 5, Q7).
+     - **FIXED - the hold-label examples never checked the label took** (F5),
+       and with REQ-PIPE-179's live labels the schedule-ended example had in
+       fact become a plain hold. The test now sets each label as configuration
+       would give it, asserts the row carries it, and covers turned off too.
+     - **FIXED - the state list came from the door's wording table** (F6): it
+       now also reads slot_state's own state constants.
+     - **FIXED - the offer after placing skipped the one combiner** (F7):
+       `_offer_next_decision` passed the slot's operations alone, so a late
+       placed supply was not offered its excuse.
+     - **FIXED - the held menu was hard-coded** (F8): it now offers exactly
+       what `held_operations` gives.
+     - **FIXED - a promote naming no supply** (F10): on an empty period it
+       said "None is already promoted"; once that check was corrected the
+       flag route would have recorded a promotion of nothing. It is refused
+       now, naming --supply, and nothing is recorded.
+     - **NOT CHANGED - the un-supersede count and version list filter
+       differently** (F9): not reproducible - rejecting a superseded supply is
+       refused - so left as the critic found it.
