@@ -318,9 +318,16 @@ def _runs_as(monkeypatch, **outcome):
     return seen
 
 
+def _plain(output: str) -> str:
+    """The output with any colour codes taken out, its lines kept."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", output)
+
+
 def _said(output: str) -> str:
-    """The output as one line of words, the panels' borders taken out."""
-    return " ".join(re.sub(r"[\u2500-\u257f]", " ", output).split())
+    """The output as one line of words, the panels' borders and any colour
+    codes taken out - CI forces colour on (1e6fffb's run went red on it)."""
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", output)
+    return " ".join(re.sub(r"[\u2500-\u257f]", " ", plain).split())
 
 
 def _argv(supply, target, *extra):
@@ -339,27 +346,27 @@ class TestDecidePlacesThroughFlags:
         _no_run(monkeypatch)
         got = cli(_argv(supply, target))
         assert got.exit_code == 0, got.output
-        assert f"placed into {target}" in got.output
-        assert "\nmothman pipeline process\n" in got.output
+        assert f"placed into {target}" in _plain(got.output)
+        assert "\nmothman pipeline process\n" in _plain(got.output)
         assert "every owed QA run" in _said(got.output)
         assert [o for o in recheck.owed(conn, DS) if o.supply_id == supply]
 
     def test_a_placement_needs_the_supply(self, cli):
         got = cli(["decide", "--operation", "place", "--dataset", DS, "--to-period",
                    "2099-Q1", "--reason", "r", "--yes"])
-        assert got.exit_code != 0 and "--supply" in got.output
+        assert got.exit_code != 0 and "--supply" in _plain(got.output)
 
     def test_a_placement_takes_no_period(self, conn, period, target, cli):
         supply, _ = _held(conn, period)
         got = cli(_argv(supply, target, "--period", target))
-        assert got.exit_code != 0 and "--period" in got.output and "--to-period" in got.output
+        assert got.exit_code != 0 and "--period" in _plain(got.output) and "--to-period" in _plain(got.output)
 
     def test_the_dataset_must_be_the_supplys_own(self, conn, period, target, cli):
         supply, _ = _held(conn, period)
         argv = _argv(supply, target)
         argv[argv.index(DS)] = "cp-clients"
         got = cli(argv)
-        assert got.exit_code != 0 and DS in got.output and "cp-clients" in got.output
+        assert got.exit_code != 0 and DS in _plain(got.output) and "cp-clients" in _plain(got.output)
 
     def test_help_names_place_and_says_checks_are_left_owed(self, cli):
         said = _said(cli(["decide", "--help"]).output)
@@ -369,7 +376,7 @@ class TestDecidePlacesThroughFlags:
     def test_wait_is_refused_for_a_decision_that_owes_no_run(self, cli):
         got = cli(["decide", "--operation", "promote", "--dataset", DS, "--period",
                    "2099-Q1", "--supply", "x", "--reason", "r", "--yes", "--wait"])
-        assert got.exit_code != 0 and "--wait" in got.output and "promote" in got.output
+        assert got.exit_code != 0 and "--wait" in _plain(got.output) and "promote" in _plain(got.output)
 
 
 class TestDecideWaitRunsTheChecks:
@@ -419,10 +426,10 @@ class TestDecideWaitRunsTheChecks:
         supply, _ = _held(conn, period)
         got = cli(_argv(supply, target, "--wait"))
         assert got.exit_code == filing_tui.CHECKS_STILL_OWED_EXIT
-        assert "Traceback" not in got.output
+        assert "Traceback" not in _plain(got.output)
         said = _said(got.output)
         assert "placement stands" in said and "still owed" in said
-        assert "\nmothman pipeline process\n" in got.output
+        assert "\nmothman pipeline process\n" in _plain(got.output)
 
     def test_a_refile_through_decide_accepts_wait_likewise(self, conn, period, target, cli,
                                                            monkeypatch):
@@ -480,7 +487,8 @@ class TestThePeriodChooser:
             "cp-carers", self._received("2024-05-15T09:00:00+08:00"),
             {"2024-Q1": "promoted", "2024-Q2": "inherited", "2024-Q3": "awaiting-decision"})
         by = {r.period: r.label for r in got.rows}
-        assert by["2024-Q1"].endswith("accepted")
+        # The period list's own word for it (#188, cli-ux M5).
+        assert by["2024-Q1"].endswith("promoted")
         assert "un-inherit it first" in by["2024-Q2"]
         assert "decide the version waiting there first" in by["2024-Q3"]
 
@@ -570,7 +578,7 @@ class TestTheFilingDecisionsDoorListsHeldSupplies:
         assert out.index("Held - no period yet") < out.index("waiting on a decision")
         assert "15 May 2024, 09:00" in out and "could not be placed" in out
         (choices,) = offered
-        assert any(c.startswith("Held: Carer Register") for c in choices)
+        assert any(c.startswith(f"Held, no period yet: {DS}") for c in choices)
 
     def test_a_held_supply_offers_place_and_reject(self, monkeypatch):
         door, offered = self._door(monkeypatch, [], [])
@@ -750,3 +758,189 @@ class TestASettlementsRefileTargetIsChosen:
                                   received_at=_at(day, "13:30")) is None
         assert seen["default"].startswith("2026-11-03 ")
         assert seen["default"] in seen["choices"]
+
+
+class TestARepeatedRejectIsAlreadySo:
+    """Found by REQ-GHUB-165's parity test (post-build-review): rejecting a
+    supply already rejected appended a second rejection rather than saying
+    nothing changed (REQ-GHUB-082 criterion 26)."""
+
+    def test_the_second_reject_changes_nothing(self, conn, period):
+        from qa_tools.common import filing_decisions as fd, people
+
+        supply, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+
+        def reject():
+            return fd.apply(fd.Request(operation=fd.REJECT, dataset_id=DS,
+                                       actor=people.person_by_email(REAL_PERSON), reason="r",
+                                       period=period, supply=supply, confirmed=True),
+                            effective_at=WHEN, conn=conn)
+
+        assert reject().changed
+        again = reject()
+        assert not again.changed and "already rejected" in again.message
+        assert len([d for d in dl.decisions_for(conn, DS)
+                    if d["supply"] == supply and d["action"] == dl.REJECT]) == 1
+
+
+# post-build-review #188 (delivery-critic on REQ-PIPE-163) - each written first.
+
+class TestCriticFindingsOnPlacement:
+
+    def test_d1_wait_is_accepted_for_un_supersede_which_owes_a_run(self, cli):
+        """Criterion 27 refuses --wait only for a decision that owes no QA run;
+        un-supersede owes one (REQ-PIPE-120)."""
+        got = cli(["decide", "--operation", "un-supersede", "--dataset", DS, "--period",
+                   "2099-Qnone", "--supply", "x", "--reason", "r", "--yes", "--wait"])
+        assert "owes none" not in _said(got.output)
+
+    def test_d4_holds_keeps_every_response_of_a_correction_hold(self, conn, period, cli):
+        supply, _ = _held(conn, period)
+        conn.execute(f"UPDATE {supply_holds.TABLE} SET reason = reason || "
+                     "'{\"correction\": \"CAB-9\"}'::jsonb WHERE supply_id = ?", [supply])
+        out = _said(cli(["holds"]).output)
+        assert "declare a correction adding a date" in out
+        assert f"--supply {supply} --to-period <period>" in out
+
+    def test_d5_filings_names_the_rule_for_the_rules_placement(self, conn, period, target,
+                                                               cli, monkeypatch):
+        from cli import supply as supply_cli
+        from qa_tools.common import placing
+
+        monkeypatch.setattr(supply_cli.console, "_width", 400)
+        supply, _ = _held(conn, period)
+        with dl.decision_transaction(conn):
+            placing.place(conn, agency_id="child-protection-family-support",
+                          collection_id="child-protection", dataset_id=DS, supply=supply,
+                          to_period=target, actor="calendar rule", actor_kind=dl.RULE,
+                          reason="dates now cover it", effective_at=WHEN)
+        said = _said(cli(["filings", "--dataset", DS, "--limit", "100000"]).output)
+        line = next(x for x in said.split(supply)[1:2])
+        assert "by the rule" in line and "by a person" not in line
+
+    def test_d7_a_pair_placed_through_flags_says_where_it_is_settled(self, conn, cli):
+        """Criterion 37: the outcome offers settling the pair now."""
+        held = TestAPairHeldWholeIsPlacedTogether.held_pair.__wrapped__(None, conn)
+        ds, p = held
+        from qa_tools.common import filing_decisions as fd, placing
+
+        key = fd.consequences(conn, _request(p.pair, p.target, ds)).key
+        got = cli(["decide", "--operation", "place", "--dataset", ds, "--supply", p.pair,
+                   "--to-period", p.target, "--reason", "r", "--yes", "--acknowledge", key])
+        assert got.exit_code == 0, got.output
+        said = _said(got.output)
+        assert placing.where_to_decide(ds) in said and "settle" in said.lower()
+
+    def test_d8_the_preview_says_on_time_in_words(self):
+        from cli import filing_tui
+        from qa_tools.common import placing
+
+        p = placing.Plan(dataset_id=DS, supply="s", to_period="2024-Q1", received="",
+                         classification="on_time")
+        assert "on time" in filing_tui.preview(p) and "on_time" not in filing_tui.preview(p)
+
+    def test_d9_an_agreement_refused_hold_offers_nothing_to_choose(self):
+        from qa_tools.common import filing_queue as fq
+
+        row = fq.HeldRow(dataset_id=DS, dataset_name="Carer Register", supply="s",
+                         received_at=None, received_text="x", why="w", schedule_ended=False,
+                         agreement_refused=True)
+        assert fq.held_operations(row) == ()
+
+    def test_d10_the_owes_nothing_refusal_has_one_full_stop(self, conn, period):
+        supply = _held(conn, period, dataset="cp-case-workers")[0]
+        with pytest.raises(dl.DecisionRefused) as refused:
+            _place(conn, supply, "2023-Q2", dataset="cp-case-workers")
+        assert ".." not in str(refused.value)
+
+    def test_d6_a_refile_of_a_held_supply_names_the_place_command(self, conn, period, target):
+        from qa_tools.common import refiling
+
+        supply, _ = _held(conn, period)
+        with pytest.raises(dl.DecisionRefused) as refused:
+            refiling.plan(conn, dataset_id=DS, supply=supply, to_period=target)
+        assert (f"\n  mothman supply decide --operation place --dataset {DS} --supply {supply} "
+                f"--to-period <period>") in str(refused.value)
+
+
+# post-build-review #188 (delivery-cli-ux-critic on REQ-PIPE-163) - written first.
+
+class TestTheChooserOnARealScreen:
+
+    def _drive(self, monkeypatch, dataset, received, first=None, current=None):
+        import contextlib
+
+        from cli import common, filing_tui
+        from qa_tools.common import filing_queue as fq
+
+        monkeypatch.setattr(filing_tui, "open_log", lambda: contextlib.nullcontext(None))
+        monkeypatch.setattr(fq, "slots_of", lambda *a, **k: [])
+        seen = {}
+
+        def pick(message, choices, flag_hint, default=None):
+            # As questionary does: a default that is not a selectable choice raises.
+            labels = [c for c in choices if isinstance(c, str)]
+            if default is not None and default not in labels:
+                raise ValueError(f"Invalid `default` value passed: {default}")
+            seen.update(choices=choices, default=default)
+            return None
+
+        monkeypatch.setattr(common, "select", pick)
+        filing_tui.choose_period(dataset, received, "Which period?", first=first,
+                                 current=current)
+        return seen
+
+    def test_blocker_a_page_with_an_owes_nothing_row_does_not_crash(self, monkeypatch):
+        from datetime import datetime
+
+        seen = self._drive(monkeypatch, "cp-case-workers",
+                           datetime.fromisoformat("2024-05-15T09:00:00+08:00"))
+        assert seen["choices"]
+
+    def test_the_cursor_starts_on_the_nearest_owed_period(self, monkeypatch):
+        from datetime import datetime
+
+        seen = self._drive(monkeypatch, "cp-case-workers",
+                           datetime.fromisoformat("2024-05-15T09:00:00+08:00"))
+        assert seen["default"].startswith("2024-Q3 ")
+
+    def test_the_supplys_own_period_cannot_be_chosen(self, monkeypatch):
+        from datetime import datetime
+
+        seen = self._drive(monkeypatch, "cp-carers",
+                           datetime.fromisoformat("2024-05-15T09:00:00+08:00"),
+                           current="2024-Q2")
+        labels = [c for c in seen["choices"] if isinstance(c, str)]
+        assert not any(c.startswith("2024-Q2 ") for c in labels)
+        shown = [getattr(c, "title", "") or "" for c in seen["choices"]
+                 if not isinstance(c, str)]
+        assert any("2024-Q2" in t and "filed here now" in t for t in shown)
+
+
+class TestTheHeldScreenSaysWhy:
+
+    def test_the_reason_is_shown_above_place_and_reject(self, monkeypatch, capsys):
+        from cli import filing_tui
+        from qa_tools.common import filing_queue as fq
+
+        monkeypatch.setattr(filing_tui.common, "select", lambda *a, **k: None)
+        filing_tui.held_flow(fq.HeldRow(
+            dataset_id=DS, dataset_name="Carer Register", supply="cp-carers@h1",
+            received_at=None, received_text="x",
+            why="cp-carers@h1 could not be placed - 2024-Q1: closed.",
+            schedule_ended=False))
+        assert "2024-Q1: closed" in capsys.readouterr().out
+
+    def test_an_unlisted_person_is_told_on_entering_filing_decisions(self, monkeypatch, capsys):
+        from cli import filing_tui
+        from qa_tools.common import people
+
+        def nobody():
+            raise people.UnknownActor("'x@y' is not in contract/people.yaml")
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", nobody)
+        asked = []
+        monkeypatch.setattr(filing_tui.common, "select",
+                            lambda *a, **k: asked.append(a) or None)
+        filing_tui.filing_menu()
+        assert "people.yaml" in capsys.readouterr().out and not asked

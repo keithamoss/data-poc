@@ -9006,3 +9006,66 @@ twice. It deliberately did not re-find the `TypeError`.
        stays; the card paragraph says a card never names, describes or quotes
        the reviewer; REQ-DASH-220 NFR 8 now says card text is escaped first,
        its old premise (renderPlansMarkdown's own escaping) having been false.
+
+188. **[in-progress, 2026-10-14]** **[Pipeline & publishing]** **[Testing & dev
+     tooling]** **delivery-critic and delivery-cli-ux-critic on REQ-PIPE-163
+     (place a held supply), overnight #5.** Each finding checked against the
+     code before it is written here; each fix had a failing test first
+     (`tests/test_place_held_supply.py`'s critic classes).
+     - **FIXED - BLOCKER: choosing "place" crashed the terminal for every held
+       supply in the queue** (cli-ux). The chooser's default matched
+       `r.period == first` with `first=None`, and an owes-nothing row's period
+       is None too, so questionary was handed an unselectable separator as its
+       default and raised. All 8 holds in today's queue are cp-case-workers',
+       which owes February and August only, so every chooser page had such a
+       row. Shipped in 1e6fffb; the tests drove the chooser with a stubbed
+       select that accepted any default. The stub now refuses a default that
+       is not a selectable choice, as questionary does. The cursor also starts
+       on the nearest owed period now, never on "Earlier periods".
+     - **FIXED - `--wait` on un-supersede was refused, saying it owes no run**
+       (D1). It owes a re-check (REQ-PIPE-120); --wait now covers place, refile
+       and un-supersede.
+     - **FIXED - placing and rejecting one held supply were not serialised**
+       (D3): a placement locked only its target period and a period-less reject
+       locked nothing, so two placements into different periods could both find
+       the hold open. The decision log now also locks the held supply itself.
+       By reading; not reproduced as a race.
+     - **FIXED - `supply holds` dropped a correction hold's middle response**
+       (D4), and **`supply filings` said "by a person" for the rule's
+       placements** (D5).
+     - **FIXED - the place command was not on a line of its own everywhere**
+       (D6): the dashboard's held item put it inline in backticks (now a code
+       line of its own), and the re-file and decision-log refusals named
+       neither the command nor the screen.
+     - **FIXED - a pair placed through the flags gave no pointer to settling
+       it** (D7); the preview printed `on_time` (D8); an **agreement-refused
+       hold was offered place and reject** although it files itself and placing
+       it is refused (D9) - the door now offers nothing on it, as `supply holds`
+       already said.
+     - **FIXED - smaller**: the owes-nothing refusal ended in ".."; the chooser
+       crashed rather than emptied on a dataset with no calendar; "Name another"
+       after a refused target that is now chosen; `decide --help` still called
+       --to-period re-file only; an already-run check said the gate "did not
+       promote it"; Ctrl-C still asked "Decide on it now?".
+     - **FIXED - cli-ux**: an unlisted person was told only after walking
+       dataset, period, operation and target - the door now asks who is
+       deciding on the way in; a held supply's reason was off-screen when its
+       place/reject menu was shown - it is printed above the menu now; held rows
+       read "Held: Case Workers, received ..." beside slot rows reading
+       "cp-case-workers ... arrived" - now said the same way; the re-file
+       chooser offered the supply's own period - shown, not selectable, "it is
+       filed here now"; the chooser said "accepted" where the period list one
+       screen earlier says "promoted".
+     - **NOT CHANGED, pre-existing - Back from a held supply's or a slot's menu
+       goes to the collection menu, not "Which one?"** (cli-ux L7). Same for slot
+       rows before this change; a separate piece of polish.
+     - **QUESTIONS FOR KEITH** (queued in morning report #5):
+       1. **D2: should the flags refuse rejecting a schedule-ended held
+          supply?** The door offers only adding dates (criterion 22); the flag
+          route records a reject. REQ-GHUB-165's parity test names it as a
+          deliberate exception until you decide.
+       2. **Should `decide --operation un-supersede` run its check in the
+          foreground?** REQ-PIPE-120's decision says "the terminal waits";
+          REQ-PIPE-163 criterion 32 says decide leaves a decision's checks owed
+          unless --wait is given, and that is what it does now (the door still
+          waits). --wait is accepted for it since D1's fix.

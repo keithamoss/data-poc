@@ -177,7 +177,7 @@ def period_problem(dataset_id: str, period: str) -> str | None:
     if reason is None:
         return (f"{period} is not a period {dataset_id}'s calendar generates. Nothing was "
                 f"recorded. Its periods:" + listing)
-    return (f"{dataset_id} owes nothing in {period} - {reason}. A supply is placed only "
+    return (f"{dataset_id} owes nothing in {period} - {reason.rstrip('.')}. A supply is placed only "
             f"into a period it owes. Nothing was recorded. Its periods:" + listing)
 
 
@@ -262,10 +262,10 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
 _ONE_WORD = {
     "not-yet-due": "upcoming", "overdue": "overdue", "never-supplied": "missed",
     "awaiting-decision": "waiting", "returned-by-a-person": "empty",
-    "two-files": "contested", "promoted": "accepted", "rejected": "rejected",
+    "two-files": "contested", "promoted": "promoted", "rejected": "rejected",
     "substituted": "substituted", "inherited": "inherited",
     "not-supplied-accepted": "unsupplied", "amber-waiting": "waiting",
-    "awaiting-acknowledgement": "accepted", "another-version-waiting": "waiting",
+    "awaiting-acknowledgement": "promoted", "another-version-waiting": "waiting",
 }
 
 #: States whose slot must be decided before anything is placed there.
@@ -287,6 +287,9 @@ class Choices:
     rows: tuple[PeriodChoice, ...]
     has_earlier: bool
     has_later: bool
+    #: The owed period nearest the receipt on the later side (or the last),
+    #: where the cursor starts - never "Earlier periods" (cli-ux critic, #188).
+    nearest: str | None = None
 
 
 def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
@@ -300,11 +303,18 @@ def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
     later. `states` is {period: slot_state value}, read by the caller."""
     from qa_tools.common import asset_time, slots
 
+    from qa_tools.common import schedule
+
     horizon = asset_time.local_date(asset_time.now())
     horizon = horizon.replace(year=horizon.year + slots.SLOT_LOOKUP_YEARS)
-    owed = {s.name: s for s in slots.slots_for_dataset(dataset_id, until=horizon)}
-    sequence = [p for p in slots._calendar_periods(dataset_id, horizon)
-                if p.date <= horizon or p.name in owed]
+    try:
+        owed = {s.name: s for s in slots.slots_for_dataset(dataset_id, until=horizon)}
+        sequence = [p for p in slots._calendar_periods(dataset_id, horizon)
+                    if p.date <= horizon or p.name in owed]
+    except (schedule.ScheduleConfigError, schedule.NoCalendarAgreed, KeyError, ValueError):
+        # NO CALENDAR TO CHOOSE FROM (#188 D10) - an empty chooser, never a
+        # traceback; the refusal that follows says why.
+        return Choices((), False, False)
     rows: list[PeriodChoice] = []
     run: list[str] = []
 
@@ -340,7 +350,8 @@ def period_choices(dataset_id: str, received_at, states: dict[str, str], *,
     # gap at its edge is never silently cut off.
     lo = first - 1 if first > 0 and not rows[first - 1].selectable else first
     hi = last + 1 if last + 1 < len(rows) and not rows[last + 1].selectable else last
-    return Choices(tuple(rows[lo:hi + 1]), start > 0, end < len(owed_at))
+    nearest = rows[owed_at[min(pivot, len(owed_at) - 1)]].period
+    return Choices(tuple(rows[lo:hi + 1]), start > 0, end < len(owed_at), nearest)
 
 
 def _label(slot, received_at, state: str | None) -> str:

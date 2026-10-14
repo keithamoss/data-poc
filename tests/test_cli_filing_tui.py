@@ -480,7 +480,7 @@ class TestEveryOperationIsReachableFromSomeDoor:
     reach it.
     """
 
-    def _offered_by(self, flow, state, monkeypatch, excuse_offers=()):
+    def _offered_by(self, flow, state, monkeypatch, excuse_offers=(), supersede_offers=()):
         """What this door would put in front of somebody, for this slot.
         `excuse_offers` stands in for the recorded punctuality the excuse
         offer reads (REQ-PIPE-161 criterion 10), which needs a database."""
@@ -488,6 +488,8 @@ class TestEveryOperationIsReachableFromSomeDoor:
         monkeypatch.setattr(filing_tui, "open_log",
                              lambda: __import__("contextlib").nullcontext(None))
         monkeypatch.setattr(filing_queue, "excuse_offers", lambda conn, s: excuse_offers)
+        monkeypatch.setattr(filing_queue, "supersede_offers",
+                            lambda conn, s: supersede_offers)
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
@@ -543,6 +545,11 @@ class TestEveryOperationIsReachableFromSomeDoor:
                 filing_tui.queue_flow,
                 _state(slot_state.AWAITING_DECISION, supply="cp-carers@1"), monkeypatch,
                 excuse_offers=offers)
+        # UN-SUPERSEDE wherever a superseded version could come back (REQ-GHUB-165).
+        reachable |= self._offered_by(
+            filing_tui.queue_flow,
+            _state(slot_state.AWAITING_DECISION, supply="cp-carers@1"), monkeypatch,
+            supersede_offers=(fd.UN_SUPERSEDE,))
         # PLACE IS REACHED FROM A HELD SUPPLY'S ROW (REQ-PIPE-163 criterion 10).
         reachable |= self._held_offers(monkeypatch)
         assert reachable == set(fd.OPERATIONS)

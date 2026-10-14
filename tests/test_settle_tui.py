@@ -408,6 +408,11 @@ class TestThePointerMatchesTheMenus:
         monkeypatch.setattr(filing_tui, "_pending_corrections", lambda: [])
         monkeypatch.setattr(filing_tui, "_parked_moves", lambda: [])
         monkeypatch.setattr(common, "select", select)
+        # A LISTED PERSON: the door asks who is deciding on the way in (#188).
+        from qa_tools.common import people
+
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard",
+                            lambda: people.person_by_email(REAL_PERSON))
         filing_tui.filing_menu()
         pointer = supply_files.where_to_settle(DS).split(" > ")
         assert pointer[2] in asked[0]

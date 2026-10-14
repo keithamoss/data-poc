@@ -583,7 +583,10 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
             raise DecisionRefused(
                 f"{decision.supply} is not held, so a re-file naming no period it leaves is "
                 f"refused: only a held supply is filed from no period, and that is a "
-                f"placement - `place`. A filed supply is re-filed from the period it is in.")
+                f"placement. A filed supply is re-filed from the period it is in. A held "
+                f"one is placed:\n"
+                f"  mothman supply decide --operation place --dataset {decision.dataset_id} "
+                f"--supply {decision.supply} --to-period <period> --reason '<why>'")
     needs_reason: str | None = None
     if decision.action == REJECT:
         needs_reason = "rejecting a supply"
@@ -781,6 +784,15 @@ def _lock(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     for slot in sorted(set(decision.slots) | ({decision.stands_on} - {None})):
         conn.execute("SELECT pg_advisory_xact_lock(hashtext(?))",
                       [f"{decision.dataset_id}/{slot}"])
+    # AND THE HELD SUPPLY ITSELF (post-build-review #188 D3): two placements
+    # of one held supply into different periods, or a placement racing its
+    # rejection, lock different slots - or none - and would each find the
+    # hold open. Taken after the slots, always, so the order is fixed.
+    if decision.supply and (
+            (decision.action == REFILE and not decision.from_slot)
+            or (decision.action == REJECT and not decision.slots)):
+        conn.execute("SELECT pg_advisory_xact_lock(hashtext(?))",
+                     [f"{decision.dataset_id}/held/{decision.supply}"])
 
 
 def _table_of(dataset_id: str) -> str | None:

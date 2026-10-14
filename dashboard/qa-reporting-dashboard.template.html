@@ -316,6 +316,9 @@ button{font:inherit; color:inherit;}
 .queue-head{display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;}
 .queue-detail, .queue-responses{color:var(--ink-muted); font-size:12.5px; margin-top:3px;}
 .queue-responses b{font-weight:600; color:var(--ink);}
+.queue-responses code.queue-command{display:inline-block; font-family:var(--font-mono, ui-monospace, monospace);
+  font-size:12px; color:var(--ink); background:var(--surface-2, transparent); padding:2px 4px;
+  border-radius:4px; overflow-wrap:anywhere; margin:2px 0;}
 /* Running LOW, not run out - a different state from .notice-exhausted
    and deliberately quieter than it, since nothing has failed and
    nothing is unprocessable yet (post-build-review #2). */
@@ -5648,7 +5651,10 @@ function acceptedGapsMarker(n){
 function outstandingResponses(item){
   const responses = item.responses || [];
   if(!responses.length) return "";
-  const list = responses.map(r=>escHtml(r)).join("; ");
+  // A COMMAND IN BACKTICKS SITS ON A LINE OF ITS OWN (REQ-PIPE-163 criterion
+  // 12; post-build-review #188 D6), as code a person can copy - never inline.
+  const list = responses.map(r=>escHtml(r).replace(/`([^`]+)`/g,
+    (_, cmd)=>`<br><code class="queue-command">${cmd}</code><br>`)).join("; ");
   const lead = item.actionable ? "You can" : "What resolves it";
   const caveat = item.actionable ? ""
     : ` <span style="color:var(--ink-faint);">— not yet possible from this page; these are

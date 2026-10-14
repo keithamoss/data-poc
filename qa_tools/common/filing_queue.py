@@ -312,6 +312,30 @@ def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     return ()
 
 
+def supersede_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
+    """Un-supersede wherever filing_decisions.apply would accept it
+    (REQ-GHUB-165 criterion 1): a superseded version of the dataset's table
+    in this period that was not rejected since, and no other version
+    waiting there (REQ-PIPE-120 criterion 5) - read on the caller's
+    connection, as excuse_offers reads punctuality. Never only on a slot
+    whose supply was rejected: after a newer file or an automatic
+    replacement superseded one, that was the only way back."""
+    if not state.period:
+        return ()
+    return (filing_decisions.UN_SUPERSEDE,) if superseded_to_bring_back(conn, state) else ()
+
+
+def superseded_to_bring_back(conn, state: slot_state.SlotState) -> list[dict]:
+    """The superseded versions un-supersede could bring back into this
+    period now - none while another version waits there."""
+    from qa_tools.common import supersession
+
+    if supersession.waiting_in(conn, state.dataset_id, state.period):
+        return []
+    return [v for v in supersession.superseded_in(conn, state.dataset_id, state.period)
+            if not supersession._rejected(conn, state.dataset_id, v["supply"])]
+
+
 @dataclass(frozen=True)
 class HeldRow:
     """One held supply in the queue (REQ-PIPE-163 criteria 10 and 17): its
@@ -326,6 +350,19 @@ class HeldRow:
     why: str
     schedule_ended: bool
     files: tuple[str, ...] = ()
+    #: Held because its dataset is refused by the agreement backstop
+    #: (REQ-PIPE-173) - it files itself once that is put right.
+    agreement_refused: bool = False
+
+
+def held_operations(row: HeldRow) -> tuple[str, ...]:
+    """What the door offers on a held supply (REQ-PIPE-163 criteria 10 and
+    22): place and reject - nothing on a hold labelled schedule ended, which
+    the rule files once dates cover it."""
+    if row.schedule_ended or row.agreement_refused:
+        # Both file themselves once configuration is put right (#188 D9).
+        return ()
+    return (filing_decisions.PLACE, filing_decisions.REJECT)
 
 
 def held_in(conn: supply_db.SupplyConnection, collection_id: str) -> list[HeldRow]:
@@ -346,6 +383,7 @@ def held_in(conn: supply_db.SupplyConnection, collection_id: str) -> list[HeldRo
             supply=h.supply_id, received_at=at,
             received_text=display_time.format_instant(at) if at else "an unknown time",
             why=h.describe(), schedule_ended=h.schedule_ended,
+            agreement_refused=h.agreement_refused,
             files=tuple(contest.files) if contest is not None else ()))
     return sorted(rows, key=lambda r: (r.received_at is None, r.received_at or 0, r.supply))
 
@@ -362,8 +400,9 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
     supply_scoped: tuple[str, ...] = ()
     if state.state == ANOTHER_VERSION_WAITING:
         # PROMOTE OVER, behind the warning; or set it aside.
+        # ...or move it to the period it belongs to (REQ-GHUB-165 parity).
         return (filing_decisions.PROMOTE, filing_decisions.REJECT,
-                filing_decisions.SUPERSEDE), ()
+                filing_decisions.SUPERSEDE, filing_decisions.REFILE), ()
     if state.state == slot_state.TWO_FILES:
         # AN OPEN PAIR IS SETTLED, AND NOTHING ELSE (REQ-PIPE-194 criterion 4):
         # 'settle' and 'reject both' are both choose-file - the TUI words the
@@ -379,18 +418,22 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
             # REQ-PIPE-122 criterion 13: answered, and owed a look - so
             # acknowledging comes first, beside taking it back out.
             supply_scoped = (filing_decisions.ACKNOWLEDGE, filing_decisions.DEMOTE,
-                             filing_decisions.REFILE)
+                             filing_decisions.REFILE, filing_decisions.REJECT)
         elif state.state == slot_state.PROMOTED:
-            # Already answered. The only supply-shaped things left are
-            # taking it back out and moving it somewhere else.
-            supply_scoped = (filing_decisions.DEMOTE, filing_decisions.REFILE)
+            # Already answered. What is left is taking it back out, moving
+            # it somewhere else, or saying it is not fit after all - a
+            # rejection needs no demotion first (REQ-PIPE-075 criterion 4;
+            # REQ-GHUB-165's parity test found the door did not offer it).
+            supply_scoped = (filing_decisions.DEMOTE, filing_decisions.REFILE,
+                             filing_decisions.REJECT)
         elif state.state == slot_state.REJECTED:
             # Rejected, and nothing replaced it. Promoting it anyway is
             # a real thing an operator does after a second look.
             # ...or bringing back a version a newer one superseded, once
             # the newer one has been rejected (REQ-PIPE-120 criterion 5).
-            supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REFILE,
-                             filing_decisions.UN_SUPERSEDE)
+            # (Un-supersede is offered by supersede_offers, wherever a
+            # superseded version could come back - REQ-GHUB-165 criterion 1.)
+            supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REFILE)
         else:
             # SUPERSEDE IS OFFERED ON A WAITING SUPPLY (REQ-PIPE-120
             # criterion 1): set it aside without rejecting it.

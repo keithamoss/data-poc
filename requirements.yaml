@@ -26620,7 +26620,7 @@ requirements:
     date_written: '2026-10-07'
     story: "As a person fixing something an automated rule decided, I want the terminal's filing-decisions door to offer every decision the flags can take wherever it applies, so that undoing a mistake never depends on knowing a command line the screen did not show me."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -26665,6 +26665,28 @@ requirements:
     - "THE OFFER CARRIES A COUNT (delivery-cli-ux L5, 2026-10-14): 'Un-supersede (2 earlier versions)' tells the person there is a choice to come before they take it."
     - "BUILT AFTER REQ-PIPE-163 (delivery-architect, 2026-10-14): the test takes a held supply of each label as a state (REQ-PIPE-163 criteria 10 and 17), and the door has none until 163 is built."
     - "REVIEWS FOLDED, 2026-10-14: changed in place 1 (the caller's connection; the count); added 7 (the test's own examples); NFR 4 now places the test in the fast half of CI."
+    - 'BUILT 2026-10-14 night (overnight #5, sprint 1). UN-SUPERSEDE''S OFFER is filing_queue.supersede_offers(conn, state) beside excuse_offers - a superseded version in the period, not rejected since, and nothing else waiting there - and the door''s one combiner filing_tui._offers() adds both to every slot''s offer. operations_for no longer lists it on a REJECTED slot, so there is one rule, not two. The menu line carries the count (''(2 earlier versions)'').'
+    - 'THE PARITY TEST''S EXAMPLES ARE REAL FACTS ON MINTED PERIODS (tests/test_door_flag_parity.py): a `2099-...` period per example, made a calendar slot of cp-carers for the test''s length with the timing its state needs (open, due, closed, owes-nothing), so apply''s refusals are the state''s rather than ''not on the calendar''; each example''s state is DERIVED by slot_state.state_of from the seeded facts and asserted, never stated. An open pair uses Birth Registrations'' real daily periods (pair_support). The states come from filing_tui._HOW_IT_READS - the states the door has words for - plus the queue''s two, so a new state without an example fails (criterion 5).'
+    - 'WHAT THE TEST FOUND, AND WHAT WAS DONE: the door now offers reject on a promoted (and an acknowledgement-owing) supply - REQ-PIPE-075 criterion 4''s one-decision reject of a promoted supply - and re-file on another version waiting in a promoted period. A repeated reject of an already-rejected supply appended a second rejection; it is ''already so'' now (REQ-GHUB-082 criterion 26), with its own test. NAMED AS DELIBERATELY HIDDEN, with reasons in the test: a failed load''s re-file, supersede and substitute (the queue offers reject only, REQ-PIPE-153 criteria 5-6; the period door shows the same slot as awaiting a decision and offers them); a schedule-ended hold''s reject (REQ-PIPE-163 c22; Keith asked, post-build-review #188 Q1); an agreement-refused hold''s place and reject (it files itself, REQ-PIPE-173).'
+    - 'PROVISIONAL, FOR KEITH (morning report #5): a second substitution over a substituted or an inherited period is recorded by the flags but not offered by the door, which has offered only undoing it since REQ-GHUB-082 phase 3 (''offers undoing it and not redoing it''). Kept as built, named in HIDDEN; offering it is a one-line change to operations_for.'
+    - 'A HELD SUPPLY''S OFFERS ARE ONE FUNCTION, filing_queue.held_operations(row), which the door''s held_flow and the test both read - place and reject, nothing for a hold labelled schedule ended or agreement refused. The held cases try supply-scoped decisions only: a held supply has no period, and the flags take a period-scoped decision only with --period.'
+    linked_tests:
+    - 'tests/test_door_flag_parity.py'
+    - 'tests/test_place_held_supply.py::TestARepeatedRejectIsAlreadySo'
+    - 'tests/test_cli_filing_tui.py::TestEveryOperationIsReachableFromSomeDoor'
+    - 'tests/test_filing_queue.py::TestWhatASlotOffers'
+    implemented_by:
+    - 'qa_tools/common/filing_queue.py::supersede_offers'
+    - 'qa_tools/common/filing_queue.py::superseded_to_bring_back'
+    - 'qa_tools/common/filing_queue.py::operations_for'
+    - 'qa_tools/common/filing_queue.py::held_operations'
+    - 'qa_tools/common/filing_decisions.py::_already'
+    - 'cli/filing_tui.py::_offers'
+    - 'cli/filing_tui.py::_supersede_offers'
+    - 'cli/filing_tui.py::_decide_on'
+    - 'cli/filing_tui.py::held_flow'
+    evidence:
+    - '2026-10-14 night: tests/test_door_flag_parity.py 42 tests - every one of the 16 examples (15 door states plus a closed unfilled period) builds and shows its own state; every operation in filing_decisions.OPERATIONS tried through filing_decisions.apply on each, and on a held supply of each of four labels; TERMINAL_ONLY refused on GitHub; un-supersede offered with its count and not while another version waits. Its first run failed on 11 cases, which the door changes and the named exceptions above answer.'
 
   - id: REQ-PIPE-166
     title: "A person can withdraw a mark-as-not-supplied or an acknowledgement recorded by mistake"

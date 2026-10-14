@@ -1433,3 +1433,21 @@ one or more component tags, and a date.
         database was rebuilt by reset-synthetic + bootstrap (8m00s). Full gate
         green: 5,104 passed, 14m42s. Criterion 26's re-check half waits on
         REQ-PIPE-164 (sprint 3). Critics next, then REQ-GHUB-165.
+      - ~23:15 - SPRINT 1 DONE. REQ-GHUB-165 BUILT: un-supersede offered
+        wherever a superseded version could come back, with its count; a parity
+        test tries every decision against all 16 door states and four hold
+        labels - its first run found 11 gaps, now offered or named with a
+        reason. The two critics on REQ-PIPE-163 (post-build-review #188): a
+        BLOCKER - "place" crashed the terminal for every held supply in today's
+        queue (a None default matching an owes-nothing row) - fixed test-first,
+        with D1-D10 and the CLI UX findings. Gate and push follow this line.
+    - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
+      conservative way meanwhile):
+      1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
+         schedule ended? The terminal offers only adding dates.
+      2. (#188) `decide --operation un-supersede` now leaves its check owed
+         unless `--wait` (REQ-PIPE-163 c32), though REQ-PIPE-120 says the
+         terminal waits; the screen still waits. Keep it that way?
+      3. (REQ-GHUB-165) Should the screen offer re-substituting a substituted
+         period, or substituting over an inherited one? The flags allow both;
+         the screen offers only undoing first, as built in REQ-GHUB-082.

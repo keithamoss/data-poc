@@ -205,7 +205,7 @@ def _target(dataset_id: str, period: str, filename: str, taken: str | None, *,
                 why = blocked.rstrip(".")
         if why is None:
             return answer
-        console.print(f"Not that period: {why}. Name another.", style="yellow")
+        console.print(f"Not that period: {why}. Choose another.", style="yellow")
 
 
 def _open():

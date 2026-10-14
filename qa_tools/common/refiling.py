@@ -80,10 +80,13 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
         # A HELD SUPPLY IS PLACED, NOT RE-FILED (#114, minor): it has no
         # period to leave, and the decision log refused it later with a
         # message about two slots.
+        from qa_tools.common import placing
+
         raise decision_log.DecisionRefused(
             f"{supply} is filed to no period - it is held, waiting to be placed - so there "
-            f"is nothing to re-file it from. Place it instead; `mothman supply holds` "
-            f"shows how.")
+            f"is nothing to re-file it from. Place it instead, at "
+            f"'{placing.where_to_decide(dataset_id)}', or:\n"
+            f"  {placing.flag_form(dataset_id, supply)}")
     if from_period == to_period:
         raise decision_log.DecisionRefused(f"{supply} is already filed to {to_period}.")
     from qa_tools.common import settlement, supply_files

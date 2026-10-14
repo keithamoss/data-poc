@@ -134,6 +134,14 @@ releases:
               now leaves its checks owed for `mothman pipeline process` instead
               of running them there. Add `--wait` to run them straight away;
               it exits 3 if the decision stands but its checks did not finish.
+          - headline: Filing decisions offers everything the command line can do
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              Bringing back a superseded version is offered wherever one can
+              come back - not only after the newer one is rejected - and says
+              how many there are. A promoted supply can be rejected straight
+              from the screen. A test now tries every decision against every
+              state the screen can show, so the two cannot drift apart.
           - headline: Link straight to one requirement
             components: ["Dashboard UI"]
             description: >

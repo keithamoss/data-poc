@@ -497,23 +497,25 @@ def filings_command(dataset_id: str, limit: int) -> None:
     for record in found[-limit:]:
         why = readable.get(record.get("branch", ""), record.get("branch", ""))
         if record.get("supply_id") in placed:
-            # Said as a placement (REQ-PIPE-163 criterion 41).
+            # Said as a placement (REQ-PIPE-163 criterion 41), by whoever made
+            # it - the rule places held supplies too (#188 D5).
             from qa_tools.common import placing
 
-            why = f"{placing.said(record.get('slot'))} by a person, from held"
+            by = "the rule" if placed[record.get("supply_id")] == "rule" else "a person"
+            why = f"{placing.said(record.get('slot'))} by {by}, from held"
         table.add_row(record.get("supply_id", ""),
                        record.get("slot") or "[yellow]unfiled[/yellow]", why)
     console.print(table)
 
 
-def _placements(dataset_id: str) -> set[str]:
-    """The supplies whose current filing PLACED them from held - a re-file
-    from no period (REQ-PIPE-163 criterion 2)."""
+def _placements(dataset_id: str) -> dict[str, str]:
+    """{supply: actor_kind} for the supplies whose current filing PLACED them
+    from held - a re-file from no period (REQ-PIPE-163 criterion 2)."""
     from qa_tools.common import decision_log, filing, supply_db
 
     with supply_db.connect(read_only=True, label="mothman:supply-filings") as conn:
-        return {r[0] for r in conn.execute(
-            f"SELECT f.supply_id FROM {filing.CURRENT} f JOIN {decision_log.TABLE} d "
+        return {r[0]: r[1] for r in conn.execute(
+            f"SELECT f.supply_id, d.actor_kind FROM {filing.CURRENT} f JOIN {decision_log.TABLE} d "
             "ON d.id = f.refiled_by WHERE f.dataset_id = ? AND d.action = ? "
             "AND d.from_slot IS NULL AND d.to_slot IS NOT NULL",
             [dataset_id, decision_log.REFILE]).fetchall()}
@@ -647,17 +649,18 @@ def holds_command() -> None:
                            f"[dim]({held.kind})[/dim]")
             console.print(f"  {held.describe()}")
             command = held.place_command
-            if command:
-                # PLACE, ITS SCREEN AND ITS COMMAND (REQ-PIPE-163 criterion 12),
-                # the command on a line of its own so it copies cleanly.
-                from qa_tools.common import placing
-
-                console.print(f"  [dim]- place it into the period it belongs to, at "
-                              f"'{placing.where_to_decide(held.dataset_id)}', or:[/dim]")
-                console.print(command, soft_wrap=True, highlight=False, markup=False)
-                console.print("  [dim]- or reject the supply[/dim]")
-                continue
             for response in held.responses:
+                if command and response.startswith(supply_holds.RESPONSES[
+                        supply_holds.ASSIGNMENT_RULE][0]):
+                    # PLACE, ITS SCREEN AND ITS COMMAND (REQ-PIPE-163 criterion
+                    # 12), the command on a line of its own so it copies cleanly.
+                    # Every other response is kept (#188 D4).
+                    from qa_tools.common import placing
+
+                    console.print(f"  [dim]- place it into the period it belongs to, at "
+                                  f"'{placing.where_to_decide(held.dataset_id)}', or:[/dim]")
+                    console.print(command, soft_wrap=True, highlight=False, markup=False)
+                    continue
                 console.print(f"  [dim]- {response}[/dim]")
 
 
@@ -982,7 +985,8 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
 @click.option("--dataset", "dataset_id", required=True, help="The dataset.")
 @click.option("--period", default=None,
                help="The period the decision is about. Required, except for a range "
-                    "excuse, which takes --from-period and --through-period instead.")
+                    "excuse (--from-period and --through-period), a place (--to-period) and "
+                    "rejecting a held supply, which has no period.")
 @click.option("--from-period", "from_period", default=None,
                help="For excuse-lateness over a RANGE: the first period. Every late "
                     "supply filed from here to --through-period is excused, one entry "
@@ -991,11 +995,11 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
                help="For excuse-lateness over a range: the last period, inclusive.")
 @click.option("--supply", default=None,
                help="The supply being acted on, where the operation acts on one. "
-                    "Taken from the slot when omitted.")
+                    "Taken from the slot when omitted - except a place, which names it.")
 @click.option("--stands-on", "stands_on", default=None,
                help="For a substitute: the earlier period this one stands on.")
 @click.option("--to-period", "to_period", default=None,
-               help="For a re-file: the period to move the supply to.")
+               help="For a re-file or a place: the period the supply goes into.")
 @click.option("--reason", default=None,
                help="Why. Required - a decision nobody can explain is the "
                     "thing the log exists to prevent.")
@@ -1050,10 +1054,12 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     operation = operation.lower()
     # --wait IS FOR A DECISION THAT OWES A QA RUN (REQ-PIPE-163 criteria 25 and
     # 27): a placement or a re-file.
-    if wait and operation not in (filing_decisions.PLACE, filing_decisions.REFILE):
+    # UN-SUPERSEDE OWES ONE TOO (REQ-PIPE-120; #188 D1).
+    if wait and operation not in (filing_decisions.PLACE, filing_decisions.REFILE,
+                                  filing_decisions.UN_SUPERSEDE):
         raise click.UsageError(
             f"--wait runs the QA a decision owes, and a {operation} owes none - it is for "
-            f"--operation place and --operation refile.")
+            f"--operation place, refile and un-supersede.")
     if operation == filing_decisions.PLACE:
         _place_from_flags(dataset_id, period, supply, to_period, stands_on, from_period,
                           through_period, reason=reason, yes=yes,

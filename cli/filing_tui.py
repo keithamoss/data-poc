@@ -487,6 +487,9 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
 
     decision = _STANDS.get(operation, "decision")
     who = supply or "The supply"
+    if got.completed and got.message == "already run":
+        return (f"Its checks had already run, elsewhere. The {decision} stands; "
+                f"`mothman supply decisions` shows what the gate did.", "Already checked", "blue")
     if not got.completed and got.message == recheck.CLAIMED_ELSEWHERE:
         # Criterion 30: no verdict shown.
         return (f"Its checks are being run elsewhere and will finish there. The {decision} "
@@ -612,6 +615,24 @@ def _excuse_offers(state: slot_state.SlotState) -> tuple[str, ...]:
         return ()
 
 
+def _supersede_offers(state: slot_state.SlotState) -> tuple[str, ...]:
+    """REQ-GHUB-165 criterion 1: un-supersede wherever a superseded version
+    could come back - read from the log, so it needs a connection."""
+    try:
+        with open_log() as conn:
+            return filing_queue.supersede_offers(conn, state)
+    except filing_queue.LogUnreachable:
+        return ()
+
+
+def _offers(state: slot_state.SlotState, supply_scoped: tuple[str, ...]) -> tuple[str, ...]:
+    """A slot's supply-scoped offers plus the two read from the log - the
+    excuse (REQ-PIPE-161) and un-supersede (REQ-GHUB-165) - once each."""
+    extra = tuple(op for op in _excuse_offers(state) + _supersede_offers(state)
+                  if op not in supply_scoped)
+    return supply_scoped + extra
+
+
 def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     """Offer this slot's operations and carry one out.
 
@@ -632,6 +653,18 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     words = dict(_WHAT_IT_DOES)
     if state.state == filing_queue.ANOTHER_VERSION_WAITING:
         words.update(_WHAT_IT_DOES_TO_ANOTHER_VERSION)
+    if filing_decisions.UN_SUPERSEDE in offer:
+        # THE OFFER CARRIES A COUNT (REQ-GHUB-165 criterion 1): a choice is
+        # coming, and the person sees that before taking it.
+        try:
+            with open_log() as conn:
+                n = len(filing_queue.superseded_to_bring_back(conn, state))
+        except filing_queue.LogUnreachable:
+            n = 0
+        if n:
+            words[filing_decisions.UN_SUPERSEDE] = (
+                f"{words[filing_decisions.UN_SUPERSEDE]} ({n} earlier "
+                f"version{'s' if n != 1 else ''})")
     by_label = {words[op]: op for op in offer}
     picked = common.select(f"{state.dataset_id} {state.period} - what are you "
                             f"recording?", list(by_label), flag_hint=_FLAG_HINT)
@@ -662,7 +695,7 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
         # CHOSEN, NEVER TYPED (REQ-PIPE-163 criterion 16), opening on the
         # periods nearest the supply's receipt.
         to_period = choose_period(state.dataset_id, _receipt_of(state.dataset_id, supply),
-                                  "Which period should it move to?")
+                                  "Which period should it move to?", current=state.period)
         if to_period is None:
             return
     if operation == filing_decisions.SUBSTITUTE:
@@ -755,7 +788,8 @@ def queue_flow(collection_id: str) -> None:
         # HELD SUPPLIES, THEIR OWN GROUP ABOVE THE SLOT ROWS (REQ-PIPE-163
         # criterion 17): a dataset and a receipt in place of a period, and why
         # it was held in the hold's own reason (criterion 10).
-        console.print(f"[bold]Held - no period yet ({len(held)})[/bold]")
+        console.print(f"[bold]Held - no period yet ({len(held)})[/bold] - each needs a "
+                      f"period chosen, or rejecting")
         console.print(held_table(held))
         console.print()
     if not waiting and not held:
@@ -784,7 +818,7 @@ def queue_flow(collection_id: str) -> None:
     if state is None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=supply_scoped + _excuse_offers(state))
+    _decide_on(state, offer=_offers(state, supply_scoped))
 
 
 def held_table(held) -> Table:
@@ -796,7 +830,9 @@ def held_table(held) -> Table:
 
 
 def _held_label(h) -> str:
-    return f"Held: {h.dataset_name}, received {h.received_text} - {h.supply}"
+    """Said as a slot row is - the dataset id and when it arrived - under the
+    group's own heading (#188, cli-ux M4)."""
+    return f"Held, no period yet: {h.dataset_id} (the supply that arrived {arrived(h.supply)})"
 
 
 def held_flow(h) -> None:
@@ -805,7 +841,14 @@ def held_flow(h) -> None:
     which is configuration, so nothing is offered to choose."""
     from qa_tools.common import placing
 
-    if h.schedule_ended:
+    console.print(Panel(Text(h.why), title=f"Held - {h.dataset_name}", border_style="yellow",
+                        expand=False))
+    if h.agreement_refused:
+        console.print("It files itself on the next processing pass once the delivery "
+                      "agreement matches its recorded judgements again - nothing to decide "
+                      "here.", style="yellow")
+        return
+    if not filing_queue.held_operations(h):
         _show(f"{h.why}\nAdd the next delivery dates to contract/calendar.yaml - it files "
               f"itself on the next processing pass. Where a declared correction is "
               f"needed:\nmothman schedule draft-correction",
@@ -831,7 +874,7 @@ _LATER = "Later periods"
 
 
 def choose_period(dataset_id: str, received_at, message: str,
-                  first: str | None = None) -> str | None:
+                  first: str | None = None, current: str | None = None) -> str | None:
     """THE PERIOD CHOOSER (REQ-PIPE-163 criterion 16): periods offered as a
     choice, never typed - opening on the nearest either side of the receipt,
     owed-nothing periods shown in place and not selectable, paging earlier
@@ -851,13 +894,22 @@ def choose_period(dataset_id: str, received_at, message: str,
         if got.has_earlier:
             choices.append(_EARLIER)
         for row in got.rows:
-            choices.append(row.label if row.selectable
-                           else questionary.Separator(f"  {row.label}"))
+            if row.selectable and row.period == current:
+                # ITS OWN PERIOD IS NOT A TARGET (#188, cli-ux M5).
+                choices.append(questionary.Separator(f"  {row.label} - it is filed here now"))
+            else:
+                choices.append(row.label if row.selectable
+                               else questionary.Separator(f"  {row.label}"))
         if got.has_later:
             choices.append(_LATER)
         # THE FIRST CHOICE, where the caller names one (REQ-PIPE-193 criterion
         # 19: a settlement's re-file target opens on the next period).
-        default = next((r.label for r in got.rows if r.period == first), None)
+        # NEVER AN UNSELECTABLE ROW (#188 blocker: an owes-nothing row's period
+        # is None, which matched first=None and crashed questionary), and the
+        # nearest owed period where the caller names none.
+        selectable = {r.period: r.label for r in got.rows
+                      if r.selectable and r.period != current}
+        default = selectable.get(first) or selectable.get(got.nearest)
         picked = common.select(message, choices, flag_hint="--to-period <period>",
                                default=default)
         if picked is None:
@@ -899,7 +951,7 @@ def place_flow(h) -> None:
 
             if common.confirm("Settle the pair now?", yes=False, default=True):
                 settle_tui.settle(h.dataset_id, target, h.supply)
-        elif outcome is not None and outcome.changed:
+        elif outcome is not None and outcome.changed and outcome.checks_finished:
             _offer_next_decision(h.dataset_id, target, h.supply)
         return
 
@@ -939,7 +991,8 @@ def preview(p) -> str:
     holds = (f"{p.to_period} holds {p.target_holds} now ({p.target_held_as}); it keeps it "
              f"until this one is checked and promoted." if p.target_holds
              else f"{p.to_period} holds no accepted supply now.")
-    reads = p.classification or "without a verdict"
+    reads = {"on_time": "on time", "late": "late", "early": "early",
+             "unfiled": "unfiled"}.get(p.classification or "", "without a verdict")
     return (f"Against {p.to_period}'s slot it reads {reads}. {holds} Placing files it "
             f"there and owes its checks; the promotion gate then decides, as for any "
             f"arrival.")
@@ -976,7 +1029,7 @@ def period_flow(collection_id: str) -> None:
     if state is None:
         return
     supply_scoped, period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=supply_scoped + _excuse_offers(state) + period_scoped)
+    _decide_on(state, offer=_offers(state, supply_scoped) + period_scoped)
 
 
 def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
@@ -1038,6 +1091,13 @@ def filing_menu() -> None:
     note warns about: at thirty datasets, one undifferentiated list is
     what people stop reading.
     """
+    # WHO IS DECIDING, ASKED ON THE WAY IN (#188, cli-ux H2): an unlisted
+    # person was told only after walking dataset, period, operation and target.
+    try:
+        actor_at_the_keyboard()
+    except people.UnknownActor as exc:
+        _show(str(exc), title="Filing decisions - who is deciding?", style="red")
+        return
     # BY NAME, as every pointer into this menu names them (Keith,
     # 2026-10-13, post-build-review #170); the id is what the code keeps.
     by_name = {_collection_name(c): c for c in _collections()}
@@ -1247,4 +1307,4 @@ def offer_after_run(collection_id: str, run_key: str) -> None:
     if state is None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=supply_scoped + _excuse_offers(state))
+    _decide_on(state, offer=_offers(state, supply_scoped))

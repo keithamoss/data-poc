@@ -497,6 +497,8 @@ def _place_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
     """A placement does nothing beyond its own slot - except for an open
     pair held whole, whose SECOND file moves with it (criterion 37), which
     is named and confirmed."""
+    from qa_tools.common import placing
+
     p = place_plan(conn, request)
     if not p.is_pair:
         return [], []
@@ -504,7 +506,8 @@ def _place_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
     return ([f"Both files of this pair are placed into {p.to_period}, still contested: "
              f"{first} and {', '.join(rest)}. Neither is checked or promoted until the "
              f"pair is settled there, by saying what each file is."],
-            [f"Both files ({' and '.join(p.pair_files)}) were placed, still contested."])
+            [f"Both files ({' and '.join(p.pair_files)}) were placed, still contested - "
+             f"settle the pair now, at '{placing.where_to_decide(p.dataset_id)}'."])
 
 
 def terminal_only_reply(dataset_id: str, period: str | None,
@@ -669,6 +672,14 @@ def _already(conn, request: Request) -> str | None:
     exists, not what put it there or whether somebody has since removed
     the indirection and left the object behind.
     """
+    if request.operation == REJECT and request.supply:
+        # A REPEAT IS ALREADY SO (found by REQ-GHUB-165's parity test): a
+        # supply rejected and not promoted back since is not rejected twice.
+        from qa_tools.common import refiling, supersession
+
+        if (supersession._rejected(conn, request.dataset_id, request.supply)
+                and not refiling._since_unrejected(conn, request.dataset_id, request.supply)):
+            return f"{request.supply} is already rejected. Nothing to do."
     period = request.period
     if period is None:
         return None

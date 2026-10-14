@@ -372,7 +372,7 @@ class TestEveryFactIsRecorded:
     def test_a_persons_refile_from_no_period_is_refused_unless_it_places(self, conn, dataset):
         """REQ-PIPE-163 criterion 39: accepted only where it places a held
         supply, and refused otherwise naming place."""
-        with pytest.raises(dl.DecisionRefused, match="`place`"):
+        with pytest.raises(dl.DecisionRefused, match="--operation place"):
             with dl.apply_decision(conn, a_decision(
                     dataset, action=dl.REFILE, from_slot=None, to_slot="2026-Q3",
                     reason="somewhere")):

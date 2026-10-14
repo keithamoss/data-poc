@@ -98,9 +98,12 @@ class TestWhatASlotOffers:
                 _state(state, supply="cp-carers@1", closed=closed))
             offered |= set(supply_scoped) | set(period_scoped)
         # PLACE IS OFFERED ON A HELD SUPPLY'S ROW, never a slot's (REQ-PIPE-163
-        # criterion 10) - tests/test_place_held_supply.py covers it.
+        # criterion 10) - tests/test_place_held_supply.py covers it. And
+        # UN-SUPERSEDE comes from supersede_offers, wherever a superseded
+        # version could come back (REQ-GHUB-165 criterion 1) -
+        # tests/test_door_flag_parity.py covers both.
         assert offered == set(fd.OPERATIONS) - {fd.EXCUSE_LATENESS, fd.WITHDRAW_EXCUSE,
-                                                fd.PLACE}
+                                                fd.PLACE, fd.UN_SUPERSEDE}
 
     def test_the_queue_half_is_only_ever_supply_scoped(self):
         """Criterion 31 made mechanical: whatever a slot is in, the first
