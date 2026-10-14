@@ -11,11 +11,12 @@ Configuration only: the agreement, never data.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from qa_tools.common import agreement as agreement_mod
 
 #: The values in the order a reader asks about them, with their labels.
+_ONE_DAY = timedelta(days=1)
 LABELS = (("participates", "Owes"), ("expected_time", "Due time"), ("grace", "Grace"),
           ("days_before", "Days before"), ("claim_window", "Claim window"))
 
@@ -37,6 +38,97 @@ class View:
     #: Set instead of values where the date is before the first version.
     not_yet: date | None
     values: tuple[Value, ...] = ()
+    #: 'Turned off - nothing due' or 'Turning off after <date> - nothing more
+    #: owed' (REQ-PIPE-179 criterion 29), or None.
+    headline: str | None = None
+    #: What a turn-off means for it (REQ-PIPE-179 criterion 28), in order.
+    turn_off: tuple[str, ...] = ()
+
+
+def _day(d) -> str:
+    return f"{d.day} {d.strftime('%b %Y')}"
+
+
+def _turn_off_for(dataset_id: str, on: date, agr):
+    """(the turn-off that matters on `on` - the one in force, else the next
+    one ahead - and the standing on `on`), or (None, standing)."""
+    standing = agr.standing_on(dataset_id, on)
+    if standing.turned_off is not None:
+        return standing.turned_off, standing
+    entry = agr.dataset(dataset_id)
+    ahead = []
+    for level, versions in ((agreement_mod.DATASET, entry.participation),
+                            (agreement_mod.COLLECTION, agr.defaults_for(dataset_id))):
+        for v in versions:
+            if v.effective_to is not None and v.effective_to >= on:
+                probe = agr.standing_on(dataset_id, v.effective_to + _ONE_DAY)
+                if probe.turned_off is not None:
+                    ahead.append(probe.turned_off)
+    return (min(ahead, key=lambda t: t.effective_to) if ahead else None), standing
+
+
+def _turn_off_lines(dataset_id: str, on: date, agr) -> tuple[str | None, tuple[str, ...]]:
+    """REQ-PIPE-179 criteria 28 and 29 - from configuration alone."""
+    from qa_tools.common import agreement_freeze, asset_time, slots, turned_off
+
+    if not agr.ever_turned_off(dataset_id):
+        return None, ()
+    turn, standing = _turn_off_for(dataset_id, on, agr)
+    lines: list[str] = []
+    if standing.brought_back:
+        lines.append(f"Back on by a version of its own, inside "
+                     f"{_collection(dataset_id)}'s turned-off gap.")
+    if turn is None:
+        return None, tuple(lines)
+    lines.append(f"Turned off after {_day(turn.effective_to)} ({turn.reason}), "
+                 f"{turned_off.level_words(turn, dataset_id)}"
+                 + (f", until {_day(turn.until)}." if turn.until else " - for good."))
+    start = asset_time.start_of_day(on)
+    try:
+        owed = slots.slots_for_dataset(dataset_id, until=turn.effective_to, agreement=agr)
+    except Exception:  # noqa: BLE001 - a schedule that cannot be built shows nothing owed
+        owed = []
+    still = [s for s in owed if s.date <= turn.effective_to
+             and (s.closes_at is None or s.closes_at > start)]
+    for s in still:
+        lines.append(f"Still owes {s.name}: its slot stays open until "
+                     f"{asset_time.localise(s.closes_at).strftime('%-d %b %Y %H:%M')}."
+                     if s.closes_at else f"Still owes {s.name}.")
+    try:
+        sequence = slots._calendar_periods(dataset_id, (turn.until or turn.effective_to)
+                                           + _ONE_DAY * 400, agr)
+    except Exception:  # noqa: BLE001
+        sequence = []
+    gap = [p for p in sequence if p.date > turn.effective_to
+           and (turn.until is None or p.date < turn.until)]
+    if gap and turn.until is not None:
+        lines.append(f"Owes nothing in {gap[0].name} to {gap[-1].name}." if len(gap) > 1
+                     else f"Owes nothing in {gap[0].name}.")
+    elif gap:
+        lines.append(f"Owes nothing from {gap[0].name} on - the turn-off is permanent.")
+    else:
+        lines.append("Owes nothing after it - the turn-off is permanent."
+                     if turn.until is None else "")
+    if gap:
+        opens = agreement_freeze._claim_open(dataset_id, gap[0].date, agr)
+        if opens is not None:
+            when = asset_time.localise(opens).strftime('%-d %b %Y %H:%M')
+            lines.append(f"Changeable by an ordinary edit until {when}; after that only by "
+                         f"a declared correction." if opens > start else
+                         f"A declared correction is needed to change it - {gap[0].name}'s "
+                         f"claim window opened {when}.")
+    headline = None
+    if standing.state == agreement_mod.TURNED_OFF and not still:
+        headline = "Turned off - nothing due"
+    elif standing.state == agreement_mod.OWING and not still and turn.effective_to >= on:
+        headline = f"Turning off after {_day(turn.effective_to)} - nothing more owed"
+    return headline, tuple(x for x in lines if x)
+
+
+def _collection(dataset_id: str) -> str:
+    from qa_tools.common import hierarchy
+
+    return hierarchy.dataset(dataset_id).collection_name
 
 
 def _text(key: str, version, dataset_id: str, on: date, agr) -> str:
@@ -113,4 +205,12 @@ def view(dataset_id: str, on: date, agreement=None) -> View:
                     changes = f"{when.day} {when.strftime('%b %Y')}: {new}"
                     break
         values.append(Value(label, text, words, changes))
-    return View(dataset_id, on, not_yet=None, values=tuple(values))
+    headline, lines = _turn_off_lines(dataset_id, on, agr)
+    if agr.standing_on(dataset_id, on).state == agreement_mod.TURNED_OFF:
+        # NOTHING IS OWED, and its timing is its last version's, said so
+        # (REQ-PIPE-179 criterion 29).
+        values = [Value(x.label, "nothing - turned off", x.source) if x.label == "Owes"
+                  else Value(x.label + " (when last on)", x.text, x.source, x.changes)
+                  if x.label in ("Due time", "Grace") else x for x in values]
+    return View(dataset_id, on, not_yet=None, values=tuple(values), headline=headline,
+                turn_off=lines)

@@ -1443,6 +1443,17 @@ one or more component tags, and a date.
         with D1-D10 and the CLI UX findings. CI was red on 1e6fffb (two tests
         broke on CI's coloured output) - fixed here. Full gate green on this
         tree: 5,160 passed, 16m40s.
+      - ~00:40 - REQ-PIPE-179 BUILT (sprint 2): a dataset or a collection is
+        turned off by an effective_to and a turned_off_reason on a
+        participation version, for good or until a later version. One helper
+        answers owing / turned off / not yet; gap periods have no slot, the
+        last owed slot closes as if the turn-off were absent, a file received
+        while off is held quietly (one terminal row per dataset, counted apart,
+        never as needing a person), and every hold's label is worked out from
+        the configuration as it stands. A turn-off freezes when the periods it
+        flips start to matter; corrections, the backstop, runway and the
+        overlap gate all know about it. The 22 amendments applied in Keith's
+        approved wording. Gate result in the commit message.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
@@ -1453,3 +1464,17 @@ one or more component tags, and a date.
       3. (REQ-GHUB-165) Should the screen offer re-substituting a substituted
          period, or substituting over an inherited one? The flags allow both;
          the screen offers only undoing first, as built in REQ-GHUB-082.
+      4. (REQ-PIPE-179, the architect's build check) The one re-filer reads
+         the configuration on disk, so it files a held supply that a declared
+         but not yet CONFIRMED correction now covers - ahead of that
+         correction's confirmation (REQ-PIPE-170). Built that way,
+         PROVISIONAL. Should it wait for the confirmation instead?
+      5. (REQ-PIPE-179) A collection's turn-off applies only to the datasets
+         that take its defaults - so not to one that names a calendar of its
+         own. Built that way, PROVISIONAL; no dataset is configured so today.
+      6. (REQ-GHUB-165 critic, #189 F2) The flags let you substitute over a
+         period holding an open contested pair; the screen hides it
+         (REQ-PIPE-194 c4). Should the flags refuse it too?
+      7. (#189 F3/F4) A period door shows ONE supply per slot, so a failed
+         resupply can hide a waiting good one (or the reverse) from every
+         door. Should the door list every filed supply in a period?

@@ -176,3 +176,49 @@ def refusal(dataset_id: str, period: str, agreement=None) -> str | None:
     return (f"{dataset_id} owes nothing in {period}: it is {gap_words(turn, dataset_id)}. "
             f"Nothing was recorded. A period becomes owed by changing effective_to or "
             f"effective_from in {supply_holds.SCHEDULE_FILE}.")
+
+
+def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
+    """Every turn-off this dataset reads - its own versions' and its
+    collection's defaults' - for the dashboard build (REQ-PIPE-179 criterion
+    41, for REQ-DASH-180 criteria 27 and 28): its effective_to, the
+    effective_from that ends it (or None, for good), its turned_off_reason,
+    its level and the date it was AUTHORED - the newest declared correction
+    that set or moved that effective_to where there is one, else the newest
+    changelog entry carrying turns_off: true. Configuration only."""
+    from qa_tools.common import agreement_freeze, agreement_drift, schedule
+
+    agr = schedule._agreement(agreement)
+    if not agr.ever_turned_off(dataset_id):
+        return []
+    cal_doc, asset_doc = docs or agreement_drift._load_docs()
+    corrected: dict[str, str] = {}
+    for entries in agreement_freeze._corrections_by_owner(cal_doc, asset_doc).values():
+        for corr in entries:
+            corr = corr or {}
+            for change in corr.get("changes") or []:
+                change = change or {}
+                new = change.get("new")
+                if isinstance(new, dict) and new.get("effective_to"):
+                    key, when = str(change.get("item")), str(corr.get("date"))
+                    corrected[key] = max(corrected.get(key, when), when)
+    entry = agr.dataset(dataset_id)
+    collection = agr.collection_of(dataset_id)
+    out = []
+    for level, versions, key in (
+            (agreement_mod.DATASET, entry.participation, f"dataset {dataset_id} participation"),
+            (agreement_mod.COLLECTION, agr.defaults_for(dataset_id),
+             f"collection {collection} participation_defaults")):
+        for v in versions:
+            if v.effective_to is None:
+                continue
+            item = f"{key} {v.effective_from.isoformat()} effective_to"
+            later = [w.effective_from for w in versions if w.effective_from > v.effective_from]
+            logged = v.turns_off_logged[-1].isoformat() if v.turns_off_logged else None
+            out.append({"effectiveTo": v.effective_to.isoformat(),
+                        "until": min(later).isoformat() if later else None,
+                        "reason": v.turned_off_reason or "", "level": level,
+                        "versionFrom": v.effective_from.isoformat(),
+                        "authoredOn": corrected.get(item) or logged,
+                        "authoredBy": "correction" if item in corrected else "changelog"})
+    return sorted(out, key=lambda t: t["effectiveTo"])

@@ -725,11 +725,16 @@ def _show_values(v) -> None:
         console.print(f"  On {when}: it has no participation versions, so it owes nothing.",
                       markup=False)
         return
-    console.print(f"  On {when}:", markup=False)
+    console.print(f"  On {when}:" + (f" {v.headline}" if v.headline else ""), markup=False)
     width = max(len(x.label) for x in v.values)
     for x in v.values:
         console.print(f"    {x.label:<{width}}  {x.text}  ({x.source})"
                       + (f"; changes {x.changes}" if x.changes else ""), markup=False)
+    # A TURN-OFF (REQ-PIPE-179 criterion 28): who, when, why, what is still
+    # owed and until when, what is not, and how long an ordinary edit can
+    # change it.
+    for line in v.turn_off:
+        console.print(f"    {line}", markup=False)
 
 
 def _show_in_force(f) -> None:

@@ -434,6 +434,21 @@ class TestTheLastOwedSlotBeforeAGap:
         assert q1.closes_at == _at("2025-05-01", "13:00") - timedelta(days=14)
 
 
+    def test_the_claim_window_too(self):
+        """The same, for a collection version widening the window inside the
+        gap: 2025-Q1 closes when 2025-Q2 would have opened under 20 days."""
+        doc = _unshare(_doc())
+        first = _defaults_version(doc)
+        _collection(doc)["participation_defaults"]["versions"].append(
+            {**{k: v for k, v in first.items() if k != "changelog"},
+             "effective_from": "2025-04-01", "claim_window": "20d", "changelog": LOG})
+        _turn_off(_versions(doc, "cp-clients")[0])
+        agr = agreement.from_doc(doc)
+        [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
+                if s.name == "2025-Q1"]
+        assert q1.closes_at == _at("2025-05-01") - timedelta(days=20)
+
+
 class TestWhatAReceiptFallsIn:
     """Criteria 15, 16 and 17."""
 
@@ -855,3 +870,98 @@ class TestTheQuietGroup:
         assert "cp-clients - 1 received while turned off, earliest 1 June 2025" in text
         assert "cp-clients (the supply" not in text.split("Received while turned off")[0], \
             "not listed in the held group above it"
+
+
+# ---- what a person reads (criteria 28 and 29) --------------------------------
+
+class TestScheduleShowSaysSo:
+    def _view(self, doc, on):
+        from qa_tools.common import participation_view
+
+        return participation_view.view("cp-clients", on, agreement.from_doc(doc))
+
+    def test_turned_off_and_nothing_due(self):
+        v = self._view(_off_for_a_while(), date(2025, 9, 1))
+        assert v.headline == "Turned off - nothing due"
+        labels = {x.label: x.text for x in v.values}
+        assert labels["Owes"] == "nothing - turned off"
+        assert labels["Due time (when last on)"] == "09:00"
+        said = "\n".join(v.turn_off)
+        assert "Turned off after 31 Mar 2025 (supplier paused), set for Client Register, " \
+               "until 1 Jan 2026." in said
+        assert "Owes nothing in 2025-Q2 to 2025-Q4." in said
+        assert "declared correction" in said
+
+    def test_still_owing_its_last_slot(self):
+        """2025-Q1's slot is open until 17 April - turned off on the date
+        asked about, and the slot still owed."""
+        v = self._view(_off_for_a_while(), date(2025, 4, 10))
+        assert v.headline is None
+        assert "Still owes 2025-Q1: its slot stays open until 17 Apr 2025 09:00." \
+            in v.turn_off
+
+    def test_turning_off_with_nothing_more_owed(self):
+        """Owing until 31 July; its last owed period, 2025-Q2, closed on 18
+        July when 2025-Q3's window would have opened."""
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2025-07-31")
+        v = self._view(doc, date(2025, 7, 25))
+        assert v.headline == "Turning off after 31 Jul 2025 - nothing more owed"
+
+    def test_a_turn_off_ahead_is_shown_with_its_ordinary_edit_window(self):
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2027-03-31")
+        said = "\n".join(self._view(doc, date(2026, 10, 14)).turn_off)
+        assert "for good" in said and "Changeable by an ordinary edit until 17 Apr 2027 09:00" in said
+
+    def test_back_on_inside_its_collections_gap(self):
+        doc = _unshare(_doc())
+        _turn_off(_defaults_version(doc))
+        _back_on(doc, "cp-carers", "2025-07-01", expected_time="11:00", grace="2h")
+        from qa_tools.common import participation_view
+
+        v = participation_view.view("cp-carers", date(2025, 8, 1), agreement.from_doc(doc))
+        assert v.turn_off[0].startswith("Back on by a version of its own")
+
+
+class TestTheBuildCarriesIt:
+    """Criterion 41."""
+
+    def test_each_turn_off_with_when_it_was_authored(self):
+        doc = _off_for_a_while()
+        got = turned_off.timeline("cp-clients", agreement.from_doc(doc),
+                                  docs=(doc, _load("data-asset.yaml")))
+        assert got == [{"effectiveTo": "2025-03-31", "until": "2026-01-01",
+                        "reason": "supplier paused", "level": "dataset",
+                        "versionFrom": "2023-01-01", "authoredOn": "2026-10-14",
+                        "authoredBy": "changelog"}]
+
+    def test_a_declared_correction_dates_it_instead(self):
+        doc = _off_for_a_while()
+        entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+        entry.setdefault("corrections", []).append({
+            "change_reference": "CAB-7", "date": "2026-10-20", "author": "a", "approver": "b",
+            "reason": "r", "changes": [{"item": CLIENTS_KEY, "old": None,
+                                         "new": {"effective_to": "2025-03-31"}}]})
+        [got] = turned_off.timeline("cp-clients", agreement.from_doc(doc),
+                                    docs=(doc, _load("data-asset.yaml")))
+        assert (got["authoredOn"], got["authoredBy"]) == ("2026-10-20", "correction")
+
+    def test_a_dataset_never_turned_off_carries_nothing(self):
+        assert turned_off.timeline("cp-clients") == []
+
+
+class TestAnOwedPeriodStillCounts:
+    """Criterion 23 (the 'no false quiet' line): a period owed before the
+    turn-off keeps its slot and its state until resolved; the periods inside
+    the gap have none."""
+
+    def test_the_queue_still_reads_the_last_owed_period(self, conn, using):
+        from qa_tools.common import slot_state
+
+        using(_off_for_a_while())
+        states = {s.period for s in slot_state.states_for(conn, "child-protection",
+                                                          now=_at("2025-09-01"))
+                  if s.dataset_id == "cp-clients"}
+        assert "2025-Q1" in states
+        assert not {"2025-Q2", "2025-Q3", "2025-Q4"} & states

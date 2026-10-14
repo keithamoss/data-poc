@@ -109,6 +109,40 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-15"
+    summary: >
+      A dataset, or a whole collection, can now be turned off for a while or
+      for good, without losing its configuration or anything it still owed.
+    changes:
+      - category: New
+        items:
+          - headline: Turn a dataset off
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Give a participation version an effective_to and a
+              turned_off_reason, and the dataset stops owing supplies after
+              that day - for good, or until a later version brings it back.
+              One edit turns off a whole collection.
+          - headline: Nothing owed goes quiet early
+            components: ["Pipeline & publishing"]
+            description: >
+              A period owed before the turn-off is still chased until it is
+              settled, and its slot stays open as long as it always would have.
+              A file received while turned off is held quietly, apart from
+              everything waiting on you.
+          - headline: Changing a turn-off after the fact
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Moving or removing a turn-off is an ordinary edit until the
+              periods it changes start to matter; after that it needs a
+              declared correction, and the refusal names each period and when
+              it started to matter.
+          - headline: "`schedule show` says it is off"
+            components: ["Pipeline & publishing"]
+            description: >
+              `mothman schedule show --on <date>` and the Calendar entry now say
+              who turned a dataset off, when and why, what it still owes and
+              until when, and how long an ordinary edit can still change it.
   - date: "2026-10-14"
     summary: >
       The dashboard now counts what is not green at every level, and every

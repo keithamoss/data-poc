@@ -639,10 +639,16 @@ def in_force(dataset_id: str, on: date, agreement=None) -> InForce:
     if entry and entry.participation:
         begins.append(entry.participation[0].effective_from)
     starts = max(begins)
+    standing = agreement.standing_on(dataset_id, on)
     if on < starts:
         # delivery-critic on 169, F9: the first version stands in for the
         # periods before it, but nothing was owed then.
         owes = f"nothing yet - its delivery agreement starts {starts:%-d %b %Y}"
+    elif standing.turned_off is not None:
+        # REQ-PIPE-179 criterion 27: owes nothing, said with why.
+        from qa_tools.common import turned_off
+
+        owes = f"nothing - it is {turned_off.gap_words(standing.turned_off, dataset_id)}"
     elif version.participates:
         owes = (f"periods dated in {', '.join(_MONTHS[m - 1] for m in version.participates)}"
                 + (f" - {version.reason}" if version.reason else ""))

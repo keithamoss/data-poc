@@ -32,6 +32,7 @@ from datetime import datetime
 from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel, recorded_arrival,
                       promotion_timeline, red_promoted, slot_timeline)
 from qa_tools.common import schedule_ended
+from qa_tools.common import turned_off
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common import hierarchy, qa_store
 from qa_tools.cp import cp_common
@@ -639,6 +640,9 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         # HELD BECAUSE ITS SCHEDULE ENDED (REQ-DASH-155): receipt and
         # resolution instants from hold records only, for the notice.
         "scheduleEndedHolds": schedule_ended.for_dataset(dataset_id),
+        # EVERY TURN-OFF IT READS (REQ-PIPE-179 criterion 41), from
+        # configuration only, for REQ-DASH-180's page.
+        "turnOffs": turned_off.timeline(dataset_id),
         # REQ-PIPE-081 criteria 14 and 15 - see build_dashboard_data.py.
         "census": census.for_datasets({dataset_id}),
         # REQ-PIPE-122 NFR 1: the amber setting in force over time, in

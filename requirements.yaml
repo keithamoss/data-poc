@@ -8373,9 +8373,7 @@ requirements:
         show it even though the run that would have produced new results
         did not happen.
       - 'MOVED 2026-10-06 (Keith) to REQ-DASH-155 criteria 1 and 2. It read: THE SYSTEM SHALL state, in that message, how many supplies are waiting and since when, and SHALL NOT state how many days have elapsed.'
-      - WHERE a calendar is an authored date list, THE SYSTEM SHALL warn
-        when fewer than a configured number of future slots remain for a
-        dataset naming it.
+      - WHERE a calendar is an authored date list, THE SYSTEM SHALL warn when fewer than a configured number of future slots remain for a dataset naming it - counting, for a dataset in a temporary turned-off gap, only the periods it owes once turned back on - and SHALL NOT warn for a dataset turned off for good (REQ-PIPE-179 criterion 25). AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
       - WHERE a calendar is a cadence rule, THE SYSTEM SHALL NOT warn
         about runway for any dataset naming it.
       - THE SYSTEM SHALL surface the low-runway warning both in the
@@ -8384,9 +8382,7 @@ requirements:
         not failing the build.
       - THE SYSTEM SHALL distinguish a warning from a failure in text as
         well as colour, and SHALL NOT rely on colour alone.
-      - WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for
-        that calendar, naming it, its last authored period and how many
-        datasets name it, and SHALL NOT enumerate those datasets.
+      - WHEN a calendar is low on runway, THE SYSTEM SHALL warn once for that calendar, naming it, its last authored period and how many datasets name it, not counting a dataset turned off for good (REQ-PIPE-179 criterion 25), and SHALL NOT enumerate those datasets. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
       - THE SYSTEM SHALL render an exhausted schedule as a status
         distinct from green, amber and red, and SHALL NOT render it with
         the same status or the same wording as a dataset that simply has
@@ -11074,10 +11070,10 @@ requirements:
       - "THE SYSTEM SHALL NOT assign a held supply to a slot whose claim window has not opened, under any fallback, default or recovery path."
       - "WHILE a supply is held, THE SYSTEM SHALL keep it staged, and SHALL NOT promote it or classify its arrival."
       - "WHEN a supply is held, THE SYSTEM SHALL state why no slot could be assigned, naming the slots it considered and why each was unavailable."
-      - "THE SYSTEM SHALL report a held supply as an event needing action, distinguished from an informational one."
+      - THE SYSTEM SHALL report a held supply as an event needing action, distinguished from an informational one - except a supply held as turned off (REQ-PIPE-179 criterion 24), which SHALL be reported as a quiet count and not as needing action. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 24.
       - "WHILE a supply is held, THE SYSTEM SHALL leave every slot's state unchanged."
       - "THE SYSTEM SHALL continue to process every other dataset and every other delivery while a supply is held."
-      - "THE SYSTEM SHALL count and report outstanding holds together, and SHALL NOT present one element per held supply."
+      - THE SYSTEM SHALL count and report outstanding holds together, by label - turned off, schedule ended or the plain assignment-rule hold, each worked out from the configuration in force when the count is made (REQ-PIPE-179 criterion 18) - and SHALL NOT present one element per held supply. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
     non_functional_requirements:
       - "A hold is the correct output of the rule, not a defect in it - the same reasoning that established a queue of red supplies is a work queue rather than an obstruction. Treating 'something is waiting for a human' as a failure mode is the error to avoid."
       - "At ~30 datasets, holds must aggregate. A design that is fine at two datasets produces thirty banners at thirty, and a banner per dataset is how people learn to ignore the whole class."
@@ -20280,12 +20276,7 @@ requirements:
       his own question about datasets on the quarterly asset that
       deliver only once a year.
     acceptance_criteria:
-      - >
-        WHEN a period's schema is first created, THE SYSTEM SHALL
-        INHERIT, for each dataset the schedule says does not
-        participate in that period, that dataset's most recent
-        promoted supply - creating in the new period's schema a view
-        that resolves the dataset's logical name to it.
+      - "WHEN a period's schema is first created, THE SYSTEM SHALL INHERIT, for each dataset the schedule says does not participate in that period or is turned off in it (REQ-PIPE-179 criterion 22), that dataset's most recent promoted supply - creating in the new period's schema a view that resolves the dataset's logical name to it.\n AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32."
       - >
         THE SYSTEM SHALL create such a view only at that moment, and
         SHALL NOT create one later by any automatic rule.
@@ -24206,7 +24197,7 @@ requirements:
       supplier stops supplying for a while or for good, without deleting its configuration or history, so that it stops owing
       supplies from the right date while anything it still owed before then is chased as usual.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -25057,6 +25048,60 @@ requirements:
       - and whether anything purges them is plans/running-thoughts.md #77''s question (recorded there 2026-10-14), not this
       requirement''s. REJECTED (option B) a one-action ''reject everything received while turned off'' per dataset in the terminal:
       a bulk operation for a pile nobody is asked to act on, with retention still unanswered.'
+    - 'BUILT 2026-10-15 overnight (overnight #5, sprint 2). THE ONE HELPER is agreement.Agreement.standing_on(dataset, date) -> Standing(state, values, turned_off, brought_back): NOT_YET_OWING, TURNED_OFF (a TurnOff naming effective_to, reason, level, the version stating it, the effective_from that ends the gap or None, and when it was authored) or OWING with REQ-PIPE-181''s resolved values. participation_on is now its .values - the timing only, never whether the dataset owes - so every consumer that read timing kept working, and every consumer that decided owed-ness (schedule.periods_for_dataset, and through it slots, filing, runway, the generators, verdict.compared) was routed through standing_on. The grep the NFR asks for was re-run at build time; the remaining readers are timing-only.'
+    - 'CRITERION 14 IS agreement.timing_on: resolve() with ignore_turn_offs=True, used by slots._participation_for and schedule.claim_window for a period inside a gap. A collection version taking effect inside a dataset''s own gap is what tells this apart from ''the last day on''s values'', and the test for exactly that (13:00 rather than 09:00; a 20-day window rather than 14) was seen to fail first. REJECTED reusing the last applying version''s timing, which is the same answer except in that case.'
+    - 'A COLLECTION''S TURN-OFF APPLIES TO THE DATASETS TAKING ITS DEFAULTS (defaults_for), so a dataset that names a calendar other than its collection''s - which takes none of its defaults (REQ-PIPE-181 criterion 9) - is not turned off by it. PROVISIONAL: no dataset is configured that way, and criterion 9''s gate check reads ''any inheriting dataset''s calendar'', which is the same reading.'
+    - 'THE LABEL IS WORKED OUT LIVE (criterion 18): supply_holds.Held.label calls turned_off.label_at(dataset, our receipt instant) - covered by an open owed slot, turned off, schedule ended, or plain - and Held.schedule_ended now reads that rather than the recorded flag, as REQ-PIPE-154 criterion 2 is amended to say. Every hold reader joins qa.supply_receipt for the receipt. A hold with no recorded receipt - only a test''s - falls back to its recorded reason. The tally, the pass summary and the dashboard''s blockers all count by that label; turned-off holds are counted apart and never as needing a person (criterion 24: outstanding items INFORMATIONAL, non-blocking; Tally.needing_a_person; the page''s blockersOpenInPlaceOn skips them).'
+    - 'ONE RE-FILER (criterion 19): schedule_ended.refile_covered now takes every outstanding assignment-rule hold, whatever its label, whose receipt the configuration as it stands gives an open owed slot - excluding agreement-refused holds, which their own drain files, and datasets the backstop refuses. One file of an open contested pair is placed without owing its checks, and its partner, sharing the receipt, is placed in the same pass, still contested. ARCHITECT''S BUILD CHECK, ANSWERED PROVISIONALLY: the re-filer reads the configuration on disk, so it DOES act on a hold a declared-but-unconfirmed correction now covers, ahead of REQ-PIPE-170''s confirmation. Queued for Keith in morning report 5.'
+    - 'THE TURN-OFF IS ITS OWN FREEZE ITEM (criteria 11, 12, 30): agreement_freeze.flatten takes effective_to and turned_off_reason out of the participation (and participation_defaults) version item and adds ''<version key> effective_to'', valued {effective_to, turned_off_reason}. Its freeze instant is the earliest claim-opening, the earlier under old and new configuration, of the first period whose owed-or-not status the change flips; a change of reason alone flips nothing and freezes with the first period the turn-off already turned off. The refusal names each flipped period and its passed instant, prints `mothman schedule draft-correction` on its own line and the mark-not-supplied route. revert() rebuilds the two keys on their version, and restoring the version itself keeps them. A dated calendar entry counts a turned-off dataset only for the first period of its gap.'
+    - 'THE BACKSTOP (criterion 38): verdict.compared marks a judged period a turn-off now leaves owed nothing with the TurnOff and words it as the turn-off, not ''not expected''; agreement_drift then accepts only a declared correction of THAT effective_to item - a correction of the version alone does not account for it. Found test-first: before this the period read as ''no longer a period of its schedule'' and any participation correction cleared it.'
+    - 'CORRECTIONS (criteria 35-37): a correction''s move out of a period the corrected agreement owes nothing in carries Move.keep_refused, shown in the trial report; confirming with --keep on it is refused, and keeping a parked move whose current period is owed nothing is refused too. A parked move whose confirmed period now lies inside a gap stays parked and says the gap, its reason and how it ends. Criterion 35 needed no code of its own: the trial''s slots exclude gap periods, so a supply left there is held, and its live label reads turned off.'
+    - 'DISPLAY (criteria 28, 29): participation_view.View carries a headline (''Turned off - nothing due'' / ''Turning off after <date> - nothing more owed'') and the turn-off lines - level, back-on-by-its-own-version, effective_to and reason, each owed slot still open and until when, the periods owed nothing (or ''permanent''), and the instant until which an ordinary edit can change it - rendered by cli/schedule.py _show_values, the one renderer `schedule show --on` and the Calendar entry share. Due time and grace read ''(when last on)'' on a turned-off date and ''Owes'' reads ''nothing - turned off''.'
+    - 'THE TERMINAL''S QUIET GROUP (criterion 34): filing_queue.turned_off_groups gives one row per dataset, ''<dataset> - <n> received while turned off, earliest <date>'', printed after the slot rows and outside every count; choosing one lists that dataset''s supplies, each opening the held flow whose panel is criterion 34''s sentence.'
+    - 'RUNWAY (criterion 25): runway.off_for_good skips a dataset whose newest turn-off has no end from the runway minimum, the exhausted list and the dashboard''s runway notice (REQ-PIPE-053 criteria 10 and 15 as amended); a temporary gap needs nothing, because its periods are not owed. OVERLAP (criterion 31): period_overlap skips pairs inside one gap, checks the last owed period before a gap against the gap''s first period''s opening (criterion 14''s instant), and checks the first owed slot after a temporary gap against the last owed slot''s closing.'
+    - 'THE BUILD CARRIES IT (criterion 41): turned_off.timeline(dataset) -> every turn-off the dataset reads with effectiveTo, until, reason, level, versionFrom and authoredOn - the newest declared correction setting or moving that effective_to, else the newest turns_off changelog entry - embedded as ''turnOffs'' by both dashboard builders for REQ-DASH-180.'
+    - 'THE 22 AMENDMENTS (decisions above, ''PROPOSED AMENDMENT WORDING ... batch amendment N'', approved by Keith 2026-10-14 in the drafted wording) were applied 2026-10-15 exactly as drafted, ''<date built>'' read as 2026-10-15, each OLD text first checked to match the criterion as it stood.'
+    - 'FAIL LOUD: an effective_to that is not a date raises at load rather than reading as absent, which would be a dataset silently owing again. The gate refuses it before anything loads it.'
+    linked_tests:
+    - 'tests/test_turn_off.py'
+    - 'tests/test_correction_apply.py::TestATurnOffDeclaredAsACorrection'
+    - 'tests/test_agreement_drift.py::TestATurnOffOverAJudgedPeriod'
+    - 'tests-js/blocked-dataset.test.js'
+    implemented_by:
+    - 'qa_tools/common/agreement.py'
+    - 'qa_tools/common/turned_off.py'
+    - 'qa_tools/common/schemas.py'
+    - 'qa_tools/common/validate_schedule.py'
+    - 'qa_tools/common/schedule.py'
+    - 'qa_tools/common/slots.py'
+    - 'qa_tools/common/assignment.py'
+    - 'qa_tools/common/filing.py'
+    - 'qa_tools/common/supply_holds.py'
+    - 'qa_tools/common/schedule_ended.py'
+    - 'qa_tools/common/placing.py'
+    - 'qa_tools/common/refiling.py'
+    - 'qa_tools/common/inheritance.py'
+    - 'qa_tools/common/agreement_freeze.py'
+    - 'qa_tools/common/correction_trial.py'
+    - 'qa_tools/common/correction_apply.py'
+    - 'qa_tools/common/verdict.py'
+    - 'qa_tools/common/agreement_drift.py'
+    - 'qa_tools/common/runway.py'
+    - 'qa_tools/common/period_overlap.py'
+    - 'qa_tools/common/outstanding.py'
+    - 'qa_tools/common/dataset_blockers.py'
+    - 'qa_tools/common/filing_queue.py'
+    - 'qa_tools/common/participation_view.py'
+    - 'qa_tools/common/processing_pass.py'
+    - 'cli/filing_tui.py'
+    - 'cli/schedule.py'
+    - 'cli/pipeline.py'
+    - 'dashboard/embed_dashboard_data.py'
+    - 'dashboard/qa-reporting-dashboard.template.html'
+    - 'pipeline/build_dashboard_data.py'
+    - 'pipeline/build_cp_dashboard_data.py'
+    evidence:
+    - '2026-10-15 overnight: tests/test_turn_off.py (81 tests) plus TestATurnOffDeclaredAsACorrection (3) and TestATurnOffOverAJudgedPeriod (3), written before or alongside each chunk; the false-quiet guards (criteria 14, 15/16 holds, 18, 25, 31, 36, 37, 38, the claim window under criterion 14) were each run against the code before the change and seen to fail. Full gate result in the commit message that flips this to built.'
 
   - id: REQ-DASH-180
     title: 'The dashboard shows a turned-off dataset honestly: its real verdict, a marker, and nothing owed gone quiet'
@@ -25610,22 +25655,11 @@ requirements:
     - WHEN a commit changes contract/calendar.yaml or the asset's timezone versions, THE SYSTEM SHALL compare
       the parsed configuration against its state at the base of the whole push, and SHALL refuse the commit
       if any rule below is broken.
-    - THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset's own authored dates,
-      calendar version, participation version (including a collection's default participation), not_expected
-      entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry,
-      the earliest claim-opening instant that EVERY dataset on its calendar would have for that period,
-      participating or not, since that instant also closes each one's previous period; for a not_expected
-      entry, that dataset's claim-opening instant for the period; for a version, the earlier of the start
-      of its effective-from date and the earliest claim-opening instant of any period it governs.
+    - THE SYSTEM SHALL treat each dated calendar entry, each dated entry of a dataset's own authored dates, calendar version, participation version (including a collection's default participation), not_expected entry and timezone version as FROZEN from the first instant it can govern a filing - for a dated entry, the earliest claim-opening instant that EVERY dataset on its calendar would have for that period, participating or not - a dataset turned off in that period (REQ-PIPE-179) counted only where it is the first period of its gap, whose claim-opening instant closes the last owed slot before it (REQ-PIPE-179 criterion 14) - since that instant also closes each one's previous period; for a not_expected entry, that dataset's claim-opening instant for the period; for a version, the earlier of the start of its effective-from date and the earliest claim-opening instant of any period it governs; except that a participation version's effective_to and turned_off_reason are not frozen with their version but on their own, as REQ-PIPE-179 criteria 11 and 12 state. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 30.
     - IF a frozen item is changed or removed, THEN THE SYSTEM SHALL refuse the commit unless the same change
       appends a declared correction listing that exact change to the corrections list of the item that owns
       it.
-    - THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its
-      versions - a calendar's on that calendar; a dataset's (its participation, due time, participates,
-      not_expected and own authored dates) on that dataset's entry; a collection's participation_defaults on
-      that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction
-      stating change_reference, date, author, approver, reason, and a list of changes each naming the item,
-      its old value and its new value; and SHALL refuse a correction missing any of them.
+    - THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its versions - a calendar's on that calendar; a dataset's (its participation, due time, participates, not_expected, own authored dates, effective_to and turned_off_reason) on that dataset's entry; a collection's participation_defaults, their effective_to and turned_off_reason included, on that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each naming the item, its old value and its new value; and SHALL refuse a correction missing any of them. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 30.
     - IF a declared correction's item, old value or new value does not match the change actually made, THEN
       THE SYSTEM SHALL refuse the commit, saying 'you declared <X>; the file had <Y>'.
     - THE SYSTEM SHALL NOT accept a changelog entry that is not a declared correction as licence for any
@@ -25654,12 +25688,7 @@ requirements:
       push, so that a commit made without the hook is still caught.
     - IF there is no previous committed state available to compare against, THEN THE SYSTEM SHALL pass rather
       than fail.
-    - WHEN a change is refused, THE SYSTEM SHALL report it as the existing configuration errors do (file,
-      where, problem, fix), grouped by item, saying that nothing was committed, naming the item in exactly
-      the syntax a correction uses, printing a ready-to-paste correction entry with the item, old and new
-      values filled in and reason, approver and change_reference as placeholders, listing who may approve,
-      naming the impact preview command (REQ-PIPE-169), and - for a not_expected entry - naming mark as
-      not supplied (REQ-PIPE-132) as the after-the-fact route.
+    - WHEN a change is refused, THE SYSTEM SHALL report it as the existing configuration errors do (file, where, problem, fix), grouped by item, saying that nothing was committed, naming the item in exactly the syntax a correction uses, printing a ready-to-paste correction entry with the item, old and new values filled in and reason, approver and change_reference as placeholders, listing who may approve, naming the impact preview command (REQ-PIPE-169), and - for a not_expected entry or an effective_to - naming mark as not supplied (REQ-PIPE-132) as the after-the-fact route. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 30.
     - THE SYSTEM SHALL decide whether a change is legal from committed configuration alone, and SHALL NOT
       open or query any database, warehouse schema or anything under data/.
     - WHERE a calendar is expressed as a cadence rule, THE SYSTEM SHALL apply the version rule to it and
@@ -26018,15 +26047,11 @@ requirements:
     - THE SYSTEM SHALL compute each slot's due instant from its period's date, less the participation version's
       whole number of days before (zero unless stated), at the participation version's expected time of
       day, in the timezone version in force on the day that falls on.
-    - THE SYSTEM SHALL take a slot's expected time, days before, grace allowance and claim-window override
-      each as the value REQ-PIPE-181 resolves for that period's own date, from the dataset or its collection,
-      and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181).
+    - THE SYSTEM SHALL take a slot's expected time, days before, grace allowance and claim-window override each as the value REQ-PIPE-181 resolves for that period's own date, from the dataset or its collection - through the one participation resolution of REQ-PIPE-179 criterion 27, so that a collection inside its own turned-off gap supplies no value (REQ-PIPE-179 criterion 7) - and its default claim window from the calendar version in force on that date (amended by REQ-PIPE-181, and 2026-10-15 by REQ-PIPE-179 criterion 31).
     - WHEN a later participation or calendar version changes any of those inputs, THE SYSTEM SHALL leave
       the due instant, grace and claim-opening instant of every slot whose period date precedes that version's
       effective-from unchanged.
-    - THE SYSTEM SHALL compute each slot's closing instant (REQ-PIPE-131) from the next calendar period's
-      claim-opening instant as that next period's own inputs give it, so that a version change takes effect
-      at its own boundary and nowhere before it.
+    - THE SYSTEM SHALL compute each slot's closing instant (REQ-PIPE-131) from the next calendar period's claim-opening instant as that next period's own inputs give it, so that a version change takes effect at its own boundary and nowhere before it; WHERE the dataset is turned off in that next period, from the claim-opening instant it would have had, each value resolved as if every effective_to on or before its date were absent (REQ-PIPE-179 criterion 14). AMENDED 2026-10-15 by REQ-PIPE-179 criterion 31.
     - THE SYSTEM SHALL express a supply due on the evening before its period's date as one day before at
       that evening's time, and SHALL NOT require a separate rule to reinterpret the arrival afterwards.
     - WHERE a dataset widens its claim window, THE SYSTEM SHALL treat that as changing how early a supply
@@ -27060,8 +27085,7 @@ requirements:
       and SHALL leave every affected supply where it is until they are confirmed.
     - THE SYSTEM SHALL let only the person holding the data asset's manager role (REQ-GHUB-171) confirm
       the list, and SHALL refuse anyone else, including a manager of one agency, naming the role required.
-    - THE SYSTEM SHALL let the asset manager exclude individual supplies and then confirm every remaining
-      move, across every dataset and agency the correction touches, in one action.
+    - THE SYSTEM SHALL let the asset manager exclude individual supplies and then confirm every remaining move, across every dataset and agency the correction touches, in one action; IF the corrected configuration makes a supply's current period one its dataset owes nothing in - by participation, not_expected or a turn-off - THEN THE SYSTEM SHALL NOT offer to exclude (keep) that supply, and SHALL propose moving it to the owed slot the filing rule gives it, or holding it, saying that the period no longer owes a supply. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 36.
     - THE SYSTEM SHALL record each excluded supply as KEPT - a decision-log entry naming the supply, its
       period, the correction's change reference, the actor and a mandatory reason - and SHALL leave it filed
       where it is.
@@ -27106,9 +27130,9 @@ requirements:
     - 'THE SYSTEM SHALL generate the calendar-correction scenarios TS-57 to TS-62 (TS-63 by REQ-GEN-218, Keith, 2026-10-13 and 2026-10-14) in the test scenario register (plans/supply-model.md) into the synthetic history once this requirement is built - a correction made part way through that history, merged, and confirmed with at least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left awaiting confirmation - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64 each a unit test. AMENDED 2026-10-14 by REQ-GEN-218 criterion 7: TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13) and was split out of it into REQ-GEN-218 (Keith, 2026-10-14).'
     - THE SYSTEM SHALL record a confirmed correction''s moves and holds as the rule''s, naming who confirmed them, so a later correction may move them again (added 2026-10-11, Keith''s answer (o)).
     - WHEN a correction is confirmed, THE SYSTEM SHALL apply every move that is not blocked or kept and SHALL PARK each blocked move, recording the correction, the supply, the period it would leave, the period confirmed for it, what blocks it and who confirmed it, and SHALL list the parked moves in what was applied.
-    - WHEN a processing pass finds a parked move whose blocker has cleared, THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who confirmed it, before any arrival in that pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173).
+    - WHEN a processing pass finds a parked move whose blocker has cleared, THE SYSTEM SHALL carry it out to the period confirmed, as the rule naming who confirmed it, before any arrival in that pass, and SHALL NOT do so for a dataset the agreement backstop refuses (REQ-PIPE-173), nor WHERE the confirmed period now lies inside a turned-off gap, when the move stays parked and says so (REQ-PIPE-179 criterion 37). AMENDED 2026-10-15 by REQ-PIPE-179 criterion 37.
     - IF a parked supply is no longer filed where it was parked from, THEN THE SYSTEM SHALL leave it parked and say so, rather than move it from somewhere nobody confirmed.
-    - WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu.
+    - WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu - except WHERE the supply's current period is one its dataset now owes nothing in, when keep SHALL NOT be offered (criterion 5). AMENDED 2026-10-15 by REQ-PIPE-179 criterion 36.
     - THE SYSTEM SHALL list parked moves in mothman supply corrections, as their own entry in the filing menu, and as an outstanding item each, naming what blocks it and both ways it ends.
     - WHILE a synthetic history is replayed, THE SYSTEM SHALL file and judge each arrival against the agreement as it stood at that arrival's receipt, reverting every declared correction whose date is after it, a correction counting from the start of its date on the asset's clock; and SHALL NOT revert anything outside a replay.
     - WHEN a replay of both collections finishes - a bootstrap, or `mothman pipeline run` over both - THE SYSTEM SHALL confirm every pending correction dated up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager role during playback, and SHALL rebuild both collections' results if any was confirmed; a replay of one collection SHALL leave them pending.
@@ -27397,7 +27421,7 @@ requirements:
     - WHILE a dataset is refused, THE SYSTEM SHALL leave every re-check and re-evaluation owed to it owed and unrun, and SHALL NOT let the rule promote any of its supplies - recording no gate outcome, so the first pass after it is cleared gates them as usual (added 2026-10-11, Keith's answer (f)).
     - THE SYSTEM SHALL show a refusal on the dashboard only for in-place-on dates on or after the earliest period it affects, and WHERE the dataset already shows another blocker SHALL show the refusal beside it rather than in its place (added 2026-10-11, Keith's answer (g)).
     - THE SYSTEM SHALL exit the processing pass and `mothman schedule check-agreement` with status 3 where a dataset is refused - never the 1 that red data gives - and SHALL say so in each command's help (added 2026-10-11, Keith's answer (h)).
-    - THE SYSTEM SHALL treat a judged period that a not_expected entry now declares owed nothing as changed, so it refuses the dataset unless a declared correction of that entry accounts for it (added 2026-10-11, Keith's answer (i)).
+    - THE SYSTEM SHALL treat a judged period that a not_expected entry, or an effective_to added or moved (REQ-PIPE-179), now declares owed nothing as changed, so it refuses the dataset unless a declared correction of that entry or that effective_to accounts for it (added 2026-10-11, Keith's answer (i); AMENDED 2026-10-15 by REQ-PIPE-179 criterion 38).
     non_functional_requirements:
     - 'Scoped to the dataset, never the run: at thirty datasets one broken agreement must not stop twenty-nine
       (Thread C''s exhausted-schedule rule).'
@@ -29247,8 +29271,8 @@ requirements:
       long as the one before it, and a 2030 instant finds no open slot.'
     source: "Keith, 2026-10-04, group 3 sign-off round of option A, after finding backward filing while checking the since-dropped REQ-PIPE-124 (plans/road-testing.md #16, 'FOUND WHILE CHECKING THAT', 'KEITH'S PROPOSAL', 'PERIOD CLOSING SETTLED', 'SIGN-OFF ROUND, period closing'). Scoped by delivery-scoper 2026-10-04, separately from option A; signed off by Keith 2026-10-04."
     acceptance_criteria:
-      - "THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period - and as CLOSED from then on."
-      - "THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period's date with each value as REQ-PIPE-181 resolves it on that next period's date (amended by REQ-PIPE-181)."
+      - THE SYSTEM SHALL treat a dataset's slot as OPEN from its claim-opening instant until the claim-opening instant that dataset would have for the NEXT PERIOD OF ITS CALENDAR - whether or not the dataset participates in that next period or is turned off in it (REQ-PIPE-179) - and as CLOSED from then on. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 31.
+      - THE SYSTEM SHALL compute that next claim-opening instant from the next calendar period's date with each value as REQ-PIPE-181 resolves it on that next period's date (amended by REQ-PIPE-181) - or, WHERE the dataset is turned off in that next period, as if every effective_to on or before that date were absent (REQ-PIPE-179 criterion 14; AMENDED 2026-10-15 by REQ-PIPE-179 criterion 31).
       - "WHERE a period has no claim window, THE SYSTEM SHALL take its claim-opening instant to be its due instant, so the period before it closes when it is due."
       - "THE SYSTEM SHALL apply this rule to every dataset on every data asset, for authored-date calendars and cadence-rule calendars alike, and SHALL NOT offer it as a setting."
       - "THE SYSTEM SHALL decide which slot is open by a supply's RECEIPT instant, never by when it is processed, so that a file received inside a slot's open interval but processed after the slot has closed is filed to that slot."
@@ -29554,7 +29578,7 @@ requirements:
     status: built
     source: 'Keith, 2026-10-04 (''PERIODS MUST NOT OVERLAP, ENFORCED''; ''134 agreed, constraint after due time plus grace'', plans/road-testing.md #16). Checked 2026-10-04: validate_schedule.py checks dates, months and grace, never one period''s windows against the next. Scoped by delivery-scoper 2026-10-04; signed off by Keith 2026-10-04.'
     acceptance_criteria:
-    - THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one.
+    - THE SYSTEM SHALL require, for every dataset and every pair of consecutive periods of that dataset's calendar - whether or not the dataset participates in either - that the claim-opening instant the dataset would have for the later period is strictly after the late-after instant (due instant plus grace) the dataset would have for the earlier one; WHERE either period of a pair lies inside a turned-off gap (REQ-PIPE-179), THE SYSTEM SHALL instead check the last owed period before the gap against the closing instant REQ-PIPE-179 criterion 14 gives it and, WHERE the gap is temporary, require the first owed slot after it to open strictly after the last owed slot before it closes, and SHALL NOT check any pair both of whose periods lie inside the gap. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 31.
     - THE SYSTEM SHALL compute those instants exactly as filing does - the dataset's expected time, grace and claim window from its participation version in contract/calendar.yaml, and the calendar's dates, each as effective on that period's date.
     - THE SYSTEM SHALL apply the check across the transition between two calendar versions, comparing the last period under the earlier version with the first under the later one.
     - THE SYSTEM SHALL apply the check over every period the configuration generates - every authored date, and for a cadence-rule calendar every period to the same horizon the runway warning uses.
@@ -30132,7 +30156,7 @@ requirements:
       - "WHERE the target period already holds a PROMOTED version of the table, THE SYSTEM SHALL leave that version promoted until the re-filed supply is promoted, SHALL treat the re-filed supply as a resupply of a filled slot (REQ-PIPE-123 decides whether the gate may replace it), and SHALL NOT leave the period without its promoted version while the re-filed supply is checked."
       - "IF a person re-files a REJECTED supply, THEN THE SYSTEM SHALL refuse it, say why, and name reversing the rejection as the step that must come first."
       - "IF a person re-files one file of a CONTESTED pair, THEN THE SYSTEM SHALL refuse it, say that the contest is per arrival so moving one file would not end it, and name resolving the contest as the step that must come first."
-      - "IF a person re-files a supply into a period where its dataset's slot is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name un-inherit as the step that must come first."
+      - IF a person re-files a supply into a period where its dataset's slot is resolved by INHERITANCE, THEN THE SYSTEM SHALL refuse it, say that nothing was expected for that period, and name un-inherit as the step that must come first - except WHERE that period lies inside a turned-off gap (REQ-PIPE-179), when REQ-PIPE-179 criterion 20's refusal SHALL be given in its place. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 20.
       - "WHERE a supply is re-filed into a period whose slot is resolved by SUBSTITUTION, THE SYSTEM SHALL leave the substitution in place until the re-filed supply is promoted, when REQ-PIPE-128's warn-and-de-substitute applies."
       - "WHEN a promoted supply leaves its old period, THE SYSTEM SHALL re-evaluate, in the old period, the cross-table checks that read its table, and SHALL re-apply the gate to every waiting supply those checks belong to."
       - "WHEN the re-filed supply is checked in the target period, THE SYSTEM SHALL re-evaluate the cross-table checks there that read its table, as for an arrival (REQ-PIPE-079 criterion 6), and, if it is promoted, re-check waiting readers under REQ-PIPE-121."
@@ -31350,23 +31374,15 @@ requirements:
       by: Keith
       date: '2026-10-06'
     acceptance_criteria:
-    - IF a supply arrives after the last slot of its dataset's authored calendar has closed, THEN THE SYSTEM
-      SHALL hold it for a person under REQ-PIPE-064 with a reason stating that the dataset's delivery schedule
-      has ended and naming that dataset's own last authored period.
-    - THE SYSTEM SHALL record whether a hold was raised because the schedule ended as a structured field
-      of the hold, and SHALL NOT require any reader to parse the hold's prose to tell.
+    - IF a supply arrives after the last slot of its dataset's authored calendar has closed, THEN THE SYSTEM SHALL hold it for a person under REQ-PIPE-064 with a reason stating that the dataset's delivery schedule has ended and naming that dataset's own last authored period - unless the dataset is turned off for the period whose slot would then be current, when the hold is labelled turned off instead (REQ-PIPE-179 criterion 17). AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
+    - THE SYSTEM SHALL record whether a hold was raised because the schedule ended as a structured field of the hold, kept as history, and SHALL NOT require any reader to parse the hold's prose to tell; every reader that labels, re-files or counts a hold SHALL take its label from the configuration in force when it reads (REQ-PIPE-179 criterion 18), not from that field. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
     - THE SYSTEM SHALL name, in a schedule-ended hold's reason, the configuration file a person must edit
       to add dates and the mothman command that proposes them.
     - THE SYSTEM SHALL NOT state, in a schedule-ended hold's reason, that the last slot closed because a
       next period's claim window opened.
     - 'WHILE a dataset''s schedule has ended, THE SYSTEM SHALL continue to stage each supply that arrives for it and run its file checks, SHALL NOT run its data checks while it is held (REQ-PIPE-078 criterion 9, one rule for every hold), and SHALL NOT stop processing any other dataset or delivery. AMENDED 2026-10-06 (Keith): it read ''stage and check'', on a premise that was wrong - a held supply is staged and file-checked but not data-checked; its data checks run on the re-check owed when the rule files it (criterion 7).'
-    - WHEN a processing pass holds one or more supplies because their dataset's schedule has ended, THE
-      SYSTEM SHALL state in that pass's own summary how many datasets and how many supplies were held for
-      that reason, separately from any other holds.
-    - WHEN dates are added to a dataset's calendar that cover the receipt instant of a supply held because
-      its schedule ended, THE SYSTEM SHALL re-file that supply by the filing rule on the next processing
-      pass, in receipt order with every other supply so held, and SHALL resolve its hold naming the filing
-      that replaced it.
+    - WHEN a processing pass holds one or more supplies because their dataset's schedule has ended, THE SYSTEM SHALL state in that pass's own summary how many datasets and how many supplies were held for that reason - the label worked out as REQ-PIPE-179 criterion 18 says - separately from any other holds, turned-off holds included (REQ-PIPE-179 criterion 26). AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
+    - WHEN configuration later gives an outstanding assignment-rule hold's receipt instant an open owed slot - dates added to a dataset's calendar covering a supply held because its schedule ended, or any other change, whatever the hold's label (REQ-PIPE-179 criterion 19) - THE SYSTEM SHALL re-file that supply by the filing rule on the next processing pass, in receipt order with every other supply so held, and SHALL resolve its hold naming the filing that replaced it. AMENDED 2026-10-15 by REQ-PIPE-179 criterion 32.
     non_functional_requirements:
     - Scale. At ~30 datasets the pass summary must aggregate - one line naming counts, never one line per
       held supply (REQ-PIPE-064 criterion 8's rule, carried here).

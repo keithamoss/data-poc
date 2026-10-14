@@ -438,6 +438,11 @@ def embed() -> None:
                 # ask somebody to author dates for a schedule nobody has
                 # agreed.
                 continue
+            if runway.off_for_good(entry.dataset_id):
+                # TURNED OFF FOR GOOD (REQ-PIPE-179 criterion 32, amending
+                # REQ-PIPE-053 criteria 10 and 15): neither warned about nor
+                # counted - it owes no more dates.
+                continue
             owed = [p for p in schedule.periods_for_dataset(entry.dataset_id) if p.expected]
             # A dataset's OWN last period, not the calendar's. They
             # differ the moment a dataset participates in some months
