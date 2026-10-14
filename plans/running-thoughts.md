@@ -5342,3 +5342,19 @@ could never have computed it), and it belongs with batch 5's check work.
     promoted, one promoted later, re-filed or superseded) - each with a
     criterion and a test that reproduces today's wrong reading first.
 
+
+96. **[todo, 2026-10-14]** **[Dashboard UI]** **[QA checks & contract]**
+    **File-check verdicts should show through every level of the
+    dashboard - but how is not yet known.** Keith, 2026-10-14, answering
+    road-testing sprint 1's question on whether file checks count as a
+    "column" in the new "N of M columns not green" counts: "Let's separate
+    this and scope it separately - I do think they need to display through
+    all levels of the dashboard, but just not sure how yet." Today REQ-DASH-097
+    criterion 2 (signed, built) keeps every file-check verdict out of "any
+    status, count or trend", and criterion 7 says a file warning never changes
+    the dataset's status; a refused file is already its own reason row. File
+    checks are recorded per load attempt, not per QA run, so a trend of them
+    is a different shape from the check trends. Sprint 1 leaves them out of
+    every count and trend meanwhile. Needs scoping with Keith - starting from
+    what a reader at the agency card, the dataset list and the dataset page
+    should learn about a file that warned or was refused.
