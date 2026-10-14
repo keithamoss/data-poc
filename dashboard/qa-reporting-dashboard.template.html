@@ -4604,6 +4604,10 @@ window.addEventListener("popstate", (e)=>{
     setInPlaceOnQuietly(STATE.scenarioJump.to);
   }
   renderFromState();
+  if(CLOSE_PANEL_AFTER_POP){
+    CLOSE_PANEL_AFTER_POP = false;
+    if(STATE && STATE.panel) return closePanelInPlace();
+  }
   if(leaving && leaving.panel === "requirements" && !(STATE && STATE.panel)) returnFocusToRequirementOpener();
 });
 
@@ -7307,11 +7311,12 @@ function hideAllPanelsDom(){ SIDE_PANELS.forEach(hidePanelDom); }
 function openPanel(name, opts){
   const pushHistory = !opts || opts.pushHistory !== false;
   if(pushHistory){
-    // sidePanelPushed: THIS entry is ours, so Close may step back over it
-    // (post-build-review #180, as closeCheckPanel()'s panelPushed).
+    // panelDepth: how many entries the panel has pushed over the page
+    // beneath it, so Close may step back over all of them (post-build-
+    // review #180 and #182, as closeCheckPanel()'s panelPushed).
     // Opened from its header button, a panel opens at the top: any `req=`
     // is dropped (REQ-DASH-222 criterion 13).
-    STATE = {...STATE, panel:name, sidePanelPushed:true, req:undefined};
+    STATE = {...STATE, panel:name, panelDepth:(STATE && STATE.panel ? (STATE.panelDepth||0) : 0) + 1, req:undefined};
     const url = new URL(location.href);
     url.searchParams.set("panel", name);
     url.searchParams.delete("req");
@@ -7333,10 +7338,20 @@ function openPanel(name, opts){
 // left the dashboard, and in a tab with no history did nothing at all.
 // There it closes in place, dropping `panel=` from the address - the
 // side-panel twin of closeCheckPanel()'s road-testing #8 fix.
+//
+// CLOSE ALWAYS CLOSES (post-build-review #182, Keith 2026-10-14): each link
+// followed inside the Requirements panel pushes an entry so Back steps
+// through them, and Close steps back over every one at once. Where the
+// page underneath was itself a panel - one loaded with `?panel=` - the
+// popstate handler finishes the close in place (CLOSE_PANEL_AFTER_POP).
+let CLOSE_PANEL_AFTER_POP = false;
 function closePanel(){
   if(!(STATE && STATE.panel)) return hideAllPanelsDom();
-  if(STATE.sidePanelPushed) return history.back();
-  STATE = {...STATE, panel:undefined, sidePanelPushed:undefined, req:undefined};
+  if(STATE.panelDepth){ CLOSE_PANEL_AFTER_POP = true; return history.go(-STATE.panelDepth); }
+  closePanelInPlace();
+}
+function closePanelInPlace(){
+  STATE = {...STATE, panel:undefined, panelDepth:undefined, req:undefined};
   history.replaceState(STATE, "", navUrl({dropArrival:false}));
   hideAllPanelsDom();
   returnFocusToRequirementOpener();
@@ -7730,7 +7745,7 @@ document.addEventListener("click", (e)=>{
   e.preventDefault();
   const id = a.dataset.reqLink;
   if(!a.closest("#requirements-panel")) REQ_OPENER = {el:a, id};
-  STATE = {...STATE, panel:"requirements", req:id, sidePanelPushed:true};
+  STATE = {...STATE, panel:"requirements", req:id, panelDepth:(STATE && STATE.panel ? (STATE.panelDepth||0) : 0) + 1};
   history.pushState(STATE, "", requirementHref(id));
   PANEL_RENDER.requirements();
   hideAllPanelsDom();

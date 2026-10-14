@@ -648,6 +648,47 @@ class TestARequirementHasItsOwnAddress:
         clean_page.wait_for_function("() => STATE.panel === 'requirements'")
         assert self._linked(clean_page) == rid
 
+    def _follow_in_panel(self, page, rid):
+        page.locator(f'#requirements-panel a[data-req-link="{rid}"]').first.click()
+        page.wait_for_function("(r) => STATE.req === r", arg=rid)
+
+    @pytest.mark.parametrize("close", ["Escape", "x"])
+    def test_close_closes_after_following_links_inside_the_panel(
+            self, clean_page, built_dashboard_html, close):
+        """post-build-review #182, Keith 2026-10-14: 'Close always closes'.
+        Each in-panel link pushed an entry and Close was Back, so the first
+        press only stepped to the previous requirement."""
+        _goto(clean_page, built_dashboard_html)
+        before = clean_page.evaluate("() => history.length")
+        ids = [r for r, _ in self._ids(clean_page)][:3]
+        clean_page.locator("#requirements-btn").click()
+        clean_page.wait_for_function("() => STATE.panel === 'requirements'")
+        self._follow_in_panel(clean_page, ids[1])
+        self._follow_in_panel(clean_page, ids[2])
+        clean_page.go_back()
+        clean_page.wait_for_function("(r) => STATE.req === r", arg=ids[1])
+        if close == "Escape":
+            clean_page.keyboard.press("Escape")
+        else:
+            clean_page.locator("#requirements-panel-close").click()
+        clean_page.wait_for_function("() => !STATE.panel")
+        assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "true"
+        assert "panel=" not in clean_page.url and "req=" not in clean_page.url
+        # Closing stepped back to the page the panel was opened over.
+        assert clean_page.evaluate("() => history.length") >= before
+
+    def test_close_closes_a_cold_loaded_panel_after_following_a_link(
+            self, clean_page, built_dashboard_html):
+        self._load(clean_page, built_dashboard_html, "panel=requirements")
+        ids = [r for r, _ in self._ids(clean_page)][:2]
+        self._load(clean_page, built_dashboard_html, f"panel=requirements&req={ids[0]}")
+        self._follow_in_panel(clean_page, ids[1])
+        clean_page.keyboard.press("Escape")
+        clean_page.wait_for_function("() => !STATE.panel")
+        assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "true"
+        assert "qa-reporting-dashboard" in clean_page.url
+        assert "panel=" not in clean_page.url and "req=" not in clean_page.url
+
     def test_a_requirement_hidden_by_the_status_filter_resets_it(self, clean_page,
                                                                  built_dashboard_html):
         _goto(clean_page, built_dashboard_html)

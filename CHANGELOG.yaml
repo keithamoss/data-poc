@@ -153,6 +153,12 @@ releases:
               A dbt macro or test kept in a subfolder now needs a changelog
               note when it changes, like one at the top level. Drift checks
               also read their column from the check's own entry now.
+          - headline: Close shuts the Requirements panel in one press
+            components: ["Dashboard UI"]
+            description: >
+              After following links from one requirement to another inside
+              the panel, X or Escape used to step back one requirement at a
+              time. It now closes the panel; Back still steps through them.
           - headline: An early supply no longer reads as "No data"
             components: ["Dashboard UI"]
             description: >

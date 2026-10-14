@@ -8811,7 +8811,7 @@ twice. It deliberately did not re-find the `TypeError`.
      seen failing first. The one implementation (no Python mirror). Road-
      testing sprint 1's REQ-DASH-224 builds on this rather than being it.
 
-182. **[in-progress, 2026-10-14]** **[Dashboard UI]** **[QA checks &
+182. **[done, 2026-10-14]** **[Dashboard UI]** **[QA checks &
      contract]** **delivery-critic on REQ-DASH-222 and REQ-QAC-223.** Every
      finding below was checked against the code before being written up.
      Each REQ-QAC-223 edit scenario the critic ran for real (a macro, a Soda
@@ -8843,8 +8843,8 @@ twice. It deliberately did not re-find the `TypeError`.
        `?panel=requirements&req=` is now dropped on load like a `req=` beside
        another panel. `test_an_empty_req_is_dropped_and_the_panel_opens_at_the_top`
        failed first.
-     - **FOR KEITH - Close after following a link inside the panel takes
-       two presses.** A link followed inside the Requirements panel pushes a
+     - **FIXED (Keith, 2026-10-14: "Close always closes") - Close after
+       following a link inside the panel took two presses.** A link followed inside the Requirements panel pushes a
        history entry (criterion 4: Back returns to the panel as it was), and
        Close is Back whenever the panel was opened by a push (#180's
        design). So after one in-panel link, X or Escape steps back to the
@@ -8852,14 +8852,21 @@ twice. It deliberately did not re-find the `TypeError`.
        criterion 4 asks; Close does not read as closing. Options: (a) Close
        always closes in place, leaving Back for stepping; (b) Close steps
        back over all of the panel's own entries in one go; (c) leave it.
-     - **FOR KEITH - a comment-only edit to a macro asks for changelog
-       entries on every check the macro backs** (6 for `matches_regex`). This
-       is the "errs towards too much" design the requirement chose, so it
-       stays unless he wants comments stripped before hashing.
-     - **FOR KEITH (wording in signed criteria) - `matches_regex` backs 6
-       checks, not 11.** REQ-QAC-223's criteria and NFRs say 11; the
-       evidence already says 6. Fixing the number changes signed text, so it
-       waits for him.
+       Built as (b) under the hood so that (a) is what a reader sees: STATE
+       counts the panel's own entries (`panelDepth`, replacing
+       `sidePanelPushed`), Close does `history.go(-depth)`, and where the
+       page underneath was itself a cold-loaded panel the popstate handler
+       finishes the close in place. Back still steps requirement by
+       requirement. `test_close_closes_after_following_links_inside_the_panel`
+       (X and Escape) and `test_close_closes_a_cold_loaded_panel_after_following_a_link`
+       all failed first.
+     - **KEPT (Keith, 2026-10-14: "keep it strict") - a comment-only edit
+       to a macro asks for changelog entries on every check the macro
+       backs** (6 for `matches_regex`), as the requirement chose.
+     - **CORRECTED (Keith, 2026-10-14) - `matches_regex` backs 6 checks,
+       not 11.** REQ-QAC-223's NFR and its carried decision now say 6. The
+       same 11 sits in held REQ-QAC-176's decisions and is left for when
+       that requirement is next opened.
      - **NOTED, no change**: a retired check backed by a changed macro also
        needs an entry (REQ-QAC-025's same-terms rule, deliberate); `method`
        is read only by `check_bands.evidently_bounds`, since each runner
