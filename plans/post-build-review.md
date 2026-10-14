@@ -8743,3 +8743,28 @@ twice. It deliberately did not re-find the `TypeError`.
     REQ-DASH-054. The "No data" still seen on cp-clients at 2025-06-15 is a
     cross-table check that could not be judged (identical before and after
     the fix) - running-thoughts #95's subject, not this one.
+
+179. **[todo, 2026-10-14]** **[Pipeline & publishing]** **A Lambda
+     processing pass stops taking arrivals at its 10-minute budget, but
+     then runs ALL owed work with no budget at all.** Found by
+     delivery-scoper while re-scoping REQ-PIPE-177 (2026-10-14), verified
+     by the main session against the code: `processing_pass.run_pass`
+     checks `deadline` only before taking a new arrival
+     (qa_tools/common/processing_pass.py:319-334), then calls
+     `recheck.run_all_owed(kinds=(REEVALUATE, RECHECK))` (line 520), which
+     takes no deadline and runs up to `limit=1000` items
+     (qa_tools/common/recheck.py:391). So an invocation that reaches its
+     budget still runs every owed re-evaluation and re-check after it,
+     and then tickets - against Lambda's hard 15-minute limit.
+     NOT A DEFECT AGAINST REQ-PIPE-152 AS WRITTEN: its criterion 12 only
+     says "take no new arrival once 10 minutes have passed", and is met.
+     It is a GAP in what that criterion covers, which matters once owed
+     work can be large (REQ-PIPE-177's bulk re-checks, ~400 supplies).
+     Nothing is lost if Lambda kills the invocation (owed work is cleared
+     only when it completes), but the tickets step at the end of the pass
+     would not run. REQ-PIPE-177's re-scoped draft keeps its criterion 24
+     (the deadline applies to owed work too) as unmet, with a decision
+     saying why. **Keith, 2026-10-14: leave it to REQ-PIPE-177** - it only
+     bites once bulk re-checks exist, and 177 criterion 24 carries the fix
+     (pass the pass's deadline into the owed work, test first). Stays todo
+     until 177 is built.
