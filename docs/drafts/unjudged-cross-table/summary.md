@@ -339,3 +339,27 @@ same thing true of re-files?
 - Re-gate on a staged arrival - amend REQ-PIPE-121's "a file landing in
   staging stays outside this mechanism" (architect A1): reminded of the
   decision's wording; PARKED with the shape question ("see previous").
+
+## Shape question re-asked, 2026-10-14 13:06 - PARKED again ("Come back to this"; REQ-PIPE-121: "See previous")
+
+Reframed for next time. Q2 = B (an incomplete supply promotes itself) rules out
+a TRULY red status, which never promotes itself, and largely dissolves the
+architect's B1 (the deadlock: early arrivals promote, the period opens, the
+existing knock-on re-checks them when the missing table is promoted) and B2
+(nothing sits in AWAITING_DECISION). Three shapes remain:
+
+1. **Its own "Incomplete" status** (recommended): between amber and red in
+   every rollup - own red wins, it beats green and amber - pill "Incomplete:
+   no promoted <table>" linking to the table, whose page gives the cause;
+   promotes as "Incomplete promoted"; re-checked when the table is promoted,
+   substituted or inherited.
+2. **Red-looking with a pill**, but promoting itself unlike every other red:
+   loudest, but red would mean two things and early Child Protection arrivals
+   read red every quarter.
+3. **The real verdict plus a flag** (the red-promoted pattern): least change,
+   but a green pill still reads green at a glance.
+
+REQ-PIPE-121: with self-promotion the case for amending "a file landing in
+staging stays outside this mechanism" (architect A1) mostly falls away.
+Recommended: keep it, and have the architect confirm no deadlock remains once
+self-promotion is in.
