@@ -97,7 +97,10 @@ class TestWhatASlotOffers:
             supply_scoped, period_scoped = filing_queue.operations_for(
                 _state(state, supply="cp-carers@1", closed=closed))
             offered |= set(supply_scoped) | set(period_scoped)
-        assert offered == set(fd.OPERATIONS) - {fd.EXCUSE_LATENESS, fd.WITHDRAW_EXCUSE}
+        # PLACE IS OFFERED ON A HELD SUPPLY'S ROW, never a slot's (REQ-PIPE-163
+        # criterion 10) - tests/test_place_held_supply.py covers it.
+        assert offered == set(fd.OPERATIONS) - {fd.EXCUSE_LATENESS, fd.WITHDRAW_EXCUSE,
+                                                fd.PLACE}
 
     def test_the_queue_half_is_only_ever_supply_scoped(self):
         """Criterion 31 made mechanical: whatever a slot is in, the first

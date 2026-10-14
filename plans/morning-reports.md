@@ -1417,4 +1417,11 @@ one or more component tags, and a date.
         which is unsigned and behind running-thoughts #89.
       - REQ-DASH-204, REQ-PIPE-210, REQ-PIPE-211 and REQ-GEN-206 wait on
         #95's shape.
+    - **KEITH, ~22:15 Perth:** a self check-in every 10 minutes through the
+      night (send_later, re-armed each time), and "the usual rules apply in
+      terms of overnight sprints where I'm involved and not involved" - so
+      the terms above, with anything needing him queued for the morning.
+      And: address running-thoughts #89 and #95 in the next few days, since
+      they hold the requirements under HELD above. Both are conversations with
+      him, so they are not built tonight - a priority line now sits on each.
     - **PROGRESS** (a line per push, newest last):

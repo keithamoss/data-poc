@@ -1176,7 +1176,11 @@ to the exact right file/line/folder with zero console errors.
 
 89. **[parked, 2026-10-13]** **[Pipeline & publishing]** **SIGNIFICANT: a
     schema change has no production path - "wipe and rebuild" only works on
-    a synthetic asset.** Priority: deal with it this week (Keith,
+    a synthetic asset.** Priority: address in the next few days (Keith,
+    2026-10-14 night, setting up overnight #5: "let's address number 89 and
+    number 95 if we can in the next few days, given that they block some other
+    requirements" - it holds REQ-QAC-176, so REQ-PIPE-177, REQ-PIPE-178 and
+    REQ-DASH-221). Earlier priority: deal with it this week (Keith,
     2026-10-13: "I'm quite concerned about that database schema thing.
     There's no way that approach of rewriting is viable. So that is a
     significant issue ... and we should deal with that this week.") Found answering Keith's question on REQ-PIPE-193 ("is that
@@ -5308,7 +5312,11 @@ could never have computed it), and it belongs with batch 5's check work.
 
 95. **[todo, 2026-10-14]** **[Pipeline & publishing]** **[QA checks &
     contract]** **[Dashboard UI]** **A dataset whose cross-table check could
-    not be judged is neither green nor red.** Keith, 2026-10-14, reviewing
+    not be judged is neither green nor red.** Priority: address in the next
+    few days (Keith, 2026-10-14 night, with #89: "given that they block some
+    other requirements" - its shape holds REQ-DASH-204, REQ-PIPE-210,
+    REQ-PIPE-211 and REQ-GEN-206). Both need Keith in the conversation, so
+    they are scoped with him by day, not built overnight. Keith, 2026-10-14, reviewing
     the close-out batch: "that cross-table check isn't judging on
     notifications, so you can't really rule it green - but it's also not a
     true red." What happens today (checked in unrunnable.py and

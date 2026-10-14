@@ -75,7 +75,9 @@ class TestAHoldIsRecorded:
         raise_one(conn, dataset, kind=supply_holds.ASSIGNMENT_RULE,
                    reason={"unavailable": [["2026-Q1", "already filled"]]})
         [held] = supply_holds.outstanding(conn, dataset_id=dataset)
-        assert "slot" in " ".join(held.responses)
+        # PLACE, THE OPERATION THAT NOW EXISTS (REQ-PIPE-163 criterion 12).
+        assert held.responses[0].startswith("place it into the period")
+        assert "reject the supply" in held.responses
 
 
 class TestALaterRunDoesNotClearIt:
