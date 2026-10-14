@@ -9179,3 +9179,8 @@ twice. It deliberately did not re-find the `TypeError`.
          follows the signed criterion 28, so it is left as signed.
          Morning report 5, Q10.
        - **J1 and J6.** Already Q4 and Q5.
+     - **A WRONG NUMBER IN THE FIX COMMIT (c21b495).** Its message says the
+       tests ran over "59 test files"; the selection was 70. The pass and
+       fail counts in it are from that run and stand; the file count was
+       written without being looked at. Recorded here rather than by
+       rewriting a pushed commit.

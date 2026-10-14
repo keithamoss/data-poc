@@ -1454,6 +1454,13 @@ one or more component tags, and a date.
         flips start to matter; corrections, the backstop, runway and the
         overlap gate all know about it. The 22 amendments applied in Keith's
         approved wording. Gate result in the commit message.
+      - ~01:30 - REQ-PIPE-179 critic fixes (c21b495, post-build-review #190):
+        D1-D12 fixed test-first (runway, quiet holds on the page and in
+        `supply holds`, live labels, keep never offered where refused, every
+        flipped period named, markup, the view's wording). Q8-Q10 below.
+        One order-dependent failure in test_supersession, which passes alone
+        and beside every changed file - left to CI's full run. Sprint 3
+        (REQ-PIPE-164, 166) next.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
