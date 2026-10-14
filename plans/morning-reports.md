@@ -1376,3 +1376,45 @@ one or more component tags, and a date.
         replay's end", would confirm REQ-PIPE-181 nineteen days before its
         own date. REQ-GEN-205 criterion 19 now proposes the later of the two;
         question 28 is yours.
+
+5. **[in-progress, 2026-10-14]** **[Docs & process]** **Overnight 2026-10-14 to
+   15: the signed calendar close-out, then the generator chain.**
+
+    - **KEITH'S GO, ~21:20 Perth:** "set up a sprint plan... you can just keep
+      building", to follow from his phone. He chose the order as listed.
+    - **TERMS.**
+      - Stop on product questions only: anything needing his sign-off, meaning
+        a criterion change or a significant defect. When that happens, move to
+        the next unblocked sprint.
+      - Minor bugs and polish are fixed and written up as usual.
+      - Each sprint follows the same steps: tests first, build, gate, commit
+        and push, then critics, whose fixes go in their own commit.
+      - Nothing unsigned is built.
+      - Only scratch databases are written. The real `supply` database is
+        touched only via `mothman env reset-synthetic` then `mothman pipeline
+        bootstrap`.
+    - **PIPE-179's three proposals, put to Keith before the night started and
+      all CONFIRMED.** These are recorded in its decisions, and the open
+      question is gone:
+      - the newest correction or entry dates a turn-off;
+      - a `turns_off` entry on a version with no `effective_to` is accepted
+        and read by nothing;
+      - N in "Received while turned off (N)" counts supplies.
+    - **THE PLAN.** Ordered by dependency. The chain is 163 → 179 → 164, and
+      the dashboard needs all three:
+      1. Place a held supply: REQ-PIPE-163, then REQ-GHUB-165.
+      2. Turn a dataset off: REQ-PIPE-179.
+      3. Re-check and undo: REQ-PIPE-164, REQ-PIPE-166.
+      4. Dashboard catches up: REQ-DASH-182, then REQ-DASH-180, then
+         REQ-DASH-175.
+      5. Scenario links: REQ-DASH-208, REQ-PIPE-202.
+      6. Grow the Child Protection history: finish REQ-GEN-044, then
+         REQ-GEN-207, then REQ-GEN-203.
+      7. Calendar-correction scenarios: REQ-GEN-205, then REQ-GEN-218, then
+         REQ-DASH-209.
+    - **HELD, not in the plan:**
+      - REQ-PIPE-177, REQ-PIPE-178 and REQ-DASH-221 wait on REQ-QAC-176,
+        which is unsigned and behind running-thoughts #89.
+      - REQ-DASH-204, REQ-PIPE-210, REQ-PIPE-211 and REQ-GEN-206 wait on
+        #95's shape.
+    - **PROGRESS** (a line per push, newest last):
