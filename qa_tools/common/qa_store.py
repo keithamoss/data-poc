@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 41
+SCHEMA_VERSION = 42
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -914,7 +914,12 @@ ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
                       'promotion-withheld', 'mark-not-supplied', 'acknowledge',
                       'supersede', 'un-supersede', 'still-failing',
                       'promotion-refused', 'excuse-lateness', 'withdraw-excuse',
-                      'keep', 'choose-file'));
+                      'keep', 'choose-file',
+                      -- SCHEMA 42: a person's re-check (REQ-PIPE-164), and the
+                      -- withdrawal of an acknowledgement or of a mark as not
+                      -- supplied (REQ-PIPE-166) - one version for the sprint.
+                      're-check', 'withdraw-acknowledgement',
+                      'withdraw-not-supplied'));
 -- A SETTLEMENT OF A CONTESTED PAIR (REQ-PIPE-193 criterion 8, schema 40):
 -- a person's, naming the pair's `#1` supply and the period it was filed
 -- to. What became of each file is on qa.decision_file below.

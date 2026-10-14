@@ -113,6 +113,7 @@ releases:
     summary: >
       A dataset, or a whole collection, can now be turned off for a while or
       for good, without losing its configuration or anything it still owed.
+      And a supply's checks can be run again where it is filed.
     changes:
       - category: New
         items:
@@ -137,6 +138,20 @@ releases:
               periods it changes start to matter; after that it needs a
               declared correction, and the refusal names each period and when
               it started to matter.
+          - headline: Re-check a supply where it is
+            components: ["Pipeline & publishing"]
+            description: >
+              When a check was wrong and you have fixed it, ask for a waiting or
+              promoted supply's checks to run again in the period it is filed to,
+              with a reason, from Filing decisions or `mothman supply decide
+              --operation re-check`. Nothing moves; a waiting supply that comes
+              back green can promote itself.
+          - headline: A promoted supply that re-checks worse stays, and says so
+            components: ["Pipeline & publishing"]
+            description: >
+              A promoted supply is never taken out by a re-check. If it comes
+              back worse than it was promoted on, it is listed as "Promoted, then
+              re-checked" until someone demotes it or acknowledges the new verdict.
           - headline: "`schedule show` says it is off"
             components: ["Pipeline & publishing"]
             description: >

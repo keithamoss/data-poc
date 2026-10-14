@@ -54,6 +54,13 @@ def why_not_owed(conn: supply_db.SupplyConnection, dataset_id: str, supply: str,
     reason it does not, in words a person can act on (criterion 14)."""
     if not slot:
         return "no period was named"
+    # RE-CHECKED WORSE THAN IT WAS PROMOTED ON (REQ-PIPE-164 criterion 21,
+    # amending criterion 14): owed whatever the amber setting, until a person
+    # acknowledges the new verdict or demotes it.
+    from qa_tools.common import rechecking
+
+    if rechecking.worse_for(conn, dataset_id, supply, slot) is not None:
+        return None
     found = _promotion(conn, dataset_id, supply, slot, None)
     if found is None:
         from qa_tools.common import slot_state
@@ -92,6 +99,13 @@ def owed(conn: supply_db.SupplyConnection, dataset_id: str, slot: str,
     h = decision_log.held(conn, dataset_id, slot, as_at=as_at)
     if not h or h.held_as != decision_log.PROMOTED:
         return None
+    if as_at is None:
+        # RE-CHECKED WORSE (REQ-PIPE-164 criterion 21): read as it stands now -
+        # the verdict a re-check changed is the supply's current one.
+        from qa_tools.common import rechecking
+
+        if rechecking.worse_for(conn, dataset_id, h.holder, slot) is not None:
+            return h.holder
     found = _promotion(conn, dataset_id, h.holder, slot, as_at)
     if not found or not found[2]:
         return None

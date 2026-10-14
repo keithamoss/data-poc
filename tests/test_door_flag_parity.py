@@ -81,6 +81,24 @@ HIDDEN: dict[tuple[str, str], str] = {
 # Minted calendar slots.
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _forget_its_filings(supply_dsn):
+    """Each test forgets the cp-carers filings it made (post-build-review
+    #191). Filed into minted periods that stop being calendar slots when the
+    test ends, they outlived it, and the agreement backstop then read them as
+    moved and froze cp-carers for every later module on the worker -
+    test_replacement_setting's gate tests went red in CI."""
+    import filing_support
+    from qa_tools.common import filing, qa_store, supply_db
+
+    with supply_db.connect(label="test-parity-forget") as c:
+        qa_store.ensure_schema(c)
+        (before,) = c.execute(f"SELECT coalesce(max(id), 0) FROM {filing.TABLE}").fetchone()
+    yield
+    with supply_db.connect(label="test-parity-forget") as c:
+        filing_support.forget(c, "dataset_id = ? AND id > ?", [DS, before])
+
+
 @pytest.fixture
 def minted(monkeypatch):
     """{period: Slot} made part of cp-carers' calendar for this test."""
@@ -287,6 +305,24 @@ def ex_another_version_waiting(conn, mint):
     return waiting, later
 
 
+def ex_rechecked_worse(conn, mint):
+    """Promoted on green, re-checked red (REQ-PIPE-164 criterion 15): the
+    queue's own heading. The verdict is set for the example - a minted
+    supply has no check results to read one from."""
+    from dataclasses import replace
+    from unittest import mock
+
+    from qa_tools.common import supply_status
+
+    with mock.patch.object(supply_status, "status", return_value="green"):
+        st, supply = ex_promoted(conn, mint)
+        _person(conn, fd.RECHECK, period=st.period, supply=supply)
+    with mock.patch.object(supply_status, "status", return_value="red"):
+        (item,) = filing_queue._rechecked_worse(
+            conn, COL, [replace(st, state=slot_state.AWAITING_ACKNOWLEDGEMENT)])
+    return item, supply
+
+
 def ex_could_not_load(conn, mint):
     import filing_support
     from qa_tools.common import assignment, load_log
@@ -340,6 +376,7 @@ EXAMPLES = {
     slot_state.TWO_FILES: ex_two_files,
     filing_queue.ANOTHER_VERSION_WAITING: ex_another_version_waiting,
     filing_queue.COULD_NOT_LOAD: ex_could_not_load,
+    filing_queue.RECHECKED_WORSE: ex_rechecked_worse,
     # A closed, unfilled period is OVERDUE with `closed` set: its own offers.
     "closed-unfilled": ex_closed_unfilled,
 }
@@ -424,7 +461,8 @@ def _every_state() -> list[str]:
     own = {v for k, v in vars(slot_state).items()
            if k.isupper() and isinstance(v, str) and re.fullmatch(r"[a-z]+(-[a-z]+)*", v)}
     return sorted(set(filing_tui._HOW_IT_READS) | own
-                  | {filing_queue.ANOTHER_VERSION_WAITING, filing_queue.COULD_NOT_LOAD})
+                  | {filing_queue.ANOTHER_VERSION_WAITING, filing_queue.COULD_NOT_LOAD,
+                     filing_queue.RECHECKED_WORSE})
 
 
 # ---------------------------------------------------------------------------

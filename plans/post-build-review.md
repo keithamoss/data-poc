@@ -9184,3 +9184,45 @@ twice. It deliberately did not re-find the `TypeError`.
        fail counts in it are from that run and stand; the file count was
        written without being looked at. Recorded here rather than by
        rewriting a pushed commit.
+
+191. **[in-progress, 2026-10-15]** **[Testing & dev tooling]** **Three test-suite
+     problems found while building REQ-PIPE-164, overnight #5 - two of them CI
+     reds. None was in the code under test.**
+     - **FIXED - a test that failed for one minute a night.**
+       `tests/test_cli_supply.py::TestReadingTheDecisionLog::test_the_instant_is_rendered_on_the_assets_clock`
+       asserted that "1:30am" appears nowhere in cp-clients' decision log. The log
+       is shared by every module on the worker, so a cp-clients decision another
+       module records live at 01:30 Perth correctly reads 1:30am. It went red at
+       01:30 on 2026-10-15. It now asks for the log as at the fixture's own
+       instant (`--as-at`), so no decision that took effect later is in the
+       answer. Two narrower first attempts failed in the full gate, because the
+       table truncates and wraps its cells differently as the log grows.
+     - **FIXED - a new test that left a shared supply promoted.** REQ-PIPE-164's
+       first test of a promoted re-check promoted the session's CP fixture
+       supply and demoted it afterwards. The promotion superseded another
+       version and moved the table, which no demote undoes, and 48 setup errors
+       and two test_recheck failures followed in the full gate. That test now
+       drives recheck.run on a minted promoted supply with only the four tools
+       stubbed (TestThroughTheRealExecutor), so it touches nothing shared.
+     - **FIXED - order-dependent state between modules, and a CI red of my own
+       making.** Running `tests/test_door_flag_parity.py` before
+       `tests/test_replacement_setting.py` on one worker failed four or five of
+       the latter's TestTheGate tests: the gate found cp-carers frozen by the
+       agreement backstop. The parity module's filings into minted periods
+       outlived each test, and once the minted calendar was gone the backstop
+       read them as moved. The same failures reproduce on e184025 without
+       REQ-PIPE-164. A first draft of this entry said CI had not hit it. That
+       was wrong: CI's `test` job failed on exactly these on 778ccc7 and on
+       e184025, after #189's overlays (778ccc7) added more such filings. The
+       parity module now forgets its own cp-carers filings after each test
+       (`_forget_its_filings`, which tests/test_recheck_decision.py shares),
+       and the pair passes in that order (67 passed, -n0).
+     - **CHANGED ON A HYPOTHESIS, NOT REPRODUCED - TS-79a off-screen on CI.**
+       `TestTheAsAtScenarioChips` for TS-79a failed on CI three runs in a row
+       (7aa2c82, 778ccc7, e184025) with the element at -38..-14px, and passed
+       here every time, including at 8x CPU throttling. The scenarios page is
+       long, so the chip is scrolled to before it is clicked, and the jump
+       scrolls back to the top smoothly. The test measured at a fixed 700ms.
+       It now waits for `window.scrollY` to reach 0 (10s timeout) before
+       measuring. If CI is still red on TS-79a, the cause is elsewhere and
+       this is reopened.

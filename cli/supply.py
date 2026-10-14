@@ -1012,7 +1012,7 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
                help="Confirm a decision's consequences beyond its own slot, by the key "
                     "its warning showed - needed with --yes where there are any.")
 @click.option("--wait", is_flag=True,
-               help="For a place or a re-file: run its checks now, in the foreground, and "
+               help="For a place, a re-file or a re-check: run its checks now, in the foreground, and "
                     "end with where the supply stands. Without it the checks are left owed "
                     "for `mothman pipeline process`.")
 @click.option("--file-outcome", "file_outcomes", multiple=True,
@@ -1058,10 +1058,10 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     # 27): a placement or a re-file.
     # UN-SUPERSEDE OWES ONE TOO (REQ-PIPE-120; #188 D1).
     if wait and operation not in (filing_decisions.PLACE, filing_decisions.REFILE,
-                                  filing_decisions.UN_SUPERSEDE):
+                                  filing_decisions.UN_SUPERSEDE, filing_decisions.RECHECK):
         raise click.UsageError(
             f"--wait runs the QA a decision owes, and a {operation} owes none - it is for "
-            f"--operation place, refile and un-supersede.")
+            f"--operation place, refile, un-supersede and re-check.")
     if operation == filing_decisions.PLACE:
         _place_from_flags(dataset_id, period, supply, to_period, stands_on, from_period,
                           through_period, reason=reason, yes=yes,

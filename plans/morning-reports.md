@@ -1454,13 +1454,28 @@ one or more component tags, and a date.
         flips start to matter; corrections, the backstop, runway and the
         overlap gate all know about it. The 22 amendments applied in Keith's
         approved wording. Gate result in the commit message.
-      - ~01:30 - REQ-PIPE-179 critic fixes (c21b495, post-build-review #190):
+      - ~01:18 - REQ-PIPE-179 critic fixes (c21b495, post-build-review #190):
         D1-D12 fixed test-first (runway, quiet holds on the page and in
         `supply holds`, live labels, keep never offered where refused, every
         flipped period named, markup, the view's wording). Q8-Q10 below.
         One order-dependent failure in test_supersession, which passes alone
         and beside every changed file - left to CI's full run. Sprint 3
         (REQ-PIPE-164, 166) next.
+      - ~01:50 - REQ-PIPE-164 BUILT (sprint 3, first half): re-check a waiting
+        or promoted supply where it is filed, from the door or `supply decide
+        --operation re-check` (left owed unless --wait). A promoted supply is
+        never re-gated or moved; re-checked worse than it was promoted on, it is
+        listed as 'Promoted, then re-checked <verdict>' and owes an
+        acknowledgement until demoted or acknowledged. Refusals name the way
+        back (place, promote, un-supersede, settle the pair, the backstop's
+        fix). SCHEMA 42 (with 166's two withdrawal actions), so the real
+        database was rebuilt (bootstrap 7m43s). Amendments T1, T5, T6, T7
+        applied with 164's clauses only. Gate result in the commit message.
+        Q11 below. ALSO TWO CI REDS (post-build-review #191): the parity test
+        leaked filings that froze cp-carers for test_replacement_setting
+        (made worse by my #189 overlays), now forgotten after each test; and
+        TS-79a off-screen on CI only, changed to wait for the page's scroll -
+        a hypothesis CI will confirm. REQ-PIPE-166 next.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
@@ -1493,3 +1508,10 @@ one or more component tags, and a date.
          a turn-off be the exception, holding it as turned off?
       10. (#190 J5) "Changeable by an ordinary edit until ..." comes from the
           signed criterion 28. The critic found it unclear. Reword it?
+      11. (REQ-PIPE-164) A promoted supply re-checked worse now owes an
+          acknowledgement (REQ-PIPE-122 c14 as amended), and the terminal and
+          the slot's state say so. A period's `_manifest` view (REQ-PIPE-130)
+          still reports `acknowledged` only for amber-on-arrival, because the
+          re-checked case needs the supply's current verdict, which that SQL
+          view cannot compute. Built that way, PROVISIONAL. Should `_manifest`
+          carry it too, as a column the build fills?

@@ -4948,6 +4948,11 @@ class TestTheAsAtScenarioChips:
         assert index >= 0, f"{sid} is not in the embedded map"
         clean_page.locator(f'button[data-scenario="{index}"]').click()
         clean_page.wait_for_timeout(700)
+        # THE PAGE'S OWN SMOOTH SCROLL BACK TO THE TOP, to its end (post-build-
+        # review #191): a chip far down the list is scrolled to before it is
+        # clicked, and on CI's Chromium the jump's scroll was still running at
+        # 700ms - TS-79a measured -38px, three runs in a row.
+        clean_page.wait_for_function("window.scrollY === 0", timeout=10000)
         assert f"in-place-on={placement.in_place_on}" in clean_page.url
 
         def holder():

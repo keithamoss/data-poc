@@ -349,7 +349,12 @@ class TestReadingTheDecisionLog:
         # shared by every module on this worker, so another module's later
         # cp-clients decisions (tests/test_excuse.py, 2026-10-11) pushed this
         # fixture's row out of the newest twenty.
-        result = _run(["decisions", "--dataset", "cp-clients", "--limit", "100000"])
+        # AS AT THE FIXTURE'S OWN DAY (post-build-review #191): a cp-clients
+        # decision another module records live at 01:30 Perth rightly reads
+        # 1:30am, which failed this between 1:30 and 1:31am. Decisions that
+        # take effect later than this one are not in the answer at all.
+        result = _run(["decisions", "--dataset", "cp-clients", "--limit", "100000",
+                       "--as-at", "2026-08-01T09:31:00+08:00"])
         assert "9:30am" in result.output, result.output
         assert "1:30am" not in result.output
 

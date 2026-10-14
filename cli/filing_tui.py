@@ -103,6 +103,9 @@ _WHAT_IT_DOES = {
     filing_decisions.CHOOSE_FILE: "settle - say what each file is",
     # REACHED FROM A HELD SUPPLY'S ROW (REQ-PIPE-163 criterion 10), never a slot's.
     filing_decisions.PLACE: "place - say which period this held supply belongs to",
+    # WHAT IT DOES AND WHAT IT COSTS (REQ-PIPE-164 criterion 26).
+    filing_decisions.RECHECK: ("Re-check: run its checks again where it is (about a "
+                               "minute; recorded and published)"),
 }
 
 #: The same operations on ANOTHER VERSION WAITING in a promoted period
@@ -123,19 +126,23 @@ _NAMES_THE_SUPPLY = (filing_decisions.PROMOTE, filing_decisions.REJECT,
                      filing_decisions.DEMOTE, filing_decisions.SUPERSEDE,
                      filing_decisions.UN_SUPERSEDE, filing_decisions.ACKNOWLEDGE,
                      filing_decisions.REFILE, filing_decisions.EXCUSE_LATENESS,
-                     filing_decisions.WITHDRAW_EXCUSE, filing_decisions.PLACE)
+                     filing_decisions.WITHDRAW_EXCUSE, filing_decisions.PLACE,
+                     filing_decisions.RECHECK)
 
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
 #: the verb doing a noun's job (#107).
 _NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement", filing_decisions.REFILE: "re-file",
          filing_decisions.PLACE: "placement",
          filing_decisions.EXCUSE_LATENESS: "excuse",
-         filing_decisions.WITHDRAW_EXCUSE: "withdrawal of the excuse"}
+         filing_decisions.WITHDRAW_EXCUSE: "withdrawal of the excuse",
+         filing_decisions.RECHECK: "re-check"}
 
 #: Decisions whose reason is PUBLISHED beside the supply on the dashboard
 #: (REQ-PIPE-161 criterion 18), said when the reason is asked for.
 _PUBLISHED_REASON = (filing_decisions.EXCUSE_LATENESS, filing_decisions.WITHDRAW_EXCUSE,
-                     filing_decisions.PLACE)
+                     filing_decisions.PLACE,
+                     # REQ-PIPE-164 criterion 14.
+                     filing_decisions.RECHECK)
 
 _HOW_IT_READS = {
     slot_state.NOT_YET_DUE: "[dim]not yet due[/dim]",
@@ -156,6 +163,8 @@ _HOW_IT_READS = {
     filing_queue.COULD_NOT_LOAD: "[red]could not be loaded[/red]",
     filing_queue.ANOTHER_VERSION_WAITING:
         "[yellow]another version waiting - the period holds a promoted one[/yellow]",
+    # REQ-PIPE-164 criterion 15 - _words() gives its new verdict from the reason.
+    filing_queue.RECHECKED_WORSE: "[red]Promoted, then re-checked worse[/red]",
 }
 
 
@@ -404,7 +413,9 @@ def apply_decision(*, operation: str, dataset_id: str, period: str | None,
             # THE FLAG ROUTE DOES NOT WAIT (REQ-PIPE-163 criteria 4 and 32):
             # the checks are owed, and the processing pass runs them.
             _show("Its checks are owed. The processing pass runs them - it runs every "
-                  "owed QA run, not only this one:\nmothman pipeline process",
+                  "owed QA run, not only this one:\nmothman pipeline process\n"
+                  # REQ-PIPE-164 criterion 5.
+                  "Nothing runs until the processing pass or that command does.",
                   title="Checks owed", style="yellow")
         elif outcome.owed:
             finished = all(_run_owed(owed_id, operation=operation, supply=supply,
@@ -472,7 +483,8 @@ def _run_owed(owed_id: int, *, operation: str = filing_decisions.REFILE,
     return got.completed
 
 
-_STANDS = {filing_decisions.PLACE: "placement", filing_decisions.REFILE: "re-file"}
+_STANDS = {filing_decisions.PLACE: "placement", filing_decisions.REFILE: "re-file",
+           filing_decisions.RECHECK: "re-check"}
 
 
 def outcome_panel(operation: str, supply: str | None, period: str | None,
@@ -500,6 +512,8 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
                 f"still owed - the processing pass will finish them:\nmothman pipeline "
                 f"process", "Checks still owed", "yellow")
     where = got.period or period or "its period"
+    if operation == filing_decisions.RECHECK:
+        return _recheck_panel(who, where, got)
     lines = [f"{who} is filed to {where}, checked {got.status or 'without a verdict'}."]
     if operation == filing_decisions.PLACE:
         lines.append(f"It had not been checked in {where} before.")
@@ -513,6 +527,42 @@ def outcome_panel(operation: str, supply: str | None, period: str | None,
     style = ("green" if got.status in ("green", "amber") else
              "red" if got.status == "red" else "yellow")
     return " ".join(lines), "Where it stands now", style
+
+
+def _recheck_panel(who: str, where: str, got) -> tuple[str, str, str]:
+    """A re-check's outcome (REQ-PIPE-164 criteria 13 and 17): the verdict
+    before and after, and what the gate did with a waiting supply - or, for a
+    promoted one, that it stays promoted, naming demote and acknowledge where
+    it came back red, each command on a line of its own."""
+    lines = [f"{who} in {where} was {got.before or 'without a verdict'}, re-checked "
+             f"{got.status or 'without a verdict'}."]
+    if got.stays_promoted:
+        lines.append(f"It is still promoted - {where} keeps it.")
+        text = " ".join(lines)
+        if got.status == "red":
+            text += (f"\nTo take it out of {where}, demote it:\n"
+                     f"mothman supply decide --operation demote --dataset "
+                     f"{_dataset_of(who)} --period {where} --supply {who} --reason '<why>'\n"
+                     f"To record that it stays, acknowledge its new verdict:\n"
+                     f"mothman supply decide --operation acknowledge --dataset "
+                     f"{_dataset_of(who)} --period {where} --supply {who} --reason '<why>'")
+    elif got.promoted:
+        lines.append(f"The promotion gate promoted it into {where}.")
+        text = " ".join(lines)
+    else:
+        lines.append(f"It is waiting in {where}. The promotion gate did not promote it - "
+                     f"{_gate_words(got.waits_because or 'it waits for a person')}. Promote or "
+                     f"reject it next, at Filing decisions > Supplies waiting on a decision.")
+        text = " ".join(lines)
+    style = ("green" if got.status in ("green", "amber") else
+             "red" if got.status == "red" else "yellow")
+    return text, "Where it stands now", style
+
+
+def _dataset_of(supply: str) -> str:
+    from qa_tools.common import supply_files
+
+    return supply_files.dataset_of(supply)
 
 
 def _gate_words(text: str) -> str:
@@ -596,6 +646,9 @@ def _label(state: slot_state.SlotState) -> str:
     # IN WORDS, as the table above it says it (CLI UX critic, #107): the
     # picker used to show the machine id - `awaiting-acknowledgement`.
     words = re.sub(r"\[/?[a-z ]+\]", "", _HOW_IT_READS.get(state.state, state.state))
+    if state.state == filing_queue.RECHECKED_WORSE and state.reason:
+        # 'Promoted, then re-checked <verdict>' (REQ-PIPE-164 criterion 15).
+        words = state.reason.split(":")[0]
     return f"{state.period}  {state.dataset_id}  {where}  ({words})"
 
 

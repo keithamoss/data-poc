@@ -12253,7 +12253,7 @@ requirements:
       by: Keith
       date: "2026-09-26"
     acceptance_criteria:
-      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep, choose-file and place - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause). And 2026-10-14 by REQ-PIPE-163 criterion 13 (place - recorded as a person's re-file from no period, REQ-PIPE-163 criterion 2, so it adds no decision-log action of its own).
+      - THE SYSTEM SHALL record every filing decision - promote, reject, demote, re-file, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse, keep, choose-file, place and re-check - as an entry in one append-only log, and SHALL NOT keep a second record of any of them anywhere else. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13, REQ-PIPE-122 criterion 22 and REQ-PIPE-120 criterion 9, and 2026-10-11 by REQ-PIPE-161 criterion 13 and REQ-PIPE-170 criterion 11 (keep; confirming a calendar correction records each re-file, hold and keep it makes as its own entry here), and 2026-10-13 by REQ-PIPE-193 criterion 29 (choose-file - one entry for a settlement, with each file's rejection, supersession or re-file its own entry naming it as the cause). And 2026-10-14 by REQ-PIPE-163 criterion 13 (place - recorded as a person's re-file from no period, REQ-PIPE-163 criterion 2, so it adds no decision-log action of its own). And 2026-10-15 by REQ-PIPE-164 criterion 12 (re-check - one entry for each supply re-checked, a bulk re-check (REQ-PIPE-177) writing one for each supply it covers).
       - >
         THE SYSTEM SHALL record, with each entry, the actor, the instant
         the decision took effect, the instant the entry was written, the
@@ -13050,7 +13050,7 @@ requirements:
       - >
         THE SYSTEM SHALL distinguish, among staged supplies, one nobody
         has decided on from one a person has looked at and returned.
-      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, re-file (a person's placement of a held supply included, being recorded as a re-file - REQ-PIPE-163 criteria 2 and 24) and an excuse of lateness or its withdrawal, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19, 2026-10-11 by REQ-PIPE-161 criterion 19, and 2026-10-14 by REQ-PIPE-163 criterion 24.
+      - WHERE any decision has been recorded against a supply by a person, THE SYSTEM SHALL NOT promote that supply automatically thereafter - EXCEPT un-supersede, re-file (a person's placement of a held supply included, being recorded as a re-file - REQ-PIPE-163 criteria 2 and 24), re-check, single or bulk, and an excuse of lateness or its withdrawal, the person-decisions after which the gate may still promote automatically, and the supersede un-supersede undoes (REQ-PIPE-120 criterion 4, REQ-PIPE-141 criterion 8, REQ-PIPE-161 criterion 19, REQ-PIPE-164 criterion 20). AMENDED 2026-10-05 by REQ-PIPE-120 criterion 9 and REQ-PIPE-141 criterion 19, 2026-10-11 by REQ-PIPE-161 criterion 19, 2026-10-14 by REQ-PIPE-163 criterion 24, and 2026-10-15 by REQ-PIPE-164 criterion 20.
       - THE SYSTEM SHALL leave a red supply nobody has decided on in staging UNTIL a later version of its table for the same period supersedes it (REQ-PIPE-118), and SHALL NOT move it to the rejected schema. AMENDED 2026-10-05 by REQ-PIPE-118 criterion 16.
       - >
         THE SYSTEM SHALL allow a rejection to be reversed by a later
@@ -14872,7 +14872,7 @@ requirements:
       the write path 2026-09-22. Scoped by delivery-scoper, batch 4,
       2026-09-26.
     acceptance_criteria:
-      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness and withdraw excuse as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fourteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), and 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29. Placing a held supply (place) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-14 by REQ-PIPE-163 criterion 13.
+      - THE SYSTEM SHALL accept promote, reject, demote, re-file, substitute, de-substitute, inherit, un-inherit, mark as not supplied, acknowledge, supersede, un-supersede, excuse lateness, withdraw excuse and re-check as structured filing decisions raised on the GitHub ticket for the SLOT they concern - one dataset in one period, per REQ-PIPE-083 - so that the period a decision applies to comes from the ticket's own identity rather than from anything stated in the body. Every criterion below that says "a filing decision" SHALL mean any one of those fifteen. AMENDED 2026-10-05 by REQ-PIPE-132 criterion 13 (mark as not supplied), REQ-PIPE-122 criterion 22 (acknowledge) and REQ-PIPE-120 criterion 9 (supersede, un-supersede), 2026-10-11 by REQ-PIPE-161 criterion 13 (excuse lateness, withdraw excuse), and 2026-10-15 by REQ-PIPE-164 criterion 12 (re-check). Keep, and the confirmation of a calendar correction's moves, are filing decisions too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-11 by REQ-PIPE-170 criterion 11. Settling a contested pair (choose-file) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-13 by REQ-PIPE-193 criterion 29. Placing a held supply (place) is a filing decision too, offered on the terminal route only (criterion 3) - AMENDED 2026-10-14 by REQ-PIPE-163 criterion 13.
       - >
         THE SYSTEM SHALL offer every one of those operations in the
         mothman TUI.
@@ -26320,7 +26320,7 @@ requirements:
     date_written: '2026-10-07'
     story: "As the person who has just fixed a check that was wrong - our mistake, not the supplier's - I want to ask for a waiting supply's QA to be run again in the period it is filed to, so that a verdict produced by our own fault does not stand, and nobody has to re-file a supply to the same place or promote a red one to get past it."
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -26405,6 +26405,56 @@ requirements:
     - "REVIEWS FOLDED, 2026-10-14 (delivery-architect and delivery-cli-ux, recorded in docs/drafts/unsigned-triage/review-architect.md and review-cli-ux.md): criteria 1 to 24 keep their numbers. Changed in place: 5 (says nothing runs until the processing pass or that command does - cli-ux L4), 10 (a rejected or superseded supply's refusal names promote or un-supersede with its flag form - cli-ux L2), 15 (the verdict promoted on is the promote decision's promoted_status - architect), 23 (the backstop's refusal gives REQ-PIPE-173's finding and paste-ready fix and says the re-check can be raised again once declared - cli-ux H3). Added: 25 (a test that a promoted supply's re-check appends no gate decision - architect HIGH, because recheck._run_claimed calls promotion.after_runs on every re-check today), 26 (the door's label, and its place after the settling decisions - cli-ux L1), 27 (the same next step for REQ-PIPE-163 criterion 35 - cli-ux H3's flag on a signed requirement, carried as amendment T12). Criterion 19's linked test at build is tests/test_recheck.py::TestTwoRunnersNeverRunOneOwedItem (architect LOW), as the decision above already says."
     - "THE BACKSTOP REFUSAL GIVES A NEXT STEP (delivery-cli-ux H3, 2026-10-14): a refusal that only says the past changed leaves the person nothing to do. REQ-PIPE-173 already computes the fix for the dataset (agreement_freeze's Finding.fix, paste-ready), so the refusal gives it. REQ-PIPE-163 criterion 35 has the same gap and is signed, so criterion 27 carries its amendment (summary T12) rather than this pass editing 163. REJECTED naming the agreement command alone: the person would run a second command to learn what the first already knew."
     - 'CRITERION 27 ALREADY APPLIED (Keith, 2026-10-14, T12 option A): the amendment to REQ-PIPE-163 criterion 35 was approved and applied to the register the afternoon this requirement was signed, before REQ-PIPE-163 is built, so criterion 27 is met on signing; its text is kept so the amendment''s provenance stays on the requirement that carries it.'
+    - 'BUILT 2026-10-15 (overnight #5, sprint 3): one module, rechecking.py, owns what may be re-checked, the refusals and the recording; the run is recheck.py''s, the one executor. The decision names the supply''s filed period as to_slot and owes the re-check in the same transaction (rechecking.record); nothing runs inside it.'
+    - 'A RE-CHECK NAMING ANOTHER PERIOD IS REFUSED, naming where the supply is filed and the command for there - never silently re-pointed at the filed period (the flags take --period, and a re-check against the wrong period is exactly the confusion criterion 9 rules out).'
+    - 'REFUSAL ORDER: an open pair first (the shared refusal, with criterion 22''s clause added for a re-check), then where the supply stands (held, superseded, rejected, the wrong period, never loaded), then the agreement backstop - so a held or rejected supply hears its own next step before an asset-wide one.'
+    - 'THE GATE IS SKIPPED BY WHAT THE PERIOD HOLDS AT RUN TIME (recheck._run_claimed): a supply promoted into its filed period when its re-check runs gets no gate and no gate decision, whatever caused the run - criterion 8 is about the supply''s state, not the decision''s kind.'
+    - '''PROMOTED, THEN RE-CHECKED'' IS COMPUTED, NOT RECORDED: the latest re-check decision after the promotion, a current verdict worse than the promote entry''s promoted_status, and no acknowledge for that supply and period since that re-check. A later re-check that comes back worse again lists it afresh. A promotion with no recorded promoted_status is never listed (nothing to be worse than).'
+    - 'ONE STATE FOR THE PERIOD, ONE HEADING FOR THE QUEUE: acknowledgement.owed reads the re-checked case, so the slot reads awaiting acknowledgement everywhere and counts among the states needing a person by the existing machinery (criterion 21); the supply queue alone relabels it RECHECKED_WORSE under its own heading. REJECTED a new slot_state, which every reader and the dashboard would have had to learn.'
+    - 'AS AT A PAST DATE, ONLY THE AMBER CASE: acknowledgement.owed with as_at reads only the recorded amber debt, because the re-checked case turns on the supply''s verdict now, and the verdict as at a past date is not what the criterion asks about.'
+    - 'PROVISIONAL (morning report 5, Q11): a period''s _manifest (REQ-PIPE-130) still reports acknowledged for amber-on-arrival only - the SQL view cannot compute the supply''s current verdict.'
+    - 'SCHEMA 42 also admits REQ-PIPE-166''s two withdrawal actions, so one rebuild of the real database covers the sprint.'
+    - 'THE AMENDMENTS (T1, T5, T6, T7) were applied with this requirement''s clauses only, as each approved amendment''s own note directs while REQ-PIPE-166 is unbuilt: REQ-GHUB-082 c1 counts fifteen, REQ-PIPE-074 c1 lists place and re-check.'
+    - 'THE PAGE NAMES IT ''re-checked'' in its decision words (DECISION_DONE), so no raw action name reaches the dashboard; the page''s own treatment of a re-check is REQ-DASH-221''s.'
+    linked_tests:
+    - 'tests/test_recheck_decision.py::TestARecheckIsRecordedAndOwed'
+    - 'tests/test_recheck_decision.py::TestOnlyAWaitingOrPromotedSupplyIsRechecked'
+    - 'tests/test_recheck_decision.py::TestPromotedThenRecheckedWorse'
+    - 'tests/test_recheck_decision.py::TestTheDoorOffersIt'
+    - 'tests/test_recheck_decision.py::TestTheDoorRunsItStraightAfter'
+    - 'tests/test_recheck_decision.py::TestDecideLeavesItOwed'
+    - 'tests/test_recheck_decision.py::TestDecideWait'
+    - 'tests/test_recheck_decision.py::TestThroughTheRealExecutor'
+    - 'tests/test_recheck.py::TestTwoRunnersNeverRunOneOwedItem'
+    - 'tests/test_door_flag_parity.py::test_the_door_offers_what_the_flags_would_record'
+    - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_seventeen_of_them'
+    implemented_by:
+    - 'qa_tools/common/rechecking.py::standing'
+    - 'qa_tools/common/rechecking.py::refuse_a_backstopped_dataset'
+    - 'qa_tools/common/rechecking.py::record'
+    - 'qa_tools/common/rechecking.py::worse_than_promoted'
+    - 'qa_tools/common/rechecking.py::worse_for'
+    - 'qa_tools/common/decision_log.py::RECHECK'
+    - 'qa_tools/common/filing_decisions.py::RECHECK'
+    - 'qa_tools/common/filing_decisions.py::apply'
+    - 'qa_tools/common/filing_decisions.py::_apply_one'
+    - 'qa_tools/common/filing_decisions.py::_refuse_on_an_open_pair'
+    - 'qa_tools/common/rejection.py::NOT_A_DECISION_ABOUT_ITS_DATA'
+    - 'qa_tools/common/qa_store.py::SCHEMA_VERSION'
+    - 'qa_tools/common/recheck.py::_run_claimed'
+    - 'qa_tools/common/recheck.py::_promoted_outcome'
+    - 'qa_tools/common/acknowledgement.py::why_not_owed'
+    - 'qa_tools/common/acknowledgement.py::owed'
+    - 'qa_tools/common/filing_queue.py::RECHECKED_WORSE'
+    - 'qa_tools/common/filing_queue.py::_rechecked_worse'
+    - 'qa_tools/common/filing_queue.py::operations_for'
+    - 'cli/filing_tui.py::_recheck_panel'
+    - 'cli/filing_tui.py::outcome_panel'
+    - 'cli/filing_tui.py::apply_decision'
+    - 'cli/filing_tui.py::_label'
+    - 'cli/supply.py::decide_command'
+    evidence:
+    - '2026-10-15 overnight: tests/test_recheck_decision.py (37 tests), each written before its chunk and seen to fail first - TestThroughTheRealExecutor runs recheck.run with only the four tools stubbed and asserts the gate is never asked for a promoted supply (criterion 25), and fails with the skip removed. The door/flag parity test failed on six states until the door offered re-check (criterion 11). Full gate result in the commit message that flips this to built.'
 
   - id: REQ-QAC-176
     title: Every check result records a fingerprint of the check's definition that survives settings being added
@@ -28518,7 +28568,7 @@ requirements:
       - "WHERE the resolved setting is promote-and-acknowledge, THE SYSTEM SHALL promote an amber supply into an unfilled slot as REQ-PIPE-075 criterion 1 does, and SHALL record on that promotion that an acknowledgement is owed."
       - "WHERE the resolved setting is promote, THE SYSTEM SHALL promote an amber supply into an unfilled slot as REQ-PIPE-075 criterion 1 does, and SHALL NOT ask for an acknowledgement."
       - "THE SYSTEM SHALL offer ACKNOWLEDGE as a filing decision a person raises, on the same terms as every other - actor, mandatory reason, the contract/people.yaml allowlist, refusal, and parity across the GitHub and terminal routes (REQ-GHUB-082)."
-      - "IF a person acknowledges a supply that owes no acknowledgement - not promoted, not amber, promoted under promote, or already acknowledged - THEN THE SYSTEM SHALL refuse it and say why."
+      - "IF a person acknowledges a supply that owes no acknowledgement - not promoted, not amber, promoted under promote, or already acknowledged - THEN THE SYSTEM SHALL refuse it and say why; a promoted supply whose re-check came back worse than the verdict it was promoted on (REQ-PIPE-164) owes an acknowledgement of that new verdict, whatever the amber setting, until a person acknowledges it or demotes it. AMENDED 2026-10-15 by REQ-PIPE-164 criterion 21."
       - "THE SYSTEM SHALL NOT change any data, re-run any check or change what any period resolves to on an acknowledgement."
       - "WHEN a supply that owes an acknowledgement leaves its period - superseded, demoted, rejected or re-filed - THE SYSTEM SHALL treat the owed acknowledgement as lapsed rather than outstanding."
       - "THE SYSTEM SHALL show an amber supply held under hold, and a promoted supply awaiting acknowledgement, in the terminal's standing queue and in REQ-PIPE-083's needs-action ticket policy, each distinguishably from the other and from a red supply awaiting a decision."
@@ -34376,14 +34426,8 @@ requirements:
     - 'OWES NOTHING IS ONE RESOLUTION (criterion 7): placing.period_problem() says a period is owed when refiling._on_calendar does (the dataset''s slots), and otherwise reads why from the configuration - listed not_expected, before the first participation version, or a month the participation does not include, quoting its reason. REQ-PIPE-179 adds the turned-off gap to the same function.'
     - 'THE CHOOSER IS ONE FUNCTION, placing.period_choices(), pure over configuration plus the states the caller reads; filing_tui.choose_period() renders it - owed-nothing runs as questionary Separators, so they sit in place and cannot be chosen - and serves placing, a door re-file and a settlement''s re-file target (criteria 16 and 42). Marks are relative to the supply''s RECEIPT (''closed when it arrived'', ''not yet open when it arrived''), the instant the rule judged it by. Inherited, contested and waiting periods stay selectable and are refused with their own step, then offered again.'
     - 'A PAIR HELD WHOLE IS ONE SUPPLY (criterion 37): an open pair''s `#1` owns both files (supply_files), so placing it is one filing and one hold, both files moving together; no re-check is owed until it is settled, and --wait is refused naming both files and where it is settled.'
-    unmet_criteria:
-    - criterion: 'Criterion 26, in part - a RE-CHECK ending with the shared outcome panel. The panel is built (filing_tui.outcome_panel) and ends every placement and re-file; the re-check that will also end with it is REQ-PIPE-164''s, not built yet.'
-      why: 'REQ-PIPE-164 (signed, not started) builds the re-check, and depends on this requirement. Its own criterion 17 points at this panel, so the remaining half lands with it rather than as a second panel here.'
-      owner: REQ-PIPE-164 (overnight #5, sprint 3)
-      blocked_by:
-        requirements:
-        - REQ-PIPE-164
     linked_tests:
+    - 'tests/test_recheck_decision.py::TestDecideWait'
     - 'tests/test_place_held_supply.py'
     - 'tests/test_cli_filing_tui.py::TestEveryOperationIsReachableFromSomeDoor::test_between_the_two_doors_all_of_them_are_reachable'
     - 'tests/test_settle_tui.py::TestTheTargetPrompt'
@@ -34422,6 +34466,7 @@ requirements:
     evidence:
     - '2026-10-14 night: tests/test_place_held_supply.py 47 tests, written first, cover criteria 1-4, 6-12, 14-16, 18-22, 24, 25, 27-30, 32-42; with the 18 neighbouring modules (filing decisions, decision log, re-file, correction apply, schedule-ended holds, choose-file, settle and filing TUIs, supply CLI, holds, outstanding, blockers, schema version, processing pass) 602 passed on this tree once test_outstanding''s response wording was updated to place.'
     - 'Seven amendments applied with the wording Keith approved (REQ-GHUB-082 c1 and c3, REQ-PIPE-074 c1 and c9, REQ-PIPE-076 c7, REQ-PIPE-140 new c9, REQ-PIPE-141 c7) and REQ-PIPE-193 c19 as proposed and approved; REQ-DASH-175 c12''s amendment waits for that requirement (unsigned when 163 was signed).'
+    - 'Criterion 26''s re-check half met 2026-10-15 by REQ-PIPE-164: a re-check ends with the same outcome panel (filing_tui.outcome_panel -> _recheck_panel), verdict before and after; tests/test_recheck_decision.py::TestDecideWait.'
   - id: REQ-DASH-208
     title: A scenario link from the test-scenarios panel lands with what the scenario is about in view
     date_written: '2026-10-14'

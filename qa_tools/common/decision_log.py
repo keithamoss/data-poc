@@ -186,10 +186,17 @@ KEEP = "keep"
 #: changes nothing a period resolves to and qa.slot_holds ignores it.
 CHOOSE_FILE = "choose-file"
 
+#: A PERSON ASKS FOR A WAITING OR PROMOTED SUPPLY'S QA TO RUN AGAIN where it
+#: is filed (REQ-PIPE-164), recorded with the owed re-check it causes. It
+#: moves nothing and changes nothing a period resolves to, so qa.slot_holds
+#: ignores it by construction; nor is it a person's decision about the
+#: supply's data (criterion 20, rejection.NOT_A_DECISION_ABOUT_ITS_DATA).
+RECHECK = "re-check"
+
 ACTIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
            INHERIT, INHERIT_REFUSED, UN_INHERIT, PROMOTION_WITHHELD,
            MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE, STILL_FAILING,
-           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP, CHOOSE_FILE)
+           PROMOTION_REFUSED, EXCUSE_LATENESS, WITHDRAW_EXCUSE, KEEP, CHOOSE_FILE, RECHECK)
 
 #: Actions that name no supply - each is about one that is not there, or
 #: (STILL_FAILING) about several.

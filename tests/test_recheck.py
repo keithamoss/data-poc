@@ -447,3 +447,4 @@ class TestTwoRunnersNeverRunOneOwedItem:
             assert other.execute("SELECT pg_try_advisory_lock(?, ?)",
                                  [space, owed_id]).fetchone()[0]
             other.execute("SELECT pg_advisory_unlock(?, ?)", [space, owed_id])
+

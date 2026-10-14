@@ -80,9 +80,14 @@ CHOOSE_FILE = decision_log.CHOOSE_FILE
 #: (criterion 41). Supply-scoped, person only, reason required, terminal only.
 PLACE = "place"
 
+#: The seventeenth (REQ-PIPE-164): run a waiting or promoted supply's QA
+#: again where it is filed. Supply-scoped, person only, reason required;
+#: it moves nothing, and owes a re-check run (rechecking.record).
+RECHECK = decision_log.RECHECK
+
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
               INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE)
+              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK)
 
 #: Offered on the terminal and never on GitHub (REQ-PIPE-193 criteria 1 and
 #: 16; Keith, 2026-10-13: "given the complexity of this, the choices and the
@@ -94,7 +99,7 @@ TERMINAL_ONLY = (CHOOSE_FILE, PLACE)
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
 SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE)
+                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE, RECHECK)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
@@ -610,7 +615,7 @@ def _spoken(operation: str) -> str:
     """The operation as a person writes it - `re-file`, as the menu and the
     warnings say it, never the identifier (#115, W8)."""
     return {REFILE: "re-file", CHOOSE_FILE: "settlement",
-            PLACE: "placement"}.get(operation, operation)
+            PLACE: "placement", RECHECK: "re-check"}.get(operation, operation)
 
 
 def offered(operation: str) -> str:
@@ -859,6 +864,16 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> tup
         return placing.apply(conn, place_plan(conn, request), agency_id=entry.agency_id,
                              collection_id=entry.collection_id, actor=request.actor_name,
                              reason=reason, effective_at=effective_at)
+    elif request.operation == RECHECK:
+        # REQ-PIPE-164: the decision and its owed re-check, nothing run here
+        # (criterion 3) - the route runs it after the commit, or leaves it owed.
+        from qa_tools.common import rechecking
+
+        return (rechecking.record(conn, agency_id=entry.agency_id,
+                                  collection_id=entry.collection_id,
+                                  dataset_id=request.dataset_id, supply=request.supply,
+                                  period=request.period, actor=request.actor_name,
+                                  reason=reason, effective_at=effective_at),)
     elif request.operation == CHOOSE_FILE:
         # REQ-PIPE-193: settlement owns the effect, from the plan the
         # warning was built from.
@@ -1037,7 +1052,7 @@ def _refuse_promoting_what_never_loaded(conn, request: Request) -> None:
 #: REQ-PIPE-194 criteria 4 and 6). Promoting it would put two versions of
 #: one table into the period (REQ-PIPE-128).
 _NOT_ON_AN_OPEN_PAIR = (PROMOTE, REJECT, SUPERSEDE, REFILE, DEMOTE, ACKNOWLEDGE,
-                        EXCUSE_LATENESS, WITHDRAW_EXCUSE, UN_SUPERSEDE)
+                        EXCUSE_LATENESS, WITHDRAW_EXCUSE, UN_SUPERSEDE, RECHECK)
 
 
 class OpenPair(decision_log.DecisionRefused):
@@ -1068,8 +1083,12 @@ def _refuse_on_an_open_pair(conn, request: Request) -> None:
         f"yet says which is the supply, so a {_spoken(request.operation)} of one of them "
         f"is not recorded. The pair is settled by saying what each file is, at "
         f"'{supply_files.where_to_settle(request.dataset_id)}' - where 'reject both' "
-        f"rejects each file on its own, so either can be brought back alone. Nothing was "
-        f"recorded.",
+        f"rejects each file on its own, so either can be brought back alone"
+        # A RE-CHECK IS NOT NEEDED THERE (REQ-PIPE-164 criterion 22): the
+        # settlement runs the checks itself (REQ-PIPE-193 criterion 21).
+        + (", and where settling it checks each file that becomes a supply"
+           if request.operation == RECHECK else "")
+        + ". Nothing was recorded.",
         dataset_id=request.dataset_id, period=request.period, supply=request.supply,
         files=contest.files)
 
@@ -1138,6 +1157,17 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
 
     _refuse_promoting_what_never_loaded(conn, request)
     _refuse_promoting_where_it_is_not_filed(conn, request)
+    if request.operation == RECHECK:
+        # WHERE IT IS FILED, AND ONLY A WAITING OR PROMOTED SUPPLY (REQ-PIPE-164
+        # criteria 10 and 23), refused before anything is written.
+        from dataclasses import replace
+
+        from qa_tools.common import rechecking
+
+        where = rechecking.standing(conn, request.dataset_id, request.supply or "",
+                                    request.period)
+        rechecking.refuse_a_backstopped_dataset(conn, request.dataset_id)
+        request = replace(request, period=where.period)
     already = _already(conn, request)
     if already is not None:
         return Outcome(operation=request.operation, dataset_id=request.dataset_id,

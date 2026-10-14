@@ -129,7 +129,10 @@ NOT_A_DECISION_ABOUT_ITS_DATA = (
     decision_log.EXCUSE_LATENESS, decision_log.WITHDRAW_EXCUSE, decision_log.KEEP,
     # NOR A SETTLEMENT (REQ-PIPE-193 criterion 22): it says which file to
     # judge, not whether to accept it.
-    decision_log.CHOOSE_FILE)
+    decision_log.CHOOSE_FILE,
+    # NOR A RE-CHECK (REQ-PIPE-164 criterion 20): it asks for the checks to
+    # run again, so a waiting supply re-checked green may promote itself.
+    decision_log.RECHECK)
 
 
 def decided_by_a_person(conn: supply_db.SupplyConnection,

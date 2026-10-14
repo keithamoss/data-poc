@@ -88,6 +88,11 @@ class Outcome:
     period: str | None = None
     promoted: bool | None = None
     waits_because: str | None = None
+    #: A PROMOTED supply re-checked (REQ-PIPE-164 criterion 8): no gate, and
+    #: it stays promoted whatever came back.
+    stays_promoted: bool = False
+    #: Its status before the run, for the panel's before and after (criterion 17).
+    before: str | None = None
 
 
 _OWED_COLUMNS = ("id", "kind", "dataset_id", "supply_id", "period", "caused_by_decision",
@@ -319,6 +324,16 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
         period = filed[0][0]
         run_key = mint_run_id(conn, item.dataset_id, item.supply_id, owed_id=item.id,
                               taken=item.run_key)
+        # PROMOTED, SO NOT RE-GATED (REQ-PIPE-164 criteria 8 and 25; Keith,
+        # 2026-10-10): its new verdict is recorded and shown, and taking it out
+        # stays a person's decision.
+        promoted_here = decision_log.promoted_into(conn, item.dataset_id, period) == item.supply_id
+        from qa_tools.common import supply_status
+
+        try:
+            before = supply_status.status(conn, item.dataset_id, item.supply_id)
+        except Exception:  # noqa: BLE001 - the message, never the run, depends on it
+            before = None
     entry_ds = hierarchy.dataset(item.dataset_id)
     try:
         arrival, results = execute(
@@ -338,6 +353,8 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
         return Outcome(item.id, run_key, False,
                        f"the re-check of {item.supply_id} did not complete ({message}); its "
                        f"earlier verdict stands and the re-check is still owed")
+    if promoted_here:
+        return _promoted_outcome(item, run_key, period, before)
     # THE GATE, AS FOR AN ARRIVAL (REQ-PIPE-141 criterion 7) - under the
     # settings in force now, which after_runs reads at this instant.
     gated = promotion.after_runs(
@@ -360,7 +377,35 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
     then = f"Promoted into {period}." if promoted else f"Not promoted - {why}."
     return Outcome(item.id, run_key, True,
                    f"Checked against {period}: {verdict or 'no verdict'}. {then}",
-                   status=verdict, period=period, promoted=promoted, waits_because=why)
+                   status=verdict, period=period, promoted=promoted, waits_because=why,
+                   before=before)
+
+
+def _promoted_outcome(item, run_key: str, period: str, before: str | None) -> Outcome:
+    """A promoted supply's re-check, cleared with no gate (criterion 8): its
+    new verdict, that it is still promoted and the period keeps it, and - where
+    it came back red - demote as what takes it out and acknowledge as what
+    records that it stays (criterion 13)."""
+    from qa_tools.common import supply_status
+
+    clear(item.id, run_key)
+    with supply_db.connect(label="mothman:recheck") as conn:
+        try:
+            verdict = supply_status.status(conn, item.dataset_id, item.supply_id)
+        except Exception:  # noqa: BLE001 - the message, never the run, depends on it
+            verdict = None
+    message = (f"Checked against {period}: {verdict or 'no verdict'} (was "
+               f"{before or 'no verdict'}). It is still promoted - {period} keeps it.")
+    if verdict == "red":
+        message += (
+            f" To take it out of {period}, demote it:\n"
+            f"  mothman supply decide --operation demote --dataset {item.dataset_id} "
+            f"--period {period} --supply {item.supply_id} --reason '<why>'\n"
+            f"To record that it stays, acknowledge its new verdict:\n"
+            f"  mothman supply decide --operation acknowledge --dataset {item.dataset_id} "
+            f"--period {period} --supply {item.supply_id} --reason '<why>'")
+    return Outcome(item.id, run_key, True, message, status=verdict, period=period,
+                   promoted=None, stays_promoted=True, before=before)
 
 
 def _cause_instant(item) -> str:

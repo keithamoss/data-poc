@@ -97,6 +97,12 @@ ANOTHER_VERSION_WAITING = "another-version-waiting"
 #: person does outside this tool.
 REPROCESS = "fix the fault and reprocess the delivery"
 
+#: A promoted supply whose re-check came back worse than the verdict it was
+#: promoted on (REQ-PIPE-164 criterion 15): its own heading in the queue,
+#: 'Promoted, then re-checked <verdict>', in place of the slot's plain
+#: awaiting-acknowledgement - which is what it reads as everywhere else.
+RECHECKED_WORSE = "promoted-then-rechecked"
+
 
 def could_not_load(conn: supply_db.SupplyConnection,
                    collection_id: str) -> list[slot_state.SlotState]:
@@ -154,10 +160,41 @@ def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
               and (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
     over = [s for s in waiting_over_promoted(conn, every)
             if (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
+    states = _rechecked_worse(conn, collection_id, states)
     # AN OPEN PAIR LEADS (REQ-PIPE-194 criterion 4): nothing about the
     # dataset is checked until it is settled.
     return sorted(states + failed + over,
                   key=lambda s: (s.state != slot_state.TWO_FILES, s.period, s.dataset_id))
+
+
+def _rechecked_worse(conn, collection_id: str,
+                     states: list[slot_state.SlotState]) -> list[slot_state.SlotState]:
+    """Each promoted supply re-checked worse, under its own heading
+    (criterion 15): naming its period, the verdict it was promoted on, the
+    new one and the re-check that found it."""
+    from dataclasses import replace
+
+    from qa_tools.common import hierarchy, rechecking
+
+    # ONLY A SLOT AWAITING ACKNOWLEDGEMENT CAN BE ONE (acknowledgement.owed),
+    # so with none there is nothing to read.
+    if not any(s.state == slot_state.AWAITING_ACKNOWLEDGEMENT for s in states):
+        return states
+    ours = {d.dataset_id for d in hierarchy.all_datasets() if d.collection_id == collection_id}
+    worse = {(w.dataset_id, w.supply, w.period): w
+             for w in rechecking.worse_than_promoted(conn) if w.dataset_id in ours}
+    out = []
+    for s in states:
+        w = worse.get((s.dataset_id, s.supply, s.period))
+        if w is None or s.state != slot_state.AWAITING_ACKNOWLEDGEMENT:
+            out.append(s)
+            continue
+        out.append(replace(s, state=RECHECKED_WORSE, reason=(
+            f"Promoted, then re-checked {w.now}: {w.supply} in {w.period} was promoted on "
+            f"{w.promoted_on}, and the re-check recorded {w.recheck_at[:16].replace('T', ' ')} "
+            f"(decision {w.recheck_id}) came back {w.now}. It stays promoted until a person "
+            f"demotes it, or acknowledges its new verdict with a reason.")))
+    return out
 
 
 def waiting_over_promoted(conn: supply_db.SupplyConnection,
@@ -436,7 +473,14 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
         # PROMOTE OVER, behind the warning; or set it aside.
         # ...or move it to the period it belongs to (REQ-GHUB-165 parity).
         return (filing_decisions.PROMOTE, filing_decisions.REJECT,
-                filing_decisions.SUPERSEDE, filing_decisions.REFILE), ()
+                filing_decisions.SUPERSEDE, filing_decisions.REFILE,
+                filing_decisions.RECHECK), ()
+    if state.state == RECHECKED_WORSE:
+        # REQ-PIPE-164 criterion 15: take it out, or record that it stays - then
+        # what every promoted supply offers, and re-check last (criterion 26).
+        return (filing_decisions.ACKNOWLEDGE, filing_decisions.DEMOTE,
+                filing_decisions.REFILE, filing_decisions.REJECT,
+                filing_decisions.RECHECK), ()
     if state.state == slot_state.TWO_FILES:
         # AN OPEN PAIR IS SETTLED, AND NOTHING ELSE (REQ-PIPE-194 criterion 4):
         # 'settle' and 'reject both' are both choose-file - the TUI words the
@@ -452,14 +496,15 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
             # REQ-PIPE-122 criterion 13: answered, and owed a look - so
             # acknowledging comes first, beside taking it back out.
             supply_scoped = (filing_decisions.ACKNOWLEDGE, filing_decisions.DEMOTE,
-                             filing_decisions.REFILE, filing_decisions.REJECT)
+                             filing_decisions.REFILE, filing_decisions.REJECT,
+                             filing_decisions.RECHECK)
         elif state.state == slot_state.PROMOTED:
             # Already answered. What is left is taking it back out, moving
             # it somewhere else, or saying it is not fit after all - a
             # rejection needs no demotion first (REQ-PIPE-075 criterion 4;
             # REQ-GHUB-165's parity test found the door did not offer it).
             supply_scoped = (filing_decisions.DEMOTE, filing_decisions.REFILE,
-                             filing_decisions.REJECT)
+                             filing_decisions.REJECT, filing_decisions.RECHECK)
         elif state.state == slot_state.REJECTED:
             # Rejected, and nothing replaced it. Promoting it anyway is
             # a real thing an operator does after a second look.
@@ -473,6 +518,11 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
             # criterion 1): set it aside without rejecting it.
             supply_scoped = (filing_decisions.PROMOTE, filing_decisions.REJECT,
                              filing_decisions.REFILE, filing_decisions.SUPERSEDE)
+            # RE-CHECK, LAST - after the decisions that settle it (REQ-PIPE-164
+            # criteria 11 and 26) - on a supply filed and waiting.
+            if state.state in (slot_state.AWAITING_DECISION, slot_state.RETURNED,
+                               slot_state.AMBER_WAITING):
+                supply_scoped += (filing_decisions.RECHECK,)
 
     if state.state == slot_state.NOT_SUPPLIED_ACCEPTED:
         # Accepted - and a late file can still be re-filed in, or an
