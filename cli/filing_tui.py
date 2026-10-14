@@ -769,6 +769,11 @@ def queue_flow(collection_id: str) -> None:
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
+    # RECEIVED WHILE TURNED OFF (REQ-PIPE-179 criterion 34): a quiet last
+    # group, after the slot rows and outside every count of what waits on a
+    # decision - one row per dataset.
+    quiet = filing_queue.turned_off_groups(held)
+    held = [h for h in held if not h.turned_off]
 
     if gaps:
         # PERIOD ITEMS, GROUPED (REQ-PIPE-132 criterion 11): consecutive
@@ -796,19 +801,30 @@ def queue_flow(collection_id: str) -> None:
         if not gaps:
             console.print(f"Nothing is waiting on a person in "
                            f"{_collection_name(collection_id)}.", style="green")
-        return
+        if not quiet:
+            return
     if waiting:
         console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
                        f"decision in {_collection_name(collection_id)}\n")
         console.print(queue_table(waiting))
         console.print()
-    if held:
+    if quiet:
+        total = sum(len(g.rows) for g in quiet)
+        console.print(f"[dim]Received while turned off ({total})[/dim]")
+        for g in quiet:
+            console.print(f"[dim]  {g.line}[/dim]", markup=True)
+        console.print()
+    if held or quiet:
         labels = {_held_label(h): h for h in held}
         labels.update({_label(s): s for s in waiting})
+        labels.update({g.line: g for g in quiet})
         picked = common.select("Which one?", list(labels), flag_hint=_FLAG_HINT)
         if picked is None:
             return
         chosen = labels[picked]
+        if isinstance(chosen, filing_queue.TurnedOffGroup):
+            turned_off_flow(chosen)
+            return
         if isinstance(chosen, filing_queue.HeldRow):
             held_flow(chosen)
             return
@@ -819,6 +835,19 @@ def queue_flow(collection_id: str) -> None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
     _decide_on(state, offer=_offers(state, supply_scoped))
+
+
+def turned_off_flow(group) -> None:
+    """One dataset's supplies received while turned off, each saying what
+    can be done (REQ-PIPE-179 criterion 34) - then the held supply's own
+    place-or-reject flow."""
+    if len(group.rows) == 1:
+        held_flow(group.rows[0])
+        return
+    labels = {f"{_held_label(r)}": r for r in group.rows}
+    picked = common.select(f"{group.line}: which one?", list(labels), flag_hint=_FLAG_HINT)
+    if picked is not None:
+        held_flow(labels[picked])
 
 
 def held_table(held) -> Table:
@@ -832,6 +861,9 @@ def held_table(held) -> Table:
 def _held_label(h) -> str:
     """Said as a slot row is - the dataset id and when it arrived - under the
     group's own heading (#188, cli-ux M4)."""
+    if getattr(h, "turned_off", False):
+        return (f"Received while turned off: {h.dataset_id} (the supply that arrived "
+                f"{arrived(h.supply)})")
     return f"Held, no period yet: {h.dataset_id} (the supply that arrived {arrived(h.supply)})"
 
 

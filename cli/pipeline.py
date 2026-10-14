@@ -234,6 +234,11 @@ def _say_pass(report) -> None:
     line = schedule_ended.pass_line(report.schedule_ended)
     if line:
         console.print(line, style="yellow")
+    # REQ-PIPE-179 criterion 26: apart again, and quietly - not a state
+    # needing a person.
+    line = schedule_ended.turned_off_pass_line(report.turned_off)
+    if line:
+        console.print(line, style="dim")
     if report.refiled:
         console.print(f"{len(report.refiled)} supply/supplies held for an ended schedule were "
                       f"filed now that dates cover them.", style="green")

@@ -36,14 +36,37 @@ def raised_by_runs(conn, run_ids) -> tuple[int, int]:
 
     One aggregate, never a fetch of the supplies (NFR: at thirty datasets the
     summary is a count, not a list)."""
+    return _labelled_by_runs(conn, run_ids).get("schedule ended", (0, 0))
+
+
+def turned_off_by_runs(conn, run_ids) -> tuple[int, int]:
+    """(datasets, supplies) these runs held while their dataset was turned off
+    (REQ-PIPE-179 criterion 26)."""
+    return _labelled_by_runs(conn, run_ids).get("turned off", (0, 0))
+
+
+def _labelled_by_runs(conn, run_ids) -> dict[str, tuple[int, int]]:
+    """The holds these runs raised, counted by the label worked out from
+    configuration as it stands (REQ-PIPE-179 criterion 18, amending
+    REQ-PIPE-154 criterion 6)."""
     ids = list(run_ids)
     if not ids:
-        return (0, 0)
-    row = conn.execute(
-        f"SELECT count(DISTINCT dataset_id), count(*) FROM {supply_holds.TABLE} "
-        "WHERE (reason->>'schedule_ended')::boolean IS TRUE "
-        f"AND raised_by IN ({', '.join('?' for _ in ids)})", ids).fetchall()[0]
-    return (int(row[0]), int(row[1]))
+        return {}
+    rows = conn.execute(
+        f"SELECT {supply_holds._COLUMNS} FROM {supply_holds._from()} "
+        f"WHERE h.raised_by IN ({', '.join('?' for _ in ids)})", ids).fetchall()
+    return supply_holds.label_counts(supply_holds._held_from(r) for r in rows)
+
+
+def turned_off_pass_line(counts: tuple[int, int]) -> str | None:
+    """The pass summary's line for REQ-PIPE-179 criterion 26, or None."""
+    datasets, supplies = counts
+    if not supplies:
+        return None
+    return (f"{supplies} {'supply' if supplies == 1 else 'supplies'} across {datasets} "
+            f"{'dataset' if datasets == 1 else 'datasets'} received while turned off - "
+            f"held, not needing a person; place, reject, or change effective_to/"
+            f"effective_from in {supply_holds.SCHEDULE_FILE} if the period should be owed.")
 
 
 def pass_line(counts: tuple[int, int]) -> str | None:

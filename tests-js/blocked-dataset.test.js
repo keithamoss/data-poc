@@ -149,3 +149,14 @@ describe("which open blocker leaves the period without a run of its own", () => 
     expect(w.rollup([{columns: [{status: "green", checks: []}], waitingBlocker: HELD}])).toBe("red");
   });
 });
+
+// REQ-PIPE-179 criterion 24: a supply received while its dataset is turned
+// off is not a state needing a person, so it never blocks the dataset.
+describe("a supply received while turned off", () => {
+  it("does not block or redden its dataset", () => {
+    const w = load();
+    const off = {...HELD, turnedOff: true};
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2027-01-01", SOURCE(off))).toBeNull();
+    expect(w.blockerOpenInPlaceOn("cp-case-workers", "2027-01-01", SOURCE(HELD))).not.toBeNull();
+  });
+});

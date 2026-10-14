@@ -138,6 +138,12 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
     # check against the file (post-build-review #22).
     per_dataset: list[tuple[int, str, object]] = []
     for dataset_id in _datasets_on(calendar_name):
+        if off_for_good(dataset_id):
+            # REQ-PIPE-179 criterion 25: a dataset turned off for good owes
+            # no more dates, so it never drives the minimum. A temporary
+            # gap needs nothing here - its periods are not owed, so only
+            # those it owes once back on are counted.
+            continue
         owed = [p for p in schedule.periods_for_dataset(dataset_id) if p.expected]
         per_dataset.append((len([p for p in owed if p.date > as_of]),
                              dataset_id, owed[-1] if owed else None))
@@ -183,8 +189,8 @@ def exhausted_datasets(as_of: date) -> dict[str, str]:
             calendar = schedule.calendar_for_dataset(dataset.dataset_id)
         except schedule.NoCalendarAgreed:
             continue            # owes nothing, so cannot be exhausted
-        if calendar.current.is_cadence_rule:
-            continue
+        if calendar.current.is_cadence_rule or off_for_good(dataset.dataset_id):
+            continue    # a turn-off for good is not an exhausted schedule (criterion 25)
         try:
             ends = schedule_ends_on(dataset.dataset_id)
         except (ValueError, KeyError, FileNotFoundError):
@@ -196,6 +202,26 @@ def exhausted_datasets(as_of: date) -> dict[str, str]:
         if ends is not None and as_of >= ends:
             out[dataset.dataset_id] = calendar.name
     return out
+
+
+def off_for_good(dataset_id: str, agreement=None) -> bool:
+    """Whether the dataset's newest turn-off has no end (REQ-PIPE-179
+    criterion 5) - whenever it starts. Read from the latest effective date
+    any version it reads takes effect on, a day past which nothing later
+    can bring it back."""
+    from datetime import timedelta
+
+    from qa_tools.common import agreement as agreement_mod
+
+    agr = schedule._agreement(agreement)
+    if not agr.ever_turned_off(dataset_id):
+        return False
+    entry = agr.dataset(dataset_id)
+    latest = max([v.effective_from for v in entry.participation + agr.defaults_for(dataset_id)]
+                 + [v.effective_to for v in entry.participation + agr.defaults_for(dataset_id)
+                    if v.effective_to])
+    standing = agr.standing_on(dataset_id, latest + timedelta(days=1))
+    return standing.state == agreement_mod.TURNED_OFF and standing.turned_off.until is None
 
 
 def schedule_ends_on(dataset_id: str) -> date | None:

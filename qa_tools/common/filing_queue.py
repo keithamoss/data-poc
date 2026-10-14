@@ -353,6 +353,40 @@ class HeldRow:
     #: Held because its dataset is refused by the agreement backstop
     #: (REQ-PIPE-173) - it files itself once that is put right.
     agreement_refused: bool = False
+    #: Received while its dataset is turned off (REQ-PIPE-179 criterion 34):
+    #: listed quietly, apart, and not counted as waiting on a decision.
+    turned_off: bool = False
+
+
+@dataclass(frozen=True)
+class TurnedOffGroup:
+    """One dataset's supplies received while turned off - ONE ROW PER
+    DATASET (REQ-PIPE-179 criterion 34 and its SCALE NFR: a supplier still
+    sending daily files adds one row, not 365 a year)."""
+
+    dataset_id: str
+    dataset_name: str
+    rows: tuple[HeldRow, ...]
+
+    @property
+    def line(self) -> str:
+        from qa_tools.common import asset_time
+
+        dated = [r.received_at for r in self.rows if r.received_at is not None]
+        earliest = (f", earliest {asset_time.localise(min(dated)).strftime('%-d %B %Y')}"
+                    if dated else "")
+        return f"{self.dataset_id} - {len(self.rows)} received while turned off{earliest}"
+
+
+def turned_off_groups(held) -> list[TurnedOffGroup]:
+    """The held rows received while turned off, one group per dataset, in
+    dataset order - each group's supplies oldest receipt first."""
+    by: dict[str, list[HeldRow]] = {}
+    for row in held:
+        if row.turned_off:
+            by.setdefault(row.dataset_id, []).append(row)
+    return [TurnedOffGroup(ds, rows[0].dataset_name, tuple(rows))
+            for ds, rows in sorted(by.items())]
 
 
 def held_operations(row: HeldRow) -> tuple[str, ...]:
@@ -383,7 +417,7 @@ def held_in(conn: supply_db.SupplyConnection, collection_id: str) -> list[HeldRo
             supply=h.supply_id, received_at=at,
             received_text=display_time.format_instant(at) if at else "an unknown time",
             why=h.describe(), schedule_ended=h.schedule_ended,
-            agreement_refused=h.agreement_refused,
+            agreement_refused=h.agreement_refused, turned_off=h.turned_off,
             files=tuple(contest.files) if contest is not None else ()))
     return sorted(rows, key=lambda r: (r.received_at is None, r.received_at or 0, r.supply))
 

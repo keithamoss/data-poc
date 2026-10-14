@@ -725,3 +725,133 @@ class TestACorrectionOfATurnOffReverts:
         cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [
             ("dataset cp-clients participation 2023-01-01", {}, {"claim_window": "10d"})])
         assert _clients_version(cal)["effective_to"] == "2025-03-31"
+
+
+# ---- runway and the overlap gate (criteria 25 and 31) -----------------------
+
+class TestRunway:
+    def test_off_for_good_is_not_an_exhausted_schedule(self, using):
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0])
+        using(doc)
+        assert runway.off_for_good("cp-clients")
+        assert "cp-clients" not in runway.exhausted_datasets(date(2026, 10, 14))
+        assert runway.calendar_runway("quarterly", date(2026, 10, 14)).driving_dataset \
+            != "cp-clients"
+
+    def test_a_temporary_gap_counts_only_what_is_owed_once_back_on(self, using):
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2026-10-31")
+        _back_on(doc, "cp-clients", "2027-10-15")
+        using(doc)
+        assert not runway.off_for_good("cp-clients")
+        got = runway.calendar_runway("quarterly", date(2026, 10, 14))
+        assert (got.driving_dataset, got.remaining) == ("cp-clients", 1)
+
+
+class TestTheOverlapGate:
+    """Criterion 31, all three clauses (the requirement's 'amendments
+    nobody else states' NFR)."""
+
+    def _overlaps(self, **back):
+        from qa_tools.common import period_overlap
+
+        doc = _off_for_a_while()
+        _versions(doc, "cp-clients")[-1].update(back)
+        return period_overlap.overlaps_for("cp-clients", agreement=agreement.from_doc(doc))
+
+    def test_a_gap_alone_overlaps_nothing(self):
+        assert self._overlaps() == []
+
+    def test_the_first_owed_slot_after_a_gap_is_checked_against_the_last_before(self):
+        """Back on with a 300-day window, 2026-Q1 opens 7 April 2025 -
+        before 2025-Q1 closes on 17 April."""
+        found = self._overlaps(claim_window="300d")
+        pairs = {(o.earlier, o.later) for o in found}
+        assert ("2025-Q1", "2026-Q1") in pairs
+        assert not any(o.earlier in ("2025-Q2", "2025-Q3", "2025-Q4") for o in found), \
+            "a pair inside one gap is skipped"
+        [o] = [o for o in found if o.later == "2026-Q1"]
+        assert o.on_time_until == _at("2025-05-01") - timedelta(days=14)
+
+
+class TestNotAStateNeedingAPerson:
+    """Criteria 24 and 26: counted apart, one line per label, and never
+    among what needs a person."""
+
+    def test_the_tally(self, conn, using):
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tc1", GAP)
+        counted = supply_holds.tally(conn)
+        assert counted.turned_off == (1, 1)
+        assert counted.needing_a_person == counted.total - 1
+        assert "received while turned off - not counted as needing a person" \
+            in counted.summary()
+
+    def test_the_pass_counts_them_apart(self, conn, using):
+        from qa_tools.common import schedule_ended
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tc2", GAP)
+        assert schedule_ended.turned_off_by_runs(conn, ["run_x"]) == (1, 1)
+        assert schedule_ended.raised_by_runs(conn, ["run_x"]) == (0, 0)
+        assert "received while turned off" in schedule_ended.turned_off_pass_line((1, 1))
+
+    def test_the_outstanding_list_shows_it_quietly(self, conn, using):
+        from qa_tools.common import outstanding
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tc3", GAP)
+        [item] = [i for i in outstanding._from_holds(conn) if i.dataset_id == "cp-clients"]
+        assert item.severity == outstanding.INFORMATIONAL and not item.blocking
+
+    def test_the_page_is_told_it_is_this_kind(self, conn, using):
+        from qa_tools.common import dataset_blockers
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tc4", GAP)
+        [b] = [b for b in dataset_blockers._holds(conn) if b.supply == "cp-clients@tc4"]
+        assert b.as_record()["turnedOff"] is True and b.as_record()["scheduleEnded"] is False
+
+
+class TestTheQuietGroup:
+    """Criterion 34: one row per dataset, opening to its supplies."""
+
+    @staticmethod
+    def _row(ds, supply, day, off=True):
+        from qa_tools.common import filing_queue
+
+        return filing_queue.HeldRow(
+            dataset_id=ds, dataset_name=ds, supply=supply, received_at=_at(day),
+            received_text=day, why="", schedule_ended=False, turned_off=off)
+
+    def test_one_row_per_dataset_counting_supplies_and_naming_the_earliest(self):
+        from qa_tools.common import filing_queue
+
+        rows = [self._row("cp-clients", f"cp-clients@{d}", f"2025-06-0{d}") for d in (3, 1, 2)]
+        rows += [self._row("cp-carers", "cp-carers@1", "2025-07-01"),
+                 self._row("cp-carers", "cp-carers@plain", "2025-07-02", off=False)]
+        groups = filing_queue.turned_off_groups(rows)
+        assert [g.line for g in groups] == [
+            "cp-carers - 1 received while turned off, earliest 1 July 2025",
+            "cp-clients - 3 received while turned off, earliest 1 June 2025"]
+
+    def test_the_queue_lists_them_last_and_apart(self, conn, using, monkeypatch):
+        from cli import filing_tui
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tq1", GAP)
+        printed = []
+        monkeypatch.setattr(filing_tui.console, "print",
+                            lambda *a, **k: printed.append(" ".join(str(x) for x in a)))
+        monkeypatch.setattr(filing_tui.common, "select", lambda *a, **k: None)
+        filing_tui.queue_flow("child-protection")
+        text = "\n".join(printed)
+        assert "Received while turned off (1)" in text
+        assert "cp-clients - 1 received while turned off, earliest 1 June 2025" in text
+        assert "cp-clients (the supply" not in text.split("Received while turned off")[0], \
+            "not listed in the held group above it"

@@ -360,9 +360,15 @@ def _from_holds(conn=None) -> list[Item]:
             "ORDER BY dataset_id, delivery, received_instant, receipt_sequence").fetchall()}
     for held in held_supplies:
         agency, collection = _scope_of(held.dataset_id)
+        # RECEIVED WHILE TURNED OFF (REQ-PIPE-179 criterion 24, amending
+        # REQ-PIPE-064 criterion 5): listed, quietly, and NOT counted among
+        # the states needing a person.
+        quiet = held.turned_off
         items.append(Item(
-            kind=HELD_SUPPLY, severity=NEEDS_ACTION, blocking=True,
-            headline=f"{held.dataset_id} has a supply nothing could place",
+            kind=HELD_SUPPLY, severity=INFORMATIONAL if quiet else NEEDS_ACTION,
+            blocking=not quiet,
+            headline=(f"{held.dataset_id} sent a supply while turned off" if quiet else
+                      f"{held.dataset_id} has a supply nothing could place"),
             detail=(f"{held.describe()} Every other dataset in the same delivery "
                      f"was processed as usual."),
             agency_id=agency, collection_id=collection, dataset_id=held.dataset_id,

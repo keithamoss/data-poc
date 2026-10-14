@@ -392,10 +392,18 @@ class Tally:
     #: (datasets, supplies) held because their schedule ended (REQ-PIPE-154
     #: criterion 6) - counted apart, since the fix is configuration.
     schedule_ended: tuple[int, int] = (0, 0)
+    #: (datasets, supplies) received while turned off (REQ-PIPE-179
+    #: criteria 24 and 26) - counted apart, and NOT as needing a person.
+    turned_off: tuple[int, int] = (0, 0)
 
     @property
     def total(self) -> int:
         return sum(n for _, n in self.by_dataset)
+
+    @property
+    def needing_a_person(self) -> int:
+        """Every hold but those received while turned off (criterion 24)."""
+        return self.total - self.turned_off[1]
 
     @property
     def datasets(self) -> tuple[str, ...]:
@@ -403,14 +411,20 @@ class Tally:
 
     @property
     def needs_action(self) -> bool:
-        return self.total > 0
+        return self.needing_a_person > 0
 
     def summary(self) -> str:
         if not self.total:
             return "No supply is currently held."
-        line = (f"{self.total} supply/supplies held across "
+        off_datasets, off_supplies = self.turned_off
+        quiet = (f" {off_supplies} {'supply' if off_supplies == 1 else 'supplies'} across "
+                 f"{off_datasets} dataset(s) received while turned off - not counted as "
+                 f"needing a person." if off_supplies else "")
+        if not self.needing_a_person:
+            return "No supply held needs a person." + quiet
+        line = (f"{self.needing_a_person} supply/supplies held across "
                 f"{len(self.by_dataset)} dataset(s) - {', '.join(self.datasets)}. "
-                f"Each needs somebody to resolve it.")
+                f"Each needs somebody to resolve it.") + quiet
         datasets, supplies = self.schedule_ended
         if supplies:
             line += (f" {supplies} of them, across {datasets} dataset(s), because the "
@@ -570,12 +584,25 @@ def tally(conn) -> Tally:
     by_kind = conn.execute(
         f"SELECT kind, count(*) FROM {TABLE} WHERE resolved_by IS NULL "
         "GROUP BY kind ORDER BY kind").fetchall()
-    ended = conn.execute(
-        f"SELECT count(DISTINCT dataset_id), count(*) FROM {TABLE} WHERE resolved_by IS NULL "
-        "AND (reason->>'schedule_ended')::boolean IS TRUE").fetchall()[0]
+    # THE LABELS FROM CONFIGURATION AS IT STANDS (REQ-PIPE-179 criterion
+    # 18), so counted from the outstanding holds rather than their recorded
+    # reasons - one line per label, never one per supply (its SCALE NFR).
+    labels = label_counts(outstanding(conn))
     return Tally(by_dataset=tuple((row[0], row[1]) for row in by_dataset),
                   by_kind=tuple((row[0], row[1]) for row in by_kind),
-                  schedule_ended=(int(ended[0]), int(ended[1])))
+                  schedule_ended=labels.get("schedule ended", (0, 0)),
+                  turned_off=labels.get("turned off", (0, 0)))
+
+
+def label_counts(holds) -> dict[str, tuple[int, int]]:
+    """{label: (datasets, supplies)} for these holds, by the label worked
+    out from configuration as it stands (REQ-PIPE-179 criterion 18)."""
+    by: dict[str, tuple[set, int]] = {}
+    for h in holds:
+        datasets, n = by.get(h.label.label, (set(), 0))
+        datasets.add(h.dataset_id)
+        by[h.label.label] = (datasets, n + 1)
+    return {label: (len(ds), n) for label, (ds, n) in by.items()}
 
 
 def arrival_key_of(supply: str) -> str:

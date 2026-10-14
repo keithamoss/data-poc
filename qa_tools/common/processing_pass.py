@@ -261,6 +261,9 @@ class PassReport:
     #: (REQ-PIPE-154 criterion 6), and what it re-filed once dates covered
     #: one (criterion 7).
     schedule_ended: tuple[int, int] = (0, 0)
+    #: (datasets, supplies) this pass held while turned off (REQ-PIPE-179
+    #: criterion 26), counted apart as schedule-ended holds are.
+    turned_off: tuple[int, int] = (0, 0)
     refiled: list = field(default_factory=list)
     #: Datasets the agreement backstop refused this pass (REQ-PIPE-173
     #: criterion 4), each held rather than processed.
@@ -512,6 +515,7 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         from qa_tools.common import schedule_ended
         with supply_db.connect(read_only=True, label="mothman:process") as conn:
             report.schedule_ended = schedule_ended.raised_by_runs(conn, report.processed)
+            report.turned_off = schedule_ended.turned_off_by_runs(conn, report.processed)
     except Exception as exc:  # noqa: BLE001 - the holds are durable; the next pass retries
         failed("schedule-ended holds", exc)
     # OWED WORK (criterion 11): re-evaluations and re-checks alike, each

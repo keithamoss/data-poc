@@ -85,17 +85,44 @@ def overlaps_for(dataset_id: str, until: date | None = None,
         periods = [p for p in slots._calendar_periods(dataset_id, bound, agreement)
                    if p.date <= bound]
 
+    agr = schedule._agreement(agreement)
+    turned_off = agr.ever_turned_off(dataset_id)
     found: list[Overlap] = []
     previous = None
+    #: Inside a turned-off gap: (the last owed period before it, when its
+    #: slot closes) - criterion 14's closing instant (REQ-PIPE-179 c31).
+    gap = None
     for period in periods:
         instants = slots.slot_instants(dataset_id, period.date, agreement)
+        off = turned_off and agr.standing_on(dataset_id, period.date).state == "turned off"
+        if gap is not None and off:
+            previous = (period, instants)
+            continue        # both inside one gap: no slot either side to overlap
+        if gap is not None:
+            # THE FIRST OWED SLOT AFTER A TEMPORARY GAP opens after the last
+            # owed slot before it closes (REQ-PIPE-179 criterion 31).
+            last, closes = gap
+            gap = None
+            if previous is not None and not instants.claim_opens_at > closes:
+                found.append(Overlap(dataset_id=dataset_id, earlier=last.name,
+                                     later=period.name, on_time_until=closes,
+                                     later_claim_opens=instants.claim_opens_at))
+            previous = (period, instants)
+            continue
         if previous is not None:
             earlier, earlier_instants = previous
             on_time_until = earlier_instants.due_at + earlier_instants.grace
+            # The last owed period before a gap is checked against the
+            # closing instant criterion 14 gives it - the gap's first
+            # period's own opening, which slot_instants resolves so.
             if not instants.claim_opens_at > on_time_until:
                 found.append(Overlap(dataset_id=dataset_id, earlier=earlier.name,
                                      later=period.name, on_time_until=on_time_until,
                                      later_claim_opens=instants.claim_opens_at))
+            if off:
+                gap = (earlier, instants.claim_opens_at)
+        elif off:
+            gap = (period, instants.claim_opens_at)
         previous = (period, instants)
     return found
 

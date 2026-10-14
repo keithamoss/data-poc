@@ -63,6 +63,9 @@ class Blocker:
     #: (REQ-PIPE-173) - the refusal's own hold, never "another blocker"
     #: beside it (delivery-critic on (f)-(i), finding 1).
     agreement_refused: bool = False
+    #: Received while its dataset is turned off (REQ-PIPE-179 criterion 24):
+    #: NOT a state needing a person, so it never blocks or reddens the page.
+    turned_off: bool = False
     #: How a contested pair was settled (REQ-PIPE-194 criteria 10 and 13):
     #: {"actor", "at", "reason", "arrivalRunId", "files": [{"filename",
     #: "receivedAt", "outcome", "toPeriod", "supplyId", "runId"}]}, files in
@@ -92,6 +95,7 @@ class Blocker:
                 "delivery": self.delivery, "rejected": self.rejected,
                 "scheduleEnded": self.schedule_ended,
                 "agreementRefused": self.agreement_refused,
+                "turnedOff": self.turned_off,
                 "settlement": self.settlement, "supersededBy": self.superseded_by,
                 # WHERE IT IS SETTLED, for the page's own wording on any date
                 # (REQ-PIPE-194 criteria 1 and 14, #171).
@@ -137,7 +141,8 @@ def _holds(db) -> list[Blocker]:
             resolved_at=(_iso(effective_at or held.resolved_at)
                          if held.resolved_by is not None else None),
             reason=held.describe(), delivery=held.delivery,
-            schedule_ended=held.schedule_ended, agreement_refused=held.agreement_refused))
+            schedule_ended=held.schedule_ended, agreement_refused=held.agreement_refused,
+            turned_off=held.turned_off))
     return out
 
 

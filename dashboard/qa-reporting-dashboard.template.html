@@ -5225,9 +5225,11 @@ function blockersFor(datasetId, source){
   const src = outstandingSource(source);
   return ((src && src.blockers) || []).filter(b=> b.datasetId === datasetId);
 }
+// A SUPPLY RECEIVED WHILE ITS DATASET IS TURNED OFF is not a state needing a
+// person (REQ-PIPE-179 criterion 24), so it never blocks or reddens a dataset.
 function blockersOpenInPlaceOn(datasetId, inPlaceOnDateStr, source){
-  return blockersFor(datasetId, source).filter(b=>
-    assetDateStrOf(b.openedAt) <= inPlaceOnDateStr
+  return blockersFor(datasetId, source).filter(b=> !b.turnedOff
+    && assetDateStrOf(b.openedAt) <= inPlaceOnDateStr
     && (!b.resolvedAt || assetDateStrOf(b.resolvedAt) > inPlaceOnDateStr));
 }
 // The first open one, carrying how many there are of its kind - a
