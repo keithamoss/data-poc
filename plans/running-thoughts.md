@@ -5379,3 +5379,7 @@ could never have computed it), and it belongs with batch 5's check work.
     which calendar, what changes in its second version (anchor months, claim
     window, day of month), when it takes effect inside the synthetic
     history, and which scenarios it should exercise.
+    Keith, 2026-10-15: keep this SEPARATE from REQ-GEN-205, whose
+    correction adds a past-dated calendar version - 205 is about
+    corrections; a deliberate second calendar version is its own
+    conversation.

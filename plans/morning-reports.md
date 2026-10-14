@@ -1743,3 +1743,11 @@ one or more component tags, and a date.
         decided supplies listed too; `supply slots` shows the count) and
         REQ-DASH-230 (the supply-history last column headed 'How it got
         here'; a moved supply's 'Late at the time' stays in Timing).
+    - **KEITH, 2026-10-15 ~07:30, before leaving for work**: order A (#196,
+      the REQ-DASH-175 critic's defects), B (the approved amendments and the
+      Q16-Q23 fixes), C (REQ-GHUB-229, REQ-DASH-230), then D (sprints 5, 6,
+      7). Keep running-thoughts #97 (a deliberate second calendar version)
+      SEPARATE from REQ-GEN-205's correction. While he is away: STOP AT HIS
+      CALLS - build only what needs no decision of his; where one is needed,
+      that item waits (a question queued here) rather than being built
+      PROVISIONAL.
