@@ -1473,17 +1473,59 @@ function cadenceLabel(cadence){
   // config file, not an instant, and a reader checking this tile
   // against the contract is comparing those two strings.
   // A FOLLOWING-PERIOD DATASET (REQ-PIPE-167) is due days before each
-  // date the calendar names (post-build-review #142).
-  const ahead = cadence.days_before
-    ? `due ${cadence.days_before} day${cadence.days_before===1?"":"s"} before each date, ` : "";
-  const byTime = `${ahead}by ${cadence.expected_time}`;
+  // date the calendar names (post-build-review #142), in the words Keith
+  // chose (REQ-DASH-182 criterion 7).
+  const db = cadence.days_before;
+  const byTime = !db ? `by ${cadence.expected_time}`
+    : db === 1 ? `by ${cadence.expected_time} the day before`
+    : `by ${cadence.expected_time}, ${db} days before each date`;
   if(cadence.type==="daily") return `Daily, ${byTime}`;
   if(cadence.type==="weekly") return `Weekly (${WEEKDAY_NAMES[cadence.weekday]}), ${byTime}`;
-  if(cadence.type==="quarterly"){
-    const months = cadence.anchor_months.map(m=>MONTH_NAMES[m-1]).join("/");
-    return `Quarterly (${months}, day ${cadence.day_of_month}), ${byTime}`;
+  // ANY NUMBER OF MONTHS, AUTHORED OR NOT (REQ-DASH-182 criteria 8 and 11):
+  // the dataset's own months, a frequency word for how many, and 'various
+  // days' where its periods fall on different days - never blank.
+  const months = cadence.anchor_months || [];
+  if(months.length){
+    const day = cadence.day_of_month == null ? "various days" : `day ${cadence.day_of_month}`;
+    return `${frequencyWord(months.length)} (${months.map(m=>MONTH_NAMES[m-1]).join(", ")}, ${day}), ${byTime}`;
   }
   return "";
+}
+const FREQUENCY_WORDS = {1:"Yearly", 2:"Twice a year", 4:"Quarterly", 12:"Monthly"};
+function frequencyWord(n){ return FREQUENCY_WORDS[n] || `${n} times a year`; }
+// EVERY OWED-NOTHING PERIOD'S WORDS, FROM ONE PLACE (REQ-DASH-182 criterion
+// 14): the supply-history rows, the standing-in heading, REQ-DASH-180's
+// turned-off rows and REQ-DASH-209's 'Not owed' group all read this, kind
+// and reason separated by the page's em dash. A participation row recurs,
+// so its label is generated from the months and the authored reason is
+// shown once, on the SLA tile (criterion 2). Raw text: escape where shown.
+const OWED_NOTHING_WORD = {participation:"Not owed", not_expected:"Not expected",
+                           turned_off:"Turned off"};
+function owedNothingLabel(entry){
+  const word = OWED_NOTHING_WORD[entry.kind] || "Not owed";
+  const detail = entry.kind === "participation"
+    ? `outside its agreed months (${(entry.months || []).map(m=>MONTH_NAMES[m-1]).join(", ")})`
+    : (entry.reason || "");
+  return {word, label: `${word} — ${detail}`, reason: entry.reason || ""};
+}
+// THE DELIVERY TIME IN FORCE ON THE DATE ON SHOW (REQ-DASH-182 criteria 3
+// and 11): the newest participation version dated on or before it, as the
+// build resolved it; before the first, the dataset is not owed yet.
+function slaInPlaceOn(d, dateStr){
+  const sla = (d && d.sla) || {};
+  if(sla.owesFrom && dateStr && dateStr < sla.owesFrom) return {notOwedYet: sla.owesFrom};
+  let found = null;
+  (sla.versions || []).forEach(v=>{ if(!dateStr || v.from <= dateStr) found = v; });
+  return found ? {cadence: found.cadence, reason: found.reason || null}
+    : {cadence: sla.cadence, reason: null};
+}
+function notOwedYetText(owesFrom){ return `Not owed yet — owes supplies from ${fmtDay(owesFrom)}`; }
+function slaTileHtml(d, dateStr){
+  const s = slaInPlaceOn(d, dateStr);
+  const value = s.notOwedYet ? notOwedYetText(s.notOwedYet) : (s.cadence ? cadenceLabel(s.cadence) : "");
+  const why = s.reason
+    ? `<div class="sla-why" style="color:var(--ink-faint); font-size:12px; margin-top:4px; line-height:1.4;">${escHtml(s.reason)}</div>` : "";
+  return `<div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${escHtml(value)}</div>${why}</div>`;
 }
 // A PERMISSIVE FALLBACK FAILS IN THE DANGEROUS DIRECTION, and this one
 // did (REQ-DASH-070 criterion 10). Both of these used to map anything
@@ -2748,7 +2790,9 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
   // for the quarter. Without a recorded period, the run date stands in.
   const filedSlot = ((d.arrivalByRun || {})[effectiveRun.run_id] || {}).slot;
   const filedPeriodDate = filedSlot != null ? periodDateNamed(d.id, filedSlot) : null;
-  const staleInPlaceOn = (filedPeriodDate || effectiveRun.run_date) < periodStartDate(d.id, inPlaceOnDateStr);
+  // AGAINST THE NEWEST PERIOD IT OWES (REQ-DASH-182 criterion 15): a period
+  // owed nothing is not one the supply in place has missed.
+  const staleInPlaceOn = (filedPeriodDate || effectiveRun.run_date) < owedPeriodStart(d, inPlaceOnDateStr);
   const effectiveRunId = effectiveRun.run_id;
   const prevRunId = eligibleRuns.length>1 ? eligibleRuns[eligibleRuns.length-2].run_id : null;
   const eligibleRunIds = new Set(eligibleRuns.map(r=>r.run_id));
@@ -4157,6 +4201,13 @@ function standingInHeading(d){
   const on = d.promotionState.past ? fmtDay(d.promotionState.on) : null;
   if(st.kind === "substituted")
     return on ? `On ${escHtml(on)} this period stood on an earlier one` : "This period stands on an earlier one";
+  // AN OWED-NOTHING PERIOD NAMES ITS KIND (REQ-DASH-182 criterion 9), the
+  // row's own label, dated on a past date; its reason is in .promo-why.
+  const owed = owedNothingFor(d.id, st.period);
+  if(owed){
+    const label = escHtml(owedNothingLabel(owed).label);
+    return on ? `On ${escHtml(on)}: ${label}` : label;
+  }
   return on ? `On ${escHtml(on)} this period held an earlier period's data - nothing was owed for it`
     : "Nothing was owed for this period";
 }
@@ -4168,6 +4219,11 @@ function standingInSince(d){
   if(!since || !since.on) return "";
   const how = since.how === "replaced" ? "Since replaced" : "Since removed";
   return `<div class="promo-sub" data-testid="standing-in-since">${how}, as from ${escHtml(fmtDay(since.on))}</div>`;
+}
+function standingInWhy(d){
+  const st = d.promotionState.standingIn;
+  const owed = st.kind !== "substituted" ? owedNothingFor(d.id, st.period) : null;
+  return (owed && owed.reason) || st.reason || "";
 }
 function standingInDetail(d){
   const st = d && d.promotionState && d.promotionState.standingIn;
@@ -4192,7 +4248,7 @@ function standingInDetail(d){
         </div>
       </div>
       ${who}
-      ${st.reason ? `<div class="promo-why">${escHtml(String(st.reason))}</div>` : ""}
+      ${standingInWhy(d) ? `<div class="promo-why">${escHtml(String(standingInWhy(d)))}</div>` : ""}
       ${standingInSince(d)}
       ${standingInDrill(d)}
     </div>`;
@@ -6514,9 +6570,92 @@ function renderBlockedSupplyHistoryOnly(ds){
   const wrap = document.getElementById("supply-history-wrap");
   if(wrap) wrap.innerHTML = renderSupplyHistorySection(ds, [], null);
 }
+// EVERY PERIOD OWED NOTHING UP TO THE DATE ON SHOW, as runs (REQ-DASH-182
+// criteria 1, 2, 9 and 13): consecutive periods - adjacent in the
+// dataset's own calendar - that share a kind, a reason and the period
+// they stand on are one run, worded as gapText() words a gap, "so far"
+// while the run holds the period current on the date. The periods come
+// from the build (pipeline/owed_nothing.py); the page only filters by date.
+function owedNothingRuns(d, dateStr){
+  const list = ((d && d.owedNothing) || []).filter(e=> !dateStr || e.date <= dateStr);
+  if(!list.length) return [];
+  const seq = periodsFor(d.id) || [];
+  const index = new Map(seq.map((p, i)=> [p.period, i]));
+  const tl = d.promotionTimeline;
+  const inheritedFrom = period=>{
+    const st = tl ? newestOnOrBefore(tl.standing, dateStr || "9999-12-31", e=> e.period === period) : null;
+    return st && st.standingIn && st.standingIn.kind === "inherited" ? st.standingIn.standsOn : null;
+  };
+  const runs = [];
+  list.forEach(e=>{
+    const words = owedNothingLabel(e);
+    const from = inheritedFrom(e.period);
+    const last = runs[runs.length-1];
+    const adjacent = last && index.has(last.periods[last.periods.length-1]) && index.has(e.period)
+      && index.get(e.period) === index.get(last.periods[last.periods.length-1]) + 1;
+    if(adjacent && last.label === words.label && last.reason === words.reason && last.inheritedFrom === from){
+      last.periods.push(e.period);
+      last.lastDate = e.date;
+    } else {
+      runs.push({kind: e.kind, word: words.word, label: words.label, reason: words.reason,
+                 inheritedFrom: from, periods: [e.period], firstDate: e.date, lastDate: e.date});
+    }
+  });
+  const current = dateStr ? periodNameFor(d.id, dateStr) : null;
+  runs.forEach(r=>{
+    const n = r.periods.length;
+    r.current = current != null && r.periods[n-1] === current;
+    const unit = /^\d{4}-\d{2}-\d{2}$/.test(r.periods[0]) ? "day" : "period";
+    r.text = n === 1 ? r.label
+      : `${r.label}, ${fmtPeriodOrDay(r.periods[0])} to ${fmtPeriodOrDay(r.periods[n-1])} (${n} ${pluralize(n, unit)}${r.current ? " so far" : ""})`;
+  });
+  return runs;
+}
+function owedNothingFor(datasetId, period){
+  const raw = typeof rawRealDatasetById === "function" ? rawRealDatasetById(datasetId) : null;
+  return (raw && (raw.owedNothing || []).find(e=> e.period === period)) || null;
+}
+// THE PERIOD A DATASET'S CURRENT SUPPLY IS JUDGED AGAINST (REQ-DASH-182
+// criterion 15): the newest period on or before the date that it OWES. A
+// period it owes nothing in is not a cycle the supply in place has missed,
+// so a dataset between deliveries never reads stale for one.
+function owedPeriodStart(d, dateStr){
+  const skipped = new Set(((d && d.owedNothing) || []).map(e=> e.period));
+  const seq = periodsFor(d && d.id);
+  if(!skipped.size || !seq) return periodStartDate(d && d.id, dateStr);
+  let found = null;
+  for(const p of seq){
+    if(p.date > dateStr) break;
+    if(!skipped.has(p.period)) found = p;
+  }
+  return found ? found.date : periodStartDate(d.id, dateStr);
+}
+// NOTHING ON SHOW YET: NOT OWED, OR NOT SUPPLIED (REQ-DASH-182 criterion
+// 3). Before the dataset's first participation version nothing was owed,
+// so the heading says so and the body keeps only its way back - 'no QA run
+// within the accepted freshness window' would read as a supply missed.
+function neverSuppliedNotice(d, dateStr){
+  const back = `Pick a later date, or reset to the default, using the 📅 In place on control above.`;
+  const s = slaInPlaceOn(d, dateStr);
+  if(s.notOwedYet){
+    return `<div class="notice-exhausted" role="status" data-not-owed-yet>
+        <b>${escHtml(notOwedYetText(s.notOwedYet))}</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">${back}</div>
+      </div>`;
+  }
+  return `<div class="notice-exhausted" role="status">
+        <b>Nothing had been supplied by this date.</b>
+        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
+          There is no QA run within the accepted freshness window as of
+          <b style="display:inline">${fmtDay(dateStr)}</b>. ${back}
+        </div>
+      </div>`;
+}
 function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const waiting = blockerHistoryRows(ds.id, CURRENT_IN_PLACE_ON) + gapHistoryRows(ds, CURRENT_IN_PLACE_ON);
-  if(!cycles.length){
+  const raw = (typeof rawRealDatasetById === "function" && rawRealDatasetById(ds.id)) || ds;
+  const owed = owedNothingRuns(raw, CURRENT_IN_PLACE_ON);
+  if(!cycles.length && !owed.length){
     return waiting ? `<div class="supply-history"><div class="supply-history-head"><h3>Supply history</h3></div>${waiting}</div>` : "";
   }
   // A NULL as-of period MATCHES NOTHING, rather than matching every
@@ -6525,13 +6664,25 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   // history "Current cycle" - which is exactly the confident wrong
   // answer REQ-PIPE-106 exists to stop.
   const isCurrent = c => currentCycleStart!=null && c.cycleStart===currentCycleStart;
-  const current = cycles.find(isCurrent);
-  const older = cycles.filter(c=>!isCurrent(c));
+  const CURRENT_TAG = '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>';
+  // A PERIOD OWED NOTHING IS A LABEL-ONLY BLOCK (REQ-DASH-182 criterion 12):
+  // a cycle's heading with its kind label where a cycle counts deliveries,
+  // muted, no pill, no table - quieter than a red 'No supply' or an
+  // 'Accepted' tag, and never under 'Periods with no supply'.
+  const owedBlock = r => `
+    <div class="supply-cycle owed-nothing" data-owed-nothing="${escHtml(r.kind)}">
+      <div class="supply-cycle-label">
+        <b>${cycleLabel(ds.sla.cadence, r.firstDate, ds.id)}</b>
+        ${r.current ? CURRENT_TAG : ""}
+        <span style="color:var(--ink-faint);">${escHtml(r.text)}</span>
+        ${r.inheritedFrom ? `<span style="color:var(--ink-faint);">Inherited from ${escHtml(fmtPeriodName(r.inheritedFrom) || r.inheritedFrom)}</span>` : ""}
+      </div>
+    </div>`;
   const cycleBlock = c => `
     <div class="supply-cycle">
       <div class="supply-cycle-label">
         <b>${cycleLabel(ds.sla.cadence, c.cycleStart, ds.id)}</b>
-        ${isCurrent(c) ? '<span class="pill tag sm"><span class="ico"></span>Current cycle</span>' : ""}
+        ${isCurrent(c) ? CURRENT_TAG : ""}
         <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
       </div>
       <div class="overflow-x">
@@ -6541,15 +6692,26 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       </table>
       </div>
     </div>`;
+  // ONE NEWEST-FIRST LIST of cycles and owed-nothing runs (criteria 12 and
+  // 13); the current one is either a cycle or the run holding the current
+  // period (criterion 10), never shown twice.
+  const sortKey = c => c.cycleStart
+    || c.entries.reduce((newest, e)=> e.run_date > newest ? e.run_date : newest, "");
+  const items = [
+    ...cycles.map(c=> ({key: sortKey(c), current: isCurrent(c), html: ()=> cycleBlock(c)})),
+    ...owed.map(r=> ({key: r.firstDate, current: r.current, html: ()=> owedBlock(r)})),
+  ].sort((a, b)=> b.key.localeCompare(a.key));
+  const current = items.find(i=> i.current);
+  const older = items.filter(i=> !i.current);
   return `
     <div class="supply-history">
       <div class="supply-history-head">
         <h3>Supply history</h3>
-        ${older.length ? `<button class="link-btn" id="supply-history-toggle" type="button">Show all history (${cycles.length} cycles)</button>` : ""}
+        ${older.length ? `<button class="link-btn" id="supply-history-toggle" type="button">Show all history (${older.length} ${pluralize(older.length, "cycle")})</button>` : ""}
       </div>
       ${waiting}
-      ${current ? cycleBlock(current) : `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`}
-      ${older.length ? `<div id="supply-history-older" hidden>${older.map(cycleBlock).join("")}</div>` : ""}
+      ${current ? current.html() : `<div style="color:var(--ink-faint); font-size:13px;">No deliveries in the current cycle yet.</div>`}
+      ${older.length ? `<div id="supply-history-older" hidden>${older.map(i=> i.html()).join("")}</div>` : ""}
     </div>
   `;
 }
@@ -6744,14 +6906,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${arrivalBanner(ds)}
-      <div class="notice-exhausted" role="status">
-        <b>Nothing had been supplied by this date.</b>
-        <div style="color:var(--ink-muted); font-size:13.5px; margin-top:6px; max-width:70ch;">
-          There is no QA run within the accepted freshness window as of
-          <b style="display:inline">${fmtDay(CURRENT_IN_PLACE_ON)}</b>. Pick a
-          later date, or reset to the default, using the 📅 In place on control above.
-        </div>
-      </div>
+      ${neverSuppliedNotice(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
     `;
     // THE WAY BACK HAS TO EXIST ON THIS BRANCH TOO, and this is the
     // branch that needs it most: drilling back to the period that
@@ -6793,7 +6948,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     ${standingInDetail(ds)}
     ${promotionSplit(ds)}
     <div class="sla-strip">
-      <div class="sla-tile"><div class="k">SLA</div><div class="v" style="font-size:14px;">${cadenceLabel(ds.sla.cadence)}</div></div>
+      ${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
       ${ds.blocked ? `
       <div class="sla-tile"><div class="k">Waiting since</div><div class="v mono" title="When we received the supply that is waiting for a person">${ds.blocked.openedAt ? fmtInstant(ds.blocked.openedAt) : "—"} (${escHtml(blockerLabel(ds.blocked))})</div></div>
       <div class="sla-tile"><div class="k">Delivery format</div><div class="v" style="font-size:14px;">${ds.deliveryFormat}</div></div>

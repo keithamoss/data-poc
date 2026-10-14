@@ -33,6 +33,7 @@ from pipeline import (acknowledgements, closed_slots, corrections, excuses, file
                       promotion_timeline, red_promoted, slot_timeline)
 from qa_tools.common import schedule_ended
 from qa_tools.common import turned_off
+from pipeline import owed_nothing
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common import hierarchy, qa_store
 from qa_tools.cp import cp_common
@@ -594,7 +595,11 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
         "name": hierarchy.dataset_for_table(table).dataset_name,
         "provider": "Department for Child Protection and Family Support — Casework Management System",
         "deliveryFormat": "CSV (S3 drop)",
-        "sla": {"cadence": cadence},
+        # THE DELIVERY TIME IN FORCE ON EACH DATE, and every period owed
+        # nothing up to now (REQ-DASH-182): configuration only; the page
+        # compares the dates with the date on show.
+        "sla": {"cadence": cadence, **owed_nothing.sla_timeline(dataset_id)},
+        "owedNothing": owed_nothing.for_dataset(dataset_id, until=asset_time.now().date()),
         # WHETHER ANYBODY HAS AGREED A SCHEDULE FOR THIS DATASET
         # (REQ-PIPE-106). None for every dataset that has a calendar, so
         # the page renders nothing extra in the ordinary case - which is

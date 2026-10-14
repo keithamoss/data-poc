@@ -877,6 +877,57 @@ class TestTicketBadge:
         assert clean_page.locator("a.pill.tag[href*='github.com'][href*='issues']").count() == 0
 
 
+class TestOwedNothingPeriods:
+    """REQ-DASH-182 on the real built dashboard. Criterion 15 is a
+    REGRESSION GUARD (Keith, 2026-10-14, review Q2): it passes on today's
+    page, and asserts first that the date is one the dataset owes nothing
+    in, so it cannot pass vacuously."""
+
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-case-workers"}
+    #: The agency page carries each collection's table of datasets.
+    COLLECTION = {"tier": "agency", "agencyId": CP}
+    #: In a May quarter, after cp-case-workers' first supply.
+    ON = "2025-06-15"
+
+    def _owes_nothing_on(self, page, date):
+        return page.evaluate(
+            """(date) => {
+                const raw = rawRealDatasetById('cp-case-workers');
+                const period = periodNameFor('cp-case-workers', date);
+                const supplied = (raw.runs || []).some(r => r.run_date <= date);
+                return supplied && (raw.owedNothing || []).some(e => e.period === period);
+            }""", date)
+
+    def test_an_owed_nothing_quarter_is_not_stale_on_the_page(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.DS, in_place_on=self.ON)
+        assert self._owes_nothing_on(page, self.ON), "precondition: an owed-nothing date"
+        text = " ".join(page.locator("#view").inner_text().split())
+        assert "nothing has landed yet" not in text
+        assert "No data" not in page.locator(".view-head").inner_text()
+
+    def test_nor_in_its_collection_table(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.COLLECTION, in_place_on=self.ON)
+        assert self._owes_nothing_on(page, self.ON), "precondition: an owed-nothing date"
+        row = page.locator("tr", has_text="Case Workers").first
+        assert row.count() == 1
+        # THE WORDS, not the class: the timing pill "Not filed to a slot"
+        # shares .pill.nodata and says nothing about staleness.
+        text = " ".join(row.inner_text().split())
+        assert "No data" not in text and "nothing has landed yet" not in text
+
+    def test_the_period_is_a_quiet_row_and_the_tile_names_its_own_months(self, page,
+                                                                         built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.DS, in_place_on=self.ON)
+        row = page.locator("[data-owed-nothing]").first
+        assert "Not owed — outside its agreed months (Feb, Aug)" in row.inner_text()
+        assert row.locator(".pill:not(.tag)").count() == 0
+        tile = page.locator(".sla-tile", has_text="SLA").first.inner_text()
+        assert "Twice a year (Feb, Aug, day 1), by 09:00" in tile
+        assert "staffing register" in tile
+
+
 class TestAcknowledgementBadge:
     """REQ-PIPE-122 criterion 21, which replaced REQ-QAC-017's per-run
     /accept badge (retired by criterion 23): a promoted amber supply reads

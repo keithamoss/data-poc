@@ -25433,7 +25433,7 @@ requirements:
       reason, and its delivery time to be the one in force on the date I am looking at, so that I never read a deliberate gap
       as a missed supply or judge a supply against a due time that did not apply.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -25616,6 +25616,33 @@ requirements:
     - 'THE STANDING-IN HEADING NAMES THE KIND, DATED ON A PAST DATE (Keith, 2026-10-14, H3, option A; dashboard UX 5): criterion
       9 - ''On <date>: <kind label>'' on a past date, the kind label alone on the present, the reason in .promo-why. REJECTED
       (B) keeping today''s heading sentences with the kind label only in .promo-why.'
+    - 'THE PERIODS AND THE VERSIONS TRAVEL, NOT THE RULE (built 2026-10-15): pipeline/owed_nothing.py lists every calendar period up to the build''s date that the dataset owes nothing in - kind, reason, months - and each participation version''s resolved timing, from configuration through schedule and agreement; the page only compares their dates with the date on show. The same decision pipeline/slot_timeline.py and closed_slots.py record. REJECTED working out participation in the browser: a second implementation of the rule, free to drift.'
+    - 'THE TILE''S CADENCE IS agreement.cadence() WITH THE DATASET''S OWN MONTHS (built 2026-10-15): sla.versions carries one cadence per participation version in the shape the page already labels, its anchor_months narrowed to the months the dataset participates in; sla.cadence stays as the fallback and as cycleLabel()''s input. The muted reason is sent only while a version owes fewer months than the calendar has.'
+    - 'THE NOT_EXPECTED STALENESS WAS A REAL DEFECT, NOT ONLY A GUARD (found building criterion 15, 2026-10-15): the participation case passed on today''s page, but the page judged staleness against the start of the period on show whatever the dataset owed in it - so a not_expected period between deliveries read ''nothing has landed yet''. clipDatasetToInPlaceOn now judges against owedPeriodStart(), the newest period on or before the date that the dataset owes; the tests-js test failed before the change.'
+    - 'TWO WORDING CHANGES TO BUILT LABELS, AS SIGNED (criteria 7 and 11): months are separated by commas, ''Quarterly (Feb, May, Aug, Nov, day 1)'', where the page said ''Feb/May/Aug/Nov'', and a due-before supply reads ''by 09:00, 60 days before each date'' where it said ''due 60 days before each date, by 09:00''. tests-js/cadence.test.js updated to the signed wording.'
+    - '''SHOW ALL HISTORY (N CYCLES)'' NOW COUNTS WHAT IT HIDES (criterion 13): it used to count every cycle including the one on show. N is the number of hidden rows, owed-nothing rows included; the word stays ''cycles''.'
+    linked_tests:
+    - 'tests/test_owed_nothing.py'
+    - 'tests-js/owed-nothing.test.js'
+    - 'tests-js/cadence.test.js'
+    - 'tests/test_dashboard_e2e.py::TestOwedNothingPeriods'
+    implemented_by:
+    - 'pipeline/owed_nothing.py::for_dataset'
+    - 'pipeline/owed_nothing.py::sla_timeline'
+    - 'dashboard/qa-reporting-dashboard.template.html::cadenceLabel'
+    - 'dashboard/qa-reporting-dashboard.template.html::frequencyWord'
+    - 'dashboard/qa-reporting-dashboard.template.html::owedNothingLabel'
+    - 'dashboard/qa-reporting-dashboard.template.html::slaInPlaceOn'
+    - 'dashboard/qa-reporting-dashboard.template.html::slaTileHtml'
+    - 'dashboard/qa-reporting-dashboard.template.html::neverSuppliedNotice'
+    - 'dashboard/qa-reporting-dashboard.template.html::owedNothingRuns'
+    - 'dashboard/qa-reporting-dashboard.template.html::owedPeriodStart'
+    - 'dashboard/qa-reporting-dashboard.template.html::renderSupplyHistorySection'
+    - 'dashboard/qa-reporting-dashboard.template.html::standingInHeading'
+    - 'dashboard/qa-reporting-dashboard.template.html::standingInWhy'
+    - 'dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn'
+    evidence:
+    - '2026-10-15 overnight: tests/test_owed_nothing.py (10 tests) written first and seen to fail (no module); tests-js/owed-nothing.test.js (18 tests), its first 14 written first and 13 of them seen to fail, the not_expected staleness test among them; tests/test_dashboard_e2e.py::TestOwedNothingPeriods (3) on the real built dashboard, the criterion 15 guard asserting first that 2025-06-15 is a date cp-case-workers owes nothing in. The full gate result is in the commit that flips this to built.'
 
   - id: REQ-PIPE-111
     title: A delivery agreement's past changes only by a declared, approved correction

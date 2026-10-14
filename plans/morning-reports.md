@@ -1491,6 +1491,14 @@ one or more component tags, and a date.
         acknowledgement said to need a person, and no browser test: fixed
         test-first. Four questions (Q14-Q17) - the ticket-reopen promise is
         the one that matters.
+      - ~04:15 REQ-DASH-182 BUILT (sprint 4, first): every period a dataset
+        owes nothing in is a quiet row in its supply history, the SLA tile
+        names the dataset's own months and the delivery time in force on the
+        date on show, and before a dataset owes anything it reads "Not owed
+        yet". Building criterion 15's guard found a real defect beside it: a
+        not_expected period between deliveries read "nothing has landed yet";
+        fixed test-first. Two built labels reworded as signed (commas between
+        months; "by 09:00, 60 days before each date"). Gate in the commit.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose

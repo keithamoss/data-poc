@@ -533,7 +533,8 @@ def cadence(dataset_id: str, agreement: Agreement | None = None) -> dict:
     The calendar says the cycle - a daily rule, or the months and day its
     authored dates fall on - and the newest participation version says the
     expected time and grace. Which version applies on the date on show is
-    REQ-DASH-182's; until then each dataset carries one.
+    REQ-DASH-182's: pipeline/owed_nothing.sla_timeline() gives one of these
+    per participation version, and this stays the fallback.
     """
     from qa_tools.common import schedule
 
