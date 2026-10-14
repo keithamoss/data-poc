@@ -9410,7 +9410,20 @@ twice. It deliberately did not re-find the `TypeError`.
      the built page and drove it with Python Playwright (the Playwright MCP
      server did not connect this session). Each finding is still to be
      checked against the code before it is fixed; defects get a failing test
-     first.
+     first. FIXED 2026-10-15 except F3 (Keith's call, queued) - each defect
+     with a test that failed first: F1 and F4 in `tests-js/placed.test.js`
+     ("post-build-review #196"), F4's data in `tests/test_placements_page.py`
+     (`TestAPlacementLaterOvertaken`), F2 in `tests-js/turned-off.test.js`
+     ("criterion 14 as amended") and `tests/test_turn_off.py`
+     (`test_a_resolved_one_says_how_it_ended`). F5 and F6 were changed with
+     no test of their own (F5's date format is asserted by the existing tag
+     test, updated). F7: the promotion timeline's placedIn path now has a
+     test (`TestThePromotionTimelineSaysPlaced`). That test FAILED ONCE, in
+     the first run of the file that contained it, and has passed in eight
+     runs since; its error output was not captured, so the cause is unknown
+     and is recorded here rather than assumed away. Still untested: a
+     placement and an excuse on one row, the Outcome cell, and that the
+     builders embed `placements`.
      - **F1, DEFECT (criteria 3, 10)**: `blockerHistoryRows` checks
        `placedHoldNote()` before `rejected`/`supersededBy`, so a contested pair
        placed whole and later superseded or rejected reads "placed in ..." and

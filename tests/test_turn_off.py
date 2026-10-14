@@ -859,6 +859,39 @@ class TestNotAStateNeedingAPerson:
         [b] = [b for b in dataset_blockers._holds(conn) if b.supply == "cp-clients@tc4"]
         assert b.as_record()["turnedOff"] is True and b.as_record()["scheduleEnded"] is False
 
+    def test_a_resolved_one_says_how_it_ended(self, conn, using):
+        """REQ-DASH-180 criterion 14 as amended 2026-10-15 (post-build-review
+        #196 F2): the section lists every supply held while off, and a
+        resolved one says how it ended - so the page is told the decision
+        that ended it: its action, whether a person or the rule, who, when
+        and the period it went to."""
+        from qa_tools.common import dataset_blockers
+        from qa_tools.common import decision_log as dl
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tc5", GAP)
+        with conn.raw.transaction():
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id="child-protection-family-support", collection_id="child-protection",
+                    dataset_id="cp-clients", action=dl.REFILE, supply="cp-clients@tc5",
+                    actor="schedule drain", actor_kind=dl.RULE,
+                    effective_at="2026-02-03T01:00:00+00:00", from_slot=None, to_slot="2026-Q1",
+                    reason="owed again")) as decision_id:
+                supply_holds.resolve(conn, dataset_id="cp-clients", supply_id="cp-clients@tc5",
+                                     decision_id=decision_id)
+        [b] = [b for b in dataset_blockers._holds(conn) if b.supply == "cp-clients@tc5"]
+        ended = b.as_record()["ended"]
+        assert ended["action"] == dl.REFILE and ended["actorKind"] == dl.RULE
+        assert ended["toPeriod"] == "2026-Q1" and ended["at"].startswith("2026-02-03")
+
+    def test_an_open_one_has_no_ending(self, conn, using):
+        from qa_tools.common import dataset_blockers
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@tc6", GAP)
+        [b] = [b for b in dataset_blockers._holds(conn) if b.supply == "cp-clients@tc6"]
+        assert b.as_record()["ended"] is None
+
 
 class TestTheQuietGroup:
     """Criterion 34: one row per dataset, opening to its supplies."""

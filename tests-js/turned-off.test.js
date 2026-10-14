@@ -158,7 +158,7 @@ describe("a supply received while turned off (criterion 14)", () => {
     const el = w.document.createElement("div");
     el.innerHTML = w.receivedWhileOffLine("cp-clients", "2025-08-01", source);
     expect(el.textContent.replace(/\s+/g, " ").trim())
-      .toBe(`2 received while turned off, earliest ${w.fmtDay("2025-06-02")}`);
+      .toBe(`2 received while turned off, earliest ${w.fmtDay("2025-06-02")} · 2 still held`);
     expect(el.querySelector(".accepted-gaps-note")).not.toBeNull();
     expect(w.receivedWhileOffLine("cp-clients", "2025-05-01", source)).toBe("");
   });
@@ -170,6 +170,54 @@ describe("a supply received while turned off (criterion 14)", () => {
     expect(html).toContain("cp-clients@2025-07-02T01:00:00+00:00");
     expect(html).not.toContain("pill red");
     expect(html).not.toContain("Waiting for a person");
+  });
+});
+
+// REQ-DASH-180 criterion 14 AS AMENDED 2026-10-15 (Keith; post-build-review
+// #196 F2): every supply held while off is listed, each resolved one saying
+// how it ended, and the line says how many are still held.
+describe("criterion 14 as amended: how each one ended", () => {
+  const held = (at, extra = {}) => ({ kind: "held", datasetId: "cp-clients", supply: `cp-clients@${at}`,
+    openedAt: at, resolvedAt: null, turnedOff: { reason: "supplier paused" }, ...extra });
+  const ended = (at, e) => ({ resolvedAt: at, ended: { at, reason: "", actor: null, toPeriod: null, ...e } });
+  const source = { blockers: [
+    held("2025-06-02T01:00:00+00:00"),
+    held("2025-06-03T01:00:00+00:00", ended("2025-07-01T01:00:00+00:00",
+      { action: "refile", actorKind: "rule", toPeriod: "2025-Q3" })),
+    held("2025-06-04T01:00:00+00:00", ended("2025-07-02T01:00:00+00:00",
+      { action: "reject", actorKind: "person", actor: "Keith Moss", reason: "a duplicate" })),
+    held("2025-06-05T01:00:00+00:00", ended("2025-07-03T01:00:00+00:00",
+      { action: "supersede", actorKind: "rule" })),
+  ] };
+
+  it("says how each resolved one ended, and that the open one is held and owed by nobody", () => {
+    const w = load();
+    const el = w.document.createElement("div");
+    el.innerHTML = w.receivedWhileOffSection("cp-clients", "2025-08-01", source);
+    const rows = [...el.querySelectorAll("tbody tr")].map(r => r.textContent.replace(/\s+/g, " "));
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toContain("held, and owed by nobody");
+    expect(rows[1]).toContain("filed by the rule once 2025-Q3 was owed again");
+    expect(rows[2]).toContain("rejected by Keith Moss");
+    expect(rows[2]).toContain("a duplicate");
+    expect(rows[3]).toContain("superseded");
+    expect(rows.slice(1).some(r => r.includes("owed by nobody"))).toBe(false);
+  });
+
+  it("is still open on a date before it ended", () => {
+    const w = load();
+    const el = w.document.createElement("div");
+    el.innerHTML = w.receivedWhileOffSection("cp-clients", "2025-06-20", source);
+    const rows = [...el.querySelectorAll("tbody tr")].map(r => r.textContent);
+    expect(rows.every(r => r.includes("held, and owed by nobody"))).toBe(true);
+  });
+
+  it("counts them all and says how many are still held", () => {
+    const w = load();
+    const el = w.document.createElement("div");
+    el.innerHTML = w.receivedWhileOffLine("cp-clients", "2025-08-01", source);
+    expect(el.textContent.replace(/\s+/g, " ").trim())
+      .toBe(`4 received while turned off, earliest ${w.fmtDay("2025-06-02")} · 1 still held`);
   });
 });
 
@@ -271,7 +319,7 @@ describe("post-build-review #195", () => {
                             resolvedAt: null, turnedOff: { reason: "r" } });
     const el = w.document.createElement("div");
     el.innerHTML = w.receivedWhileOffLine("cp-clients", "2025-08-01", { blockers: [held("2025-06-02T01:00:00+00:00")] });
-    expect(el.textContent.trim()).toBe(`1 received while turned off, earliest ${w.fmtDay("2025-06-02")}`);
+    expect(el.textContent.trim()).toBe(`1 received while turned off, earliest ${w.fmtDay("2025-06-02")} · 1 still held`);
     const off = { id: "o", turnedOffOutOfRollup: true };
     const un = { id: "u", scheduleNotAgreed: "not-yet-agreed" };
     el.innerHTML = w.notCountedMarker("notcounted", [off, { ...off, id: "o2" }, un]);

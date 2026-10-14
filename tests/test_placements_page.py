@@ -78,3 +78,47 @@ class TestDecisionsSayPlaced:
         assert placements.placed_in(dl.REFILE, dl.RULE, None, "2025-Q1") is None
         assert placements.placed_in(dl.REFILE, dl.PERSON, "2024-Q4", "2025-Q1") is None
         assert placements.placed_in(dl.PROMOTE, dl.PERSON, None, "2025-Q1") is None
+
+
+class TestAPlacementLaterOvertaken:
+    """post-build-review #196 F4: a supply placed into one period and later
+    re-filed by a person to another kept saying 'Placed in' the first. The
+    placement carries the instant a later decision moved it, so the page
+    stops showing it from then and still shows it on earlier dates."""
+
+    def test_a_later_refile_out_of_the_placed_period_ends_it(self, conn, period, target):
+        supply, _ = _held(conn, period)
+        _place(conn, supply, target)
+        later = "2099-Pmoved"
+        moved_at = (datetime.fromisoformat(WHEN) + timedelta(days=3)).isoformat()
+        with conn.raw.transaction():
+            with dl.apply_decision(conn, dl.Decision(
+                    agency_id="child-protection-family-support", collection_id="child-protection",
+                    dataset_id=DS, action=dl.REFILE, supply=supply, actor=REAL_PERSON,
+                    actor_kind=dl.PERSON, effective_at=moved_at, from_slot=target,
+                    to_slot=later, reason="wrong quarter")):
+                pass
+        got = placements.for_dataset(DS, conn)[supply]
+        assert got["period"] == target
+        assert got["until"] is not None and got["until"].startswith(moved_at[:10])
+
+    def test_a_placement_still_standing_has_no_end(self, conn, period, target):
+        supply, _ = _held(conn, period)
+        _place(conn, supply, target)
+        assert placements.for_dataset(DS, conn)[supply]["until"] is None
+
+
+class TestThePromotionTimelineSaysPlaced:
+    """post-build-review #196 F7: the promotion timeline's decisions carry
+    placedIn too (criterion 7), which no test covered."""
+
+    def test_the_decisions_on_the_day_mark_the_placement(self, conn, period, target):
+        from pipeline import promotion_timeline, slot_timeline
+
+        supply, _ = _held(conn, period)
+        _place(conn, supply, target)
+        got = promotion_timeline.for_dataset(DS, slot_timeline.for_dataset(DS, conn=conn),
+                                             conn=conn)
+        decided = [d for p in got["points"] for d in p.get("decisions", [])
+                   if d["supply"] == supply and d["action"] == dl.REFILE]
+        assert decided and all(d["placedIn"] == target for d in decided)

@@ -25166,7 +25166,10 @@ requirements:
       SHALL NOT show it red, under 'Waiting for a person', in a 'Waiting since' tile or in the outstanding count, and SHALL
       NOT treat the dataset as blocked (REQ-PIPE-115 criterion 10) because of it, so that such a supply neither turns the dataset's
       status red nor brings the dataset back into its group's rollup; the quiet line SHALL sit where the accepted-gaps note
-      sits (.accepted-gaps-note).
+      sits (.accepted-gaps-note); the section SHALL list every supply held as turned off up to the date on show - one still
+      held described 'held, and owed by nobody', one resolved with a note saying how it ended (placed in <period>, filed by
+      the rule once <period> was owed again, rejected or superseded), by whom and when - and the quiet line SHALL count them
+      all, saying how many are still held. AMENDED 2026-10-15 by Keith (post-build-review item 196 F2, morning report 5).
     - THE SYSTEM SHALL show a turned-off gap's periods as owed-nothing rows (REQ-DASH-182) whose kind reads 'Turned off' with
       the turned_off_reason, starting a new group wherever the kind or reason changes.
     - WHILE a dataset is turned off on the date on show and owes no period whose slot is still open, THE SYSTEM SHALL show its
@@ -25359,7 +25362,11 @@ requirements:
     - 'tests/test_turn_off.py::TestCriticFindingsOn190::test_each_gap_is_sent_for_the_page'
     - 'tests/test_dashboard_e2e.py::TestTurnedOffOnThePage'
     - 'tests/test_turn_off.py::TestCriticFindingsOn190::test_d3_the_backlog_line_reads_the_label_as_it_stands'
+    - 'tests/test_turn_off.py::TestNotAStateNeedingAPerson::test_a_resolved_one_says_how_it_ended'
     implemented_by:
+    - 'qa_tools/common/dataset_blockers.py::_ended'
+    - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffEnding'
+    - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffLine'
     - 'qa_tools/common/turned_off.py::timeline'
     - 'qa_tools/common/turned_off.py::_last_owed'
     - 'qa_tools/common/runway.py::off_gaps'
@@ -26770,6 +26777,9 @@ requirements:
     - 'THE TAG GOES IN THE LAST CELL OF THE SUPPLY ROW (built 2026-10-15): the page has no column named provenance; the row''s last cell - where the resupply badge says how the row came to be in its cycle - takes the ''Placed in <period>'' tag, its person, date, reason and the closed-or-not-open line. The timing cell keeps punctuality and any excuse, so the two never share a cell (criterion 4).'
     - 'A PLACED TURNED-OFF HOLD STAYS LISTED (built 2026-10-15, as this requirement''s decision says): the ''Received while turned off'' section (REQ-DASH-180 criterion 14) now lists everything received while off by the date on show, resolved ones included, each placed one saying where it went - it used to list only the open ones, which would have made a placed hold vanish from it. Its one-line count counts the same set.'
     - 'NO REAL PLACEMENT EXISTS (2026-10-15): no supply in the real database has been placed by a person, so the browser test adds a placement of a real cp-clients run to the page''s embedded data (tests/test_dashboard_e2e.py::TestPlacedOnThePage).'
+    - 'CORRECTED 2026-10-15 (post-build-review item 196): the decision above that listing every turned-off hold "changes no behaviour Keith signed" was wrong - it widened REQ-DASH-180 criterion 14 for rejected, superseded and rule-filed holds with no note of how each ended. Keith chose to keep every one and say how it ended; criterion 14 is amended with his wording.'
+    - 'A PLACEMENT A LATER RE-FILE OVERTOOK (post-build-review item 196 F4, 2026-10-15): pipeline/placements.py sends until - the instant a later re-file moved the supply out of the placed period - and the tag stops from then; the hold''s own note still says where it went, which stays true. A PAIR PLACED THEN SUPERSEDED OR REJECTED says both (F1). The tag gives the placement''s instant, as the hold note does (F5).'
+    - 'OPEN WITH KEITH (post-build-review item 196 F3): before the placement instant the supply''s row already sits in the target period''s cycle, because supply history shows a dataset''s whole history whatever the date on show; the hold row reads Waiting for a person on those dates. Whether criterion 5 asks for more than that is his call (morning report 5).'
     linked_tests:
     - 'tests/test_placements_page.py'
     - 'tests-js/placed.test.js'
@@ -26778,6 +26788,7 @@ requirements:
     - 'pipeline/placements.py::for_dataset'
     - 'pipeline/placements.py::placed_in'
     - 'pipeline/placements.py::when_received'
+    - 'pipeline/placements.py::_moved_out'
     - 'pipeline/slot_timeline.py::supply_states'
     - 'pipeline/promotion_timeline.py::for_dataset'
     - 'dashboard/qa-reporting-dashboard.template.html::placementFor'

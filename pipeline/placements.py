@@ -46,8 +46,9 @@ def when_received(slot, received_at) -> str | None:
 
 def for_dataset(dataset_id: str,
                 conn: supply_db.SupplyConnection | None = None) -> dict[str, dict]:
-    """{supply: {period, at, actor, reason, when, runId}} for each supply a
-    person placed - the newest placement where there is more than one."""
+    """{supply: {period, at, actor, reason, when, runId, until}} for each
+    supply a person placed - the newest placement where there is more than
+    one; `until` is when a later re-file moved it out, else None."""
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:placements") as opened:
             return for_dataset(dataset_id, opened)
@@ -64,11 +65,24 @@ def for_dataset(dataset_id: str,
         "AND d.supply IS NOT NULL AND d.to_slot IS NOT NULL ORDER BY d.effective_at, d.id",
         [dataset_id, decision_log.REFILE, decision_log.PERSON]).fetchall()
     for supply, period, at, actor, reason, received in rows:
-        try:
-            slot = slots.slot_named(dataset_id, period)
-        except Exception:  # noqa: BLE001 - a period no calendar knows has no instants
-            slot = None
+        # slot_named answers None for a period no calendar knows, so nothing
+        # needs catching here (post-build-review #196 F6): a real failure
+        # should surface, not quietly drop the closed / not-yet-open line.
+        slot = slots.slot_named(dataset_id, period)
         out[supply] = {"period": period, "at": _iso(at), "actor": people.display_name(actor),
                        "reason": reason or "", "when": when_received(slot, received),
-                       "runId": slot_timeline._run_for(conn, dataset_id, supply)}
+                       "runId": slot_timeline._run_for(conn, dataset_id, supply),
+                       "until": _moved_out(conn, dataset_id, supply, period, at)}
     return out
+
+
+def _moved_out(conn, dataset_id: str, supply: str, period: str, at) -> str | None:
+    """The instant a later re-file moved the supply out of the period it was
+    placed in, or None while it is still there (post-build-review #196 F4) -
+    an answer the page compares with the date on show, so the tag still
+    reads on every date before the move."""
+    row = conn.execute(
+        f"SELECT min(effective_at) FROM {decision_log.TABLE} WHERE dataset_id = ? AND supply = ? "
+        "AND action = ? AND from_slot = ? AND effective_at > ?",
+        [dataset_id, supply, decision_log.REFILE, period, at]).fetchone()
+    return _iso(row[0]) if row and row[0] is not None else None

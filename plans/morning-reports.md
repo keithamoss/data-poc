@@ -1751,3 +1751,10 @@ one or more component tags, and a date.
       CALLS - build only what needs no decision of his; where one is needed,
       that item waits (a question queued here) rather than being built
       PROVISIONAL.
+    - **QUESTION FOR KEITH (#196 F3), queued under his away terms, not
+      built**: before a placement's instant, the placed supply's row already
+      sits in its target period's cycle, untagged - supply history shows a
+      dataset's whole history whatever the date on show, and the hold row
+      reads "Waiting for a person" on those dates. REQ-DASH-175 criterion 5
+      says "show the supply as held on any earlier date". Is the hold row
+      enough, or should the row leave the cycle before the placement?

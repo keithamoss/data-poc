@@ -3,6 +3,8 @@
 // placement's own instant, never in the timing cell beside an excuse.
 import { afterEach, describe, expect, it } from "vitest";
 import { loadDashboard } from "./support/loadDashboard.js";
+import { readFileSync } from "node:fs";
+import { TEMPLATE_PATH as TEMPLATE } from "./support/loadDashboard.js";
 
 let dashboard;
 afterEach(() => { dashboard?.close(); dashboard = undefined; });
@@ -21,7 +23,7 @@ describe("the placement tag (criteria 1, 2 and 5)", () => {
     const text = el.textContent.replace(/\s+/g, " ");
     expect(text).toContain("Placed in");
     expect(text).toContain("Keith Moss");
-    expect(text).toContain(w.fmtDay("2026-03-10"));
+    expect(text).toContain(w.fmtInstant(PLACED.at));
     expect(text).toContain("the supplier's Q1 file");
     expect(text).toContain("closed when it arrived");
   });
@@ -43,6 +45,19 @@ describe("the placement tag (criteria 1, 2 and 5)", () => {
     const w = load();
     const bad = raw({ placements: { "cp-clients@a": { ...PLACED, reason: "<b>x</b>" } } });
     expect(w.placedTag(bad, "r1", "2026-03-11")).toContain("&lt;b&gt;x&lt;/b&gt;");
+  });
+});
+
+describe("post-build-review #196 F4: a placement a later re-file overtook", () => {
+  const moved = () => raw({ placements: { "cp-clients@a": { ...PLACED, until: "2026-04-02T02:00:00+00:00" } } });
+  it("shows the tag before the move and not from it", () => {
+    const w = load();
+    expect(w.placedTag(moved(), "r1", "2026-04-01")).toContain("Placed in");
+    expect(w.placedTag(moved(), "r1", "2026-04-02")).toBe("");
+  });
+  it("still says where the hold went", () => {
+    const w = load();
+    expect(w.placedHoldNote(moved(), "cp-clients@a", "2026-05-01")).toContain("placed in");
   });
 });
 
@@ -77,5 +92,45 @@ describe("a placed turned-off hold stays in its quiet section (decision, with RE
     const html = w.receivedWhileOffSection("cp-clients", "2026-03-11", { blockers: [b] });
     expect(html).toContain("cp-clients@a");
     expect(html).toContain("placed in");
+  });
+});
+
+// post-build-review #196 F1: a resolved blocker whose supply was placed read
+// "placed in" whatever actually ended it, because the placement was checked
+// first. A contested pair placed whole and later superseded says both.
+describe("post-build-review #196: a placed blocker's real ending", () => {
+  const withData = placements => {
+    const html = readFileSync(TEMPLATE, "utf-8").replace("const REAL_CP_DATA = null;",
+      `const REAL_CP_DATA = ${JSON.stringify({ datasets: [{ id: "cp-clients", placements }] })};`);
+    return (dashboard = loadDashboard({ html })).window;
+  };
+  const PAIR = { kind: "contested", datasetId: "cp-clients", supply: "cp-clients@a",
+    openedAt: "2026-03-01T02:00:00+00:00", resolvedAt: "2026-03-20T02:00:00+00:00",
+    reason: "Two files claim this dataset's table", files: ["a.csv", "b.csv"],
+    loadFailures: [], settlement: null,
+    supersededBy: { receivedAt: "2026-03-20T02:00:00+00:00" } };
+
+  it("says it was superseded after it was placed", () => {
+    const w = withData({ "cp-clients@a": PLACED });
+    const html = w.blockerHistoryRows("cp-clients", "2026-04-01", { items: [], blockers: [PAIR] });
+    expect(html).toContain("placed in");
+    expect(html).toContain("superseded by the supply received");
+  });
+
+  it("says it was rejected after it was placed", () => {
+    const w = withData({ "cp-clients@a": PLACED });
+    const rejected = { ...PAIR, supersededBy: null,
+      rejected: { actor: "Keith Moss", at: "2026-03-20T02:00:00+00:00", reason: "wrong extract" } };
+    const html = w.blockerHistoryRows("cp-clients", "2026-04-01", { items: [], blockers: [rejected] });
+    expect(html).toContain("placed in");
+    expect(html).toContain("rejected by Keith Moss");
+  });
+
+  it("a hold the placement resolved still says only where it went", () => {
+    const w = withData({ "cp-clients@a": PLACED });
+    const hold = { ...PAIR, kind: "unassigned", supersededBy: null };
+    const html = w.blockerHistoryRows("cp-clients", "2026-04-01", { items: [], blockers: [hold] });
+    expect(html).toContain("placed in");
+    expect(html).not.toContain("— resolved");
   });
 });

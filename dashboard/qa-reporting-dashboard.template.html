@@ -1656,9 +1656,13 @@ const PLACED_WHEN = {"closed": "closed when it arrived", "not-yet-open": "not ye
 function placedTag(d, runId, dateStr){
   const p = placementFor(d, runId, dateStr, false);
   if(!p) return "";
+  // OVERTAKEN (post-build-review #196 F4): from the instant a later re-file
+  // moved the supply out of the period it was placed in, its row no longer
+  // says it was placed there.
+  if(p.until && dateStr && Date.parse(p.until) <= assetEndOfDay(dateStr).getTime()) return "";
   const when = PLACED_WHEN[p.when] ? `<div style="color:var(--ink-muted); font-size:11.5px;">${escHtml(fmtPeriodOrDay(p.period))} was ${PLACED_WHEN[p.when]}</div>` : "";
   return `<span class="pill tag sm" data-placed><span class="ico"></span>Placed in ${escHtml(fmtPeriodOrDay(p.period))}</span>
-    <div style="color:var(--ink-faint); font-size:11.5px;">${escHtml(p.actor)}, ${fmtDay(assetDateStrOf(p.at))}</div>
+    <div style="color:var(--ink-faint); font-size:11.5px;">${escHtml(p.actor)}, ${fmtInstant(p.at)}</div>
     ${p.reason ? `<div style="color:var(--ink-muted); font-size:11.5px; max-width:40ch;">${escHtml(p.reason)}</div>` : ""}${when}`;
 }
 // A HOLD RESOLVED BY PLACING, in the rejected row's form (criteria 3 and 10).
@@ -5462,9 +5466,9 @@ function blockersFor(datasetId, source){
 // RECEIVED WHILE TURNED OFF (REQ-DASH-180 criterion 14): quiet - its own
 // section of supply history and one line where the accepted-gaps note sits,
 // counted as at the date on show; never red, never waiting for a person.
-// EVERYTHING RECEIVED WHILE OFF BY THE DATE, resolved ones included: a
-// placed one stays in this section (REQ-DASH-175's decision), and the
-// section would otherwise under-count what was received.
+// EVERYTHING RECEIVED WHILE OFF BY THE DATE, resolved ones included, each
+// saying how it ended (criterion 14 as amended by Keith, 2026-10-15 - the
+// build had widened it without a note, post-build-review #196 F2).
 function receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source){
   return blockersFor(datasetId, source).filter(b=> b.turnedOff
     && assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
@@ -5473,20 +5477,48 @@ function receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source){
 function receivedWhileOffLine(datasetId, inPlaceOnDateStr, source){
   const found = receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source);
   if(!found.length) return "";
-  return `<div class="accepted-gaps-note received-while-off" data-received-while-off style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${found.length} received while turned off, earliest ${fmtDay(assetDateStrOf(found[0].openedAt))}</div>`;
+  // HOW MANY ARE STILL HELD (criterion 14 as amended, Keith 2026-10-15):
+  // the count is everything received while off, so it says the rest.
+  const still = found.filter(b=> !resolvedInPlaceOn(b, inPlaceOnDateStr)).length;
+  return `<div class="accepted-gaps-note received-while-off" data-received-while-off style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${found.length} received while turned off, earliest ${fmtDay(assetDateStrOf(found[0].openedAt))} · ${still ? `${still} still held` : "none still held"}</div>`;
+}
+function resolvedInPlaceOn(b, inPlaceOnDateStr){
+  return !!(b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr);
+}
+// HOW A SUPPLY HELD WHILE OFF ENDED (criterion 14 as amended, Keith
+// 2026-10-15; post-build-review #196 F2), from the decision that resolved
+// it: a person's placement in REQ-DASH-175's own words, the rule's filing
+// once its period was owed again, a rejection or a supersession - or, still
+// open on the date on show, held and owed by nobody.
+function receivedWhileOffEnding(d, b, inPlaceOnDateStr){
+  const quiet = text => ` <span style="color:var(--ink-faint);">— ${text}</span>`;
+  if(!resolvedInPlaceOn(b, inPlaceOnDateStr)) return quiet("held, and owed by nobody");
+  const placed = placedHoldNote(d, b.supply, inPlaceOnDateStr);
+  if(placed) return placed;
+  const e = b.ended || {};
+  const at = fmtInstant(e.at || b.resolvedAt);
+  const why = e.reason ? ": "+escHtml(e.reason) : "";
+  if(e.action === "refile" && e.actorKind === "rule" && e.toPeriod)
+    return quiet(`filed by the rule once ${escHtml(fmtPeriodOrDay(e.toPeriod))} was owed again, ${at}`);
+  if(e.action === "refile" && e.toPeriod)
+    return quiet(`filed to ${escHtml(fmtPeriodOrDay(e.toPeriod))} by ${escHtml(e.actor || "a person")}, ${at}${why}`);
+  if(e.action === "reject")
+    return quiet(`rejected by ${escHtml(e.actor || "a person")}, ${at}${why}`);
+  if(e.action === "supersede")
+    return quiet(`superseded${e.actorKind === "person" && e.actor ? ` by ${escHtml(e.actor)}` : ""}, ${at}${why}`);
+  return quiet(`resolved ${at}`);
 }
 function receivedWhileOffSection(datasetId, inPlaceOnDateStr, source){
   const found = receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source);
   if(!found.length) return "";
   return `
     <div class="supply-cycle received-while-off" data-received-while-off-section>
-      <div class="supply-cycle-label"><b>Received while turned off</b>
-        <span style="color:var(--ink-faint);">held, and owed by nobody</span></div>
+      <div class="supply-cycle-label"><b>Received while turned off</b></div>
       <div class="overflow-x">
       <table class="dataset-table supply-cycle-table static-rows">
         <thead><tr><th>Received</th><th>Supply</th></tr></thead>
         <tbody>${found.map(b=> `<tr><td class="mono">${fmtInstant(b.openedAt)}</td>
-          <td class="mono" style="color:var(--ink-muted);">${escHtml(b.supply || "")}${placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)}</td></tr>`).join("")}</tbody>
+          <td class="mono" style="color:var(--ink-muted);">${escHtml(b.supply || "")}${receivedWhileOffEnding(rawRealDatasetById(datasetId), b, inPlaceOnDateStr)}</td></tr>`).join("")}</tbody>
       </table>
       </div>
     </div>`;
@@ -6688,18 +6720,21 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
         <tbody>${rows.map(b=>{
           const resolved = b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr;
           if(resolved && b.settlement) return settledPairRow(b, datasetId, inPlaceOnDateStr);
+          // A PLACEMENT FIRST, THEN HOW IT ENDED (post-build-review #196 F1):
+          // a pair placed whole can still be superseded or rejected later,
+          // and a placed note in place of that ending hid it.
+          const placed = placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr);
+          const ending = !resolved ? ""
+            : b.rejected
+            ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
+            : b.supersededBy
+            ? ` <span style="color:var(--ink-faint);">— superseded by the supply received ${b.supersededBy.receivedAt ? fmtInstant(b.supersededBy.receivedAt) : "later"}</span>`
+            : placed ? ""
+            : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`;
           return `<tr data-blocker="${b.kind}">
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
-            <td><b>${escHtml(blockerLabel(b))}</b>${resolved
-              ? (placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)
-                  ? placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)
-                  : b.rejected
-                  ? ` <span style="color:var(--ink-faint);">— rejected by ${escHtml(b.rejected.actor)}, ${fmtInstant(b.rejected.at)}${b.rejected.reason ? ": "+escHtml(b.rejected.reason) : ""}</span>`
-                  : b.supersededBy
-                  ? ` <span style="color:var(--ink-faint);">— superseded by the supply received ${b.supersededBy.receivedAt ? fmtInstant(b.supersededBy.receivedAt) : "later"}</span>`
-                  : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`)
-              : (b.kind === "contested" ? placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr) : "")}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
+            <td><b>${escHtml(blockerLabel(b))}</b>${resolved || b.kind === "contested" ? placed : ""}${ending}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
           </tr>`;}).join("")}</tbody>
       </table>
       </div>

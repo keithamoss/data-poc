@@ -74,6 +74,10 @@ class Blocker:
     #: Where a later arrival's supply superseded the pair instead
     #: (criterion 10): {"supply", "receivedAt"}.
     superseded_by: dict | None = None
+    #: The decision that ended a HOLD (REQ-DASH-180 criterion 14 as amended
+    #: 2026-10-15): {"action", "actorKind", "actor", "at", "toPeriod",
+    #: "reason"} - the page words it; None while open.
+    ended: dict | None = None
 
     @property
     def is_open(self) -> bool:
@@ -97,6 +101,7 @@ class Blocker:
                 "agreementRefused": self.agreement_refused,
                 "turnedOff": self.turned_off,
                 "settlement": self.settlement, "supersededBy": self.superseded_by,
+                "ended": self.ended,
                 # WHERE IT IS SETTLED, for the page's own wording on any date
                 # (REQ-PIPE-194 criteria 1 and 14, #171).
                 "settleAt": _settle_at(self.dataset_id) if self.kind == CONTESTED else None}
@@ -122,7 +127,8 @@ def _holds(db) -> list[Blocker]:
         "       h.raised_at, h.resolved_by, h.resolved_at, r.received_instant, d.effective_at, "
         "       (SELECT df.received_at FROM qa.delivery_file df "
         "         WHERE df.delivery = h.delivery AND df.dataset_id = h.dataset_id "
-        "         ORDER BY df.received_instant, df.receipt_sequence LIMIT 1) "
+        "         ORDER BY df.received_instant, df.receipt_sequence LIMIT 1), "
+        "       d.action, d.actor_kind, d.actor, d.to_slot, d.reason "
         f"FROM qa.hold h LEFT JOIN {supply_holds._receipt_table()} r "
         "  ON r.dataset_id = h.dataset_id AND r.supply_id = h.supply_id "
         "LEFT JOIN qa.decision d ON d.id = h.resolved_by "
@@ -133,6 +139,7 @@ def _holds(db) -> list[Blocker]:
         # 18), so the receipt instant travels with the hold.
         held = supply_holds._held_from(row[:10])
         effective_at, received_at = row[10], row[11]
+        action, actor_kind, actor, to_slot, why = row[12:17]
         out.append(Blocker(
             kind=HELD, dataset_id=held.dataset_id, supply=held.supply_id,
             # The receipt where the delivery recorded one; the instant it
@@ -142,8 +149,20 @@ def _holds(db) -> list[Blocker]:
                          if held.resolved_by is not None else None),
             reason=held.describe(), delivery=held.delivery,
             schedule_ended=held.schedule_ended, agreement_refused=held.agreement_refused,
-            turned_off=held.turned_off))
+            turned_off=held.turned_off,
+            ended=_ended(action, actor_kind, actor, effective_at, to_slot, why)
+            if held.resolved_by is not None and action else None))
     return out
+
+
+def _ended(action, actor_kind, actor, at, to_slot, reason) -> dict:
+    """The decision that ended a hold, in the page's terms - the actor as a
+    display name, never an address (REQ-DASH-071)."""
+    from qa_tools.common import people
+
+    return {"action": action, "actorKind": actor_kind,
+            "actor": people.display_name(actor) if actor else None, "at": _iso(at),
+            "toPeriod": to_slot, "reason": reason or ""}
 
 
 def _arrival_of(supply: str) -> str:
