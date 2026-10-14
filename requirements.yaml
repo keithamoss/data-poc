@@ -33272,3 +33272,318 @@ requirements:
       approval.'
     - SIGNED OFF by Keith, 2026-10-14, with the mark's label '<scenario id> · in place on <date>' and the exact wording of close-out
       amendments 9 and 10 (REQ-GEN-199 criteria 36 and 37), which apply to their targets when this requirement is built.
+  - id: REQ-GEN-205
+    title: The synthetic history holds the calendar-correction scenarios TS-57 to TS-62 - a correction confirmed by a scripted
+      asset manager who keeps one supply, with others moved, held, parked and re-judged, and one left awaiting confirmation
+    date_written: '2026-10-14'
+    story: As Keith showing what happens when a delivery calendar turns out to have been wrong, I want the synthetic history
+      to hold a correction merged part way through it and confirmed by the asset manager - one supply moved, one kept, one held,
+      one parked behind an inheriting quarter and one only re-judged - and a second correction still awaiting confirmation,
+      so that every shape of REQ-PIPE-170 can be shown on the real dashboard and in the terminal rather than only in unit tests.
+    moscow: must
+    status: not_started
+    signed_off:
+      by: Keith
+      date: '2026-10-14'
+    source: 'REQ-PIPE-170 criterion 23''s first half (signed 2026-10-07; TS-63 moved to REQ-PIPE-179 criterion 39 by Keith 2026-10-13).
+      Keith, 2026-10-13: the fictional past corrections are declared in contract/calendar.yaml. Scoped to design by the main
+      session overnight 2026-10-13 to 14 (plans/morning-reports.md entry 4, forks (e) to (h)), which stopped short of building
+      because a wrong guess would write fictional corrections into the real calendar file. Drafted by delivery-scoper the same
+      night while Keith was asleep, so every fork is an open question.'
+    acceptance_criteria:
+    - 'THE SYSTEM SHALL declare the corrections these scenarios need in contract/calendar.yaml itself, in the corrections: list
+      of each owner a correction changes, each with a change_reference, a date inside the synthetic history, an author, Keith''s
+      real identity as approver (agreement_freeze''s approvers exclude the synthetic identities) and a reason that says it is
+      a fictional correction made to demonstrate the correction route on this synthetic asset, and SHALL NOT declare them in
+      a synthetic-only overlay file.'
+    - THE SYSTEM SHALL generate, through REQ-GEN-044's injection mechanism, only the arrivals the corrections act on, and SHALL
+      NOT generate any filing, move, hold, park, keep, verdict or confirmation the scenarios expect (REQ-GEN-044 criterion 6).
+    - WHEN the synthetic history is replayed, THE SYSTEM SHALL file and judge each of these arrivals against the agreement as
+      it stood at its receipt (REQ-PIPE-170 criterion 30), so that an arrival received before a correction's date is filed without
+      it.
+    - 'THE SYSTEM SHALL let contract/scripted_decisions.yaml declare a scripted correction confirmation, in a top-level corrections:
+      list separate from its decisions: list - naming a declared correction by change_reference, with no dataset of its own,
+      and saying either keep, a list of supplies each named by scenario, dataset and that scenario''s supply index (never a
+      generated id) with one keep_reason covering them, or pending - read only by correction_replay.confirm_due, outside the
+      Player that plays filing decisions and outside filing_decisions'' operation validation, each kept supply resolved to its
+      supply id as scripted decisions resolve theirs (scripted_decisions._supply_of).'
+    - IF a scripted correction confirmation names an undeclared change reference, an unknown scenario or supply index, a dataset
+      that scenario's arrival does not carry, keeps without a keep_reason, a keep_reason without keeps, pending together with
+      keeps, a confirmation with no keeps (which says nothing the default does not), any timing field (after_hours, at, day_offset),
+      or a change reference another confirmation already names, THEN `mothman scenarios validate` SHALL refuse it, naming the
+      entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
+    - 'WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31) - on every route that does
+      so: a bootstrap, a resumed bootstrap or `mothman pipeline run` over both - THE SYSTEM SHALL confirm a correction that
+      has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script names, SHALL
+      leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with none as it
+      does today.'
+    - IF a scripted keep names a supply its correction does not propose to move, or a scripted confirmation is refused for any
+      other reason, THEN THE SYSTEM SHALL stop the replay naming the scenario and the change reference, SHALL NOT drop the keep
+      or confirm without it, and SHALL list in that message the correction's proposed moves by scenario, dataset and supply
+      index where a scenario names them, so that the script can be put right.
+    - WHEN a bootstrap has confirmed corrections, THE SYSTEM SHALL run every QA run the confirmations owe - each moved or placed
+      supply's re-check and gate, and the knock-on re-evaluation of each period a move left or reached (REQ-PIPE-121) - through
+      recheck.run_all_owed inside the bootstrap's own pass lock and under the replay clock, before it rebuilds both collections'
+      results; SHALL say, before starting, how many runs are owed and that each takes about a minute; and IF any does not complete,
+      THEN SHALL stop the bootstrap naming it, as a refused scripted decision does.
+    - 'THE SYSTEM SHALL generate, as registered scenarios: TS-57, a supply re-judged by a confirmed correction with no move;
+      TS-58, a supply moved by it, re-checked and judged against the period it moved to; TS-59, a supply it would move that
+      the scripted asset manager keeps, with a reason; TS-60, a supply the corrected agreement gives no period, held on confirmation
+      with a hold naming the correction; TS-61, a cp-case-workers supply whose move is blocked because a later quarter inherits
+      it, parked on confirmation (REQ-PIPE-170 criterion 25); and TS-62, a correction merged and left awaiting confirmation
+      - a new Birth Registrations daily calendar version with a different claim window - with an arrival for a dataset it affects
+      received after its date.'
+    - THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared
+      change alters together with the period before and the period after it - except that for a version-level change (TS-62's),
+      only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received
+      before its effective date and for every arrival received on or after it, together with the day before and the day after
+      each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and REQ-PIPE-179's
+      TS-63 correction; and IF it meets a period another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift
+      either or relax the rule.
+    - THE SYSTEM SHALL place TS-57 to TS-61 in Child Protection quarters REQ-GEN-207 adds by growing the history earlier, so
+      that no existing scenario moves, and TS-62 on Birth Registrations, its correction dated a few days before the end of the
+      history and its later arrival the next daily supply.
+    - THE SYSTEM SHALL give TS-57 to TS-61 each two lettered-sibling links (REQ-GEN-201) - 'a' on a date after their correction's
+      date and before its confirmation, where the affected datasets read awaiting confirmation (REQ-DASH-172 criterion 4), and
+      'b' on the history's last day, after the confirmation - and TS-62 one link on the history's last day; and SHALL extend
+      REQ-GEN-201's event vocabulary so that a link may be bounded by a declared correction's date, named by its change_reference,
+      and by the end of the history.
+    - THE SYSTEM SHALL update the register entries of TS-57 to TS-62 in plans/supply-model.md to the Child Protection calendar's
+      real values - the 1st of February, May, August and November, due 09:00 with 8 hours' grace, a 14-day claim window - and
+      to the correction each rides, each with a Config line, an Expect quoting what the page and the terminal say as observed
+      on the first bootstrapped build, and a Breaks as line.
+    - THE SYSTEM SHALL rewrite TS-61's Expect to the parking REQ-PIPE-170 criterion 25 built (Keith, 2026-10-11, answer (p))
+      - parked on confirmation, an outstanding item naming what blocks it and both ways it ends - in place of 'listed as blocked
+      ... the correction stays among the states needing action until it is moved or kept'.
+    - THE SYSTEM SHALL record in each scenario's register entry what it leaves standing at the end of the history - TS-61's
+      parked move as an outstanding item for as long as the quarter after it inherits, and TS-62's correction as a pending item
+      with its datasets reading awaiting confirmation - so that the needs-action items they add are known rather than discovered,
+      and TS-60's hold standing at the end of the history.
+    - THE SYSTEM SHALL have fixture tests, written first and seen to fail, that replay a small history with two declared corrections
+      and assert that a scripted keep is recorded as KEEP naming the change reference and the script's reason, that the other
+      move is carried out and re-checked before the replay ends, and that the correction scripted pending is still pending afterwards,
+      on a bootstrap and on a resumed bootstrap alike.
+    - THE SYSTEM SHALL clear REQ-PIPE-170's unmet entry for criterion 23, naming this requirement, in the change that builds
+      it.
+    - IF a correction's date, or a period one of its declared changes names, falls outside the generated history - as a date
+      fixed in configuration can once ANCHOR_DATE moves - THEN generation SHALL refuse naming the scenario and the change reference,
+      and SHALL NOT drop or shift it.
+    - WHEN a bootstrap is resumed (bootstrap.resume), THE SYSTEM SHALL confirm the due corrections and run what they owe exactly
+      as a bootstrap from empty does.
+    - 'THE SYSTEM SHALL declare exactly two corrections for these scenarios: one, confirmed by its scripted confirmation, whose
+      changes carry TS-57 to TS-61, so that one applied summary shows all five shapes; and one for TS-62, whose scripted confirmation
+      says pending.'
+    - THE SYSTEM SHALL date every correction declared here late in the synthetic history - within weeks of its end - including
+      a correction that edits an old quarter, so that 'awaiting confirmation' lasts weeks on the page rather than years.
+    - 'THE SYSTEM SHALL make each change the confirmed correction declares an edit to one grown quarter''s date in the quarterly
+      calendar''s dates: list, one such edit per shape, and SHALL NOT change a claim window or any other version-level value.'
+    - THE SYSTEM SHALL leave TS-61's parked move parked to the end of the history, with no scripted keep of it, so that its
+      'Correction move waiting' item on cp-case-workers stands, as criterion 15 records.
+    - THE SYSTEM SHALL make TS-62's correction add a new version of Birth Registrations' daily calendar, taking effect on a
+      day near the end of the history, whose claim window is wider than the version before it - about six hours against today's
+      four (Keith, round 4 R1) - a version-level change, unlike the confirmed correction's dated edits (criterion 22), and SHALL
+      leave that correction pending (criterion 20), so that the moves it proposes read as awaiting confirmation and are never
+      applied.
+    - THE SYSTEM SHALL make TS-62's new version take effect after 2026-09-08, TS-47's following day, so that TS-47's four-hour
+      claim window and every text REQ-GEN-199 quotes (the last Birth Registrations one on 2026-09-01, TS-78b) stand under the
+      version before it; and IF that effective date falls on or before 2026-09-08, or on or before the last day any REQ-GEN-199
+      scenario link names, THEN generation SHALL refuse naming TS-62, and SHALL NOT shift it.
+    - THE SYSTEM SHALL check, before the first rebuild, that TS-43 to TS-46's arrivals - TS-46's green following day on 2026-09-22,
+      the history's last day, included - are filed and judged identically under TS-62's new version and the version before it,
+      by the impact preview shown to Keith (NFR 5); and IF any would not be, THEN criterion 10 SHALL refuse generation, and
+      the case SHALL go to Keith rather than the version being moved.
+    - THE SYSTEM SHALL have TS-62's new version pass REQ-PIPE-134's overlap gate in mothman check as any version does, with
+      no exemption.
+    non_functional_requirements:
+    - 'NOISE: a correction that moves a date re-judges every supply of every dataset in the period it alters. Count, in the
+      register entries, every period these corrections leave unfilled, red or awaiting confirmation and every outstanding item
+      they add.'
+    - 'FICTIONAL CORRECTIONS IN THE REAL CALENDAR FILE (Keith, 2026-10-13): each is gated by REQ-PIPE-111 exactly as a real
+      one would be - the agreement-freeze gate in mothman check, the entry printed by `mothman schedule draft-correction` -
+      which is the point of showing them. Each reason says it is fictional so nobody later reads it as the agency''s history.'
+    - 'SECURITY: the scripted confirmation plays back as the synthetic actor holding the asset-manager role during playback
+      only, on an asset that declares itself synthetic (people.require_role, people.playback, scripted_decisions._refuse_unless_synthetic);
+      nothing here widens what a person or script may do on a real asset.'
+    - 'SCALE: the confirmed correction alters named periods only (criterion 10). TS-62''s correction is a version-level change
+      on purpose (Keith, 2026-10-14, follow-up F11): from its effective date every later Birth Registrations arrival is filed
+      under it at receipt, confirmed or not (round 4 architect M4) - one dataset today, many more at the target - which is tolerable
+      here only because it is left pending, takes effect after 2026-09-08, and widens the window so that ordinary on-time arrivals
+      file as before (round 4 R1).'
+    - 'PROCESS: before the first rebuild, the builder shows Keith each correction''s exact edits and its impact preview (REQ-PIPE-169)
+      against the generated history, with the dates - the main session''s own offer on fork (g) - including, for TS-62, the
+      proof that TS-43 to TS-46 do not move (criterion 26).'
+    - DETERMINISM and loud failure are REQ-GEN-044's, inherited (criteria 3 and 4); configuration only, every effect in the
+      database.
+    - 'BOOTSTRAP COST: 7m00s from empty on 2026-10-13. The growth is REQ-GEN-207''s to measure; this requirement adds its own
+      arrivals plus the post-confirmation runs (criterion 8), which run serially after BOTH replays at about a minute each and
+      add to the total directly - so count them in the dry run and measure from empty before and after, logged in CLAUDE.md''s
+      running log.'
+    - 'PENDING IS THE OPT-OUT (Keith, 2026-10-14, round 4 fold G3): a replay confirms every due correction, as today, unless
+      its scripted confirmation says pending; TS-62''s stays pending because every route that confirms reads that entry (criterion
+      6), which criterion 16''s test holds on a bootstrap and a resumed bootstrap. A forgotten ''pending'' entry would confirm
+      a correction silently - the accepted cost of G3.'
+    dependencies:
+    - REQ-PIPE-170
+    - REQ-PIPE-111
+    - REQ-PIPE-168
+    - REQ-PIPE-169
+    - REQ-PIPE-121
+    - REQ-GEN-044
+    - REQ-GEN-135
+    - REQ-GEN-196
+    - REQ-GEN-201
+    - REQ-DASH-172
+    - REQ-GEN-207
+    - REQ-PIPE-140
+    - REQ-DASH-208
+    - REQ-PIPE-134
+    decisions:
+    - 'DECLARED IN contract/calendar.yaml ITSELF (Keith, 2026-10-13): ''this asset is a synthetic data asset for demo purposes,
+      so that is fine''. REJECTED a synthetic-only overlay file.'
+    - 'THE MECHANISM IS BUILT AND NOT REOPENED (Keith, 2026-10-11, answer (n); REQ-PIPE-170 criteria 30 and 31): a replay stages
+      each correction - reverted until the start of its date on the asset''s clock, then in force - and confirms each due one
+      once BOTH collections'' replays finish, stamped at the end of the replay, as the synthetic asset manager through correction_apply.confirm.
+      REJECTED replaying the collections one after the other or as one stream (costs the parallel bootstrap). A one-collection
+      replay leaves corrections pending (PROVISIONAL in REQ-PIPE-170).'
+    - 'HOW THE GENERATOR STAGES IT WAS LEFT TO THE BUILDER (Keith, 2026-10-08, signing off the route): REQ-PIPE-111 already
+      lets a synthetic asset add past-dated versions. Answered since for the declaration (above) and the staging (criteria 30
+      and 31); what remains is the scripted manager''s choices, which this requirement adds.'
+    - 'TS-63 IS NOT HERE (Keith, 2026-10-13): REQ-PIPE-179 criterion 39 plants it in the change that builds the turn-off, declared
+      as a correction like these.'
+    - 'KEEP AND ''LEAVE IT PENDING'' ARE THE MANAGER''S, SAID IN THE SCRIPT FILE (main session, overnight 2026-10-13, fork (e),
+      PROVISIONAL until Keith answers open question 1): a scripted confirmation naming the change_reference - first proposed
+      as a confirm-correction operation in decisions:, now recommended as a top-level corrections: list (CLI UX A). REJECTED
+      flags on the correction itself: a keep is the asset manager''s decision about a supply, not part of the agreement.'
+    - 'WHY THE BUILD STOPPED AT DESIGN (main session, overnight #4): four forks stack, and a wrong guess on the first writes
+      fictional corrections into the real calendar file that every later one builds on.'
+    - 'A MOVED SUPPLY''S RE-CHECK IS LEFT OWED BY TODAY''S BOOTSTRAP (found by delivery-scoper reading qa_tools/common/bootstrap.py,
+      2026-10-14, PROPOSED fix): _confirm_corrections calls correction_replay.confirm_due and then rebuilds results; no processing
+      pass follows, and REQ-PIPE-170''s own PROVISIONAL decision is that ''automatically'' means the next pass. So TS-58''s
+      ''re-QA''d and re-gated automatically'' would not be on the page. Criterion 8 runs what is owed before the rebuild. REJECTED
+      leaving it for the next `mothman pipeline process`, which a demo history may never get.'
+    - 'THE REGISTER''S CONFIG LINE IS NOT THE CHILD PROTECTION CALENDAR (found 2026-10-14): it says the 15th, 17:00, 2 days''
+      grace, a 30-day window; contract/calendar.yaml says the 1st, 09:00, 8 hours, 14 days. Criterion 13. The same defect REQ-PIPE-179
+      records for TS-63.'
+    - 'THE QUARTER BUDGET, COMPUTED WITH THE GENERATOR''S OWN COLLISION LOGIC (delivery-scoper, 2026-10-14): of fifteen Child
+      Protection quarters, the only ones no scenario claims are 2023-Q1, 2024-Q3, 2026-Q2 and the current 2026-Q3. REQ-GEN-203
+      wants two and REQ-PIPE-179 several. REQ-GEN-203''s suggested -13 (2023-Q3) is TS-67''s filed-early quarter (scenario_injection.filed_early_into)
+      and would collide - reported to the main session. Keith already chose to grow the history earlier for TS-63 (REQ-PIPE-179,
+      2026-10-13); criterion 11 follows that.'
+    - 'BLOCKED IS SHOWN ON cp-case-workers (main session fork (g), PROVISIONAL): it is delivered only in February and August,
+      so the quarter after each of its supplies inherits it (REQ-GEN-199''s TS-79 mechanism), and refiling refuses to move a
+      supply a later period stands on. REJECTED a substitution as the blocker: TS-76''s and TS-77''s both end, so a move blocked
+      by one would drain.'
+    - 'STILL REJECTED (REQ-GEN-044): a scenario label on the dataset pages.'
+    - 'A PROBABLE DEFECT IN BUILT CODE, FOR post-build-review (architect B10, verified 2026-10-14): bootstrap._confirm_corrections
+      enters replay_clock.replaying(), whose start() sets no anchor, so replay_clock.now() returns the real wall clock and correction_replay.confirm_due
+      stamps the confirmation at the real now - not ''at the end of the replay'' as REQ-PIPE-170''s decision (n) says. Criterion
+      19 fixes it test-first; the main session should open its own post-build-review entry, the fix touching a signed requirement''s
+      built behaviour.'
+    - 'B10''s ANCHOR CORRECTED BY THE MAIN SESSION (2026-10-14, post-build-review #177): the end of the replay alone is wrong
+      for the one correction that exists - REQ-PIPE-181 is dated 2026-10-11 and the replayed history ends 2026-09-22, so that
+      anchor would confirm it nineteen days before it was merged. Keith chose the later of the two (close-out Q28); built -
+      see the decision recording it below.'
+    - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect A5 (REQ-PIPE-179 dropped from the dependencies,
+      REQ-GEN-207 added; REQ-PIPE-170''s unmet entry for criterion 23 is re-pointed at sign-off - criterion 17 clears TS-57
+      to TS-62, REQ-PIPE-179 criterion 40 TS-63); architect A6 (criterion 10 - a correction''s claim counted once, checked against
+      injections, post-generation placements and TS-63); architect A7 (criterion 18 - configuration-dated scenarios do not move
+      with ANCHOR_DATE, so refuse); architect B8 and CLI UX 2 and 9 (criteria 4 and 5 - read only by confirm_due, outside the
+      Player and the filing-decision validation, a change_reference and no dataset, keeps by scenario, DATASET and index resolved
+      through _supply_of, the shape''s refusals); architect B9 and CLI UX 10 (criterion 8 - recheck.run_all_owed inside the
+      pass lock, stop if incomplete, say how many and how long; criterion 7 lists the proposed moves); architect B10 (criterion
+      19); architect B12 (criterion 15 - TS-60''s hold stands); architect B13 (criterion 20 - carried rather than accepted,
+      because a resumed bootstrap would otherwise end with every correction pending); dashboard UX 13 (criterion 12 - lettered
+      siblings, since REQ-GEN-201 writes one date per id; a link bounded by a correction''s date and the end of history).'
+    - 'KEITH''S REAL IDENTITY APPROVES THE FICTIONAL CORRECTIONS (Keith, 2026-10-14, close-out Q2, option A, the architect''s
+      recommendation): criterion 1. Each reason says the correction is fictional and made for the demonstration, so the demo
+      goes through the same gate a real correction does. REJECTED extending REQ-PIPE-111''s synthetic exception. The same answer
+      covers REQ-PIPE-179''s TS-63.'
+    - 'A TOP-LEVEL corrections: LIST IN contract/scripted_decisions.yaml (Keith, 2026-10-14, close-out Q5, option A, the CLI
+      UX recommendation): criterion 4. Read only by confirm_due, so the Player and the filing-decision validation are unchanged.
+      REJECTED a confirm-correction operation in decisions: (option B) and keys on the correction in contract/calendar.yaml
+      (option C - a keep is the manager''s decision, not the agreement''s). The ''KEEP AND LEAVE IT PENDING'' decision above
+      is no longer provisional.'
+    - 'TWO CORRECTIONS (Keith, 2026-10-14, close-out Q6, option A): criterion 20 (numbered after this fold). One confirmed correction
+      carries TS-57 to TS-61 so one applied summary shows all five shapes; one is left pending for TS-62. REJECTED six, one
+      per scenario.'
+    - 'TS-62 ON BIRTH REGISTRATIONS; EVERY CORRECTION DATED LATE (Keith, 2026-10-14, close-out Q7, option A): criteria 11 and
+      21. TS-62 claims no Child Protection quarter, at the cost of Birth Registrations reading ''awaiting confirmation'' at
+      the end of the history; ''awaiting confirmation'' lasts weeks, not years. REJECTED TS-62 on Child Protection. REQ-PIPE-179''s
+      TS-63 is the one correction dated early, by Keith''s Q4.'
+    - 'ONE GROWN QUARTER''S DATE PER SHAPE (Keith, 2026-10-14, close-out Q8, option A): criterion 22 - the narrowest frozen
+      item. REJECTED claim-window changes, which need extra versions either side or re-judge every quarter. Q8 settles the Child
+      Protection correction; what TS-62''s Birth Registrations correction edits is still open.'
+    - 'TS-61 STAYS PARKED TO THE END (Keith, 2026-10-14, close-out Q9, option A): criterion 23 - a standing item, which is honestly
+      what happens. REJECTED a later scripted keep.'
+    - 'THE REPLAYED CONFIRMATION''S STAMP IS BUILT, SO ITS CRITERION IS GONE (Keith, 2026-10-14, close-out Q28, option A; post-build-review
+      #177, fixed test-first the same morning): the later of the history''s end and the correction''s own date. correction_replay.history_end
+      reads the latest receipt or decision taking effect, and confirm_due(history_end=...) stamps each correction at the later
+      of that and its own date; a real asset still stamps the wall clock. Recorded on REQ-PIPE-170''s decisions, which own the
+      built behaviour. The draft''s criterion 19 is removed rather than carried as unbuilt work. REJECTED the real clock (not
+      reproducible) and the replay''s end alone (confirms REQ-PIPE-181 nineteen days before its own date).'
+    - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s close-out answers): criteria 1, 4 and 11 reworded; criterion 19 removed
+      (built, #177), so the old criterion 20 (resume) is now 19; criteria 20 to 23 added. Decisions written before this fold
+      use the old numbers. Still the scoper''s and the main session''s, not put to Keith: cp-case-workers as TS-61''s blocker
+      (fork (g)''s PROVISIONAL decision above).'
+    - 'TS-62''s CORRECTION IS A NEW DAILY VERSION WITH A DIFFERENT CLAIM WINDOW, LEFT PENDING (Keith, 2026-10-14, follow-up
+      F11, option B, against the recommendation): criteria 9, 24 and 25 - this settles what decision 19 above left open. ACCEPTED
+      COST: once confirmed it would re-judge every later day; it is the correction left pending, so its moves read as awaiting
+      confirmation. Its effective date falls after 2026-09-01, the last Birth Registrations day REQ-GEN-199 quotes, so those
+      quotes do not move (criterion 25). REJECTED (the recommendation) a not_expected entry for one past day, added after the
+      fact.'
+    - 'F11 MEETS CRITERION 10 (found by delivery-scoper while folding F11, 2026-10-14, verified in generator/scenario_injection.py,
+      generator/anchor_date.py and plans/supply-model.md): Birth Registrations scenarios sit later than 2026-09-01 - TS-43 (anchor
+      -18), TS-47 landing 2026-09-07 (its whole shape is the 4-hour claim window), TS-44 and TS-45 in the promote-and-acknowledge
+      era from 2026-09-10, and TS-46 on 2026-09-21 with the history''s last day, 2026-09-22, as its green following day. A version
+      taking effect on any later day alters every slot after it, so criterion 10 refuses generation against those scenarios''
+      claims; and arrivals after the correction''s date are filed under the new claim window in the replay (criterion 3). As
+      drafted, criteria 24 and 25 cannot be met together with criterion 10. Open question 1.'
+    - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answer F11): criterion 9 reworded; criteria 24 and 25 added; NFR
+      4 reworded. The question F11 answered is replaced by the conflict it exposed (open question 1) and a build-time check
+      (open question 2).'
+    - 'TS-62 AFTER 2026-09-08, CLAIM NARROWED TO WHAT ITS PREVIEW MOVES, WIDER WINDOW (Keith, 2026-10-14, round 4 R1, option
+      A, the recommendation; scoper''s question 5 and architect question D): criteria 10, 24, 25 and 26. It takes effect after
+      TS-47''s following day, clear of TS-47''s four-hour window; for a version-level correction criterion 10 claims only the
+      days its impact preview says it would change, plus one either side; TS-46''s last day is checked at build; the window
+      is wider (about six hours) so the default view stays quiet. This resolves ''F11 MEETS CRITERION 10'' above. REJECTED (B)
+      a not_expected entry for one past day and (C) waiving criterion 10 and re-observing TS-43 to TS-47''s Expects.'
+    - 'A PENDING CORRECTION STILL FILES LATER ARRIVALS (round 4 architect M4): every arrival from its date on is filed under
+      the corrected agreement at receipt, confirmed or not (REQ-PIPE-170 criterion 30). So criterion 10''s narrowed claim counts
+      arrivals received on or after the effective date, not only supplies the correction would move, and criterion 26 proves
+      TS-43 to TS-46 unmoved. NOT TAKEN AS WORDED: M4''s ''refuse a TS-62 version taking effect on or before any other Birth
+      Registrations scenario''s dates'' - TS-44 to TS-46 lie after 2026-09-08, so that would refuse what Keith chose in R1;
+      the narrowed claim refuses only where a filing actually changes.'
+    - 'WITHDRAWN - A REPLAY CONFIRMS EVERYTHING DUE UNLESS THE SCRIPT SAYS PENDING (Keith, 2026-10-14, round 4 fold G3, option
+      B, against the recommendation; round 4 architect M4): criteria 4, 5 and 6 are back to their wording before the round 4
+      fold - confirm stays today''s default, pending is the only opt-out, a confirmation with no keeps is refused again as saying
+      nothing the default does not, and a declared correction with no entry is confirmed, not refused - and criterion 28 (a
+      confirm entry for REQ-PIPE-181''s correction, and the REQ-PIPE-170 criterion 31 amendment) is removed. Criterion 6 now
+      names every route that confirms, and criterion 16''s test covers the bootstrap and the resumed bootstrap, since TS-62
+      stays pending only while each route reads its entry. ACCEPTED COST: a forgotten ''pending'' entry confirms silently. REJECTED
+      (the recommendation, option A) confirming only the corrections the script says to confirm.'
+    - 'THE NEW WINDOW MUST PASS THE OVERLAP GATE (round 4 architect M4): criterion 27, and REQ-PIPE-134 added as a dependency.
+      With Birth Registrations due 14:00 with 1 hour''s grace, a six-hour window opens the next day''s claim at 08:00, after
+      the previous day''s 15:00 late-after instant; the gate checks it rather than this note.'
+    - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 answer R1 and architect M4): criteria 4, 5, 6, 10, 24 and 25 reworded;
+      criteria 26 to 28 added; NFRs 4 and 5 reworded and a FAIL SAFE NFR added; REQ-PIPE-134 added as a dependency. The old
+      open question 1 is answered; a new open question 1 (confirm only what the script says) is raised by M4.'
+    - 'AMENDMENT 44 DROPPED (Keith, 2026-10-14, round 4 fold G3, option B): the proposed rewording of REQ-PIPE-170 criterion
+      31 - ''confirm every pending correction ... whose scripted confirmation ... says confirm ... SHALL leave every other correction
+      pending'' - existed only to carry option A. With G3''s option B, criterion 31 already says what this requirement needs
+      (''confirm every pending correction dated up to now''), and the pending opt-out narrows nothing it promises, so REQ-PIPE-170
+      stays as signed and no built behaviour of correction_replay.confirm_due''s loop changes beyond reading ''pending''.'
+    - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 fold answer G3): criteria 4, 5 and 6 restored to their wording before
+      the round 4 fold, criterion 6 naming every route; criterion 16 extended to the resumed bootstrap; criterion 28 removed;
+      the FAIL SAFE NFR replaced; amendment 44 dropped; open question 1 removed as answered, the two build-time checks renumbered
+      1 and 2.'
+    - SIGNED OFF by Keith, 2026-10-14. Its two build-time checks stay with the architect (open questions 1 and 2).
+    open_questions:
+    - '1. CHECK AT BUILD (architect, not a question for Keith): on a synthetic asset, adding a past-dated calendar version needs
+      no correction (REQ-PIPE-111 criterion 9; agreement_freeze skips it). Read 2026-10-14, a declared correction naming the
+      added version is matched against the added item and accepted. Confirm that correction_replay then stages it as a pending
+      correction, rather than as the synthetic exemption''s undeclared addition, which would make TS-62 a version with no correction
+      to leave pending.'
+    - '2. CHECK AT BUILD (architect, not a question for Keith): whether REQ-PIPE-169''s impact preview reports arrivals received
+      on or after a version''s effective date - filed under the new version at receipt rather than moved - as well as supplies
+      it would move. If it does not, criterion 10''s narrowed claim and criterion 26''s proof compute those filings with the
+      same implementation (REQ-PIPE-169 criterion 6), never a second rule.'
