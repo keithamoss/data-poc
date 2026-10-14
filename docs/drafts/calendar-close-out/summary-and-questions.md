@@ -749,3 +749,9 @@ Folded 2026-10-14. Each answer is a decision citing "Keith, 2026-10-14, follow-u
 - REQ-GEN-203: SIGNED by Keith, 2026-10-14, readers' status deferred to running-thoughts #95, REQ-PIPE-211 added as a dependency. Moved into requirements.yaml.
 - REQ-PIPE-163: SIGNED by Keith, 2026-10-14, with the nine amendments it carries approved in their exact wording (2, 11, 12, 18, 19, 20, 31, 32, 42). Replaced its older unsigned entry in requirements.yaml; removed from this draft.
 - REQ-DASH-182: sent to its own UX review at Keith's ask before signing (review-182-ux.md); his four answers recorded there; to be re-folded and presented again.
+
+## Keith's answers to the round 4 fold's questions (2026-10-14)
+
+- G1 (REQ-DASH-209 previous/next-period links): B (NOT the recommendation) - YES, previous and next period links beside the heading, keeping the date on show.
+- G2 (REQ-DASH-209 who decided): A - the page's own wording, "Decided by <name>" / "Applied automatically by the schedule".
+- G3 (REQ-GEN-205 which corrections a replay confirms): B (NOT the recommendation) - everything due, as today, unless the script says pending. The provisional "confirm only listed" criteria and amendment 44 (REQ-PIPE-170 c31) are withdrawn.
