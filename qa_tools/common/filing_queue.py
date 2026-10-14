@@ -312,6 +312,44 @@ def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     return ()
 
 
+@dataclass(frozen=True)
+class HeldRow:
+    """One held supply in the queue (REQ-PIPE-163 criteria 10 and 17): its
+    dataset and receipt in place of a period, why it was held in the hold's
+    own reason, and - for a pair held whole - both its files, counted once."""
+
+    dataset_id: str
+    dataset_name: str
+    supply: str
+    received_at: datetime | None
+    received_text: str
+    why: str
+    schedule_ended: bool
+    files: tuple[str, ...] = ()
+
+
+def held_in(conn: supply_db.SupplyConnection, collection_id: str) -> list[HeldRow]:
+    """Every supply the assignment rule holds in this collection, oldest
+    receipt first. One row per supply - a pair held whole is one supply."""
+    from qa_tools.common import display_time, hierarchy, supersession, supply_files
+    from qa_tools.common import supply_holds
+
+    datasets = {d.dataset_id: d for d in hierarchy.datasets_in_collection(collection_id)}
+    rows = []
+    for h in supply_holds.outstanding(conn):
+        if h.dataset_id not in datasets or h.kind != supply_holds.ASSIGNMENT_RULE:
+            continue
+        at = supersession._receipt(conn, h.dataset_id, h.supply_id)
+        contest = supply_files.open_contest(conn, h.dataset_id, h.supply_id)
+        rows.append(HeldRow(
+            dataset_id=h.dataset_id, dataset_name=datasets[h.dataset_id].dataset_name,
+            supply=h.supply_id, received_at=at,
+            received_text=display_time.format_instant(at) if at else "an unknown time",
+            why=h.describe(), schedule_ended=h.schedule_ended,
+            files=tuple(contest.files) if contest is not None else ()))
+    return sorted(rows, key=lambda r: (r.received_at is None, r.received_at or 0, r.supply))
+
+
 def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """(supply-scoped, period-scoped) - what is worth offering on this slot.
 

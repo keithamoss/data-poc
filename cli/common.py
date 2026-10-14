@@ -144,7 +144,8 @@ def require_tty(flag_hint: str) -> None:
         raise NotInteractive(flag_hint)
 
 
-def select(message: str, choices: list[str], flag_hint: str) -> str | None:
+def select(message: str, choices: list[str], flag_hint: str,
+           default: str | None = None) -> str | None:
     """A questionary select with the non-TTY guard already applied and a
     real "<- Back" choice always appended (the wizard back-navigation gap
     plans/tooling.md #1 flagged as a real, previously-undesigned hole).
@@ -156,7 +157,8 @@ def select(message: str, choices: list[str], flag_hint: str) -> str | None:
     prompt types, only Ctrl-C/Ctrl-Q; this docstring used to claim
     otherwise)."""
     require_tty(flag_hint)
-    answer = _ask(questionary.select(message, choices=[*choices, BACK], style=_QMARK_STYLE))
+    answer = _ask(questionary.select(message, choices=[*choices, BACK], style=_QMARK_STYLE,
+                                     **({"default": default} if default else {})))
     if answer is None or answer == BACK:
         return None
     return answer

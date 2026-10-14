@@ -383,7 +383,9 @@ def _check_shape(decision: Decision) -> None:
         raise DecisionRefused(
             "a refused inheritance names no supply - that is what it could not "
             "find. Recording one would say the opposite of what happened.")
-    if not decision.slots and decision.action != PROMOTION_REFUSED:
+    # A HELD SUPPLY HAS NO PERIOD, and a person may still reject it
+    # (REQ-PIPE-163 criterion 11) - judged in _judge, which can see the hold.
+    if (not decision.slots and decision.action not in (PROMOTION_REFUSED, REJECT)):
         raise DecisionRefused(
             "a decision needs at least one slot - which period it acts on")
     # A HELD SUPPLY HAS NO SLOT TO LEAVE - and only the filing rule re-files
@@ -394,9 +396,10 @@ def _check_shape(decision: Decision) -> None:
     # leaves - a confirmed correction whose calendar offers it no period
     # (REQ-PIPE-170 criterion 8), recorded as the rule's since Keith's answer
     # (o), 2026-10-11, naming who confirmed it.
-    if decision.action == REFILE and not (
-            (decision.to_slot and (decision.from_slot or decision.actor_kind == RULE))
-            or decision.from_slot):
+    # A PERSON'S RE-FILE FROM NO PERIOD IS A PLACEMENT (REQ-PIPE-163
+    # criteria 2 and 39) - accepted only where the supply is held, which is
+    # a fact about other rows and so judged in _judge, under the lock.
+    if decision.action == REFILE and not (decision.to_slot or decision.from_slot):
         raise DecisionRefused(
             "a re-file names both slots: the one the supply is in and the one it "
             "is moving to. One entry, not a demotion followed by a promotion.")
@@ -565,6 +568,22 @@ def _judge(conn: supply_db.SupplyConnection, decision: Decision) -> None:
     keeps the requirement honest: demand a reason for everything and the
     reasons become "ok" and the log stops meaning anything.
     """
+    if decision.action == REJECT and not decision.slots:
+        hold = supply_holds.hold_on(conn, decision.dataset_id, decision.supply or "")
+        if hold is None:
+            raise DecisionRefused(
+                "a decision needs at least one slot - which period it acts on. Only a held "
+                "supply, which has no period, is rejected without one.")
+    if (decision.action == REFILE and not decision.from_slot
+            and decision.actor_kind != RULE):
+        # REQ-PIPE-163 criterion 39: a person's re-file naming no period left
+        # is accepted where, and only where, it places a held supply.
+        hold = supply_holds.hold_on(conn, decision.dataset_id, decision.supply or "")
+        if hold is None or hold.kind != supply_holds.ASSIGNMENT_RULE:
+            raise DecisionRefused(
+                f"{decision.supply} is not held, so a re-file naming no period it leaves is "
+                f"refused: only a held supply is filed from no period, and that is a "
+                f"placement - `place`. A filed supply is re-filed from the period it is in.")
     needs_reason: str | None = None
     if decision.action == REJECT:
         needs_reason = "rejecting a supply"

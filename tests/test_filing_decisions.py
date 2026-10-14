@@ -107,14 +107,20 @@ class TestTheEightAreOneList:
     the other lacks, which is a property of there being one list."""
 
     def test_every_operation_is_a_real_decision_log_action(self):
+        """All but place, which the log records as a re-file from no period
+        by the person (REQ-PIPE-163 criterion 2)."""
         for operation in fd.OPERATIONS:
+            if operation == fd.PLACE:
+                assert dl.REFILE in dl.ACTIONS
+                continue
             assert operation in dl.ACTIONS, operation
 
-    def test_there_are_fifteen_of_them(self):
+    def test_there_are_sixteen_of_them(self):
         """Eight, REQ-PIPE-132's mark as not supplied (2026-10-05),
-        REQ-PIPE-161's excuse lateness and withdraw excuse (2026-10-11), and
-        REQ-PIPE-193's settlement of a pair (2026-10-13)."""
-        assert len(set(fd.OPERATIONS)) == 15
+        REQ-PIPE-161's excuse lateness and withdraw excuse (2026-10-11),
+        REQ-PIPE-193's settlement of a pair (2026-10-13) and REQ-PIPE-163's
+        placement of a held supply (2026-10-14)."""
+        assert len(set(fd.OPERATIONS)) == 16
         assert fd.MARK_NOT_SUPPLIED in fd.PERIOD_SCOPED
 
     def test_supply_scoped_and_period_scoped_partition_them(self):

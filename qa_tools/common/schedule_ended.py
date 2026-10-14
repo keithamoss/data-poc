@@ -99,7 +99,7 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
     one's receipt, oldest receipt first, as a rule re-file owing a re-check -
     the one loop both a schedule-ended hold (REQ-PIPE-154) and a hold on a
     refused dataset (REQ-PIPE-173) are drained by once their cause is gone."""
-    from qa_tools.common import (decision_log, filing, hierarchy, qa_store, recheck,
+    from qa_tools.common import (decision_log, filing, hierarchy, placing, qa_store,
                                  replay_clock)
 
     done: list[tuple[str, str, str]] = []
@@ -124,16 +124,12 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
             if slot is None:
                 continue
             entry = hierarchy.dataset(h.dataset_id)
-            with decision_log.apply_decision(conn, decision_log.Decision(
-                    agency_id=entry.agency_id, collection_id=entry.collection_id,
-                    dataset_id=h.dataset_id, action=decision_log.REFILE, supply=h.supply_id,
-                    actor=ACTOR, actor_kind=decision_log.RULE,
-                    effective_at=replay_clock.now().isoformat(),
-                    from_slot=None, to_slot=slot.name,
-                    reason=reason(h, slot.name))) as entry_id:
-                filing.refile(conn, h.dataset_id, h.supply_id, slot.name, decision_id=entry_id)
-                recheck.owe(conn, dataset_id=h.dataset_id, supply_id=h.supply_id,
-                            decision_id=entry_id)
+            # THE ONE PLACER (REQ-PIPE-163 criterion 40).
+            placing.place(
+                conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+                dataset_id=h.dataset_id, supply=h.supply_id, to_period=slot.name,
+                actor=ACTOR, actor_kind=decision_log.RULE,
+                effective_at=replay_clock.now().isoformat(), reason=reason(h, slot.name))
             say(said(h, slot.name))
             done.append((h.dataset_id, h.supply_id, slot.name))
     return done

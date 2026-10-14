@@ -324,8 +324,10 @@ class TestTheTargetPrompt:
         first, second = (slots.relative_period(DS, period, 1),
                          slots.relative_period(DS, period, 2))
         answers = iter([first, second])
-        monkeypatch.setattr(common, "require_tty", lambda *a, **k: None)
-        monkeypatch.setattr(common, "_ask", lambda *a, **k: next(answers))
+        from cli import filing_tui
+
+        # CHOSEN, NOT TYPED (REQ-PIPE-163 criterion 42): the shared chooser.
+        monkeypatch.setattr(filing_tui, "choose_period", lambda *a, **k: next(answers))
         monkeypatch.setattr(settlement, "open_pair_in",
                             lambda conn, ds, p, besides: (f"{p} has two files of its own"
                                                           if p == first else None))

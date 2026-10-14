@@ -74,20 +74,27 @@ WITHDRAW_EXCUSE = decision_log.WITHDRAW_EXCUSE
 #: offered on the TERMINAL route only (criterion 1).
 CHOOSE_FILE = decision_log.CHOOSE_FILE
 
+#: The sixteenth (REQ-PIPE-163): place a HELD supply into a period. Recorded
+#: in the log as a re-file from no period by the person (criterion 2), so it
+#: is not one of the log's actions - but every route calls it place
+#: (criterion 41). Supply-scoped, person only, reason required, terminal only.
+PLACE = "place"
+
 OPERATIONS = (PROMOTE, REJECT, DEMOTE, REFILE, SUBSTITUTE, DE_SUBSTITUTE,
               INHERIT, UN_INHERIT, MARK_NOT_SUPPLIED, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE)
+              EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE)
 
 #: Offered on the terminal and never on GitHub (REQ-PIPE-193 criteria 1 and
 #: 16; Keith, 2026-10-13: "given the complexity of this, the choices and the
-#: options here ... just via the terminal").
-TERMINAL_ONLY = (CHOOSE_FILE,)
+#: options here ... just via the terminal"). Placing too (REQ-PIPE-163
+#: criterion 14), which offers its periods as a choice.
+TERMINAL_ONLY = (CHOOSE_FILE, PLACE)
 
 #: The four that act on a SUPPLY - "what do I do with this thing that
 #: arrived" - and so belong in the queue of supplies awaiting a decision
 #: (criterion 16).
 SUPPLY_SCOPED = (PROMOTE, REJECT, DEMOTE, REFILE, ACKNOWLEDGE, SUPERSEDE, UN_SUPERSEDE,
-                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE)
+                 EXCUSE_LATENESS, WITHDRAW_EXCUSE, CHOOSE_FILE, PLACE)
 
 #: The four that act on a PERIOD - how it is filled when a supply for it
 #: never came. None of them answers a question about an arriving supply,
@@ -186,6 +193,9 @@ class Outcome:
     #: the processing pass for a decision made on GitHub (Keith, 2026-10-05).
     #: A TUPLE since a settlement owes up to two (REQ-PIPE-193 criterion 21).
     owed: tuple[int, ...] = ()
+    #: Whether the owed checks finished where a route ran them while the
+    #: person waited (REQ-PIPE-163 criterion 28) - None where none ran.
+    checks_finished: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -294,6 +304,8 @@ def consequences(conn, request: Request) -> Consequences:
             done.append(f"The substitution of {period} onto {h.stands_on} was removed.")
     if request.operation == REFILE and request.supply and request.to_period:
         lines, done = _refile_consequences(conn, request)
+    if request.operation == PLACE:
+        lines, done = _place_consequences(conn, request)
     notes: list[str] = []
     if request.operation == CHOOSE_FILE:
         lines, done, notes = _settlement_consequences(conn, request)
@@ -466,11 +478,47 @@ def _refile_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
     return lines, done
 
 
-def terminal_only_reply(dataset_id: str, period: str | None) -> str:
+def place_plan(conn, request: Request):
+    """The placement's one plan, refused here where it cannot happen - so
+    every route is refused before anyone is asked (REQ-PIPE-163)."""
+    from qa_tools.common import placing
+
+    if not request.supply:
+        raise decision_log.DecisionRefused(
+            "a placement names the held supply, with --supply.")
+    if not request.to_period:
+        raise decision_log.DecisionRefused(
+            "a placement names the period it goes into, with --to-period.")
+    return placing.plan(conn, dataset_id=request.dataset_id, supply=request.supply,
+                        to_period=request.to_period)
+
+
+def _place_consequences(conn, request: Request) -> tuple[list[str], list[str]]:
+    """A placement does nothing beyond its own slot - except for an open
+    pair held whole, whose SECOND file moves with it (criterion 37), which
+    is named and confirmed."""
+    p = place_plan(conn, request)
+    if not p.is_pair:
+        return [], []
+    first, *rest = p.pair_files
+    return ([f"Both files of this pair are placed into {p.to_period}, still contested: "
+             f"{first} and {', '.join(rest)}. Neither is checked or promoted until the "
+             f"pair is settled there, by saying what each file is."],
+            [f"Both files ({' and '.join(p.pair_files)}) were placed, still contested."])
+
+
+def terminal_only_reply(dataset_id: str, period: str | None,
+                        operation: str = CHOOSE_FILE) -> str:
     """What the GitHub route says to a choose-file comment (REQ-PIPE-193
     criterion 16): made in the terminal, and where - the pair's files named
-    as code, never a command to paste."""
+    as code, never a command to paste. And to a place comment (REQ-PIPE-163
+    criterion 36), in the same terms."""
     from qa_tools.common import dataset_blockers, supply_files
+
+    if operation == PLACE:
+        return (f"Placing a held supply into a period is made in the terminal, not on "
+                f"GitHub - it offers the periods it can go into as a choice. It is made at "
+                f"'{supply_files.where_to_settle(dataset_id)}'.")
 
     files: tuple[str, ...] = ()
     try:
@@ -558,7 +606,8 @@ def _settlement_consequences(conn, request: Request
 def _spoken(operation: str) -> str:
     """The operation as a person writes it - `re-file`, as the menu and the
     warnings say it, never the identifier (#115, W8)."""
-    return {REFILE: "re-file", CHOOSE_FILE: "settlement"}.get(operation, operation)
+    return {REFILE: "re-file", CHOOSE_FILE: "settlement",
+            PLACE: "placement"}.get(operation, operation)
 
 
 def offered(operation: str) -> str:
@@ -789,6 +838,13 @@ def _apply_one(conn, request: Request, reason: str, *, effective_at: str) -> tup
                                collection_id=entry.collection_id,
                                actor=request.actor_name, reason=reason,
                                effective_at=effective_at),)
+    elif request.operation == PLACE:
+        # REQ-PIPE-163: placing owns the effect, through the one placer.
+        from qa_tools.common import placing
+
+        return placing.apply(conn, place_plan(conn, request), agency_id=entry.agency_id,
+                             collection_id=entry.collection_id, actor=request.actor_name,
+                             reason=reason, effective_at=effective_at)
     elif request.operation == CHOOSE_FILE:
         # REQ-PIPE-193: settlement owns the effect, from the plan the
         # warning was built from.
@@ -869,13 +925,16 @@ def _refuse_promoting_where_it_is_not_filed(conn, request: Request) -> None:
             f"against {request.period}. A supply is promoted only into the period it "
             f"is filed to. Nothing was recorded.")
     if where is None:
+        # THE HOLD'S OWN RESPONSES (REQ-PIPE-163 criterion 38), each command
+        # on a line of its own.
+        from qa_tools.common import supply_holds
+
+        held = supply_holds.hold_on(conn, request.dataset_id, request.supply)
         raise decision_log.DecisionRefused(
             f"{request.supply} is held - it arrived when no period of "
             f"{request.dataset_id} was open - so its data has never been checked against "
-            f"{request.period}, and it cannot be promoted there. Reject it, or correct the "
-            f"calendar if a period should have been open (`mothman schedule "
-            f"draft-correction`) - `mothman supply holds` lists it with what can be done. "
-            f"Nothing was recorded.")
+            f"{request.period}, and it cannot be promoted there. Nothing was recorded.\n"
+            + held_responses(request.dataset_id, request.supply, held))
     if where != request.period:
         raise decision_log.DecisionRefused(
             f"{request.supply} is filed to {where}, not {request.period}, so its checks ran "
@@ -885,6 +944,23 @@ def _refuse_promoting_where_it_is_not_filed(conn, request: Request) -> None:
             f"--period {where} --supply {request.supply} --to-period {request.period} "
             f"--reason '<why>'")
     _refuse_promoting_what_is_not_checked_there(conn, request)
+
+
+def held_responses(dataset_id: str, supply: str, held) -> str:
+    """What can be done about a held supply, as its hold's label works them
+    out (REQ-PIPE-163 criteria 12 and 38): place - its menu path and flag
+    form - or reject, for a plain hold; adding dates for a schedule-ended one.
+    Each command on a line of its own."""
+    from qa_tools.common import placing
+
+    if held is not None and held.schedule_ended:
+        return ("Add the next delivery dates to contract/calendar.yaml and it files itself. "
+                "Where a declared correction is needed:\n  mothman schedule draft-correction")
+    return (f"Place it into the period it belongs to, at '{placing.where_to_decide(dataset_id)}', "
+            f"or:\n  {placing.flag_form(dataset_id, supply)}\n"
+            f"Or reject it:\n"
+            f"  mothman supply decide --operation reject --dataset {dataset_id} "
+            f"--supply {supply} --reason '<why>'")
 
 
 def _refuse_promoting_what_is_not_checked_there(conn, request: Request) -> None:
@@ -1058,6 +1134,16 @@ def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:
             terminal_only=request.operation in TERMINAL_ONLY)
 
     owed = _apply_one(conn, request, reason, effective_at=effective_at)
+    if request.operation == PLACE:
+        # CALLED A PLACEMENT (criterion 41), never "re-file None -> period".
+        from qa_tools.common import placing
+
+        return Outcome(
+            operation=PLACE, dataset_id=request.dataset_id, period=request.to_period,
+            changed=True, owed=owed,
+            message=(f"{request.supply} {placing.said(request.to_period)} for "
+                     f"{request.dataset_id}, by {request.actor_name}."
+                     + "".join(f" {line}" for line in found.done)))
     return Outcome(
         operation=request.operation, dataset_id=request.dataset_id,
         period=request.period, changed=True, owed=owed,

@@ -37,7 +37,7 @@ def reject(conn: supply_db.SupplyConnection, *,
            actor: str,
            effective_at: str,
            reason: str,
-           from_slot: str,
+           from_slot: str | None,
            actor_kind: str = decision_log.PERSON,
            promoted: bool = False) -> None:
     """Move this supply to the rejected schema and record the decision.

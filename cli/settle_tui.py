@@ -162,30 +162,25 @@ def _pick(message: str, options: list[Option]) -> Option | None:
         console.print(f"Not available: {picked.unavailable}.", style="yellow")
 
 
-def _next_period(dataset_id: str, period: str) -> str | None:
+def _target(dataset_id: str, period: str, filename: str, taken: str | None, *,
+            besides: str | None = None, received_at=None) -> str | None:
+    """Which period a re-filed file belongs to, CHOSEN, never typed (REQ-PIPE-163
+    criterion 42, amending criterion 19): the shared period chooser, opening on
+    the periods nearest the file's receipt. A refused target says why and is
+    offered again, before the reason is asked and keeping both files' answers."""
+    from cli import filing_tui
+    from qa_tools.common import refiling
+
     from qa_tools.common import slots
 
     try:
-        return slots.relative_period(dataset_id, period, 1)
-    except Exception:  # noqa: BLE001 - no default is still a question
-        return None
-
-
-def _target(dataset_id: str, period: str, filename: str, taken: str | None, *,
-            besides: str | None = None) -> str | None:
-    """Which period a re-filed file belongs to, the next period offered as
-    the default (criterion 19). A refused target says why and asks again,
-    before the reason is asked and keeping both files' answers."""
-    import questionary
-
-    from qa_tools.common import refiling
-
-    default = _next_period(dataset_id, period) or ""
+        following = slots.relative_period(dataset_id, period, 1)
+    except Exception:  # noqa: BLE001 - the chooser still opens, with no first choice
+        following = None
     while True:
-        common.require_tty(_FLAG_HINT)
-        answer = common._ask(questionary.text(
-            f"Which period does {filename} belong to?", default=default))
-        answer = (answer or "").strip()
+        answer = filing_tui.choose_period(dataset_id, received_at,
+                                          f"Which period does {filename} belong to?",
+                                          first=following)
         if not answer:
             return None
         why = None
@@ -234,7 +229,8 @@ def _ask_file(dataset_id: str, period: str, files, n: int,
         if picked.outcome != REFILE:
             return settlement.Answer(f.filename, picked.outcome)
         to = _target(dataset_id, period, f.filename,
-                     first.to_period if first is not None else None, besides=besides)
+                     first.to_period if first is not None else None, besides=besides,
+                     received_at=f.received_at)
         if to is not None:
             return settlement.Answer(f.filename, REFILE, to)
         # A BLANK PERIOD is "not re-file after all": this file's question

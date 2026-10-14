@@ -76,7 +76,9 @@ KINDS = (ASSIGNMENT_RULE,)
 #: whose record does not carry the resolution path is indistinguishable
 #: from a bug (NFR 2), and the two kinds genuinely need different acts.
 RESPONSES = {
-    ASSIGNMENT_RULE: ("file it to a slot yourself",
+    # PLACE, THE OPERATION THAT NOW EXISTS (REQ-PIPE-163 criterion 12) - it
+    # said "file it to a slot yourself" while there was no way to.
+    ASSIGNMENT_RULE: ("place it into the period it belongs to",
                        "reject the supply"),
 }
 
@@ -212,9 +214,30 @@ class Held:
             # NOT PROMOTE (post-build-review #173): a held supply's data was
             # never checked against a period, so promoting it is refused. A
             # re-file is refused too - it has no period to leave.
-            return ("declare a correction adding a date that covers its receipt",
+            return (self._place_response(),
+                    "declare a correction adding a date that covers its receipt",
                     "reject the supply")
+        if self.kind == ASSIGNMENT_RULE:
+            return (self._place_response(), "reject the supply")
         return RESPONSES.get(self.kind, ())
+
+    def _place_response(self) -> str:
+        """Place, naming the terminal screen and the exact command, its
+        supply and dataset filled in (REQ-PIPE-163 criterion 12)."""
+        from qa_tools.common import placing
+
+        return (f"{RESPONSES[ASSIGNMENT_RULE][0]} - at '{placing.where_to_decide(self.dataset_id)}', "
+                f"or `{placing.flag_form(self.dataset_id, self.supply_id)}`")
+
+    @property
+    def place_command(self) -> str | None:
+        """The command that places it, or None where placing is not how this
+        hold is resolved (schedule ended, agreement refused)."""
+        from qa_tools.common import placing
+
+        if self.schedule_ended or self.agreement_refused or self.kind != ASSIGNMENT_RULE:
+            return None
+        return placing.flag_form(self.dataset_id, self.supply_id)
 
     @property
     def correction(self) -> str | None:

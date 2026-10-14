@@ -82,6 +82,12 @@ class Outcome:
     #: Not run because the agreement backstop refuses its dataset (Keith,
     #: 2026-10-11, morning-report (f)) - left owed, and not a failure.
     frozen: bool = False
+    #: Where a completed re-check left the supply, for the one outcome panel
+    #: (REQ-PIPE-163 criteria 19 and 26): the period it was checked against,
+    #: whether the gate promoted it, and - where it did not - why it waits.
+    period: str | None = None
+    promoted: bool | None = None
+    waits_because: str | None = None
 
 
 _OWED_COLUMNS = ("id", "kind", "dataset_id", "supply_id", "period", "caused_by_decision",
@@ -349,13 +355,12 @@ def _run_claimed(owed_id: int, *, run_by: str | None = None, on_step=None) -> Ou
             verdict = None
     # THE OUTCOME, NOT TWO IDS (post-build-review #115, D5): what it came out
     # as against which period, and whether the gate promoted it.
-    if item.dataset_id in gated.promoted:
-        then = f"Promoted into {period}."
-    else:
-        then = (f"Not promoted - {gated.refused.get(item.dataset_id) or 'it waits for a person'}.")
+    promoted = item.dataset_id in gated.promoted
+    why = None if promoted else (gated.refused.get(item.dataset_id) or "it waits for a person")
+    then = f"Promoted into {period}." if promoted else f"Not promoted - {why}."
     return Outcome(item.id, run_key, True,
                    f"Checked against {period}: {verdict or 'no verdict'}. {then}",
-                   status=verdict)
+                   status=verdict, period=period, promoted=promoted, waits_because=why)
 
 
 def _cause_instant(item) -> str:

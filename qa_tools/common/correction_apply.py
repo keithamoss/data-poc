@@ -511,21 +511,16 @@ def _entry(dataset_id: str):
 
 def _place(conn, m, entry, email: str, reference: str, effective_at: str, ids=None):
     """A held supply the corrected calendar now covers is filed by the rule,
-    as REQ-PIPE-154's drain files one, naming who confirmed it."""
-    from qa_tools.common import filing, recheck
+    through the one placer (REQ-PIPE-163 criterion 40), naming who confirmed
+    it."""
+    from qa_tools.common import placing
 
-    with decision_log.apply_decision(conn, decision_log.Decision(
-            agency_id=entry.agency_id, collection_id=entry.collection_id,
-            dataset_id=m.dataset_id, action=decision_log.REFILE, supply=m.supply_id,
-            actor=RULE_ACTOR, actor_kind=decision_log.RULE, effective_at=effective_at,
-            from_slot=None, to_slot=m.to_period,
-            reason=f"Correction {reference}, confirmed by {email}: the corrected calendar "
-                   f"files it to {m.to_period}.")) as entry_id:
-        filing.refile(conn, m.dataset_id, m.supply_id, m.to_period, decision_id=entry_id)
-        if ids is not None:
-            ids.append(entry_id)
-        return recheck.owe(conn, dataset_id=m.dataset_id, supply_id=m.supply_id,
-                           decision_id=entry_id)
+    return placing.place(
+        conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
+        dataset_id=m.dataset_id, supply=m.supply_id, to_period=m.to_period,
+        actor=RULE_ACTOR, actor_kind=decision_log.RULE, effective_at=effective_at,
+        reason=f"Correction {reference}, confirmed by {email}: the corrected calendar "
+               f"files it to {m.to_period}.", entry_out=ids)
 
 
 def _hold(conn, m, entry, email: str, reference: str, why: str, effective_at: str,

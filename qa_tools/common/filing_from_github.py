@@ -128,7 +128,7 @@ def read(comment: Comment) -> filing_decisions.Request:
         # MADE IN THE TERMINAL, NEVER HERE (REQ-PIPE-193 criterion 16): the
         # GitHub intake knows the operation's name, and appends nothing.
         raise decision_log.DecisionRefused(
-            filing_decisions.terminal_only_reply(dataset_id, period))
+            filing_decisions.terminal_only_reply(dataset_id, period, match.group("name")))
     arguments = {m.group("key").lower(): m.group("value")
                  for m in _ARGUMENT.finditer(match.group("rest"))}
 

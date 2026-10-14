@@ -101,6 +101,8 @@ _WHAT_IT_DOES = {
                                        "again"),
     # NEVER 'choose-file' ON A SCREEN (REQ-PIPE-193 criterion 27).
     filing_decisions.CHOOSE_FILE: "settle - say what each file is",
+    # REACHED FROM A HELD SUPPLY'S ROW (REQ-PIPE-163 criterion 10), never a slot's.
+    filing_decisions.PLACE: "place - say which period this held supply belongs to",
 }
 
 #: The same operations on ANOTHER VERSION WAITING in a promoted period
@@ -121,17 +123,19 @@ _NAMES_THE_SUPPLY = (filing_decisions.PROMOTE, filing_decisions.REJECT,
                      filing_decisions.DEMOTE, filing_decisions.SUPERSEDE,
                      filing_decisions.UN_SUPERSEDE, filing_decisions.ACKNOWLEDGE,
                      filing_decisions.REFILE, filing_decisions.EXCUSE_LATENESS,
-                     filing_decisions.WITHDRAW_EXCUSE)
+                     filing_decisions.WITHDRAW_EXCUSE, filing_decisions.PLACE)
 
 #: How an operation reads as a NOUN in a prompt - "this acknowledge" was
 #: the verb doing a noun's job (#107).
 _NOUN = {filing_decisions.ACKNOWLEDGE: "acknowledgement", filing_decisions.REFILE: "re-file",
+         filing_decisions.PLACE: "placement",
          filing_decisions.EXCUSE_LATENESS: "excuse",
          filing_decisions.WITHDRAW_EXCUSE: "withdrawal of the excuse"}
 
 #: Decisions whose reason is PUBLISHED beside the supply on the dashboard
 #: (REQ-PIPE-161 criterion 18), said when the reason is asked for.
-_PUBLISHED_REASON = (filing_decisions.EXCUSE_LATENESS, filing_decisions.WITHDRAW_EXCUSE)
+_PUBLISHED_REASON = (filing_decisions.EXCUSE_LATENESS, filing_decisions.WITHDRAW_EXCUSE,
+                     filing_decisions.PLACE)
 
 _HOW_IT_READS = {
     slot_state.NOT_YET_DUE: "[dim]not yet due[/dim]",
@@ -253,14 +257,15 @@ def _refused(exc: Exception, operation: str, *, flag_route: bool) -> None:
     _show(text, title=f"{operation} refused", style="red")
 
 
-def apply_decision(*, operation: str, dataset_id: str, period: str,
+def apply_decision(*, operation: str, dataset_id: str, period: str | None,
                    supply: str | None = None, stands_on: str | None = None,
                    to_period: str | None = None, reason: str | None = None,
                    actor: dict | None = None,
                    yes: bool = False,
                    acknowledged: str | None = None,
                    through_period: str | None = None,
-                   flag_route: bool = False) -> filing_decisions.Outcome | None:
+                   flag_route: bool = False,
+                   wait: bool = False) -> filing_decisions.Outcome | None:
     """Collect what is missing, confirm, apply, and say what happened.
 
     RETURNS None WHERE NOTHING WAS APPENDED and an Outcome where the
@@ -305,8 +310,12 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
             console.print("No reason given - nothing recorded.", style="yellow")
             return None
 
-    where = f"{dataset_id} {period}" + (f" -> {to_period}" if to_period else "") \
+    where = f"{dataset_id}" + (f" {period}" if period else "") \
+        + (f" -> {to_period}" if to_period else "") \
         + (f" to {through_period}" if through_period else "")
+    if operation == filing_decisions.PLACE:
+        # SAID AS A PLACEMENT (REQ-PIPE-163 criterion 41), never "None -> period".
+        where = f"{dataset_id}, into {to_period}"
     if supply and operation in _NAMES_THE_SUPPLY:
         where += f" (the supply that arrived {arrived(supply)})"
     request = filing_decisions.Request(
@@ -391,8 +400,17 @@ def apply_decision(*, operation: str, dataset_id: str, period: str,
     if outcome.changed:
         console.print(Panel(Text(outcome.message, style="bold green"),
                              title="Recorded", border_style="green", expand=False))
-        for owed_id in outcome.owed:
-            _run_owed(owed_id)
+        if outcome.owed and flag_route and not wait:
+            # THE FLAG ROUTE DOES NOT WAIT (REQ-PIPE-163 criteria 4 and 32):
+            # the checks are owed, and the processing pass runs them.
+            _show("Its checks are owed. The processing pass runs them - it runs every "
+                  "owed QA run, not only this one:\nmothman pipeline process",
+                  title="Checks owed", style="yellow")
+        elif outcome.owed:
+            finished = all(_run_owed(owed_id, operation=operation, supply=supply,
+                                     to_period=to_period or period)
+                           for owed_id in outcome.owed)
+            outcome = dataclasses.replace(outcome, checks_finished=finished)
         _follow_up(hierarchy.dataset(dataset_id).collection_id)
         filing_decisions.reconcile_after(
             outcome, hierarchy.dataset(dataset_id).collection_id)
@@ -423,26 +441,83 @@ def _follow_up(collection_id: str) -> None:
                                 border_style="yellow", expand=False))
 
 
-def _run_owed(owed_id: int) -> None:
+#: decide --wait's exit code where the decision stands and its checks are
+#: still owed - the run failed, was stopped, or is being run elsewhere
+#: (REQ-PIPE-163 criterion 28). Distinct from 0 and from 1.
+CHECKS_STILL_OWED_EXIT = 3
+
+
+def _run_owed(owed_id: int, *, operation: str = filing_decisions.REFILE,
+              supply: str | None = None, to_period: str | None = None) -> bool:
     """The decision's re-check, run while the person waits (REQ-PIPE-140;
-    Keith, 2026-10-05). A run that breaks leaves the decision recorded and
-    the re-check owed, and says so - the processing pass finishes it."""
+    Keith, 2026-10-05), ending with the one outcome panel (REQ-PIPE-163
+    criteria 19 and 26). A run that breaks, or is stopped with Ctrl-C,
+    leaves the decision recorded and the re-check owed, and says so - the
+    processing pass finishes it. Returns whether the checks finished."""
     from qa_tools.common import recheck
 
-    console.print("Checking it again against its period - this runs the four QA "
-                  "tools and takes a minute or so.", style="dim")
+    console.print("Checking it against its period - this runs the four QA tools and takes "
+                  "a minute or so. Ctrl-C stops it; the decision stands either way.",
+                  style="dim")
     try:
         got = recheck.run(owed_id, on_step=lambda label: console.print(f"  {label}",
                                                                      style="dim"))
     except recheck.RecheckRefused as exc:
-        console.print(f"Not checked again: {exc}. It stays owed.", style="yellow")
-        return
-    # GREEN ONLY FOR A GREEN OR AMBER RESULT (post-build-review #115, D5): a
-    # red re-check that completed is not good news.
-    style = ("green" if got.completed and got.status in ("green", "amber")
-             else "red" if got.completed and got.status == "red" else "yellow")
-    console.print(Panel(Text(got.message), title="Checked again" if got.completed
-                        else "Check owed", border_style=style, expand=False))
+        got = recheck.Outcome(owed_id, "", False, str(exc))
+    except KeyboardInterrupt:
+        # Criterion 29: no traceback - the decision stands, its checks owed.
+        got = recheck.Outcome(owed_id, "", False, "stopped with Ctrl-C")
+    text, title, style = outcome_panel(operation, supply, to_period, got)
+    _show(text, title=title, style=style)
+    return got.completed
+
+
+_STANDS = {filing_decisions.PLACE: "placement", filing_decisions.REFILE: "re-file"}
+
+
+def outcome_panel(operation: str, supply: str | None, period: str | None,
+                  got) -> tuple[str, str, str]:
+    """THE ONE OUTCOME PANEL for a placement, a re-file and a re-check
+    (REQ-PIPE-163 criteria 19 and 26): where the supply now stands - its
+    period, its verdict and what the gate did. Never 'rejected' or 'refused'
+    for a gate outcome (criterion 20) - those words name a person's
+    decision. Returns (text, title, style); a `mothman` line in the text is
+    printed below the panel."""
+    from qa_tools.common import recheck
+
+    decision = _STANDS.get(operation, "decision")
+    who = supply or "The supply"
+    if not got.completed and got.message == recheck.CLAIMED_ELSEWHERE:
+        # Criterion 30: no verdict shown.
+        return (f"Its checks are being run elsewhere and will finish there. The {decision} "
+                f"stands.", "Being run elsewhere", "blue")
+    if not got.completed:
+        why = _gate_words(got.message)
+        return (f"The {decision} stands. Its checks did not finish ({why}), so they are "
+                f"still owed - the processing pass will finish them:\nmothman pipeline "
+                f"process", "Checks still owed", "yellow")
+    where = got.period or period or "its period"
+    lines = [f"{who} is filed to {where}, checked {got.status or 'without a verdict'}."]
+    if operation == filing_decisions.PLACE:
+        lines.append(f"It had not been checked in {where} before.")
+    if got.promoted:
+        lines.append(f"The promotion gate promoted it into {where}.")
+    else:
+        lines.append(f"It is waiting in {where}: filed, and nothing is lost. The promotion "
+                     f"gate did not promote it - {_gate_words(got.waits_because or 'it waits for a person')}. "
+                     f"Promote or reject it next, at Filing decisions > Supplies waiting on a "
+                     f"decision.")
+    style = ("green" if got.status in ("green", "amber") else
+             "red" if got.status == "red" else "yellow")
+    return " ".join(lines), "Where it stands now", style
+
+
+def _gate_words(text: str) -> str:
+    """A gate's own reason, in words that cannot be read as a person's
+    decision (criterion 20)."""
+    import re
+
+    return re.sub(r"\b(refused|rejected)\b", "held back", text or "", flags=re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -584,8 +659,10 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
             return
         supply = by_label[picked_version]
     if operation == filing_decisions.REFILE:
-        to_period = common.text_prompt("Which period should it move to?",
-                                        flag_hint=_FLAG_HINT)
+        # CHOSEN, NEVER TYPED (REQ-PIPE-163 criterion 16), opening on the
+        # periods nearest the supply's receipt.
+        to_period = choose_period(state.dataset_id, _receipt_of(state.dataset_id, supply),
+                                  "Which period should it move to?")
         if to_period is None:
             return
     if operation == filing_decisions.SUBSTITUTE:
@@ -655,6 +732,7 @@ def queue_flow(collection_id: str) -> None:
         with open_log() as conn:
             waiting = filing_queue.awaiting(conn, collection_id)
             gaps = filing_queue.closed_gaps(conn, collection_id)
+            held = filing_queue.held_in(conn, collection_id)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
@@ -673,20 +751,198 @@ def queue_flow(collection_id: str) -> None:
         console.print("[dim]Answer one from the period door, or `mothman supply decide "
                        "--operation mark-not-supplied --dataset <id> --period <p> "
                        "--reason <why>`.[/dim]\n")
-    if not waiting:
+    if held:
+        # HELD SUPPLIES, THEIR OWN GROUP ABOVE THE SLOT ROWS (REQ-PIPE-163
+        # criterion 17): a dataset and a receipt in place of a period, and why
+        # it was held in the hold's own reason (criterion 10).
+        console.print(f"[bold]Held - no period yet ({len(held)})[/bold]")
+        console.print(held_table(held))
+        console.print()
+    if not waiting and not held:
         if not gaps:
             console.print(f"Nothing is waiting on a person in "
                            f"{_collection_name(collection_id)}.", style="green")
         return
-    console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
-                   f"decision in {_collection_name(collection_id)}\n")
-    console.print(queue_table(waiting))
-    console.print()
-    state = _pick_slot(waiting, "Which one?")
+    if waiting:
+        console.print(f"[bold]{len(waiting)}[/bold] supply/supplies waiting on a "
+                       f"decision in {_collection_name(collection_id)}\n")
+        console.print(queue_table(waiting))
+        console.print()
+    if held:
+        labels = {_held_label(h): h for h in held}
+        labels.update({_label(s): s for s in waiting})
+        picked = common.select("Which one?", list(labels), flag_hint=_FLAG_HINT)
+        if picked is None:
+            return
+        chosen = labels[picked]
+        if isinstance(chosen, filing_queue.HeldRow):
+            held_flow(chosen)
+            return
+        state = chosen
+    else:
+        state = _pick_slot(waiting, "Which one?")
     if state is None:
         return
     supply_scoped, _period_scoped = filing_queue.operations_for(state)
     _decide_on(state, offer=supply_scoped + _excuse_offers(state))
+
+
+def held_table(held) -> Table:
+    """The held group: dataset, receipt on the asset's clock, and why."""
+    table = Table("Dataset", "Received", "Why it is held", box=None, pad_edge=False)
+    for h in held:
+        table.add_row(h.dataset_name, h.received_text, h.why)
+    return table
+
+
+def _held_label(h) -> str:
+    return f"Held: {h.dataset_name}, received {h.received_text} - {h.supply}"
+
+
+def held_flow(h) -> None:
+    """What a person can do about one held supply (REQ-PIPE-163 criteria 10
+    and 22): place or reject it - or, where its schedule ended, add dates,
+    which is configuration, so nothing is offered to choose."""
+    from qa_tools.common import placing
+
+    if h.schedule_ended:
+        _show(f"{h.why}\nAdd the next delivery dates to contract/calendar.yaml - it files "
+              f"itself on the next processing pass. Where a declared correction is "
+              f"needed:\nmothman schedule draft-correction",
+              title="Held - its schedule has ended", style="yellow")
+        return
+    if h.files:
+        console.print(f"Two files of one delivery are held together: "
+                      f"{' and '.join(h.files)}. Placing puts both into the period, still "
+                      f"contested, to be settled there.", style="dim")
+    place = "place - say which period it belongs to"
+    reject = "reject - it is not fit for any period"
+    picked = common.select(f"{h.supply}: what now?", [place, reject], flag_hint=(
+        placing.flag_form(h.dataset_id, h.supply)))
+    if picked == place:
+        place_flow(h)
+    elif picked == reject:
+        apply_decision(operation=filing_decisions.REJECT, dataset_id=h.dataset_id,
+                       period=None, supply=h.supply)
+
+
+_EARLIER = "Earlier periods"
+_LATER = "Later periods"
+
+
+def choose_period(dataset_id: str, received_at, message: str,
+                  first: str | None = None) -> str | None:
+    """THE PERIOD CHOOSER (REQ-PIPE-163 criterion 16): periods offered as a
+    choice, never typed - opening on the nearest either side of the receipt,
+    owed-nothing periods shown in place and not selectable, paging earlier
+    and later. Used to place a held supply, to re-file one, and for a
+    settlement's re-file target (criterion 42). None on Back."""
+    import questionary
+
+    from qa_tools.common import placing
+
+    with open_log() as conn:
+        states = {s.period: s.state for s in filing_queue.slots_of(
+            conn, hierarchy.dataset(dataset_id).collection_id, dataset_id=dataset_id)}
+    page = 0
+    while True:
+        got = placing.period_choices(dataset_id, received_at, states, page=page)
+        choices: list = []
+        if got.has_earlier:
+            choices.append(_EARLIER)
+        for row in got.rows:
+            choices.append(row.label if row.selectable
+                           else questionary.Separator(f"  {row.label}"))
+        if got.has_later:
+            choices.append(_LATER)
+        # THE FIRST CHOICE, where the caller names one (REQ-PIPE-193 criterion
+        # 19: a settlement's re-file target opens on the next period).
+        default = next((r.label for r in got.rows if r.period == first), None)
+        picked = common.select(message, choices, flag_hint="--to-period <period>",
+                               default=default)
+        if picked is None:
+            return None
+        if picked == _EARLIER:
+            page -= 1
+            continue
+        if picked == _LATER:
+            page += 1
+            continue
+        return next(r.period for r in got.rows if r.label == picked)
+
+
+def place_flow(h) -> None:
+    """Place a held supply (REQ-PIPE-163): choose the period, see how it
+    would read there before the reason is asked (criterion 18), then the
+    one decision path - whose run, while the person waits, ends with the
+    outcome panel (criteria 3 and 19). A period refused is offered again."""
+    from qa_tools.common import placing
+
+    while True:
+        target = choose_period(h.dataset_id, h.received_at,
+                               f"Which period does {h.dataset_name}'s supply belong to?")
+        if target is None:
+            return
+        try:
+            with open_log() as conn:
+                p = placing.plan(conn, dataset_id=h.dataset_id, supply=h.supply,
+                                 to_period=target)
+        except decision_log.DecisionRefused as exc:
+            _refused(exc, "placement", flag_route=False)
+            continue
+        _show(preview(p), title=f"Placing it into {target}", style="blue")
+        outcome = apply_decision(operation=filing_decisions.PLACE, dataset_id=h.dataset_id,
+                                 period=target, supply=h.supply, to_period=target)
+        if outcome is not None and outcome.changed and p.is_pair:
+            # CRITERION 37: offer to settle the pair now, where it was placed.
+            from cli import settle_tui
+
+            if common.confirm("Settle the pair now?", yes=False, default=True):
+                settle_tui.settle(h.dataset_id, target, h.supply)
+        elif outcome is not None and outcome.changed:
+            _offer_next_decision(h.dataset_id, target, h.supply)
+        return
+
+
+def _offer_next_decision(dataset_id: str, period: str, supply: str) -> None:
+    """WHERE IT IS WAITING, THE NEXT DECISION (criterion 19): offered, not
+    only named."""
+    try:
+        with open_log() as conn:
+            states = [s for s in filing_queue.slots_of(
+                conn, hierarchy.dataset(dataset_id).collection_id, dataset_id=dataset_id)
+                if s.period == period and s.supply == supply
+                and s.state in filing_queue.WITH_A_SUPPLY]
+    except filing_queue.LogUnreachable:
+        return
+    if states and common.confirm("Decide on it now?", yes=False, default=True):
+        supply_scoped, _ = filing_queue.operations_for(states[0])
+        _decide_on(states[0], offer=supply_scoped)
+
+
+def _receipt_of(dataset_id: str, supply: str | None):
+    """The supply's receipt instant, or None - for the chooser to open on."""
+    from qa_tools.common import supersession
+
+    if not supply:
+        return None
+    try:
+        with open_log() as conn:
+            return supersession._receipt(conn, dataset_id, supply)
+    except Exception:  # noqa: BLE001 - the chooser opens on the newest periods instead
+        return None
+
+
+def preview(p) -> str:
+    """How the supply would read in the chosen period, what that period
+    holds now, and what placing does to it (criterion 18) - no QA run."""
+    holds = (f"{p.to_period} holds {p.target_holds} now ({p.target_held_as}); it keeps it "
+             f"until this one is checked and promoted." if p.target_holds
+             else f"{p.to_period} holds no accepted supply now.")
+    reads = p.classification or "without a verdict"
+    return (f"Against {p.to_period}'s slot it reads {reads}. {holds} Placing files it "
+            f"there and owes its checks; the promotion gate then decides, as for any "
+            f"arrival.")
 
 
 def period_flow(collection_id: str) -> None:

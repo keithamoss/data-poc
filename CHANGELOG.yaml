@@ -112,11 +112,28 @@ releases:
   - date: "2026-10-14"
     summary: >
       The dashboard now counts what is not green at every level, and every
-      requirement has a link of its own. Also fixes for a supply that arrives
-      early reading as missing, and for side panels opened from a shared link.
+      requirement has a link of its own, and a held supply can be placed into a
+      period. Also fixes for a supply that arrives early reading as missing, and
+      for side panels opened from a shared link.
     changes:
       - category: New
         items:
+          - headline: Place a held supply into the period it belongs to
+            components: ["Pipeline & publishing", "Testing & dev tooling"]
+            description: >
+              A supply the filing rule could not place used to have one way
+              out: rejection. Now Filing decisions lists held supplies in their
+              own group, and you can place one by picking its period from a list
+              that marks closed periods and ones it owes nothing in. It is then
+              checked there and the promotion gate decides, as for any arrival.
+              A held supply can also be rejected without naming a period.
+          - headline: "`supply decide` leaves checks to the processing pass"
+            components: ["Pipeline & publishing"]
+            description: >
+              Recording a placement or a re-file with `mothman supply decide`
+              now leaves its checks owed for `mothman pipeline process` instead
+              of running them there. Add `--wait` to run them straight away;
+              it exits 3 if the decision stands but its checks did not finish.
           - headline: Link straight to one requirement
             components: ["Dashboard UI"]
             description: >

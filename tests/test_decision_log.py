@@ -369,8 +369,10 @@ class TestEveryFactIsRecorded:
             pass
         assert len(dl.decisions_for(conn, dataset)) == 1
 
-    def test_a_refile_must_name_both_slots(self, conn, dataset):
-        with pytest.raises(dl.DecisionRefused, match="names both slots"):
+    def test_a_persons_refile_from_no_period_is_refused_unless_it_places(self, conn, dataset):
+        """REQ-PIPE-163 criterion 39: accepted only where it places a held
+        supply, and refused otherwise naming place."""
+        with pytest.raises(dl.DecisionRefused, match="`place`"):
             with dl.apply_decision(conn, a_decision(
                     dataset, action=dl.REFILE, from_slot=None, to_slot="2026-Q3",
                     reason="somewhere")):

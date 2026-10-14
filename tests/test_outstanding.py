@@ -417,7 +417,8 @@ class TestAHoldLeavesTheQueueWhenItIsResolved:
             _delivery(conn, "monday",
                        contested=[{"dataset_id": "cp-clients", "files": ["a.csv", "b.csv"]}])
         [item] = outstanding.survey(observations_dir=tmp_path).items
-        assert item.responses and any("file" in r for r in item.responses)
+        # PLACE, THE OPERATION THAT NOW EXISTS (REQ-PIPE-163 criterion 12).
+        assert item.responses and any(r.startswith("place") for r in item.responses)
 
 
 

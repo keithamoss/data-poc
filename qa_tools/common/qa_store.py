@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 40
+SCHEMA_VERSION = 41
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -900,8 +900,12 @@ ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_check;
 -- `decision_check`, which a CREATE TABLE IF NOT EXISTS could never relax.
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_check;
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_names_a_slot;
+-- AND A PERSON'S REJECTION OF A HELD SUPPLY (REQ-PIPE-163 criterion 11,
+-- schema 41): a held supply has no period, and rejecting it acts on none.
+-- decision_log._judge accepts one only where the supply is held.
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_names_a_slot
-    CHECK (action = 'promotion-refused' OR from_slot IS NOT NULL OR to_slot IS NOT NULL);
+    CHECK (action IN ('promotion-refused', 'reject')
+           OR from_slot IS NOT NULL OR to_slot IS NOT NULL);
 ALTER TABLE "{SCHEMA}".decision DROP CONSTRAINT IF EXISTS decision_action_known;
 ALTER TABLE "{SCHEMA}".decision ADD CONSTRAINT decision_action_known
     CHECK (action IN ('promote', 'reject', 'demote', 'refile',

@@ -491,13 +491,32 @@ def filings_command(dataset_id: str, limit: int) -> None:
         assignment.RESUPPLY: "resupply - the open period was already filled",
         assignment.HELD: "[yellow]no period was open for it - held for a person[/yellow]",
     }
+    placed = _placements(dataset_id)
     console.print(f"[bold]{dataset_id}[/bold] - {len(found)} supply/supplies filed\n")
     table = Table("Supply", "Filed against", "Why", box=None, pad_edge=False)
     for record in found[-limit:]:
+        why = readable.get(record.get("branch", ""), record.get("branch", ""))
+        if record.get("supply_id") in placed:
+            # Said as a placement (REQ-PIPE-163 criterion 41).
+            from qa_tools.common import placing
+
+            why = f"{placing.said(record.get('slot'))} by a person, from held"
         table.add_row(record.get("supply_id", ""),
-                       record.get("slot") or "[yellow]unfiled[/yellow]",
-                       readable.get(record.get("branch", ""), record.get("branch", "")))
+                       record.get("slot") or "[yellow]unfiled[/yellow]", why)
     console.print(table)
+
+
+def _placements(dataset_id: str) -> set[str]:
+    """The supplies whose current filing PLACED them from held - a re-file
+    from no period (REQ-PIPE-163 criterion 2)."""
+    from qa_tools.common import decision_log, filing, supply_db
+
+    with supply_db.connect(read_only=True, label="mothman:supply-filings") as conn:
+        return {r[0] for r in conn.execute(
+            f"SELECT f.supply_id FROM {filing.CURRENT} f JOIN {decision_log.TABLE} d "
+            "ON d.id = f.refiled_by WHERE f.dataset_id = ? AND d.action = ? "
+            "AND d.from_slot IS NULL AND d.to_slot IS NOT NULL",
+            [dataset_id, decision_log.REFILE]).fetchall()}
 
 
 @supply_group.command("decisions")
@@ -549,15 +568,24 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
     table = Table("Took effect", "Action", "Supply", "Slot", "Who", "Why",
                    box=None, pad_edge=False)
     for entry in shown:
-        slot = (f"{entry['from_slot']} -> {entry['to_slot']}"
-                 if entry["action"] == decision_log.REFILE
-                 else (entry["to_slot"] or entry["from_slot"] or ""))
+        action = entry["action"]
+        if action == decision_log.REFILE and not entry["from_slot"]:
+            # A PLACEMENT, SAID AS ONE (REQ-PIPE-163 criterion 41) - never
+            # a re-file, "None -> period" or a machine name.
+            from qa_tools.common import placing
+
+            slot, action = placing.said(entry["to_slot"]), "placement"
+        elif action == decision_log.REFILE and not entry["to_slot"]:
+            slot = f"held - out of {entry['from_slot']}"
+        elif action == decision_log.REFILE:
+            slot = f"{entry['from_slot']} -> {entry['to_slot']}"
+        else:
+            slot = entry["to_slot"] or entry["from_slot"] or ""
         # FREE TEXT IS TEXT, NEVER MARKUP (delivery-critic on 161, #9): a
         # reason containing "[/]" took the whole listing down.
         from rich.markup import escape
 
         who = escape(entry["actor"] or "")
-        action = entry["action"]
         if entry["action"] == decision_log.STILL_FAILING:
             # FULL PROMINENCE, NEVER DIMMED (REQ-PIPE-121 criteria 12 and 13):
             # a re-evaluation left waiting supplies failing, and a person must
@@ -618,6 +646,17 @@ def holds_command() -> None:
             console.print(f"\n[yellow]{held.dataset_id}[/yellow] - {held.supply_id} "
                            f"[dim]({held.kind})[/dim]")
             console.print(f"  {held.describe()}")
+            command = held.place_command
+            if command:
+                # PLACE, ITS SCREEN AND ITS COMMAND (REQ-PIPE-163 criterion 12),
+                # the command on a line of its own so it copies cleanly.
+                from qa_tools.common import placing
+
+                console.print(f"  [dim]- place it into the period it belongs to, at "
+                              f"'{placing.where_to_decide(held.dataset_id)}', or:[/dim]")
+                console.print(command, soft_wrap=True, highlight=False, markup=False)
+                console.print("  [dim]- or reject the supply[/dim]")
+                continue
             for response in held.responses:
                 console.print(f"  [dim]- {response}[/dim]")
 
@@ -966,6 +1005,10 @@ def superseded_command(collection_id: str, dataset_id: str | None, period: str |
 @click.option("--acknowledge", "acknowledged", default=None, metavar="KEY",
                help="Confirm a decision's consequences beyond its own slot, by the key "
                     "its warning showed - needed with --yes where there are any.")
+@click.option("--wait", is_flag=True,
+               help="For a place or a re-file: run its checks now, in the foreground, and "
+                    "end with where the supply stands. Without it the checks are left owed "
+                    "for `mothman pipeline process`.")
 @click.option("--file-outcome", "file_outcomes", multiple=True,
                metavar="'<filename>=<supply|refile:<period>|reject|supersede>'",
                help="For choose-file only, once per file of the pair, by the filename it "
@@ -977,8 +1020,20 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
                     from_period: str | None, through_period: str | None,
                     supply: str | None, stands_on: str | None,
                     to_period: str | None, reason: str | None, yes: bool,
-                    acknowledged: str | None, file_outcomes: tuple[str, ...] = ()) -> None:
+                    acknowledged: str | None, wait: bool = False,
+                    file_outcomes: tuple[str, ...] = ()) -> None:
     """Record one filing decision (REQ-GHUB-082 criteria 2, 3, 28).
+
+    It leaves a decision's checks owed unless --wait is given: `mothman
+    pipeline process` runs every owed QA run. --wait runs them now, for a
+    place or a re-file, and exits 3 where the decision stands but its checks
+    did not finish.
+
+    \b
+    A held supply - one the filing rule could not file to any period - is
+    placed into the period it belongs to:
+      mothman supply decide --operation place --dataset cp-carers \\
+        --supply 'cp-carers@<key>' --to-period 2026-Q3 --reason '<why>'
 
     THE FLAG FORM OF THE WIZARD, calling the same implementation the
     GitHub route calls. The actor is whoever `git config user.email`
@@ -991,6 +1046,19 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     """
     from cli import filing_tui
     from qa_tools.common import filing_queue
+
+    operation = operation.lower()
+    # --wait IS FOR A DECISION THAT OWES A QA RUN (REQ-PIPE-163 criteria 25 and
+    # 27): a placement or a re-file.
+    if wait and operation not in (filing_decisions.PLACE, filing_decisions.REFILE):
+        raise click.UsageError(
+            f"--wait runs the QA a decision owes, and a {operation} owes none - it is for "
+            f"--operation place and --operation refile.")
+    if operation == filing_decisions.PLACE:
+        _place_from_flags(dataset_id, period, supply, to_period, stands_on, from_period,
+                          through_period, reason=reason, yes=yes,
+                          acknowledged=acknowledged, wait=wait)
+        return
 
     # A SETTLEMENT TAKES ITS OWN FLAGS AND NO OTHERS (REQ-PIPE-193 criterion
     # 15) - each refusal names the flag.
@@ -1035,7 +1103,9 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
         if outcome is None:
             raise SystemExit(1)
         return
-    if period is None:
+    if period is None and not (operation == filing_decisions.REJECT and supply):
+        # A HELD SUPPLY HAS NO PERIOD (REQ-PIPE-163 criterion 11): it is
+        # rejected by --supply alone, and the log refuses one that is not held.
         raise click.UsageError("--period is required.")
 
     if supply is None:
@@ -1054,13 +1124,64 @@ def decide_command(operation: str, dataset_id: str, period: str | None,
     outcome = filing_tui.apply_decision(
         operation=operation.lower(), dataset_id=dataset_id, period=period,
         supply=supply, stands_on=stands_on, to_period=to_period,
-        reason=reason, yes=yes, acknowledged=acknowledged, flag_route=True)
+        reason=reason, yes=yes, acknowledged=acknowledged, flag_route=True, wait=wait)
     # A REFUSAL FAILS AND A NO-OP DOES NOT (criterion 26). Both end with
     # nothing appended and a panel already saying which, but a script
     # that treats "already promoted" as an error is a script that stops
     # on the ordinary case of two people working the same slot.
     if outcome is None:
         raise SystemExit(1)
+    if outcome.checks_finished is False:
+        raise SystemExit(filing_tui.CHECKS_STILL_OWED_EXIT)
+
+
+def _place_from_flags(dataset_id: str, period: str | None, supply: str | None,
+                      to_period: str | None, stands_on: str | None, from_period: str | None,
+                      through_period: str | None, *, reason: str | None, yes: bool,
+                      acknowledged: str | None, wait: bool) -> None:
+    """A placement from the flag form (REQ-PIPE-163 criterion 15): --supply
+    and --to-period, never --period, which a held supply does not have."""
+    from cli import filing_tui
+    from qa_tools.common import supply_files
+
+    if not supply:
+        raise click.UsageError("a placement names the held supply, with --supply.")
+    if period:
+        raise click.UsageError(
+            "--period cannot be used with --operation place: a held supply has no period. "
+            "Name the period it goes into with --to-period.")
+    for flag, value in (("--stands-on", stands_on), ("--from-period", from_period),
+                        ("--through-period", through_period)):
+        if value:
+            raise click.UsageError(f"{flag} cannot be used with --operation place.")
+    if not to_period:
+        raise click.UsageError("a placement names the period it goes into, with --to-period.")
+    own = supply_files.dataset_of(supply)
+    if own and own != dataset_id:
+        raise click.UsageError(
+            f"{supply} is a supply of {own}, not {dataset_id}. Give --dataset {own}.")
+    if wait:
+        # A PAIR HELD WHOLE OWES NO RUN until it is settled (REQ-PIPE-163
+        # criterion 37), so --wait is refused under criterion 27, saying
+        # where the settlement is made and naming both files.
+        from qa_tools.common import placing
+
+        with filing_tui.open_log() as conn:
+            contest = supply_files.open_contest(conn, dataset_id, supply)
+        if contest is not None:
+            raise click.UsageError(
+                f"--wait runs the QA a decision owes, and placing a pair owes none: neither "
+                f"{' nor '.join(contest.files)} is checked until the pair is settled where it "
+                f"is placed, at '{placing.where_to_decide(dataset_id)}'. Place it without "
+                f"--wait, then settle it there.")
+    outcome = filing_tui.apply_decision(
+        operation=filing_decisions.PLACE, dataset_id=dataset_id, period=to_period,
+        supply=supply, to_period=to_period, reason=reason, yes=yes,
+        acknowledged=acknowledged, flag_route=True, wait=wait)
+    if outcome is None:
+        raise SystemExit(1)
+    if outcome.checks_finished is False:
+        raise SystemExit(filing_tui.CHECKS_STILL_OWED_EXIT)
 
 
 def _settle_from_flags(dataset_id: str, period: str, tokens: tuple[str, ...], *,

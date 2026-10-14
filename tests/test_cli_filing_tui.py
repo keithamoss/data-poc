@@ -491,6 +491,7 @@ class TestEveryOperationIsReachableFromSomeDoor:
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
+        monkeypatch.setattr(filing_queue, "held_in", lambda *a, **k: [])
         monkeypatch.setattr(filing_tui, "_pick_slot", lambda states, msg: state)
         monkeypatch.setattr(filing_tui, "_decide_on",
                              lambda s, offer: seen.setdefault("offer", offer))
@@ -542,7 +543,22 @@ class TestEveryOperationIsReachableFromSomeDoor:
                 filing_tui.queue_flow,
                 _state(slot_state.AWAITING_DECISION, supply="cp-carers@1"), monkeypatch,
                 excuse_offers=offers)
+        # PLACE IS REACHED FROM A HELD SUPPLY'S ROW (REQ-PIPE-163 criterion 10).
+        reachable |= self._held_offers(monkeypatch)
         assert reachable == set(fd.OPERATIONS)
+
+    def _held_offers(self, monkeypatch):
+        from qa_tools.common import filing_queue as fq
+
+        held = fq.HeldRow(dataset_id="cp-carers", dataset_name="Carer Register",
+                          supply="cp-carers@1", received_at=None, received_text="x",
+                          why="held", schedule_ended=False)
+        seen = []
+        monkeypatch.setattr(filing_tui.common, "select",
+                            lambda msg, choices, **k: seen.extend(choices) or None)
+        filing_tui.held_flow(held)
+        return {op for op, sentence in ((fd.PLACE, "place"), (fd.REJECT, "reject"))
+                if any(str(c).startswith(sentence) for c in seen)}
 
 
 class TestProductionTypesItsIdIntoTheRealFlows:
