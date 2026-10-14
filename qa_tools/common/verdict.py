@@ -272,6 +272,9 @@ class Compared:
     #: When the verdict was recorded - a correction declared before it was
     #: part of the terms it was judged under (REQ-PIPE-173).
     recorded_at: object = None
+    #: The turn-off that now leaves the slot owed nothing (REQ-PIPE-179
+    #: criterion 38), where that is why it is gone.
+    turned_off: object = None
 
     @property
     def moved(self) -> bool:
@@ -327,11 +330,27 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
     else:
         no_schedule = None
     by_slot: dict[str, tuple] = {}
+    gaps: dict[str, object] = {}
     out = []
     for supply_id, slot_name, vid, classification, inputs, fingerprint, received, at in parsed:
         if slot_name not in by_slot:
             when = dated.get(slot_name)
-            if no_schedule is None and slot_name in unowed:
+            turn = None
+            if when is None and no_schedule is None:
+                from qa_tools.common import turned_off
+
+                turn = turned_off.gap_for_period(dataset_id, slot_name, agreement)
+            if turn is not None:
+                # A JUDGED PERIOD A TURN-OFF NOW LEAVES OWED NOTHING
+                # (REQ-PIPE-179 criterion 38): gone, as a not_expected one is,
+                # and named as the turn-off rather than 'not expected'.
+                from qa_tools.common import turned_off
+
+                gaps[slot_name] = turn
+                by_slot[slot_name] = (None, f"{slot_name} is now owed nothing - "
+                                            f"{dataset_id} is "
+                                            f"{turned_off.gap_words(turn, dataset_id)}")
+            elif no_schedule is None and slot_name in unowed:
                 by_slot[slot_name] = (None, f"{slot_name} is now declared not expected "
                                             f"({unowed[slot_name]})")
             elif when is None:
@@ -346,7 +365,7 @@ def compared(conn, dataset_id: str, agreement=None) -> list[Compared]:
                     by_slot[slot_name] = (None, f"{slot_name} cannot be built now ({exc})")
         now, missing = by_slot[slot_name]
         out.append(Compared(supply_id, slot_name, vid, classification, inputs, fingerprint,
-                            received, now, missing, at))
+                            received, now, missing, at, gaps.get(slot_name)))
     return out
 
 

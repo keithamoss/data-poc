@@ -98,6 +98,10 @@ class Move:
     #: Its verdict if it is KEPT where it is, under the corrected agreement
     #: (delivery-critic on 170, D6) - shown before anyone chooses to keep it.
     if_kept: str | None = None
+    #: WHY IT CANNOT BE KEPT, or None (REQ-PIPE-179 criterion 36, amending
+    #: REQ-PIPE-170 criteria 5 and 28): the corrected agreement owes nothing
+    #: in its period - by participation, not_expected or a turn-off.
+    keep_refused: str | None = None
 
     @property
     def held(self) -> bool:
@@ -310,6 +314,7 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                 rejudged = verdict.rejudged(conn, ds, agr)
                 in_place = {r.supply_id: r.new.classification for r in rejudged}
                 proposed = []
+                owed_now = {s.name for s in new_slots}
                 for supply, period, received, by_person in filed:
                     was = assignment.open_slot(old_slots, received)
                     now = assignment.open_slot(new_slots, received)
@@ -328,7 +333,11 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                     proposed.append(Move(ds, supply, period, now_name,
                                          judged.classification if judged else None,
                                          old_verdict=was_said,
-                                         if_kept=in_place.get(supply, was_said)))
+                                         if_kept=in_place.get(supply, was_said),
+                                         keep_refused=(
+                                             f"{period} no longer owes a supply under the "
+                                             f"corrected agreement"
+                                             if period and period not in owed_now else None)))
         except (ValueError, KeyError, LookupError) as exc:
             # One dataset's schedule that cannot be built is said, not fatal
             # - ScheduleConfigError and a missing timezone version are both
@@ -353,7 +362,7 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                      for r in rejudged if r.supply_id not in moving]
         moves += [Move(m.dataset_id, m.supply_id, m.from_period, m.to_period, m.verdict,
                        _blocked(conn, ds, m.supply_id, m.from_period, m.to_period),
-                       m.old_verdict, m.if_kept)
+                       m.old_verdict, m.if_kept, m.keep_refused)
                   for m in proposed]
     return Trial(changes, tuple(slot_moves), tuple(obligations), tuple(verdicts),
                  tuple(moves), tuple(skipped), tuple(unbuildable))
@@ -442,7 +451,9 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
                 to = f"{m.to_period}, {_said(m.verdict).lower()}"
             was = (f"{m.from_period} ({_said(m.old_verdict)})" if m.from_period else "held")
             line = f"- {m.dataset_id} `{m.supply_id}`: {was} -> {to}"
-            if not applied and m.from_period and m.if_kept != m.old_verdict:
+            if not applied and m.keep_refused:
+                line += f" - it cannot be kept: {m.keep_refused}"
+            elif not applied and m.from_period and m.if_kept != m.old_verdict:
                 line += f" (if kept in {m.from_period}: {_said(m.if_kept).lower()})"
             if m.blocked:
                 # Indented, so a multi-line reason stays inside its bullet (F5).

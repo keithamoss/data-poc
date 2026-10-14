@@ -622,3 +622,106 @@ class TestCoveredHoldsFileThemselves:
         assert ("cp-clients", "cp-clients@to6", "2025-Q2") in done
         assert filing.filing_for("cp-clients", "cp-clients@to6")["slot"] == "2025-Q2"
         assert supply_holds.hold_on(conn, "cp-clients", "cp-clients@to6") is None
+
+
+# ---- the freeze (criteria 11, 12 and 30) -------------------------------------
+
+import copy as _copy  # noqa: E402
+
+from qa_tools.common import agreement_freeze as freeze  # noqa: E402
+from tests.test_agreement_freeze import CODEOWNERS, KEITH, _correction, _load  # noqa: E402
+
+PERTH = asset_time.wall_clock(date(2026, 10, 14), "23:00").tzinfo
+TONIGHT = datetime(2026, 10, 14, 23, 0, tzinfo=PERTH)
+CLIENTS_KEY = "dataset cp-clients participation 2023-01-01 effective_to"
+
+
+def _clients_version(doc) -> dict:
+    """cp-clients' own first version, unshared from the anchor the real file
+    gives all six Child Protection datasets."""
+    entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+    entry["participation"]["versions"] = [dict(v) for v in entry["participation"]["versions"]]
+    return entry["participation"]["versions"][0]
+
+
+def _freeze_check(old_cal, change, at=TONIGHT):
+    asset, people = _load("data-asset.yaml"), _load("people.yaml")
+    new_cal = _copy.deepcopy(old_cal)
+    change(new_cal)
+    return freeze.check(old_cal, new_cal, asset, _copy.deepcopy(asset), people,
+                        instant_of=lambda key: at, today=at.date(), base_codeowners=CODEOWNERS)
+
+
+def _findings_text(found):
+    return "\n".join(f"{f.scope} | {f.problem} | {f.fix}" for f in found)
+
+
+class TestATurnOffFreezesWhenItsPeriodsDo:
+    def test_turning_off_from_a_period_not_yet_open_is_an_ordinary_edit(self):
+        """2027-Q1's window opens 18 January 2027 - nothing it flips has
+        started to matter."""
+        assert _freeze_check(_load("calendar.yaml"), lambda doc: _turn_off(
+            _clients_version(doc), to="2026-12-31")) == []
+
+    def test_turning_off_a_past_period_needs_a_correction(self):
+        found = _freeze_check(_load("calendar.yaml"),
+                              lambda doc: _turn_off(_clients_version(doc)))
+        got = _findings_text(found)
+        assert CLIENTS_KEY in got
+        assert "cp-clients 2025-Q2" in got and "2025-04-17T09:00" in got
+        assert "\n  mothman schedule draft-correction" in got
+        assert "mark-not-supplied" in got
+
+    def test_moving_a_future_turn_off_later_is_an_ordinary_edit(self):
+        old = _load("calendar.yaml")
+        _turn_off(_clients_version(old), to="2026-12-31")
+        assert _freeze_check(old, lambda doc: _clients_version(doc).update(
+            effective_to="2027-06-30")) == []
+
+    def test_its_reason_freezes_with_it(self):
+        """Criterion 12: a change of wording after the freeze, too."""
+        old = _load("calendar.yaml")
+        _turn_off(_clients_version(old))
+        found = _freeze_check(old, lambda doc: _clients_version(doc).update(
+            turned_off_reason="supplier paused while it rebuilt its system"))
+        assert CLIENTS_KEY in _findings_text(found)
+
+    def test_a_declared_correction_is_accepted(self):
+        def change(doc):
+            _turn_off(_clients_version(doc))
+            entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
+            _correction(entry, (CLIENTS_KEY, None, {"effective_to": "2025-03-31",
+                                                    "turned_off_reason": "supplier paused"}),
+                        approver=KEITH)
+        assert _freeze_check(_load("calendar.yaml"), change) == []
+
+    def test_the_rest_of_the_version_is_not_reopened(self):
+        """The version's other values are frozen from 2023 as before."""
+        found = _freeze_check(_load("calendar.yaml"), lambda doc: _clients_version(doc).update(
+            claim_window="10d"))
+        assert "dataset cp-clients participation 2023-01-01" in _findings_text(found)
+
+
+class TestACorrectionOfATurnOffReverts:
+    """What the impact preview and the correction trial rebuild (REQ-PIPE-169)."""
+
+    def test_reverting_puts_the_old_turn_off_back(self):
+        new = _load("calendar.yaml")
+        _turn_off(_clients_version(new), to="2025-06-30")
+        cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [
+            (CLIENTS_KEY, {"effective_to": "2025-03-31", "turned_off_reason": "was"}, None)])
+        v = _clients_version(cal)
+        assert (v["effective_to"], v["turned_off_reason"]) == ("2025-03-31", "was")
+
+    def test_reverting_an_added_one_removes_it(self):
+        new = _load("calendar.yaml")
+        _turn_off(_clients_version(new))
+        cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [(CLIENTS_KEY, None, {})])
+        assert "effective_to" not in _clients_version(cal)
+
+    def test_reverting_the_version_keeps_its_turn_off(self):
+        new = _load("calendar.yaml")
+        _turn_off(_clients_version(new))
+        cal, _asset = freeze.revert(new, _load("data-asset.yaml"), [
+            ("dataset cp-clients participation 2023-01-01", {}, {"claim_window": "10d"})])
+        assert _clients_version(cal)["effective_to"] == "2025-03-31"

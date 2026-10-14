@@ -141,9 +141,23 @@ def _sources(dataset_id: str, slot: str, period_date, agreement, asset_doc) -> s
     return keys
 
 
+def _turn_off_key(dataset_id: str, turn, agreement) -> str:
+    """The freeze gate's key for the turn-off a period falls in - the item a
+    declared correction of it names (REQ-PIPE-179 criterion 38)."""
+    from qa_tools.common import agreement as agreement_mod
+
+    since = turn.version_from.isoformat()
+    if turn.level == agreement_mod.COLLECTION:
+        return (f"collection {agreement.collection_of(dataset_id)} participation_defaults "
+                f"{since} effective_to")
+    return f"dataset {dataset_id} participation {since} effective_to"
+
+
 def _kind(key: str) -> str | None:
     """Which kind of slot input a freeze-gate item key names."""
     parts = key.split()
+    if parts and parts[-1] == "effective_to":
+        return "turn_off"
     if parts[:2] == ["timezone", "version"]:
         return "tz_version"
     if parts and parts[0] == "calendar" and len(parts) >= 3:
@@ -264,7 +278,12 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
     for c in verdict.compared(conn, dataset_id, agr):
         if not c.moved:
             continue
-        if c.now is None:
+        if c.now is None and c.turned_off is not None:
+            # REQ-PIPE-179 criterion 38: accounted for only by a declared
+            # correction of THAT effective_to.
+            changes = ((c.missing, None, None),)
+            needed = [{"turn_off"}]
+        elif c.now is None:
             gone = (c.missing if c.missing and "not expected" in c.missing else
                     f"no longer a period of its schedule (it was dated "
                     f"{c.inputs.get('period_date')})")
@@ -282,6 +301,8 @@ def refusal_for(conn, dataset_id: str, *, cal_doc: dict | None = None,
         if c.slot not in sources:
             when = c.now[3] if c.now else date.fromisoformat(c.inputs["period_date"])
             sources[c.slot] = _sources(dataset_id, c.slot, when, agr, asset_doc)
+            if c.turned_off is not None:
+                sources[c.slot].add(_turn_off_key(dataset_id, c.turned_off, agr))
         judged_on = asset_time.local_date(c.recorded_at) if c.recorded_at else None
         # EVERY differing input must be accounted for, not any one of them.
         if all(_accounted(sources[c.slot], declared, items, kinds, judged_on)

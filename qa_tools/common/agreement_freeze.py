@@ -109,6 +109,19 @@ def _windows(versions: list[dict]) -> list[tuple[str, str | None]]:
 
 
 _SKIPPED = ("changelog", "corrections")
+#: A turn-off is ITS OWN ITEM (REQ-PIPE-179 criteria 11 and 12, amending
+#: REQ-PIPE-111 criterion 2): it freezes when the periods it flips start to
+#: matter, not when its version took effect.
+_TURN_OFF_KEYS = ("effective_to", "turned_off_reason")
+
+
+def _turn_off_item(add, key: str, owner: tuple, v: dict, ctx: dict) -> None:
+    """The turn-off of one version, where it states one - its effective_to
+    and its turned_off_reason, frozen together (criterion 12)."""
+    if not any(k in v for k in _TURN_OFF_KEYS):
+        return
+    add(Item(f"{key} effective_to", owner, "turn_off",
+             _plain({k: v[k] for k in _TURN_OFF_KEYS if k in v}), dict(ctx)))
 
 
 def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
@@ -161,8 +174,10 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             eff = str(v.get("effective_from"))
             add(Item(f"dataset {ds} participation {eff}", owner, "participation",
                      _plain({k: val for k, val in v.items()
-                             if k not in _SKIPPED + ("effective_from",)}),
+                             if k not in _SKIPPED + _TURN_OFF_KEYS + ("effective_from",)}),
                      {"dataset": ds, "eff": eff, "end": windows.get(eff)}))
+            _turn_off_item(add, f"dataset {ds} participation {eff}", owner, v,
+                           {"datasets": [ds]})
         for ne in entry.get("not_expected") or []:
             ne = ne or {}
             add(Item(f"dataset {ds} not_expected {ne.get('period')}", owner, "not_expected",
@@ -199,8 +214,10 @@ def flatten(cal_doc: dict, asset_doc: dict) -> dict[str, Item]:
             add(Item(f"collection {cid} participation_defaults {eff}", ("collection", cid),
                      "defaults",
                      _plain({k: val for k, val in v.items()
-                             if k not in _SKIPPED + ("effective_from",)}),
+                             if k not in _SKIPPED + _TURN_OFF_KEYS + ("effective_from",)}),
                      {"collection": cid, "eff": eff, "end": windows.get(eff)}))
+            _turn_off_item(add, f"collection {cid} participation_defaults {eff}",
+                           ("collection", cid), v, {"collection": cid})
     # WHICH CALENDAR EACH DATASET IS ON, as resolved (delivery-critic on
     # 111, H2; PROVISIONAL, Keith's fork from REQ-PIPE-110 and
     # plans/running-thoughts.md #79): moving a dataset - or its whole
@@ -272,6 +289,27 @@ def _first_period_on_or_after(dataset_id: str, day: date, end: date | None, agr)
     return min(dates) if dates else None
 
 
+def _counts_on(dataset_id: str, day: date, agr) -> bool:
+    """Whether a dataset counts in a dated entry's freeze (REQ-PIPE-179
+    criterion 30, amending REQ-PIPE-111 criterion 2): always, unless it is
+    turned off on that day - then only for the first period of its gap,
+    whose opening closes its last owed slot."""
+    from qa_tools.common import agreement
+
+    try:
+        standing = agr.standing_on(dataset_id, day)
+    except Exception:  # noqa: BLE001 - not in this state's agreement
+        return True
+    if standing.state != agreement.TURNED_OFF:
+        return True
+    try:
+        first = _first_period_on_or_after(dataset_id, standing.turned_off.effective_to
+                                          + timedelta(days=1), None, agr)
+    except Exception:  # noqa: BLE001
+        return True
+    return first == day
+
+
 def _min(*values):
     present = [v for v in values if v is not None]
     return min(present) if present else None
@@ -284,7 +322,8 @@ def freeze_instant(item: Item, agr) -> datetime | None:
     c = item.ctx
     if item.kind == "cal_date":
         day = date.fromisoformat(c["date"])
-        opens = [_claim_open(ds, day, agr) for ds in _datasets_on(c["calendar"], agr)]
+        opens = [_claim_open(ds, day, agr) for ds in _datasets_on(c["calendar"], agr)
+                 if _counts_on(ds, day, agr)]
         return _min(*opens) or asset_time.start_of_day(day)
     if item.kind == "cal_version":
         eff = date.fromisoformat(c["eff"])
@@ -567,11 +606,69 @@ def _agreements(old_cal: dict | None, new_cal: dict):
     return new_agr, old_agr
 
 
+def _turn_off_datasets(item: Item, agr) -> list[str]:
+    """The datasets a turn-off item applies to - its own dataset, or every
+    dataset taking its collection's defaults."""
+    if item.ctx.get("datasets"):
+        return list(item.ctx["datasets"])
+    return [ds for ds in agr.datasets
+            if agr.collection_of(ds) == item.ctx.get("collection") and agr.defaults_for(ds)]
+
+
+#: How far past the earlier effective_to a flipped period is looked for - the
+#: FIRST flipped period is the freeze, and it is never further than a period.
+_FLIP_REACH = timedelta(days=800)
+
+
+def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str, datetime]]:
+    """(dataset, period, earliest claim-opening) for every period whose
+    owed-or-not status this turn-off change flips - each opening the
+    earlier of its values under the configuration before and after
+    (REQ-PIPE-179 criterion 11), computed with criterion 14's inputs. A
+    change of the reason alone flips nothing, and freezes with the periods
+    it already turned off (criterion 12)."""
+    from qa_tools.common import agreement, slots
+
+    tos = [date.fromisoformat(str(v["effective_to"])) for v in (before, after)
+           if isinstance(v, dict) and v.get("effective_to")]
+    if not tos:
+        return []
+    start = min(tos)
+    out = []
+    for ds in sorted(set(_turn_off_datasets(item, old_agr)) | set(_turn_off_datasets(item, new_agr))):
+        try:
+            periods = slots._calendar_periods(ds, start + _FLIP_REACH, new_agr)
+        except Exception:  # noqa: BLE001 - a dataset with no calendar flips nothing
+            continue
+        reason_only = len(tos) == 2 and tos[0] == tos[1]
+        for p in periods:
+            if p.date <= start:
+                continue
+            was = old_agr.standing_on(ds, p.date).state
+            now = new_agr.standing_on(ds, p.date).state
+            if was == now and not (reason_only and was == agreement.TURNED_OFF):
+                continue
+            opens = _min(_claim_open(ds, p.date, old_agr), _claim_open(ds, p.date, new_agr))
+            if opens is not None:
+                out.append((ds, p.name, opens))
+            break   # the first is the freeze; later ones only open later
+    return out
+
+
 def _changed(old_items: dict, new_items: dict, old_agr, new_agr) -> dict:
     changes: dict[str, tuple[Item, object, object, datetime | None]] = {}
     for key in set(old_items) | set(new_items):
         before, after = old_items.get(key), new_items.get(key)
         if before is not None and after is not None and before.norm == after.norm:
+            continue
+        item = before or after
+        if item.kind == "turn_off":
+            flips = _flipped(item, before.value if before else None,
+                             after.value if after else None, old_agr or new_agr, new_agr)
+            item.ctx["flipped"] = flips
+            changes[key] = (item, before.value if before else None,
+                            after.value if after else None,
+                            _min(*(opens for _d, _p, opens in flips)))
             continue
         if before is not None and old_agr is not None:
             frozen_at = freeze_instant(before, old_agr)   # a change or a removal
@@ -749,12 +846,26 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         said = []
         for item, old, new, frozen_at in rows:
             verb = "added" if old is None else ("removed" if new is None else "changed")
+            if item.kind == "turn_off":
+                # REQ-PIPE-179 criterion 11: each period whose status it flips,
+                # and the claim-opening instant that has passed for it.
+                flips = "; ".join(
+                    f"{ds} {period}, whose claim window opened "
+                    f"{asset_time.localise(opens).isoformat(timespec='minutes')}"
+                    for ds, period, opens in item.ctx.get("flipped", ()))
+                said.append(f"{item.key} was {verb} ({_value_text(old)} -> {_value_text(new)}), "
+                            f"which changes whether a period already open is owed: {flips}")
+                continue
             said.append(f"{item.key} was {verb} ({_value_text(old)} -> {_value_text(new)}) "
                         f"after it froze at "
                         f"{asset_time.localise(frozen_at).isoformat(timespec='minutes')}, the "
                         f"first instant it could govern a filing")
         fix = _paste_ready(owner, [(item.key, old, new) for item, old, new, _f in rows],
                            may, today)
+        if any(item.kind == "turn_off" for item, *_ in rows):
+            fix += ("\nOr draft it:\n  mothman schedule draft-correction"
+                    "\nIf a period simply was not supplied, record that after the fact "
+                    f"instead: `{MARK_NOT_SUPPLIED}`.")
         if any(item.kind == "not_expected" for item, *_ in rows):
             fix += ("\nIf a period simply was not supplied, record that after the fact "
                     f"instead: `{MARK_NOT_SUPPLIED}`.")
@@ -912,14 +1023,34 @@ def revert(cal_doc: dict, asset_doc: dict,
                 _set_period(versions, p[3], old)
         elif len(p) == 4 and p[0] == "dataset" and p[2] == "participation":
             part = _own(entry(p[1]), "participation", {})
-            _set_settings(part.setdefault("versions", []), p[3], old, keep=_SKIPPED)
+            _set_settings(part.setdefault("versions", []), p[3], old,
+                          keep=_SKIPPED + _TURN_OFF_KEYS)
         elif len(p) == 4 and p[0] == "collection" and p[2] == "participation_defaults":
             coll = next((c for c in cal.get("collections") or [] if str((c or {}).get("id")) == p[1]),
                         None)
             if coll is None:
                 raise ValueError(f"{key!r} names a collection the file does not hold.")
             part = _own(coll, "participation_defaults", {})
-            _set_settings(part.setdefault("versions", []), p[3], old, keep=_SKIPPED)
+            _set_settings(part.setdefault("versions", []), p[3], old,
+                          keep=_SKIPPED + _TURN_OFF_KEYS)
+        elif len(p) == 5 and p[4] == "effective_to" and (
+                (p[0] == "dataset" and p[2] == "participation")
+                or (p[0] == "collection" and p[2] == "participation_defaults")):
+            # A TURN-OFF (REQ-PIPE-179): its two keys on the one version.
+            if p[0] == "dataset":
+                block = _own(entry(p[1]), "participation", {})
+            else:
+                coll = next((c for c in cal.get("collections") or []
+                             if str((c or {}).get("id")) == p[1]), None)
+                if coll is None:
+                    raise ValueError(f"{key!r} names a collection the file does not hold.")
+                block = _own(coll, "participation_defaults", {})
+            found = _version(block.setdefault("versions", []), p[3])
+            if found is None:
+                raise ValueError(f"{key!r} names a version the file does not hold.")
+            for k in _TURN_OFF_KEYS:
+                found.pop(k, None)
+            found.update(copy.deepcopy(old or {}))
         elif len(p) == 4 and p[0] == "dataset" and p[2] == "not_expected":
             listed = [n for n in _own(entry(p[1]), "not_expected", [])
                       if str((n or {}).get("period")) != p[3]]

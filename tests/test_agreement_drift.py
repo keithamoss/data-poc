@@ -366,3 +366,46 @@ class TestFromIsTheEarlierDate:
             if d["period"] == "2023-Q3":
                 d["date"] = "2023-07-25"
         assert _refusal(conn, cal, asset).as_record()["from"] == "2023-07-25"
+
+
+class TestATurnOffOverAJudgedPeriod:
+    """REQ-PIPE-179 criterion 38 (amending REQ-PIPE-173 criterion 12): an
+    effective_to added without a declared correction, leaving the judged
+    2023-Q3 owed nothing, counts as changed, names the turn-off, and is
+    accounted for only by a declared correction of that effective_to."""
+
+    KEY = "dataset cp-clients participation 2023-01-01 effective_to"
+
+    @staticmethod
+    def _off(cal):
+        v = _clients(cal)["participation"]["versions"][0]
+        v.update(effective_to="2023-06-30", turned_off_reason="supplier paused")
+
+    @staticmethod
+    def _declare(cal, item, new):
+        _clients(cal).setdefault("corrections", []).append({
+            "change_reference": "CAB-9", "date": _today(), "author": "a", "approver": "b",
+            "reason": "it stopped", "changes": [{"item": item, "old": None, "new": new}]})
+
+    def test_undeclared_it_is_refused_naming_the_turn_off(self, conn):
+        cal, asset = _docs()
+        self._off(cal)
+        text = _refusal(conn, cal, asset).message()
+        assert "2023-Q3" in text and "turned off" in text and "supplier paused" in text
+        assert "not expected" not in text
+
+    def test_a_declared_correction_of_the_effective_to_accounts_for_it(self, conn):
+        cal, asset = _docs()
+        self._off(cal)
+        self._declare(cal, self.KEY, {"effective_to": "2023-06-30",
+                                      "turned_off_reason": "supplier paused"})
+        assert _refusal(conn, cal, asset) is None
+
+    def test_a_correction_of_the_version_alone_does_not(self, conn):
+        cal, asset = _docs()
+        self._off(cal)
+        version = {k: v for k, v in _clients(cal)["participation"]["versions"][0].items()
+                   if k not in ("changelog", "effective_from", "effective_to",
+                                "turned_off_reason")}
+        self._declare(cal, "dataset cp-clients participation 2023-01-01", version)
+        assert _refusal(conn, cal, asset) is not None

@@ -225,6 +225,13 @@ def why_not_confirmable(t, keep: set[tuple[str, str]], keep_reason: str | None) 
                 f"this correction's proposed moves, so there is nothing to keep")
     if keep and not (keep_reason or "").strip():
         return "keeping a supply needs a reason - why it stays where it is"
+    # KEEP IS NOT OFFERED where the corrected agreement owes nothing in the
+    # supply's period (REQ-PIPE-179 criterion 36).
+    refused = sorted(f"{m.supply_id} ({m.keep_refused})" for m in t.moves
+                     if (m.dataset_id, m.supply_id) in keep and m.keep_refused)
+    if refused:
+        return (f"{', '.join(refused)} cannot be kept where it is - it is moved to the owed "
+                f"period the filing rule gives it, or held")
     # A BLOCKED MOVE NO LONGER STOPS THE REST (Keith, 2026-10-11, (p)): it is
     # parked by confirm(), never dropped.
     return None
@@ -412,6 +419,17 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
                     f"{(now or {}).get('slot') or 'no period'} - left parked for the asset "
                     f"manager to keep or move by hand.")
                 continue
+            # INSIDE A TURNED-OFF GAP (REQ-PIPE-179 criterion 37, amending
+            # REQ-PIPE-170 criterion 26): left parked, saying why and what ends
+            # it - and still listed among what needs a person.
+            gap = refiling.gap_problem(item.dataset_id, item.to_period) if item.to_period \
+                else None
+            if gap:
+                say(f"{item.supply_id}: parked under {item.reference} for {item.to_period}. "
+                    f"{gap.replace(' Nothing was recorded.', '')} It stays parked: keep it "
+                    f"where it is, where its period is still owed, or change effective_to or "
+                    f"effective_from so {item.to_period} is owed.")
+                continue
             # THE CONFIRMED PERIOD MUST STILL EXIST (#152, 2): a later
             # correction can take it away, and a placement never asked.
             if item.to_period and not refiling._on_calendar(item.dataset_id, item.to_period):
@@ -490,6 +508,14 @@ def keep_parked(conn, reference: str, dataset_id: str, supply: str, *, actor: di
     # KEPT WHERE IT IS NOW (#152, 4): a person may have moved it since it
     # was parked, and the keep names the period it actually stays in.
     where = (filing.filing_for(dataset_id, supply) or {}).get("slot")
+    from qa_tools.common import refiling
+
+    if where and not refiling._on_calendar(dataset_id, where):
+        # REQ-PIPE-179 criterion 36: not while the move is parked either.
+        raise decision_log.DecisionRefused(
+            f"{supply} cannot be kept in {where}: {where} no longer owes a supply under the "
+            f"agreement - by participation, not_expected or a turn-off. It moves to the owed "
+            f"period the filing rule gives it once what blocks it clears, or is held.")
     with decision_log.decision_transaction(conn):
         with decision_log.apply_decision(conn, decision_log.Decision(
                 agency_id=entry.agency_id, collection_id=entry.collection_id,

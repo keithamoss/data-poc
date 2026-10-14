@@ -1010,3 +1010,60 @@ class TestCriticFindingsOn152TheCommand:
         monkeypatch.setattr(correction_trial, "working", lambda: docs)
         got = self._run("corrections", "--reference", "BOGUS")
         assert got.exit_code != 0 and "BOGUS" in got.output
+
+
+class TestATurnOffDeclaredAsACorrection:
+    """REQ-PIPE-179 criteria 35-37: a correction that turns cp-clients off
+    after 30 June 2023, so its 2023-Q3 supply sits in a period the corrected
+    agreement owes nothing in."""
+
+    @staticmethod
+    def _off(cal, asset, to="2023-06-30"):
+        v = _clients(cal)["participation"]["versions"][0]
+        v.update(effective_to=to, turned_off_reason="supplier paused")
+
+    def test_the_supply_left_in_the_gap_is_held_as_turned_off(self, conn, manager):
+        """Criterion 35."""
+        from qa_tools.common import correction_trial
+
+        docs = _corrected(self._off)
+        done = correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT,
+                                        docs=docs)
+        assert [s for _d, s, *_ in done.held] == [SUPPLY]
+        with correction_trial.configured(*docs):
+            held = supply_holds.hold_on(conn, DATASET, SUPPLY)
+            assert held.turned_off and "supplier paused" in held.describe()
+
+    def test_it_cannot_be_kept_there(self, conn, manager):
+        """Criterion 36: keep is not offered."""
+        from qa_tools.common import correction_trial
+
+        docs = _corrected(self._off)
+        [p] = correction_apply.pending(conn, docs)
+        base, work = correction_apply.states(p, [p], docs)
+        t = correction_trial.trial(conn, base, work, dataset_ids=[DATASET])
+        [m] = [m for m in t.moves if m.supply_id == SUPPLY]
+        assert m.keep_refused and "2023-Q3 no longer owes a supply" in m.keep_refused
+        why = correction_apply.why_not_confirmable(t, {(DATASET, SUPPLY)}, "it is Q3 data")
+        assert why and "cannot be kept" in why
+        assert "it cannot be kept" in correction_trial.report(
+            t, as_at=datetime(2026, 10, 14, tzinfo=PERTH), database="d", against="a")
+
+    def test_a_parked_move_into_a_gap_stays_parked(self, conn):
+        """Criterion 37: said, naming the gap and what ends it."""
+        _file("g1", "2023-Q3", RECEIVED + timedelta(minutes=21))
+        _park(conn, "g1", "2023-Q3", "2023-Q4")
+        # IN FORCE, not a pending correction - the drain reverts those.
+        cal, asset = _docs()
+        versions = _clients(cal)["participation"]["versions"]
+        versions.append({**{k: v for k, v in versions[0].items() if k != "changelog"},
+                         "effective_from": "2024-01-01",
+                         "changelog": [{"date": "2026-10-14", "author": "a", "change": "on"}]})
+        self._off(cal, asset, to="2023-09-30")
+        docs = (cal, asset)
+        said = []
+        assert correction_apply.drain_parked(conn, docs=docs, say=said.append) == []
+        assert [p.supply_id for p in correction_apply.parked(conn)] == ["g1"]
+        [line] = [s for s in said if "g1" in s]
+        assert "turned off" in line and "supplier paused" in line
+        assert "effective_to or effective_from" in line and "stays parked" in line
