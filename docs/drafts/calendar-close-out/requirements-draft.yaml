@@ -171,42 +171,80 @@ requirements:
     with the Child Protection pattern widening (Keith, 2026-10-13: close out the calendar group before the road-testing review;
     scope 163 WITH 179 so 179 does not amend a requirement that may change under it).'
   acceptance_criteria:
-  - THE SYSTEM SHALL show every period a dataset owes nothing in - whether by participation or by not_expected - together
-    with its reason, and SHALL NOT omit it.
+  - THE SYSTEM SHALL show, in a dataset page's supply history - and, once REQ-DASH-209 is built, in its period-composition
+    view's 'Not owed' group - every period the dataset owes nothing in, whether by participation or by not_expected, together
+    with its reason; SHALL NOT omit it; and SHALL show those rows even where the dataset has no supply cycles yet.
   - WHERE the dashboard shows a period a dataset owes nothing in, THE SYSTEM SHALL show it as a quiet row stating its kind
-    - a participation row, 'Not expected - <reason>', and WHERE the dataset is turned off (REQ-PIPE-179), 'Turned off - <reason>'
-    (REQ-DASH-180 criterion 15) - in its chronological place among the supply cycles, each run of consecutive periods of the
-    same kind and reason as one row giving its first and last period and their count, only for periods up to the date on show,
-    and SHALL NOT show it red, among things needing action, or as 'No supply'; a participation row, which recurs, SHALL carry
-    a short label generated from the configuration - 'Not owed - outside its agreed months (Feb, Aug)' - and the authored
-    reason SHALL be shown once, on the dataset's agreement tile, not on every row.
-  - WHERE the dashboard shows a dataset's delivery time or cycle, THE SYSTEM SHALL take it from the values resolved for the
-    dataset on the date on show - expected time, grace, participates and days before - each from the level REQ-PIPE-181 resolves
-    it to; WHERE the date falls before its first participation version, SHALL show 'Not yet owing - first version takes effect
-    <date>'; and WHERE the dataset is turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says.
+    - a participation row 'Not owed — outside its agreed months (Feb, Aug)', 'Not expected — <reason>', and WHERE the dataset
+    is turned off (REQ-PIPE-179), 'Turned off — <reason>' (REQ-DASH-180 criterion 15) - in its chronological place among the
+    supply cycles, only for periods up to the date on show, and SHALL NOT show it red, among things needing action, or as
+    'No supply'; a participation row, which recurs, SHALL carry that short label generated from the configuration, and the
+    authored reason SHALL be shown once, on the dataset's SLA tile (criterion 11), not on every row.
+  - WHERE the dashboard shows a dataset's delivery time or cycle - on its SLA tile or anywhere else - THE SYSTEM SHALL take
+    it from the values resolved for the dataset on the date on show - expected time, grace, participates and days before -
+    each from the level REQ-PIPE-181 resolves it to; WHERE the date on show falls before the dataset's first participation
+    version, SHALL show 'Not owed yet — owes supplies from <date>', the date that version takes effect, on the SLA tile and
+    as the heading of the notice that today reads 'Nothing had been supplied by this date', which it replaces; and WHERE the
+    dataset is turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says.
   - THE SYSTEM SHALL render every reason it shows as text, never as markup.
   - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
   - THE SYSTEM SHALL NOT show periods before a dataset's first participation version as owed-nothing rows.
   - WHERE a dataset's supply for a period is due on an earlier day than the period's date (days_before above 0), THE SYSTEM
-    SHALL say so in the delivery-time label - 'by 22:00 the day before' where it is one day, 'by 22:00, N days before each
-    date' where it is more - and SHALL NOT show the time alone.
+    SHALL say so in the delivery-time label on the SLA tile - 'by 22:00 the day before' where it is one day, 'by 22:00, N
+    days before each date' where it is more - SHALL NOT show the time alone, and SHALL have a test of each of the two forms.
   - WHERE a dataset's calendar is not exactly four delivery months a year, or its periods fall on different days of the month,
-    THE SYSTEM SHALL still label its cycle in words, and SHALL NOT render the label blank.
-  - WHERE an owed-nothing period stands on an earlier supply by inheritance (REQ-PIPE-098), THE SYSTEM SHALL show that on
-    the same row - the period it stands on - rather than as a second row or a second pill for the same period; and the standing-in
-    heading above that row SHALL name the row's kind label.
+    THE SYSTEM SHALL still label its cycle in words - 'Yearly' for one delivery month a year, 'Twice a year' for two, 'Quarterly'
+    for four, 'Monthly' for twelve, otherwise '<N> times a year' - and 'various days' in place of the day where its periods
+    fall on different days of the month, for a calendar of the 'authored' type as for any other, and SHALL NOT render the
+    label blank.
+  - WHERE an owed-nothing period stands on an earlier supply by inheritance (REQ-PIPE-098), THE SYSTEM SHALL say so on the
+    same row, as muted text 'Inherited from <period>' with no pill, rather than as a second row or a second pill for the same
+    period; and the heading of the standing-in panel near the top of the dataset page (standingInHeading, in standingInDetail)
+    SHALL name the row's kind word and label where it now says 'Nothing was owed for this period', with the reason in that
+    panel's .promo-why line.
   - WHERE the current cycle on the date on show is a period the dataset owes nothing in, THE SYSTEM SHALL show that period's
     owed-nothing row in place of 'No deliveries in the current cycle yet.'
+  - THE SYSTEM SHALL show on a dataset's SLA tile the delivery months the dataset itself participates in on the date on show,
+    not its calendar's, in the same form as its participation row, with the frequency word criterion 8 gives for that number
+    of months - for example 'Twice a year (Feb, Aug, day 1), by 09:00' for cp-case-workers, never 'Quarterly (Feb/May/Aug/Nov)'
+    - and WHILE that participation is not every period of its calendar, SHALL show the authored reason as a muted second line
+    on the tile.
+  - THE SYSTEM SHALL draw a period a dataset owes nothing in as a label-only block in the style of a supply cycle's heading
+    (.supply-cycle-label) with no table beneath it, headed by cycleLabel() as its neighbouring cycles are, with its kind label
+    where a cycle shows its number of deliveries, in muted text and with no pill of any kind, so that it ranks below a red
+    'No supply' and an 'Accepted' tag; SHALL order it newest first among the supply cycles; and SHALL NOT list it under 'Periods
+    with no supply'.
+  - WHERE consecutive owed-nothing periods share a kind, a reason and the period they stand on, THE SYSTEM SHALL show them
+    as one row reading '<kind label>, <first> to <last> (<n> periods)' - 'days' for a daily dataset - with the range and unit
+    worded as gapText() words a gap, and a single period as '<kind label>' under its own heading with no count; WHERE such
+    a run is still open on the date on show, its count SHALL read '(<n> periods so far)'; WHERE the run holds the current
+    period, its row SHALL be the current-cycle block, with its 'Current cycle' tag, and SHALL NOT be shown a second time among
+    the older cycles; and 'Show all history (N cycles)' SHALL count the rows it hides, owed-nothing rows included.
+  - THE SYSTEM SHALL produce every owed-nothing period's kind word, label and reason from one function in the page, used alike
+    by the rows here, REQ-DASH-180 criterion 15's turned-off rows, the standing-in heading (criterion 9) and, once it is built,
+    REQ-DASH-209's 'Not owed' group and its counting line; SHALL separate kind and reason with the page's em dash (—); and
+    SHALL show the same label on every page, REQ-DASH-209's 'Not owed' group included, not shortened there.
+  - THE SYSTEM SHALL NOT show a dataset as stale, as 'No data', or with the line 'nothing has landed yet in this dataset's
+    current expected cycle' - on its page or in its collection table - because the period current on the date on show is one
+    it owes nothing in by participation or by not_expected, and SHALL show the verdict of the supply in place as for any dataset
+    between deliveries; THE SYSTEM SHALL have a real-browser test against the built dashboard, a REGRESSION GUARD that passes
+    on today's page, holding this for cp-case-workers on a date in a May or November quarter after its first supply - asserting
+    first that the date is one the dataset owes nothing in, so that the test cannot pass vacuously - and a tests-js test holding
+    the same for a not_expected period.
   non_functional_requirements:
   - Rendered from REQ-PIPE-110's agreement value; this only consumes it (docs/components.md).
   - Same date formatting as everything else on the page (REQ-DASH-071).
-  - 'SCALE: rows are collapsed per run of periods (criterion 2), so the page carries one row per change of kind or reason,
+  - 'SCALE: rows are collapsed per run of periods (criterion 13), so the page carries one row per change of kind or reason,
     not one per period - a daily dataset owing nothing for a year is one row, and thirty datasets over years stay a handful
     of rows each.'
   - 'PERFORMANCE: computed at build time from configuration through REQ-PIPE-181''s one resolution function, never per period
     in the browser; the build''s time does not grow with the length of history beyond reading the calendar once.'
   - 'PRIVACY: reasons are authored configuration text, rendered as text (criterion 4); nothing here reads or shows supply
     rows.'
+  - 'ACCESSIBILITY: every owed-nothing state is said in words, never by colour alone (dashboard UX 11, REQ-DASH-182 review
+    2026-10-14).'
+  - 'NO ROUTE OR URL WORK: everything here is judged on the date on show, so a cold-loaded link to a past date rebuilds that
+    date''s rows and SLA tile - one for the post-build critic to check (dashboard UX 11).'
   dependencies:
   - REQ-PIPE-110
   - REQ-DASH-071
@@ -215,12 +253,13 @@ requirements:
   - REQ-DASH-198
   - REQ-PIPE-113
   - REQ-PIPE-106
+  - REQ-DASH-054
   decisions:
   - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith, T9, option A), on the REQ-PIPE-154 / REQ-DASH-155 pattern: the configuration
     and its rendering are separate reviewable units. REQ-DASH-180''s turned-off rows are owed-nothing rows of a third kind
     and depend on this. The decision below travelled from REQ-PIPE-110 unchanged.'
   - 'PERIODS OWED NOTHING ARE QUIET, NEVER RED (delivery-dashboard-ux pre-build review, 2026-10-07): a reason row, grouped
-    in supply history, never ''No supply'' and never in needs-action. The SLA label follows the participation version in force
+    in supply history, never ''No supply'' and never in needs-action. The SLA tile follows the participation version in force
     on the date on show.'
   - 'ROUND 3 FOLDED, 2026-10-10 (main session): the three kind labels fixed in one place so REQ-DASH-180 cannot drift (delivery-dashboard-ux
     15); rows in chronological place, a run of periods collapsed to one row, nothing after the date on show - a daily dataset
@@ -244,14 +283,64 @@ requirements:
   - 'KEITH''S THREE ANSWERS OF 2026-10-13 (DECIDED Keith, 2026-10-13 evening, answering the CLI and dashboard UX reviews -
     plans/running-thoughts.md #92; carried in by dashboard UX 1, 2026-10-14, as a carry-over gap): owed-nothing rows that
     recur (cp-case-workers'' May and November) read a SHORT generated label, ''Not owed - outside its agreed months (Feb,
-    Aug)'', with the authored reason once on the agreement tile (criterion 2); the current cycle shows its owed-nothing row
-    in place of ''No deliveries in the current cycle yet.'' (criterion 10); and the due-before label reads ''by 22:00 the
-    day before'' for one day and ''by 22:00, N days before each date'' for more (criterion 7). REJECTED repeating the authored
-    reason on every recurring row.'
+    Aug)'', with the authored reason once on the SLA tile (criterion 2); the current cycle shows its owed-nothing row in place
+    of ''No deliveries in the current cycle yet.'' (criterion 10); and the due-before label reads ''by 22:00 the day before''
+    for one day and ''by 22:00, N days before each date'' for more (criterion 7). REJECTED repeating the authored reason on
+    every recurring row.'
   - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): dashboard UX 1 (the three answers above, which had
     not reached the criteria); dashboard UX 12 (criterion 9 - the standing-in heading names the kind). This requirement had
     the 2026-10-13 joint scoper pass, not one of its own (dashboard UX 16).'
-  open_questions: []
+  - 'REQ-DASH-182 SENT TO ITS OWN UX REVIEW (Keith, 2026-10-14, at sign-off: ''send it to the UX reviewer first''; docs/drafts/calendar-close-out/review-182-ux.md).
+    Its findings 2 to 11 and Keith''s four answers are folded below; finding 1 is folded differently from how it was proposed
+    (see the next decision).'
+  - 'FINDING 1 DID NOT REPRODUCE AS STATED; A GUARD, NOT A FIX (main session''s real-browser check, 2026-10-14; Keith, 2026-10-14,
+    REQ-DASH-182 review Q2, option A): cp-case-workers at 2025-06-15 and 2026-06-15 shows no ''No data'' and no ''nothing
+    has landed yet'', so an owed-nothing period does not read stale today. A DIFFERENT false ''No data'' did reproduce - a
+    supply received inside its claim window but before its period''s start read stale for its whole period - and is FIXED
+    as post-build-review #178, recorded on REQ-DASH-054. Keith''s Q2 gives the participation and not_expected cases to this
+    requirement and leaves REQ-DASH-180 criterion 5 only the turned-off case, so criterion 15 is a regression guard with a
+    real-browser test that passes today rather than a test written to fail first. REJECTED the reviewer''s proposed staleness
+    criterion, which described a defect the page does not have.'
+  - 'THE SLA TILE NAMES THE DATASET''S OWN MONTHS (Keith, 2026-10-14, REQ-DASH-182 review Q1, option A; dashboard UX 2, HIGH,
+    confirmed in the browser): criterion 11. agreement.cadence() takes its months from the calendar, so cp-case-workers''
+    tile read ''Quarterly (Feb/May/Aug/Nov)'' directly above a row saying ''outside its agreed months (Feb, Aug)''. The tile
+    now names the dataset''s months in the row''s form with a matching frequency word, and the authored reason on a muted
+    line. The page calls it the SLA tile (its key reads SLA, .sla-tile), so the draft''s ''agreement tile'' and ''delivery-time
+    tile'' are both now ''SLA tile'', here and in REQ-DASH-180 criterion 16.'
+  - '''NOT OWED YET'' REPLACES ''NOTHING HAD BEEN SUPPLIED'' (Keith, 2026-10-14, REQ-DASH-182 review Q3, option A; dashboard
+    UX 6): criterion 3. Before a dataset''s first participation version the page takes its never-supplied branch, so the draft''s
+    ''Not yet owing - first version takes effect <date>'' had nowhere to appear; the notice''s heading and the SLA tile now
+    read ''Not owed yet — owes supplies from <date>''. REJECTED keeping ''Nothing had been supplied by this date'', which
+    reads as a supply missed.'
+  - 'LABELS UNCHANGED ON EVERY PAGE (Keith, 2026-10-14, REQ-DASH-182 review Q4, option A): criterion 14 - REQ-DASH-209''s
+    ''Not owed'' group shows the full label, not one shortened because the group heading already says ''Not owed''.'
+  - 'THE REVIEWER''S PROPOSALS FOLDED AS CRITERIA (REQ-DASH-182 dashboard UX review, 2026-10-14): finding 3 (criterion 12
+    - what a quiet row looks like; it is deliberately NEVER under ''Periods with no supply'', recorded here so the post-build
+    critic does not flag the contrast with a gap); finding 4 (criterion 13 - runs worded as gapText() words a gap, ''so far''
+    while open, the current period''s run is the current-cycle block, ''Show all history'' counts what it hides); finding
+    5 (criterion 9 - the standing-in panel''s heading, standingInHeading, not ''the heading above that row'', and the row''s
+    ''Inherited from <period>'' as muted text); finding 7 (criterion 14 - one function for kind, label and reason, and the
+    page''s em dash); finding 8 (criterion 7 - tested in both forms); finding 9 (criterion 8 - the frequency words and ''various
+    days''); finding 10 (criterion 1 - scoped to supply history and 209''s view, and shown with no supply cycles yet); finding
+    11 (two NFRs). The new user-facing wording in criteria 3, 9, 11, 13 and 14 is the reviewer''s and the scoper''s, for Keith''s
+    approval.'
+  - 'CRITERION 7 REWORDS BUILT BEHAVIOUR (dashboard UX 8): cadenceLabel already handles days_before (post-build-review #142),
+    reading ''due N days before each date, by 22:00''; criterion 7 replaces that with the wording Keith chose on 2026-10-13.
+    The terminal''s `mothman schedule show` probably needs the same words - not this requirement''s (DASH); flagged for delivery-cli-ux
+    rather than folded.'
+  open_questions:
+  - '1. THE ''NOT OWED YET'' NOTICE''S BODY (criterion 3; Keith''s Q3 named only its heading). Today''s body says ''There
+    is no QA run within the accepted freshness window as of <date>. Pick a later date, or reset to the default, using the
+    In place on control above.'' Recommended (A): keep only the way-back sentence (''Pick a later date, or reset to the default
+    ...''), dropping the freshness-window sentence, which reads as a missed supply. (B) Keep the body unchanged under the
+    new heading.'
+  - '2. THE SEPARATOR IN THE LABELS (criteria 2, 3 and 14; dashboard UX 7). Recommended (A): the page''s own em dash - ''Not
+    owed — outside its agreed months (Feb, Aug)'', ''Not owed yet — owes supplies from <date>''. (B) A plain hyphen, as the
+    labels were worded in Keith''s answers.'
+  - '3. THE STANDING-IN HEADING ON A PAST DATE (criterion 9; dashboard UX 5). Today it reads ''On <date> this period held
+    an earlier period''s data - nothing was owed for it''. Recommended (A): ''On <date>: <kind label>'' on a past date and
+    the kind label alone on the present, the reason in .promo-why. (B) Keep today''s heading sentences and put the kind label
+    only in .promo-why.'
 - id: REQ-PIPE-179
   title: A dataset, or a whole collection, can be turned off for a time or for good, and nothing still owed goes quiet
   date_written: '2026-10-10'
@@ -1013,8 +1102,8 @@ requirements:
   - WHILE a dataset is past its effective_to and its last owed slot before the gap has not yet closed, THE SYSTEM SHALL word
     the marker 'Turning off - <period> supply still owed, open until <date and time>' while that period has no supply, and
     'Turned off since <date> - <period> open for resupply until <date and time>' once it has one.
-  - THE SYSTEM SHALL NOT treat the verdict of the supply in place as stale because of a period the dataset owes nothing in,
-    whether by being turned off, by participation or by not_expected.
+  - THE SYSTEM SHALL NOT treat the verdict of the supply in place as stale because of a period the dataset owes nothing in
+    by being turned off; the participation and not_expected cases are REQ-DASH-182 criterion 15's.
   - THE SYSTEM SHALL keep counting in every needs-action count every item about a period the dataset owed - any period outside
     a turned-off gap - a slot closed unfilled and overdue, a supply on an owed period waiting for a person's decision (red
     included), a promoted supply listed as 'Promoted, then re-checked <verdict>' (REQ-PIPE-164) - until it is resolved, whether
@@ -1052,8 +1141,8 @@ requirements:
   - THE SYSTEM SHALL show a turned-off gap's periods as owed-nothing rows (REQ-DASH-182) whose kind reads 'Turned off' with
     the turned_off_reason, starting a new group wherever the kind or reason changes.
   - WHILE a dataset is turned off on the date on show and owes no period whose slot is still open, THE SYSTEM SHALL show its
-    delivery-time tile as 'Turned off - nothing due' and SHALL NOT show the last version's due time as though it applied;
-    and WHILE it still owes a period whose slot is open, SHALL show that period's due time labelled with the period.
+    SLA tile as 'Turned off - nothing due' and SHALL NOT show the last version's due time as though it applied; and WHILE
+    it still owes a period whose slot is open, SHALL show that period's due time labelled with the period.
   - THE SYSTEM SHALL NOT show a dataset turned off for good in the exhausted-schedule notice, its marker or the runway warning;
     SHALL show a dataset in a temporary gap in the runway warning by the periods it owes once back on (REQ-PIPE-179 criterion
     25); and SHALL show those for a dataset turned back on with no dates left from the moment it is back on.
@@ -1172,7 +1261,7 @@ requirements:
     4 replacing criterion 1''s while it applies (T8, delivery-dashboard-ux F2 and F3, delivery-scoper 25); the new statuses
     joined in both implementations, the shared cases and the legend, with an order (delivery-dashboard-ux F4); their look
     (F5); the marker told apart from the inherited one (F6); the quiet received-while-off line (T3, F7); every collection
-    and agency card (F8); the delivery-time tile true while a period is still owed (delivery-scoper 23); reasons as text (delivery-architect,
+    and agency card (F8); the SLA tile true while a period is still owed (delivery-scoper 23); reasons as text (delivery-architect,
     security); the REQ-PIPE-053 and REQ-DASH-155 amendments (delivery-architect F9); the owed-nothing rows now REQ-DASH-182''s.
     Criterion numbers in earlier decisions refer to the list before this fold.'
   - 'A TURNED-OFF DATASET STAYS NAMED ON ITS COLLECTION''S RED-PROMOTED LINE, MARKED ''(turned off)'' (Keith, 2026-10-10,
@@ -1185,10 +1274,9 @@ requirements:
     is waiting (4); a person''s excuse is not overridden (5); the executive tier and rollupStatuses() (6); the not-counted
     line does not repeat the exhausted line (7); the marker''s placement and icon made testable (8); a collection-level turn-off
     named as such (9, delivery-architect); status keys named (10); instants judged at the end of the date on show (11); Keith''s
-    Q5 (12); the runway wording for a temporary gap (delivery-scoper D); the delivery-time tile while a period is still owed
-    (delivery-scoper F); the supplying-ahead stretch marked (delivery-architect 10); REQ-PIPE-181, REQ-PIPE-164, REQ-DASH-162
-    and REQ-PIPE-115 added as dependencies. Criterion numbers in decisions written before this fold refer to the list as it
-    then stood.'
+    Q5 (12); the runway wording for a temporary gap (delivery-scoper D); the SLA tile while a period is still owed (delivery-scoper
+    F); the supplying-ahead stretch marked (delivery-architect 10); REQ-PIPE-181, REQ-PIPE-164, REQ-DASH-162 and REQ-PIPE-115
+    added as dependencies. Criterion numbers in decisions written before this fold refer to the list as it then stood.'
   - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): dashboard UX 10 (criterion 13 - after the red-promoted
     badge too); dashboard UX 11 (criterion 14 - the quiet line in the accepted-gaps slot); dashboard UX 16 (process note in
     the source).'
@@ -1236,6 +1324,10 @@ requirements:
     build reads with REQ-PIPE-179''s other turn-off data''; REQ-PIPE-179 gains the criterion that carries it once question
     1 is answered, since what it carries depends on the answer.'
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answer F9): criterion 27 reworded, criterion 28 added.'
+  - 'CRITERION 5 KEEPS ONLY THE TURNED-OFF CASE; ''SLA tile'' IN CRITERION 16 (Keith, 2026-10-14, REQ-DASH-182 review Q2 and
+    Q1, folded by delivery-scoper the same day): the participation and not_expected cases of ''never stale because owed nothing''
+    moved to REQ-DASH-182 criterion 15, a regression guard (the case did not reproduce in the browser; the false ''No data''
+    that did is post-build-review #178, fixed on REQ-DASH-054). The tile is named as the page names it, the SLA tile.'
 - id: REQ-DASH-208
   title: A scenario link from the test-scenarios panel lands with what the scenario is about in view
   date_written: '2026-10-14'
@@ -1387,19 +1479,20 @@ requirements:
     it.
   - 'THE SYSTEM SHALL let contract/scripted_decisions.yaml declare a scripted correction confirmation, in a top-level corrections:
     list separate from its decisions: list - naming a declared correction by change_reference, with no dataset of its own,
-    and saying either confirm, optionally with a list of supplies kept - each named by scenario, dataset and that scenario''s
-    supply index (never a generated id) - and one keep_reason covering them, or pending - read only by correction_replay.confirm_due,
-    outside the Player that plays filing decisions and outside filing_decisions'' operation validation, each kept supply resolved
-    to its supply id as scripted decisions resolve theirs (scripted_decisions._supply_of).'
+    and saying either keep, a list of supplies each named by scenario, dataset and that scenario''s supply index (never a
+    generated id) with one keep_reason covering them, or pending - read only by correction_replay.confirm_due, outside the
+    Player that plays filing decisions and outside filing_decisions'' operation validation, each kept supply resolved to its
+    supply id as scripted decisions resolve theirs (scripted_decisions._supply_of).'
   - IF a scripted correction confirmation names an undeclared change reference, an unknown scenario or supply index, a dataset
     that scenario's arrival does not carry, keeps without a keep_reason, a keep_reason without keeps, pending together with
-    keeps, any timing field (after_hours, at, day_offset), or a change reference another confirmation already names - or IF
-    a correction declared in contract/calendar.yaml has no scripted confirmation at all - THEN `mothman scenarios validate`
-    SHALL refuse it, naming the entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
-  - WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31) - a bootstrap, a resumed bootstrap
-    or `mothman pipeline run` over both - THE SYSTEM SHALL confirm through correction_apply.confirm only a correction whose
-    scripted confirmation says confirm, with exactly the keeps and reason it names, and SHALL leave every other correction
-    pending, so that TS-62's is never confirmed by default.
+    keeps, a confirmation with no keeps (which says nothing the default does not), any timing field (after_hours, at, day_offset),
+    or a change reference another confirmation already names, THEN `mothman scenarios validate` SHALL refuse it, naming the
+    entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
+  - 'WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31) - on every route that does
+    so: a bootstrap, a resumed bootstrap or `mothman pipeline run` over both - THE SYSTEM SHALL confirm a correction that
+    has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script names, SHALL
+    leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with none as it
+    does today.'
   - IF a scripted keep names a supply its correction does not propose to move, or a scripted confirmation is refused for any
     other reason, THEN THE SYSTEM SHALL stop the replay naming the scenario and the change reference, SHALL NOT drop the keep
     or confirm without it, and SHALL list in that message the correction's proposed moves by scenario, dataset and supply
@@ -1444,7 +1537,8 @@ requirements:
     and TS-60's hold standing at the end of the history.
   - THE SYSTEM SHALL have fixture tests, written first and seen to fail, that replay a small history with two declared corrections
     and assert that a scripted keep is recorded as KEEP naming the change reference and the script's reason, that the other
-    move is carried out and re-checked before the replay ends, and that the correction scripted pending is still pending afterwards.
+    move is carried out and re-checked before the replay ends, and that the correction scripted pending is still pending afterwards,
+    on a bootstrap and on a resumed bootstrap alike.
   - THE SYSTEM SHALL clear REQ-PIPE-170's unmet entry for criterion 23, naming this requirement, in the change that builds
     it.
   - IF a correction's date, or a period one of its declared changes names, falls outside the generated history - as a date
@@ -1476,10 +1570,6 @@ requirements:
     the case SHALL go to Keith rather than the version being moved.
   - THE SYSTEM SHALL have TS-62's new version pass REQ-PIPE-134's overlap gate in mothman check as any version does, with
     no exemption.
-  - THE SYSTEM SHALL add, in the same change, a scripted confirmation saying confirm, with no keeps, for every correction
-    already declared in contract/calendar.yaml (today REQ-PIPE-181's), so that the replayed history confirms it exactly as
-    before; and SHALL amend, in the same change, REQ-PIPE-170 criterion 31 so that a replay confirms only the corrections
-    a scripted confirmation says to confirm.
   non_functional_requirements:
   - 'NOISE: a correction that moves a date re-judges every supply of every dataset in the period it alters. Count, in the
     register entries, every period these corrections leave unfilled, red or awaiting confirmation and every outstanding item
@@ -1504,8 +1594,10 @@ requirements:
     arrivals plus the post-confirmation runs (criterion 8), which run serially after BOTH replays at about a minute each and
     add to the total directly - so count them in the dry run and measure from empty before and after, logged in CLAUDE.md''s
     running log.'
-  - 'FAIL SAFE: a correction is confirmed in a replay only where the script says so (criterion 6); a correction the script
-    forgot is refused by validation (criterion 5) rather than confirmed by default.'
+  - 'PENDING IS THE OPT-OUT (Keith, 2026-10-14, round 4 fold G3): a replay confirms every due correction, as today, unless
+    its scripted confirmation says pending; TS-62''s stays pending because every route that confirms reads that entry (criterion
+    6), which criterion 16''s test holds on a bootstrap and a resumed bootstrap. A forgotten ''pending'' entry would confirm
+    a correction silently - the accepted cost of G3.'
   dependencies:
   - REQ-PIPE-170
   - REQ-PIPE-111
@@ -1637,44 +1729,36 @@ requirements:
     TS-43 to TS-46 unmoved. NOT TAKEN AS WORDED: M4''s ''refuse a TS-62 version taking effect on or before any other Birth
     Registrations scenario''s dates'' - TS-44 to TS-46 lie after 2026-09-08, so that would refuse what Keith chose in R1;
     the narrowed claim refuses only where a filing actually changes.'
-  - 'A REPLAY CONFIRMS ONLY WHAT THE SCRIPT SAYS TO (round 4 architect M4; PROVISIONAL on open question 1): criteria 4, 5,
-    6 and 28. Today confirm_due confirms every pending correction (REQ-PIPE-170 criterion 31), so TS-62 stayed pending only
-    if its ''pending'' entry was read on every route that confirms; one missed route, or one missing entry, would confirm
-    it silently. Inverted: confirm is said, pending is the default, and validation refuses a declared correction the script
-    does not mention. COST: REQ-PIPE-181''s correction needs a one-line confirm entry, a confirmation with no keeps is now
-    meaningful (criterion 5 no longer refuses it), and REQ-PIPE-170 criterion 31 is amended. REJECTED, but offered as option
-    B: today''s default with ''pending'' as the only opt-out.'
-  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 44, PROVISIONAL on open
-    question 1) - REQ-PIPE-170 criterion 31 (signed 2026-10-07, built; criterion 28 here). OLD: ''WHEN a replay of both collections
-    finishes - a bootstrap, or `mothman pipeline run` over both - THE SYSTEM SHALL confirm every pending correction dated
-    up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager
-    role during playback, and SHALL rebuild both collections'' results if any was confirmed; a replay of one collection SHALL
-    leave them pending.'' NEW: ''WHEN a replay of both collections finishes - a bootstrap, or `mothman pipeline run` over
-    both - THE SYSTEM SHALL confirm every pending correction dated up to now whose scripted confirmation in contract/scripted_decisions.yaml
-    says confirm (REQ-GEN-205 criterion 6), the oldest first, through the same confirmation a person uses, as the synthetic
-    actor holding the asset manager role during playback, SHALL leave every other correction pending, and SHALL rebuild both
-    collections'' results if any was confirmed; a replay of one collection SHALL leave them pending. AMENDED <date built>
-    by REQ-GEN-205 criterion 28.'' BUILT BEHAVIOUR: BUILT CODE CHANGES (correction_replay.confirm_due''s loop); built and
-    tested by REQ-GEN-205 criteria 6, 16 and 28.'
+  - 'WITHDRAWN - A REPLAY CONFIRMS EVERYTHING DUE UNLESS THE SCRIPT SAYS PENDING (Keith, 2026-10-14, round 4 fold G3, option
+    B, against the recommendation; round 4 architect M4): criteria 4, 5 and 6 are back to their wording before the round 4
+    fold - confirm stays today''s default, pending is the only opt-out, a confirmation with no keeps is refused again as saying
+    nothing the default does not, and a declared correction with no entry is confirmed, not refused - and criterion 28 (a
+    confirm entry for REQ-PIPE-181''s correction, and the REQ-PIPE-170 criterion 31 amendment) is removed. Criterion 6 now
+    names every route that confirms, and criterion 16''s test covers the bootstrap and the resumed bootstrap, since TS-62
+    stays pending only while each route reads its entry. ACCEPTED COST: a forgotten ''pending'' entry confirms silently. REJECTED
+    (the recommendation, option A) confirming only the corrections the script says to confirm.'
   - 'THE NEW WINDOW MUST PASS THE OVERLAP GATE (round 4 architect M4): criterion 27, and REQ-PIPE-134 added as a dependency.
     With Birth Registrations due 14:00 with 1 hour''s grace, a six-hour window opens the next day''s claim at 08:00, after
     the previous day''s 15:00 late-after instant; the gate checks it rather than this note.'
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 answer R1 and architect M4): criteria 4, 5, 6, 10, 24 and 25 reworded;
     criteria 26 to 28 added; NFRs 4 and 5 reworded and a FAIL SAFE NFR added; REQ-PIPE-134 added as a dependency. The old
     open question 1 is answered; a new open question 1 (confirm only what the script says) is raised by M4.'
+  - 'AMENDMENT 44 DROPPED (Keith, 2026-10-14, round 4 fold G3, option B): the proposed rewording of REQ-PIPE-170 criterion
+    31 - ''confirm every pending correction ... whose scripted confirmation ... says confirm ... SHALL leave every other correction
+    pending'' - existed only to carry option A. With G3''s option B, criterion 31 already says what this requirement needs
+    (''confirm every pending correction dated up to now''), and the pending opt-out narrows nothing it promises, so REQ-PIPE-170
+    stays as signed and no built behaviour of correction_replay.confirm_due''s loop changes beyond reading ''pending''.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 fold answer G3): criteria 4, 5 and 6 restored to their wording before
+    the round 4 fold, criterion 6 naming every route; criterion 16 extended to the resumed bootstrap; criterion 28 removed;
+    the FAIL SAFE NFR replaced; amendment 44 dropped; open question 1 removed as answered, the two build-time checks renumbered
+    1 and 2.'
   open_questions:
-  - '1. A REPLAY CONFIRMS ONLY WHAT THE SCRIPT SAYS TO (round 4 architect M4). Recommended (A): confirm_due confirms only
-    a correction whose scripted confirmation says confirm; every other stays pending; `mothman scenarios validate` refuses
-    a declared correction with no entry; REQ-PIPE-181''s correction gets a one-line confirm entry; REQ-PIPE-170 criterion
-    31 is amended (batch amendment 44). Fail-safe: forgetting an entry is refused, never silently confirmed. (B) Keep today''s
-    default - every due correction is confirmed unless its entry says pending - with no amendment; TS-62 stays pending only
-    while every route that confirms reads its entry.'
-  - '2. CHECK AT BUILD (architect, not a question for Keith): on a synthetic asset, adding a past-dated calendar version needs
+  - '1. CHECK AT BUILD (architect, not a question for Keith): on a synthetic asset, adding a past-dated calendar version needs
     no correction (REQ-PIPE-111 criterion 9; agreement_freeze skips it). Read 2026-10-14, a declared correction naming the
     added version is matched against the added item and accepted. Confirm that correction_replay then stages it as a pending
     correction, rather than as the synthetic exemption''s undeclared addition, which would make TS-62 a version with no correction
     to leave pending.'
-  - '3. CHECK AT BUILD (architect, not a question for Keith): whether REQ-PIPE-169''s impact preview reports arrivals received
+  - '2. CHECK AT BUILD (architect, not a question for Keith): whether REQ-PIPE-169''s impact preview reports arrivals received
     on or after a version''s effective date - filed under the new version at receipt rather than moved - as well as supplies
     it would move. If it does not, criterion 10''s narrowed claim and criterion 26''s proof compute those filings with the
     same implementation (REQ-PIPE-169 criterion 6), never a second rule.'
@@ -1950,10 +2034,10 @@ requirements:
     uses (promotionStateOn), and SHALL NOT work out a second derivation, nor read a period schema, its catalogue, its _manifest
     or any supply row.
   - THE SYSTEM SHALL show, for each table held, the supply's receipt on the asset's clock, when the decision that put it there
-    took effect, who made it - worded as the rest of the page words it, 'Decided by <display name>' or 'Applied automatically
-    by the schedule' (REQ-DASH-198), the display name from contract/people.yaml and never an email address - its reason, the
-    status it was promoted on, in a column headed 'Status when promoted' and never its health since (REQ-PIPE-130 criterion
-    12), and, where an acknowledgement is owed, whether it was given.
+    took effect, who made it - worded as the rest of the page words it, 'Decided by <name>' or 'Applied automatically by the
+    schedule', exactly as REQ-DASH-198's drill-down words it, <name> being the person's display name from contract/people.yaml
+    and never an email address - its reason, the status it was promoted on, in a column headed 'Status when promoted' and
+    never its health since (REQ-PIPE-130 criterion 12), and, where an acknowledgement is owed, whether it was given.
   - 'THE SYSTEM SHALL open the view with one line counting the period''s datasets by kind - for example ''30 datasets: 1 not
     supplied, 1 substituted, 2 inherited, 25 promoted, 1 not owed'' - and SHALL list the rows grouped by kind in that order,
     ''Not supplied'' first and ''Not owed'' last, each group in dataset display-name order, with every row shown and no group
@@ -1990,6 +2074,11 @@ requirements:
     table a caption saying the same, and SHALL move focus to the h2 on arrival.
   - IF the address names an agency, collection or period the dashboard does not hold, THEN THE SYSTEM SHALL show the existing
     not-found page (renderNotFound) naming what was not found, and SHALL NOT show an empty view.
+  - 'THE SYSTEM SHALL show beside the view''s h2 a link to the previous period''s composition view and one to the next period''s,
+    reading ''Previous period: <period name>'' and ''Next period: <period name>'' - ''Previous day: <date>'' and ''Next day:
+    <date>'' for a daily collection - each a real <a href> to that period''s route (criterion 6) keeping the date on show
+    in the in-place-on parameter; and SHALL leave a link out, rather than show it disabled, where the collection''s history
+    has no earlier period or where the next period had not opened by the date on show.'
   non_functional_requirements:
   - 'SCALE (CLAUDE.md''s ~30-datasets rule, Keith''s own condition for this view): one row per dataset with its kind readable
     without expanding anything, every row shown (Keith, round 4 R6), the counting line first, and ''Not supplied'' at the
@@ -2021,6 +2110,7 @@ requirements:
   - REQ-DASH-071
   - REQ-DASH-197
   - REQ-PIPE-179
+  - REQ-DASH-182
   decisions:
   - 'A PAGE FOR A PERIOD''S COMPOSITION (Keith, 2026-10-14, close-out Q16, option B, against the recommendation): TS-55 needs
     a page that shows promoted, inherited and substituted tables together, and none does. It must work at about thirty datasets
@@ -2096,21 +2186,30 @@ requirements:
   - 'THE PAGE''S OWN WORDS (round 4 dashboard UX 8, MED): criterion 3 - ''Decided by <name>'' and ''Applied automatically
     by the schedule'', as REQ-DASH-198''s drill-down already says; a column headed ''Status when promoted''; a table caption
     (criterion 12). This reads follow-up F3''s ''the person''s name, as the rest of the page shows'' as the page''s own sentence,
-    which replaces F3''s literal ''the rule'' - open question 2 asks Keith to confirm. Criterion 10 maps each to _manifest''s
+    which replaces F3''s literal ''the rule'' - Keith confirmed it (round 4 fold G2, below). Criterion 10 maps each to _manifest''s
     ''person'' or ''rule''.'
-  - 'PREVIOUS/NEXT-PERIOD LINKS NOT DECIDED (round 4 dashboard UX 10, question D4): not answered in round 4, so open question
-    1; nothing here builds them.'
+  - 'PREVIOUS AND NEXT-PERIOD LINKS (Keith, 2026-10-14, round 4 fold G1, option B, against the recommendation; round 4 dashboard
+    UX 10, D4): criterion 14 - beside the h2, each a real <a href> to the adjacent period''s route (docs/spa-best-practices.md
+    section D), keeping the date on show. Left out, not disabled, where there is no earlier period or the next had not opened
+    by the date on show (delivery-scoper, PROVISIONAL): the page never offers a date with nothing behind it (REQ-DASH-054''s
+    ''NO FUTURE DATES'' decision). The link wording is the scoper''s, for Keith''s approval. REJECTED (the recommendation)
+    leaving them out for now.'
   - 'FOLDED 2026-10-14 (delivery-scoper, round 4 reviews and Keith''s round 4 answers R6 and R7): criteria 1 to 4 and 6 to
     10 reworded, criteria 12 and 13 added, NFRs 1 to 4, 6 and 7 reworded, REQ-DASH-197 and REQ-PIPE-179 added as dependencies.
     The architect''s REQ-GEN-045 check is answered (amendment 3 dropped).'
+  - 'WHO DECIDED, IN THE PAGE''S OWN WORDS (Keith, 2026-10-14, round 4 fold G2, option A, the recommendation): criterion 3
+    says exactly ''Decided by <name>'' or ''Applied automatically by the schedule'', the sentences REQ-DASH-198''s drill-down
+    already uses. This settles follow-up F3: ''the rule'' is not shown. REJECTED F3''s literal ''the person''s name, or the
+    rule''.'
+  - 'ONE LABEL FUNCTION WITH REQ-DASH-182 (delivery-scoper, 2026-10-14, folding REQ-DASH-182''s review, finding 7, and Keith''s
+    Q4 there): the ''Not owed'' group and its counting line take each dataset''s kind, label and reason from REQ-DASH-182
+    criterion 14''s one function, unshortened, so REQ-DASH-182 is added as a dependency.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 fold answers G1 and G2): criterion 3 reworded, criterion 14 added,
+    open questions 1 and 2 removed as answered, REQ-DASH-182 added as a dependency.'
   open_questions:
-  - '1. PREVIOUS AND NEXT-PERIOD LINKS ON THE VIEW (round 4 dashboard UX 10, D4; not answered in round 4). Recommended (A):
-    not for now - the supply history and the date picker already reach any period, and the view is new. (B) Yes - a ''previous
-    period'' and ''next period'' link beside the h2, each a real <a href> keeping the date on show.'
-  - '2. WHO DECIDED, IN THE PAGE''S WORDS OR F3''S (round 4 dashboard UX 8). Recommended (A): ''Decided by <name>'' and ''Applied
-    automatically by the schedule'', the sentences REQ-DASH-198''s drill-down already uses - which is what F3''s ''as the
-    rest of the page shows'' asked for. (B) The person''s name, or ''the rule'', literally as F3''s answer was worded - a
-    second way of saying the same thing on one page.'
+  - '1. PREVIOUS/NEXT LINKS AT THE ENDS (criterion 14, delivery-scoper, PROVISIONAL). Recommended (A): leave a link out where
+    there is no earlier period, or the next had not opened by the date on show - the page never offers a date with nothing
+    behind it (REQ-DASH-054). (B) Show the next link anyway, landing on ''<period> had not opened by <date>'' (criterion 8).'
 - id: REQ-PIPE-210
   title: The terminal's queue says a waiting supply turned red only by another table needs nothing decided on it, and lists
     it under that table's own item
