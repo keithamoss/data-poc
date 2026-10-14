@@ -676,6 +676,15 @@ class TestARequirementHasItsOwnAddress:
         assert clean_page.locator("#activity-panel").get_attribute("aria-hidden") == "false"
         assert "req=" not in clean_page.url
 
+    def test_an_empty_req_is_dropped_and_the_panel_opens_at_the_top(self, clean_page,
+                                                                     built_dashboard_html):
+        """post-build-review #182: `req=` with no value used to stay in the
+        address, so a copied link carried a parameter that meant nothing."""
+        self._load(clean_page, built_dashboard_html, "panel=requirements&req=")
+        assert clean_page.locator("#requirements-panel").get_attribute("aria-hidden") == "false"
+        assert "req=" not in clean_page.url and "panel=requirements" in clean_page.url
+        assert clean_page.locator(".req-linked").count() == 0
+
     def test_closing_a_cold_loaded_one_drops_both_parameters(self, clean_page,
                                                              built_dashboard_html):
         self._load(clean_page, built_dashboard_html, "panel=requirements")

@@ -47,9 +47,6 @@ DATASET_ID = hierarchy.dataset_for_table("cp_notifications").dataset_id
 # no such period rather than "use a default".
 
 
-_COLUMN = "concern_type"
-
-
 def _current_frame(run_id: str):
     """This run's column, from the warehouse - see the BDM counterpart.
 
@@ -70,7 +67,7 @@ def _current_frame(run_id: str):
     with supply_db.connect(read_only=True, label="mothman:evidently-cp") as conn:
         conn.execute(f'SET search_path TO "{schema}"')
         try:
-            rows = conn.execute(f"SELECT {_COLUMN} FROM cp_notifications").fetchall()
+            rows = conn.execute(f'SELECT {_PSI["column"]} FROM cp_notifications').fetchall()
         except psycopg.errors.UndefinedTable as exc:
             # NAME THE SCHEMA. PostgreSQL ignores a missing schema in
             # search_path rather than complaining, so the bare error
@@ -82,7 +79,7 @@ def _current_frame(run_id: str):
                 f"run {run_id!r} has no readable cp_notifications: schema {schema!r} "
                 f"{'exists but has no such view' if schema in existing else 'does not exist'}. "
                 f"Stage that supply before checking it.") from exc
-    return pd.DataFrame({_COLUMN: [r[0] for r in rows]})
+    return pd.DataFrame({_PSI["column"]: [r[0] for r in rows]})
 
 
 def _reference_frame(reference_run_id: str):
@@ -99,9 +96,9 @@ def _reference_frame(reference_run_id: str):
     )
 
     counts = reference_value_counts(
-        cp_common.AGENCY_ID, cp_common.COLLECTION_ID, reference_run_id, _COLUMN)
+        cp_common.AGENCY_ID, cp_common.COLLECTION_ID, reference_run_id, _PSI["column"])
     if counts:
-        return frame_from_value_counts(counts, _COLUMN)
+        return frame_from_value_counts(counts, _PSI["column"])
     # NO RECORDING YET, SO READ THE WAREHOUSE - never a CSV
     # (REQ-PIPE-102 criterion 4). A recorded distribution is the
     # preferred source because it keeps working after the reference

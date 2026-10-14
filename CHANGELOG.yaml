@@ -147,6 +147,12 @@ releases:
               count as failing in the Trend column, so a dataset with nothing
               wrong could draw a line near the top of its box. Only amber and
               red count now.
+          - headline: Check rules in subfolders need a note too
+            components: ["QA checks & contract"]
+            description: >
+              A dbt macro or test kept in a subfolder now needs a changelog
+              note when it changes, like one at the top level. Drift checks
+              also read their column from the check's own entry now.
           - headline: An early supply no longer reads as "No data"
             components: ["Dashboard UI"]
             description: >

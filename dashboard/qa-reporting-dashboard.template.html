@@ -8719,7 +8719,8 @@ renderBuildStamp();
 // rewritten, or it would take over every later reload and copied link.
 const INITIAL_URL = new URL(location.href);
 if(INITIAL_URL.searchParams.get("panel") === "scenarios") INITIAL_URL.searchParams.delete("panel");
-if(INITIAL_URL.searchParams.has("req") && INITIAL_URL.searchParams.get("panel") !== "requirements") INITIAL_URL.searchParams.delete("req");
+// An empty req= names nothing, so it goes too (post-build-review #182).
+if(INITIAL_URL.searchParams.has("req") && (INITIAL_URL.searchParams.get("panel") !== "requirements" || !INITIAL_URL.searchParams.get("req"))) INITIAL_URL.searchParams.delete("req");
 history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
 </script>

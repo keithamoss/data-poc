@@ -108,11 +108,14 @@ _MACRO_HEAD = re.compile(r"{%-?\s*(macro|test)\s+(\w+)\s*\(")
 
 
 def _files_in(rel_dir: str, ref: str | None) -> list[str]:
-    """The .sql files directly in `rel_dir`, at `ref` or in the working tree."""
+    """The .sql files anywhere under `rel_dir`, at `ref` or in the working
+    tree. Recursive because dbt is: it reads every folder under its
+    macro-paths and test-paths, so a macro filed in a subfolder still backs
+    checks (post-build-review #182 - it used to be invisible here)."""
     if ref is None:
         d = ROOT / rel_dir
-        return sorted(f"{rel_dir}/{p.name}" for p in d.glob("*.sql")) if d.is_dir() else []
-    result = subprocess.run(["git", "ls-tree", "--name-only", f"{ref}:{rel_dir}"], cwd=ROOT,
+        return sorted(f"{rel_dir}/{p.relative_to(d).as_posix()}" for p in d.rglob("*.sql")) if d.is_dir() else []
+    result = subprocess.run(["git", "ls-tree", "-r", "--name-only", f"{ref}:{rel_dir}"], cwd=ROOT,
                             capture_output=True, text=True)
     if result.returncode != 0:
         return []
@@ -138,6 +141,9 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
                 if kind == "macro" and name.startswith("test_"):
                     macros.setdefault(name[len("test_"):], (rel, text))
 
+    singular = [f for f in _files_in(_DBT_SINGULAR_DIR, ref)
+                if not f.startswith(f"{_DBT_SINGULAR_DIR}/generic/")]
+
     def _with_used_macros(files: list[str], texts: list[str]) -> tuple[str, tuple[str, ...]]:
         seen = set(files)
         i = 0
@@ -152,8 +158,10 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
 
     def definition(kind: str, name: str):
         if kind == "singular":
-            rel = f"{_DBT_SINGULAR_DIR}/{name}.sql"
-            text = _old_file_content(rel, ref)
+            # dbt names a singular test by its file, in any folder under
+            # tests/ - generic tests (tests/generic/) are macros, not these.
+            rel = next((f for f in singular if f.rsplit("/", 1)[-1] == f"{name}.sql"), None)
+            text = _old_file_content(rel, ref) if rel else None
             if text is None:
                 return None, ()
             return _with_used_macros([rel], [text])

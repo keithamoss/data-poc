@@ -35253,6 +35253,7 @@ requirements:
     - "REVIEWS FOLDED, 2026-10-14 (delivery-architect: buildable now): three NFRs added - the one reader, not merged with sources_fingerprint, the Evidently bands and their comment. No criterion changed."
     - 'THE BUILD COMMIT TRIPS THE GATE ONCE PER EVIDENTLY CHECK, AND PAYS FOR IT WITH CHANGELOG ENTRIES (Keith, 2026-10-14, option A): criterion 3 starts recording each Evidently check''s column, method and thresholds, so the commit that builds this changes about five definition hashes; it adds one changelog entry to each, ''definition now recorded with the check; behaviour unchanged''. Rejected: a one-off gate exemption for the build commit (Keith''s 2026-10-10 rejection of exemptions stands).'
     - 'BUILT 2026-10-14. The nine Evidently checks (two Birth Registrations, seven Child Protection) each gained their column, method and bands as literals plus a changelog entry, ''Definition now recorded with the check ... behaviour unchanged'' - nine rather than the ~5 estimated at sign-off; Keith''s answer (one entry each, no exemption) covers the count. The four shared module constants in evidently_common were removed rather than kept beside the entries, and status_for_psi/status_for_row_drop became one status_for(value, entry), so no second source of a band remains; check_bands.evidently_bounds reads the entries too. The definition source is passed to the dbt parser only by the gate (definition=None elsewhere keeps the parser pure); the hash''s NEW inputs - the test type and the Soda expression - apply on every path, which changes no comparison because both sides of the gate''s diff use the same formula.'
+    - 'POST-BUILD FIXES (post-build-review #182, 2026-10-14). The Evidently runners now read the column from the entry for both the run''s rows and the recorded reference (BDM had ''sex'' by name, CP a surviving module constant). The dbt scan recurses, because dbt reads every folder under macro-paths and test-paths, and a singular test is found by its file name in any folder outside tests/generic/. REJECTED stripping Jinja comments before hashing for now: the requirement chose to err towards too much, and that is Keith''s call.'
     linked_tests:
     - 'tests/test_validate_check_lifecycle.py::test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs'
     - 'tests/test_validate_check_lifecycle.py::test_an_unexplained_singular_sql_edit_fails_naming_that_check_alone'
@@ -35263,6 +35264,8 @@ requirements:
     - 'tests/test_validate_check_lifecycle.py::test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry'
     - 'tests/test_check_bands.py'
     - 'tests/test_run_evidently_cp_real.py'
+    - 'tests/test_evidently_reads_its_entry.py'
+    - 'tests/test_validate_check_lifecycle.py::test_a_macro_in_a_subfolder_is_still_covered'
     implemented_by:
     - 'qa_tools/common/check_lifecycle.py::_with_definition'
     - 'qa_tools/common/check_lifecycle.py::parse_dbt_check_metadata'

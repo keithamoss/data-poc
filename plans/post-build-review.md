@@ -8810,3 +8810,61 @@ twice. It deliberately did not re-find the `TypeError`.
      reads 0. `tests-js/trend-counts-only-verdicts.test.js`, three tests, all
      seen failing first. The one implementation (no Python mirror). Road-
      testing sprint 1's REQ-DASH-224 builds on this rather than being it.
+
+182. **[in-progress, 2026-10-14]** **[Dashboard UI]** **[QA checks &
+     contract]** **delivery-critic on REQ-DASH-222 and REQ-QAC-223.** Every
+     finding below was checked against the code before being written up.
+     Each REQ-QAC-223 edit scenario the critic ran for real (a macro, a Soda
+     expression, an Evidently band, a contract SQL rule, a singular test)
+     failed the gate, naming only the checks that edit backs, and every file
+     was restored afterwards.
+     - **FIXED - the Evidently runners did not read their column from the
+       entry** (REQ-QAC-223 criterion 3, "the runners read them from
+       there"). BDM selected and looked up `sex` by name; CP used a module
+       constant `_COLUMN`, which the requirement's own decision says was
+       deleted. Editing the entry's column alone would have read one column
+       and labelled the result as another. Both now use `_PSI["column"]` for
+       the run's own rows and for the recorded reference.
+       `tests/test_evidently_reads_its_entry.py` (4 tests) failed first.
+     - **FIXED - the dbt scan saw only the top level of each folder.**
+       `_files_in` listed `macros/` and `tests/` without recursing, and
+       singular tests were assumed to sit at `tests/<name>.sql`. dbt reads
+       every folder under macro-paths and test-paths, so a macro or test
+       filed in a subfolder could change with no changelog entry. None does
+       today, so this was latent. It now recurses (`git ls-tree -r`,
+       `rglob`) and finds a singular test by its file name in any subfolder
+       outside `tests/generic/`. `test_a_macro_in_a_subfolder_is_still_covered`
+       and `test_a_singular_test_in_a_subfolder_is_still_covered` both failed
+       first. On the real repo the gate still reads 307 checks, OK.
+     - **FIXED - coverage gap**: criterion 9's "and passes with an entry"
+       half for singular SQL had no test. Added
+       `test_a_singular_sql_edit_passes_once_its_check_has_a_changelog_entry`.
+     - **FIXED (polish) - an empty `req=` stayed in the address.**
+       `?panel=requirements&req=` is now dropped on load like a `req=` beside
+       another panel. `test_an_empty_req_is_dropped_and_the_panel_opens_at_the_top`
+       failed first.
+     - **FOR KEITH - Close after following a link inside the panel takes
+       two presses.** A link followed inside the Requirements panel pushes a
+       history entry (criterion 4: Back returns to the panel as it was), and
+       Close is Back whenever the panel was opened by a push (#180's
+       design). So after one in-panel link, X or Escape steps back to the
+       previous requirement and only a second press closes. Back behaves as
+       criterion 4 asks; Close does not read as closing. Options: (a) Close
+       always closes in place, leaving Back for stepping; (b) Close steps
+       back over all of the panel's own entries in one go; (c) leave it.
+     - **FOR KEITH - a comment-only edit to a macro asks for changelog
+       entries on every check the macro backs** (6 for `matches_regex`). This
+       is the "errs towards too much" design the requirement chose, so it
+       stays unless he wants comments stripped before hashing.
+     - **FOR KEITH (wording in signed criteria) - `matches_regex` backs 6
+       checks, not 11.** REQ-QAC-223's criteria and NFRs say 11; the
+       evidence already says 6. Fixing the number changes signed text, so it
+       waits for him.
+     - **NOTED, no change**: a retired check backed by a changed macro also
+       needs an entry (REQ-QAC-025's same-terms rule, deliberate); `method`
+       is read only by `check_bands.evidently_bounds`, since each runner
+       already holds one method per entry; macros reached only through
+       `adapter.dispatch` are not followed (none exist here); REQ-QAC-223's
+       evidence cites runs, while its commit was a checkpoint with no test
+       claims - the full `mothman check` ran before that push, but nothing
+       records whether an edit landed between, so the tie is not proven.

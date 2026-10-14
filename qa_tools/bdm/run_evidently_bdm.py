@@ -90,7 +90,7 @@ def _row_count_of(df) -> tuple[int, dict]:
 
 
 def _current_frame(run_id: str):
-    """This run's `sex` column, from the warehouse.
+    """This run's drift column (the entry's `column`), from the warehouse.
 
     NO CSV FALLBACK (REQ-PIPE-102, 2026-09-27). There used to be one,
     "for the local-file path where somebody is checking a file
@@ -109,7 +109,7 @@ def _current_frame(run_id: str):
     with supply_db.connect(read_only=True, label="mothman:evidently-bdm") as conn:
         conn.execute(f'SET search_path TO "{schema}"')
         try:
-            rows = conn.execute("SELECT sex FROM birth_registrations").fetchall()
+            rows = conn.execute(f'SELECT {_PSI["column"]} FROM birth_registrations').fetchall()
         except psycopg.errors.UndefinedTable as exc:
             # NAME THE SCHEMA: PostgreSQL ignores a missing schema in
             # search_path rather than complaining, so the bare error
@@ -119,7 +119,7 @@ def _current_frame(run_id: str):
                 f"run {run_id!r} has no readable birth_registrations: schema "
                 f"{schema!r} {'exists but has no such view' if schema in existing else 'does not exist'}. "
                 f"Stage that supply before checking it.") from exc
-    return pd.DataFrame({"sex": [r[0] for r in rows]})
+    return pd.DataFrame({_PSI["column"]: [r[0] for r in rows]})
 
 
 def _reference_frame(reference_run_id: str):
@@ -141,9 +141,9 @@ def _reference_frame(reference_run_id: str):
         frame_from_value_counts, reference_value_counts,
     )
 
-    counts = reference_value_counts(AGENCY_ID, COLLECTION_ID, reference_run_id, "sex")
+    counts = reference_value_counts(AGENCY_ID, COLLECTION_ID, reference_run_id, _PSI["column"])
     if counts:
-        return frame_from_value_counts(counts, "sex")
+        return frame_from_value_counts(counts, _PSI["column"])
     return _current_frame(reference_run_id)
 
 

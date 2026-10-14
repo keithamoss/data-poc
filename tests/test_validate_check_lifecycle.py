@@ -441,7 +441,7 @@ select * from {{ model }} where not regexp_like({{ column_name }}, '{{ regex }}'
 """
 
 
-def _regex_schema(changelog_on_a: str = "[]") -> str:
+def _regex_schema(changelog_on_a: str = "[]", changelog_on_rule: str = "[]") -> str:
     return textwrap.dedent(f"""\
         models:
           - name: m
@@ -473,7 +473,7 @@ def _regex_schema(changelog_on_a: str = "[]") -> str:
               meta:
                 check_id: {_BDM}.b.sibling_rule_dbt
                 category: consistency
-                changelog: []
+                changelog: {changelog_on_rule}
                 reads_columns: [birth_registrations.date_of_birth]
         """)
 
@@ -547,6 +547,49 @@ def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, m
     _commit(repo, "change the helper macro, no changelog")
 
     monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert f"{_BDM}.b.sibling_rule_dbt" in err
+
+
+def test_a_singular_sql_edit_passes_once_its_check_has_a_changelog_entry(tmp_path, monkeypatch, capsys):
+    """REQ-QAC-223 criterion 9's other half for singular SQL (#182)."""
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
+    (repo / "schema.yml").write_text(_regex_schema(
+        changelog_on_rule='[{"date": "2026-10-14", "change": "Rule now flags every row."}]'))
+    _commit(repo, "change the singular test and say why")
+    assert vcl.main() == 0, capsys.readouterr().err
+
+
+def test_a_macro_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
+    """dbt reads macros from every folder under macro-paths, so the gate must
+    too (#182: it listed only the top level, so this edit passed)."""
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    sub = repo / "dbt_project" / "macros" / "regex"
+    sub.mkdir()
+    (repo / "dbt_project" / "macros" / "matches_regex.sql").rename(sub / "matches_regex.sql")
+    _commit(repo, "move the macro into a subfolder (no behaviour change)")
+    (sub / "matches_regex.sql").write_text(_MATCHES_REGEX.replace("regexp_like", "not regexp_like"))
+    _commit(repo, "change the macro, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert "dbt_project/macros/regex/matches_regex.sql" in err
+    assert f"{_BDM}.a.matches_regex_dbt" in err
+
+
+def test_a_singular_test_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    sub = repo / "dbt_project" / "tests" / "rules"
+    sub.mkdir()
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").rename(sub / "sibling_rule.sql")
+    _commit(repo, "move the singular test into a subfolder")
+    (sub / "sibling_rule.sql").write_text("select 1 where true\n")
+    _commit(repo, "change the singular test, no changelog")
+
     assert vcl.main() == 1
     err = capsys.readouterr().err
     _only_changelog_errors(err)
