@@ -121,8 +121,11 @@ def _turn_off_lines(dataset_id: str, on: date,
         opens = agreement_freeze._claim_open(dataset_id, gap[0].date, agr)
         if opens is not None:
             when = asset_time.localise(opens).strftime('%-d %b %Y %H:%M')
-            lines.append(f"Changeable by an ordinary edit until {when}; after that only by "
-                         f"a declared correction." if opens > start else
+            # REQ-PIPE-179 c28 as amended by Keith, 2026-10-15 (morning report
+            # 5 Q10): "ordinary edit" read unclearly; say which file.
+            lines.append(f"Edit calendar.yaml to change this until {when}, when the first "
+                         f"period's claim window opens. After that it needs a declared "
+                         f"correction." if opens > start else
                          f"A declared correction is needed to change it - {gap[0].name}'s "
                          f"claim window opened {when}.")
     headline = None

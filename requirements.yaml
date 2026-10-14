@@ -24287,7 +24287,7 @@ requirements:
       --on <date>` (REQ-PIPE-181''s one renderer), for a dataset with an effective_to: the level that turned it off, and for
       a dataset back on inside its collection''s gap, that its own version brought it back; the date it is turned off after
       and its reason; which periods it still owes and until when their slots stay open; which periods it owes nothing in and
-      whether the turn-off is permanent; and the instant until which the turn-off can be changed by an ordinary edit.'
+      whether the turn-off is permanent; and the instant until which the turn-off can be changed by editing contract/calendar.yaml, worded ''Edit calendar.yaml to change this until <instant>, when the first period''s claim window opens. After that it needs a declared correction.'' AMENDED 2026-10-15 by Keith (morning report 5 Q10).'
     - WHILE a dataset is turned off on the date asked about and owes no period whose slot is still open, THE SYSTEM SHALL show
       'Turned off - nothing due', and SHALL show the due time and grace of its last version only labelled 'when last on'; and
       WHILE its last owed slot before a turn-off has closed and its effective_to has not yet passed, SHALL show 'Turning off
@@ -25045,6 +25045,7 @@ requirements:
     - 'THE BUILD CARRIES IT (criterion 41): turned_off.timeline(dataset) -> every turn-off the dataset reads with effectiveTo, until, reason, level, versionFrom and authoredOn - the newest declared correction setting or moving that effective_to, else the newest turns_off changelog entry - embedded as ''turnOffs'' by both dashboard builders for REQ-DASH-180.'
     - 'THE 22 AMENDMENTS (decisions above, ''PROPOSED AMENDMENT WORDING ... batch amendment N'', approved by Keith 2026-10-14 in the drafted wording) were applied 2026-10-15 exactly as drafted, ''<date built>'' read as 2026-10-15, each OLD text first checked to match the criterion as it stood.'
     - 'FAIL LOUD: an effective_to that is not a date raises at load rather than reading as absent, which would be a dataset silently owing again. The gate refuses it before anything loads it.'
+    - 'CRITERION 28 REWORDED (Keith, 2026-10-15, morning report 5 Q10): the critic found ''ordinary edit'' unclear; the line names calendar.yaml and says when the claim window opens.'
     linked_tests:
     - 'tests/test_turn_off.py'
     - 'tests/test_correction_apply.py::TestATurnOffDeclaredAsACorrection'
@@ -26901,7 +26902,7 @@ requirements:
     - "THE SYSTEM SHALL honour a withdrawal in every reader of the annotation it withdraws - the terminal's slot states and queue, the needs-action policy and its tickets (REQ-PIPE-083), the acknowledgement lookup (acknowledgement.acknowledged_by), the slot timeline (pipeline/slot_timeline.py), the dashboard-data builders (pipeline/build_dashboard_data.py, pipeline/build_cp_dashboard_data.py) and the page's decision wording (DECISION_DONE) - so that none of them still reads the withdrawn annotation as standing."
     - "THE SYSTEM SHALL describe each withdrawal in words wherever a past decision is described - 'no longer acknowledged', 'no longer marked not supplied', as REQ-DASH-198 words de-substitute and un-inherit - and SHALL NOT show the raw operation name."
     - "WHERE an acknowledgement or a mark as not supplied was withdrawn, THE SYSTEM SHALL show the dashboard's acknowledgement badge or not-supplied (accepted) reading up to the withdrawal's instant and not from it, and SHALL show an acknowledgement and its withdrawal in the supply history, as REQ-DASH-162 criterion 3 does for an excuse, and a mark and its withdrawal where criterion 15 says."
-    - "WHEN a withdrawal is confirmed, on either route, THE SYSTEM SHALL name the entry withdrawn - who recorded it, when, and its reason - and its public consequence (for an acknowledgement, that the page stops showing it from now, that it stays in the supply's history, and that the supply needs a person again; for a mark, that the period reads overdue or never supplied again and its ticket reopens), and SHALL say that it can be recorded again."
+    - "WHEN a withdrawal is confirmed, on either route, THE SYSTEM SHALL name the entry withdrawn - who recorded it, when, and its reason - and its public consequence (for an acknowledgement, that the page stops showing it from now, that it stays in the supply's history, and that the supply needs a person again; for a mark, that the period is owed again and reads overdue or never supplied again), and SHALL say that it can be recorded again. AMENDED 2026-10-15 by Keith (morning report 5 Q14)."
     - "WHERE a mark as not supplied was withdrawn, THE SYSTEM SHALL show the withdrawal in the period's cell of the cycle table and in the accepted-gaps list, in the shape excuseNote() gives an excuse - '<annotation> · withdrawn by <person>, <instant>: <reason>' - since a mark has no supply-history row of its own."
     - "WHERE an acknowledgement was withdrawn, THE SYSTEM SHALL show the supply's awaiting-acknowledgement tag again with the withdrawn acknowledgement on a line beneath it, and SHALL show an acknowledgement's reason as visible text, not only in a title attribute."
     - "WHEN a supply whose acknowledgement was withdrawn is acknowledged again, THE SYSTEM SHALL report the newer acknowledgement as the one standing, in every reader criterion 11 names."
@@ -26939,7 +26940,11 @@ requirements:
     - 'THE MANIFEST VIEW HONOURS A WITHDRAWAL TOO (built 2026-10-15, found enumerating readers for criterion 11): qa.manifest_for''s acknowledged column read any acknowledge row as standing. It now excludes one with a withdraw-acknowledgement naming it, in schema 43 alongside the new constraints, so a period schema''s _manifest says false again once the acknowledgement is withdrawn.'
     - 'CONFIRMATION ON THE FLAG ROUTE NEEDS NO --acknowledge KEY (built 2026-10-15): a withdrawal moves no supply, so consequences() returns the entry withdrawn and what follows as notes rather than consequence lines, and the flag route applies it on the reason alone - as withdraw-excuse does. The terminal shows the notes after the reason and before the confirmation, as for every other decision (corrected 2026-10-15, post-build-review #193 F8 - this note first said before the reason, which the code never did).'
     - 'CRITERION 18''S TEST NAMES NO EXCEPTIONS (built 2026-10-15): every action decision_log admits now has page wording, including inherit-refused (''refused carrying forward'', added here) - the one that had none. A rule''s refusal reaches the page only if its entry is in a run''s states, but wording it costs nothing and keeps the test exception-free.'
+    - 'ONE HISTORY READER, AS NFR 5 ASKED (Keith, 2026-10-15, morning report 5 Q16): the first build added a second pairing reader in pipeline/closed_slots.py beside excuse.history. Both now go through decision_log.annotation_pairs, which pairs a withdrawal with the entry it names (acknowledgements, marks) or, where it names none, with the newest entry if still standing (an excuse). No behaviour changed; the existing tests are the evidence.'
+    - 'THE TERMINAL USES THE WORDS TOO (Keith, 2026-10-15, Q17): criterion 12 covers mothman supply decisions. qa_tools/common/decision_words.py holds the terminal''s table; the page keeps its DECISION_DONE const because the raw template must work with no build, and tests/test_decision_words.py fails on any difference between the two. REJECTED embedding one table into the page: it would make the raw template depend on a build step.'
+    - 'CRITERION 14 AMENDED (Keith, 2026-10-15, Q14): the confirmation no longer promises the ticket reopens - the ticket pass returns the slot to what its ticket last said, so a closed one can stay closed.'
     linked_tests:
+    - 'tests/test_decision_words.py'
     - 'tests/test_withdrawal.py::TestTheOperations'
     - 'tests/test_withdrawal.py::TestWithdrawingAMark'
     - 'tests/test_withdrawal.py::TestWithdrawingAnAcknowledgement'
@@ -26953,6 +26958,9 @@ requirements:
     - 'tests/test_filing_decisions.py::TestTheEightAreOneList::test_there_are_nineteen_of_them'
     - 'tests-js/withdrawal.test.js'
     implemented_by:
+    - 'qa_tools/common/decision_log.py::annotation_pairs'
+    - 'qa_tools/common/decision_words.py::said'
+    - 'cli/supply.py::decisions_command'
     - 'qa_tools/common/withdrawal.py::not_withdrawn'
     - 'qa_tools/common/withdrawal.py::standing_acknowledgement'
     - 'qa_tools/common/withdrawal.py::target'

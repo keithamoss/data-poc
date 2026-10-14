@@ -72,22 +72,16 @@ def _current(conn, dataset_id: str, supply: str) -> tuple[str | None, str | None
 def history(conn, dataset_id: str, supply: str, as_at: str | None = None) -> list[Excuse]:
     """Every excuse this supply has had, oldest first, each with its
     withdrawal or lapse - as at `as_at` (an effective instant), or now."""
-    rows = conn.execute(
-        f"SELECT action, actor, reason, effective_at, to_slot FROM {decision_log.TABLE} "
-        "WHERE dataset_id = ? AND supply = ? AND action IN (?, ?) "
-        "AND (CAST(? AS timestamptz) IS NULL OR effective_at <= CAST(? AS timestamptz)) "
-        "ORDER BY effective_at, id",
-        [dataset_id, supply, decision_log.EXCUSE_LATENESS, decision_log.WITHDRAW_EXCUSE,
-         as_at, as_at]).fetchall()
+    # THE ONE HISTORY READER (REQ-PIPE-166 NFR 5), shared with
+    # acknowledgements and marks as not supplied.
     out: list[Excuse] = []
-    for action, actor, reason, at, slot in rows:
-        if action == decision_log.EXCUSE_LATENESS:
-            out.append(Excuse(slot=slot, actor=actor, reason=reason or "", at=_iso(at)))
-        elif out and out[-1].withdrawn is None:
-            last = out[-1]
-            out[-1] = Excuse(slot=last.slot, actor=last.actor, reason=last.reason,
-                             at=last.at, withdrawn={"actor": actor, "reason": reason or "",
-                                                    "at": _iso(at)})
+    for given, withdrawn in decision_log.annotation_pairs(
+            conn, dataset_id, (decision_log.EXCUSE_LATENESS,), (decision_log.WITHDRAW_EXCUSE,),
+            supply=supply, as_at=as_at):
+        out.append(Excuse(
+            slot=given["slot"], actor=given["actor"], reason=given["reason"], at=_iso(given["at"]),
+            withdrawn={"actor": withdrawn["actor"], "reason": withdrawn["reason"],
+                       "at": _iso(withdrawn["at"])} if withdrawn else None))
     lapsed = []
     for e in out:
         why = at = None

@@ -50,16 +50,13 @@ def _decision_entry(at, actor: str | None, reason: str | None) -> dict:
 def withdrawals(conn, dataset_id: str) -> dict[int, dict]:
     """{id of the entry withdrawn: its withdrawal as the page shows it}
     for every acknowledgement or mark as not supplied withdrawn in this
-    dataset (REQ-PIPE-166). The first withdrawal of an entry is the one -
-    the log refuses a second while nothing stands."""
-    out: dict[int, dict] = {}
-    for withdrawn_id, at, actor, reason in conn.execute(
-            f"SELECT caused_by_decision, effective_at, actor, reason FROM {decision_log.TABLE} "
-            "WHERE dataset_id = ? AND action IN (?, ?) ORDER BY effective_at, id",
-            [dataset_id, decision_log.WITHDRAW_ACKNOWLEDGEMENT,
-             decision_log.WITHDRAW_NOT_SUPPLIED]).fetchall():
-        out.setdefault(withdrawn_id, _decision_entry(at, actor, reason))
-    return out
+    dataset (REQ-PIPE-166) - through the one history reader
+    (decision_log.annotation_pairs, the requirement's NFR 5)."""
+    return {given["id"]: _decision_entry(withdrawn["at"], withdrawn["actor"], withdrawn["reason"])
+            for given, withdrawn in decision_log.annotation_pairs(
+                conn, dataset_id, (decision_log.ACKNOWLEDGE, decision_log.MARK_NOT_SUPPLIED),
+                (decision_log.WITHDRAW_ACKNOWLEDGEMENT, decision_log.WITHDRAW_NOT_SUPPLIED))
+            if withdrawn}
 
 
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None,

@@ -972,7 +972,10 @@ class TestScheduleShowSaysSo:
         doc = _unshare(_doc())
         _turn_off(_versions(doc, "cp-clients")[0], to="2027-03-31")
         said = "\n".join(self._view(doc, date(2026, 10, 14)).turn_off)
-        assert "for good" in said and "Changeable by an ordinary edit until 17 Apr 2027 09:00" in said
+        # REQ-PIPE-179 c28 AS AMENDED 2026-10-15 (Keith, morning report 5 Q10).
+        assert "for good" in said and ("Edit calendar.yaml to change this until 17 Apr 2027 09:00, "
+                                       "when the first period's claim window opens. After that it "
+                                       "needs a declared correction.") in said
 
     def test_back_on_inside_its_collections_gap(self):
         doc = _unshare(_doc())

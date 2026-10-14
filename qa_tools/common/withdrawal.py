@@ -141,5 +141,8 @@ def consequence_words(conn, request) -> list[str]:
     mark = not_supplied.marked(conn, request.dataset_id, request.period)
     return [f"It withdraws the mark as not supplied {people.display_name(mark.actor)} recorded "
             f"{_when(mark.effective_at)}: \"{mark.reason}\".",
-            f"{request.period} reads overdue or never supplied again, and its ticket reopens.",
+            # NO PROMISE ABOUT ITS TICKET (REQ-PIPE-166 c14 as amended by Keith,
+            # 2026-10-15): the ticket pass returns the slot to what its ticket
+            # last said, so a ticket a person closed can stay closed.
+            f"{request.period} is owed again and reads overdue or never supplied again.",
             "A mark as not supplied can be recorded again."]

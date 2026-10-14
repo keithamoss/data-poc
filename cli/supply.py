@@ -569,17 +569,21 @@ def decisions_command(dataset_id: str | None, as_at: str | None, limit: int) -> 
                    + (f", as at {as_at}" if as_at else "") + "\n")
     table = Table("Took effect", "Action", "Supply", "Slot", "Who", "Why",
                    box=None, pad_edge=False)
+    from qa_tools.common import decision_words
+
     for entry in shown:
-        action = entry["action"]
-        if action == decision_log.REFILE and not entry["from_slot"]:
+        # IN WORDS, AS THE PAGE SAYS IT (REQ-PIPE-166 criterion 12, which
+        # Keith confirmed 2026-10-15 covers this listing too).
+        action = decision_words.said(entry["action"])
+        if entry["action"] == decision_log.REFILE and not entry["from_slot"]:
             # A PLACEMENT, SAID AS ONE (REQ-PIPE-163 criterion 41) - never
             # a re-file, "None -> period" or a machine name.
             from qa_tools.common import placing
 
             slot, action = placing.said(entry["to_slot"]), "placement"
-        elif action == decision_log.REFILE and not entry["to_slot"]:
+        elif entry["action"] == decision_log.REFILE and not entry["to_slot"]:
             slot = f"held - out of {entry['from_slot']}"
-        elif action == decision_log.REFILE:
+        elif entry["action"] == decision_log.REFILE:
             slot = f"{entry['from_slot']} -> {entry['to_slot']}"
         else:
             slot = entry["to_slot"] or entry["from_slot"] or ""

@@ -188,11 +188,14 @@ class TestTheRoutes:
             period=state.period))
         said = " ".join(found.notes)
         assert "seeding" in said and people.display_name(parity.REAL_PERSON) in said
-        assert "overdue or never supplied again" in said and "ticket reopens" in said
+        # REQ-PIPE-166 c14 AS AMENDED 2026-10-15 (Keith, morning report 5 Q14):
+        # owed again, and no promise about the ticket.
+        assert "is owed again and reads overdue or never supplied again" in said
+        assert "ticket" not in said
         assert "can be recorded again" in said
         assert not found.lines, "no --acknowledge key on the flag route"
         got = _withdraw(conn, fd.WITHDRAW_NOT_SUPPLIED, state.period)
-        assert "ticket reopens" in got.message
+        assert "ticket" not in got.message
 
     def test_confirming_an_acknowledgement_withdrawal_names_it_and_what_follows(
             self, conn, minted, quiet):

@@ -833,6 +833,48 @@ def _table_of(dataset_id: str) -> str | None:
         return None
 
 
+def annotation_pairs(conn: supply_db.SupplyConnection, dataset_id: str,
+                     annotate: tuple[str, ...], withdraw: tuple[str, ...], *,
+                     supply: str | None = None,
+                     as_at: str | None = None) -> list[tuple[dict, dict | None]]:
+    """THE ONE HISTORY READER for an annotation and its withdrawal
+    (REQ-PIPE-166 NFR 5, Keith 2026-10-15: generalise rather than keep a
+    second reader) - an excuse, an acknowledgement or a mark as not supplied,
+    each with the entry that withdrew it, oldest first.
+
+    [(annotation, withdrawal or None)], each a dict of id, action, actor,
+    reason, at (the effective instant), slot and supply. A withdrawal that
+    NAMES its entry (caused_by_decision - acknowledgements and marks) ends
+    that one; one that does not (an excuse's) ends the newest annotation
+    if it is still standing, which is the only one the log lets it end. The first
+    withdrawal of an entry is the one - the log refuses a second.
+
+    `supply` narrows to one supply; `as_at` reads the log as at an effective
+    instant."""
+    actions = tuple(annotate) + tuple(withdraw)
+    marks = ", ".join("?" for _ in actions)
+    rows = conn.execute(
+        f"SELECT id, action, actor, reason, effective_at, to_slot, supply, caused_by_decision "
+        f"FROM {TABLE} WHERE dataset_id = ? AND action IN ({marks}) "
+        "AND (CAST(? AS text) IS NULL OR supply = ?) "
+        "AND (CAST(? AS timestamptz) IS NULL OR effective_at <= CAST(? AS timestamptz)) "
+        "ORDER BY effective_at, id",
+        [dataset_id, *actions, supply, supply, as_at, as_at]).fetchall()
+    pairs: list[list] = []
+    by_id: dict[int, list] = {}
+    for decision_id, action, actor, reason, at, slot, of_supply, names in rows:
+        entry = {"id": decision_id, "action": action, "actor": actor, "reason": reason or "",
+                 "at": at, "slot": slot, "supply": of_supply}
+        if action in annotate:
+            pairs.append([entry, None])
+            by_id[decision_id] = pairs[-1]
+            continue
+        target = by_id.get(names) if names is not None else (pairs[-1] if pairs else None)
+        if target is not None and target[1] is None:
+            target[1] = entry
+    return [(a, w) for a, w in pairs]
+
+
 def follows(conn: supply_db.SupplyConnection, decision_id: int | None) -> str:
     """When work that a decision caused takes effect: as long after the
     decision took effect as it really ran after the decision was recorded
