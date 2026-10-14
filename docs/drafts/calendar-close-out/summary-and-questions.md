@@ -1,6 +1,6 @@
 # Calendar close-out batch: for sign-off
 
-Keith - this is the batch with your close-out answers, your 15 follow-up answers and your round 4 answers (all 2026-10-14) folded in, with the round 4 reviews (`review4-findings.md`) folded into REQ-DASH-208, REQ-DASH-209, REQ-GEN-205 and REQ-GEN-206. Since then, REQ-DASH-182's own UX review (`review-182-ux.md`) with your four answers to it, and your answers G1 to G3, are folded too. **None of it is signed, and requirements.yaml has not changed.** The full text is in `requirements-draft.yaml` next to this file, with the three overnight reviews (`review-*.md`). Merged with the live register (the draft's versions replacing the register's) it passes `mothman dashboard validate-requirements` (206 requirements, zero errors; re-run 2026-10-14 after the REQ-DASH-182 review and G1 to G3 fold).
+Keith - this is the batch with your close-out answers, your 15 follow-up answers and your round 4 answers (all 2026-10-14) folded in, with the round 4 reviews (`review4-findings.md`) folded into REQ-DASH-208, REQ-DASH-209, REQ-GEN-205 and REQ-GEN-206. Since then, REQ-DASH-182's own UX review (`review-182-ux.md`) with your four answers to it, your answers G1 to G3, your answers H1 to H4, and REQ-PIPE-179's own scoper pass (`req-179-own-pass.md`) with your four answers to it, are folded too. TS-63 is now its own requirement, **REQ-GEN-218**. **None of it is signed, and requirements.yaml has not changed.** The full text is in `requirements-draft.yaml` next to this file, with the three overnight reviews (`review-*.md`). Merged with the live register (the draft's versions replacing the register's) it passes `mothman dashboard validate-requirements` (207 requirements, zero errors; re-run 2026-10-14 after the H1 to H4 fold and REQ-PIPE-179's own pass, with REQ-GEN-218 added).
 
 Every answer that took the recommendation now uses the wording already drafted for it, and each is recorded in its requirement's `decisions:` as "Keith, 2026-10-14, close-out QN", "Keith, 2026-10-14, follow-up FN" or "Keith, 2026-10-14, round 4 RN"; each round 4 finding folded is recorded as "round 4 <reviewer> <finding>". **Answers are not sign-off**, so each requirement below still needs your yes.
 
@@ -22,17 +22,25 @@ Every answer that took the recommendation now uses the wording already drafted f
 - F11: REQ-GEN-205 criteria 24 and 25.
 
 **New wording from REQ-DASH-182's review and G1, for your approval** (none of it is marked in the YAML; it is listed here in full):
-- REQ-DASH-182 criteria 2, 3 and 14: the em dash as the separator - "Not owed — outside its agreed months (Feb, Aug)", "Not expected — <reason>", "Turned off — <reason>", "Not owed yet — owes supplies from <date>". The words are yours; only the dash is new (open question 2 on REQ-DASH-182).
+- REQ-DASH-182 criteria 2, 3 and 14: the em dash as the separator - "Not owed — outside its agreed months (Feb, Aug)", "Not expected — <reason>", "Turned off — <reason>", "Not owed yet — owes supplies from <date>". The words are yours, and since H1 so is the dash; REQ-DASH-180 criterion 16's "Turned off — nothing due" follows suit.
 - REQ-DASH-182 criterion 8: the frequency words "Yearly", "Twice a year", "Quarterly", "Monthly", otherwise "<N> times a year", and "various days" where the days differ.
-- REQ-DASH-182 criterion 9: the row's muted "Inherited from <period>", and the standing-in panel's heading naming the kind label where it now says "Nothing was owed for this period".
+- REQ-DASH-182 criterion 9: the row's muted "Inherited from <period>", and the standing-in panel's heading: the kind label alone on the present, "On <date>: <kind label>" on a past date, the reason in .promo-why (your H3).
+- REQ-DASH-182 criterion 3: the "Not owed yet" notice's body keeps only "Pick a later date, or reset to the default, using the 📅 In place on control above." (your H2).
 - REQ-DASH-182 criterion 11: the SLA tile in the row's form, "Twice a year (Feb, Aug, day 1), by 09:00" (your Q1 example; months now comma-separated where today's tile uses a slash), the reason on a muted second line.
 - REQ-DASH-182 criterion 13: a run reads "<kind label>, <first> to <last> (<n> periods)" ("days" for a daily dataset), and "(<n> periods so far)" while it is open.
 - REQ-DASH-209 criterion 14: "Previous period: <period name>" and "Next period: <period name>"; "Previous day: <date>" and "Next day: <date>" for a daily collection.
 
+**New wording from REQ-PIPE-179's own pass, for your approval:**
+- REQ-PIPE-179 criteria 20, 36, 37, 38, 40 and 41, as listed in `req-179-own-pass.md` ("New wording that needs your approval"). Your Q2 approved the substance of 36 and 37; the words are still for your yes.
+- REQ-PIPE-179 criterion 34 (your Q3): one row per dataset, reading "<dataset> - <n> received while turned off, earliest <date>", as REQ-DASH-180's quiet line reads; N in "Received while turned off (N)" counts supplies.
+- REQ-GEN-218: the whole requirement, though criteria 1 to 5 carry criterion 39's words; criterion 7 and amendments 45 to 47 are new.
+
 ## Scoper passes, honestly
 
 - **Round 4 reviews (architect, CLI UX, dashboard UX), 2026-10-14:** REQ-DASH-208, REQ-DASH-209, REQ-PIPE-210 and REQ-PIPE-211 (and REQ-GEN-207, now signed). The findings for 208 and 209, and those touching 205 and 206, are folded. The findings for 210 and 211 are not: those two wait on running-thoughts #95.
-- **Only the joint 2026-10-13 pass:** REQ-PIPE-179 and REQ-DASH-182 (scoped jointly with REQ-PIPE-163).
+- **REQ-PIPE-179:** the joint 2026-10-13 pass with REQ-PIPE-163 and REQ-DASH-182, then its own delivery-scoper pass, 2026-10-14 (`req-179-own-pass.md`), with your four answers folded.
+- **REQ-DASH-182:** the joint 2026-10-13 pass, then its own dashboard UX review, 2026-10-14 (`review-182-ux.md`), with your answers to it and H1 to H3 folded.
+- **REQ-GEN-218 (new):** drafted by delivery-scoper on 2026-10-14 from REQ-PIPE-179 criterion 39. Not reviewed as a requirement of its own; its content was reviewed in round 3 as criterion 39 (architect A4, A5 and E21).
 - **Neither that pass nor one of its own:** REQ-DASH-180.
 - The rest had a scoper pass and the round 3 reviews.
 
@@ -53,9 +61,12 @@ The round 4 architect's order (H5), which REQ-GEN-203's sign-off already follows
 11. REQ-DASH-208
 12. REQ-DASH-209
 13. REQ-GEN-205
-14. REQ-GEN-206
+14. REQ-GEN-218 (new, TS-63)
+15. REQ-GEN-206
 
 REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 bootstrap, because TS-55's chip opens 209's view. REQ-GEN-206 also comes after REQ-PIPE-211 because of TS-81 (F8): planted there, TS-81 is observed with the fix in place. Running-thoughts #95 has to be signed before REQ-DASH-204, 210 and 211 are built, and so before 206's TS-81 Expect can be written.
+
+REQ-GEN-218 (TS-63) must come after REQ-DASH-180, because its register entry quotes 180's quiet line and marker; that was your Q1 on REQ-PIPE-179's own pass. Placing it after REQ-GEN-205 rather than straight after 180 is provisional: it follows the recommended answer to the new question on TS-63's scenario links (below), because the link that shows the marker needs REQ-GEN-205 criterion 12. If you choose option B there, it moves up to straight after REQ-DASH-180. Either way REQ-GEN-207's dry run has already sized room for TS-63, and each of 205 and 218 checks its claims against the other's where it is already planted.
 
 ## The requirements, in build order
 
@@ -127,7 +138,12 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
   - the scope of criterion 1 (1);
   - two NFRs: words, never colour alone; a cold-loaded past-date link.
 - **REQ-DASH-054 added as a dependency.** Criterion 7 rewords built behaviour (today's tile reads "due N days before each date, by 22:00"). The terminal's `mothman schedule show` is flagged for delivery-cli-ux, not folded.
-- **Open:** questions 1 to 3 below (the "Not owed yet" notice's body, the em dash, the standing-in heading on a past date).
+- **Your H1 to H3 (2026-10-14), folded:**
+  - H1: the em dash in every label (criteria 2, 3 and 14), and REQ-DASH-180 criterion 16's "Turned off — nothing due" with it.
+  - H2: the "Not owed yet" notice keeps only its way-back sentence and drops "There is no QA run within the accepted freshness window" (criterion 3).
+  - H3: the standing-in heading reads "On <date>: <kind label>" on a past date, the kind label alone on the present, and the reason in .promo-why (criterion 9). The substituted heading is unchanged.
+  - Each is a decision citing "Keith, 2026-10-14, H<N>"; the three open questions are removed.
+- **Open:** nothing.
 
 **REQ-PIPE-163 (must): placing a held supply.**
 - **What changed:**
@@ -137,14 +153,19 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
 - **Open, a note rather than a question:** criterion 26 names re-check, which does nothing until REQ-PIPE-164 is built.
 
 **REQ-PIPE-179 (must): turning a dataset off.**
-- **What changed:**
-  - Q4: criterion 39 dates TS-63's correction before the gap. Its register entry must say that cp-carers reads "awaiting confirmation" from that date to the end of the history (the accepted cost).
-  - Q2: your real identity approves it, and its reason says it is fictional.
-- **Open, a build-time check:** whether the agreement backstop already notices a slot that vanished (criterion 38).
+- **Its own scoper pass (2026-10-14, `req-179-own-pass.md`)** replaced the draft. Criteria 1 to 41, numbers 1 to 39 unchanged. In short: criterion 40 now refuses a turn-off with no `turns_off: true` changelog entry (R8), criterion 41 dates a turn-off and carries it to the build for REQ-DASH-180, criteria 24 and 32 are trimmed, criteria 20, 36 and 37 name the amendments they carry, and criterion 38 is reworded against the built backstop.
+- **Your four answers to that pass, folded:**
+  - Q1: TS-63 is split out into **REQ-GEN-218**. Criterion 39 is now a pointer that keeps its number ("THE SYSTEM SHALL NOT plant TS-63 ... planted by REQ-GEN-218"), because signed REQ-PIPE-163, 170 and 181 cite criteria by number. REQ-DASH-180, REQ-GEN-207 and REQ-GEN-044 leave the dependencies (they were there for criterion 39 alone), so 179 and 180 no longer depend on each other.
+  - Q2: keep is refused on a parked move too (criteria 36 and 37, amendment 40).
+  - Q3: the terminal's "Received while turned off" group lists one row per dataset with its count and earliest receipt, opening to its supplies (criterion 34, and the SCALE NFR).
+  - Q4: turned-off holds stay quiet and kept; retention is plans/running-thoughts.md #77's question, which already says so (added 2026-10-14). PRIVACY NFR updated.
+  - Each is a decision citing "Keith, 2026-10-14, own pass Q<N>"; the four open questions are removed.
+- **Still in open_questions, none for you:** provisional choices (which correction or entry is "the newest"; a `turns_off` entry with no effective_to; N counting supplies and the row wording in criterion 34), and two build checks for the architect (criterion 19's re-filer before a correction is confirmed; criterion 38's `_sources` key).
 
 **REQ-DASH-180 (must): the turned-off dataset on the page.**
 - **What changed (Q26, new wording):** criterion 27 adds the "Turning off after <effective_to>" marker. The dataset stays counted in its rollups while it shows. The marker gives way to criterion 4's or 25's wording once either applies.
 - **Follow-up F9 (new wording):** criterion 27 now starts the marker on the date the turn-off was authored (its changelog entry's date) and runs it until effective_to. New criterion 28: a turn-off authored after its effective_to shows no marker at all.
+- **Your H1:** criterion 16's SLA tile now reads "Turned off — nothing due" (em dash). Criterion 25's "Turning off after <effective_to> - nothing more owed" still has a hyphen; H1 did not name it, so it is left for 180's own sign-off.
 - **Open:** the two questions F9 raised (set A: which changelog entry dates a turn-off, and what dates a turn-off declared as a correction) were answered by R8; that fold belongs to REQ-DASH-180's own sign-off.
 
 **REQ-DASH-208 (should): a scenario link lands on what it is about.**
@@ -178,9 +199,10 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
   - **Link placement (UX 5):** the link goes in each period's label in supply history and on gap and owed-nothing rows, never inside a delivery row. This is how F1's "each period row" is read, because supply history has no period row.
   - **Wording (UX 8; your G2):** criterion 3 says exactly "Decided by <name>" or "Applied automatically by the schedule", the page's own sentences, under a column headed "Status when promoted". "The rule" is not shown.
   - New wording, for your approval: the h2, sub-line and rail in criterion 12.
-- **Your G1 (new criterion 14):** previous and next-period links beside the h2. Each is a real `<a href>` to the adjacent period's route and keeps the date on show. Provisionally, a link is left out where there is no earlier period, or where the next period had not opened by the date on show. The link wording is new (listed above).
+- **Your G1 (new criterion 14):** previous and next-period links beside the h2. Each is a real `<a href>` to the adjacent period's route and keeps the date on show. The link wording is new (listed above).
+- **Your H4:** a link is left out, not disabled, where there is no earlier period or where the next period had not opened by the date on show (criterion 14 as written). Recorded as a decision citing "Keith, 2026-10-14, H4".
 - REQ-DASH-182 is added as a dependency, because the "Not owed" group takes its labels from REQ-DASH-182's one function.
-- **Open:** question 4 below (the links at the ends).
+- **Open:** nothing.
 
 **REQ-GEN-205 (must): TS-57 to TS-62.**
 - **What changed:**
@@ -209,6 +231,15 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
     This is because TS-62 stays pending only while each route reads its entry. The accepted cost: a forgotten "pending" entry would confirm silently.
 - **Open:** nothing for you. Build-time checks: whether a correction declared for an added synthetic version is staged as a correction, and whether REQ-PIPE-169's impact preview reports arrivals filed under the new version, not only moves.
 - **Not put to you:** cp-case-workers as TS-61's blocker is still the main session's provisional choice.
+- **Since REQ-GEN-218:** REQ-GEN-205 is signed (2026-10-14), so its criterion 10's "REQ-PIPE-179's TS-63 correction" is re-pointed by amendment 47 rather than edited here; the draft's copy is left exactly as signed.
+
+**REQ-GEN-218 (NEW, must, provisional; your Q1 on REQ-PIPE-179's own pass): TS-63, a dataset turned off for two quarters.**
+- **Story:** the synthetic history shows a dataset turned off for a while and turned back on, through the same declared-correction gate a real turn-off goes through: the marker before it, a supply for a quarter it still owed filed there, a supply received inside the gap held quietly, and the gap's owed-nothing rows.
+- **What it carries from REQ-PIPE-179 criterion 39:** cp-carers split off the shared `*cp_participation` alias (criterion 1); the turn-off declared as a correction dated before the gap, approved by your real identity, with a fictional reason and a `turns_off: true` changelog entry (criterion 2); its quarters in REQ-GEN-207's grown history, refused on collision (criterion 3); two injected supplies, one filed to the last owed quarter and one held as turned off (criterion 4); the register entry rewritten to the real calendar, quoting 180's quiet line and marker (criterion 5).
+- **New:** a unit test for TS-63, which REQ-PIPE-170 criterion 23 asks of TS-57 to TS-64 (criterion 6); the three citations re-pointed (criterion 7, amendments 45 to 47). It clears no unmet entry: REQ-PIPE-170's lists TS-63 only as moved.
+- **Decisions carried, each with its source:** your Q1 split; 2026-10-13 set 2 Q8 (TS-63 with the turn-off work); declared as a correction; grow earlier; close-out Q4 (dated before the gap) and Q2 (your identity); architect A4 and E21; R8 (the marker dates from the correction).
+- **Provisional, not put to you:** cp-carers as the dataset (carried); must.
+- **Open:** one question for you, on its scenario links (below).
 
 **REQ-GEN-206 (should): the rest of REQ-GEN-136 and 137, plus #175.**
 - **What changed:**
@@ -238,11 +269,11 @@ REQ-DASH-208 and REQ-DASH-209 must come before the first REQ-GEN-205 or 206 boot
 
 ## Proposed amendments to signed requirements (complete)
 
-**44 amendments numbered, 42 standing, to 24 requirements**, every one with exact wording: the 9 drafted on the morning of 2026-10-14, plus 35 drafted since. Two are now DROPPED: amendment 3 (round 4 architect H3) and amendment 44, REQ-PIPE-170 criterion 31 (your G3, option B). One target, REQ-DASH-175, is unsigned. Each is also recorded on the requirement that carries it, as a "PROPOSED AMENDMENT WORDING" decision. Every OLD text is copied from the live requirements.yaml. `<date built>` is the one placeholder: it is the date the amendment lands, written the way the register already dates its amendments.
+**47 amendments numbered, 45 standing, to 26 requirements**, every one with exact wording: the 9 drafted on the morning of 2026-10-14, plus 38 drafted since. Amendments 45 to 47 are new with REQ-GEN-218: they re-point REQ-PIPE-170 criterion 23 (and its unmet entry), REQ-GEN-207 criterion 2 and REQ-GEN-205 criterion 10 (signed since) from REQ-PIPE-179 to REQ-GEN-218. Two are now DROPPED: amendment 3 (round 4 architect H3) and amendment 44, REQ-PIPE-170 criterion 31 (your G3, option B). One target, REQ-DASH-175, is unsigned. Each is also recorded on the requirement that carries it, as a "PROPOSED AMENDMENT WORDING" decision. Every OLD text is copied from the live requirements.yaml. `<date built>` is the one placeholder: it is the date the amendment lands, written the way the register already dates its amendments.
 
 Four kinds of entry need you more than the rest:
 
-- **Not promised by the draft.** Found by reading the targets: REQ-PIPE-141 criterion 12 (amendment 33) and REQ-PIPE-170 criterion 26 (amendment 39). Without them, each contradicts REQ-PIPE-179. REQ-PIPE-170 criterion 28 (amendment 40) stretches REQ-PIPE-179 criterion 36 to the second place keep is offered.
+- **Not promised by the draft.** Found by reading the targets: REQ-PIPE-141 criterion 12 (amendment 33) and REQ-PIPE-170 criterion 26 (amendment 39). Without them, each contradicts REQ-PIPE-179. Since REQ-PIPE-179's own pass, criteria 20 and 37 name them. REQ-PIPE-170 criterion 28 (amendment 40) stretches REQ-PIPE-179 criterion 36 to the second place keep is offered; you chose that extension (own pass Q2), and criterion 36 now says it.
 
 - **Contingent, and settled.** REQ-GEN-045 criterion 1 (amendment 3) was a "check at build" item for the architect. Round 4 (H3) found it is not needed, so it is DROPPED. REQ-PIPE-121 criterion 1 (amendment 27) was contingent too. Since your follow-up F5 it is needed, and its NEW text changed.
 
@@ -341,6 +372,24 @@ Four kinds of entry need you more than the rest:
 - New: "IF the Expect's element is outside the 1280x800 viewport once the scenario jump (REQ-DASH-208) has run, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect."
 - Why: follows criterion 36.
 - Built behaviour: TEXT ONLY beyond criterion 36's test change.
+
+### REQ-GEN-205 (signed 2026-10-14, not_started): TS-57 to TS-62
+
+**47. REQ-GEN-205 criterion 10**. Carried by REQ-GEN-218 criterion 7.
+
+- Old: "THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared change alters together with the period before and the period after it - except that for a version-level change (TS-62's), only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received before its effective date and for every arrival received on or after it, together with the day before and the day after each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and REQ-PIPE-179's TS-63 correction; and IF it meets a period another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift either or relax the rule."
+- New: "THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared change alters together with the period before and the period after it - except that for a version-level change (TS-62's), only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received before its effective date and for every arrival received on or after it, together with the day before and the day after each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and TS-63's correction (REQ-GEN-218) where it is already planted; and IF it meets a period another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift either or relax the rule. AMENDED <date applied> by REQ-GEN-218 criterion 7."
+- Why: as amendment 45. "Where it is already planted" because REQ-GEN-205 may be built before REQ-GEN-218; REQ-GEN-218 criterion 3 makes the check the other way.
+- Built behaviour: TEXT ONLY. REQ-GEN-205 is not built. Applied with amendment 45, together with a decision appended to REQ-GEN-205: "TS-63 RE-POINTED (Keith, 2026-10-14, REQ-PIPE-179 own pass Q1): TS-63 is planted by REQ-GEN-218, built after REQ-DASH-180; criterion 10 checks against its correction where it is already planted. Recorded <date applied> by REQ-GEN-218 criterion 7." Its 2026-10-13 decision "TS-63 IS NOT HERE" stays as history.
+
+### REQ-GEN-207 (signed 2026-10-14, not_started): grow the Child Protection history earlier, once
+
+**46. REQ-GEN-207 criterion 2**. Carried by REQ-GEN-218 criterion 7.
+
+- Old: "THE SYSTEM SHALL size the growth by a dry run of the generator's collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-PIPE-179), and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206) - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run's output in this requirement's evidence."
+- New: "THE SYSTEM SHALL size the growth by a dry run of the generator's collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-GEN-218), and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206) - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run's output in this requirement's evidence. AMENDED <date applied> by REQ-GEN-218 criterion 7."
+- Why: as amendment 45.
+- Built behaviour: TEXT ONLY. REQ-GEN-207 is not built, and its dry run counts TS-63 and its correction exactly as before. Applied with amendment 45.
 
 ### REQ-GHUB-082 (signed 2026-09-28, built): An operator records a filing decision from GitHub or from the terminal, and both write the same entry
 
@@ -452,7 +501,7 @@ Four kinds of entry need you more than the rest:
 - Old: "THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its versions - a calendar's on that calendar; a dataset's (its participation, due time, participates, not_expected and own authored dates) on that dataset's entry; a collection's participation_defaults on that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each naming the item, its old value and its new value; and SHALL refuse a correction missing any of them."
 - New: "THE SYSTEM SHALL carry declared corrections in a `corrections:` list on each OWNING ITEM, beside its versions - a calendar's on that calendar; a dataset's (its participation, due time, participates, not_expected, own authored dates, effective_to and turned_off_reason) on that dataset's entry; a collection's participation_defaults, their effective_to and turned_off_reason included, on that collection's entry (amended by REQ-PIPE-181); the zone's on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each naming the item, its old value and its new value; and SHALL refuse a correction missing any of them. AMENDED <date built> by REQ-PIPE-179 criterion 30."
 - Why: a correction must be able to carry the two new frozen items.
-- Built behaviour: BUILT CODE CHANGES (agreement_freeze's correction matching); built and tested by REQ-PIPE-179 criteria 11, 12 and 39 (TS-63's correction).
+- Built behaviour: BUILT CODE CHANGES (agreement_freeze's correction matching); built and tested by REQ-PIPE-179 criteria 11 and 12, and shown by TS-63's correction (REQ-GEN-218, split out of criterion 39).
 
 **24. REQ-PIPE-111 criterion 15**. Carried by REQ-PIPE-179 criterion 30.
 
@@ -592,10 +641,19 @@ Four kinds of entry need you more than the rest:
 - Old: "WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu."
 - New: "WHILE a move is parked, THE SYSTEM SHALL let the data asset's manager keep the supply where it is instead, with a reason, recorded as a keep against that correction, through mothman supply confirm-correction --keep on the confirmed reference and from the filing menu - except WHERE the supply's current period is one its dataset now owes nothing in, when keep SHALL NOT be offered (criterion 5). AMENDED <date built> by REQ-PIPE-179 criterion 36."
 - Why: the scoper's reading: keep on a parked move is the same act as keep at confirmation, so the same exception applies.
-- Built behaviour: BUILT CODE CHANGES (confirm-correction --keep on a parked move); NOT IN REQ-PIPE-179 criterion 36 AS WORDED, which says only "keep is not offered for that supply" - needs a test.
-- **Note:** PROPOSED BY THE SCOPER, not promised by the draft in words - an extension of criterion 36 to the second place keep is offered.
+- Built behaviour: BUILT CODE CHANGES (confirm-correction --keep on a parked move); stated in REQ-PIPE-179 criterion 36 since its own pass, and listed in its NFR 11, so it gets a test of its own.
+- **Note:** an extension of criterion 36 to the second place keep is offered. It was the scoper's proposal; you chose it (Keith, 2026-10-14, REQ-PIPE-179 own pass Q2, option A).
 
 **44. REQ-PIPE-170 criterion 31: DROPPED** (Keith, 2026-10-14, G3, option B). It existed only to carry the "confirm only what the script says" option. Under G3 a replay confirms everything due unless the script says pending. Criterion 31 already says that ("confirm every pending correction dated up to now"), so REQ-PIPE-170 stays as signed. Recorded on REQ-GEN-205 as "AMENDMENT 44 DROPPED".
+
+**45. REQ-PIPE-170 criterion 23, and its unmet entry**. Carried by REQ-GEN-218 criterion 7.
+
+- Old criterion: "THE SYSTEM SHALL generate the calendar-correction scenarios TS-57 to TS-62 (TS-63 by REQ-PIPE-179 criterion 39, Keith, 2026-10-13) in the test scenario register (plans/supply-model.md) into the synthetic history once this requirement is built - a correction made part way through that history, merged, and confirmed with at least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left awaiting confirmation - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64 each a unit test."
+- New criterion: "THE SYSTEM SHALL generate the calendar-correction scenarios TS-57 to TS-62 (TS-63 by REQ-GEN-218, Keith, 2026-10-13 and 2026-10-14) in the test scenario register (plans/supply-model.md) into the synthetic history once this requirement is built - a correction made part way through that history, merged, and confirmed with at least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left awaiting confirmation - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64 each a unit test. AMENDED <date applied> by REQ-GEN-218 criterion 7: TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13) and was split out of it into REQ-GEN-218 (Keith, 2026-10-14)."
+- Old unmet entry (its `criterion` field; `why`, `owner` and `blocked_by` unchanged): "Criterion 23, first half - TS-57 to TS-62 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13)."
+- New: "Criterion 23, first half - TS-57 to TS-62 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13) and from there to REQ-GEN-218 (Keith, 2026-10-14)."
+- Why: Keith, 2026-10-14, REQ-PIPE-179 own pass Q1: TS-63 is planted by REQ-GEN-218, and REQ-PIPE-179 criterion 39 is now a pointer.
+- Built behaviour: TEXT ONLY. Applied in the change that adds REQ-GEN-218 to requirements.yaml (so the signed register never names a criterion that no longer plants TS-63); `<date applied>` is that change's date, not a build date.
 
 ### REQ-PIPE-173 (signed 2026-10-07, built): The pipeline refuses a dataset whose judged past changed without a declared correction
 
@@ -630,7 +688,7 @@ Four kinds of entry need you more than the rest:
 - **REQ-PIPE-053 criteria 16, 17 and 18** (named by REQ-DASH-180 criterion 22): they render, keep out of the rollup and count the exhausted condition, which criterion 19 evaluates; amending 19 alone carries all three.
 - **REQ-DASH-155 criterion 3** (named by REQ-DASH-180 criterion 22): it is worded on the same test as criterion 1 ("no supply is held because a schedule ended"), so amending 1's count carries it. One corner is left for the architect: a temporary gap running past the calendar's last date could leave turned-off holds received after the schedule ended, making "nothing has arrived since the schedule ended" untrue.
 - **REQ-PIPE-154 criterion 7** (named by REQ-PIPE-163 (folded decision, 2026-10-10)): REQ-PIPE-163's own decision records that amendment as SUPERSEDED by round 3 Q7: schedule-ended holds are never placed or rejected, which REQ-PIPE-163 criterion 22 states. Only REQ-PIPE-179's amendment to criterion 7 remains.
-- **REQ-PIPE-170 its unmet entry for criterion 23** (named by REQ-PIPE-179 criterion 40): the live register already reads "TS-57 to TS-62 ... TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13)" in both criterion 23 and its unmet entry. Criterion 40 is already met in the register and can be dropped.
+- **REQ-PIPE-170 its unmet entry for criterion 23** (named by REQ-PIPE-179's old criterion 40): the live register already read "TS-57 to TS-62 ... TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13)" in both criterion 23 and its unmet entry, so that criterion was dropped. SUPERSEDED 2026-10-14 by the TS-63 split: both now need re-pointing at REQ-GEN-218, which is amendment 45.
 - **REQ-PIPE-163 criterion 17** (named by REQ-PIPE-179 (round 3 decision)): REQ-PIPE-179's decision "163 NO LONGER AMENDED HERE" records that 163 is written turn-off-aware (Keith, set 1 Q1). REQ-PIPE-163 is unsigned in any case.
 
 ### Register bookkeeping, not amendments
@@ -641,26 +699,20 @@ Clearing an unmet entry once its scenario is planted is done when the scenario i
 
 **Answered since the last version of this list.** Set A was answered by R8, set B waits on running-thoughts #95, and set C was answered by R1. The round 4 fold's three questions were answered by G1 to G3, and all three are folded.
 
-**New, from the REQ-DASH-182 review fold and G1.** The four questions below fit one AskUserQuestion call.
+**Answered since:** H1 to H4 (REQ-DASH-182's three and REQ-DASH-209's one) and the four questions of REQ-PIPE-179's own pass, all option A, are folded.
 
-### REQ-DASH-182
-1. **The "Not owed yet" notice's body?** (criterion 3; your Q3 named only its heading)
-   - A) Keep only the way-back sentence, "Pick a later date, or reset to the default, using the 📅 In place on control above.", and drop "There is no QA run within the accepted freshness window", which reads as a missed supply (recommended).
-   - B) Keep today's body unchanged under the new heading.
-2. **The separator in the labels?** (criteria 2, 3 and 14; review finding 7)
-   - A) The page's own em dash: "Not owed — outside its agreed months (Feb, Aug)" (recommended).
-   - B) A plain hyphen, as your answers were worded.
-3. **The standing-in heading on a past date?** (criterion 9; review finding 5). Today it reads "On <date> this period held an earlier period's data - nothing was owed for it".
-   - A) "On <date>: <kind label>" on a past date, the kind label alone on the present, and the reason in the line beneath (recommended).
-   - B) Keep today's heading sentences, and show the kind label only in the line beneath.
+**New, one question, from the TS-63 split.**
 
-### REQ-DASH-209
-4. **Previous/next links at the ends?** (criterion 14)
-   - A) Leave a link out where there is no earlier period, or where the next had not opened by the date on show. The page never offers a date with nothing behind it (REQ-DASH-054) (recommended).
-   - B) Show the next link anyway, landing on "<period> had not opened by <date>".
+### REQ-GEN-218
+1. **TS-63's scenario links?** Criterion 39 never said. Without a declared link, a scenario lands on the latest day it has anything to show (REQ-GEN-201 criterion 6). For TS-63 that is long after the gap, where the "Turning off after" marker its Expect quotes no longer shows.
+   - A) Two lettered links: "a" after the correction's date and before effective_to, where the marker shows; "b" inside the gap, after the injected gap supply arrives, where it is held and REQ-DASH-180's quiet line counts it. Link "a" needs REQ-GEN-205 criterion 12's link bounded by a correction's date, so REQ-GEN-218 is built after REQ-GEN-205 (recommended).
+   - B) The default single link only, built straight after REQ-DASH-180. The register describes the marker but nothing links to it.
 
 ### Not questions, but provisional, so say if you want them otherwise
 - TS-81's shape (REQ-GEN-206): one grown quarter, no green targeting or lead-ins, and the settlement the day after arrival. This reads F8's "another grown quarter" as one quarter.
+- REQ-GEN-218: cp-carers as TS-63's dataset (carried from REQ-PIPE-179), and must.
+- REQ-PIPE-179 criterion 34: N counts supplies, and the per-dataset row reads as REQ-DASH-180's quiet line does. Criterion 41: "the newest" correction or entry where there are several; a `turns_off` entry on a version with no effective_to is accepted and read by nothing.
+- REQ-DASH-180 criterion 25's "Turning off after <effective_to> - nothing more owed" keeps its hyphen, and REQ-PIPE-179 criterion 29's terminal labels ("Turned off - nothing due") keep theirs: H1 named the page's labels and REQ-DASH-180 criterion 16 only.
 - cp-case-workers as TS-61's blocker (REQ-GEN-205).
 - New wording in REQ-DASH-208 (criteria 4, 7, 11 and 12) and REQ-DASH-209 (criterion 12's h2, sub-line and rail, and criterion 14's links), and REQ-DASH-182's new wording listed at the top.
 - REQ-GEN-205 criterion 16's test now also covers the resumed bootstrap. This is the scoper's addition under G3, and can be dropped.
@@ -674,8 +726,19 @@ Clearing an unmet entry once its scenario is planted is done when the scenario i
 - REQ-GEN-205: whether a correction declared for a version added to a synthetic asset is staged as a correction.
 - REQ-GEN-205: whether REQ-PIPE-169's impact preview reports arrivals filed under a new version at receipt, as well as moves.
 - REQ-DASH-204: which notice each cause has, to end with "Affects".
-- REQ-PIPE-179: whether the agreement backstop already notices a vanished slot.
+- REQ-PIPE-179: criterion 38's remaining check - that a turned-off period reaches verdict.compared as gone, and that agreement_drift._sources includes the effective_to item key.
+- REQ-PIPE-179: whether criterion 19's re-filer acts before REQ-PIPE-170's confirmation of a correction that is declared but not yet confirmed.
 - REQ-GEN-206: #175's 8 September supply.
+
+## Ready for sign-off: REQ-PIPE-179, REQ-DASH-182, REQ-DASH-209 and REQ-GEN-218
+
+**REQ-PIPE-179.** It has had its own scoper pass, and all four of that pass's questions are answered and folded. Nothing in its open_questions needs you: three provisional choices you can override, and two build checks for the architect. What you would be signing: 41 criteria (criterion 39 now a pointer to REQ-GEN-218), the new wording listed at the top, and the 22 amendments it carries (13, 14, 16, 17, 21 to 26, 28 to 30 and 33 to 41) in their exact wording. Amendment 40 is no longer the scoper's proposal. Signing it does not need REQ-GEN-218 signed, but amendments 45 to 47 should land in the same change that adds REQ-GEN-218, so the register never cites criterion 39 for TS-63 once 39 is a pointer.
+
+**REQ-DASH-182.** Your H1 to H3 are folded, and it has no open questions. What you would be signing: 15 criteria, including the wording you have not yet approved word for word (criteria 3, 8, 9, 11, 13 and 14, listed at the top). It amends no signed requirement.
+
+**REQ-DASH-209.** Your H4 is folded, and it has no open questions. The wording still for your approval is criterion 12 (h2, sub-line and rail) and criterion 14 (the link wording). It amends no signed requirement, since amendment 3 is dropped.
+
+**REQ-GEN-218 (new).** Its content is REQ-PIPE-179 criterion 39 and the TS-63 decisions you already made, now in a requirement of its own. It has one open question for you: its scenario links (above). Your answer decides whether it is built after REQ-GEN-205 or straight after REQ-DASH-180. It carries amendments 45 to 47 (text only), which you would approve with it. It was not reviewed as a requirement of its own, so say if you want a review first.
 
 ## Non-functional angles on the three new requirements
 
@@ -699,6 +762,8 @@ Clearing an unmet entry once its scenario is planted is done when the scenario i
 - **plans/post-build-review.md #174:** append "Keith's answers 2026-10-14 (close-out Q15, Q24): the page fix is REQ-DASH-208, with the jump carried in the URL; criterion 9's wording is amended by REQ-GEN-206 criterion 15." It stays todo until those are built.
 - **plans/post-build-review.md #175:** append "Keith's answer 2026-10-14 (close-out Q14): option 1, carried by REQ-GEN-206 criterion 11."
 - **plans/post-build-review.md #177:** already done. REQ-GEN-205's draft criterion 19 is now removed, as its last line said it would be.
+- **plans/running-thoughts.md #77:** nothing to apply. It already carries the retention of turned-off holds (added 2026-10-14), which is where your own pass Q4 sends it.
+- **plans/supply-model.md, TS-63's register entry:** not a plans edit to apply now. Rewriting it is REQ-GEN-218 criterion 5's build duty.
 
 ## Keith's answers (2026-10-14 morning, via AskUserQuestion)
 
@@ -774,6 +839,9 @@ Folded 2026-10-14. Each answer is a decision citing "Keith, 2026-10-14, follow-u
 - REQ-GEN-203: SIGNED by Keith, 2026-10-14, readers' status deferred to running-thoughts #95, REQ-PIPE-211 added as a dependency. Moved into requirements.yaml.
 - REQ-PIPE-163: SIGNED by Keith, 2026-10-14, with the nine amendments it carries approved in their exact wording (2, 11, 12, 18, 19, 20, 31, 32, 42). Replaced its older unsigned entry in requirements.yaml; removed from this draft.
 - REQ-DASH-182: sent to its own UX review at Keith's ask before signing (review-182-ux.md); his four answers recorded there. Re-folded 2026-10-14 (findings 2 to 11 and Q1 to Q4; finding 1 replaced by a regression guard, criterion 15, after the browser check and post-build-review #178); to be presented again.
+- REQ-DASH-208: SIGNED by Keith, 2026-10-14. Moved into requirements.yaml; removed from this draft.
+- REQ-GEN-205: SIGNED by Keith, 2026-10-14. Moved into requirements.yaml; removed from this draft. Amendment 47 (re-pointing its criterion 10 at REQ-GEN-218) is proposed against the signed text.
+- REQ-GEN-206: HELD by Keith, 2026-10-14, until running-thoughts #95's shape is settled.
 
 ## Keith's answers to the round 4 fold's questions (2026-10-14)
 
@@ -790,6 +858,10 @@ Folded 2026-10-14 by delivery-scoper. G1 is REQ-DASH-209 criterion 14, and G2 is
 - H3 the standing-in heading on a past date: A - "On <date>: <kind label>"; the label alone on the present; the reason in .promo-why.
 - H4 REQ-DASH-209's previous/next links at the ends: A - left out where there is no earlier period, or the next had not opened by the date on show.
 
+Folded 2026-10-14 by delivery-scoper. H1 is REQ-DASH-182 criteria 2, 3 and 14 and REQ-DASH-180 criterion 16; H2 is REQ-DASH-182 criterion 3; H3 is criterion 9; H4 is REQ-DASH-209 criterion 14 as already written. Each is a decision citing "Keith, 2026-10-14, H<N>", and the four open questions are removed. Answers are still not sign-off.
+
 ## REQ-PIPE-179's own scoper pass: Keith's answers (2026-10-14)
 
 See req-179-own-pass.md: split TS-63 into its own generator requirement built after REQ-DASH-180; refuse keep on a parked move into a gap; one row per dataset in "Received while turned off"; turned-off holds kept quiet, retention to running-thoughts #77.
+
+Folded 2026-10-14 by delivery-scoper. The own pass's REQ-PIPE-179 replaced the draft's. Q1 is REQ-GEN-218 (new), with criterion 39 as a pointer and amendments 45 to 47. Q2 is criteria 36 and 37 and amendment 40. Q3 is criterion 34. Q4 is the PRIVACY NFR and a decision. Each is a decision citing "Keith, 2026-10-14, own pass Q<N>". `req-179-own-pass.yaml` is merged and deleted; `req-179-own-pass.md` stays as the pass's record. Answers are still not sign-off.
