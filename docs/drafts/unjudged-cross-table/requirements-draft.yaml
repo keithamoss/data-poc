@@ -1,0 +1,205 @@
+# DRAFT - plans/running-thoughts.md #95, scoped by delivery-scoper 2026-10-14.
+# A PROPOSAL for Keith's sign-off, not a settled requirement. Nothing here is
+# in requirements.yaml. Every criterion marked PROVISIONAL hangs on a question
+# in summary.md; the recommended answer is what is drafted.
+requirements:
+- id: REQ-QAC-212
+  title: "A dataset whose cross-table checks could not run against everything they read is Incomplete - a status that is neither green nor red"
+  date_written: "2026-10-14"
+  story: "As a data team leader glancing at a Child Protection dataset, I want a dataset whose cross-table checks could not run against every table they read to say so with a status of its own, so that I never read it as green when nobody could check it, nor as red when nothing in its own data failed."
+  moscow: must
+  status: not_started
+  source: "Keith, reviewing the calendar close-out batch, 2026-10-14 ('that cross-table check isn't judging on notifications, so you can't really rule it green - but it's also not a true red'; 'if the cross-table checks can't run against everything, then notifications should shout'). plans/running-thoughts.md #95. Drafted by delivery-scoper 2026-10-14."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL recognise a dataset status INCOMPLETE, meaning that at least one cross-table check contributing to the dataset could not be evaluated because a table it reads was not readable for the period, and SHALL NOT use it for any other cause."
+  - "THE SYSTEM SHALL order INCOMPLETE above amber and below red in every rollup, so that a dataset with a red of its own reads red, and a dataset that would otherwise read green or amber reads INCOMPLETE. (PROVISIONAL - question Q1.)"
+  - "THE SYSTEM SHALL NOT let INCOMPLETE lose a rollup to green, amber, no data or any quiet status, at the column, dataset, collection or agency level."
+  - "THE SYSTEM SHALL roll an INCOMPLETE dataset up to its collection and agency on the same terms as any ordered status, subject to REQ-PIPE-106 criterion 9's exclusion of datasets with no agreed schedule."
+  - "THE SYSTEM SHALL return the same INCOMPLETE answer from its Python and browser implementations for every case, held to the shared status-cases.json table, which SHALL gain check, rollup and dataset-rollup cases for it (REQ-QAC-047 criteria 1, 4 and 6)."
+  - "IF either implementation meets INCOMPLETE where its level does not allow it, THEN THE SYSTEM SHALL fail loudly naming the status and where it was read from, as REQ-QAC-047 criterion 2 requires of any status."
+  - "THE SYSTEM SHALL NOT use INCOMPLETE for a drift or volume check whose reference period has no promoted supply - REQ-QAC-108 criteria 5, 9 and 10 keep their own rules - nor for a trial run, which decides nothing (REQ-PIPE-115 criterion 17)."
+  - "THE SYSTEM SHALL have tests in tests/test_status_parity.py and tests-js/status-parity.test.js, driven by the new status-cases.json rows and seen to fail before the status exists, asserting: green plus INCOMPLETE rolls up to INCOMPLETE; amber plus INCOMPLETE rolls up to INCOMPLETE; red plus INCOMPLETE rolls up to red; no data plus INCOMPLETE rolls up to INCOMPLETE."
+  non_functional_requirements:
+  - "NO FALSE GREEN (CLAUDE.md): the whole point of the status is that a dataset nobody could fully check never reads green, at any level a person looks at."
+  - "NO FALSE RED: a dataset with no failure of its own never reads red because another table is missing - the 'red that cries wolf' REQ-PIPE-079 criterion 14 was written to prevent."
+  - "SCALE (~30 datasets per asset): the status is a rollup member like any other, so a collection of thirty shows one status and a count rather than thirty banners; one widely read table missing can make many readers INCOMPLETE at once, and the aggregation for that is REQ-DASH-216's and REQ-DASH-204's."
+  - "MAINTAINABILITY: one new value in two parity-held vocabularies (qa_tools/common/dataset_status.py and the template's STATUS_ORDER), changed together under REQ-QAC-047; no new dependency."
+  - "ACCESSIBILITY: INCOMPLETE is distinguished by label as well as colour (REQ-DASH-070 criterion 6), carried by REQ-DASH-216."
+  dependencies: []
+  decisions:
+  - "A DISTINCT STATUS, NOT RED AND NOT A LABEL ON GREEN (delivery-scoper, RECOMMENDED - question Q1): Keith's own words rule out both ends - 'you can't really rule it green - but it's also not a true red'. REJECTED (pending Keith) keeping the verdict of the checks that ran with an 'Incomplete' label beside the pill, REQ-DASH-126's red-promoted pattern: a green pill with a qualifier is still read as green at a glance by the data team leader this register is for. REJECTED red for every case including not yet due: simplest, but it is the red-for-nothing-wrong REQ-PIPE-079 criterion 14 forbade, and at thirty datasets every early arrival in a quarter would read red. REJECTED an unordered status surfaced beside the rollup (like 'exhausted'): it could not express 'red beats it' and 'it beats green', and every rollup would need a second channel to carry it."
+  - "ABOVE AMBER (delivery-scoper, RECOMMENDED - question Q1 option A): an amber dataset whose cross-table checks could not run would otherwise read amber and promote itself, which is the shout absorbed. Amber's own warning stays visible on its check card."
+  - "ONE TRIGGER, NOT ONE PER CAUSE (Keith, 2026-10-14, #95's 'input for the scoper'): 'the fact is that there is no promoted clients'; whether the other table is late, overdue, held, contested or red is read on that table's own page. So INCOMPLETE has one meaning and the cause is never part of the status."
+  - "WORKING NAME 'INCOMPLETE' (delivery-scoper, PROVISIONAL - open question 1): Keith's own phrase was 'we can't assert that it's complete and actually green'. REJECTED 'nodata' (already means nothing to show yet, and sits below green where it loses every rollup - the false green itself) and 'waiting' (already used for a supply awaiting a person, REQ-PIPE-122's AMBER_WAITING)."
+  - "SOLVES BOTH #95 CASES OR IT IS WRONG (Keith, 2026-10-14, via the main session, binding on this draft): whatever shape is recommended must demonstrably fix the false green (a not-yet-due dependency recorded nodata, the reader reads green, is promoted, never revisited) and the false red (a reader with no failure of its own red for an overdue, contested or awaiting-a-decision dependency), plus every similar mis-reading found on the way, each with a criterion and a named test reproducing today's reading. The case table is in summary.md; the criteria are in REQ-PIPE-213 to REQ-PIPE-217."
+  open_questions:
+  - "1. THE WORD ON THE PILL. Working name 'Incomplete'. Alternatives: 'Not fully checked', 'Partly checked'. Not put to Keith as a relay question because the dashboard UX review should propose wording first; it is an authoring choice he approves, not a design fork."
+- id: REQ-PIPE-213
+  title: "A cross-table check that could not run against a table it reads makes its readable participants Incomplete, whatever the reason the table was unreadable"
+  date_written: "2026-10-14"
+  story: "As a data engineer operating this pipeline, I want every cross-table check that could not be evaluated - because a table it reads had not arrived, was overdue, held, contested, could not be loaded or was waiting on a decision - to count as Incomplete against the datasets whose tables it could read, so that one rule decides it and neither a quiet 'not yet due' nor a borrowed red misstates what was checked."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-14, plans/running-thoughts.md #95 and its 'input for the scoper'. The defect verified 2026-10-14 in qa_tools/common/unrunnable.py, held_blast_radius.py and qa.check_result (see decisions). Drafted by delivery-scoper 2026-10-14."
+  acceptance_criteria:
+  - "WHERE a cross-table check in a run's scope reads one or more tables the run cannot read for the period, THE SYSTEM SHALL record that check as not evaluated (REQ-PIPE-115 criteria 2 and 3) with a status that reads INCOMPLETE (REQ-QAC-212), whatever the reason each table was unreadable - not yet due, past due, staged awaiting a decision, contested, could not be loaded, held, or the catch-all - and SHALL NOT record it as red or as no data."
+  - "THE SYSTEM SHALL keep recording, on that record, every unreadable table and the reason each was unreadable as at the run (REQ-PIPE-115 criterion 2), and SHALL NOT let that reason change the status the record reads."
+  - "THE SYSTEM SHALL count such a record toward the status of every dataset whose table the check read and could read, including the dataset the check is filed under where its own table was readable, and SHALL NOT count it toward the status of a dataset whose table it names as unreadable."
+  - "THE SYSTEM SHALL NOT record a passing result for a check that was not evaluated (REQ-PIPE-115 criterion 4, unchanged)."
+  - "THE SYSTEM SHALL leave unchanged how a dataset whose OWN table cannot be read is signalled - held, contested or failed to load reads red through its outstanding item (REQ-PIPE-115 criteria 7, 8 and 10; REQ-DASH-148) - and SHALL apply this requirement only to the OTHER datasets whose checks read that table."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-079 criteria 4, 14, 15 and 16, REQ-PIPE-105 criterion 13, REQ-PIPE-115 criteria 14 and 20, REQ-PIPE-078 criterion 10 and REQ-QAC-037 criterion 7, so that each says the check reads INCOMPLETE rather than red or no data, keeps naming the table and its reason, and counts only toward the datasets it could read - with the wording in summary.md's amendment list, for Keith's approval."
+  - "CASE 1, NOT YET DUE (the false green): WHEN a reader runs while a table its cross-table check reads is not yet due for the period, THE SYSTEM SHALL read the reader INCOMPLETE, not green - proved by tests/test_incomplete_cross_table.py::TestNotYetDueDependency::test_reader_reads_incomplete_not_green, which drives the real Child Protection orchestrator with cp-investigations arriving before cp_clients is due, written first and seen to fail reading green (today's nodata)."
+  - "CASE 4, PAST DUE (the false red): WHEN a reader with no failing check of its own runs while a table it reads is past due, THE SYSTEM SHALL read it INCOMPLETE, not red - tests/test_incomplete_cross_table.py::TestOverdueDependency::test_reader_with_no_own_failure_reads_incomplete_not_red, seen to fail reading red first."
+  - "CASE 5, STAGED AWAITING A DECISION: WHEN a reader runs while a table it reads cannot be read because its supply is staged awaiting a decision, THE SYSTEM SHALL read the reader INCOMPLETE - tests/test_incomplete_cross_table.py::TestAwaitingDecisionDependency::test_reader_reads_incomplete_not_red, seen to fail reading red first."
+  - "CASE 6, CONTESTED: WHEN a reader runs while a table it reads is contested (REQ-PIPE-105 criterion 6), THE SYSTEM SHALL read the reader INCOMPLETE - tests/test_incomplete_cross_table.py::TestContestedDependency::test_reader_reads_incomplete_not_red, seen to fail reading red first."
+  - "CASE 7, COULD NOT BE LOADED: WHEN a reader runs while a table it reads arrived and could not be loaded, THE SYSTEM SHALL read the reader INCOMPLETE - tests/test_incomplete_cross_table.py::TestUnloadableDependency::test_reader_reads_incomplete_not_red, seen to fail reading red first (today's shape on the real page: cp_investigations__202505010900000800, could-not-be-loaded against cp_clients)."
+  - "CASE 8, HELD: WHEN a reader runs while a table it reads is held with no period (held_blast_radius), THE SYSTEM SHALL read the reader INCOMPLETE - tests/test_incomplete_cross_table.py::TestHeldDependency::test_reader_reads_incomplete_not_red, seen to fail reading red first."
+  - "CASE 12, SIBLINGS RE-FILED TOGETHER: WHEN several supplies are re-filed into one period at one instant and each re-check finds a sibling unreadable for the catch-all reason, THE SYSTEM SHALL read each INCOMPLETE rather than red - tests/test_incomplete_cross_table.py::TestRefiledTogether::test_catch_all_reads_incomplete_not_red, seen to fail reading red first (today's shape: the 2023-Q4 re-file runs ending __r1, 'missing-table')."
+  - "CASE 14, THE OTHER SIDE OF THE CHECK: WHEN a dataset arrives whose table a cross-table check filed under ANOTHER dataset reads, and that other dataset's table is not readable, THE SYSTEM SHALL read the arriving dataset INCOMPLETE on that check's account - tests/test_incomplete_cross_table.py::TestCheckFiledUnderTheMissingTable::test_arriving_participant_reads_incomplete, seen to fail reading green first (today's shape: cp_carers__202305010900000800, a cp-placements check recorded nodata with cp_placements unreadable). (PROVISIONAL - question Q8.)"
+  - "CASE 15, THE MISSING TABLE'S OWN PAGE: WHERE a reader's not-evaluated record names a table as unreadable, THE SYSTEM SHALL NOT count it toward that table's dataset - tests/test_incomplete_cross_table.py::TestMissingTableNotColouredByItsReaders::test_record_not_counted_toward_the_unreadable_dataset, which asserts on both promotion.status_of and the dashboard build's per-dataset rows (pipeline/build_cp_dashboard_data.py shares a cross-table record with every table it reads today), written first."
+  non_functional_requirements:
+  - "THE BUILD RULE: everything here is decided when the run records its results; the dashboard build reads recorded QA results only (CLAUDE.md, REQ-DOCS-101)."
+  - "ONE RULE (Keith, #95): the trigger is 'could not run against everything it reads'; no per-cause status, no per-cause gate behaviour."
+  - "RELIABILITY: a reason this requirement does not recognise still reads INCOMPLETE, never green - the catch-all is covered by case 12, not left to fall through."
+  - "REGENERATE, DO NOT MIGRATE (Keith's standing rule from REQ-PIPE-089): the 90 not-evaluated records in today's database (48 nodata, 42 fail, queried 2026-10-14) are replaced by a bootstrap from empty; readers SHALL meet no old-shape record in a regenerated database. Whether old records must still read correctly is open question 1."
+  - "PRIVACY: the record names tables and periods, never a row; nothing new is recorded about supply contents."
+  - "TEST FIRST for every case criterion: each test reproduces today's wrong reading before the fix."
+  dependencies:
+  - REQ-QAC-212
+  - REQ-PIPE-115
+  - REQ-PIPE-079
+  - REQ-PIPE-105
+  - REQ-PIPE-078
+  - REQ-QAC-037
+  decisions:
+  - "THE DEFECT, VERIFIED 2026-10-14 (delivery-scoper, in code and in the bootstrapped database): unrunnable.results_for records status 'nodata' where every unreadable table is not yet due and 'fail' for every other reason; held_blast_radius records 'fail'. dataset_status.ORDERED_STATUSES puts nodata at -1, below green, so rollup_statuses drops it beside any live verdict - a reader with all other checks passing reads GREEN. 'fail' maps to red and rolls up - a reader with nothing failing of its own reads RED. Both are read once, at the run, and never re-derived."
+  - "THE FALSE GREEN IS REAL, NOT HYPOTHETICAL (queried 2026-10-14): cp-investigations@202408010100000000 was PROMOTED by rule at 2024-08-01 09:20 (decision 103) while fifteen of its results were nodata 'not-yet-due' for cp_clients, cp_case_workers and cp_notifications. It was later re-checked only because those three happened to be promoted (knock-on runs __r1 to __r3, decisions 122, 124, 128); had any never arrived, it would have stayed green and promoted for good."
+  - "THE FALSE RED IS REAL (queried 2026-10-14): the 2023-Q4 re-file batch's re-check runs (__r1) recorded 30 catch-all 'missing-table' fails across four datasets for siblings re-filed at the same instant, and the knock-on wrote a 'still-failing ... A person decides' record for cp-notifications (decision 70) when nothing in its own data had failed. Why siblings re-filed together read each other as missing at all (REQ-PIPE-105 criterion 5's same-instant rule is worded for arrivals) is a SIGHTING for the architect, not scoped here."
+  - "COUNTED TOWARD EVERY READABLE PARTICIPANT, NOT THE MISSING ONE (delivery-scoper, following REQ-QAC-037 criterion 7's 'fold into every dataset it reads'): the missing table's dataset already has its own signal - its slot state, its outstanding item - and colouring it from its readers' records double-counts one cause. REJECTED counting only toward the dataset the check is filed under (question Q8 option B): REQ-QAC-037 exists because a check's filing is arbitrary."
+  - "THE RECORDED REASON STAYS, AS AT THE RUN (delivery-scoper): it is the audit trail of what the run saw. It is never presented as the dependency's current state - REQ-DASH-216 criterion 4 - which is what made today's 'not yet due' silently false a week later."
+  - "TRIALS UNCHANGED (delivery-scoper, PROVISIONAL): unrunnable.results_for_trial records nodata; a trial is filed to no period and decides nothing (REQ-PIPE-115 criterion 17), so there is no period for a table to be missing from. Say if a trial should read Incomplete too."
+  - "REJECTED a time-triggered rewrite of the recorded status when the dependency goes overdue (the #95 plans entry's first proposal, 're-checked when the dependency ... goes overdue'): once not-yet-due reads INCOMPLETE, going overdue changes only the reason, and Keith said the reason belongs on the dependency's page. See REQ-PIPE-215."
+  open_questions:
+  - "1. OLD RECORDS (for the architect, not Keith): must readers also read a pre-change record (status nodata or fail with an unrunnable_code, or tool 'held') as INCOMPLETE, or does the regenerate-not-migrate rule make that unnecessary? Recommended: derive INCOMPLETE from the not-evaluated marker rather than the recorded status, which makes old and new records read the same and costs nothing."
+- id: REQ-PIPE-214
+  title: "An Incomplete supply does not promote itself, and a person may still promote it"
+  date_written: "2026-10-14"
+  story: "As manager of the data team, I want a supply whose cross-table checks could not run against everything to wait rather than promote itself, so that nothing reaches the period schema on the strength of checks nobody could run, while a person can still let it through when they judge it right."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-14, plans/running-thoughts.md #95 ('Proposed: a distinct status the gate does not promote on'; 'we can't assert that it's complete and actually green'). Drafted by delivery-scoper 2026-10-14."
+  acceptance_criteria:
+  - "IF a supply's status, read by the promotion gate from every contributing check (REQ-PIPE-075 criterion 2), is INCOMPLETE, THEN THE SYSTEM SHALL NOT promote it automatically, and SHALL leave it staged. (PROVISIONAL - question Q2.)"
+  - "WHEN the gate refuses a supply for being INCOMPLETE, THE SYSTEM SHALL give as its reason that cross-table checks could not run because the period has no readable <table> for each table named, and SHALL NOT say the supply is red or that a person must decide about its data."
+  - "THE SYSTEM SHALL allow a person to promote an INCOMPLETE supply, with a reason, on the same terms as any other person's promotion (REQ-PIPE-075 criterion 14, REQ-PIPE-074)."
+  - "WHERE a supply is INCOMPLETE and also red on a check of its own, THE SYSTEM SHALL refuse it as red (REQ-PIPE-075 criterion 3), naming its own failure first."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-075 criterion 3 to read 'IF a supply's status is red or INCOMPLETE, THEN THE SYSTEM SHALL NOT promote it automatically, and SHALL leave it staged awaiting a person or, where INCOMPLETE, the table it waits on (REQ-PIPE-214)'."
+  - "CASE 1, THE GATE HALF OF THE FALSE GREEN: WHEN a reader is otherwise green and a table it reads is not yet due, THE SYSTEM SHALL NOT promote it - tests/test_incomplete_cross_table.py::TestNotYetDueDependency::test_reader_is_not_promoted_by_rule, which replays the shape of decision 103 (cp-investigations, 2024-Q3) through the real gate and is seen to fail first by promoting it."
+  - "CASE 3, NEVER ARRIVES: WHILE a table a waiting reader's cross-table check reads is never supplied and its slot closes unfilled, THE SYSTEM SHALL keep the reader INCOMPLETE and staged until the table is promoted, substituted or inherited into the period or a person decides - tests/test_incomplete_cross_table.py::TestDependencyNeverArrives::test_reader_stays_incomplete_after_the_period_closes, seen to fail first (today the reader reads green and is promoted)."
+  - "WHERE a person has marked the unreadable table's slot as not supplied (REQ-PIPE-132 criterion 4), THE SYSTEM SHALL keep the reader INCOMPLETE and leave its promotion to a person. (PROVISIONAL - question Q5.)"
+  non_functional_requirements:
+  - "SCALE AND THROUGHPUT: on Child Protection, where every table is read by another table's cross-table check, an early arrival in a quarter now waits until its partners are readable; the last arrival is evaluated against all of them and the knock-on (REQ-PIPE-121 criterion 11) carries the earlier ones through. Today's data shows the period's six tables arriving within eight minutes, so the wait is usually minutes; a genuinely late table holds its readers for as long as it is late, which is the intended shout."
+  - "COST: more knock-on re-checks per quarter (one per promotion that unblocks readers), cross-table checks only (REQ-PIPE-121 criterion 2)."
+  - "SECURITY: nothing widened - a person's promotion keeps its allowlist, actor and mandatory reason."
+  - "OBSERVABILITY: the refusal is a recorded promotion-refused decision with its reason, like every other refusal."
+  dependencies:
+  - REQ-QAC-212
+  - REQ-PIPE-213
+  - REQ-PIPE-075
+  - REQ-PIPE-121
+  decisions:
+  - "INCOMPLETE WAITS (delivery-scoper, RECOMMENDED - question Q2 option A; it is also what the #95 plans entry proposed): promoting it is the false green moved one step along. REJECTED (pending Keith) promoting it and showing it 'promoted, incomplete' until re-judged: it keeps data flowing, but REQ-PIPE-121 criterion 6 forbids demoting a promoted reader, so a reader promoted before its dependency turned out to break the relationship could only ever be shown red promoted - the warehouse would hold it either way."
+  - "NOT A DEADLOCK, CHECKED (delivery-scoper): every arrival overlays every other table staged for its period (REQ-PIPE-105 criterion 5), so the last of a period's tables to arrive is evaluated against all the others; once it promotes, the knock-on re-gates the waiting readers and each promotion it makes owes its own (REQ-PIPE-121 criterion 11). Tables waiting only on each other are released by the last arrival."
+  - "A PERSON CAN STILL PROMOTE (delivery-scoper): the same escape every red supply has. REJECTED forbidding it - a table that will never come must not freeze its readers for good."
+  open_questions: []
+- id: REQ-PIPE-215
+  title: "An Incomplete reader is checked again when the table it could not read becomes readable or stops being what it read - never on the clock"
+  date_written: "2026-10-14"
+  story: "As the person working a period's supplies, I want a reader that could not be fully checked to be checked again the moment the missing table is promoted into the period, and a reader that was checked against a staged table to be checked again if that table is rejected or superseded, so that its status always describes the tables the period really holds."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-14, plans/running-thoughts.md #95: 'decide the re-check question as part of that'. The delivery-architect's round 4 blocker B1 (docs/drafts/calendar-close-out/review4-findings.md). Drafted by delivery-scoper 2026-10-14."
+  acceptance_criteria:
+  - "WHEN a re-evaluation is owed for a table in a period (REQ-PIPE-121), THE SYSTEM SHALL run again every reading check whose latest result for a waiting or promoted supply is a not-evaluated record naming that table, whatever the period held when that record was written and whatever it holds now, and SHALL NOT only re-gate such a reader."
+  - "WHEN a staged supply of a table is rejected, or superseded by a later file (REQ-PIPE-118), and any waiting or promoted supply's latest result for a reading check read that supply, THE SYSTEM SHALL owe a re-evaluation of those readers in that period through REQ-PIPE-121's one handler, and SHALL NOT add a separate path. (PROVISIONAL - question Q4.)"
+  - "THE SYSTEM SHALL NOT re-evaluate a reader because time has passed - a dependency going overdue, or its period closing - since the reader already reads INCOMPLETE and only the dependency's state has changed."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-121 criterion 1 to add 'a staged supply of the table, which a reader read, being rejected or superseded' among its triggers, and REQ-PIPE-121 non-functional requirement 4 to say that a reader whose latest result for a reading check is not evaluated is always re-run - with the wording in summary.md, for Keith's approval; and SHALL fold this with REQ-PIPE-211's amendment of the same criterion so that criterion 1 is amended once."
+  - "CASE 2, GOES OVERDUE: WHILE a reader checked when its dependency was not yet due waits and the dependency's slot then passes due, THE SYSTEM SHALL keep the reader INCOMPLETE without re-running it - tests/test_incomplete_cross_table.py::TestDependencyGoesOverdue::test_reader_stays_incomplete_and_is_not_rerun, seen to fail first (today the reader reads green and has been promoted)."
+  - "CASE 9, DEPENDENCY RED AND NEVER PROMOTED: WHERE the dependency arrives after the reader, reads red and is never promoted, THE SYSTEM SHALL keep the reader INCOMPLETE - tests/test_incomplete_cross_table.py::TestDependencyRedNeverPromoted::test_reader_stays_incomplete, seen to fail first (today the reader keeps whatever its first run recorded)."
+  - "CASE 10, A STAGED DEPENDENCY THE READER READ IS REJECTED: WHEN a reader evaluated against a dependency's staged supply is followed by a person rejecting that supply, THE SYSTEM SHALL re-evaluate the reader and read it INCOMPLETE - tests/test_incomplete_cross_table.py::TestReadStagedDependencyRejected::test_reader_is_rechecked_and_reads_incomplete, seen to fail first (today nothing re-checks it, and it keeps a verdict about data the period will never hold)."
+  - "CASE 11, DEPENDENCY PROMOTED LATER: WHEN a table a reader could not read is later promoted into the period - including after a contest in which both files were rejected and a later file arrived - THE SYSTEM SHALL re-run the reader's reading checks against it and re-gate it - tests/test_incomplete_cross_table.py::TestDependencyPromotedLater::test_not_evaluated_reader_is_rerun_not_only_regated, which reproduces round 4's B1 (the knock-on reads None as None and only re-gates), seen to fail first."
+  - "CASE 13, A STAGED DEPENDENCY THE READER READ IS SUPERSEDED: WHEN a later file supersedes the staged supply a reader was evaluated against, THE SYSTEM SHALL re-evaluate the reader against what the period now offers - tests/test_incomplete_cross_table.py::TestReadStagedDependencySuperseded::test_reader_is_rechecked_against_the_later_file, seen to fail first."
+  non_functional_requirements:
+  - "RELIABILITY: every new trigger is owed in the same transaction as its decision and finished by the processing pass if interrupted (REQ-PIPE-121 criteria 14 to 16)."
+  - "COST: cross-table checks only, one re-evaluation per decision (REQ-PIPE-121 criteria 2 and 9); no scheduled job, no clock-driven sweep, so no new compute that grows with history."
+  - "AUDITABILITY: every re-run names the decision that caused it (REQ-PIPE-121 criterion 5)."
+  - "SCALE: a widely read table may have many readers; one re-evaluation per decision covers them all."
+  dependencies:
+  - REQ-PIPE-213
+  - REQ-PIPE-121
+  - REQ-PIPE-118
+  decisions:
+  - "THE RE-CHECK QUESTION, ANSWERED BY THE SHAPE (delivery-scoper, RECOMMENDED - question Q3 option A): re-check when something MOVES - the missing table promoted, substituted or inherited into the period (already REQ-PIPE-121), and a staged table a reader read being rejected or superseded (new). NOT on the clock: once not-yet-due already reads INCOMPLETE, going overdue changes only the reason, which Keith said lives on the dependency's page. REJECTED (pending Keith) a clock-driven re-check on going overdue and on the period closing: it would re-record the same INCOMPLETE with a newer reason, cost a scheduled sweep that grows with history, and the dashboard shows the current state anyway (REQ-DASH-216 criterion 4)."
+  - "ROUND 4 BLOCKER B1 IS GENERAL, NOT A CONTEST QUIRK (delivery-scoper, from the architect's finding, 2026-10-14): knock_on.readers marks a reader stale only where _read_as differs from _now_holds; an unreadable table was never read (None), so whenever the period still holds nothing - and in a real knock-on for another table - the reader is only re-gated. Criterion 1 makes 'its latest result is not evaluated' stale by itself, which REQ-PIPE-211 then needs rather than restates."
+  - "READING A STAGED DEPENDENCY STILL COUNTS AS RUNNING AGAINST IT (delivery-scoper, RECOMMENDED - question Q4 option A): REQ-PIPE-105 criterion 5 (signed) evaluates every arrival against the one staged version of each other table, and Keith's trigger is 'can't run against everything', which a check that ran did not fail. The hole that leaves - the staged table rejected or superseded afterwards - is closed by criterion 2. REJECTED (pending Keith) INCOMPLETE until every table read is PROMOTED, his literal 'if clients is red and not promoted, notifications shouts': it would make every co-arriving pair wait on each other unless the gate learned to promote a period's waiting supplies together, a far larger change to signed REQ-PIPE-075 and REQ-PIPE-105."
+  open_questions: []
+- id: REQ-DASH-216
+  title: "The dashboard shows an Incomplete dataset as neither green nor red, and names the table with no promoted supply"
+  date_written: "2026-10-14"
+  story: "As a data team leader, I want an Incomplete dataset shown with its own status everywhere a status appears, with the table it could not be checked against named and linked, so that I see at a glance it is not fine and not failing, and go to that table's page for why."
+  moscow: must
+  status: not_started
+  source: "Keith, 2026-10-14, plans/running-thoughts.md #95 ('notifications should shout'; 'the fact is that there is no promoted clients', the reader goes to clients to see why). Drafted by delivery-scoper 2026-10-14."
+  acceptance_criteria:
+  - "THE SYSTEM SHALL show INCOMPLETE as its own status pill, with its own label and a treatment that is neither the green nor the red one, wherever a dataset, collection or agency status is shown - the dataset page, the collection table, the agency card and the executive tier - and SHALL distinguish it by label as well as colour."
+  - "THE SYSTEM SHALL show, on a not-evaluated check's card, that the check was not evaluated and which tables it could not read, and SHALL NOT show it as failed or passed."
+  - "THE SYSTEM SHALL count INCOMPLETE datasets in each collection and agency card's status breakdown as their own category."
+  - "THE SYSTEM SHALL describe the missing table, wherever it is named for an INCOMPLETE dataset, only as having no readable supply for the period on show, and SHALL NOT present the reason recorded at the reader's run - not yet due, overdue, held - as the table's current state."
+  - "WHERE a promoted supply's status, recomputed with its most recent cross-table results, is INCOMPLETE, THE SYSTEM SHALL show an 'Incomplete promoted' label beside the pill on the same terms as REQ-DASH-126's red promoted, and SHALL NOT show it with the treatment of a green promoted supply."
+  - "THE SYSTEM SHALL judge all of this as at the date on show, from recorded QA results and recorded decisions only (REQ-PIPE-115 criterion 12; the build rule)."
+  - "CASES 1 AND 4 AT THE LAYER A PERSON SEES (CLAUDE.md: assert at the last transform): THE SYSTEM SHALL have a real-browser test, tests/test_dashboard_e2e.py::TestIncompleteReader, against a dashboard built from a fixture history, written first and seen to fail, asserting that a reader whose dependency was not yet due at its run shows INCOMPLETE rather than green, that a reader whose dependency was overdue with no failure of its own shows INCOMPLETE rather than red, that a reader with its own red shows red, and that the INCOMPLETE rolls up to the collection and agency."
+  - "CASE 15 AT THE LAYER A PERSON SEES: THE SYSTEM SHALL assert in the same test class (test_missing_tables_own_tile_not_coloured_by_its_readers) that the dataset whose table was missing shows its own state and not its readers' INCOMPLETE."
+  non_functional_requirements:
+  - "SCALE: the status is one pill and one count per card; the explanation is one line per missing table, never per check or per reader (REQ-DASH-204 as re-folded)."
+  - "PERFORMANCE: computed once per dataset per build from embedded results; no per-render history scan."
+  - "COMPATIBILITY: no new asset, font or vendor file; file:// and offline viewing unaffected."
+  - "ACCESSIBILITY: label plus colour; the same role='status' semantics the other pills carry."
+  - "NO FALSE GREEN: the INCOMPLETE treatment must not be confusable with green at a glance - the dashboard UX review owns the colour."
+  dependencies:
+  - REQ-QAC-212
+  - REQ-PIPE-213
+  - REQ-DASH-126
+  - REQ-DASH-204
+  decisions:
+  - "THE CAUSE IS NOT PART OF THE READER'S DISPLAY (Keith, 2026-10-14: 'the fact is that there is no promoted clients', the reader goes to clients' page for whether it is late, overdue, held or anything else): criterion 4. This is also what makes a clock-driven re-check unnecessary (REQ-PIPE-215): the recorded reason may be stale, but it is never shown as current."
+  - "THE EXPLANATORY LINE STAYS WITH REQ-DASH-204 (delivery-scoper): 204 already owns the top-of-page line, its link, the collection note and the 'Affects' ending; this requirement owns only the status itself. REJECTED drafting a second line here - two requirements describing one banner can disagree."
+  - "INCOMPLETE PROMOTED AS A LABEL (delivery-scoper, following REQ-DASH-126 criterion 5's own choice for red promoted): a promoted reader can become INCOMPLETE when the staged table it read is rejected (REQ-PIPE-215 criterion 2)."
+  open_questions: []
+- id: REQ-PIPE-217
+  title: "An Incomplete reader shouts through its status, not through a 'still failing - a person decides' record, and its ticket says what it waits on"
+  date_written: "2026-10-14"
+  story: "As one of the team working the queue, I want a reader that is only Incomplete to be reported the same way whether its dependency never came or both of its files were rejected - through its status and its ticket, never as a supply needing my decision - so that the decision log and the queue hold only things a person can decide."
+  moscow: should
+  status: not_started
+  source: "Keith, 2026-10-14, calendar close-out answer R2 ('Shout, but don't say it's waiting on a person. Wouldn't this be the same shout you'd get if the tables it depends on just never turned up?') and plans/running-thoughts.md #95. Drafted by delivery-scoper 2026-10-14."
+  acceptance_criteria:
+  - "WHEN a re-evaluation leaves a waiting supply INCOMPLETE and not red, THE SYSTEM SHALL NOT include it in REQ-PIPE-121 criterion 12's still-failing record, and SHALL NOT write any decision-log record on its account. (PROVISIONAL - question Q6.)"
+  - "WHERE a re-evaluation leaves a waiting supply red on a check of its own, THE SYSTEM SHALL record it as REQ-PIPE-121 criterion 12 does today."
+  - "THE SYSTEM SHALL amend, in the same change, REQ-PIPE-121 criterion 12 to exclude a supply whose only refusal is INCOMPLETE (REQ-PIPE-214)."
+  - "THE SYSTEM SHALL reflect INCOMPLETE as a state on a slot's ticket (REQ-PIPE-083 criterion 6), naming the tables with no readable supply for the period, and SHALL NOT open a ticket for a slot whose only reason is INCOMPLETE under the needs-action policy. (PROVISIONAL - question Q7.)"
+  - "CASE 4 IN THE DECISION LOG: tests/test_incomplete_cross_table.py::TestNoStillFailingForIncomplete::test_overdue_dependency_writes_no_still_failing_record, which replays the shape of decision 70 (2023-Q4 cp-notifications) and is seen to fail first by writing a 'still-failing ... A person decides' record."
+  - "THE SAME SHOUT EITHER WAY: tests/test_incomplete_cross_table.py::TestNoStillFailingForIncomplete::test_never_arrived_and_reject_both_read_the_same, asserting that a reader whose dependency never arrived and a reader whose dependency's contested pair was rejected outright carry the same status and the same (absent) decision-log record."
+  non_functional_requirements:
+  - "SCALE: the decision log and the needs-action ticket queue stay one entry per thing to decide; a widely read missing table does not add an entry per reader."
+  - "RELIABILITY: a ticketing outage still never fails the operation (REQ-PIPE-083 criterion 17)."
+  - "OBSERVABILITY: the reader's state remains traceable - its recorded not-evaluated results name the tables and the run; the knock-on that re-checked it names its causing decision."
+  dependencies:
+  - REQ-PIPE-213
+  - REQ-PIPE-214
+  - REQ-PIPE-121
+  - REQ-PIPE-083
+  - REQ-PIPE-210
+  decisions:
+  - "R2 RESOLVED BY THE SHAPE (delivery-scoper, RECOMMENDED - question Q6 option A): the still-failing record exists for a supply that failed the rules and needs a person; an INCOMPLETE one fails nothing and needs the other table. Keith's own test - is this the shout a never-arrived table gives? - is met only by writing none, because a never-arrived table causes no re-evaluation and so no record. REJECTED (pending Keith) writing it at normal prominence, worded to name what the reader waits on: it would still differ between the two cases he asked to be the same."
+  - "NO TICKET FOR INCOMPLETE ALONE UNDER NEEDS-ACTION (delivery-scoper, RECOMMENDED - question Q7 option A): the missing table's own slot already has its ticket when it is late, overdue, held or waiting; one per reader would repeat it at thirty datasets. REJECTED (pending Keith) opening one per INCOMPLETE reader."
+  open_questions: []
