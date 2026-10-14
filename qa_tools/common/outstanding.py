@@ -658,10 +658,16 @@ def _from_parked_corrections(conn=None) -> list[Item]:
     items = []
     for m in found:
         agency, collection = _scope_of(m.dataset_id)
-        keep = (f"the data asset's manager keeps it where it is: mothman supply "
-                f"confirm-correction --reference {m.reference} --keep {m.supply_id} "
-                f"--keep-reason '<why>'")
+        # NEVER OFFER A KEEP THAT WOULD BE REFUSED (post-build-review #190
+        # D5): the item says why instead.
+        refused = correction_apply.keep_refusal(m)
+        keep = None if refused else (
+            f"the data asset's manager keeps it where it is: mothman supply "
+            f"confirm-correction --reference {m.reference} --keep {m.supply_id} "
+            f"--keep-reason '<why>'")
+        cannot = f" {refused} It cannot be kept there." if refused else ""
         now = (filing.filing_for(m.dataset_id, m.supply_id) or {}).get("slot")
+        gap = correction_apply.gap_ahead(m) if now == m.from_period else None
         if now != m.from_period:
             # MOVED BY A PERSON SINCE IT WAS PARKED (delivery-critic #152, 4):
             # the pass will not move it from somewhere nobody confirmed.
@@ -669,17 +675,29 @@ def _from_parked_corrections(conn=None) -> list[Item]:
                         f"{m.from_period or 'a hold'} to {m.to_period or 'a hold'}, but it "
                         f"has since been filed to {now or 'no period'}")
             detail = (f"Confirmed by {m.confirmed_by} and parked; someone moved it while "
-                      f"it waited, so the pass leaves it alone. Keep it where it is now, or "
-                      f"move it by hand.")
-            responses = (keep,)
+                      f"it waited, so the pass leaves it alone. "
+                      + ("Keep it where it is now, or move it by hand." if keep else
+                         f"Move it by hand.{cannot}"))
+            responses = (keep,) if keep else ("move it by hand to a period still owed",)
+        elif gap:
+            # INTO A TURNED-OFF GAP (post-build-review #190 D6): the pass
+            # leaves it parked, so the item names the gap, not a move.
+            headline = (f"Correction {m.reference} was to move {m.supply_id} from "
+                        f"{m.from_period or 'a hold'} to {m.to_period}, which now owes nothing")
+            detail = (f"Confirmed by {m.confirmed_by}. {gap} It stays parked until "
+                      f"{m.to_period} is owed again.{cannot}")
+            responses = tuple(r for r in (
+                f"change effective_to or effective_from so {m.to_period} is owed", keep and
+                f"or {keep}") if r)
         else:
             headline = (f"Correction {m.reference} moves {m.supply_id} from "
                         f"{m.from_period or 'a hold'} to {m.to_period or 'a hold'}, once what "
                         f"blocks it is cleared")
             detail = (f"Confirmed by {m.confirmed_by}; parked because another decision "
                       f"blocks it. It stays where it is, with its verdict there, until then - "
-                      f"and the next processing pass moves it.")
-            responses = (f"clear what blocks it: {m.blocked.splitlines()[0]}", f"or {keep}")
+                      f"and the next processing pass moves it.{cannot}")
+            responses = tuple(r for r in (f"clear what blocks it: {m.blocked.splitlines()[0]}",
+                                          keep and f"or {keep}") if r)
         items.append(Item(
             kind=PARKED_CORRECTION_MOVE, severity=NEEDS_ACTION, blocking=False,
             headline=headline, detail=detail,

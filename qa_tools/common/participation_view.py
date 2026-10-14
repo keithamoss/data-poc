@@ -67,19 +67,27 @@ def _turn_off_for(dataset_id: str, on: date, agr):
     return (min(ahead, key=lambda t: t.effective_to) if ahead else None), standing
 
 
-def _turn_off_lines(dataset_id: str, on: date, agr) -> tuple[str | None, tuple[str, ...]]:
-    """REQ-PIPE-179 criteria 28 and 29 - from configuration alone."""
+def _turn_off_lines(dataset_id: str, on: date,
+                    agr) -> tuple[str | None, tuple[str, ...], bool]:
+    """REQ-PIPE-179 criteria 28 and 29 - from configuration alone. The third
+    value says whether an owed slot is still open on the date."""
     from qa_tools.common import agreement_freeze, asset_time, slots, turned_off
 
     if not agr.ever_turned_off(dataset_id):
-        return None, ()
+        return None, (), False
     turn, standing = _turn_off_for(dataset_id, on, agr)
     lines: list[str] = []
     if standing.brought_back:
-        lines.append(f"Back on by a version of its own, inside "
-                     f"{_collection(dataset_id)}'s turned-off gap.")
+        # NAMING THE GAP IT CAME BACK INSIDE (post-build-review #190 D9b).
+        from qa_tools.common import in_force
+
+        mine = in_force.version_on(agr.dataset(dataset_id).participation, on)
+        above = in_force.version_on(agr.defaults_for(dataset_id), on)
+        lines.append(f"Back on by a version of its own from {_day(mine.effective_from)}, "
+                     f"inside {_collection(dataset_id)}'s turned-off gap (turned off after "
+                     f"{_day(above.effective_to)}, {above.turned_off_reason or 'no reason given'}).")
     if turn is None:
-        return None, tuple(lines)
+        return None, tuple(lines), False
     lines.append(f"Turned off after {_day(turn.effective_to)} ({turn.reason}), "
                  f"{turned_off.level_words(turn, dataset_id)}"
                  + (f", until {_day(turn.until)}." if turn.until else " - for good."))
@@ -122,7 +130,7 @@ def _turn_off_lines(dataset_id: str, on: date, agr) -> tuple[str | None, tuple[s
         headline = "Turned off - nothing due"
     elif standing.state == agreement_mod.OWING and not still and turn.effective_to >= on:
         headline = f"Turning off after {_day(turn.effective_to)} - nothing more owed"
-    return headline, tuple(x for x in lines if x)
+    return headline, tuple(x for x in lines if x), bool(still)
 
 
 def _collection(dataset_id: str) -> str:
@@ -205,10 +213,11 @@ def view(dataset_id: str, on: date, agreement=None) -> View:
                     changes = f"{when.day} {when.strftime('%b %Y')}: {new}"
                     break
         values.append(Value(label, text, words, changes))
-    headline, lines = _turn_off_lines(dataset_id, on, agr)
-    if agr.standing_on(dataset_id, on).state == agreement_mod.TURNED_OFF:
+    headline, lines, still_open = _turn_off_lines(dataset_id, on, agr)
+    if agr.standing_on(dataset_id, on).state == agreement_mod.TURNED_OFF and not still_open:
         # NOTHING IS OWED, and its timing is its last version's, said so
-        # (REQ-PIPE-179 criterion 29).
+        # (REQ-PIPE-179 criterion 29) - only once no owed slot is still open
+        # (post-build-review #190 D9a): until then it is still owing.
         values = [Value(x.label, "nothing - turned off", x.source) if x.label == "Owes"
                   else Value(x.label + " (when last on)", x.text, x.source, x.changes)
                   if x.label in ("Due time", "Grace") else x for x in values]

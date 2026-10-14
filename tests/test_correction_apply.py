@@ -1067,3 +1067,77 @@ class TestATurnOffDeclaredAsACorrection:
         [line] = [s for s in said if "g1" in s]
         assert "turned off" in line and "supplier paused" in line
         assert "effective_to or effective_from" in line and "stays parked" in line
+
+
+class TestCriticFindingsOn190:
+    """delivery-critic on REQ-PIPE-179 (post-build-review #190), D5 and D6:
+    keep is never offered where it would be refused, and a parked move into
+    a gap names the gap. Each failed before its fix."""
+
+    @staticmethod
+    def _gap_then_back(cal, asset):
+        """cp-clients off after 30 June 2023, back on 1 October 2023 - so
+        2023-Q3 owes nothing and 2023-Q4 is owed."""
+        versions = _clients(cal)["participation"]["versions"]
+        versions.append({**{k: v for k, v in versions[0].items() if k != "changelog"},
+                         "effective_from": "2023-10-01",
+                         "changelog": [{"date": "2026-10-14", "author": "a", "change": "on"}]})
+        versions[0].update(effective_to="2023-06-30", turned_off_reason="supplier paused")
+
+    def _parked_in_the_gap(self, conn, supply, minutes):
+        from qa_tools.common import correction_trial
+
+        _file(supply, "2023-Q3", RECEIVED + timedelta(minutes=minutes))
+        _park(conn, supply, "2023-Q3", "2023-Q4")
+        cal, asset = _docs()
+        self._gap_then_back(cal, asset)
+        return correction_trial.configured(cal, asset)
+
+    def test_d5_a_parked_supply_in_a_gap_is_refused_a_keep(self, conn, manager):
+        with self._parked_in_the_gap(conn, "d5-a", 31):
+            with pytest.raises(decision_log.DecisionRefused, match="cannot be kept in 2023-Q3"):
+                correction_apply.keep_parked(conn, "CAB-1", DATASET, "d5-a", actor=manager,
+                                             reason="r", effective_at=AT)
+
+    def test_d5_the_outstanding_item_does_not_offer_the_keep(self, conn):
+        from qa_tools.common import outstanding
+
+        with self._parked_in_the_gap(conn, "d5-b", 32):
+            [item] = [i for i in outstanding._from_parked_corrections(conn)
+                      if "d5-b" in i.headline]
+        assert not any("--keep" in r for r in item.responses)
+        assert "cannot be kept" in item.detail
+
+    def test_d5_the_terminal_offers_no_keep_for_it(self, conn):
+        from cli import filing_tui
+
+        with self._parked_in_the_gap(conn, "d5-c", 33):
+            parked = [p for p in correction_apply.parked(conn) if p.supply_id == "d5-c"]
+            assert filing_tui._parked_keep_choices(parked) == {}
+
+    def test_d5_the_confirm_menu_offers_no_keep_where_it_is_refused(self, conn):
+        from cli import filing_tui
+        from qa_tools.common import correction_trial
+
+        docs = _corrected(TestATurnOffDeclaredAsACorrection._off)
+        [p] = correction_apply.pending(conn, docs)
+        base, work = correction_apply.states(p, [p], docs)
+        t = correction_trial.trial(conn, base, work, dataset_ids=[DATASET])
+        refused = [m for m in t.moves if m.keep_refused]
+        assert refused, "precondition - the trial has a move that cannot be kept"
+        offered = set(filing_tui._keep_choices(t.moves).values())
+        assert not offered & {(m.dataset_id, m.supply_id) for m in refused}
+
+    def test_d6_a_parked_move_into_a_gap_names_the_gap(self, conn):
+        from qa_tools.common import correction_trial, outstanding
+
+        _file("d6-a", "2023-Q3", RECEIVED + timedelta(minutes=34))
+        _park(conn, "d6-a", "2023-Q3", "2023-Q4")
+        cal, asset = _docs()
+        _clients(cal)["participation"]["versions"][0].update(
+            effective_to="2023-09-30", turned_off_reason="supplier paused")
+        with correction_trial.configured(cal, asset):
+            [item] = [i for i in outstanding._from_parked_corrections(conn)
+                      if "d6-a" in i.headline]
+        assert "turned off" in item.detail and "supplier paused" in item.detail
+        assert "next processing pass moves it" not in item.detail

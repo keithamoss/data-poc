@@ -160,3 +160,22 @@ describe("a supply received while turned off", () => {
     expect(w.blockerOpenInPlaceOn("cp-case-workers", "2027-01-01", SOURCE(HELD))).not.toBeNull();
   });
 });
+
+// post-build-review #190 D2 (REQ-PIPE-179 criterion 24): what the build emits
+// for a supply received while turned off - a quiet outstanding item and a
+// turnedOff blocker - is never "waiting for a person", and never a red row.
+describe("a supply received while turned off, on the cards and history", () => {
+  const QUIET = {kind: "held-supply", severity: "informational", blocking: false,
+                 agencyId: "dcp", collectionId: "child-protection", datasetId: "cp-case-workers"};
+
+  it("is not counted as waiting for a person", () => {
+    const w = load();
+    expect(w.outstandingMarker("agency", "dcp", {items: [QUIET], blockers: []})).toBe("");
+  });
+
+  it("is not a red row in the history of what waited for a person", () => {
+    const w = load();
+    expect(w.blockerHistoryRows("cp-case-workers", "2027-01-01",
+                                SOURCE({...HELD, turnedOff: true}))).toBe("");
+  });
+});

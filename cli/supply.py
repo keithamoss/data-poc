@@ -645,9 +645,11 @@ def holds_command() -> None:
         # something to show, which at thirty datasets is the difference
         # that matters.
         for held in supply_holds.outstanding(conn):
+            if held.turned_off:
+                continue   # quiet: the summary's count (post-build-review #190 D12)
             console.print(f"\n[yellow]{held.dataset_id}[/yellow] - {held.supply_id} "
                            f"[dim]({held.kind})[/dim]")
-            console.print(f"  {held.describe()}")
+            console.print(f"  {held.describe()}", markup=False, highlight=False)
             command = held.place_command
             for response in held.responses:
                 if command and response.startswith(supply_holds.RESPONSES[
@@ -1313,6 +1315,8 @@ def _show_parked(parked: list) -> None:
     (Keith, 2026-10-11, (p)), and the two ways it ends."""
     if not parked:
         return
+    from qa_tools.common import correction_apply
+
     console.print(f"{len(parked)} move(s) from confirmed corrections are parked until what "
                   f"blocks them is cleared - the next processing pass then moves each to the "
                   f"period confirmed:", style="bold yellow")
@@ -1321,7 +1325,13 @@ def _show_parked(parked: list) -> None:
                       f"{m.from_period or 'held'} -> {m.to_period or 'held'}", markup=False,
                       highlight=False)
         console.print(f"      blocked: {m.blocked.splitlines()[0]}", style="dim", markup=False)
-    first = parked[0]
+    # NEVER A KEEP THAT WOULD BE REFUSED (post-build-review #190 D5).
+    keepable = [m for m in parked if not correction_apply.keep_refusal(m)]
+    if not keepable:
+        console.print("None of them can be kept where it is - each is in a period that no "
+                      "longer owes a supply.\n", style="dim", markup=False)
+        return
+    first = keepable[0]
     console.print(f"Or keep one where it is (the asset manager): mothman supply "
                   f"confirm-correction --reference {first.reference} --keep {first.supply_id} "
                   f"--keep-reason '<why>'\n", style="dim", markup=False, soft_wrap=True)

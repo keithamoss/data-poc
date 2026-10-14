@@ -650,8 +650,10 @@ def _flipped(item: Item, before, after, old_agr, new_agr) -> list[tuple[str, str
                 continue
             opens = _min(_claim_open(ds, p.date, old_agr), _claim_open(ds, p.date, new_agr))
             if opens is not None:
+                # EVERY ONE, not the first (post-build-review #190 D7): the
+                # first is the freeze, and the refusal names each that has
+                # opened by the time the change was introduced.
                 out.append((ds, p.name, opens))
-            break   # the first is the freeze; later ones only open later
     return out
 
 
@@ -824,6 +826,8 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         when = instant_of(key)
         if when < frozen_at:
             continue  # not frozen yet when introduced (criterion 10)
+        if item.kind == "turn_off":
+            item.ctx["flipped_open"] = [f for f in item.ctx.get("flipped", ()) if f[2] <= when]
         added = old is None
         if added and synthetic and item.kind in ("cal_version", "participation", "tz_version",
                                                   "defaults"):
@@ -852,7 +856,8 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
                 flips = "; ".join(
                     f"{ds} {period}, whose claim window opened "
                     f"{asset_time.localise(opens).isoformat(timespec='minutes')}"
-                    for ds, period, opens in item.ctx.get("flipped", ()))
+                    for ds, period, opens in item.ctx.get("flipped_open",
+                                                          item.ctx.get("flipped", ())))
                 said.append(f"{item.key} was {verb} ({_value_text(old)} -> {_value_text(new)}), "
                             f"which changes whether a period already open is owed: {flips}")
                 continue

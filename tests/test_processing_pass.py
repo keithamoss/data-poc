@@ -637,3 +637,25 @@ class TestKeithsAnswersToTheSprint14Critic:
         pipeline._say_pass(pp.PassReport(left_locked=["a"], left_behind_locked=["b", "c"]))
         out = capsys.readouterr().out
         assert "2 later arrival(s)" in out and "receipt order" in out
+
+
+class TestCriticFindingsOn190:
+    """post-build-review #190 D8: a pass's lines carry configuration text (a
+    turned_off_reason) and are printed literally, never as Rich markup."""
+
+    def test_a_line_with_brackets_is_printed_as_written(self, monkeypatch, capsys):
+        from cli import pipeline
+
+        monkeypatch.setenv("MOTHMAN_ENVIRONMENT", "sandbox")
+
+        @__import__("contextlib").contextmanager
+        def no_lock(command):
+            yield
+
+        def run_pass(say=print, **k):
+            say("held: turned off [/supplier paused]")
+            return pp.PassReport()
+        monkeypatch.setattr(pp, "pass_lock", no_lock)
+        monkeypatch.setattr(pp, "run_pass", run_pass)
+        pipeline.run_process(confirm=lambda message, yes: True)
+        assert "turned off [/supplier paused]" in capsys.readouterr().out

@@ -732,6 +732,20 @@ class TestTheRestOfThePlacementRules:
         assert "Filing decisions" in out
 
 
+    def test_d8_a_reason_with_brackets_is_printed_as_written(self, conn, period, cli,
+                                                               monkeypatch):
+        """post-build-review #190 D8: describe() carries configuration text
+        (a turned_off_reason), printed literally, never as Rich markup."""
+        from qa_tools.common import supply_holds
+
+        _held(conn, period)
+        monkeypatch.setattr(supply_holds.Held, "describe",
+                            lambda self: "held: turned off [/supplier paused]")
+        got = cli(["holds"])
+        assert got.exit_code == 0, got.output
+        assert "turned off [/supplier paused]" in got.output
+
+
 class TestASettlementsRefileTargetIsChosen:
     """Criterion 42, amending REQ-PIPE-193 criterion 19: the chooser, with
     the next period as its first choice - never a typed period."""

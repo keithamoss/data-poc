@@ -1229,8 +1229,11 @@ def parked_flow(parked: list) -> None:
     if why:
         _show(why, title="You can look; only the asset manager keeps one", style="yellow")
         return
-    labels = {f"Keep {m.dataset_id} {m.supply_id} in {m.from_period or 'its hold'} "
-              f"({m.reference})": m for m in parked}
+    labels = _parked_keep_choices(parked)
+    if not labels:
+        console.print("None of them can be kept where it is - each is in a period that no "
+                      "longer owes a supply.", style="dim", markup=False)
+        return
     choice = common.select("Keep one where it is instead of moving it once cleared?",
                            [_KEEP_DONE_PARKED] + list(labels),
                            flag_hint="mothman supply confirm-correction --keep")
@@ -1246,6 +1249,26 @@ def parked_flow(parked: list) -> None:
 
 
 _KEEP_DONE_PARKED = "Leave them parked"
+
+
+def _parked_keep_choices(parked: list) -> dict:
+    """The parked moves the asset manager may keep, by menu label - never
+    one the keep would refuse (post-build-review #190 D5)."""
+    from qa_tools.common import correction_apply
+
+    return {f"Keep {m.dataset_id} {m.supply_id} in {m.from_period or 'its hold'} "
+            f"({m.reference})": m for m in parked if not correction_apply.keep_refusal(m)}
+
+
+def _keep_choices(moves) -> dict:
+    """A correction's moves the asset manager may keep where they are, by
+    menu label - never one whose period no longer owes a supply (REQ-PIPE-179
+    criterion 36; post-build-review #190 D5). The trial report says why."""
+    return {f"Keep {m.dataset_id} {m.supply_id} where it is "
+            f"({m.from_period or 'held'} -> {m.to_period or 'held'})"
+            + (" - BLOCKED, parked unless kept" if m.blocked else ""):
+            (m.dataset_id, m.supply_id)
+            for m in moves if not m.keep_refused}
 
 
 def corrections_flow(waiting: list) -> None:
@@ -1280,11 +1303,7 @@ def corrections_flow(waiting: list) -> None:
             _show(why, title="You can look; only the asset manager confirms", style="yellow")
             return
         keep: set = set()
-        moves = {f"Keep {m.dataset_id} {m.supply_id} where it is "
-                 f"({m.from_period or 'held'} -> {m.to_period or 'held'})"
-                 + (" - BLOCKED, parked unless kept" if m.blocked else ""):
-                 (m.dataset_id, m.supply_id)
-                 for m in t.moves}
+        moves = _keep_choices(t.moves)
         while moves:
             choice = common.select("Keep any where they are? Each one you keep is recorded as "
                                    "kept.", [_KEEP_DONE] + [k for k in moves

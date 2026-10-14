@@ -9118,3 +9118,64 @@ twice. It deliberately did not re-find the `TypeError`.
      - **NOT CHANGED - the un-supersede count and version list filter
        differently** (F9): not reproducible - rejecting a superseded supply is
        refused - so left as the critic found it.
+
+190. **[done, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **delivery-critic on REQ-PIPE-179 (turn a dataset off), overnight #5.**
+     Each finding checked against the code first; each defect fixed with a
+     test that failed first (`TestCriticFindingsOn190` in
+     `tests/test_turn_off.py`, `tests/test_correction_apply.py` and
+     `tests/test_processing_pass.py`; the dashboard's in
+     `tests-js/blocked-dataset.test.js`).
+     - **FIXED - runway warned wrongly both ways** (D1). A turn-off for good
+       that had not started yet silenced the runway warning for a dataset
+       still owing, and a calendar whose every dataset was off still read as
+       exhausted. `runway.off_for_good` now asks the one helper on a date (so
+       only a STARTED turn-off counts), and `low_runway` skips a calendar
+       with no datasets left on it. Whether a turn-off that has not started
+       should count is PROVISIONAL - built as "it does not" (morning report
+       5, Q8).
+     - **FIXED - the dashboard counted quiet holds** (D2): the outstanding
+       marker and the blocker history both included supplies received while
+       turned off, which criterion 24 says never need a person.
+     - **FIXED - the schedule-ended line read the recorded flag** (D3):
+       `schedule_ended.for_dataset` filtered on the reason stored when the hold
+       was raised, so a turn-off added since still showed it as schedule
+       ended. It reads the label as it stands now, as every other reader does.
+     - **FIXED - a dataset back on inside its collection's gap was shown off
+       for good** (D4): `turned_off.timeline` worked out `until` on its own,
+       ignoring the dataset's own version. It now uses the same `_turn_off`
+       that `standing_on` does.
+     - **FIXED - keep offered where it would be refused** (D5): the confirm
+       menu, the parked-move menu, `mothman supply corrections` and the
+       outstanding item all offered keeping a supply in a period that no
+       longer owes one. One answer now, `correction_apply.keep_refusal`, and
+       the keep refusal itself has a test of its own.
+     - **FIXED - a parked move into a gap said the next pass moves it** (D6):
+       the pass leaves it parked (criterion 37). The item names the gap and
+       what ends it.
+     - **FIXED - the freeze named only the first flipped period** (D7): a
+       turn-off reaching back eighteen months named one quarter. It names
+       every flipped period whose claim window had opened by the time the
+       change was introduced.
+     - **FIXED - configuration text printed as Rich markup** (D8): a
+       `turned_off_reason` containing brackets crashed `mothman supply holds`
+       and the processing pass's output. Both print literally now.
+     - **FIXED - the participation view** (D9): it said "nothing - turned
+       off" and "(when last on)" while an owed slot was still open, and a
+       dataset back on inside its collection's gap did not say which gap. Both
+       are fixed.
+     - **FIXED - a `turns_off` that is not true** (D10): the refusal now names
+       its version and prints the entry to paste, as criterion 40's own does.
+     - **FIXED - a comment that described a held pair as two holds** (D11).
+     - **FIXED - the held-supply summary listed quiet datasets** (D12): the
+       dataset list named datasets whose only holds were quiet ones, and
+       `mothman supply holds` listed those rows. Both now show only what
+       needs a person; the quiet count stays in the summary.
+     - **NOT CHANGED, FOR KEITH:**
+       - **J2.** A supply a PERSON filed into a period that a correction then
+         turns off is skipped by the trial (NotProposed, as any person-filed
+         supply is), so it is never held as turned off. Morning report 5, Q9.
+       - **J5.** The view says "Changeable by an ordinary edit until ...". It
+         follows the signed criterion 28, so it is left as signed.
+         Morning report 5, Q10.
+       - **J1 and J6.** Already Q4 and Q5.

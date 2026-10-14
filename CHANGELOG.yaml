@@ -143,6 +143,28 @@ releases:
               `mothman schedule show --on <date>` and the Calendar entry now say
               who turned a dataset off, when and why, what it still owes and
               until when, and how long an ordinary edit can still change it.
+      - category: Fixed
+        items:
+          - headline: Turned-off holds stay out of what needs you
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              Supplies received while a dataset was turned off no longer count
+              towards a dataset's outstanding marker or its blocker history, and
+              `mothman supply holds` no longer lists them or names their dataset
+              as waiting on you.
+          - headline: Keep is only offered where it would be accepted
+            components: ["Pipeline & publishing"]
+            description: >
+              Confirming a correction, and every list of parked moves, no longer
+              offers to keep a supply in a period that owes nothing any more. A
+              parked move into a turned-off period now names that period.
+          - headline: Turn-off wording that matched the facts
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              A dataset back on inside its collection's gap is no longer shown
+              as off for good. A turn-off that has not started yet no longer
+              silences the runway warning, and a freeze refusal names every
+              period the change reaches back into, not only the first.
   - date: "2026-10-14"
     summary: >
       The dashboard now counts what is not green at every level, and every

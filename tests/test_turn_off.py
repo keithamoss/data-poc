@@ -751,7 +751,7 @@ class TestRunway:
         doc = _unshare(_doc())
         _turn_off(_versions(doc, "cp-clients")[0])
         using(doc)
-        assert runway.off_for_good("cp-clients")
+        assert runway.off_for_good("cp-clients", date(2026, 10, 14))
         assert "cp-clients" not in runway.exhausted_datasets(date(2026, 10, 14))
         assert runway.calendar_runway("quarterly", date(2026, 10, 14)).driving_dataset \
             != "cp-clients"
@@ -763,7 +763,7 @@ class TestRunway:
         _turn_off(_versions(doc, "cp-clients")[0], to="2026-10-31")
         _back_on(doc, "cp-clients", "2027-10-15")
         using(doc)
-        assert not runway.off_for_good("cp-clients")
+        assert not runway.off_for_good("cp-clients", date(2026, 10, 14))
         got = runway.calendar_runway("quarterly", date(2026, 10, 14))
         assert (got.driving_dataset, got.remaining) == ("cp-clients", 1)
 
@@ -806,6 +806,33 @@ class TestNotAStateNeedingAPerson:
         assert counted.needing_a_person == counted.total - 1
         assert "received while turned off - not counted as needing a person" \
             in counted.summary()
+
+    def test_d12_a_dataset_held_only_while_off_is_not_listed_as_needing_a_person(
+            self, conn, using):
+        """post-build-review #190 D12."""
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@d12", GAP)
+        counted = supply_holds.tally(conn)
+        assert "cp-clients" not in counted.datasets_needing
+        assert "cp-clients" not in counted.summary().split(" received while")[0]
+
+    def test_d12_holds_lists_no_quiet_row(self, conn, using, monkeypatch):
+        """`mothman supply holds` lists only what needs a person; the quiet
+        ones are the summary's count."""
+        from click.testing import CliRunner
+
+        from cli import supply as supply_cli
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@d12b", GAP)
+        # A HOLD THAT DOES NEED A PERSON, so the rows are listed at all.
+        supply_holds.raise_hold(conn, dataset_id="cp-clients", supply_id="cp-clients@d12p",
+                                kind=supply_holds.ASSIGNMENT_RULE,
+                                reason={"unavailable": [], "considered": []}, raised_by="run_x")
+        got = CliRunner().invoke(supply_cli.supply_group, ["holds"])
+        assert got.exit_code == 0, got.output
+        assert "cp-clients@d12p" in got.output
+        assert "cp-clients@d12b" not in got.output
 
     def test_the_pass_counts_them_apart(self, conn, using):
         from qa_tools.common import schedule_ended
@@ -965,3 +992,109 @@ class TestAnOwedPeriodStillCounts:
                   if s.dataset_id == "cp-clients"}
         assert "2025-Q1" in states
         assert not {"2025-Q2", "2025-Q3", "2025-Q4"} & states
+
+
+class TestCriticFindingsOn190:
+    """delivery-critic on REQ-PIPE-179 (post-build-review #190). Each failed
+    before its fix."""
+
+    def test_d1_a_turn_off_for_good_not_yet_started_still_warns(self, using):
+        """Off for good after 2028-12-31, but the calendar ends at 2027-Q4:
+        on 1 March 2028 its schedule has ended and it still owes - so it is
+        exhausted, not quiet."""
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2028-12-31")
+        using(doc)
+        assert not runway.off_for_good("cp-clients", date(2028, 3, 1))
+        assert "cp-clients" in runway.exhausted_datasets(date(2028, 3, 1))
+
+    def test_d1_a_calendar_whose_datasets_are_all_off_is_not_exhausted(self, using):
+        """Every Child Protection dataset off for good: no dataset to count,
+        so nothing to say - never 'NO future dates left ... 0 datasets'."""
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_defaults_version(doc))
+        using(doc)
+        assert not [r for r in runway.low_runway(date(2026, 10, 14))
+                    if r.calendar_name == "quarterly"]
+        assert not any("0 datasets" in line for line in runway.warning_lines(date(2026, 10, 14)))
+
+    def test_d3_the_backlog_line_reads_the_label_as_it_stands(self, conn, using):
+        """A hold recorded as turned off whose turn-off has since gone, after
+        the calendar's last period closed, is schedule ended now - and the
+        dashboard's backlog line must count it (criterion 18)."""
+        import filing_support
+        from qa_tools.common import filing, schedule_ended
+
+        late = _at("2029-01-10")
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2027-08-31")
+        using(doc)
+        decided = filing.assignment_at("cp-clients", "cp-clients@d3", late)
+        assert decided.turned_off
+        filing_support.file(decided)
+        supply_holds.raise_hold(conn, dataset_id="cp-clients", supply_id="cp-clients@d3",
+                                kind=supply_holds.ASSIGNMENT_RULE,
+                                reason=supply_holds.reason_for(decided), raised_by="run_x")
+        assert schedule_ended.for_dataset("cp-clients", conn=conn) == []
+        using(_unshare(_doc()))
+        assert [asset_time.parse_instant(h["receivedAt"], "x")
+                for h in schedule_ended.for_dataset("cp-clients", conn=conn)] == [late]
+
+    def test_d4_a_dataset_brought_back_inside_its_collections_gap_is_not_off_for_good(self):
+        """The collection turned off for good; cp-carers came back by a
+        version of its own on 1 July 2025. The build must say when it came
+        back, not 'for good' - the page reads until=None as never."""
+        doc = _unshare(_doc())
+        _turn_off(_defaults_version(doc))
+        _back_on(doc, "cp-carers", "2025-07-01", expected_time="11:00", grace="2h")
+        [got] = turned_off.timeline("cp-carers", agreement.from_doc(doc),
+                                    docs=(doc, _load("data-asset.yaml")))
+        assert (got["level"], got["until"]) == ("collection", "2025-07-01")
+
+    def test_d7_every_flipped_period_already_open_is_named(self):
+        """Off after 31 March 2025, introduced 14 October 2026: every
+        quarter from 2025-Q2 to 2026-Q3 had opened, and each is named. A
+        quarter whose window opens after the change was introduced is not."""
+        got = _findings_text(_freeze_check(_load("calendar.yaml"),
+                                           lambda doc: _turn_off(_clients_version(doc))))
+        for period in ("2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3"):
+            assert f"cp-clients {period}," in got, period
+        assert "cp-clients 2027-Q1" not in got
+
+    def test_d9a_a_slot_still_open_is_not_called_nothing_owed(self):
+        """10 April 2025: turned off, but 2025-Q1's slot is open until 17
+        April - so 'Owes' must not read 'nothing', nor the timing 'when last
+        on'."""
+        from qa_tools.common import participation_view
+
+        v = participation_view.view("cp-clients", date(2025, 4, 10),
+                                    agreement.from_doc(_off_for_a_while()))
+        labels = {x.label: x.text for x in v.values}
+        assert labels.get("Owes") != "nothing - turned off"
+        assert "Due time" in labels and "Due time (when last on)" not in labels
+
+    def test_d9b_back_on_names_the_collections_turn_off(self):
+        from qa_tools.common import participation_view
+
+        doc = _unshare(_doc())
+        _turn_off(_defaults_version(doc), to="2025-03-31", reason="collection paused")
+        _back_on(doc, "cp-carers", "2025-07-01", expected_time="11:00", grace="2h")
+        v = participation_view.view("cp-carers", date(2025, 8, 1), agreement.from_doc(doc))
+        assert "31 Mar 2025" in v.turn_off[0] and "collection paused" in v.turn_off[0]
+        assert "1 Jul 2025" in v.turn_off[0]
+
+    def test_d10_a_turns_off_that_is_not_true_names_its_version_and_prints_the_fix(
+            self, broken):
+        def mutate(doc):
+            _turn_off(_versions(doc, "cp-clients")[0], log=[
+                {"date": "2026-10-13", "author": "a", "change": "off", "turns_off": True},
+                {"date": "2026-10-14", "author": "a", "change": "moved", "turns_off": "yes"}])
+        errors = broken(mutate)
+        assert len(errors) == 1, _text(errors)
+        got = _text(errors)
+        assert "2023-01-01" in got
+        assert "\n      turns_off: true" in got

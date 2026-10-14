@@ -1478,3 +1478,11 @@ one or more component tags, and a date.
       7. (#189 F3/F4) A period door shows ONE supply per slot, so a failed
          resupply can hide a waiting good one (or the reverse) from every
          door. Should the door list every filed supply in a period?
+      8. (#190 D1) Runway now ignores a turn-off "for good" that has not
+         started yet, so the dataset still warns until its last owed period.
+         Built that way, PROVISIONAL. Is that right?
+      9. (#190 J2) A correction that turns off a period never holds a supply a
+         PERSON filed there: the trial skips every person-filed supply. Should
+         a turn-off be the exception, holding it as turned off?
+      10. (#190 J5) "Changeable by an ordinary edit until ..." comes from the
+          signed criterion 28. The critic found it unclear. Reword it?

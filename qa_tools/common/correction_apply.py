@@ -375,6 +375,29 @@ def parked(conn, reference: str | None = None) -> list[Parked]:
             for r in rows]
 
 
+def keep_refusal(item: Parked) -> str | None:
+    """Why a parked supply cannot be kept where it is now, or None - THE ONE
+    ANSWER the refusal and every place that would offer the keep read
+    (REQ-PIPE-179 criterion 36; post-build-review #190 D5)."""
+    from qa_tools.common import filing, refiling
+
+    where = (filing.filing_for(item.dataset_id, item.supply_id) or {}).get("slot")
+    if where and not refiling._on_calendar(item.dataset_id, where):
+        return (f"{item.supply_id} cannot be kept in {where}: {where} no longer owes a supply "
+                f"under the agreement - by participation, not_expected or a turn-off.")
+    return None
+
+
+def gap_ahead(item: Parked) -> str | None:
+    """The turned-off gap a parked move's confirmed period now falls in, in
+    words, or None (REQ-PIPE-179 criterion 37; post-build-review #190 D6):
+    the pass leaves such a move parked, so nothing may say it will move."""
+    from qa_tools.common import refiling
+
+    gap = refiling.gap_problem(item.dataset_id, item.to_period) if item.to_period else None
+    return gap.replace(" Nothing was recorded.", "") if gap else None
+
+
 def _resolve(conn, item: Parked, how: str, actor: str, at: str, decision_id) -> None:
     conn.execute(f"INSERT INTO {RESOLVED} (parked_id, how, actor, resolved_at, decision_id) "
                  "VALUES (?, ?, ?, ?, ?)", [item.id, how, actor, at, decision_id])
@@ -422,11 +445,10 @@ def drain_parked(conn, *, docs: tuple[dict, dict] | None = None, skip=frozenset(
             # INSIDE A TURNED-OFF GAP (REQ-PIPE-179 criterion 37, amending
             # REQ-PIPE-170 criterion 26): left parked, saying why and what ends
             # it - and still listed among what needs a person.
-            gap = refiling.gap_problem(item.dataset_id, item.to_period) if item.to_period \
-                else None
+            gap = gap_ahead(item)
             if gap:
                 say(f"{item.supply_id}: parked under {item.reference} for {item.to_period}. "
-                    f"{gap.replace(' Nothing was recorded.', '')} It stays parked: keep it "
+                    f"{gap} It stays parked: keep it "
                     f"where it is, where its period is still owed, or change effective_to or "
                     f"effective_from so {item.to_period} is owed.")
                 continue
@@ -508,14 +530,11 @@ def keep_parked(conn, reference: str, dataset_id: str, supply: str, *, actor: di
     # KEPT WHERE IT IS NOW (#152, 4): a person may have moved it since it
     # was parked, and the keep names the period it actually stays in.
     where = (filing.filing_for(dataset_id, supply) or {}).get("slot")
-    from qa_tools.common import refiling
-
-    if where and not refiling._on_calendar(dataset_id, where):
-        # REQ-PIPE-179 criterion 36: not while the move is parked either.
+    refused = keep_refusal(item)
+    if refused:
         raise decision_log.DecisionRefused(
-            f"{supply} cannot be kept in {where}: {where} no longer owes a supply under the "
-            f"agreement - by participation, not_expected or a turn-off. It moves to the owed "
-            f"period the filing rule gives it once what blocks it clears, or is held.")
+            f"{refused} It moves to the owed period the filing rule gives it once what blocks "
+            f"it clears, or is held.")
     with decision_log.decision_transaction(conn):
         with decision_log.apply_decision(conn, decision_log.Decision(
                 agency_id=entry.agency_id, collection_id=entry.collection_id,

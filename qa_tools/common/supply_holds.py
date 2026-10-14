@@ -395,6 +395,14 @@ class Tally:
     #: (datasets, supplies) received while turned off (REQ-PIPE-179
     #: criteria 24 and 26) - counted apart, and NOT as needing a person.
     turned_off: tuple[int, int] = (0, 0)
+    #: The datasets whose every outstanding hold was received while turned
+    #: off - none of them needs a person (post-build-review #190 D12).
+    quiet_datasets: tuple[str, ...] = ()
+
+    @property
+    def datasets_needing(self) -> tuple[str, ...]:
+        """The datasets with at least one hold that needs a person."""
+        return tuple(d for d in self.datasets if d not in self.quiet_datasets)
 
     @property
     def total(self) -> int:
@@ -422,8 +430,9 @@ class Tally:
                  f"needing a person." if off_supplies else "")
         if not self.needing_a_person:
             return "No supply held needs a person." + quiet
+        needing = self.datasets_needing
         line = (f"{self.needing_a_person} supply/supplies held across "
-                f"{len(self.by_dataset)} dataset(s) - {', '.join(self.datasets)}. "
+                f"{len(needing)} dataset(s) - {', '.join(needing)}. "
                 f"Each needs somebody to resolve it.") + quiet
         datasets, supplies = self.schedule_ended
         if supplies:
@@ -587,11 +596,14 @@ def tally(conn) -> Tally:
     # THE LABELS FROM CONFIGURATION AS IT STANDS (REQ-PIPE-179 criterion
     # 18), so counted from the outstanding holds rather than their recorded
     # reasons - one line per label, never one per supply (its SCALE NFR).
-    labels = label_counts(outstanding(conn))
+    held = outstanding(conn)
+    labels = label_counts(held)
+    needing = {h.dataset_id for h in held if not h.turned_off}
     return Tally(by_dataset=tuple((row[0], row[1]) for row in by_dataset),
                   by_kind=tuple((row[0], row[1]) for row in by_kind),
                   schedule_ended=labels.get("schedule ended", (0, 0)),
-                  turned_off=labels.get("turned off", (0, 0)))
+                  turned_off=labels.get("turned off", (0, 0)),
+                  quiet_datasets=tuple(sorted({h.dataset_id for h in held} - needing)))
 
 
 def label_counts(holds) -> dict[str, tuple[int, int]]:

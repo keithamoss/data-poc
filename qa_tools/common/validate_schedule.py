@@ -1630,12 +1630,20 @@ def _turn_off_errors(cal_raw: dict, raw: dict, src: Source) -> list[ConfigError]
                 if k == "changelog" and isinstance(v, list):
                     for e in v:
                         if isinstance(e, dict) and "turns_off" in e and e["turns_off"] is not True:
+                            # NAMING ITS VERSION, WITH THE FIX TO PASTE (post-build-
+                            # review #190 D10), as criterion 40's own refusal does.
+                            version = (f" on the version from {node['effective_from']}"
+                                       if node.get("effective_from") else "")
+                            fix = ("turns_off only ever says true - leave it out of an entry "
+                                   "that does not turn a dataset or collection off.")
+                            if node.get("effective_to"):
+                                fix += (" To say this version turns off, replace the entry "
+                                        "with:" + _paste_entry(node["effective_to"],
+                                                               node.get("turned_off_reason")))
                             out.append(ConfigError(
                                 file_name, where,
-                                f"a changelog entry dated {e.get('date')} carries turns_off: "
-                                f"{e['turns_off']!r}.",
-                                "turns_off only ever says true - leave it out of an entry that "
-                                "does not turn a dataset or collection off."))
+                                f"a changelog entry dated {e.get('date')}{version} carries "
+                                f"turns_off: {e['turns_off']!r}.", fix))
                 else:
                     walk(v, where)
         elif isinstance(node, list):

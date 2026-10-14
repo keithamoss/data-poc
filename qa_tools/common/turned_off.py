@@ -205,18 +205,22 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
     entry = agr.dataset(dataset_id)
     collection = agr.collection_of(dataset_id)
     out = []
-    for level, versions, key in (
-            (agreement_mod.DATASET, entry.participation, f"dataset {dataset_id} participation"),
+    own = entry.participation
+    for level, versions, key, back in (
+            (agreement_mod.DATASET, own, f"dataset {dataset_id} participation", ()),
             (agreement_mod.COLLECTION, agr.defaults_for(dataset_id),
-             f"collection {collection} participation_defaults")):
+             f"collection {collection} participation_defaults", own)):
         for v in versions:
             if v.effective_to is None:
                 continue
             item = f"{key} {v.effective_from.isoformat()} effective_to"
-            later = [w.effective_from for w in versions if w.effective_from > v.effective_from]
+            # What ends it is standing_on's own answer (post-build-review #190
+            # D4): for a collection's, a version of the dataset's own brought
+            # back inside the gap ends it for this dataset.
+            until = agreement_mod._turn_off(v, level, versions, back).until
             logged = v.turns_off_logged[-1].isoformat() if v.turns_off_logged else None
             out.append({"effectiveTo": v.effective_to.isoformat(),
-                        "until": min(later).isoformat() if later else None,
+                        "until": until.isoformat() if until else None,
                         "reason": v.turned_off_reason or "", "level": level,
                         "versionFrom": v.effective_from.isoformat(),
                         "authoredOn": corrected.get(item) or logged,

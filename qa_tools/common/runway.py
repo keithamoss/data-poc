@@ -138,7 +138,7 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
     # check against the file (post-build-review #22).
     per_dataset: list[tuple[int, str, object]] = []
     for dataset_id in _datasets_on(calendar_name):
-        if off_for_good(dataset_id):
+        if off_for_good(dataset_id, as_of):
             # REQ-PIPE-179 criterion 25: a dataset turned off for good owes
             # no more dates, so it never drives the minimum. A temporary
             # gap needs nothing here - its periods are not owed, so only
@@ -170,7 +170,10 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
 def low_runway(as_of: date) -> list[CalendarRunway]:
     """Every authored calendar running low, worst first."""
     found = [calendar_runway(c.name, as_of) for c in _authored_calendars()]
-    return sorted([r for r in found if r.is_low], key=lambda r: r.remaining)
+    # A CALENDAR NO DATASET IS COUNTED ON (every one off for good) has no
+    # runway to warn about - not "NO future dates left" (#190 D1).
+    return sorted([r for r in found if r.is_low and r.dataset_count],
+                  key=lambda r: r.remaining)
 
 
 def exhausted_datasets(as_of: date) -> dict[str, str]:
@@ -189,7 +192,7 @@ def exhausted_datasets(as_of: date) -> dict[str, str]:
             calendar = schedule.calendar_for_dataset(dataset.dataset_id)
         except schedule.NoCalendarAgreed:
             continue            # owes nothing, so cannot be exhausted
-        if calendar.current.is_cadence_rule or off_for_good(dataset.dataset_id):
+        if calendar.current.is_cadence_rule or off_for_good(dataset.dataset_id, as_of):
             continue    # a turn-off for good is not an exhausted schedule (criterion 25)
         try:
             ends = schedule_ends_on(dataset.dataset_id)
@@ -204,23 +207,18 @@ def exhausted_datasets(as_of: date) -> dict[str, str]:
     return out
 
 
-def off_for_good(dataset_id: str, agreement=None) -> bool:
-    """Whether the dataset's newest turn-off has no end (REQ-PIPE-179
-    criterion 5) - whenever it starts. Read from the latest effective date
-    any version it reads takes effect on, a day past which nothing later
-    can bring it back."""
-    from datetime import timedelta
-
+def off_for_good(dataset_id: str, on: date, agreement=None) -> bool:
+    """Whether the dataset is turned off FOR GOOD on `on` (REQ-PIPE-179
+    criteria 5 and 25) - a turn-off with no end that has STARTED. One still
+    ahead does not count (post-build-review #190 D1, PROVISIONAL, J3): until
+    its effective_to the dataset owes, so a schedule ending before then is
+    exhausted like any other."""
     from qa_tools.common import agreement as agreement_mod
 
     agr = schedule._agreement(agreement)
     if not agr.ever_turned_off(dataset_id):
         return False
-    entry = agr.dataset(dataset_id)
-    latest = max([v.effective_from for v in entry.participation + agr.defaults_for(dataset_id)]
-                 + [v.effective_to for v in entry.participation + agr.defaults_for(dataset_id)
-                    if v.effective_to])
-    standing = agr.standing_on(dataset_id, latest + timedelta(days=1))
+    standing = agr.standing_on(dataset_id, on)
     return standing.state == agreement_mod.TURNED_OFF and standing.turned_off.until is None
 
 

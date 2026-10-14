@@ -152,11 +152,10 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
             if slot is None:
                 continue
             entry = hierarchy.dataset(h.dataset_id)
-            # ONE FILE OF A HELD CONTESTED PAIR goes with its partner, still
-            # contested, and neither is checked until the pair is settled
-            # (REQ-PIPE-179 criterion 19, REQ-PIPE-163 criterion 37). Both
-            # files share the receipt, so both are covered by the same slot
-            # and both are re-filed in this same pass.
+            # A HELD CONTESTED PAIR is ONE hold on ONE supply whose two files
+            # are contested (post-build-review #190 D11): it is placed as a
+            # whole, still contested, and not checked until the pair is
+            # settled (REQ-PIPE-179 criterion 19, REQ-PIPE-163 criterion 37).
             contested = supply_files.open_contest(conn, h.dataset_id, h.supply_id) is not None
             # THE ONE PLACER (REQ-PIPE-163 criterion 40).
             placing.place(
@@ -177,16 +176,17 @@ def for_dataset(dataset_id: str, conn=None) -> list[dict]:
     FROM HOLD RECORDS ONLY - recorded QA metadata, never a supply row - and
     with both instants, so the page can say what was held AS AT whatever
     date it is showing. One query; held supplies are few by construction."""
-    from qa_tools.common import filing
-
     if conn is None:
         with supply_db.connect(read_only=True, label="mothman:schedule-ended") as opened:
             return for_dataset(dataset_id, conn=opened)
+    # BY THE LABEL AS IT STANDS (REQ-PIPE-179 criterion 18; post-build-review
+    # #190 D3), never the flag recorded when the hold was raised: a turn-off
+    # added or removed since changes which holds are schedule ended.
     rows = conn.execute(
-        f"SELECT r.received_instant, h.resolved_at FROM {supply_holds.TABLE} h "
-        f"JOIN {filing.RECEIPT} r ON r.dataset_id = h.dataset_id AND r.supply_id = h.supply_id "
-        "WHERE h.dataset_id = ? AND (h.reason->>'schedule_ended')::boolean IS TRUE "
+        f"SELECT {supply_holds._COLUMNS} FROM {supply_holds._from()} "
+        "WHERE h.dataset_id = ? AND r.received_instant IS NOT NULL "
         "ORDER BY r.received_instant", [dataset_id]).fetchall()
-    return [{"receivedAt": received.isoformat(),
-             "resolvedAt": resolved.isoformat() if resolved else None}
-            for received, resolved in rows]
+    held = [supply_holds._held_from(row) for row in rows]
+    return [{"receivedAt": h.received_at.isoformat(),
+             "resolvedAt": h.resolved_at.isoformat() if h.resolved_at else None}
+            for h in held if h.schedule_ended]

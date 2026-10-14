@@ -192,7 +192,8 @@ def run_process(*, confirm) -> None:
             return
     try:
         with processing_pass.pass_lock("process"):
-            report = processing_pass.run_pass(say=lambda m: console.print(m, style="dim"))
+            report = processing_pass.run_pass(
+                say=lambda m: console.print(m, style="dim", markup=False, highlight=False))
     except processing_pass.PassLockHeld as exc:
         console.print(str(exc), style="yellow")
         raise SystemExit(processing_pass.EXIT_LOCKED) from None

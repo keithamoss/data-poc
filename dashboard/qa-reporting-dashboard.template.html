@@ -5616,7 +5616,9 @@ function countedKind(label, n){
   return `${n} ${label}`;
 }
 function outstandingMarker(scope, id, source, noSupply){
-  let items = outstandingItems(scope, id, source);
+  // A SUPPLY RECEIVED WHILE TURNED OFF is listed quietly and is not a thing
+  // waiting for a person (REQ-PIPE-179 criterion 24; post-build-review #190 D2).
+  let items = outstandingItems(scope, id, source).filter(i=> !isQuietHold(i));
   if(typeof noSupply === "number") items = items.filter(i=> i.kind !== "closed-unfilled-slot");
   const gaps = typeof noSupply === "number" ? noSupply : 0;
   const total = items.length + gaps;
@@ -6371,9 +6373,14 @@ const SUPPLY_CYCLE_COLS = `<colgroup><col style="width:17%"><col style="width:20
 // THREE COLUMNS, NOT FIVE (#121 D4): Rows was always a dash and the last
 // column had no heading. The first two still line up with the cycle tables.
 const SUPPLY_BLOCKER_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:63%"></colgroup>`;
+// THE QUIET HOLD (REQ-PIPE-179 criterion 24): a held supply the build marks
+// non-blocking and informational is one received while its dataset is off.
+function isQuietHold(i){
+  return i.kind === "held-supply" && !i.blocking && i.severity === "informational";
+}
 function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
   const rows = blockersFor(datasetId, source)
-    .filter(b=> assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
+    .filter(b=> !b.turnedOff && assetDateStrOf(b.openedAt) <= inPlaceOnDateStr)
     .sort((a,b)=> String(b.openedAt).localeCompare(String(a.openedAt)));
   if(!rows.length) return "";
   const anyOpen = rows.some(b=> !(b.resolvedAt && assetDateStrOf(b.resolvedAt) <= inPlaceOnDateStr));

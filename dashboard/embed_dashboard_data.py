@@ -438,7 +438,8 @@ def embed() -> None:
                 # ask somebody to author dates for a schedule nobody has
                 # agreed.
                 continue
-            if runway.off_for_good(entry.dataset_id):
+            if runway.off_for_good(entry.dataset_id,
+                                   asset_time.local_date(asset_time.now())):
                 # TURNED OFF FOR GOOD (REQ-PIPE-179 criterion 32, amending
                 # REQ-PIPE-053 criteria 10 and 15): neither warned about nor
                 # counted - it owes no more dates.
