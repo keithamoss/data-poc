@@ -1503,6 +1503,14 @@ one or more component tags, and a date.
         current "Not owed" row vanished when a supply also fell in its period
         (cp-case-workers every May), and the never-supplied branch drew no
         history - both fixed test-first. Q18-Q20.
+      - ~05:15 REQ-DASH-180 BUILT (sprint 4, second): a turned-off dataset keeps
+        its real verdict with a marker worded for where it is in the turn-off,
+        leaves its group's rollup only once it owes nothing and nothing owed
+        is waiting, and a group of them reads "Turned off". Found building
+        it: the runway embed judged "off for good" as at the build's own
+        date, so a future turn-off hid the dataset on every earlier date too;
+        it now sends each gap and the page judges it. Both amendments in
+        criterion 22 applied as the batch proposed them. Gate in the commit.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose

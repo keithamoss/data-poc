@@ -8392,10 +8392,7 @@ requirements:
       - WHEN one or more schedules are exhausted, THE SYSTEM SHALL state
         so in a notice above the executive tier's agency grid, naming
         how many.
-      - THE SYSTEM SHALL evaluate the exhausted-schedule condition
-        against the in-place-on date currently selected, and SHALL NOT report
-        a schedule as exhausted while viewing a date its calendar
-        covers.
+      - THE SYSTEM SHALL evaluate the exhausted-schedule condition against the in-place-on date currently selected, and SHALL NOT report a schedule as exhausted while viewing a date its calendar covers, nor report a dataset as exhausted on a date it is turned off (REQ-PIPE-179). AMENDED 2026-10-15 by REQ-DASH-180 criterion 22.
       - THE SYSTEM SHALL name, in that notice and in the failure, the
         configuration a person must edit.
       - THE SYSTEM SHALL NOT offer a way to dismiss or hide the
@@ -25114,7 +25111,7 @@ requirements:
       off - not as missed, not as failing, and not hiding a red verdict or an overdue period it still owed - so that I neither
       chase a supplier we stopped asking nor miss one who is late with the last file we did ask for.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -25345,6 +25342,49 @@ requirements:
     - 'THE MARKER''S START DATE (Keith, 2026-10-14, R8, option A on both questions F9 raised): the changelog entry that turns a dataset off carries turns_off: true, which validation requires (REQ-PIPE-179 criterion 40), and where a declared correction set or moved effective_to the marker starts from that correction''s date (REQ-PIPE-179 criterion 41), so that TS-63 - a turn-off declared as a correction inside the synthetic history - shows the marker (REQ-GEN-218 criterion 8). Rejected: the newest changelog entry on the version with no new key (any later edit moves the marker''s start); the earliest entry (wrong whenever effective_to was added to an existing version); dating TS-63''s changelog entry fictionally inside the history; showing criterion 27 by fixture tests alone.'
     - 'CRITERION 22 NARROWED TO WHAT NEEDS AMENDING (main session at sign-off, 2026-10-14, from the batch''s own amendment analysis): REQ-PIPE-053 criteria 16 to 18 and REQ-DASH-155 criterion 3 need no text change of their own - each reads the condition its sibling evaluates - so criterion 22 now names amendments 1 and 15 rather than six criteria.'
     - 'SPRINT 1''S TURNED-OFF CLAUSES LIVE HERE (Keith, 2026-10-14, delivery-architect review of road-testing sprint 1, B1, option b). ''Turned off'' did not exist in the page when REQ-DASH-225 and REQ-DASH-226 were scoped, so a criterion about it there could be neither built nor seen failing first. REJECTED holding sprint 1 until this requirement was built (option a). Criterion 29 added and REQ-DASH-225/226 added to the dependencies, 2026-10-14.'
+    - 'THE PHASES ARE WORKED OUT IN THE PAGE FROM INSTANTS THE BUILD SENDS (built 2026-10-15): each turn-off in turnOffs now carries its last owed slot - period, due instant and closing instant (qa_tools/common/turned_off._last_owed, the same slot REQ-PIPE-179 criterion 14 closes) - and the collection''s name; turnOffOn() compares them with the end of the date on show on the asset''s clock and returns one of five phases: announced (27), nothing-more-owed (25), still-owed (4), off (1), or none once back on (18). The rule about WHEN is configuration; only the comparison is in the browser, as for every other as-at reading.'
+    - 'OUT OF THE ROLLUP IS A FLAG buildData() SETS AS AT THE DATE (built 2026-10-15): turnedOffOutOfRollup is true only in the off and nothing-more-owed phases AND with no blocker, waiting blocker or unfilled closed period - criteria 6 and 7 - and rollup(), inRollup() (so REQ-DASH-226''s counts) and notCountedReasons() all read that one flag. qa_tools/common/dataset_status.rollup_datasets mirrors it, and status-cases.json carries the new status and its order.'
+    - 'THE RUNWAY JUDGES TURNED-OFF ON THE DATE ON SHOW, NOT THE BUILD''S (built 2026-10-15): the embed used to leave a dataset off for good out of SCHEDULE_RUNWAY as at the build''s own date, so a dataset turned off for good next year vanished from every earlier date too, against criterion 20. It now sends each gap (runway.off_gaps: from, until) and the page leaves the dataset out of both the warning and the exhausted count from a for-good gap''s first day, and out of the exhausted count only while inside a temporary gap - which is REQ-PIPE-053 criterion 19 as amended, while criterion 17 keeps the temporary-gap dataset in the runway warning by what it owes once back on.'
+    - 'CRITERION 10 CHANGES BUILT BEHAVIOUR (built 2026-10-15): notCountedMarker() used to say why only beside a ''Not counted'' status. It now also says ''N datasets not counted in this status: <counts by reason>'' wherever only some are left out - for no schedule agreed as much as for turned off - and nothing for a group reading ''Turned off'', which would only repeat it. tests-js/status-rollups.test.js''s ''and nothing else does'' case was rewritten to the new rule.'
+    - 'AMENDMENTS APPLIED AS PROPOSED (criterion 22, 2026-10-15): REQ-DASH-155 criterion 1 and REQ-PIPE-053 criterion 19 now read as batch amendments 1 and 15 worded them. Amendment 1 needed no code: schedule_ended.for_dataset already labels each hold from the configuration as it stands (REQ-PIPE-179 criterion 18).'
+    - 'THE REAL CONFIGURATION TURNS NOTHING OFF, so the browser tests add a turn-off to cp-clients'' embedded data and rebuild the page from it (tests/test_dashboard_e2e.py::TestTurnedOffOnThePage). The real cp-clients has a supply waiting for a person on the date used, so the test asserts the rule - out of the rollup exactly when nothing waits - rather than one dataset''s real state.'
+    linked_tests:
+    - 'tests-js/turned-off.test.js'
+    - 'tests-js/datasets-not-green.test.js'
+    - 'tests-js/status-rollups.test.js'
+    - 'tests-js/status-parity.test.js'
+    - 'tests/test_status_parity.py'
+    - 'tests/test_no_calendar.py::TestItIsInNoRollup::test_a_turned_off_dataset_owing_nothing_is_left_out'
+    - 'tests/test_turn_off.py::TestTheBuildCarriesIt'
+    - 'tests/test_turn_off.py::TestCriticFindingsOn190::test_each_gap_is_sent_for_the_page'
+    - 'tests/test_dashboard_e2e.py::TestTurnedOffOnThePage'
+    implemented_by:
+    - 'qa_tools/common/turned_off.py::timeline'
+    - 'qa_tools/common/turned_off.py::_last_owed'
+    - 'qa_tools/common/runway.py::off_gaps'
+    - 'qa_tools/common/dataset_status.py::rollup_datasets'
+    - 'dashboard/embed_dashboard_data.py::embed'
+    - 'dashboard/qa-reporting-dashboard.template.html::turnOffOn'
+    - 'dashboard/qa-reporting-dashboard.template.html::turnOffMarker'
+    - 'dashboard/qa-reporting-dashboard.template.html::turnOffReasonLine'
+    - 'dashboard/qa-reporting-dashboard.template.html::collectionTurnOffLine'
+    - 'dashboard/qa-reporting-dashboard.template.html::supplyFiledTo'
+    - 'dashboard/qa-reporting-dashboard.template.html::stillOwedNote'
+    - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffInPlaceOn'
+    - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffLine'
+    - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffSection'
+    - 'dashboard/qa-reporting-dashboard.template.html::slaTileHtml'
+    - 'dashboard/qa-reporting-dashboard.template.html::buildData'
+    - 'dashboard/qa-reporting-dashboard.template.html::rollup'
+    - 'dashboard/qa-reporting-dashboard.template.html::inRollup'
+    - 'dashboard/qa-reporting-dashboard.template.html::rollupStatuses'
+    - 'dashboard/qa-reporting-dashboard.template.html::notCountedReasons'
+    - 'dashboard/qa-reporting-dashboard.template.html::notCountedMarker'
+    - 'dashboard/qa-reporting-dashboard.template.html::datasetsNotGreenLine'
+    - 'dashboard/qa-reporting-dashboard.template.html::redPromotedMarker'
+    - 'dashboard/qa-reporting-dashboard.template.html::scheduleRunwayInPlaceOn'
+    evidence:
+    - '2026-10-15 overnight: tests-js/turned-off.test.js (24 tests), its marker, rollup and line tests written first and 15 seen to fail with the criterion 29 extension of datasets-not-green.test.js; the runway test and runway.off_gaps'' Python test each seen to fail before their change; tests/test_turn_off.py''s build test seen to fail on the missing lastOwed. tests/test_dashboard_e2e.py::TestTurnedOffOnThePage (2) in a real browser - the collection-row test found two row templates that had no marker. The full gate result is in the commit that flips this to built.'
 
   - id: REQ-PIPE-181
     title: A collection states participation defaults its datasets take value by value, and a dataset can go back to them with inherit
@@ -31604,8 +31644,7 @@ requirements:
       by: Keith
       date: '2026-10-06'
     acceptance_criteria:
-    - WHERE the dashboard shows the exhausted-schedule notice, THE SYSTEM SHALL state how many supplies
-      are held because a schedule ended and the receipt date of the earliest of them.
+    - WHERE the dashboard shows the exhausted-schedule notice, THE SYSTEM SHALL state how many supplies are held because a schedule ended - each hold's label worked out from the configuration in force on the in-place-on date (REQ-PIPE-179 criterion 18), so that a supply held as turned off is not counted - and the receipt date of the earliest of them. AMENDED 2026-10-15 by REQ-DASH-180 criterion 22.
     - THE SYSTEM SHALL NOT state a number of elapsed days in that notice.
     - WHERE no supply is held because a schedule ended, THE SYSTEM SHALL state that nothing has arrived
       since the schedule ended rather than omitting the backlog sentence.

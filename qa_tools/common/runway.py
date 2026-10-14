@@ -222,6 +222,22 @@ def off_for_good(dataset_id: str, on: date, agreement=None) -> bool:
     return standing.state == agreement_mod.TURNED_OFF and standing.turned_off.until is None
 
 
+def off_gaps(dataset_id: str, agreement=None) -> list[dict]:
+    """[{from, until}] - each turned-off gap's first day (the day after its
+    effective_to) and the day it ends, None for good - for the page, which
+    judges them on the date on show (REQ-DASH-180 criteria 17 and 20, and
+    REQ-PIPE-053 criterion 19 as it amends)."""
+    from datetime import timedelta
+
+    from qa_tools.common import turned_off
+
+    agr = schedule._agreement(agreement)
+    if not agr.ever_turned_off(dataset_id):
+        return []
+    return [{"from": (date.fromisoformat(t["effectiveTo"]) + timedelta(days=1)).isoformat(),
+             "until": t["until"]} for t in turned_off.timeline(dataset_id, agr)]
+
+
 def schedule_ends_on(dataset_id: str) -> date | None:
     """The asset-local date this dataset's schedule ends: when its LAST slot
     closes, the instant from which the pipeline holds a supply rather than

@@ -958,10 +958,19 @@ class TestTheBuildCarriesIt:
         doc = _off_for_a_while()
         got = turned_off.timeline("cp-clients", agreement.from_doc(doc),
                                   docs=(doc, _load("data-asset.yaml")))
+        last = got[0].pop("lastOwed")
         assert got == [{"effectiveTo": "2025-03-31", "until": "2026-01-01",
                         "reason": "supplier paused", "level": "dataset",
                         "versionFrom": "2023-01-01", "authoredOn": "2026-10-14",
-                        "authoredBy": "changelog"}]
+                        "authoredBy": "changelog", "collection": "Child Protection"}]
+        # THE LAST OWED SLOT BEFORE THE GAP (REQ-DASH-180 criteria 4, 16 and
+        # 25): 2025-Q1, closing when 2025-Q2's window would have opened.
+        assert last["period"] == "2025-Q1"
+        agr = agreement.from_doc(doc)
+        slot = next(s for s in slots.slots_for_dataset("cp-clients", until=date(2025, 3, 31),
+                                                        agreement=agr) if s.name == "2025-Q1")
+        assert last["dueAt"] == slot.due_at.isoformat()
+        assert last["closesAt"] == slot.closes_at.isoformat()
 
     def test_a_declared_correction_dates_it_instead(self):
         doc = _off_for_a_while()
@@ -1009,6 +1018,19 @@ class TestCriticFindingsOn190:
         using(doc)
         assert not runway.off_for_good("cp-clients", date(2028, 3, 1))
         assert "cp-clients" in runway.exhausted_datasets(date(2028, 3, 1))
+
+    def test_each_gap_is_sent_for_the_page(self, using):
+        """REQ-DASH-180 criteria 17 and 20: the page judges 'off for good' on
+        the date on show, so the build sends the day it starts."""
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2028-12-31")
+        using(doc)
+        assert runway.off_gaps("cp-clients") == [{"from": "2029-01-01", "until": None}]
+        assert runway.off_gaps("cp-carers") == []
+        using(_off_for_a_while())
+        assert runway.off_gaps("cp-clients") == [{"from": "2025-04-01", "until": "2026-01-01"}]
 
     def test_d1_a_calendar_whose_datasets_are_all_off_is_not_exhausted(self, using):
         """Every Child Protection dataset off for good: no dataset to count,

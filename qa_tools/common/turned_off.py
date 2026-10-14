@@ -204,6 +204,12 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
                     corrected[key] = max(corrected.get(key, when), when)
     entry = agr.dataset(dataset_id)
     collection = agr.collection_of(dataset_id)
+    from qa_tools.common import hierarchy
+
+    try:
+        collection_name = hierarchy.dataset(dataset_id).collection_name
+    except hierarchy.UnknownDatasetError:
+        collection_name = collection
     out = []
     own = entry.participation
     for level, versions, key, back in (
@@ -224,5 +230,27 @@ def timeline(dataset_id: str, agreement=None, docs=None) -> list[dict]:
                         "reason": v.turned_off_reason or "", "level": level,
                         "versionFrom": v.effective_from.isoformat(),
                         "authoredOn": corrected.get(item) or logged,
-                        "authoredBy": "correction" if item in corrected else "changelog"})
+                        "authoredBy": "correction" if item in corrected else "changelog",
+                        # For the page's turn-off marker and SLA tile
+                        # (REQ-DASH-180 criteria 2, 4, 16 and 25).
+                        "collection": collection_name,
+                        "lastOwed": _last_owed(dataset_id, v.effective_to, agr)})
     return sorted(out, key=lambda t: t["effectiveTo"])
+
+
+def _last_owed(dataset_id: str, effective_to, agr) -> dict | None:
+    """The last slot the dataset owes before a turn-off's gap - its period,
+    due instant and closing instant (REQ-PIPE-179 criterion 14) - or None
+    where it owed nothing before it. Configuration only."""
+    from qa_tools.common import schedule, slots
+
+    try:
+        found = [s for s in slots.slots_for_dataset(dataset_id, until=effective_to, agreement=agr)
+                 if s.date <= effective_to]
+    except schedule.NoCalendarAgreed:
+        return None
+    if not found:
+        return None
+    last = found[-1]
+    return {"period": last.name, "dueAt": last.due_at.isoformat(),
+            "closesAt": last.closes_at.isoformat() if last.closes_at else None}

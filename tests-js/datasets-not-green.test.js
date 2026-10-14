@@ -47,6 +47,16 @@ describe("the datasets-not-green line", () => {
     const w = load();
     expect(w.datasetsNotGreenLine([FOUR[3]], "notcounted")).toBe("");
   });
+
+  // REQ-DASH-180 criterion 29: a turned-off dataset owing nothing is left out
+  // as the rollup leaves it out - red verdict and all - and a group that is
+  // only turned off carries no line at all, never "0 of 0".
+  it("leaves out a turned-off dataset the rollup leaves out", () => {
+    const w = load();
+    const off = { id: "e", status: "red", turnedOffOutOfRollup: true };
+    expect(text(w, w.datasetsNotGreenLine([...FOUR, off], "red"))).toContain("2 of 3 counted datasets not green");
+    expect(w.datasetsNotGreenLine([off], "turnedoff")).toBe("");
+  });
 });
 
 describe("the weekly trend", () => {

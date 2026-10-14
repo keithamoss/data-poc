@@ -438,12 +438,13 @@ def embed() -> None:
                 # ask somebody to author dates for a schedule nobody has
                 # agreed.
                 continue
-            if runway.off_for_good(entry.dataset_id,
-                                   asset_time.local_date(asset_time.now())):
-                # TURNED OFF FOR GOOD (REQ-PIPE-179 criterion 32, amending
-                # REQ-PIPE-053 criteria 10 and 15): neither warned about nor
-                # counted - it owes no more dates.
-                continue
+            # TURNED OFF FOR GOOD (REQ-PIPE-179 criterion 32, amending
+            # REQ-PIPE-053 criteria 10 and 15): neither warned about nor
+            # counted - it owes no more dates. The page judges it from the
+            # day it goes off, on the date on show (REQ-DASH-180 criteria 17
+            # and 20), so the build sends each gap rather than leaving the
+            # dataset out as at its own date.
+            gaps = runway.off_gaps(entry.dataset_id)
             owed = [p for p in schedule.periods_for_dataset(entry.dataset_id) if p.expected]
             # A dataset's OWN last period, not the calendar's. They
             # differ the moment a dataset participates in some months
@@ -463,7 +464,8 @@ def embed() -> None:
                               "dates": [p.date.isoformat() for p in owed],
                               "lastPeriod": owed[-1].name if owed else None,
                               "lastDate": owed[-1].date.isoformat() if owed else None,
-                              "endsOn": ends.isoformat() if ends else None})
+                              "endsOn": ends.isoformat() if ends else None,
+                              "offGaps": gaps})
         schedule_runway["calendars"].append({
             "name": cal.name,
             "threshold": cal.runway_warning_slots or runway.DEFAULT_WARNING_SLOTS,

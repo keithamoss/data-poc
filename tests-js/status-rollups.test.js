@@ -146,7 +146,7 @@ describe("a dataset with no agreed schedule is in no rollup", () => {
                       ds("b", "amber", { scheduleNotAgreed: "never" })])).toBe("notcounted");
   });
 
-  it("a Not counted group says why, in words, by reason - and nothing else does", () => {
+  it("a Not counted group says why, in words, by reason, and a partly counted one says so", () => {
     const w = load();
     // post-build-review #135: the pill never stands alone. Counts by
     // reason, never a list of names.
@@ -155,7 +155,12 @@ describe("a dataset with no agreed schedule is in no rollup", () => {
                    ds("c", "green", { scheduleNotAgreed: "never" })];
     const line = w.notCountedMarker("notcounted", group).replace(/\s+/g, " ");
     expect(line).toContain("3 datasets not counted: 2 no schedule agreed yet, 1 one-off extraction");
-    expect(w.notCountedMarker("green", group)).toBe("");
+    // REQ-DASH-180 criterion 10: a group with only SOME left out says so too,
+    // in its own words; one whose every dataset is turned off says nothing,
+    // which would only repeat its status.
+    const partial = w.notCountedMarker("green", [group[0], ds("d", "green")]).replace(/\s+/g, " ");
+    expect(partial).toContain("1 dataset not counted in this status: 1 no schedule agreed yet");
+    expect(w.notCountedMarker("green", [ds("d", "green")])).toBe("");
   });
 
   it("an ordinary dataset is unaffected", () => {

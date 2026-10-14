@@ -377,6 +377,17 @@ class TestItIsInNoRollup:
             self._ds("b", "amber", scheduleNotAgreed="never"),
         ]) == "notcounted"
 
+    def test_a_turned_off_dataset_owing_nothing_is_left_out(self):
+        """REQ-DASH-180 criteria 7, 8 and 9, in the Python mirror."""
+        from qa_tools.common import dataset_status as ds
+
+        off = self._ds("off", "red", turnedOffOutOfRollup=True)
+        assert ds.rollup_datasets([self._ds("agreed", "green"), off]) == "green"
+        assert ds.rollup_datasets([off, self._ds("off2", "red", turnedOffOutOfRollup=True)]) \
+            == "turnedoff"
+        assert ds.rollup_datasets(
+            [off, self._ds("u", "red", scheduleNotAgreed="not-yet-agreed")]) == "notcounted"
+
     def test_an_exhausted_schedule_still_comes_back(self):
         """The contrast, asserted so the new exclusion cannot be mistaken
         for the old one."""

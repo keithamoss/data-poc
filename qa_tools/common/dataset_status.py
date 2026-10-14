@@ -74,7 +74,7 @@ ORDERED_STATUSES = {"nodata": -1, "green": 0, "amber": 1, "red": 2}
 # below is where a caller handles it explicitly instead.
 # `notcounted` is a GROUP's status: every dataset in it is left out of its
 # rollup (post-build-review #135). It replaced a false green.
-UNORDERED_STATUSES = {"exhausted", "inactive", "notcounted"}
+UNORDERED_STATUSES = {"exhausted", "inactive", "notcounted", "turnedoff"}
 
 RECOGNISED_STATUSES = set(ORDERED_STATUSES) | UNORDERED_STATUSES
 
@@ -185,7 +185,7 @@ _DASHBOARD_STATUS_BY_TOOL_STATUS = {
 #: headline; "nobody defined a rule" is a standing fact somebody can act
 #: on; "no run within tolerance as of this date" is temporal and may
 #: resolve itself tomorrow.
-_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notcounted")
+_QUIET_PRECEDENCE = ("exhausted", "inactive", "nodata", "notcounted", "turnedoff")
 
 
 def rollup_statuses(statuses) -> str:
@@ -250,7 +250,9 @@ def rollup_datasets(datasets) -> str:
     ordering rather than only of the storage.
     """
     datasets = list(datasets)
-    counted = [d for d in datasets if not in_no_rollup(d)]
+    # A TURNED-OFF DATASET OWING NOTHING is out like an unagreed one
+    # (REQ-DASH-180 criterion 7); the page sets the flag as at its date.
+    counted = [d for d in datasets if not in_no_rollup(d) and not d.get("turnedOffOutOfRollup")]
     live = [d for d in counted
             if not d.get("noDataInPlaceOn") and not d.get("scheduleExhausted")]
     if not live:
@@ -260,6 +262,8 @@ def rollup_datasets(datasets) -> str:
             return "nodata"
         # EVERY DATASET HERE IS LEFT OUT (post-build-review #135): this
         # returned "green", the false green. Only an empty group stays green.
+        if datasets and all(d.get("turnedOffOutOfRollup") for d in datasets):
+            return "turnedoff"
         return "notcounted" if datasets else "green"
     return rollup_statuses([rollup_statuses(
         [c.get("status") for c in (d.get("columns") or [])]) for d in live])

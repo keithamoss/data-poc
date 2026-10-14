@@ -955,6 +955,61 @@ class TestOwedNothingPeriods:
         assert "Not expected — System migration" in rows.first.inner_text()
 
 
+class TestTurnedOffOnThePage:
+    """REQ-DASH-180 in a real browser. The real configuration turns nothing
+    off, so a turn-off is added to cp-clients' embedded data in the page and
+    the page rebuilt from it - every reading after that is the page's own."""
+
+    CP = "child-protection-family-support"
+    DS = {"tier": "dataset", "agencyId": CP, "collectionId": "child-protection",
+          "datasetId": "cp-clients"}
+    ON = "2026-06-15"
+    TURN = """{effectiveTo: '2026-03-31', until: null, reason: 'Supplier <b>paused</b>',
+               level: 'dataset', versionFrom: '2023-01-01', authoredOn: '2026-01-10',
+               authoredBy: 'changelog', collection: 'Child Protection',
+               lastOwed: {period: '2026-Q1', dueAt: '2026-02-01T01:00:00+00:00',
+                          closesAt: '2026-04-20T16:00:00+00:00'}}"""
+
+    def _turn_off(self, page):
+        page.evaluate(f"""() => {{
+            rawRealDatasetById('cp-clients').turnOffs = [{self.TURN}];
+            DATA = buildData(CURRENT_IN_PLACE_ON);
+            render();
+        }}""")
+
+    def test_the_dataset_page_reads_turned_off(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state=self.DS, in_place_on=self.ON)
+        self._turn_off(page)
+        head = page.locator(".view-head")
+        marker = head.locator(".turnoff-marker")
+        assert marker.count() == 1
+        assert "Turned off since" in marker.inner_text()
+        assert marker.get_attribute("title") == "Supplier <b>paused</b>"
+        # The reason as visible text, as text (criteria 2 and 21).
+        why = page.locator("[data-turn-off-reason]")
+        assert why.inner_text().strip() == "Supplier <b>paused</b>"
+        assert page.locator("[data-turn-off-reason] b").count() == 0
+        tile = page.locator(".sla-tile", has_text="SLA").first.inner_text()
+        assert "Turned off — nothing due" in tile
+
+    def test_its_collection_row_carries_the_marker(self, page, built_dashboard_html):
+        _goto(page, built_dashboard_html, state={"tier": "agency", "agencyId": self.CP},
+              in_place_on=self.ON)
+        self._turn_off(page)
+        row = page.locator("tr", has_text="Client Register").first
+        assert row.locator(".turnoff-marker").count() == 1
+        # OUT OF THE ROLLUP ONLY WHILE NOTHING ABOUT AN OWED PERIOD WAITS
+        # (criteria 6 and 7) - the real cp-clients may have something waiting.
+        got = page.evaluate("""() => {
+            const ds = DATA.agencies.flatMap(a => a.collections).flatMap(c => c.datasets)
+                .find(d => d.id === 'cp-clients');
+            return {phase: ds.turnOff.phase, out: ds.turnedOffOutOfRollup,
+                    waiting: !!(ds.blocked || ds.waitingBlocker || ds.noSupply)};
+        }""")
+        assert got["phase"] == "off"
+        assert got["out"] is (not got["waiting"])
+
+
 class TestAcknowledgementBadge:
     """REQ-PIPE-122 criterion 21, which replaced REQ-QAC-017's per-run
     /accept badge (retired by criterion 23): a promoted amber supply reads
