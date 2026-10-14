@@ -4952,6 +4952,12 @@ could never have computed it), and it belongs with batch 5's check work.
     periods and its checks; how cross-table checks that read it are retired
     (check lifecycle's retirement already exists for checks); and whether a
     removed dataset can ever come back.
+    **ADDED 2026-10-14 (Keith, answering REQ-PIPE-179's own scoper pass):
+    supplies held as TURNED OFF accumulate, because nobody is asked to act on
+    them, and they may be real personal data the agency asked the supplier to
+    stop sending.** REQ-PIPE-179 keeps them quiet and kept; how long they are
+    kept, and whether anything purges them, is this item's question.
+
 
 78. **[done, 2026-10-12]** **[Pipeline & publishing]** **Does excusing a late
     supply stop the gate promoting it?** Found by delivery-architect in review

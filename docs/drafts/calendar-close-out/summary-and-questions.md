@@ -782,3 +782,14 @@ Folded 2026-10-14. Each answer is a decision citing "Keith, 2026-10-14, follow-u
 - G3 (REQ-GEN-205 which corrections a replay confirms): B (NOT the recommendation) - everything due, as today, unless the script says pending. The provisional "confirm only listed" criteria and amendment 44 (REQ-PIPE-170 c31) are withdrawn.
 
 Folded 2026-10-14 by delivery-scoper. G1 is REQ-DASH-209 criterion 14, and G2 is criterion 3's exact wording; both of 209's open questions are removed. G3 restores REQ-GEN-205 criteria 4, 5 and 6, removes criterion 28 and drops amendment 44. Each is recorded as a decision citing "round 4 fold G<N>". Answers are still not sign-off.
+
+## Keith's answers to the REQ-DASH-182/209 fold's questions (2026-10-14)
+
+- H1 separator: A - the page's em dash; REQ-DASH-180's "Turned off — nothing due" follows suit.
+- H2 the "Not owed yet" notice body: A - keep only the way-back sentence; drop "There is no QA run within the accepted freshness window".
+- H3 the standing-in heading on a past date: A - "On <date>: <kind label>"; the label alone on the present; the reason in .promo-why.
+- H4 REQ-DASH-209's previous/next links at the ends: A - left out where there is no earlier period, or the next had not opened by the date on show.
+
+## REQ-PIPE-179's own scoper pass: Keith's answers (2026-10-14)
+
+See req-179-own-pass.md: split TS-63 into its own generator requirement built after REQ-DASH-180; refuse keep on a parked move into a gap; one row per dataset in "Received while turned off"; turned-off holds kept quiet, retention to running-thoughts #77.

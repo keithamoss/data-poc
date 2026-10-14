@@ -131,3 +131,10 @@ Build-time checks for the architect:
 
 - Merged into a copy of requirements.yaml, replacing the register's older REQ-PIPE-179, at `/tmp/claude-0/-home-user-data-poc/5735d9c2-23bf-590b-afe1-e67b136c7e21/scratchpad/merged179.yaml`, `uv run mothman dashboard validate-requirements --draft` gives "requirements validation OK - 199 requirements, zero errors."
 - The one-item file on its own reports only the 24 expected cross-reference errors, one for each dependency the file doesn't contain.
+
+## Keith's answers (2026-10-14)
+
+1. Split TS-63 out: A - its own generator requirement, built after REQ-DASH-180.
+2. Refuse keep on a parked move into a gap (amendment 40): A - yes, as written in criteria 36 and 37.
+3. "Received while turned off" group: A - one row per dataset with its count and earliest receipt, opening to its supplies.
+4. Turned-off holds that pile up: A - keep them quiet and kept; the retention question goes to plans/running-thoughts.md #77.
