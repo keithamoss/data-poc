@@ -1301,6 +1301,15 @@ function assetParts(value, zone){
    Its Python twin, display_time.format_day, draws the same distinction
    on the type it is given. */
 const _PLAIN_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+// '1 Feb 2023' - a calendar day, short, for accessible names that are read
+// out (REQ-DASH-225 criterion 12). Here beside fmtDay rather than through the
+// browser's own formatter, because every date on the page goes through this
+// one place (REQ-DASH-071 criterion 9). Takes a plain date string or a Date
+// holding a day at midnight UTC, which is how run dates are carried.
+function shortDay(value){
+  const dt = typeof value === "string" ? new Date(value.trim()+"T00:00:00Z") : value;
+  return `${dt.getUTCDate()} ${_MONTH_FULL[dt.getUTCMonth()].slice(0,3)} ${dt.getUTCFullYear()}`;
+}
 function fmtDay(value, zone){
   const plain = typeof value === "string" && _PLAIN_DATE.exec(value.trim());
   if(plain){
@@ -3434,8 +3443,6 @@ function twoLineSparkline(series, opts){
 function noVerdictTrendLabel(unitWord, ser, noun){
   return `${unitWord} red and amber on each QA run, ${ser.length} runs from ${shortDay(ser[0].date)} to ${shortDay(ser[ser.length-1].date)}; no ${noun || "column"} has a verdict on this date`;
 }
-// '1 Feb 2023': accessible names are read out, so dates in them are short.
-function shortDay(dt){ return dt.toLocaleDateString("en-AU", {day:"numeric", month:"short", year:"numeric", timeZone:"UTC"}); }
 // The red and amber series as paths, in whatever box x() and y() map to:
 // each coloured only along stretches above 0% (criterion 19), red solid and
 // amber dotted, non-scaling so a stretched box keeps the pattern.

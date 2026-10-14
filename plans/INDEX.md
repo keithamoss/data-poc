@@ -821,6 +821,7 @@ one when this line suggests it matters.
   - *touches:* `tests/test_evidently_reads_its_entry.py`
 - **#183** `done` 2026-10-14 - A check section's head pill read green on a date nothing was checked. Found by the main session building REQ-DASH-225,...
 - **#184** `done` 2026-10-14 - delivery-critic on REQ-DASH-225 and REQ-DASH-227 (commit 8aad489). Every finding checked against the code before being...
+  - *touches:* `tests/test_display_time.py`
 
 ## plans/road-testing.md
 

@@ -8921,6 +8921,13 @@ twice. It deliberately did not re-find the `TypeError`.
        drawn the new two-line column series across all of an agency's
        datasets, with no key; 226 replaced that with datasets not green and
        a weekly trend in the same push.
+     - **FIXED - CI went red on 8aad489** (found by checking the run, not by
+       a critic): the accessible names' short date used the browser's
+       toLocaleDateString, which REQ-DASH-071 criterion 9 forbids and
+       tests/test_display_time.py guards. It is now shortDay() beside fmtDay.
+       The miss was mine: the local runs covered the browser module and the
+       JS suite but not the six Python modules that read the template, which
+       run in seconds and now get run with any template change.
      - **NOTED, no change**: section names come from the embedded column
        name, which matches COLUMN_SCOPES' heading today; x positions are by
        run index, not elapsed time (a question for the dashboard critics,
