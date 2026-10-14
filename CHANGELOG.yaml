@@ -111,9 +111,9 @@ intro: >
 releases:
   - date: "2026-10-14"
     summary: >
-      Every requirement now has a link of its own. Also fixes for a supply
-      that arrives early reading as missing, for how a rebuilt demo history
-      dates its corrections, and for side panels opened from a shared link.
+      The dashboard now counts what is not green at every level, and every
+      requirement has a link of its own. Also fixes for a supply that arrives
+      early reading as missing, and for side panels opened from a shared link.
     changes:
       - category: New
         items:
@@ -145,6 +145,13 @@ releases:
               dataset's columns are red or amber on its latest QA run - "1 of
               11", then "0 red, 1 amber" - with two small lines for the red and
               amber share on each run. A check section counts as one column.
+          - headline: Agency cards count datasets that are not green
+            components: ["Dashboard UI"]
+            description: >
+              Each agency card, and each collection heading under it, now says
+              how many of its datasets are not green - "2 of 6 datasets not
+              green", then "2 red, 0 amber" - with a small red and amber trend
+              for each week back to its first QA run.
           - headline: Dataset and column pages chart red and amber
             components: ["Dashboard UI"]
             description: >

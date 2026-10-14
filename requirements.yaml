@@ -35465,7 +35465,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As a data team leader reading any count or trend of what is not green, I want red and amber counted the same way everywhere - per check, per column and per check section - so that a count and the line beside it never disagree, and red and amber can be told apart in every one of them."
     moscow: must
-    status: in_progress
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35508,7 +35508,22 @@ requirements:
       - "TWO COUNTING FUNCTIONS, ONE PER UNIT (delivery-architect review H2, following Keith's NQ2 B). With the agency card judging each dataset's full status as of each date, 'one function' cannot cover datasets: a dataset's full status needs blockers, missing supplies and refusals, which only buildData() works out. So criterion 7 names two - the unit counter for columns and checks, and datasetStatusesOn(date) taken out of buildData() for datasets. REJECTED precomputing dataset statuses in Python (dataset_status.py knows no blockers, missing supplies or refusals) and REJECTED a second dataset-status routine beside buildData()."
       - "SHAPE OF THE CODE (delivery-architect review, advisory, not acceptance): one pure unitCounts(columns, runIds); one twoLineSparkline(series, {quiet, label}) shared by every tier; datasetStatusesOn(date); rollup()'s live filter lifted into a named predicate; the 0.05 floor and the endpoint-dot code removed."
       - "NO PYTHON TWIN (proposed by delivery-scoper, confirmed by the delivery-architect review L6). If a Python consumer ever shows these counts, the rule joins status-cases.json's parity cases then. REJECTED adding a twin speculatively."
+      - 'BUILT 2026-10-14. datasetStatusesOn() is buildDatasetsOn() - the per-dataset half of buildData(), split out unchanged - read into a {status, inRollup} map and cached by date, so a card''s count and its pill are the same code. The groundwork the architect asked for went in with it: datasetTile() builds Child Protection once per date''s build (a per-build cache, never shared across dates, because buildDatasetsOn() marks statuses onto the objects), and rollup()''s filter is the named inRollup(). redNames and amberNames were dropped after the post-build critic found only a test read them (#184).'
     open_questions: []
+    linked_tests:
+      - 'tests-js/unit-counts.test.js'
+      - 'tests-js/datasets-not-green.test.js'
+      - 'tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage'
+      - 'tests/test_dashboard_e2e.py::TestDatasetsNotGreenOnCardsAndHeadings'
+    implemented_by:
+      - 'dashboard/qa-reporting-dashboard.template.html::unitCounts'
+      - 'dashboard/qa-reporting-dashboard.template.html::checksAsUnits'
+      - 'dashboard/qa-reporting-dashboard.template.html::datasetStatusesOn'
+      - 'dashboard/qa-reporting-dashboard.template.html::buildDatasetsOn'
+      - 'dashboard/qa-reporting-dashboard.template.html::inRollup'
+    evidence:
+      - 'tests-js/unit-counts.test.js (8 tests, run 2026-10-14, all seen failing first against the code after post-build-review #181, the dataset-row case on behaviour - no red stroke - rather than on a missing name): a column with an amber and a red check counts as one red; a column whose only check is inactive, and a run with nothing counted, are left out; a supply-level section counts as one red unit by its heading; a run with one of each gives 3 counted, 1 red, 1 amber; two runs on a day stay two points; retired checks count on no run; an unrecognised status is refused; the dataset row''s drawn trend puts red at 50% and draws no amber where the old line plotted 2 of 3 checks failing.'
+      - 'tests/test_dashboard_e2e.py, 271 passed (run 2026-10-14 on this tree), including the row-versus-page parity at two dates and the card/heading parity built on datasetStatusesOn().'
   - id: REQ-DASH-225
     title: "The dataset list says how many columns are not green, how many red and how many amber, where Trend sits now, with small red and amber trend lines beside it"
     date_written: "2026-10-14"
@@ -35578,7 +35593,7 @@ requirements:
       - "THE LINES ARE PER CHECKED QA RUN (delivery-scoper, not asked, unchallenged at Keith's 2026-10-14 answers; corrected by the delivery-architect review M1 and Keith's answer to its Q2). Each point is a checked supply among the runs in place or awaiting on the date on show, resupplies included; a supply withdrawn by that date, or never checked, is not a point. The key says 'each QA run'. REJECTED plotting one point per period's supply in place in this sprint, which would be a different series rather than a labelling change. SUPERSEDES the first draft's 'including supplies later withdrawn'."
       - "THE TURNED-OFF CLAUSE MOVES TO REQ-DASH-180 (Keith, 2026-10-14, delivery-architect review B1, option b). 'Turned off' does not exist in the page yet - REQ-DASH-180 is signed but not built - so a criterion about it here could be neither built nor seen failing first. The owes-nothing half of the old criterion 16 stays, because REQ-DASH-182 criterion 15 already holds on today's page. REJECTED option a, building sprint 1 after REQ-DASH-180. REQ-DASH-180 and REQ-DASH-182 leave this requirement's dependencies accordingly."
       - "SORTING BY RED COUNT IS NOT IN SPRINT 1 (delivery-scoper, 2026-10-14, at the main session's direction to leave it out unless trivial). It is not trivial: the dataset list's order today is the hierarchy's, and a sort changes what 'the third row' means in every link, test and screenshot. A count invites a sort, so it is worth raising again - suggested as a plans/running-thoughts.md entry for a later sprint."
-      - 'BUILT 2026-10-14. The cell is one function over one series, so the count and the lines'' last point cannot disagree. A STALE DATASET READS ''No column has a verdict on this date'' (criterion 21): on a date with nothing in its current period its tiles roll up to ''No data'' (Phase 5g), so no column holds a verdict to count, while the history stays drawn in neutral ink - found when the parity test compared Birth Registrations'' row (''All 14 green'' off a September run) with its page (13 ''No data'' tiles). The section head pill was found saying green there too and was fixed as post-build-review #183. Amber is drawn in --warn-fill, the amber every pill and key on the page already uses; the criterion''s ''--warn'' named the colour, not a variable. The header cell keeps the old Trend column''s place, so the reason rows'' colspan is unchanged.'
+      - 'BUILT 2026-10-14. The cell is one function over one series, so the count and the lines'' last point cannot disagree. A STALE DATASET READS ''No column has a verdict on this date'' (criterion 21): on a date with nothing in its current period its tiles roll up to ''No data'' (Phase 5g), so no column holds a verdict to count, while the history stays drawn in neutral ink - found when the parity test compared Birth Registrations'' row (''All 14 green'' off a September run) with its page (13 ''No data'' tiles). The section head pill was found saying green there too and was fixed as post-build-review #183. Amber is drawn in --warn, as the CONTRAST NFR says - first built in --warn-fill on a misreading of that NFR, which names and rejects it (2.7:1 on white), and corrected the same day (post-build-review #184). The stale-row reading of criterion 21 confirmed by Keith, 2026-10-14. The header cell keeps the old Trend column''s place, so the reason rows'' colspan is unchanged.'
     open_questions: []
     linked_tests:
       - 'tests-js/columns-not-green.test.js'
@@ -35601,7 +35616,7 @@ requirements:
     date_written: "2026-10-14"
     story: "As a data team leader landing on the Agencies page, I want each agency card to say how many of its datasets are not green, split into red and amber, beside a small weekly trend of the same, so that I can tell how many places in an agency need me, and whether that is growing, before I open it."
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35647,7 +35662,24 @@ requirements:
       - "COLLECTION HEADINGS GET THE COUNT AND THE TREND (Keith, 2026-10-14, sign-off readiness check). Each collection heading on the agency tier carries the card's count line and the same small two-line weekly trend, over the collection's counted datasets. REJECTED delivery-scoper's proposal of the count only, without a trend, which argued that the collection's own table directly below already carries a trend per dataset. The heading's trend costs no extra status work, since it uses the same weekly grid dates and the same datasetStatusesOn(date) results as the cards (criterion 13)."
       - "TIER 1 ROLLS THE COUNT UP (Keith, 2026-10-13, answering the sprint plan's open question)."
       - "THE PILL STAYS WORST-OF; THE COUNT SITS BESIDE IT (#2). Worst-of is right for 'is anything wrong here', and it is deliberate: the Agencies tier's sub-heading says a failure cannot hide behind a healthy average. #2 found it lossy only for ranking. REJECTED replacing the pill with a count or a share."
+      - 'BUILT 2026-10-14. FASTER, NOT SHORTER (Keith, 2026-10-14, asked to try a faster status path before any cap or a thinner grid). The first measurement was ~15.5ms per week, ~3s for the 194-week grid. A profile put 71% of it in assetParts(), which built a new Intl.DateTimeFormat on every call; caching the formatter per zone and the answer per instant, and the date-string parse in buildRealDataset(), took one date''s whole build from 112ms to 12ms and the grid to ~260ms - pure caches, the same answers. The trends draw just after first paint, as criterion 13 allows, from slots carrying their own date and datasets so a late fill cannot draw the wrong date. M counts datasets the rollup counts AND that hold a verdict (red, amber or green), so ''All M green'' is never said over an inactive dataset. Collection headings use the cards'' grid, trimmed to their own first QA run.'
     open_questions: []
+    linked_tests:
+      - 'tests-js/datasets-not-green.test.js'
+      - 'tests/test_dashboard_e2e.py::TestDatasetsNotGreenOnCardsAndHeadings'
+    implemented_by:
+      - 'dashboard/qa-reporting-dashboard.template.html::datasetsNotGreen'
+      - 'dashboard/qa-reporting-dashboard.template.html::datasetsNotGreenLine'
+      - 'dashboard/qa-reporting-dashboard.template.html::groupWeeklySeries'
+      - 'dashboard/qa-reporting-dashboard.template.html::datasetsTrendHtml'
+      - 'dashboard/qa-reporting-dashboard.template.html::fillDatasetsTrends'
+      - 'dashboard/qa-reporting-dashboard.template.html::datasetStatusesOn'
+      - 'dashboard/qa-reporting-dashboard.template.html::inRollup'
+      - 'dashboard/qa-reporting-dashboard.template.html::assetParts'
+    evidence:
+      - 'tests-js/datasets-not-green.test.js (6 tests, run 2026-10-14, all seen failing first): one red, one amber, one green and one no-schedule dataset read ''2 of 3 counted datasets not green'' and ''1 red, 1 amber''; ''counted'' is dropped when nothing is left out and an all-green group reads ''All N datasets green''; a Not counted group shows no line; the grid steps back a week at a time from the date on show to the first week with a QA run and ends on the count; a heading over the same datasets gets the same points; the trend is labelled ''Datasets red and amber, each week'' with its accessible name.'
+      - 'tests/test_dashboard_e2e.py::TestDatasetsNotGreenOnCardsAndHeadings (run 2026-10-14 on the real built dashboard, at the build''s own date and 2025-06-15): each agency card''s and each collection heading''s red, amber and counted equal the pills of its counted datasets on the agency tier, and each trend''s accessible name ends on the same numbers; some card is not all green.'
+      - 'BUDGET (criterion 13, NFR 6), measured 2026-10-14 on the built page from a cold status cache, three runs each: pills and counts paint in 5-17ms on today''s 7 datasets and 8-37ms on a synthetic 31-dataset copy (each Child Protection dataset cloned four times); the weekly trends then finish drawing at 154-285ms and 665-733ms respectively. Keith accepted the 31-dataset trend timing as is, 2026-10-14.'
   - id: REQ-DASH-227
     title: "The dataset page and each column's panel show red and amber trend lines that say in words what they plot"
     date_written: "2026-10-14"

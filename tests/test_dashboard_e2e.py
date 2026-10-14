@@ -4101,6 +4101,16 @@ class TestAStaleDatasetsSectionsSayNoData:
         assert seen["heads"], "precondition: it has a check section"
         assert all("nodata" in c for c in seen["heads"]), seen["heads"]
 
+    def test_no_tile_lines_key_when_no_tile_draws_lines(self, clean_page, built_dashboard_html):
+        """post-build-review #184 (D3): the line explaining the tiles' two
+        lines showed above thirteen 'No data' tiles that draw none."""
+        _goto(clean_page, built_dashboard_html, _BDM)
+        seen = clean_page.evaluate("""() => ({
+          lines: document.querySelectorAll('.col-tile svg').length,
+          key: document.querySelectorAll('.tile-lines-key').length})""")
+        assert seen["lines"] == 0, "precondition: a stale dataset's tiles draw no lines"
+        assert seen["key"] == 0
+
 
 class TestColumnsNotGreenMatchesTheDatasetPage:
     """REQ-DASH-225 criterion 18: each ordinary row's 'Columns not green'
@@ -4214,6 +4224,87 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
         }""")
         assert [int(cells[1]), int(cells[2])] == [listed["red"], listed["amber"]]
         assert cells[3].endswith(f"of {listed['counted']} not green")
+
+
+class TestDatasetsNotGreenOnCardsAndHeadings:
+    """REQ-DASH-226 criterion 12: each agency card's and each collection
+    heading's count of datasets not green agrees with the pills of the
+    datasets it counts on the agency tier, and its weekly trend ends on the
+    same numbers - at the build's own date and at an earlier one."""
+
+    _AGENCIES = ["registry-services", "child-protection-family-support"]
+
+    @staticmethod
+    def _said(text):
+        import re
+        if not text:
+            return None
+        m = re.match(r"(\d+) of (\d+) (?:counted )?datasets not green (\d+) red, (\d+) amber", text)
+        if m:
+            n, total, red, amber = map(int, m.groups())
+            assert n == red + amber, text
+            return [red, amber, total]
+        m = re.match(r"All (\d+) (?:counted )?datasets green", text)
+        assert m, text
+        return [0, 0, int(m.group(1))]
+
+    @staticmethod
+    def _latest(label):
+        import re
+        m = re.search(r"latest (\d+) red and (\d+) amber of (\d+)", label or "")
+        return list(map(int, m.groups())) if m else None
+
+    def _wait_trends(self, page):
+        page.wait_for_function("() => document.querySelector('[data-trends-drawn]')")
+
+    @pytest.mark.parametrize("in_place_on", [None, "2025-06-15"])
+    def test_counts_and_trends_agree_with_the_pills(self, clean_page, built_dashboard_html, in_place_on):
+        _goto(clean_page, built_dashboard_html, {"tier": "exec"}, in_place_on)
+        self._wait_trends(clean_page)
+        cards = clean_page.evaluate("""() => [...document.querySelectorAll('a.card[data-agency]')].map(a => ({
+          id: a.dataset.agency,
+          text: (a.querySelector('.datasets-not-green') || {innerText: ''}).innerText.replace(/\\s+/g, ' ').trim(),
+          label: (a.querySelector('.datasets-trend svg') || {getAttribute: () => null}).getAttribute('aria-label')}))""")
+        if in_place_on is None:
+            assert any((self._said(c["text"]) or [0, 0])[0] + (self._said(c["text"]) or [0, 0])[1] > 0
+                       for c in cards), "precondition: some agency card has a dataset not green"
+        for card in cards:
+            said = self._said(card["text"])
+            _goto(clean_page, built_dashboard_html, {"tier": "agency", "agencyId": card["id"]}, in_place_on)
+            self._wait_trends(clean_page)
+            pills = clean_page.evaluate("""() => {
+              const ctx = {ag: DATA.agencies.find(a => a.id === STATE.agencyId)};
+              const tally = ds => {
+                const c = ds.filter(d => inRollup(d) && ['red','amber','green'].includes(d.status));
+                // the pill each counted dataset shows in its row
+                const shown = c.map(d => {
+                  const tr = [...document.querySelectorAll('tr[data-nav]')].find(r => JSON.parse(r.dataset.nav).datasetId === d.id);
+                  const p = tr && tr.querySelector('td:nth-child(2) .pill');
+                  return p ? ['red','amber','green'].find(s => p.classList.contains(s)) : null;
+                });
+                return [shown.filter(s => s === 'red').length, shown.filter(s => s === 'amber').length, shown.length];
+              };
+              return {agency: tally(ctx.ag.collections.flatMap(c => c.datasets)),
+                      collections: ctx.ag.collections.map(col => {
+                        const el = document.querySelector(`.collection-not-green[data-collection="${col.id}"]`);
+                        const line = el.querySelector('.datasets-not-green');
+                        const svg = el.querySelector('.datasets-trend svg');
+                        return {pills: tally(col.datasets), text: line ? line.innerText.replace(/\\s+/g, ' ').trim() : '',
+                                label: svg ? svg.getAttribute('aria-label') : null};
+                      })};
+            }""")
+            if said is not None:
+                assert said == pills["agency"], (card["id"], in_place_on, said, pills["agency"])
+                if card["label"]:
+                    assert self._latest(card["label"]) == said, card
+            for col in pills["collections"]:
+                col_said = self._said(col["text"])
+                if col_said is not None:
+                    assert col_said == col["pills"], (card["id"], col)
+                    if col["label"]:
+                        assert self._latest(col["label"]) == col_said, col
+            _goto(clean_page, built_dashboard_html, {"tier": "exec"}, in_place_on)
+            self._wait_trends(clean_page)
 
 
 class TestClosingASidePanelReachedByItsUrl:

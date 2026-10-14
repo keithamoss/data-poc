@@ -8889,3 +8889,41 @@ twice. It deliberately did not re-find the `TypeError`.
      standing rule. **FIXED**: a section head goes quiet with the tiles; its
      rows keep each check's own last verdict, as a column's panel does.
      `TestAStaleDatasetsSectionsSayNoData` failed first.
+
+184. **[done, 2026-10-14]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-225 and REQ-DASH-227 (commit 8aad489).** Every finding checked
+     against the code before being written up; each fix's test seen failing
+     first.
+     - **FIXED - the amber line was --warn-fill, which REQ-DASH-225's signed
+       CONTRAST NFR names and rejects** (2.73:1 on white in light theme,
+       against a 3:1 floor; --warn is 5.07:1). The builder's decision had
+       read the criterion's "--warn" as naming a colour rather than a
+       variable, which the NFR's own text rules out - a misreading, not a
+       judgement call, so corrected without sign-off and the decision
+       rewritten. The tests that asserted "no amber" by the literal
+       --warn-fill now check both variables, so the change cannot hollow
+       them out.
+     - **FIXED - amber was drawn over red** where the two lines coincide;
+       the LEGIBILITY NFR asks for red on top. Amber is drawn first now.
+     - **FIXED - a stale row's accessible name contradicted its text**:
+       "latest 0 red and 0 amber of 14" under "No column has a verdict on
+       this date". The name now gives the history and says no column (or,
+       in a column's panel, no check) has a verdict on the date.
+     - **FIXED - the tile key showed above tiles that draw no lines** (a
+       stale dataset's "No data" tiles). It shows only where tiles can.
+     - **FIXED - dead code**: unitCounts' redNames/amberNames were read
+       only by a test; removed, and the test reads sectionNames, which the
+       row uses.
+     - **CONFIRMED BY KEITH, 2026-10-14 - the stale-row reading of
+       REQ-DASH-225 criterion 21** ("No column has a verdict on this date"
+       rather than "All 14 green" off the last run).
+     - **RESOLVED BY REQ-DASH-226 - the home-page agency cards** had briefly
+       drawn the new two-line column series across all of an agency's
+       datasets, with no key; 226 replaced that with datasets not green and
+       a weekly trend in the same push.
+     - **NOTED, no change**: section names come from the embedded column
+       name, which matches COLUMN_SCOPES' heading today; x positions are by
+       run index, not elapsed time (a question for the dashboard critics,
+       not a criterion); unitTrendBlock interpolates its own constant titles
+       unescaped. Untested by automation: REQ-DASH-227 criteria 7 and 10 and
+       REQ-DASH-225 criterion 16 - checked live by the critic.

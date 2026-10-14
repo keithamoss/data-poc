@@ -63,6 +63,7 @@ describe("the Columns not green cell", () => {
     const w = load();
     const html = w.columnsNotGreenCell([unit("a", { r1: "green", r2: "green" })]);
     expect(html).not.toContain("var(--bad)");
+    expect(html).not.toContain("var(--warn)");
     expect(html).not.toContain("var(--warn-fill)");
   });
 
@@ -72,7 +73,13 @@ describe("the Columns not green cell", () => {
     expect(text(w, html)).toBe("No column has a verdict on this date");
     expect(html).toContain('data-series="red"');
     expect(html).not.toContain("var(--bad)");
+    expect(html).not.toContain("var(--warn)");
     expect(html).not.toContain("var(--warn-fill)");
+    // post-build-review #184: the lines' accessible name must not state a
+    // latest count the visible text says does not exist.
+    const label = html.match(/aria-label="([^"]+)"/)[1];
+    expect(label).toContain("no column has a verdict on this date");
+    expect(label).not.toMatch(/latest \d+ red/);
   });
 
   it("says when no column has a verdict, and when there is one run so far", () => {

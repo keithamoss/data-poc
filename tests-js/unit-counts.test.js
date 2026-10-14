@@ -50,7 +50,7 @@ describe("unitCounts", () => {
       column("a", check({ r1: "green" })),
     ]);
     expect([run.counted, run.red, run.amber]).toEqual([2, 1, 0]);
-    expect(run.redNames).toEqual(["Supply-level checks"]);
+    expect(run.sectionNames).toEqual(["Supply-level checks"]);
   });
 
   it("returns counted, red and amber for a run with one of each", () => {

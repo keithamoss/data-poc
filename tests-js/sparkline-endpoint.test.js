@@ -68,7 +68,7 @@ describe("the two trend lines", () => {
     const w = load();
     const svg = w.aggregateSparkline(COLS);
     expect(svg).toContain('stroke="var(--bad)"');
-    expect(svg).toMatch(/stroke="var\(--warn-fill\)"[^>]*stroke-dasharray="1.5,2.5"/);
+    expect(svg).toMatch(/stroke="var\(--warn\)"[^>]*stroke-dasharray="1.5,2.5"/);
     expect(svg).not.toContain("<circle");
   });
 
@@ -77,6 +77,7 @@ describe("the two trend lines", () => {
     const svg = w.aggregateSparkline(GREEN);
     expect(svg).toContain("<line"); // the neutral baseline
     expect(svg).not.toContain("var(--bad)");
+    expect(svg).not.toContain("var(--warn)");
     expect(svg).not.toContain("var(--warn-fill)");
   });
 
@@ -89,6 +90,26 @@ describe("the two trend lines", () => {
   });
 });
 
+// post-build-review #184 (delivery-critic on REQ-DASH-225): the amber line
+// is --warn, as the signed CONTRAST NFR says (--warn-fill is 2.7:1 on white),
+// and where the two lines coincide red is drawn on top (LEGIBILITY NFR).
+describe("the lines' colour and stacking", () => {
+  it("draws amber in --warn, never --warn-fill", () => {
+    const w = load();
+    const svg = w.aggregateSparkline(COLS);
+    expect(svg).toMatch(/stroke="var\(--warn\)"[^>]*stroke-dasharray="1.5,2.5"/);
+    expect(svg).not.toContain("var(--warn-fill)");
+    expect(w.columnsNotGreenKey()).toContain('stroke="var(--warn)"');
+    expect(w.columnsNotGreenKey()).not.toContain("var(--warn-fill)");
+  });
+
+  it("draws red after amber, so red is on top where they coincide", () => {
+    const w = load();
+    const svg = w.aggregateSparkline(COLS);
+    expect(svg.lastIndexOf('data-series="red"')).toBeGreaterThan(svg.lastIndexOf('data-series="amber"'));
+  });
+});
+
 describe("the lines under a quiet state", () => {
   it("still draw the history, in neutral ink, told apart by style alone", () => {
     // Keith, on the quiet states generally: "no red amber and greens...
@@ -98,6 +119,7 @@ describe("the lines under a quiet state", () => {
     for (const quiet of ["nodata", "exhausted", "inactive"]) {
       const svg = w.aggregateSparkline(COLS, quiet);
       expect(svg, quiet).not.toContain("var(--bad)");
+      expect(svg, quiet).not.toContain("var(--warn)");
       expect(svg, quiet).not.toContain("var(--warn-fill)");
       expect(svg, quiet).not.toContain("var(--good)");
       expect(svg, quiet).toContain('data-series="red"');

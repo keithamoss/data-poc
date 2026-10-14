@@ -49,15 +49,13 @@ CONFIRMED by Keith 2026-10-13. Still none of sprints 1, 3 or 4 has a requirement
 each goes through delivery-scoper and his sign-off before anything is
 built. Ordered by value to a busy data-team leader at the dashboard.
 
-- **Sprint 1 - "where do I put my effort?" (#1, #2; M).** SCOPED AND SIGNED 2026-10-14 as REQ-DASH-224 to REQ-DASH-228 (docs/drafts/road-testing-sprint-1/ holds the reviews and Keith's answers); the turned-off part is REQ-DASH-180 criterion 29. Not built yet. Its decisions are on those requirements, and this bullet goes when they are built. The overview and
-  dataset list say how big each problem is and what each trend measures:
-  labelled sparklines on dataset and column pages, "N of M checks not
-  green" on cards, a failing-COLUMNS count where Trend sits now (Keith's
-  2026-10-06 answers). Tier 1 ROLLS THE COUNT UP onto agency cards (Keith,
-  2026-10-13). TREND: labelled sparklines on the dataset and column pages,
-  AND a small labelled one kept in the dataset list beside the count
-  (Keith, 2026-10-13). First because at 30 datasets every red looking the
-  same is what stops triage.
+- **Sprint 1 - "where do I put my effort?" (#1, #2; M).** BUILT 2026-10-14
+  as REQ-DASH-224 to REQ-DASH-228: columns not green on the dataset list,
+  datasets not green on agency cards and collection headings, red and
+  amber trends on the dataset and column pages, and each check's chart
+  naming its measure. Entries #1 and #2 deleted with the build; their
+  decisions are on those requirements. The turned-off part is
+  REQ-DASH-180 criterion 29, built with that requirement.
 - **Sprint 2 - "don't mislead me" (S).** BUILT 2026-10-13 as REQ-DASH-197
   (the "not the latest file" panel as at the date on show) and REQ-DASH-198
   (the substituted/inherited qualifier, which also named a period that had
@@ -116,96 +114,6 @@ requirements:
   closer.
 Still to settle by driving the page: #8 and #17 - both since closed
 (2026-10-12 and 2026-10-13).
-
-1. **[investigate, 2026-09-24]** **[Dashboard UI]** **A trend is drawn
-   in two different places, measuring two different things, and neither
-   says which.** Keith's own sighting, road-testing the dashboard: it is
-   not clear whether a trend line is row counts, failure counts,
-   supplies or something else. It should say what it plots rather than
-   just saying "Trend".
-
-   **What the two actually plot**, read out of
-   `dashboard/qa-reporting-dashboard.template.html` rather than assumed,
-   because they are genuinely different quantities:
-
-   - **The dataset table's `Trend` column** (`aggregateSparkline()` /
-     `aggregateFailureSeries()`) plots, per run date, the **share of
-     that scope's applicable checks that were not green** - a RATE
-     between 0 and 1, deliberately not a raw count, because a check
-     introduced or retired mid-history moves the denominator. The
-     endpoint dot is coloured by the worst status that run. Nothing
-     on screen says any of this. The column header is the bare word
-     "Trend", there is no axis, no tooltip, no legend and no units; the
-     only text anywhere is the SVG's `aria-label`, "aggregate
-     failing-check trend sparkline", which a sighted reader never sees.
-   - **The per-check trend chart in the drawer** (`trendChart()`) plots
-     that ONE check's own metric over its run history, with warn and
-     fail threshold lines. Better off, since the endpoint value is
-     printed through `fmtMetric(value, unit)` and the unit carries the
-     meaning - but the y-axis itself has no title, and the "View as
-     table" header is the bare word "Value", so a check measuring a row
-     count, a failing-row count and a percentage all render under
-     identical labelling.
-
-   **Why this is worth more than a label tweak.** The two are adjacent
-   in the same UI and one is a RATE while the other is a RAW METRIC, so
-   a reader who works out what one means will carry that reading to the
-   other and be wrong. A falling line means "fewer checks failing" in
-   the column and "this metric went down" in the drawer, which for some
-   checks is bad news.
-
-   **Also worth checking while in here**, both unverified: whether the
-   `Rows, latest run` column and the trend column can be read as the
-   same series when they are not, and whether the aggregate rate is
-   legible at all as a sparkline with no scale - a line pinned near the
-   bottom by the 0.05 floor looks like a low flat value rather than an
-   all-green history.
-
-   **Not yet scoped, and it needs Keith before it is.** The real fork is
-   whether these get named in place (a header that says what is
-   measured, an axis title, a tooltip) or whether the aggregate one
-   needs a different treatment entirely at 30 datasets, where a column
-   of unlabelled sparklines is thirty invitations to the same wrong
-   reading.
-
-2. **[todo, 2026-09-24]** **[Dashboard UI]** **Tier 1 and Tier 2 say
-   whether there is a problem, never how big it is.** Keith's own ask,
-   2026-09-24: roughly how many checks are in trouble for this dataset -
-   how many amber, how many red - so a reader can see where to put their
-   effort without clicking into each dataset in turn to count failing
-   checks.
-
-   **What the two tiers show today**, read out of the template:
-
-   - **Tier 1, Executive** (`renderExec()`) counts AGENCIES by status -
-     "N agencies red, N amber, N green" - and each agency card carries
-     its collection and dataset counts. Nothing anywhere says how many
-     CHECKS are failing, at any level.
-   - **Tier 2, the agency view's dataset table** (`renderAgency()`)
-     gives each dataset a single worst-of pill, alongside latest
-     arrival, rows, last QA run and the trend sparkline. One red check
-     and forty red checks render identically.
-
-   **Why worst-of alone is the wrong signal for this job.** Worst-of is
-   right for "is anything wrong here", which is what the rollup exists
-   to answer, and it is deliberate - the Tier 1 sub-heading says so in
-   as many words ("nothing silently hides behind a healthy average").
-   But it is lossy in exactly the direction a person triaging needs:
-   every red dataset looks equally red, so the only way to rank them is
-   to open each one. At two datasets that is a click. At ~30 on the
-   quarterly asset it is the difference between a dashboard you triage
-   from and a list you work through.
-
-   **Open, and worth settling before building anything:** whether the
-   count is of CHECKS or of COLUMNS (a single bad column can carry
-   several failing checks, so a check count can overstate how many
-   things are actually wrong); whether Tier 1 aggregates the same
-   numbers upward or shows something else entirely at agency level;
-   whether a count belongs next to the pill, in its own column, or in
-   the pill itself; and how this reads against the already-unlabelled
-   trend column beside it (item 1) - adding a second number to that row
-   without fixing the first risks two unexplained figures instead of
-   one.
 
 3. **[todo, 2026-09-24]** **[Pipeline & publishing]** **A
    regularly scheduled dataset whose supplies are FOR THE FOLLOWING

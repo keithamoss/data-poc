@@ -387,6 +387,11 @@ button{font:inherit; color:inherit;}
    legend reads as the same vocabulary the page uses rather than as
    three colours plus two footnotes. */
 .not-green-key{display:block; margin-block:6px 8px;}
+.datasets-not-green{font-size:12.5px; color:var(--ink); margin-top:6px;}
+.datasets-not-green b{font-weight:600;}
+.datasets-trend{margin-top:8px;}
+.datasets-trend-label{font-size:11.5px; color:var(--ink-muted); margin-bottom:2px;}
+.collection-not-green{max-width:260px; margin:2px 0 8px;}
 .unit-trend{margin:4px 0 18px; max-width:560px;}
 .unit-trend-title{font-weight:600; font-size:13.5px; color:var(--ink); margin-bottom:2px;}
 .unit-trend .legend-key{margin-block:4px 8px;}
@@ -1258,16 +1263,35 @@ function asInstant(value){
   return at;
 }
 
+// ONE FORMATTER PER ZONE, AND ONE ANSWER PER INSTANT (REQ-DASH-226 NFR 6).
+// Constructing an Intl.DateTimeFormat is far dearer than using one, and this
+// was building one per call: profiled 2026-10-14, it was 71% of the time it
+// took to work out every dataset's status on a date, which the agency cards'
+// weekly trend does once a week back to 2023. The answer for an instant in a
+// zone never changes, so it is cached too; a copy is handed out so a caller
+// that mutates its result cannot change the next caller's.
+const _ASSET_FMT = new Map();
+const _ASSET_PARTS = new Map();
 function assetParts(value, zone){
   const at = asInstant(value);
   const tz = zone || assetZoneAt(at);
-  const f = new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday:"long",
-    day:"numeric", month:"numeric", year:"numeric", hour:"numeric", minute:"2-digit",
-    hour12:false});
-  const got = {};
-  f.formatToParts(at).forEach(p=>{ got[p.type] = p.value; });
-  return {weekday: got.weekday, day: Number(got.day), month: Number(got.month),
-          year: Number(got.year), hour: Number(got.hour) % 24, minute: Number(got.minute)};
+  const key = tz + "|" + at.getTime();
+  let parts = _ASSET_PARTS.get(key);
+  if(!parts){
+    let f = _ASSET_FMT.get(tz);
+    if(!f){
+      f = new Intl.DateTimeFormat("en-GB", {timeZone: tz, weekday:"long",
+        day:"numeric", month:"numeric", year:"numeric", hour:"numeric", minute:"2-digit",
+        hour12:false});
+      _ASSET_FMT.set(tz, f);
+    }
+    const got = {};
+    f.formatToParts(at).forEach(p=>{ got[p.type] = p.value; });
+    parts = {weekday: got.weekday, day: Number(got.day), month: Number(got.month),
+             year: Number(got.year), hour: Number(got.hour) % 24, minute: Number(got.minute)};
+    _ASSET_PARTS.set(key, parts);
+  }
+  return {...parts};
 }
 
 /* A PLAIN CALENDAR DATE IS NOT AN INSTANT and is rendered as written.
@@ -2105,8 +2129,19 @@ const DEMO_CAST = null;
 // exact per-dataset JSON shape (see pipeline/build_dashboard_data.py and
 // pipeline/build_cp_dashboard_data.py), so one function turns either into
 // what the dashboard's rendering code expects.
+// Parsing a date string is dear and the same few hundred strings recur on
+// every build of every date the agency trend asks for (REQ-DASH-226 NFR 6),
+// so the parse is cached; each caller still gets its own Date.
+const _PARSED_DATE = new Map();
 function buildRealDataset(d){
-  const toDate = s => new Date(s.length>10 ? s.replace(" ","T")+"Z" : s+"T00:00:00Z");
+  const toDate = s => {
+    let ms = _PARSED_DATE.get(s);
+    if(ms === undefined){
+      ms = new Date(s.length>10 ? s.replace(" ","T")+"Z" : s+"T00:00:00Z").getTime();
+      _PARSED_DATE.set(s, ms);
+    }
+    return new Date(ms);
+  };
 
   const columns = d.columns.map(col => {
     // SPREAD-THEN-OVERRIDE, here and on the column below. Never list
@@ -2835,6 +2870,16 @@ function rawRealDatasetById(datasetId){
 function inNoRollup(d){
   return Boolean(d && d.scheduleNotAgreed);
 }
+// WHETHER THE ROLLUP COUNTS A DATASET'S STATUS (REQ-DASH-226 criterion 3),
+// lifted out of rollup() so the agency cards' and collection headings'
+// counts leave out exactly what the pill does: no schedule agreed, an
+// ended schedule, no data. A BLOCKED DATASET IS A RED like any other
+// (REQ-PIPE-115 criterion 10), whatever quiet state its runs alone would
+// have put it in.
+function inRollup(d){
+  return !inNoRollup(d) && Boolean(d.blocked || d.waitingBlocker || d.noSupply
+    || (!d.noDataInPlaceOn && !d.scheduleExhausted));
+}
 function rollup(datasets){
   // An exhausted schedule is excluded from the worst-of for the same
   // reason nodata is - it is a different KIND of signal - but UNLIKE
@@ -2843,10 +2888,7 @@ function rollup(datasets){
   // that would be indistinguishable from a quiet healthy feed
   // (REQ-PIPE-053).
   const counted = datasets.filter(d=>!inNoRollup(d));
-  // A BLOCKED DATASET IS A RED like any other (REQ-PIPE-115 criterion
-  // 10), whatever quiet state its runs alone would have put it in.
-  const live = counted.filter(d=> d.blocked || d.waitingBlocker || d.noSupply
-    || (!d.noDataInPlaceOn && !d.scheduleExhausted));
+  const live = counted.filter(inRollup);
   if(!live.length){
     if(counted.some(d=>d.scheduleExhausted)) return "exhausted";
     if(counted.length) return "nodata";
@@ -3126,13 +3168,27 @@ const AGENCY_BLURB = {
 // Presentation copy, not hierarchy: a blurb is how the page describes
 // an agency, which contract/data-asset.yaml has no business knowing.
 // An agency with none simply shows no blurb.
-function datasetTile(datasetId, inPlaceOnDateStr){
+// `cache` is one date's build: each feed's datasets are built at most once
+// per date (REQ-DASH-226 NFR 6). Without it every Child Protection dataset
+// asked for rebuilt all six. Never shared between dates or builds, because
+// buildDatasetsOn() marks statuses onto the objects it is handed.
+function datasetTile(datasetId, inPlaceOnDateStr, cache){
   if(datasetId === "birth-registrations") return buildBirthRegistrations(inPlaceOnDateStr);
-  const cp = buildChildProtectionDatasets(inPlaceOnDateStr);
+  let cp = cache && cache.cp;
+  if(!cp){
+    cp = buildChildProtectionDatasets(inPlaceOnDateStr);
+    if(cache) cache.cp = cp;
+  }
   return cp.find(d => d.id === datasetId) || null;
 }
 
-function buildData(inPlaceOnDateStr){
+// EVERY DATASET'S OWN STATUS ON A DATE (REQ-DASH-224 criterion 7, REQ-DASH-
+// 226 criterion 2): the part of buildData() that works out each dataset,
+// lifted out so that the agency cards' and collection headings' counts and
+// weekly trends judge a dataset by exactly the code its pill does. The group
+// rollups stay in buildData().
+function buildDatasetsOn(inPlaceOnDateStr){
+  const tiles = {};
   const agencies = ((HIERARCHY && HIERARCHY.agencies) || []).map(ag => ({
     id: ag.id,
     name: ag.name,
@@ -3141,7 +3197,7 @@ function buildData(inPlaceOnDateStr){
       id: col.id,
       name: col.name,
       datasets: (col.datasets || []).map(d =>
-        datasetTile(d.id, inPlaceOnDateStr)
+        datasetTile(d.id, inPlaceOnDateStr, tiles)
         || noDataDataset(d.id, d.name, "", "", null)),
     })),
   }));
@@ -3225,11 +3281,31 @@ function buildData(inPlaceOnDateStr){
           ds.status = rollupStatuses(ds.columns.map(c=>c.status));
         }
       });
-      col.status = rollup(col.datasets);
     });
+  });
+  return data;
+}
+function buildData(inPlaceOnDateStr){
+  const data = buildDatasetsOn(inPlaceOnDateStr);
+  data.agencies.forEach(ag=>{
+    ag.collections.forEach(col=>{ col.status = rollup(col.datasets); });
     ag.status = rollupStatuses(ag.collections.map(c=>c.status));
   });
   return data;
+}
+// One map per date, {datasetId: {status, inRollup}}, cached: the weekly grid
+// asks for the same dates on every render, and one call serves every card
+// and every collection heading (REQ-DASH-226 criterion 13).
+const _STATUSES_ON = new Map();
+function datasetStatusesOn(inPlaceOnDateStr){
+  let got = _STATUSES_ON.get(inPlaceOnDateStr);
+  if(!got){
+    got = new Map();
+    buildDatasetsOn(inPlaceOnDateStr).agencies.forEach(ag=> ag.collections.forEach(col=>
+      col.datasets.forEach(d=> got.set(d.id, {status: d.status, inRollup: inRollup(d)}))));
+    _STATUSES_ON.set(inPlaceOnDateStr, got);
+  }
+  return got;
 }
 let DATA = buildData(CURRENT_IN_PLACE_ON);
 
@@ -3299,7 +3375,7 @@ function unitCounts(units){
       ck.history.forEach(h=>{
         const s = historyStatus(h, ck);
         if(s !== "red" && s !== "amber" && s !== "green") return;
-        if(!byRun.has(h.run_id)) byRun.set(h.run_id, {runId:h.run_id, date:h.date, counted:0, red:0, amber:0, redNames:[], amberNames:[], sectionNames:[]});
+        if(!byRun.has(h.run_id)) byRun.set(h.run_id, {runId:h.run_id, date:h.date, counted:0, red:0, amber:0, sectionNames:[]});
         const was = worst.get(h.run_id);
         if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(h.run_id, s);
       });
@@ -3307,8 +3383,8 @@ function unitCounts(units){
     worst.forEach((s, runId)=>{
       const e = byRun.get(runId);
       e.counted++;
-      if(s === "red"){ e.red++; e.redNames.push(u.name); }
-      if(s === "amber"){ e.amber++; e.amberNames.push(u.name); }
+      if(s === "red") e.red++;
+      if(s === "amber") e.amber++;
       if(u.scope && (s === "red" || s === "amber")) e.sectionNames.push(u.name);
     });
   });
@@ -3347,11 +3423,16 @@ function twoLineSparkline(series, opts){
   const y = v=> h-pad - v*(h-2*pad);
   const last = series[n-1];
   const unit = o.unitWord || "Columns";
-  const label = `${unit} red and amber on each QA run, ${n} runs from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+  const label = o.label ? o.label(series)
+    : `${unit} red and amber on each QA run, ${n} runs from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
   return `<svg class="spark${o.cls ? " "+o.cls : ""}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${escAttr(label)}">
     <line x1="${pad}" y1="${y(0).toFixed(1)}" x2="${w-pad}" y2="${y(0).toFixed(1)}" stroke="var(--line-strong)" stroke-width="1" vector-effect="non-scaling-stroke"/>
     ${twoLinePaths(series, x, y, !!o.quiet)}
   </svg>`;
+}
+// A quiet trend's name: its history, and that nothing has a verdict now.
+function noVerdictTrendLabel(unitWord, ser, noun){
+  return `${unitWord} red and amber on each QA run, ${ser.length} runs from ${shortDay(ser[0].date)} to ${shortDay(ser[ser.length-1].date)}; no ${noun || "column"} has a verdict on this date`;
 }
 // '1 Feb 2023': accessible names are read out, so dates in them are short.
 function shortDay(dt){ return dt.toLocaleDateString("en-AU", {day:"numeric", month:"short", year:"numeric", timeZone:"UTC"}); }
@@ -3369,8 +3450,12 @@ function twoLinePaths(series, x, y, quiet){
     }
     return paths;
   };
-  return line("red", quiet ? _QUIET_COLOUR : "var(--bad)", false)
-    + line("amber", quiet ? _QUIET_COLOUR : "var(--warn-fill)", true);
+  // Amber in --warn, not --warn-fill: the signed CONTRAST NFR (REQ-DASH-225)
+  // needs 3:1 on the surface, and --warn-fill is 2.7:1 on white. Amber is
+  // drawn first so that red sits on top where the two coincide (its
+  // LEGIBILITY NFR) - post-build-review #184.
+  return line("amber", quiet ? _QUIET_COLOUR : "var(--warn)", true)
+    + line("red", quiet ? _QUIET_COLOUR : "var(--bad)", false);
 }
 // THE DATASET LIST'S 'COLUMNS NOT GREEN' CELL (REQ-DASH-225 criteria 3-6,
 // 8, 21, 22): the newest checked run's count in words, then the two lines.
@@ -3387,7 +3472,10 @@ function columnsNotGreenCell(units, quietStatus, noVerdict){
   const faint = t=> `<span class="not-green-faint">${t}</span>`;
   if(!series.length) return faint("No column has a verdict on this date");
   if(noVerdict){
-    const lines = series.length < 2 ? "" : twoLineSparkline(series, {quiet: true, unitWord: "Columns", w: 120, h: 28});
+    // The name says what the text says (post-build-review #184): the lines
+    // are history, and no latest count is claimed.
+    const lines = series.length < 2 ? "" : twoLineSparkline(series, {quiet: true, unitWord: "Columns", w: 120, h: 28,
+      label: ser=> noVerdictTrendLabel("Columns", ser)});
     return `<div class="not-green-cell"><div class="not-green-text">${faint("No column has a verdict on this date")}</div><div class="not-green-lines">${lines}</div></div>`;
   }
   const last = series[series.length-1];
@@ -3405,7 +3493,7 @@ function lineSample(colour, dashed){
   return `<svg width="18" height="6" aria-hidden="true"><line x1="1" y1="3" x2="17" y2="3" stroke="${colour}" stroke-width="1.5" stroke-linecap="round"${dashed ? ` stroke-dasharray="${SPARK_DOTS}"` : ""}/></svg>`;
 }
 function columnsNotGreenKey(){
-  return `<div class="legend-key not-green-key">Columns not green — ${lineSample("var(--bad)", false)} red · ${lineSample("var(--warn-fill)", true)} amber, share of columns on each QA run. Supply-level, table-level and cross-table checks each count as one column.</div>`;
+  return `<div class="legend-key not-green-key">Columns not green — ${lineSample("var(--bad)", false)} red · ${lineSample("var(--warn)", true)} amber, share of columns on each QA run. Supply-level, table-level and cross-table checks each count as one column.</div>`;
 }
 // A DATASET'S OR A COLUMN'S RED AND AMBER, LARGE (REQ-DASH-227 criteria
 // 1-4, 6): the same series and the same two lines as the dataset list's row,
@@ -3430,7 +3518,8 @@ function unitTrendBlock(series, o){
   const anchor = i=> n===1 ? "middle" : i===0 ? "start" : i===n-1 ? "end" : "middle";
   const xLabels = tickIdx.map(i=> `<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9.5" text-anchor="${anchor(i)}" fill="var(--ink-faint)" font-family="IBM Plex Mono, monospace">${shortDay(series[i].date)}</text>`).join("");
   const last = series[n-1];
-  const label = `${o.unitWord} red and amber on each QA run, ${n} ${pluralize(n, "run")} from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+  const label = quiet ? noVerdictTrendLabel(o.unitWord, series, o.noun)
+    : `${o.unitWord} red and amber on each QA run, ${n} ${pluralize(n, "run")} from ${shortDay(series[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
   return `<div class="unit-trend" data-unit-trend="${o.kind}">
     ${head}
     <div class="chart-axis-title">${o.yTitle}</div>
@@ -3462,6 +3551,91 @@ document.addEventListener("click", e=>{
   btn.textContent = t.hidden ? "View as table" : "Hide table";
 });
 
+// DATASETS NOT GREEN, ON AN AGENCY CARD AND A COLLECTION HEADING
+// (REQ-DASH-226). Each dataset is judged by its own pill's status, a red
+// that is not about its checks included (a supply waiting for a person, a
+// period closed with nothing in it). M is what the group's own rollup counts
+// - inRollup(), and a verdict - so the count and the pill beside it are
+// judged over the same datasets. 'counted' is said only where the rollup
+// leaves some out. No line at all for a Not counted group or an M of 0.
+function datasetsNotGreen(datasets){
+  const counted = datasets.filter(d=> inRollup(d) && ["red","amber","green"].indexOf(d.status) !== -1);
+  return {counted: counted.length,
+    red: counted.filter(d=> d.status === "red").length,
+    amber: counted.filter(d=> d.status === "amber").length,
+    someLeftOut: counted.length < datasets.length};
+}
+function datasetsNotGreenLine(datasets, groupStatus){
+  if(groupStatus === "notcounted") return "";
+  const c = datasetsNotGreen(datasets);
+  if(!c.counted) return "";
+  const noun = c.someLeftOut ? "counted datasets" : "datasets";
+  const n = c.red + c.amber;
+  const said = n ? `<b>${n} of ${c.counted} ${noun} not green</b><div class="not-green-split">${c.red} red, ${c.amber} amber</div>`
+    : `All ${c.counted} ${noun} green`;
+  return `<div class="datasets-not-green">${said}</div>`;
+}
+// THE WEEKLY GRID (criterion 9): the date on show, then a week at a time
+// back to the first week with a QA run - judging each dataset at each point
+// by its full status on that date, so the last point is the count by
+// construction. Datasets the rollup leaves out on a date are out of that
+// point. `statusesOn` is datasetStatusesOn() in the page; tests hand in
+// their own.
+function addDaysStr(dateStr, days){ return new Date(Date.parse(dateStr+"T00:00:00Z") + days*864e5).toISOString().slice(0,10); }
+function groupWeeklySeries(datasetIds, firstRunDateStr, onDateStr, statusesOn){
+  const lookup = statusesOn || datasetStatusesOn;
+  if(!firstRunDateStr || firstRunDateStr > onDateStr) return [];
+  const dates = [];
+  for(let d = onDateStr; d >= firstRunDateStr; d = addDaysStr(d, -7)) dates.push(d);
+  return dates.reverse().map(dateStr=>{
+    const on = lookup(dateStr);
+    const p = {runId: dateStr, dateStr, date: new Date(dateStr+"T00:00:00Z"), counted:0, red:0, amber:0};
+    datasetIds.forEach(id=>{
+      const got = on.get(id);
+      if(!got || !got.inRollup || ["red","amber","green"].indexOf(got.status) === -1) return;
+      p.counted++;
+      if(got.status === "red") p.red++;
+      if(got.status === "amber") p.amber++;
+    });
+    return p;
+  });
+}
+function datasetsTrendHtml(series, quiet){
+  if(!series || series.length < 2) return "";
+  const svg = twoLineSparkline(series, {quiet: !!quiet, w: 180, h: 28, label: ser=>{
+    const last = ser[ser.length-1];
+    return `Datasets red and amber each week, ${ser.length} weeks from ${shortDay(ser[0].date)} to ${shortDay(last.date)}; latest ${last.red} red and ${last.amber} amber of ${last.counted}`;
+  }});
+  return `<div class="datasets-trend"><div class="datasets-trend-label">Datasets red and amber, each week</div>${svg}</div>`;
+}
+// The first day any of these datasets had a QA run, from the embedded runs.
+function firstRunDateOf(datasetIds){
+  const firsts = datasetIds.map(id=>{
+    const raw = rawRealDatasetById(id);
+    return raw && raw.runs && raw.runs.length ? raw.runs.map(r=> r.run_date).sort()[0] : null;
+  }).filter(Boolean).sort();
+  return firsts[0] || null;
+}
+// A trend's place on the page, filled just after first paint (criterion 13:
+// pills and counts first, then the lines). The date and datasets ride on the
+// slot itself, so a fill that lands after the reader has moved on draws the
+// date it was asked for, or nothing if its slot is gone.
+function datasetsTrendSlot(datasetIds, quiet){
+  return `<div class="datasets-trend-slot" data-on="${CURRENT_IN_PLACE_ON}" data-ids="${escAttr(datasetIds.join(" "))}"${quiet ? " data-quiet" : ""}></div>`;
+}
+function fillDatasetsTrends(root){
+  const slots = [...root.querySelectorAll(".datasets-trend-slot")];
+  if(!slots.length) return;
+  setTimeout(()=>{
+    slots.forEach(slot=>{
+      if(!slot.isConnected) return;
+      const ids = slot.dataset.ids.split(" ").filter(Boolean);
+      const series = groupWeeklySeries(ids, firstRunDateOf(ids), slot.dataset.on);
+      slot.innerHTML = datasetsTrendHtml(series, slot.hasAttribute("data-quiet"));
+    });
+    root.dataset.trendsDrawn = String(Number(root.dataset.trendsDrawn || 0) + 1);
+  }, 0);
+}
 // The row and tile entry point: the units' series, drawn.
 function aggregateSparkline(units, quietStatus, opts){
   return twoLineSparkline(unitCounts(units), {...(opts||{}), quiet: !!quietStatus});
@@ -5609,14 +5783,18 @@ function renderExec(view){
   const grid = document.getElementById("agency-grid");
   grid.innerHTML = DATA.agencies.map(ag=>{
     const nDatasets = ag.collections.reduce((s,c)=>s+c.datasets.length,0);
-    const allCols = ag.collections.flatMap(c=>c.datasets.flatMap(d=>d.columns));
-    const spark = aggregateSparkline(allCols, quietOf(ag.status));
-    return `<a class="card" href="${navHref({tier:"agency", agencyId:ag.id})}" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}'>
+    // REQ-DASH-226: how many of the agency's counted datasets are not
+    // green, then the weekly red and amber trend (drawn after first paint).
+    const agDatasets = ag.collections.flatMap(c=>c.datasets);
+    const notGreen = datasetsNotGreenLine(agDatasets, ag.status);
+    const trend = datasetsTrendSlot(agDatasets.map(d=>d.id), !notGreen);
+    return `<a class="card" href="${navHref({tier:"agency", agencyId:ag.id})}" data-nav='${JSON.stringify({tier:"agency", agencyId:ag.id})}' data-agency="${ag.id}">
       <div class="card-top"><h3>${ag.name}</h3>${pill(ag.status)}</div>
       <div style="color:var(--ink-muted); font-size:12.5px;">${ag.blurb}</div>
-      ${spark}
+      ${trend}
       ${exhaustedMarker(ag.exhaustedCount, ag.status)}${refusedMarker(ag.refusedCount)}
-      ${notCountedMarker(ag.status, ag.collections.flatMap(c=>c.datasets))}
+      ${notGreen}
+      ${notCountedMarker(ag.status, agDatasets)}
       ${outstandingMarker("agency", ag.id, undefined, ag.noSupplyCount)}
       ${redPromotedMarker(ag)}
       ${acceptedGapsMarker(ag.acceptedCount)}
@@ -5624,6 +5802,7 @@ function renderExec(view){
     </a>`;
   }).join("");
   wireCards(grid);
+  fillDatasetsTrends(grid);
 }
 
 // A URL POINTING AT SOMETHING THAT NO LONGER EXISTS is an ordinary
@@ -5686,7 +5865,7 @@ function renderAgency(view, agencyId){
   const wrap = document.getElementById("collections");
   wrap.innerHTML = ag.collections.map(col=>`
     <div class="collection-block">
-      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${notCountedMarker(col.status, col.datasets)}
+      <div class="collection-title"><h3>${col.name}</h3>${pill(col.status,"sm")}${exhaustedMarker(col.exhaustedCount, col.status)}${refusedMarker(col.refusedCount)}</div>${(ng => `<div class="collection-not-green" data-collection="${col.id}">${datasetsTrendSlot(col.datasets.map(d=>d.id), !ng)}${ng}</div>`)(datasetsNotGreenLine(col.datasets, col.status))}${notCountedMarker(col.status, col.datasets)}
       ${outstandingMarker("collection", col.id, undefined, col.noSupplyCount)}
       ${redPromotedMarker(col)}
       ${acceptedGapsMarker(col.acceptedCount)}
@@ -5777,6 +5956,7 @@ function renderAgency(view, agencyId){
   // written; moving the affordance into one cell would change what a
   // mouse user clicks to fix what a keyboard user cannot reach.
   wireNavLinks(wrap);
+  fillDatasetsTrends(wrap);
   wrap.querySelectorAll("tbody tr").forEach(tr=>{
     const go = ()=> navigate(JSON.parse(tr.dataset.nav));
     tr.addEventListener("click", e=>{
@@ -6543,7 +6723,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         key: columnsNotGreenKey(), yTitle:"% of columns", unitWord:"Columns", noun:"column", quiet: !!ds.noDataInPlaceOn})}
     <div id="file-section-wrap"></div>
     <div id="scope-sections"></div>
-    ${ds.blocked ? "" : `<div class="tile-lines-key">Each column's lines: share of its checks red (solid) and amber (dotted), each QA run</div>`}
+    ${ds.blocked || ds.noDataInPlaceOn ? "" : `<div class="tile-lines-key">Each column's lines: share of its checks red (solid) and amber (dotted), each QA run</div>`}
     <div class="col-grid" id="col-grid"></div>
     <div id="supply-history-wrap"></div>
   `;
