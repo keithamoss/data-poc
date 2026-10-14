@@ -998,6 +998,10 @@ class TestTurnedOffOnThePage:
         self._turn_off(page)
         row = page.locator("tr", has_text="Client Register").first
         assert row.locator(".turnoff-marker").count() == 1
+        # THE BAR ICON, not the small pills' square (post-build-review #195 D3).
+        size = row.locator(".turnoff-marker .ico").evaluate(
+            "e => [getComputedStyle(e).width, getComputedStyle(e).height]")
+        assert size == ["8px", "2px"]
         # OUT OF THE ROLLUP ONLY WHILE NOTHING ABOUT AN OWED PERIOD WAITS
         # (criteria 6 and 7) - the real cp-clients may have something waiting.
         got = page.evaluate("""() => {

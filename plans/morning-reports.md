@@ -1511,6 +1511,10 @@ one or more component tags, and a date.
         date, so a future turn-off hid the dataset on every earlier date too;
         it now sends each gap and the page judges it. Both amendments in
         criterion 22 applied as the batch proposed them. Gate in the commit.
+      - ~05:45 180 pushed (573e42b, full gate green). Critic (#195): an owed red
+        supply awaiting a decision let a turned-off dataset leave the rollup,
+        and the weekly trend counted what the line left out - both fixed
+        test-first, with three wording and style fixes. Q21-Q25.
     - **QUESTIONS FOR KEITH** (none blocks the plan; each is built the
       conservative way meanwhile):
       1. (#188 D2) Should `supply decide` refuse rejecting a held supply whose
@@ -1586,3 +1590,16 @@ one or more component tags, and a date.
       20. (#194 F5) The SLA tile follows participation versions by date, not
           calendar versions (no calendar has a second version today). Follow
           both now, or wait until one does?
+      21. (#195 F10) Criterion 25's "Turning off after <date> - nothing more
+          owed" - and leaving the rollup - starts when the last owed slot
+          closes, even before the turn-off was authored. Gate it on the
+          authored date as criterion 27's marker is, or keep it?
+      22. (#195 F7) Should the asset level carry the "N datasets not counted in
+          this status" line, or are the legend counts enough?
+      23. (#195 F8) Criterion 12 says 'Not counted' is drawn in the turn-off
+          marker's style; it keeps its own (fainter border, hollow circle).
+          Restyle it, or amend the criterion?
+      24. (#195) Before a for-good turn-off starts, the runway warning still
+          asks for more dates. Suppress it once the turn-off is authored?
+      25. (#195) Criterion 19's "provenance cell" doesn't exist; the note sits
+          in the Timing cell. Accept that, or wait for the cell split?

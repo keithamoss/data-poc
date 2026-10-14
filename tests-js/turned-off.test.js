@@ -158,7 +158,7 @@ describe("a supply received while turned off (criterion 14)", () => {
     const el = w.document.createElement("div");
     el.innerHTML = w.receivedWhileOffLine("cp-clients", "2025-08-01", source);
     expect(el.textContent.replace(/\s+/g, " ").trim())
-      .toBe(`2 received while turned off, earliest ${w.fmtInstant("2025-06-02T01:00:00+00:00")}`);
+      .toBe(`2 received while turned off, earliest ${w.fmtDay("2025-06-02")}`);
     expect(el.querySelector(".accepted-gaps-note")).not.toBeNull();
     expect(w.receivedWhileOffLine("cp-clients", "2025-05-01", source)).toBe("");
   });
@@ -220,5 +220,61 @@ describe("a collection's own turn-off on its card (criterion 2)", () => {
     expect(html).toContain("&lt;i&gt;paused&lt;/i&gt;");
     expect(html.match(/paused/g)).toHaveLength(1);
     expect(w.collectionTurnOffLine({ datasets: [{ id: "a", turnOff: { ...t, level: "dataset" } }] })).toBe("");
+  });
+});
+
+describe("post-build-review #195", () => {
+  it("D1: a supply waiting for a decision on an owed period keeps it in the rollup", () => {
+    const w = load();
+    const off = { turnOff: { leftOut: true } };
+    expect(w.outByTurnOff(off)).toBe(true);
+    expect(w.outByTurnOff({ ...off, verdictOf: { state: "awaiting" } })).toBe(false);
+    expect(w.outByTurnOff({ ...off, waitingBlocker: {} })).toBe(false);
+    expect(w.outByTurnOff({ turnOff: { leftOut: false } })).toBe(false);
+  });
+
+  it("D2: one marking, shared by the rollup and the per-date statuses", () => {
+    const w = load();
+    w.rawRealDatasetById = () => ds();
+    const data = { agencies: [{ collections: [{ datasets: [{ id: "cp-clients" }] }] }] };
+    w.markTurnOffs(data, "2025-05-01");
+    expect(data.agencies[0].collections[0].datasets[0].turnedOffOutOfRollup).toBe(true);
+  });
+
+  it("D4: '(turned off)' only once it is turned off", () => {
+    const w = load();
+    const named = (phase) => ({ name: "Client Register", turnOff: { phase } });
+    expect(w.turnedOffName(named("announced"))).toBe("Client Register");
+    expect(w.turnedOffName(named("nothing-more-owed"))).toBe("Client Register");
+    expect(w.turnedOffName(named("off"))).toBe("Client Register (turned off)");
+    expect(w.turnedOffName(named("still-owed"))).toBe("Client Register (turned off)");
+  });
+
+  it("D5: the header and card say 'Turning off' before it happens", () => {
+    const w = load();
+    const t = (phase) => ({ phase, reason: "r", level: "collection", turnOff: { collection: "Child Protection" } });
+    expect(w.turnOffReasonLine({ turnOff: t("announced") })).toContain("Turning off with Child Protection: r");
+    expect(w.turnOffReasonLine({ turnOff: t("off") })).toContain("Turned off with Child Protection: r");
+    expect(w.collectionTurnOffLine({ datasets: [{ turnOff: t("announced") }] })).toContain("Turning off with Child Protection: r");
+  });
+
+  it("F11: with no slot owed before the gap, nothing reads 'nothing more owed' before the effective_to", () => {
+    const w = load();
+    const none = ds({ ...TURN, lastOwed: null });
+    expect(w.turnOffOn(none, "2020-01-01")).toBeNull();
+    expect(w.turnOffOn(none, "2025-05-01").phase).toBe("off");
+  });
+
+  it("F12: the received-while-off line gives a date, and reasons come most first", () => {
+    const w = load();
+    const held = (at) => ({ kind: "held", datasetId: "cp-clients", supply: `s@${at}`, openedAt: at,
+                            resolvedAt: null, turnedOff: { reason: "r" } });
+    const el = w.document.createElement("div");
+    el.innerHTML = w.receivedWhileOffLine("cp-clients", "2025-08-01", { blockers: [held("2025-06-02T01:00:00+00:00")] });
+    expect(el.textContent.trim()).toBe(`1 received while turned off, earliest ${w.fmtDay("2025-06-02")}`);
+    const off = { id: "o", turnedOffOutOfRollup: true };
+    const un = { id: "u", scheduleNotAgreed: "not-yet-agreed" };
+    el.innerHTML = w.notCountedMarker("notcounted", [off, { ...off, id: "o2" }, un]);
+    expect(el.textContent.replace(/\s+/g, " ").trim()).toBe("3 datasets not counted: 2 turned off, 1 no schedule agreed yet");
   });
 });

@@ -25358,6 +25358,7 @@ requirements:
     - 'tests/test_turn_off.py::TestTheBuildCarriesIt'
     - 'tests/test_turn_off.py::TestCriticFindingsOn190::test_each_gap_is_sent_for_the_page'
     - 'tests/test_dashboard_e2e.py::TestTurnedOffOnThePage'
+    - 'tests/test_turn_off.py::TestCriticFindingsOn190::test_d3_the_backlog_line_reads_the_label_as_it_stands'
     implemented_by:
     - 'qa_tools/common/turned_off.py::timeline'
     - 'qa_tools/common/turned_off.py::_last_owed'
@@ -25383,6 +25384,11 @@ requirements:
     - 'dashboard/qa-reporting-dashboard.template.html::datasetsNotGreenLine'
     - 'dashboard/qa-reporting-dashboard.template.html::redPromotedMarker'
     - 'dashboard/qa-reporting-dashboard.template.html::scheduleRunwayInPlaceOn'
+    - 'dashboard/qa-reporting-dashboard.template.html::outByTurnOff'
+    - 'dashboard/qa-reporting-dashboard.template.html::markTurnOffs'
+    - 'dashboard/qa-reporting-dashboard.template.html::turnedOffName'
+    - 'dashboard/qa-reporting-dashboard.template.html::turningOrTurned'
+    - 'dashboard/qa-reporting-dashboard.template.html::datasetStatusesOn'
     evidence:
     - '2026-10-15 overnight: tests-js/turned-off.test.js (24 tests), its marker, rollup and line tests written first and 15 seen to fail with the criterion 29 extension of datasets-not-green.test.js; the runway test and runway.off_gaps'' Python test each seen to fail before their change; tests/test_turn_off.py''s build test seen to fail on the missing lastOwed. tests/test_dashboard_e2e.py::TestTurnedOffOnThePage (2) in a real browser - the collection-row test found two row templates that had no marker. The full gate result is in the commit that flips this to built.'
 

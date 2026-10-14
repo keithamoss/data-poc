@@ -238,8 +238,8 @@ button{font:inherit; color:inherit;}
    marker uses. Said in words. */
 .pill.turnedoff, .turnoff-marker{background:transparent; color:var(--ink-muted);
   border:1px solid var(--ink-muted);}
-.pill.turnedoff .ico, .turnoff-marker .ico{background:var(--ink-muted); width:8px; height:2px;
-  border-radius:1px;}
+.pill.turnedoff .ico, .pill.sm.turnoff-marker .ico, .turnoff-marker .ico{background:var(--ink-muted);
+  width:8px; height:2px; border-radius:1px;}
 
 /* A dataset nobody has agreed a delivery schedule for (REQ-PIPE-106
    criterion 8). NOT A STATUS - it sits BESIDE the real red/amber/green
@@ -3408,16 +3408,26 @@ function buildDatasetsOn(inPlaceOnDateStr){
   });
   return data;
 }
-function buildData(inPlaceOnDateStr){
-  const data = buildDatasetsOn(inPlaceOnDateStr);
-  // TURNED OFF (REQ-DASH-180 criteria 6 and 7): out of its group's rollup
-  // only once it owes nothing more AND nothing about an owed period is
-  // waiting - a held or closed-unfilled owed period keeps it in, red.
+// TURNED OFF (REQ-DASH-180 criteria 6 and 7): out of its group's rollup
+// only once it owes nothing more AND nothing about an owed period is waiting
+// - a held supply, a closed unfilled period, or a supply awaiting a person's
+// decision (post-build-review #195 D1) keeps it in, its verdict and all.
+function outByTurnOff(ds){
+  return !!(ds.turnOff && ds.turnOff.leftOut && !ds.blocked && !ds.waitingBlocker
+    && !ds.noSupply && !(ds.verdictOf && ds.verdictOf.state === "awaiting"));
+}
+// ONE MARKING for the rollup and the per-date statuses the weekly trend reads
+// (#195 D2): the trend counted a dataset the 'N of M' line left out.
+function markTurnOffs(data, inPlaceOnDateStr){
   data.agencies.forEach(ag=> ag.collections.forEach(col=> col.datasets.forEach(ds=>{
     ds.turnOff = turnOffOn(rawRealDatasetById(ds.id) || ds, inPlaceOnDateStr);
-    ds.turnedOffOutOfRollup = !!(ds.turnOff && ds.turnOff.leftOut
-      && !ds.blocked && !ds.waitingBlocker && !ds.noSupply);
+    ds.turnedOffOutOfRollup = outByTurnOff(ds);
   })));
+  return data;
+}
+function buildData(inPlaceOnDateStr){
+  const data = buildDatasetsOn(inPlaceOnDateStr);
+  markTurnOffs(data, inPlaceOnDateStr);
   data.agencies.forEach(ag=>{
     ag.collections.forEach(col=>{ col.status = rollup(col.datasets); });
     ag.status = rollupStatuses(ag.collections.map(c=>c.status));
@@ -3432,7 +3442,7 @@ function datasetStatusesOn(inPlaceOnDateStr){
   let got = _STATUSES_ON.get(inPlaceOnDateStr);
   if(!got){
     got = new Map();
-    buildDatasetsOn(inPlaceOnDateStr).agencies.forEach(ag=> ag.collections.forEach(col=>
+    markTurnOffs(buildDatasetsOn(inPlaceOnDateStr), inPlaceOnDateStr).agencies.forEach(ag=> ag.collections.forEach(col=>
       col.datasets.forEach(d=> got.set(d.id, {status: d.status, inRollup: inRollup(d)}))));
     _STATUSES_ON.set(inPlaceOnDateStr, got);
   }
@@ -4168,7 +4178,9 @@ function notCountedMarker(status, datasets){
   const by = notCountedReasons(datasets);
   const total = Object.values(by).reduce((a,b)=>a+b, 0);
   if(!total) return "";
-  const parts = Object.keys(by).sort().map(k=> `${by[k]} ${k}`).join(", ");
+  // MOST FIRST, then by name (#195 F12), as criterion 9's example reads.
+  const parts = Object.keys(by).sort((a, b)=> by[b] - by[a] || a.localeCompare(b))
+    .map(k=> `${by[k]} ${k}`).join(", ");
   const said = status === "notcounted" ? "not counted" : "not counted in this status";
   return `<div class="not-counted-why" style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${total}
     dataset${total===1?"":"s"} ${said}: ${parts}</div>`;
@@ -4203,7 +4215,10 @@ function turnOffOn(d, dateStr){
   for(const t of (d.turnOffs || [])){
     if(t.until && dateStr >= t.until) continue;            // back on (criterion 18)
     const last = t.lastOwed;
-    const closed = !last || !last.closesAt || Date.parse(last.closesAt) <= end.getTime();
+    // NO SLOT OWED BEFORE THE GAP (#195 F11): nothing to close, so nothing is
+    // said before the effective_to and it is simply off after.
+    const closed = last ? (!last.closesAt || Date.parse(last.closesAt) <= end.getTime())
+      : dateStr > t.effectiveTo;
     const coll = t.level === "collection";
     const base = {turnOff: t, reason: t.reason || "", level: t.level};
     if(dateStr <= t.effectiveTo){
@@ -4245,13 +4260,17 @@ function stillOwedNote(d, runId){
 function collectionTurnOffLine(col){
   const t = ((col && col.datasets) || []).map(d=> d.turnOff).find(t=> t && t.level === "collection");
   if(!t) return "";
-  return `<div class="collection-turn-off" data-collection-turn-off style="margin-top:6px; font-size:12px; color:var(--ink-muted);">Turned off with ${escHtml(t.turnOff.collection)}: ${escHtml(t.reason)}</div>`;
+  return `<div class="collection-turn-off" data-collection-turn-off style="margin-top:6px; font-size:12px; color:var(--ink-muted);">${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ${escHtml(t.reason)}</div>`;
+}
+// 'Turning off' until the effective_to has passed, 'Turned off' after (#195 D5).
+function turningOrTurned(t){
+  return t.phase === "off" || t.phase === "still-owed" ? "Turned off" : "Turning off";
 }
 // THE REASON AS VISIBLE TEXT IN THE HEADER (criterion 2), escaped (21).
 function turnOffReasonLine(ds){
   const t = ds && ds.turnOff;
   if(!t || !t.reason) return "";
-  const who = t.level === "collection" ? `Turned off for the whole of ${escHtml(t.turnOff.collection)}: ` : "";
+  const who = t.level === "collection" ? `${turningOrTurned(t)} with ${escHtml(t.turnOff.collection)}: ` : "";
   return `<div class="turn-off-why" data-turn-off-reason style="margin:-4px 0 12px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${who}${escHtml(t.reason)}</div>`;
 }
 function turnOffMarker(d, dateStr){
@@ -5420,7 +5439,7 @@ function receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source){
 function receivedWhileOffLine(datasetId, inPlaceOnDateStr, source){
   const found = receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source);
   if(!found.length) return "";
-  return `<div class="accepted-gaps-note received-while-off" data-received-while-off style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${found.length} received while turned off, earliest ${fmtInstant(found[0].openedAt)}</div>`;
+  return `<div class="accepted-gaps-note received-while-off" data-received-while-off style="margin:-4px 0 16px; color:var(--ink-muted); font-size:13px; max-width:70ch;">${found.length} received while turned off, earliest ${fmtDay(assetDateStrOf(found[0].openedAt))}</div>`;
 }
 function receivedWhileOffSection(datasetId, inPlaceOnDateStr, source){
   const found = receivedWhileOffInPlaceOn(datasetId, inPlaceOnDateStr, source);
@@ -6049,7 +6068,7 @@ function renderExec(view){
              separately in the legend below. The old wording was the
              page telling a reader the opposite of what its own code
              does, directly above the counters that prove it. -->
-        <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A red anywhere below makes the parent red; an amber with no red makes it amber — worst-of, so a failure cannot hide behind a healthy average. A dataset with no data, or whose schedule has ended, sits outside that comparison rather than losing to it, and is counted separately below.</div>
+        <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A red anywhere below makes the parent red; an amber with no red makes it amber — worst-of, so a failure cannot hide behind a healthy average. A dataset with no data, whose schedule has ended, that is turned off and owes nothing, or that has no schedule agreed sits outside that comparison rather than losing to it, and is counted separately below.</div>
       </div>
     </div>
     <div class="legend-key">
@@ -6170,7 +6189,7 @@ function renderAgency(view, agencyId){
           if(ds.blocked){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-blocked="${ds.blocked.kind}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">${escHtml(blockerReasonText(ds.blocked))}
                 — ${blockerReceivedText(ds.blocked)}; nothing is checked until it is resolved</td>
             </tr>`;
@@ -6187,7 +6206,7 @@ function renderAgency(view, agencyId){
           if(ds.noSupply && !ds.lastArrival){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-no-supply="${ds.noSupply.length}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.
                 Closed with nothing in it, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
             </tr>`;
@@ -6195,7 +6214,7 @@ function renderAgency(view, agencyId){
           if(ds.scheduleExhausted){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
                 ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
             </tr>`;
@@ -6203,7 +6222,7 @@ function renderAgency(view, agencyId){
           if(ds.noDataInPlaceOn && !ds.noSupply){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}${noSupplyNote(ds)}</td>
+              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance on the selected date</td>
             </tr>`;
           }
@@ -6216,7 +6235,7 @@ function renderAgency(view, agencyId){
           const dsSpark = columnsNotGreenCell(ds.columns, quietOf(ds.status), !!ds.noDataInPlaceOn);
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-            <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}${noSupplyNote(ds)}</td>
+            <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
             <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
@@ -6539,11 +6558,16 @@ function redPromotedDatasets(scope){
   }));
   return out;
 }
+// ONLY ONCE IT IS TURNED OFF (#195 D4) - not while a turn-off is announced.
+function turnedOffName(d){
+  const phase = d.turnOff && d.turnOff.phase;
+  return phase === "off" || phase === "still-owed" ? `${d.name} (turned off)` : d.name;
+}
 function redPromotedMarker(scope){
   const found = redPromotedDatasets(scope);
   if(!found.length) return "";
   // A TURNED-OFF ONE STAYS NAMED, said so (REQ-DASH-180 criterion 26).
-  const names = found.map(d=> d.turnOff ? `${d.name} (turned off)` : d.name);
+  const names = found.map(turnedOffName);
   return `<div class="red-promoted-marker" style="margin-top:4px; font-size:12px; color:var(--ink); display:flex; align-items:center; gap:5px;">${pill("red","sm")}<span>${found.length} red promoted: ${escHtml(names.join(", "))}</span></div>`;
 }
 function renderSupplyCycleRows(entries, datasetId, cycleStart){

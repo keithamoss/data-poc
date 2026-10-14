@@ -9,10 +9,11 @@ import test_place_held_supply as place
 from pipeline import placements
 from qa_tools.common import decision_log as dl
 from qa_tools.common import people
-from test_place_held_supply import DS, REAL_PERSON, WHEN, _held, _place, target  # noqa: F401
+from test_place_held_supply import DS, REAL_PERSON, WHEN, _held, _place
 
 conn = place.conn
 period = place.period
+target = place.target
 
 
 class TestAPlacementIsSent:

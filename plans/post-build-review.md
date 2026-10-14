@@ -9363,3 +9363,43 @@ twice. It deliberately did not re-find the `TypeError`.
        - **F5.** The tile follows participation versions by date but not
          calendar versions (none differ today). Follow both now, or wait for
          a second calendar version? Q20.
+
+195. **[in-progress, 2026-10-15]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-180 (a turned-off dataset on the dashboard), overnight #5.**
+     Each finding was checked against the code; each defect fix had a test
+     that failed first ("post-build-review #195" in
+     `tests-js/turned-off.test.js`). The real configuration turns nothing
+     off, so the critic built turn-offs with the real Python over altered
+     calendar copies and injected them into the page.
+     - **FIXED - an owed red supply awaiting a decision let a turned-off
+       dataset leave the rollup** (D1, criteria 6 and 7). Only blockers and
+       closed unfilled periods kept it in; a filed supply awaiting promotion
+       did not - cp-notifications read out of the rollup with its 2023-Q4
+       supply red and waiting. `outByTurnOff()` now keeps it in.
+     - **FIXED - the weekly trend counted what the 'N of M' line left out**
+       (D2, criterion 29). The per-date statuses were built without the
+       turn-off marking. One `markTurnOffs()` now serves both.
+     - **FIXED - the dataset marker's icon was a 7x7 square** (D3, criteria 12
+       and 13): the small pills' size rule outranked the bar's. Checked by
+       computed style in the browser test (written after the fix).
+     - **FIXED - '(turned off)' and 'Turned off with ...' while it was only
+       announced** (D4, criterion 26; D5, criterion 2). Both now say
+       'Turning off' until the effective_to has passed.
+     - **FIXED - edges and polish**: no slot owed before the gap no longer
+       reads 'nothing more owed' on every earlier date (F11); the
+       received-while-off line gives a date, as criterion 14 words it; the
+       reasons read most first, as criterion 9's example does (F12); the
+       'no schedule agreed yet' marker now shows on collection rows, which
+       criterion 10 asks for now that the line counts them (F6); the
+       executive intro names turned-off and unagreed datasets among those
+       outside the comparison; amendment 1's test is linked (F9).
+     - **NOTED, not changed**: the runway's "N datasets name this calendar"
+       still counts a dataset off for good; `rollup_datasets` (the Python
+       mirror) has no production caller; 'Promoted, then re-checked' items
+       are not on the page, so D1 covers what the page can see.
+     - **FOR KEITH** (morning report 5, Q21-Q25): criterion 25's 'nothing
+       more owed' marker before the turn-off was authored (F10); an
+       asset-level not-counted line (F7); restyle 'Not counted' to the
+       marker's style as criterion 12 reads, or amend it (F8); suppress the
+       runway warning once a for-good turn-off is authored; criterion 19's
+       note in the Timing cell, there being no separate provenance cell.
