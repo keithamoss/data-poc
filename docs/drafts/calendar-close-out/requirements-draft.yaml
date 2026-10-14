@@ -184,8 +184,10 @@ requirements:
     it from the values resolved for the dataset on the date on show - expected time, grace, participates and days before -
     each from the level REQ-PIPE-181 resolves it to; WHERE the date on show falls before the dataset's first participation
     version, SHALL show 'Not owed yet — owes supplies from <date>', the date that version takes effect, on the SLA tile and
-    as the heading of the notice that today reads 'Nothing had been supplied by this date', which it replaces; and WHERE the
-    dataset is turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says.
+    as the heading of the notice that today reads 'Nothing had been supplied by this date', which it replaces, that notice's
+    body keeping only its way-back sentence, 'Pick a later date, or reset to the default, using the 📅 In place on control
+    above.', and dropping 'There is no QA run within the accepted freshness window as of <date>.'; and WHERE the dataset is
+    turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says.
   - THE SYSTEM SHALL render every reason it shows as text, never as markup.
   - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
   - THE SYSTEM SHALL NOT show periods before a dataset's first participation version as owed-nothing rows.
@@ -197,11 +199,13 @@ requirements:
     for four, 'Monthly' for twelve, otherwise '<N> times a year' - and 'various days' in place of the day where its periods
     fall on different days of the month, for a calendar of the 'authored' type as for any other, and SHALL NOT render the
     label blank.
-  - WHERE an owed-nothing period stands on an earlier supply by inheritance (REQ-PIPE-098), THE SYSTEM SHALL say so on the
-    same row, as muted text 'Inherited from <period>' with no pill, rather than as a second row or a second pill for the same
-    period; and the heading of the standing-in panel near the top of the dataset page (standingInHeading, in standingInDetail)
-    SHALL name the row's kind word and label where it now says 'Nothing was owed for this period', with the reason in that
-    panel's .promo-why line.
+  - 'WHERE an owed-nothing period stands on an earlier supply by inheritance (REQ-PIPE-098), THE SYSTEM SHALL say so on the
+    same row, as muted text ''Inherited from <period>'' with no pill, rather than as a second row or a second pill for the
+    same period; and the heading of the standing-in panel near the top of the dataset page (standingInHeading, in standingInDetail)
+    SHALL read, for an owed-nothing period, the row''s kind label alone on the present date and ''On <date>: <kind label>''
+    on a past date, where it now reads ''Nothing was owed for this period'' and ''On <date> this period held an earlier period''s
+    data - nothing was owed for it'', with the reason in that panel''s .promo-why line and not in the heading; the substituted
+    heading is unchanged.'
   - WHERE the current cycle on the date on show is a period the dataset owes nothing in, THE SYSTEM SHALL show that period's
     owed-nothing row in place of 'No deliveries in the current cycle yet.'
   - THE SYSTEM SHALL show on a dataset's SLA tile the delivery months the dataset itself participates in on the date on show,
@@ -328,19 +332,18 @@ requirements:
     reading ''due N days before each date, by 22:00''; criterion 7 replaces that with the wording Keith chose on 2026-10-13.
     The terminal''s `mothman schedule show` probably needs the same words - not this requirement''s (DASH); flagged for delivery-cli-ux
     rather than folded.'
-  open_questions:
-  - '1. THE ''NOT OWED YET'' NOTICE''S BODY (criterion 3; Keith''s Q3 named only its heading). Today''s body says ''There
-    is no QA run within the accepted freshness window as of <date>. Pick a later date, or reset to the default, using the
-    In place on control above.'' Recommended (A): keep only the way-back sentence (''Pick a later date, or reset to the default
-    ...''), dropping the freshness-window sentence, which reads as a missed supply. (B) Keep the body unchanged under the
-    new heading.'
-  - '2. THE SEPARATOR IN THE LABELS (criteria 2, 3 and 14; dashboard UX 7). Recommended (A): the page''s own em dash - ''Not
-    owed — outside its agreed months (Feb, Aug)'', ''Not owed yet — owes supplies from <date>''. (B) A plain hyphen, as the
-    labels were worded in Keith''s answers.'
-  - '3. THE STANDING-IN HEADING ON A PAST DATE (criterion 9; dashboard UX 5). Today it reads ''On <date> this period held
-    an earlier period''s data - nothing was owed for it''. Recommended (A): ''On <date>: <kind label>'' on a past date and
-    the kind label alone on the present, the reason in .promo-why. (B) Keep today''s heading sentences and put the kind label
-    only in .promo-why.'
+  - 'THE EM DASH IN EVERY LABEL (Keith, 2026-10-14, H1, option A): criteria 2, 3 and 14 separate kind and reason with the
+    page''s own em dash (—) - ''Not owed — outside its agreed months (Feb, Aug)'', ''Not expected — <reason>'', ''Turned off
+    — <reason>'', ''Not owed yet — owes supplies from <date>'' - and REQ-DASH-180 criterion 16''s ''Turned off — nothing due''
+    follows suit. Keith''s answers of 2026-10-13, quoted above with a hyphen, chose the words, not the separator. REJECTED
+    (B) a plain hyphen.'
+  - 'THE ''NOT OWED YET'' NOTICE KEEPS ONLY ITS WAY BACK (Keith, 2026-10-14, H2, option A): criterion 3 - the body keeps ''Pick
+    a later date, or reset to the default, using the 📅 In place on control above.'' and drops ''There is no QA run within
+    the accepted freshness window as of <date>.'', which reads as a missed supply. REJECTED (B) today''s body unchanged under
+    the new heading.'
+  - 'THE STANDING-IN HEADING NAMES THE KIND, DATED ON A PAST DATE (Keith, 2026-10-14, H3, option A; dashboard UX 5): criterion
+    9 - ''On <date>: <kind label>'' on a past date, the kind label alone on the present, the reason in .promo-why. REJECTED
+    (B) keeping today''s heading sentences with the kind label only in .promo-why.'
 - id: REQ-PIPE-179
   title: A dataset, or a whole collection, can be turned off for a time or for good, and nothing still owed goes quiet
   date_written: '2026-10-10'
@@ -351,11 +354,12 @@ requirements:
   status: not_started
   source: 'Keith, 2026-10-07 (effective_to, proposed by him while signing off REQ-PIPE-110) and 2026-10-10 (his answers to
     the four-agent review of REQ-PIPE-110: delivery-scoper, delivery-architect, delivery-cli-ux, delivery-dashboard-ux). Split
-    out of REQ-PIPE-110 and drafted by the main session on 2026-10-10. NOT YET THROUGH delivery-scoper as a requirement of
-    its own - say so when it is presented for sign-off. Re-scoped jointly with REQ-PIPE-163 by delivery-scoper, 2026-10-13
-    - joint pass on REQ-PIPE-163, REQ-PIPE-179 and REQ-DASH-182 with the Child Protection pattern widening (Keith, 2026-10-13:
-    close out the calendar group before the road-testing review; scope 163 WITH 179 so 179 does not amend a requirement that
-    may change under it).'
+    out of REQ-PIPE-110 and drafted by the main session on 2026-10-10. Re-scoped jointly with REQ-PIPE-163 by delivery-scoper,
+    2026-10-13 - joint pass on REQ-PIPE-163, REQ-PIPE-179 and REQ-DASH-182 with the Child Protection pattern widening (Keith,
+    2026-10-13: close out the calendar group before the road-testing review; scope 163 WITH 179 so 179 does not amend a requirement
+    that may change under it). OWN delivery-scoper pass, 2026-10-14 (Keith asked for one before signing): docs/drafts/calendar-close-out/req-179-own-pass.md.
+    Keith answered that pass''s four questions 2026-10-14 (all option A); folded by delivery-scoper the same day, TS-63 moving
+    to REQ-GEN-218.'
   acceptance_criteria:
   - THE SYSTEM SHALL let a participation version - a dataset's, or a collection's participation_defaults version - state an
     effective_to date, the last day it governs on the data asset's clock, inclusive.
@@ -414,15 +418,17 @@ requirements:
     pass's tally, for the dashboard's backlog line and for every count, and SHALL keep the reason recorded when the hold was
     raised as history only.
   - WHEN configuration later gives any outstanding assignment-rule hold's receipt instant an open owed slot, whatever its
-    label, THE SYSTEM SHALL file it by the rule on the next processing pass, generalising REQ-PIPE-154's schedule-ended re-file
-    rather than adding a second re-filer, and SHALL leave every other hold for a person to place (REQ-PIPE-163) or reject,
-    except a schedule-ended hold, which offers only adding dates; and WHERE the hold is one file of a held contested pair,
-    SHALL re-file both files together, still contested (REQ-PIPE-163 criterion 37).
+    label, THE SYSTEM SHALL file it by the rule on the next processing pass, through REQ-PIPE-163 criterion 40's one shared
+    placer, generalising REQ-PIPE-154's schedule-ended re-file rather than adding a second re-filer, and SHALL leave every
+    other hold for a person to place (REQ-PIPE-163) or reject, except a schedule-ended hold, which offers only adding dates;
+    and WHERE the hold is one file of a held contested pair, SHALL re-file both files together, still contested (REQ-PIPE-163
+    criterion 37).
   - THE SYSTEM SHALL NOT let any supply be placed (REQ-PIPE-163), re-filed (REQ-PIPE-141), moved by a confirmed correction
     or carried out from a parked move (REQ-PIPE-170 criteria 7 and 26) into a period inside a turned-off gap; and a refusal
     SHALL name the gap and its turned_off_reason and say that changing effective_to or effective_from in contract/calendar.yaml
     is how a period becomes owed; for a placement this SHALL be the one refusal given, in place of REQ-PIPE-163 criterion
-    7's rather than beside it.
+    7's rather than beside it; and THE SYSTEM SHALL amend, in the same change, REQ-PIPE-141 criterion 12 so that for a period
+    inside a turned-off gap this refusal is given in place of its un-inherit advice.
   - IF a not_expected entry - a dataset's own - names a period inside a turned-off gap that applies to that dataset, whether
     the turn-off is its own or its collection's, THEN THE SYSTEM SHALL reject the configuration, naming the dataset, the not_expected
     entry's period, the gap (the effective_to it follows and the effective_from that ends it, or 'for good'), the level that
@@ -436,8 +442,7 @@ requirements:
     then re-checked <verdict>' (REQ-PIPE-164) - until it is resolved, whether or not the dataset is turned off; a promoted
     red supply counts as resolved for this purpose and keeps its red-promoted badge on the dataset.
   - THE SYSTEM SHALL NOT count a supply held as turned off among the states needing a person - in the pipeline, the terminal's
-    queue or the dashboard - and SHALL amend, in the same change, REQ-PIPE-064 criterion 5 and REQ-PIPE-083 criterion 21 to
-    except it.
+    queue or the dashboard - and SHALL amend, in the same change, REQ-PIPE-064 criterion 5 to except it.
   - THE SYSTEM SHALL leave a dataset turned off for good out of the runway minimum and the exhausted-schedule list, and for
     a dataset in a temporary gap SHALL count towards its runway only the periods it owes once it is turned back on.
   - THE SYSTEM SHALL count turned-off holds separately in the processing pass's summary, as REQ-PIPE-154 criterion 6 counts
@@ -467,41 +472,46 @@ requirements:
     gap opens after the last owed slot before it closes.
   - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-154 criteria 1, 2, 6 and 7 so that turned off outranks schedule ended
     and every label they read is the one criterion 18 works out; REQ-PIPE-064 criterion 8 likewise; REQ-PIPE-098 criterion
-    1 to name a turned-off period beside one the dataset does not participate in; and REQ-PIPE-053 criteria 4, 10 and 15 so
-    that a dataset turned off for good is neither warned about nor counted; each amending the text as REQ-PIPE-181 left it.
+    1 to name a turned-off period beside one the dataset does not participate in; and REQ-PIPE-053 criteria 10 and 15 so that
+    a dataset turned off for good is neither warned about nor counted; each amending the text as REQ-PIPE-181 left it.
   - THE SYSTEM SHALL read all of this from committed configuration and recorded facts, and SHALL NOT read supply rows to decide
     it.
   - THE SYSTEM SHALL list supplies held as turned off in the terminal's queue in a quiet last group, 'Received while turned
-    off (N)', after the slot rows and outside the count of supplies waiting on a decision, each saying 'Received while <dataset>
-    is turned off (<reason>, set for <level>). Place it into a period it still owes, reject it, or change effective_to/effective_from
-    in contract/calendar.yaml if this period should be owed.'
+    off (N)', N counting supplies, after the slot rows and outside the count of supplies waiting on a decision, as ONE ROW
+    PER DATASET reading '<dataset> - <n> received while turned off, earliest <date>', the receipt date of its earliest such
+    supply, which opens to list that dataset's supplies, each saying 'Received while <dataset> is turned off (<reason>, set
+    for <level>). Place it into a period it still owes, reject it, or change effective_to/effective_from in contract/calendar.yaml
+    if this period should be owed.'
   - WHEN a declared correction changes effective_to, THE SYSTEM SHALL propose the filing moves that result through REQ-PIPE-170's
     confirmation, a supply left in a period inside the new gap becoming a turned-off hold.
-  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-170 so that IF a corrected configuration makes a supply's current
-    period one its dataset owes nothing in - by participation, not_expected or a turn-off - THEN keep is not offered for that
-    supply, and the correction proposes moving it to the owed slot the filing rule gives it or holding it, saying that the
-    period no longer owes a supply.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-170 criteria 5 and 28 so that IF a corrected configuration makes
+    a supply's current period one its dataset owes nothing in - by participation, not_expected or a turn-off - THEN keep is
+    not offered for that supply, neither when the correction's moves are confirmed nor later while its move is parked, and
+    the correction proposes moving it to the owed slot the filing rule gives it or holding it, saying that the period no longer
+    owes a supply.
   - IF a parked move's confirmed period lies inside a turned-off gap when its blocker clears, THEN THE SYSTEM SHALL leave
-    the move parked, say so naming the gap and its turned_off_reason, and list it among the states needing action, as REQ-PIPE-170
-    criterion 27 does for a supply no longer where it was parked from.
-  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-173 so that a slot a recorded verdict was judged in, which the configuration
-    no longer owes because an effective_to was added or moved without a declared correction, counts as a difference the backstop
-    refuses, as a changed slot input does.
-  - THE SYSTEM SHALL generate, as registered scenario TS-63, in the same change that builds this requirement, a Child Protection
-    dataset turned off for a while in the synthetic history - DECLARED AS A CORRECTION in contract/calendar.yaml (REQ-PIPE-111),
-    dated before the gap's first period so that the gap's arrivals are filed under the corrected agreement as they arrive,
-    with Keith's real identity as its approver and a reason saying it is a fictional correction made for this synthetic asset's
-    demonstration, giving a participation version an effective_to and a turned_off_reason and a later version turning it back
-    on two quarters later, the dataset's participation first split from the shared *cp_participation alias so that no other
-    dataset is turned off with it - placed in quarters REQ-GEN-207 adds by growing the Child Protection history earlier, so
-    no existing scenario's quarter moves; with, through REQ-GEN-044's injection mechanism, one supply for its last owed quarter
-    arriving after the effective_to but while that quarter's slot is open, and one supply arriving inside the gap with no
-    owed slot open; and SHALL update TS-63's register entry to the Child Protection calendar's real dates, saying that the
-    ordinary deliveries inside the gap still carry the dataset's file, which is received, held as turned off and counted in
-    REQ-DASH-180's quiet line, and that cp-carers reads 'awaiting confirmation' from the correction's date to the end of the
-    history, because a replay confirms a correction only at its end.
-  - THE SYSTEM SHALL record, in the same change, that REQ-PIPE-170 criterion 23's TS-63 is delivered by criterion 39 of this
-    requirement, re-pointing REQ-PIPE-170's unmet entry for criterion 23 so that it names TS-57 to TS-62 only.
+    the move parked, say so naming the gap, its turned_off_reason and what ends it - keeping the supply where it is, where
+    criterion 36 still allows that, or changing effective_to or effective_from in contract/calendar.yaml - and list it among
+    the states needing action, as REQ-PIPE-170 criterion 27 does for a supply no longer where it was parked from; and THE
+    SYSTEM SHALL amend, in the same change, REQ-PIPE-170 criterion 26 to except such a move.
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-173 criterion 12 so that a judged period which an effective_to added
+    or moved without a declared correction now leaves owed nothing counts as changed, as one a not_expected entry declares
+    owed nothing does - the refusal naming the turn-off rather than calling the period not expected - and is accounted for
+    only by a declared correction of that effective_to.
+  - 'THE SYSTEM SHALL NOT plant TS-63 in the change that builds this requirement: TS-63 - a Child Protection dataset turned
+    off for a while, declared as a correction - is planted by REQ-GEN-218, built after REQ-DASH-180 (Keith, 2026-10-14, own
+    pass Q1). This criterion keeps its number, as criteria 40 and 41 keep theirs, because signed REQ-PIPE-163, REQ-PIPE-170
+    and REQ-PIPE-181 cite this requirement''s criteria by number.'
+  - 'IF a participation version - a dataset''s, or a collection''s participation_defaults version - states effective_to and
+    none of its changelog entries carries turns_off: true, or IF any changelog entry in contract/calendar.yaml carries turns_off
+    with a value other than true, THEN THE SYSTEM SHALL reject the configuration, naming the dataset or collection and the
+    version by its effective_from, and printing a ready-to-paste changelog entry - date, author, change and turns_off: true
+    - on lines of their own.'
+  - 'THE SYSTEM SHALL take the date a turn-off was authored as the date of the newest declared correction (REQ-PIPE-111) that
+    set or moved that version''s effective_to, where there is one, and otherwise as the date of the newest changelog entry
+    on that version carrying turns_off: true; and SHALL carry, for every participation version stating effective_to, its effective_to,
+    its turned_off_reason, its level and the date it was authored into what the dashboard build reads, for REQ-DASH-180 criteria
+    27 and 28.'
   non_functional_requirements:
   - 'A SHAPE CHANGE WITH MANY CONSUMERS - enumerate them mechanically and route each through the one helper (criterion 27).
     Found by delivery-architect, 2026-10-10: schedule.periods_for_dataset, slots.slots_for_dataset and _calendar_periods,
@@ -524,12 +534,29 @@ requirements:
     value and never re-reads the file; a dashboard build over thirty datasets and years of daily periods stays within its
     existing time.'
   - 'AUDITABLE: every effective_to and turned_off_reason sits on a version with a structured changelog entry (REQ-PIPE-110),
-    so who turned a dataset off, when and why is in the file, and changes after the freeze are declared corrections with an
-    approver.'
+    and the entry that turns a dataset off says so in a validated field, turns_off: true (criterion 40), so who turned a dataset
+    off, when and why can be filtered rather than read from prose; changes after the freeze are declared corrections with
+    an approver. ACCEPTED (F9): the changelog line is not frozen, so the date the foreshadow marker starts from is authored
+    text rather than a recorded event.'
   - 'TEST FIRST: each criterion that guards against a false quiet - criteria 14, 15, 16, 18 and 23 above all - gets a test
     written first and seen to fail, because a turn-off that hides an owed period looks exactly like one that works.'
   - 'SECURITY: turned_off_reason is free text from configuration and is rendered as text, never as markup, everywhere it is
-    shown.'
+    shown; turns_off accepts only true (criterion 40).'
+  - 'FAIL LOUD: where participation cannot be resolved for a dataset and date - a configuration error, a version missing -
+    every consumer stops with the configuration error; none falls back to treating the dataset as owing, or as turned off.'
+  - 'SCALE: a collection is turned off by one edit however many datasets inherit from it (Keith, Q-F); every count of turned-off
+    holds is one line per label; and the terminal''s quiet group lists one row per dataset, opening to its supplies, so a
+    supplier still sending daily files after a turn-off adds one row, not 365 a year (Keith, 2026-10-14, own pass Q3; criterion
+    34).'
+  - 'PRIVACY: a supply held as turned off is staged and kept like any held supply until a person places or rejects it (Keith,
+    2026-10-14, own pass Q4). Harmless on synthetic data; in a real deployment those are records the agency asked the supplier
+    to stop sending, and how long they are kept, and whether anything purges them, is plans/running-thoughts.md #77''s retention
+    question, not decided here.'
+  - 'AMENDMENTS NOBODY ELSE STATES get tests of their own in this build: REQ-PIPE-111 criterion 15''s after-the-fact route
+    for an effective_to, all three clauses of REQ-PIPE-134 criterion 1, REQ-PIPE-141 criterion 12''s narrowing and REQ-PIPE-170
+    criteria 5, 26 and 28.'
+  - 'PER DEPLOYMENT: a turn-off lives in one asset''s own contract/calendar.yaml and is read by that deployment alone; nothing
+    here reads across assets.'
   dependencies:
   - REQ-PIPE-110
   - REQ-PIPE-181
@@ -552,13 +579,17 @@ requirements:
   - REQ-PIPE-168
   - REQ-PIPE-141
   - REQ-PIPE-193
-  - REQ-GEN-044
-  - REQ-PIPE-111
-  - REQ-GEN-207
-  - REQ-DASH-180
   open_questions:
-  - 'Criterion 38''s premise is unverified: whether agreement_drift already flags a slot that vanished. Check at build, test
-    first.'
+  - 'PROVISIONAL, not put to Keith: ''the newest'' correction or turns_off entry where a version has several (criterion 41);
+    a turns_off entry on a version with no effective_to accepted and read by nothing; in criterion 34, N counting supplies
+    rather than datasets and the per-dataset row''s wording, which mirrors REQ-DASH-180''s quiet line. (cp-carers as TS-63''s
+    dataset is REQ-GEN-218''s now.)'
+  - 'BUILD CHECK (architect): whether criterion 19''s re-filer acts on a hold a declared but not yet confirmed correction
+    now covers, ahead of REQ-PIPE-170''s confirmation of that correction''s moves.'
+  - 'BUILD CHECK (criterion 38): verdict.compared already reports a period now not expected, or no longer generated, as gone,
+    and agreement_drift refuses it (read 2026-10-14); what remains to confirm is that a turned-off period reaches it that
+    way, and that agreement_drift._sources includes the effective_to item key so a declared correction of it accounts for
+    the change. Test first either way.'
   decisions:
   - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith, on the delivery-scoper review): the turn-off mechanism - added to REQ-PIPE-110
     in its 2026-10-07 sign-off commit without any agent review, which is why that sign-off was withdrawn - is its own requirement,
@@ -792,12 +823,14 @@ requirements:
     REJECTED accepting it and describing the period as turned off - two reasons for one owed-nothing period, one of them meaningless.
     COST ACCEPTED: an entry already frozen when a later turn-off covers it must be removed by a declared correction in the
     same change; the refusal says so. REQ-DASH-182 never shows a ''Not expected'' row inside a gap as a result.'
-  - '179 TAKES TS-63 OVER FROM REQ-PIPE-170 (DECIDED Keith, 2026-10-13, set 2 Q8, option B, against the scoper''s recommendation):
-    criterion 39 plants it in the same change that builds this requirement, and criterion 40 re-points REQ-PIPE-170''s unmet
-    criterion 23 to TS-57 to TS-62. PROPOSED, NOT KEITH''S: the dataset. cp-carers is the scoper''s suggestion - it owes every
-    quarter, is read by a cross-table check (so criterion 22''s inheritance is seen doing work), and is not cp-clients (TS-42,
-    TS-80) or cp-case-workers (its own participation gaps and standing holds). The register''s TS-63 config (15th of the month,
-    30-day window) is not the Child Protection calendar''s and is rewritten to the real one.'
+  - 'SUPERSEDED IN PART 2026-10-14 by the split below - TS-63 is REQ-GEN-218''s, built after REQ-DASH-180; the ''criterion
+    40'' this decision names was dropped by the own pass. WAS: 179 TAKES TS-63 OVER FROM REQ-PIPE-170 (DECIDED Keith, 2026-10-13,
+    set 2 Q8, option B, against the scoper''s recommendation): criterion 39 plants it in the same change that builds this
+    requirement, and criterion 40 re-points REQ-PIPE-170''s unmet criterion 23 to TS-57 to TS-62. PROPOSED, NOT KEITH''S:
+    the dataset. cp-carers is the scoper''s suggestion - it owes every quarter, is read by a cross-table check (so criterion
+    22''s inheritance is seen doing work), and is not cp-clients (TS-42, TS-80) or cp-case-workers (its own participation
+    gaps and standing holds). The register''s TS-63 config (15th of the month, 30-day window) is not the Child Protection
+    calendar''s and is rewritten to the real one.'
   - 'KEITH ACCEPTED THE CONFIGURATION SHAPE (DECIDED Keith, 2026-10-13, shown it during sign-off questions): a participation
     version carrying effective_to and turned_off_reason; back on is a later version with its own effective_from.'
   - 'TS-63''s TURN-OFF IS DECLARED AS A CORRECTION (DECIDED Keith, 2026-10-13 (architect review answers), round 3): like TS-57
@@ -897,8 +930,8 @@ requirements:
     on the timezone - each correction stating change_reference, date, author, approver, reason, and a list of changes each
     naming the item, its old value and its new value; and SHALL refuse a correction missing any of them. AMENDED <date built>
     by REQ-PIPE-179 criterion 30." WHY: a correction must be able to carry the two new frozen items. BUILT BEHAVIOUR: BUILT
-    CODE CHANGES (agreement_freeze''s correction matching); built and tested by REQ-PIPE-179 criteria 11, 12 and 39 (TS-63''s
-    correction).'
+    CODE CHANGES (agreement_freeze''s correction matching); built and tested by REQ-PIPE-179 criteria 11 and 12, and shown
+    by TS-63''s correction (REQ-GEN-218, split out of criterion 39 by Keith, 2026-10-14).'
   - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 24) - REQ-PIPE-111 criterion
     15 (signed 2026-10-07, built; criterion 30 here). OLD: "WHEN a change is refused, THE SYSTEM SHALL report it as the existing
     configuration errors do (file, where, problem, fix), grouped by item, saying that nothing was committed, naming the item
@@ -1051,9 +1084,9 @@ requirements:
     - except WHERE the supply''s current period is one its dataset now owes nothing in, when keep SHALL NOT be offered (criterion
     5). AMENDED <date built> by REQ-PIPE-179 criterion 36." WHY: the scoper''s reading: keep on a parked move is the same
     act as keep at confirmation, so the same exception applies. BUILT BEHAVIOUR: BUILT CODE CHANGES (confirm-correction --keep
-    on a parked move); NOT IN REQ-PIPE-179 criterion 36 AS WORDED, which says only "keep is not offered for that supply" -
-    needs a test. NOTE: PROPOSED BY THE SCOPER, not promised by the draft in words - an extension of criterion 36 to the second
-    place keep is offered.'
+    on a parked move); stated in REQ-PIPE-179 criterion 36 since the own pass ("neither when the correction''s moves are confirmed
+    nor later while its move is parked") and listed in NFR 11, so it gets a test of its own. NOTE: the extension to the second
+    place keep is offered was the scoper''s proposal; Keith chose it 2026-10-14 (own pass Q2, option A).'
   - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 41) - REQ-PIPE-173 criterion
     12 (signed 2026-10-07, built; criterion 38 here). OLD: "THE SYSTEM SHALL treat a judged period that a not_expected entry
     now declares owed nothing as changed, so it refuses the dataset unless a declared correction of that entry accounts for
@@ -1078,6 +1111,97 @@ requirements:
   - 'NO AMENDMENT NEEDED (delivery-scoper, 2026-10-14) - REQ-PIPE-163 criterion 17 (UNSIGNED, not_started), which (round 3
     decision) here names: no change is needed, because REQ-PIPE-179''s decision "163 NO LONGER AMENDED HERE" records that
     163 is written turn-off-aware (Keith, set 1 Q1). REQ-PIPE-163 is unsigned in any case.'
+  - 'OWN delivery-scoper PASS, 2026-10-14 (Keith asked for one before signing; until now this requirement had only the joint
+    2026-10-13 pass with REQ-PIPE-163 and REQ-DASH-182). What it changed: criterion 40 dropped as already met in the register
+    and its number reused for R8''s validation; criterion 41 added; criteria 24 and 32 trimmed to the targets that need a
+    change; criteria 20, 36 and 37 now state the amendments they carry (batch 33, 38, 39 and 40); criterion 38 reworded against
+    the built backstop; criterion 19 names REQ-PIPE-163 criterion 40''s shared placer; criterion 39 carries R8. Criterion
+    numbers 1 to 39 are unchanged, because signed REQ-PIPE-163, REQ-PIPE-170 and REQ-PIPE-181 cite them; a decision written
+    before this pass that says ''criterion 40'' means the re-pointing criterion that was dropped.'
+  - 'THE TURN-OFF IS NAMED BY ITS CHANGELOG ENTRY: turns_off: true (Keith, 2026-10-14, round 4 R8, option A, answering REQ-DASH-180''s
+    open questions 1 and 2): the changelog entry that sets a turn-off carries turns_off: true, validation refuses a version
+    stating effective_to with no such entry (criterion 40), and where a declared correction set or moved effective_to the
+    correction''s own date is the date the turn-off was authored (criterion 41) - so TS-63, whose turn-off is a correction
+    dated inside the history, shows REQ-DASH-180''s foreshadow marker. REJECTED the newest changelog entry on the version
+    (any later edit would move the marker''s start) and the earliest (wrong whenever effective_to was added to a version written
+    years before). PROPOSED, not Keith''s: ''the newest'' where several corrections or entries qualify, so a moved turn-off
+    dates from when it was last decided; and a turns_off entry on a version with no effective_to is accepted and read by nothing,
+    because the changelog is history and refusing it would force a past entry to be rewritten when a turn-off is withdrawn
+    before it takes effect. REQ-PIPE-110 criterion 12 needs no amendment: it names what every entry has, not what an entry
+    may not have - but agreement._changelog keeps only date, author and change today, so the field must be parsed, not merely
+    tolerated.'
+  - 'CRITERION 40 (re-pointing REQ-PIPE-170''s unmet entry for TS-63) DROPPED, 2026-10-14 (Keith''s instruction, on the scoper''s
+    ''no amendment needed'' finding above): the live register already reads ''TS-63 moved to REQ-PIPE-179 criterion 39 (Keith,
+    2026-10-13)'' in criterion 23 and in its unmet entry, so the criterion was met before anything was built.'
+  - 'CRITERIA 24 AND 32 TRIMMED, 2026-10-14 (Keith''s instruction, on the scoper''s findings above): REQ-PIPE-083 criterion
+    21 needs no change, its ticket policy being per slot and a held supply having no slot and so no ticket (REQ-PIPE-083''s
+    own decision); REQ-PIPE-053 criterion 4 needs no change, saying only that such a supply is held and leaving its label
+    to REQ-PIPE-154 criterion 1, which is amended.'
+  - 'KEEP IS REFUSED ON A PARKED MOVE TOO (own pass, 2026-10-14, PROVISIONAL, for Keith - open question 2): batch amendment
+    40 extended Keith''s round 3 Q9 to REQ-PIPE-170 criterion 28 without the criterion saying so. Recommended and now stated
+    in criterion 36: keep on a parked move is the same act as keep at confirmation, so without the extension park-then-keep
+    reaches exactly the state Q9 forbids - a supply kept in a period with no slot, which inherits and accepts no placement.
+    Its cost is a move that can be parked with no way out but configuration, which criterion 37 now says in its message. REJECTED
+    leaving keep open on a parked move.'
+  - 'THE BACKSTOP ALREADY SEES A VANISHED SLOT (own pass, 2026-10-14, read in qa_tools/common/verdict.py and agreement_drift.py):
+    verdict.compared reports a recorded slot as gone where the configuration no longer generates it or now marks it not expected,
+    and agreement_drift refuses the dataset unless a correction of a missing-slot kind accounts for it. So criterion 38''s
+    earlier premise (''NOT VERIFIED that the comparison flags a vanished slot'') is answered for the comparison; what is not
+    built is a correction of effective_to being recognised as accounting for it, and a refusal that names a turn-off rather
+    than calling the period not expected.'
+  - 'NOT SPLIT, EXCEPT POSSIBLY TS-63 (own pass, 2026-10-14): the declaration, freeze, slots, filing, holds, counts and refusals
+    are one behaviour - a turn-off that can be declared before arrivals honour it raises plain needs-action holds for every
+    gap delivery, and the filing half cannot be tested without the declaration - so they stay together. The terminal display
+    (criteria 28, 29 and 34) is not split either: signed REQ-PIPE-163 criterion 17 and REQ-PIPE-181 criterion 13 cite criteria
+    34 and 29 by number, and moving them would amend both for three criteria. TS-63 is different - generator work, built after
+    REQ-DASH-180 - and is open question 1.'
+  - 'AN active: / enabled: FLAG STAYS REJECTED (carried over 2026-10-14 from the 2026-10-07 decision above, which is marked
+    SUPERSEDED for three other rulings and so would read as withdrawing this one too): a turn-off is effective_to on a participation
+    version because it reuses the versioning already there, so ''temporarily'' needs no second mechanism.'
+  - 'turned_off_reason IS KEPT APART FROM reason (carried over 2026-10-14 from REQ-PIPE-110''s ''NAMES CONFIRMED'' decision,
+    Keith, 2026-10-10): reason explains owing only some periods, and one version can be both partial and turned off, so one
+    key cannot carry both. Criterion 2''s hint exists for that reason.'
+  - 'TS-63 SPLIT OUT INTO REQ-GEN-218 (Keith, 2026-10-14, own pass Q1, option A, the scoper''s recommendation): criterion
+    39 is now a pointer that keeps its number, and REQ-GEN-218 carries what it said - the scenario, its correction, its two
+    injected supplies, its register entry and Expect - built after REQ-DASH-180. Why: TS-63''s register entry quotes REQ-DASH-180''s
+    quiet line and its ''Turning off after'' marker, neither of which exists when this requirement is built; criterion 39
+    was the only reason this requirement depended on REQ-DASH-180, which depends on it, so the split removes a dependency
+    loop; and it follows REQ-GEN-203 (scenarios for REQ-PIPE-202) and REQ-GEN-205 (for REQ-PIPE-170). REQ-DASH-180, REQ-GEN-207
+    and REQ-GEN-044 leave the dependencies, each having been there for criterion 39 alone. The 2026-10-13 decision that TS-63
+    comes here from REQ-PIPE-170 holds in spirit: it still lands with the turn-off work. COST: REQ-PIPE-170 criterion 23 and
+    its unmet entry, and REQ-GEN-207 criterion 2, are re-pointed at REQ-GEN-218 (batch amendments 45 and 46, carried by REQ-GEN-218
+    criterion 7). REJECTED (option B) keeping TS-63 here, whose dashboard Expect could not be checked until REQ-DASH-180 was
+    built. Criterion 39 as it stood before the split, for the record: THE SYSTEM SHALL generate, as registered scenario TS-63,
+    in the same change that builds this requirement, a Child Protection dataset turned off for a while in the synthetic history
+    - DECLARED AS A CORRECTION in contract/calendar.yaml (REQ-PIPE-111), dated before the gap''s first period so that the
+    gap''s arrivals are filed under the corrected agreement as they arrive, with Keith''s real identity as its approver and
+    a reason saying it is a fictional correction made for this synthetic asset''s demonstration, giving a participation version
+    an effective_to, a turned_off_reason and the changelog entry carrying turns_off: true that criterion 40 requires, and
+    a later version turning it back on two quarters later, the dataset''s participation first split from the shared *cp_participation
+    alias so that no other dataset is turned off with it - placed in quarters REQ-GEN-207 adds by growing the Child Protection
+    history earlier, so no existing scenario''s quarter moves; with, through REQ-GEN-044''s injection mechanism, one supply
+    for its last owed quarter arriving after the effective_to but while that quarter''s slot is open, and one supply arriving
+    inside the gap with no owed slot open; and SHALL update TS-63''s register entry to the Child Protection calendar''s real
+    dates, saying that the ordinary deliveries inside the gap still carry the dataset''s file, which is received, held as
+    turned off and counted in REQ-DASH-180''s quiet line, and that cp-carers reads ''awaiting confirmation'' from the correction''s
+    date to the end of the history, because a replay confirms a correction only at its end, and quoting the ''Turning off
+    after <effective_to>'' marker REQ-DASH-180 criterion 27 shows from the correction''s date (criterion 41).'
+  - 'KEEP IS REFUSED ON A PARKED MOVE TOO - DECIDED (Keith, 2026-10-14, own pass Q2, option A): criteria 36 and 37 as written,
+    and batch amendment 40 with them; the PROVISIONAL decision above gives the reasoning and is no longer provisional. REJECTED
+    (option B) leaving keep open on a parked move, which lets park-then-keep leave a supply kept in a period with no slot
+    - the state round 3 Q9 forbade.'
+  - 'ONE ROW PER DATASET IN ''Received while turned off'' (Keith, 2026-10-14, own pass Q3, option A): criterion 34 - each
+    row gives the dataset''s count and the receipt date of its earliest such supply, and opens to list its supplies with the
+    response text Keith chose in round 3 Q3. A supplier still sending daily files after a turn-off would otherwise add 365
+    rows a year. PROPOSED, not Keith''s: N in the group heading counts supplies, as REQ-DASH-180''s quiet line does, and the
+    row reads as that quiet line does, ''<dataset> - <n> received while turned off, earliest <date>''. REJECTED (option B)
+    one row per supply.'
+  - 'TURNED-OFF HOLDS STAY QUIET AND KEPT; RETENTION IS #77''s QUESTION (Keith, 2026-10-14, own pass Q4, option A): a supply
+    held as turned off is kept like any held supply until a person places or rejects it, and is never counted as needing a
+    person (criterion 24). How long such holds are kept on a real asset - records the agency asked the supplier to stop sending
+    - and whether anything purges them is plans/running-thoughts.md #77''s question (recorded there 2026-10-14), not this
+    requirement''s. REJECTED (option B) a one-action ''reject everything received while turned off'' per dataset in the terminal:
+    a bulk operation for a pile nobody is asked to act on, with retention still unanswered.'
 - id: REQ-DASH-180
   title: 'The dashboard shows a turned-off dataset honestly: its real verdict, a marker, and nothing owed gone quiet'
   date_written: '2026-10-10'
@@ -1141,7 +1265,7 @@ requirements:
   - THE SYSTEM SHALL show a turned-off gap's periods as owed-nothing rows (REQ-DASH-182) whose kind reads 'Turned off' with
     the turned_off_reason, starting a new group wherever the kind or reason changes.
   - WHILE a dataset is turned off on the date on show and owes no period whose slot is still open, THE SYSTEM SHALL show its
-    SLA tile as 'Turned off - nothing due' and SHALL NOT show the last version's due time as though it applied; and WHILE
+    SLA tile as 'Turned off — nothing due' and SHALL NOT show the last version's due time as though it applied; and WHILE
     it still owes a period whose slot is open, SHALL show that period's due time labelled with the period.
   - THE SYSTEM SHALL NOT show a dataset turned off for good in the exhausted-schedule notice, its marker or the runway warning;
     SHALL show a dataset in a temporary gap in the runway warning by the periods it owes once back on (REQ-PIPE-179 criterion
@@ -1328,6 +1452,161 @@ requirements:
     Q1, folded by delivery-scoper the same day): the participation and not_expected cases of ''never stale because owed nothing''
     moved to REQ-DASH-182 criterion 15, a regression guard (the case did not reproduce in the browser; the false ''No data''
     that did is post-build-review #178, fixed on REQ-DASH-054). The tile is named as the page names it, the SLA tile.'
+  - '''Turned off — nothing due'' TAKES THE EM DASH (Keith, 2026-10-14, H1 on REQ-DASH-182, option A): criterion 16, so the
+    SLA tile matches REQ-DASH-182''s labels. Criterion 25''s ''Turning off after <effective_to> - nothing more owed'' was
+    not named in H1 and is left for REQ-DASH-180''s own sign-off.'
+- id: REQ-GEN-218
+  title: 'TS-63 is planted in the synthetic history: a Child Protection dataset turned off for two quarters by a declared
+    correction, with a late supply for the quarter it still owed and one received inside the gap'
+  date_written: '2026-10-14'
+  story: As someone evaluating the PoC, I want the synthetic history to show a dataset being turned off for a while and turned
+    back on, through the same declared-correction gate a real turn-off would go through, so that I can see on the real dashboard
+    and terminal what a turn-off does - the marker before it, a supply for a quarter it still owed filed there, a supply received
+    inside the gap held quietly, and the gap's owed-nothing rows.
+  moscow: must
+  status: not_started
+  source: 'Keith, 2026-10-14, answering REQ-PIPE-179''s own delivery-scoper pass, question 1, option A (docs/drafts/calendar-close-out/req-179-own-pass.md):
+    TS-63 split out of REQ-PIPE-179 criterion 39 into a generator requirement of its own, built after REQ-DASH-180. Drafted
+    by delivery-scoper, 2026-10-14, from criterion 39 and the TS-63 decisions REQ-PIPE-179 carried (Keith, 2026-10-13 and
+    2026-10-14). TS-63 came to REQ-PIPE-179 from REQ-PIPE-170 criterion 23 (Keith, 2026-10-13, set 2 Q8). Not reviewed by
+    delivery-architect or a UX reviewer as a requirement of its own; its content was reviewed in round 3 as REQ-PIPE-179 criterion
+    39 (architect A4, A5 and E21).'
+  acceptance_criteria:
+  - THE SYSTEM SHALL generate, as registered scenario TS-63, a Child Protection dataset turned off for two quarters in the
+    synthetic history and turned back on by a later participation version with its own effective_from, the dataset's participation
+    first split from the shared *cp_participation alias in contract/calendar.yaml, so that no other dataset is turned off
+    with it and no dataset's resolved participation changes on any date outside TS-63's gap.
+  - 'THE SYSTEM SHALL declare TS-63''s turn-off AS A CORRECTION in contract/calendar.yaml (REQ-PIPE-111), dated before the
+    gap''s first period so that the gap''s arrivals are filed under the corrected agreement as they arrive, with Keith''s
+    real identity as its approver and a reason saying it is a fictional correction made for this synthetic asset''s demonstration,
+    giving the participation version an effective_to, a turned_off_reason and the changelog entry carrying turns_off: true
+    that REQ-PIPE-179 criterion 40 requires.'
+  - THE SYSTEM SHALL place TS-63's correction, its gap and the quarters either side of it in quarters REQ-GEN-207 adds by
+    growing the Child Protection history earlier, so that no existing scenario's quarter moves; and IF any of them meets a
+    period another scenario or correction claims, THEN generation SHALL refuse, naming both, through the collision refusal
+    REQ-GEN-207's dry run uses, and SHALL NOT shift either.
+  - THE SYSTEM SHALL inject, through REQ-GEN-044's injection mechanism, one supply for the dataset's last owed quarter arriving
+    after the effective_to but while that quarter's slot is open, so that it files to that quarter (REQ-PIPE-179 criterion
+    15), and one supply arriving inside the gap with no owed slot open, so that it is held as turned off (REQ-PIPE-179 criterion
+    16).
+  - THE SYSTEM SHALL rewrite TS-63's register entry in plans/supply-model.md to the Child Protection calendar's real dates
+    and the marker wording REQ-DASH-180 now uses, in place of the 15th-of-the-month configuration and the wording from before
+    Keith's T8, saying that the ordinary deliveries inside the gap still carry the dataset's file, which is received, held
+    as turned off and counted in REQ-DASH-180's quiet line; that cp-carers reads 'awaiting confirmation' from the correction's
+    date to the end of the history, because a replay confirms a correction only at its end; and quoting the 'Turning off after
+    <effective_to>' marker REQ-DASH-180 criterion 27 shows from the correction's date (REQ-PIPE-179 criterion 41).
+  - THE SYSTEM SHALL give TS-63 a unit test in the scenario register's tests (TestScenarioRegister), as REQ-PIPE-170 criterion
+    23 asks of TS-57 to TS-64.
+  - THE SYSTEM SHALL amend, in the change that adds this requirement to requirements.yaml, REQ-PIPE-170 criterion 23 and its
+    unmet entry, and REQ-GEN-207 criterion 2, so that each names this requirement where it now names REQ-PIPE-179 for TS-63
+    (batch amendments 45 and 46).
+  non_functional_requirements:
+  - 'BOOTSTRAP COST: one correction, two injected supplies, and the gap''s ordinary deliveries, whose cp-carers file is each
+    received, file-checked and held (REQ-PIPE-179 criterion 16). Measure a bootstrap from empty before and after and log both
+    in CLAUDE.md''s running log, as REQ-GEN-205 and REQ-GEN-206 do.'
+  - 'NOISE, ACCEPTED (Keith, 2026-10-14, close-out Q4): cp-carers reads ''awaiting confirmation'' from the correction''s date
+    to the end of the history - years on the as-at picker. Count in the register entry the holds the gap adds and the periods
+    that inherit.'
+  - 'FICTIONAL CORRECTION IN THE REAL CALENDAR FILE: gated by REQ-PIPE-111 exactly as a real one would be - the agreement-freeze
+    gate in mothman check - and its reason says it is fictional, so nobody later reads it as the agency''s history.'
+  - 'SECURITY: Keith''s real identity approves it, because agreement_freeze''s approvers exclude the synthetic identities;
+    nothing here widens REQ-PIPE-111''s synthetic exception or what a script may do on a real asset.'
+  - 'PRIVACY: synthetic data only. The supplies it holds as turned off are kept like any held supply; how long such holds
+    are kept on a real asset is plans/running-thoughts.md #77''s question (Keith, 2026-10-14, REQ-PIPE-179 own pass Q4).'
+  - 'SEEDED: generated like every other scenario, so a regeneration reproduces TS-63 exactly and leaves every quarter outside
+    its own unchanged (criteria 1 and 3).'
+  dependencies:
+  - REQ-PIPE-179
+  - REQ-DASH-180
+  - REQ-GEN-207
+  - REQ-GEN-044
+  - REQ-PIPE-111
+  - REQ-PIPE-170
+  decisions:
+  - 'SPLIT OUT OF REQ-PIPE-179 (Keith, 2026-10-14, REQ-PIPE-179 own pass Q1, option A, the scoper''s recommendation): TS-63
+    is generator work and is built after REQ-DASH-180, because its register entry quotes REQ-DASH-180''s quiet line and ''Turning
+    off after'' marker, which do not exist when REQ-PIPE-179 is built. Criterion 39 was the only reason REQ-PIPE-179 depended
+    on REQ-DASH-180, which depends on it, so the split also removes a dependency loop. It follows REQ-GEN-203 and REQ-GEN-205.
+    REQ-PIPE-179 criterion 39 stays as a pointer, keeping its number. REJECTED (option B) keeping it in REQ-PIPE-179, whose
+    dashboard Expect could not be checked until REQ-DASH-180 was built.'
+  - 'TS-63 LANDS WITH THE TURN-OFF WORK, NOT WITH REQ-PIPE-170 (Keith, 2026-10-13, set 2 Q8, option B, against the scoper''s
+    recommendation, carried from REQ-PIPE-179): the split keeps that - TS-63 is not in REQ-GEN-205, which plants TS-57 to
+    TS-62.'
+  - 'NO UNMET ENTRY TO CLEAR: REQ-PIPE-170''s unmet entry for criterion 23 lists TS-57 to TS-62 as remaining and TS-63 only
+    as moved (2026-10-13), so building this clears nothing there; REQ-GEN-205 criterion 17 clears that entry. Only the citations
+    are re-pointed (criterion 7).'
+  - 'DECLARED AS A CORRECTION (Keith, 2026-10-13, architect review answers, round 3, carried from REQ-PIPE-179): like TS-57
+    to TS-62, through the same gate a real turn-off would go through. REJECTED extending REQ-PIPE-111''s synthetic exception
+    to a new version''s effective_to (the scoper''s recommendation then).'
+  - 'ROOM: GROW THE CHILD PROTECTION HISTORY EARLIER (Keith, 2026-10-13, architect review answers): TS-63''s quarters are
+    new ones, so no existing scenario moves; REQ-GEN-207 is the one owner of that growth and its dry run already counts TS-63
+    (architect A5). REJECTED fitting it among today''s fifteen quarters - REQ-GEN-199 found none left clean.'
+  - 'DATED BEFORE THE GAP (Keith, 2026-10-14, close-out Q4, option A, the architect''s recommendation): the turn-off is seen
+    as it happens - the marker, the hold at arrival. ACCEPTED COST: cp-carers reads ''awaiting confirmation'' from the grown
+    quarters to the end of the history. This is the one correction NOT dated late; REQ-GEN-205''s are (close-out Q7). REJECTED
+    dating it late, which shows the correction''s moves rather than the turn-off.'
+  - 'KEITH''S REAL IDENTITY APPROVES THE FICTIONAL CORRECTION (Keith, 2026-10-14, close-out Q2, option A): one answer for
+    this and REQ-GEN-205. REJECTED extending REQ-PIPE-111''s synthetic exception.'
+  - 'SPLIT FROM THE SHARED ALIAS FIRST (round 3 architect A4): cp-carers and the other Child Protection datasets share *cp_participation
+    in contract/calendar.yaml, so an effective_to added to it would turn every one of them off.'
+  - 'THE GAP''S DELIVERIES STILL CARRY THE FILE (round 3 architect E21): the whole-delivery generator writes the dataset''s
+    file into each gap delivery, and each is received and held as turned off - said in the register entry rather than suppressed,
+    because that is what a supplier still sending files looks like.'
+  - 'THE MARKER DATES FROM THE CORRECTION (Keith, 2026-10-14, round 4 R8, option A; REQ-PIPE-179 criteria 40 and 41): the
+    version carries a changelog entry with turns_off: true, and because the turn-off was set by a correction, the correction''s
+    date is the date it was authored - so the ''Turning off after'' marker shows from that date, which is why TS-63 shows
+    it at all (every changelog entry is dated after the synthetic history ends).'
+  - 'PROPOSED, NOT KEITH''S - cp-carers AS THE DATASET (delivery-scoper, 2026-10-13, carried from REQ-PIPE-179): it owes every
+    quarter, is read by a cross-table check (so REQ-PIPE-179 criterion 22''s inheritance is seen doing work), and is not cp-clients
+    (TS-42, TS-80) or cp-case-workers (its own participation gaps and standing holds).'
+  - 'PROPOSED, NOT KEITH''S - MUST: TS-63 comes from signed REQ-PIPE-170 criterion 23 and was a must inside REQ-PIPE-179,
+    and REQ-GEN-205, which plants the rest of that criterion, is a must.'
+  - 'THE REGISTER''S TS-63 TEXT IS OUT OF DATE (REQ-PIPE-179 own pass, 2026-10-14): plans/supply-model.md still gives the
+    15th-of-the-month configuration and 30-day window, which is not the Child Protection calendar, and marker wording from
+    before T8. Criterion 5 rewrites it.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 45) - REQ-PIPE-170 criterion
+    23 and its unmet entry (signed 2026-10-07, built; criterion 7 here). OLD criterion: "THE SYSTEM SHALL generate the calendar-correction
+    scenarios TS-57 to TS-62 (TS-63 by REQ-PIPE-179 criterion 39, Keith, 2026-10-13) in the test scenario register (plans/supply-model.md)
+    into the synthetic history once this requirement is built - a correction made part way through that history, merged, and
+    confirmed with at least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left
+    awaiting confirmation - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64
+    each a unit test." NEW criterion: "THE SYSTEM SHALL generate the calendar-correction scenarios TS-57 to TS-62 (TS-63 by
+    REQ-GEN-218, Keith, 2026-10-13 and 2026-10-14) in the test scenario register (plans/supply-model.md) into the synthetic
+    history once this requirement is built - a correction made part way through that history, merged, and confirmed with at
+    least one supply kept, one moved, one held, one blocked and one re-judged with no move, plus one left awaiting confirmation
+    - so that each shape can be seen in the real dashboard and terminal, and SHALL give TS-57 to TS-64 each a unit test. AMENDED
+    <date applied> by REQ-GEN-218 criterion 7: TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13) and was split
+    out of it into REQ-GEN-218 (Keith, 2026-10-14)." OLD unmet entry''s criterion field: "Criterion 23, first half - TS-57
+    to TS-62 GENERATED INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py),
+    TS-63 moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13)." NEW: "Criterion 23, first half - TS-57 to TS-62 GENERATED
+    INTO THE SYNTHETIC HISTORY. Each has a unit test (TestScenarioRegister; TS-64 in tests/test_correction_trial.py), TS-63
+    moved to REQ-PIPE-179 criterion 39 (Keith, 2026-10-13) and from there to REQ-GEN-218 (Keith, 2026-10-14)." WHY: TS-63
+    is planted by this requirement, not by REQ-PIPE-179 criterion 39, which is now a pointer. BUILT BEHAVIOUR: TEXT ONLY.
+    Applied in the change that adds this requirement to requirements.yaml, so the signed register never names a criterion
+    that no longer plants TS-63; <date applied> is that change''s date.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14; batch amendment 46) - REQ-GEN-207 criterion
+    2 (signed 2026-10-14, not_started; criterion 7 here). OLD: "THE SYSTEM SHALL size the growth by a dry run of the generator''s
+    collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80
+    with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with
+    every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-PIPE-179),
+    and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206)
+    - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run''s
+    output in this requirement''s evidence." NEW: "THE SYSTEM SHALL size the growth by a dry run of the generator''s collision
+    refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the
+    lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period
+    it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-GEN-218), and TS-50
+    with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206) - adding
+    the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run''s output in
+    this requirement''s evidence. AMENDED <date applied> by REQ-GEN-218 criterion 7." WHY: as amendment 45. BUILT BEHAVIOUR:
+    TEXT ONLY - REQ-GEN-207 is not built, and its dry run counts TS-63 and its correction exactly as before.'
+  open_questions:
+  - '1. TS-63''s SCENARIO LINKS (delivery-scoper; criterion 39 never said). Without a declared link a scenario lands on the
+    latest day it has anything to show (REQ-GEN-201 criterion 6), which for TS-63 is long after the gap, where the marker
+    its Expect quotes no longer shows. Recommended (A): two lettered links (REQ-GEN-201), ''a'' after the correction''s date
+    and before effective_to, where the ''Turning off after'' marker shows, and ''b'' inside the gap, after the injected gap
+    supply arrives, where it is held and REQ-DASH-180''s quiet line counts it - which needs REQ-GEN-205 criterion 12''s link
+    bounded by a correction''s date, so this is built after REQ-GEN-205 rather than straight after REQ-DASH-180. (B) the default
+    single link only, built straight after REQ-DASH-180, the marker described in the register but not linked to.'
 - id: REQ-DASH-208
   title: A scenario link from the test-scenarios panel lands with what the scenario is about in view
   date_written: '2026-10-14'
@@ -1513,9 +1792,9 @@ requirements:
     change alters together with the period before and the period after it - except that for a version-level change (TS-62's),
     only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received
     before its effective date and for every arrival received on or after it, together with the day before and the day after
-    each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and REQ-PIPE-179's
-    TS-63 correction; and IF it meets a period another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift
-    either or relax the rule.
+    each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and TS-63's
+    correction (REQ-GEN-218) where it is already planted; and IF it meets a period another claims, THEN generation SHALL refuse
+    naming both, and SHALL NOT shift either or relax the rule.
   - THE SYSTEM SHALL place TS-57 to TS-61 in Child Protection quarters REQ-GEN-207 adds by growing the history earlier, so
     that no existing scenario moves, and TS-62 on Birth Registrations, its correction dated a few days before the end of the
     history and its later arrival the next daily supply.
@@ -1625,7 +1904,8 @@ requirements:
     lets a synthetic asset add past-dated versions. Answered since for the declaration (above) and the staging (criteria 30
     and 31); what remains is the scripted manager''s choices, which this requirement adds.'
   - 'TS-63 IS NOT HERE (Keith, 2026-10-13): REQ-PIPE-179 criterion 39 plants it in the change that builds the turn-off, declared
-    as a correction like these.'
+    as a correction like these. RE-POINTED 2026-10-14 (Keith, REQ-PIPE-179 own pass Q1): TS-63 is now REQ-GEN-218''s, built
+    after REQ-DASH-180, and criterion 10 checks against its correction where it is already planted.'
   - 'KEEP AND ''LEAVE IT PENDING'' ARE THE MANAGER''S, SAID IN THE SCRIPT FILE (main session, overnight 2026-10-13, fork (e),
     PROVISIONAL until Keith answers open question 1): a scripted confirmation naming the change_reference - first proposed
     as a confirm-correction operation in decisions:, now recommended as a top-level corrections: list (CLI UX A). REJECTED
@@ -2206,10 +2486,10 @@ requirements:
     criterion 14''s one function, unshortened, so REQ-DASH-182 is added as a dependency.'
   - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s round 4 fold answers G1 and G2): criterion 3 reworded, criterion 14 added,
     open questions 1 and 2 removed as answered, REQ-DASH-182 added as a dependency.'
-  open_questions:
-  - '1. PREVIOUS/NEXT LINKS AT THE ENDS (criterion 14, delivery-scoper, PROVISIONAL). Recommended (A): leave a link out where
-    there is no earlier period, or the next had not opened by the date on show - the page never offers a date with nothing
-    behind it (REQ-DASH-054). (B) Show the next link anyway, landing on ''<period> had not opened by <date>'' (criterion 8).'
+  - 'PREVIOUS/NEXT LINKS LEFT OUT AT THE ENDS - DECIDED (Keith, 2026-10-14, H4, option A): criterion 14 as written - no previous
+    link where the collection''s history has no earlier period, and no next link where the next period had not opened by the
+    date on show, because the page never offers a date with nothing behind it (REQ-DASH-054). The PROVISIONAL note in the
+    G1 decision above is settled. REJECTED (B) showing the next link anyway, landing on ''<period> had not opened by <date>''.'
 - id: REQ-PIPE-210
   title: The terminal's queue says a waiting supply turned red only by another table needs nothing decided on it, and lists
     it under that table's own item
