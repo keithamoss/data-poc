@@ -108,6 +108,10 @@ class Assignment:
     #: correction accounts for it - our configuration problem. The refusal
     #: in words, naming each changed item and the remedy.
     agreement_refused: str | None = None
+    #: HELD WHILE TURNED OFF (REQ-PIPE-179 criterion 16): the turn-off its
+    #: receipt fell in - effective_to, turned_off_reason and level - recorded
+    #: as history. Outranks schedule_ended (criterion 17).
+    turned_off: dict | None = None
 
     @property
     def is_resupply(self) -> bool:

@@ -109,6 +109,8 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
     after a slot is what that slot closes against (REQ-PIPE-131) - so it
     takes the first version, the only one that could describe it.
     """
+    from qa_tools.common import agreement as agreement_mod
+
     entry = agreement.dataset(dataset_id)
     if entry is None or not entry.participation:
         raise schedule.ScheduleConfigError(
@@ -116,8 +118,16 @@ def _participation_for(dataset_id: str, period_date: date, agreement):
             f"so none of its slots has a due instant.")
     # RESOLVED, value by value, from the dataset or its collection
     # (REQ-PIPE-181, amending REQ-PIPE-113 criterion 2).
-    version = (agreement.participation_on(dataset_id, period_date)
-               or agreement.participation_on(dataset_id, entry.participation[0].effective_from))
+    standing = agreement.standing_on(dataset_id, period_date)
+    if standing.state == agreement_mod.TURNED_OFF:
+        # A PERIOD INSIDE A TURNED-OFF GAP has no slot, but the last owed
+        # slot before the gap closes at the claim-opening instant this one
+        # would have had - every input resolved as if each effective_to
+        # were absent (REQ-PIPE-179 criterion 14).
+        version = agreement.timing_on(dataset_id, period_date)
+    else:
+        version = (standing.values
+                   or agreement.participation_on(dataset_id, entry.participation[0].effective_from))
     if version.expected_time is None or version.grace is None:
         raise schedule.ScheduleConfigError(
             f"dataset {dataset_id!r}'s participation version effective "

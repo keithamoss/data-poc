@@ -80,17 +80,22 @@ def _covering_slot(dataset_id: str, received_at):
 
 
 def refile_covered(*, say=print, skip=frozenset()) -> list[tuple[str, str, str]]:
-    """Re-file every schedule-ended hold whose receipt the calendar now
-    covers, oldest receipt first. Returns (dataset, supply, period) for each.
+    """Re-file every assignment-rule hold whose receipt the configuration
+    now gives an open owed slot - WHATEVER ITS LABEL (REQ-PIPE-179 criterion
+    19, generalising REQ-PIPE-154's schedule-ended re-file rather than
+    adding a second re-filer) - oldest receipt first. Returns (dataset,
+    supply, period) for each. Every other hold is left for a person.
 
-    `skip` names datasets not to touch - a refused one (REQ-PIPE-173)."""
+    `skip` names datasets not to touch - a refused one (REQ-PIPE-173), whose
+    holds its own drain re-files."""
     return refile_holds(
         lambda conn: [h for h in supply_holds.outstanding(conn)
-                      if h.schedule_ended and h.dataset_id not in skip],
-        lambda h, slot: (f"Held because {h.dataset_id}'s schedule had ended; dates now "
-                         f"cover its receipt, so the rule files it to {slot}."),
-        lambda h, slot: (f"{h.supply_id}: its schedule now has {slot}, so it is filed "
-                         f"there and owed a re-check"),
+                      if h.kind == supply_holds.ASSIGNMENT_RULE and not h.agreement_refused
+                      and h.dataset_id not in skip and h.label.covered_by],
+        lambda h, slot: (f"Held because {h.reason_words()}; the configuration now covers "
+                         f"its receipt, so the rule files it to {slot}."),
+        lambda h, slot: (f"{h.supply_id}: the configuration now has {slot} open at its "
+                         f"receipt, so it is filed there and owed a re-check"),
         say=say)
 
 
@@ -100,7 +105,7 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
     the one loop both a schedule-ended hold (REQ-PIPE-154) and a hold on a
     refused dataset (REQ-PIPE-173) are drained by once their cause is gone."""
     from qa_tools.common import (decision_log, filing, hierarchy, placing, qa_store,
-                                 replay_clock)
+                                 replay_clock, supply_files)
 
     done: list[tuple[str, str, str]] = []
     with supply_db.connect(label="mothman:refile-holds") as conn:
@@ -124,12 +129,19 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
             if slot is None:
                 continue
             entry = hierarchy.dataset(h.dataset_id)
+            # ONE FILE OF A HELD CONTESTED PAIR goes with its partner, still
+            # contested, and neither is checked until the pair is settled
+            # (REQ-PIPE-179 criterion 19, REQ-PIPE-163 criterion 37). Both
+            # files share the receipt, so both are covered by the same slot
+            # and both are re-filed in this same pass.
+            contested = supply_files.open_contest(conn, h.dataset_id, h.supply_id) is not None
             # THE ONE PLACER (REQ-PIPE-163 criterion 40).
             placing.place(
                 conn, agency_id=entry.agency_id, collection_id=entry.collection_id,
                 dataset_id=h.dataset_id, supply=h.supply_id, to_period=slot.name,
                 actor=ACTOR, actor_kind=decision_log.RULE,
-                effective_at=replay_clock.now().isoformat(), reason=reason(h, slot.name))
+                effective_at=replay_clock.now().isoformat(), reason=reason(h, slot.name),
+                owe=not contested)
             say(said(h, slot.name))
             done.append((h.dataset_id, h.supply_id, slot.name))
     return done

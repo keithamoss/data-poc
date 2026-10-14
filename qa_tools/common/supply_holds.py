@@ -55,6 +55,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 
 from qa_tools.common import replay_clock as _replay_clock
 from qa_tools.common.assignment import Assignment
@@ -163,6 +164,10 @@ def reason_for(decided: Assignment) -> dict:
             pass
     if decided.agreement_refused:
         reason.update(agreement_refused=True, refusal=decided.agreement_refused)
+    if decided.turned_off:
+        # HISTORY ONLY (REQ-PIPE-179 criteria 16 and 18): the label a reader
+        # sees is worked out from the configuration when it is read.
+        reason["turned_off"] = dict(decided.turned_off)
     return reason
 
 
@@ -190,10 +195,39 @@ class Held:
     raised_at: datetime
     resolved_by: int | None = None
     resolved_at: datetime | None = None
+    #: OUR RECEIPT INSTANT, where it is recorded - what the label is worked
+    #: out from (REQ-PIPE-179 criterion 18).
+    received_at: datetime | None = None
 
     @property
     def outstanding(self) -> bool:
         return self.resolved_by is None
+
+    @cached_property
+    def label(self):
+        """TURNED OFF, SCHEDULE ENDED OR THE PLAIN HOLD, from the configuration
+        AS IT STANDS WHEN READ (REQ-PIPE-179 criterion 18) - the reason
+        recorded when it was raised is history only. Read from the record
+        only where no receipt was recorded, which is a test's hold."""
+        from qa_tools.common import turned_off
+
+        if self.kind != ASSIGNMENT_RULE or self.agreement_refused:
+            return turned_off.Label(turned_off.PLAIN)
+        if self.received_at is not None:
+            return turned_off.label_at(self.dataset_id, self.received_at)
+        if self.reason.get("turned_off"):
+            return turned_off.Label(turned_off.TURNED_OFF)
+        if self.reason.get("schedule_ended") is True:
+            return turned_off.Label(turned_off.SCHEDULE_ENDED,
+                                    last_period=self.reason.get("last_period"))
+        return turned_off.Label(turned_off.PLAIN)
+
+    @property
+    def turned_off(self) -> bool:
+        """Held because its receipt falls in a turned-off gap (REQ-PIPE-179)."""
+        from qa_tools.common import turned_off
+
+        return self.label.label == turned_off.TURNED_OFF
 
     @property
     def responses(self) -> tuple[str, ...]:
@@ -201,6 +235,12 @@ class Held:
         # #132 A3): a supply held because its schedule ended files itself
         # once the dates exist, so filing it by hand or rejecting it is the
         # wrong fix to offer.
+        if self.turned_off:
+            # REQ-PIPE-179 criterion 34: place it, reject it, or change the
+            # configuration if this period should be owed.
+            return (self._place_response(), "reject the supply",
+                    f"change effective_to/effective_from in {SCHEDULE_FILE} if this period "
+                    f"should be owed - it files itself on the next processing pass")
         if self.schedule_ended:
             return (f"add the next delivery dates to {SCHEDULE_FILE} - it files itself "
                     f"on the next processing pass",)
@@ -220,6 +260,25 @@ class Held:
         if self.kind == ASSIGNMENT_RULE:
             return (self._place_response(), "reject the supply")
         return RESPONSES.get(self.kind, ())
+
+    def reason_words(self) -> str:
+        """Why it was held when it was raised, from the record - for the
+        re-file's own reason, which is history too."""
+        if self.reason.get("turned_off"):
+            return f"{self.dataset_id} was turned off"
+        if self.reason.get("schedule_ended"):
+            return f"{self.dataset_id}'s schedule had ended"
+        if self.correction:
+            return f"correction {self.correction} left it no period"
+        return "no period was open at its receipt"
+
+    def _name(self) -> str:
+        from qa_tools.common import hierarchy
+
+        try:
+            return hierarchy.dataset(self.dataset_id).dataset_name
+        except Exception:  # noqa: BLE001 - a dataset since removed keeps its id
+            return self.dataset_id
 
     def _place_response(self) -> str:
         """Place, naming the terminal screen and the exact command, its
@@ -252,8 +311,12 @@ class Held:
     @property
     def schedule_ended(self) -> bool:
         """Held because the dataset's schedule ran out (REQ-PIPE-154
-        criterion 2) - read from the record, never from its prose."""
-        return self.reason.get("schedule_ended") is True
+        criterion 2) - worked out from the configuration as it stands
+        (REQ-PIPE-179 criterion 18, amending REQ-PIPE-154 criterion 2), and
+        never from its prose. Turned off outranks it (criterion 17)."""
+        from qa_tools.common import turned_off
+
+        return self.label.label == turned_off.SCHEDULE_ENDED
 
     @property
     def unavailable(self) -> tuple[tuple[str, str], ...]:
@@ -269,6 +332,20 @@ class Held:
         this is that record read back, and it says what to do about it
         because a hold nobody can clear is indistinguishable from a bug.
         """
+        if self.turned_off:
+            # REQ-PIPE-179 criterion 34's sentence.
+            from qa_tools.common import turned_off
+
+            turn = self.label.turned_off
+            name = self._name()
+            if turn is None:
+                return (f"Received while {name} is turned off. Place it into a period it still "
+                        f"owes, reject it, or change effective_to/effective_from in "
+                        f"{SCHEDULE_FILE} if this period should be owed.")
+            return (f"Received while {name} is turned off ({turn.reason}, "
+                    f"{turned_off.level_words(turn, self.dataset_id)}). Place it into a period "
+                    f"it still owes, reject it, or change effective_to/effective_from in "
+                    f"{SCHEDULE_FILE} if this period should be owed.")
         if self.correction:
             return (f"Held when correction {self.correction} was confirmed: the corrected "
                     f"calendar offers it no period"
@@ -279,15 +356,11 @@ class Held:
             # and 3), so the reason says where to make it.
             command = self.reason.get("fix_command")
             how = f" `{command}` proposes them." if command else ""
-            from qa_tools.common import hierarchy
-
-            try:
-                name = hierarchy.dataset(self.dataset_id).dataset_name
-            except Exception:  # noqa: BLE001 - a dataset since removed keeps its id
-                name = self.dataset_id
             # THE DATASET'S NAME, not its id (#132 A3 - it read "cp-clients's").
+            name = self._name()
+            last = self.label.last_period or self.reason.get("last_period")
             return (f"{self.supply_id} arrived after the {name} schedule ended - "
-                    f"its last authored period is {self.reason.get('last_period')}, and "
+                    f"its last authored period is {last}, and "
                     f"there is no later date to file it to. Add dates to the dataset's "
                     f"calendar in {SCHEDULE_FILE}.{how} The next processing pass then "
                     f"files it by the rule. Raised by {self.raised_by}.")
@@ -409,17 +482,30 @@ def resolve(conn, *, dataset_id: str, supply_id: str, decision_id: int) -> bool:
 
 def _held_from(row) -> Held:
     dataset_id, supply_id, kind, reason, raised_by, delivery, raised_at, \
-        resolved_by, resolved_at = row
+        resolved_by, resolved_at, received_at = row
     if isinstance(reason, str):
         reason = json.loads(reason)
     return Held(dataset_id=dataset_id, supply_id=supply_id, kind=kind,
                  reason=reason or {}, raised_by=raised_by, delivery=delivery,
                  raised_at=raised_at, resolved_by=resolved_by,
-                 resolved_at=resolved_at)
+                 resolved_at=resolved_at, received_at=received_at)
 
 
-_COLUMNS = ("dataset_id, supply_id, kind, reason, raised_by, delivery, "
-            "raised_at, resolved_by, resolved_at")
+def _receipt_table() -> str:
+    from qa_tools.common import filing
+
+    return filing.RECEIPT
+
+
+#: Every hold column, with OUR RECEIPT of the supply joined on - which its
+#: label is worked out from (REQ-PIPE-179 criterion 18).
+_COLUMNS = ("h.dataset_id, h.supply_id, h.kind, h.reason, h.raised_by, h.delivery, "
+            "h.raised_at, h.resolved_by, h.resolved_at, r.received_instant")
+
+
+def _from() -> str:
+    return (f"{TABLE} h LEFT JOIN {_receipt_table()} r "
+            "ON r.dataset_id = h.dataset_id AND r.supply_id = h.supply_id")
 
 
 def outstanding(conn, *, dataset_id: str | None = None) -> tuple[Held, ...]:
@@ -429,22 +515,22 @@ def outstanding(conn, *, dataset_id: str | None = None) -> tuple[Held, ...]:
     stays, pointing at the decision that ended it, because "why is this
     no longer waiting on me" is a question somebody asks later.
     """
-    where = "resolved_by IS NULL"
+    where = "h.resolved_by IS NULL"
     params: list = []
     if dataset_id is not None:
-        where += " AND dataset_id = ?"
+        where += " AND h.dataset_id = ?"
         params.append(dataset_id)
     rows = conn.execute(
-        f"SELECT {_COLUMNS} FROM {TABLE} WHERE {where} "
-        "ORDER BY raised_at, dataset_id, supply_id", params).fetchall()
+        f"SELECT {_COLUMNS} FROM {_from()} WHERE {where} "
+        "ORDER BY h.raised_at, h.dataset_id, h.supply_id", params).fetchall()
     return tuple(_held_from(row) for row in rows)
 
 
 def hold_on(conn, dataset_id: str, supply_id: str) -> Held | None:
     """This supply's outstanding hold, or None where it has none."""
     rows = conn.execute(
-        f"SELECT {_COLUMNS} FROM {TABLE} "
-        "WHERE dataset_id = ? AND supply_id = ? AND resolved_by IS NULL",
+        f"SELECT {_COLUMNS} FROM {_from()} "
+        "WHERE h.dataset_id = ? AND h.supply_id = ? AND h.resolved_by IS NULL",
         [dataset_id, supply_id]).fetchall()
     return _held_from(rows[0]) if rows else None
 

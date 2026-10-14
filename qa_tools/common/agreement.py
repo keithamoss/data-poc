@@ -198,6 +198,28 @@ class Agreement:
         is what a slot's inputs read; `standing_on` is what says it owes."""
         return self.standing_on(dataset_id, on).values
 
+    def ever_turned_off(self, dataset_id: str) -> bool:
+        """Whether any version this dataset reads states an effective_to - a
+        cheap first question, so the thirty datasets never turned off pay
+        nothing for the ones that are (the requirement's performance NFR)."""
+        entry = self.dataset(dataset_id)
+        if entry is None:
+            return False
+        return any(v.effective_to is not None
+                   for v in entry.participation + self.defaults_for(dataset_id))
+
+    def timing_on(self, dataset_id: str, on: date) -> ParticipationVersion | None:
+        """The values a period's slot inputs take AS IF EVERY effective_to WERE
+        ABSENT (REQ-PIPE-179 criterion 14) - what a period inside a turned-off
+        gap would have had, which is when the last owed slot before the gap
+        closes. Never says whether the dataset owes; None while not yet
+        owing."""
+        entry = self.dataset(dataset_id)
+        if entry is None:
+            return None
+        return resolve(entry.participation, self.defaults_for(dataset_id), on,
+                       ignore_turn_offs=True)
+
     def standing_on(self, dataset_id: str, on: date) -> Standing:
         """THE ONE HELPER (REQ-PIPE-179 criterion 27): not yet owing, turned
         off (criteria 3, 5 and 6), or owing with its resolved values.
@@ -264,7 +286,7 @@ def describe_source(source: tuple, *, collection_name: str | None = None,
 
 
 def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[ParticipationVersion, ...],
-            on: date) -> ParticipationVersion | None:
+            on: date, *, ignore_turn_offs: bool = False) -> ParticipationVersion | None:
     """THE ONE RESOLUTION FUNCTION (REQ-PIPE-181's second NFR): each value
     separately, on the date - from the dataset's version in force where it
     states it, else from the collection's version in force where that
@@ -285,7 +307,7 @@ def resolve(own: tuple[ParticipationVersion, ...], defaults: tuple[Participation
     if mine is None:
         return None
     above = in_force.version_on(defaults, on) if defaults else None
-    if above is not None and above.off_after(on):
+    if above is not None and above.off_after(on) and not ignore_turn_offs:
         # WHILE A COLLECTION IS TURNED OFF it gives no value to anybody
         # (REQ-PIPE-179 criterion 7): a dataset back on states its own.
         above = None

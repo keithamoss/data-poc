@@ -168,10 +168,15 @@ def period_problem(dataset_id: str, period: str) -> str | None:
     """Why `period` cannot be named for this dataset, or None where it is a
     period the dataset owes (criterion 7). Ends with the command that lists
     the dataset's periods, on a line of its own."""
-    from qa_tools.common import refiling
+    from qa_tools.common import refiling, turned_off
 
     if refiling._on_calendar(dataset_id, period):
         return None
+    # INSIDE A TURNED-OFF GAP (REQ-PIPE-179 criterion 20): the one refusal,
+    # in place of criterion 7's rather than beside it.
+    gap = turned_off.refusal(dataset_id, period)
+    if gap:
+        return gap
     listing = f"\n  mothman schedule show --dataset {dataset_id}"
     reason = _owes_nothing(dataset_id, period)
     if reason is None:

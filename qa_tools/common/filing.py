@@ -473,6 +473,7 @@ def file_arrivals(found_arrivals) -> list[Assignment]:
                 dataset_id=dataset_id, supply_id=supply_id,
                 at=arrival.received_at, slots=slots_by_dataset[horizon],
                 filled=filled_slots(dataset_id), final_period=final_period_for(dataset_id))
+            decided = held_as_turned_off(decided)
             # THE RULE FIRST, THE REFUSAL ONLY OVER A FILING (delivery-critic
             # on 173, #4): a supply the rule would hold anyway keeps its own
             # hold - schedule-ended says how it is fixed; a refusal hold
@@ -641,9 +642,26 @@ def assignment_at(dataset_id: str, supply_id: str, at: datetime) -> Assignment:
             dataset_id, until=slots_mod.claimable_until(dataset_id, at.date()))
     except (ValueError, KeyError, FileNotFoundError):
         slots = []
-    return assign_mod.assign(dataset_id=dataset_id, supply_id=supply_id, at=at, slots=slots,
-                             filled=filled_slots(dataset_id),
-                             final_period=final_period_for(dataset_id))
+    return held_as_turned_off(assign_mod.assign(
+        dataset_id=dataset_id, supply_id=supply_id, at=at, slots=slots,
+        filled=filled_slots(dataset_id), final_period=final_period_for(dataset_id)))
+
+
+def held_as_turned_off(decided: Assignment) -> Assignment:
+    """A hold whose receipt falls in a turned-off gap, said so (REQ-PIPE-179
+    criteria 16 and 17): the turn-off recorded as history, and never also
+    schedule ended. Every other assignment is returned as it is."""
+    from dataclasses import replace
+
+    from qa_tools.common import turned_off
+
+    if not decided.is_held or decided.received_at is None or decided.agreement_refused:
+        return decided
+    turn = turned_off.gap_at(decided.dataset_id, decided.received_at)
+    if turn is None:
+        return decided
+    return replace(decided, turned_off=turned_off.as_record(turn), schedule_ended=False,
+                   last_period=None)
 
 
 def file_settled(conn, dataset_id: str, supply_id: str, slot: str | None, *,

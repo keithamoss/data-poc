@@ -69,6 +69,11 @@ def plan(conn, *, dataset_id: str, supply: str, to_period: str) -> Plan:
             f"{supply} is not filed for {dataset_id}, so there is nothing to re-file. "
             f"`mothman supply queue` lists what is waiting.")
     from_period = rows[0][0]
+    gap = gap_problem(dataset_id, to_period)
+    if gap:
+        # INSIDE A TURNED-OFF GAP (REQ-PIPE-179 criterion 20, amending
+        # criterion 12): this refusal, in place of the un-inherit advice.
+        raise decision_log.DecisionRefused(gap)
     if not _on_calendar(dataset_id, to_period):
         # A PERIOD THE CALENDAR DOES NOT HAVE (post-build-review #115, D1):
         # `2026-Q9` was accepted, recorded and re-checked, filing a supply
@@ -191,6 +196,14 @@ def apply(conn, p: Plan, *, agency_id: str, collection_id: str, actor: str, reas
                 effective_at=effective_at,
                 reason=f"{p.supply} was re-filed into {p.to_period} in its place")
     return owed_id
+
+
+def gap_problem(dataset_id: str, period: str) -> str | None:
+    """The turned-off gap `period` falls inside, as the one refusal
+    (REQ-PIPE-179 criterion 20), or None."""
+    from qa_tools.common import turned_off
+
+    return turned_off.refusal(dataset_id, period)
 
 
 def _on_calendar(dataset_id: str, period: str) -> bool:

@@ -143,7 +143,7 @@ class TestAddingDatesFilesWhatWasHeld:
         # DATES ADDED: the calendar now runs to a 2030 period covering it.
         later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
-        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None: later)
+        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
 
         done = schedule_ended.refile_covered(say=lambda line: None)
@@ -167,7 +167,7 @@ class TestAddingDatesFilesWhatWasHeld:
 
         supply = f"cp-carers@{AFTER:%Y%m%d}b"
         self._held(conn, supply, AFTER)
-        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None: SLOTS)
+        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: SLOTS)
         assert schedule_ended.refile_covered(say=lambda line: None) == []
         assert supply_holds.hold_on(conn, "cp-carers", supply) is not None
 
@@ -180,7 +180,7 @@ class TestAddingDatesFilesWhatWasHeld:
         self._held(conn, first, AFTER)
         later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
-        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None: later)
+        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
         done = schedule_ended.refile_covered(say=lambda line: None)
         assert [s for _, s, _ in done] == [first, second]
@@ -195,7 +195,7 @@ class TestAddingDatesFilesWhatWasHeld:
         self._held(conn, supply, AFTER)
         later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
-        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None: later)
+        monkeypatch.setattr(slots, "slots_for_dataset", lambda dataset_id, until=None, **_: later)
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
         done = schedule_ended.refile_covered(say=lambda line: None,
                                              skip=frozenset({"cp-carers"}))

@@ -95,6 +95,14 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
     reason = schedule.not_expected_periods(dataset_id).get(period_name)
     if reason:
         return True, reason
+    # A TURNED-OFF PERIOD (REQ-PIPE-179 criterion 22) is owed nothing, so the
+    # last promoted supply stands in it as in a period not participated in.
+    from qa_tools.common import turned_off
+
+    turn = turned_off.gap_for_period(dataset_id, period_name)
+    if turn is not None:
+        return True, (f"{dataset_id} is {turned_off.gap_words(turn, dataset_id)} in "
+                      f"contract/calendar.yaml, so nothing is owed for {period_name}")
     # AND THE OTHER WAY A SCHEDULE SAYS IT (2026-10-02): `delivery_months`
     # subsetting the calendar. Case Workers is delivered in February and
     # August only, and the slot builder has always honoured that - but

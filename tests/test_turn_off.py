@@ -358,3 +358,267 @@ class TestNotExpectedInsideAGap:
                 {"period": "2025-Q3", "reason": "no file"}]
         got = _text(broken(mutate))
         assert "2025-Q3" in got and "whole collection paused" in got
+
+
+# ---- slots, filing and holds (criteria 13-20, 22) ---------------------------
+
+from datetime import datetime  # noqa: E402
+
+from qa_tools.common import asset_time, slots, turned_off  # noqa: E402
+
+
+def _at(day: str, hhmm: str = "09:00") -> datetime:
+    return asset_time.wall_clock(date.fromisoformat(day), hhmm)
+
+
+def _off_for_a_while(doc=None, *, back: str = "2026-01-01") -> dict:
+    """cp-clients turned off after 31 March 2025, back on from `back`."""
+    doc = doc or _unshare(_doc())
+    _turn_off(_versions(doc, "cp-clients")[0])
+    _back_on(doc, "cp-clients", back)
+    return doc
+
+
+@pytest.fixture
+def using(monkeypatch, tmp_path):
+    """Point every reader of the committed agreement at `doc`."""
+    def apply(doc):
+        path = tmp_path / "calendar.yaml"
+        path.write_text(yaml.safe_dump(doc, sort_keys=False))
+        monkeypatch.setattr(agreement, "CALENDAR_YAML", path)
+        agreement.current.cache_clear()
+        return agreement.current()
+    yield apply
+    agreement.current.cache_clear()
+
+
+class TestTheLastOwedSlotBeforeAGap:
+    """Criterion 14 - test first, because a slot that closed early would
+    hold a late supply that was owed."""
+
+    def test_closes_when_the_gaps_first_period_would_have_opened(self):
+        agr = agreement.from_doc(_off_for_a_while())
+        real = agreement.from_doc(_unshare(_doc()))
+        [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
+                if s.name == "2025-Q1"]
+        [real_q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=real)
+                     if s.name == "2025-Q1"]
+        assert q1.closes_at == real_q1.closes_at
+        assert q1.closes_at == _at("2025-05-01") - timedelta(days=14)
+
+    def test_with_a_collections_values_resolved_as_if_never_off(self):
+        """The gap's first period takes the collection's inputs even though
+        the collection gives nothing while it is off (criterion 7)."""
+        doc = _unshare(_doc())
+        _defaults_version(doc)["expected_time"] = "13:00"
+        _turn_off(_defaults_version(doc))
+        agr = agreement.from_doc(doc)
+        [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
+                if s.name == "2025-Q1"]
+        assert q1.closes_at == _at("2025-05-01", "13:00") - timedelta(days=14)
+
+
+    def test_inputs_are_those_of_the_gaps_own_date_not_the_last_day_on(self):
+        """A collection version taking effect inside a dataset's own gap
+        moves the due time from 09:00 to 13:00. The gap's first period
+        would have had 13:00 - not the dataset's last day on, 09:00."""
+        doc = _unshare(_doc())
+        first = _defaults_version(doc)
+        _collection(doc)["participation_defaults"]["versions"].append(
+            {**{k: v for k, v in first.items() if k != "changelog"},
+             "effective_from": "2025-04-15", "expected_time": "13:00", "changelog": LOG})
+        _turn_off(_versions(doc, "cp-clients")[0])
+        agr = agreement.from_doc(doc)
+        [q1] = [s for s in slots.slots_for_dataset("cp-clients", agreement=agr)
+                if s.name == "2025-Q1"]
+        assert q1.closes_at == _at("2025-05-01", "13:00") - timedelta(days=14)
+
+
+class TestWhatAReceiptFallsIn:
+    """Criteria 15, 16 and 17."""
+
+    def test_an_owed_slot_still_open_takes_it_whatever_the_date(self):
+        """Criterion 15: turned off on 10 April, and 2025-Q1 still open."""
+        agr = agreement.from_doc(_off_for_a_while())
+        got = turned_off.label_at("cp-clients", _at("2025-04-10"), agr)
+        assert got.covered_by == "2025-Q1" and got.label == turned_off.PLAIN
+
+    def test_once_it_closes_the_supply_is_held_as_turned_off(self):
+        agr = agreement.from_doc(_off_for_a_while())
+        got = turned_off.label_at("cp-clients", _at("2025-06-01"), agr)
+        assert got.label == turned_off.TURNED_OFF and got.covered_by is None
+        assert (got.turned_off.effective_to, got.turned_off.reason, got.turned_off.level) \
+            == (date(2025, 3, 31), "supplier paused", agreement.DATASET)
+
+    def test_turned_off_outranks_schedule_ended(self):
+        """Criterion 17: off for good, so its last owed slot is its last."""
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0])
+        agr = agreement.from_doc(doc)
+        assert turned_off.final_period("cp-clients", agr) == "2025-Q1"
+        assert turned_off.label_at("cp-clients", _at("2025-06-01"), agr).label \
+            == turned_off.TURNED_OFF
+
+    def test_back_on_its_owed_slot_takes_it(self):
+        agr = agreement.from_doc(_off_for_a_while())
+        assert turned_off.label_at("cp-clients", _at("2026-01-25"), agr).covered_by == "2026-Q1"
+
+    def test_the_real_configuration_holds_nothing_as_turned_off(self):
+        assert turned_off.gap_at("cp-clients", _at("2025-06-01")) is None
+
+
+class TestATurnedOffPeriodIsNotParticipated:
+    """Criterion 22: inheritance stands the last promoted supply in it."""
+
+    def test_inheritance_reads_it_as_owing_nothing(self, using):
+        from qa_tools.common import inheritance
+
+        using(_off_for_a_while())
+        skipped, why = inheritance._does_not_participate("cp-clients", "2025-Q3")
+        assert skipped and "turned off" in why and "supplier paused" in why
+        assert inheritance._does_not_participate("cp-clients", "2026-Q1") == (False, "")
+
+
+class TestNothingIsPlacedIntoAGap:
+    """Criterion 20: one refusal, naming the gap and how a period becomes
+    owed - in place of 'not a period it owes'."""
+
+    def test_placing(self, using):
+        from qa_tools.common import placing
+
+        using(_off_for_a_while())
+        why = placing.period_problem("cp-clients", "2025-Q3")
+        assert "turned off" in why and "supplier paused" in why
+        assert "effective_to" in why and "contract/calendar.yaml" in why
+        assert "does not participate" not in why
+
+    def test_an_owed_period_is_still_fine(self, using):
+        from qa_tools.common import placing
+
+        using(_off_for_a_while())
+        assert placing.period_problem("cp-clients", "2026-Q1") is None
+
+    def test_refiling_gives_the_same_refusal(self, using):
+        from qa_tools.common import refiling
+
+        using(_off_for_a_while())
+        why = refiling.gap_problem("cp-clients", "2025-Q3")
+        assert why == turned_off.refusal("cp-clients", "2025-Q3")
+        assert "supplier paused" in why
+
+
+# ---- holds, recorded and read (criteria 16, 18, 19, 34) --------------------
+
+from qa_tools.common import qa_store, supply_db, supply_holds  # noqa: E402
+
+GAP = _at("2025-06-01")
+
+
+@pytest.fixture
+def conn(supply_dsn):
+    """This worker's database, forgetting the filings and holds each test
+    makes - they sit in slots of a changed agreement, and left behind the
+    agreement backstop would read them as moved."""
+    import filing_support
+    from qa_tools.common import filing
+
+    with supply_db.connect(label="test-turn-off") as c:
+        qa_store.ensure_schema(c)
+        c.execute(f"DELETE FROM {supply_holds.TABLE} WHERE dataset_id = 'cp-clients'")
+        (before,) = c.execute(f"SELECT coalesce(max(id), 0) FROM {filing.TABLE}").fetchone()
+        try:
+            yield c
+        finally:
+            c.execute(f"DELETE FROM {supply_holds.TABLE} WHERE dataset_id = 'cp-clients'")
+            filing_support.forget(c, "dataset_id = 'cp-clients' AND id > ?", [before])
+
+
+def _hold(conn, supply: str, at: datetime):
+    """File and hold a supply received at `at`, as the pipeline does."""
+    import filing_support
+    from qa_tools.common import filing
+
+    decided = filing.assignment_at("cp-clients", supply, at)
+    filing_support.file(decided)
+    supply_holds.raise_hold(conn, dataset_id="cp-clients", supply_id=supply,
+                            kind=supply_holds.ASSIGNMENT_RULE,
+                            reason=supply_holds.reason_for(decided), raised_by="run_x",
+                            delivery=f"pytest-cp-clients-{supply}")
+    return decided
+
+
+class TestHeldWhileTurnedOff:
+    def test_the_rule_records_the_turn_off_as_history(self, conn, using):
+        """Criterion 16."""
+        using(_off_for_a_while())
+        decided = _hold(conn, "cp-clients@to1", GAP)
+        assert decided.is_held and not decided.schedule_ended
+        recorded = supply_holds.hold_on(conn, "cp-clients", "cp-clients@to1").reason
+        assert recorded["turned_off"] == {"effective_to": "2025-03-31", "reason": "supplier paused",
+                                          "level": "dataset", "version_from": "2023-01-01"}
+
+    def test_it_says_what_to_do(self, conn, using):
+        """Criterion 34's sentence and three responses."""
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@to2", GAP)
+        held = supply_holds.hold_on(conn, "cp-clients", "cp-clients@to2")
+        assert held.turned_off and not held.schedule_ended
+        assert held.describe() == (
+            "Received while Client Register is turned off (supplier paused, set for Client "
+            "Register). Place it into a period it still owes, reject it, or change "
+            "effective_to/effective_from in contract/calendar.yaml if this period should be "
+            "owed.")
+        place, reject, change = held.responses
+        assert "mothman supply decide --operation place" in place
+        assert reject == "reject the supply" and "effective_to/effective_from" in change
+
+    def test_off_for_good_is_turned_off_not_schedule_ended(self, conn, using):
+        """Criterion 17, at filing."""
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0])
+        using(doc)
+        decided = _hold(conn, "cp-clients@to3", GAP)
+        assert decided.turned_off and not decided.schedule_ended
+
+
+class TestTheLabelIsReadFromConfigurationNow:
+    """Criterion 18: the recorded reason is history only."""
+
+    def test_a_turn_off_added_since_relabels_an_old_hold(self, conn, using):
+        """Held plainly (a recorded reason with no turn-off in it), then
+        the dataset is turned off over its receipt."""
+        using(_off_for_a_while())
+        supply_holds.raise_hold(conn, dataset_id="cp-clients", supply_id="cp-clients@to4",
+                                kind=supply_holds.ASSIGNMENT_RULE, reason={"unavailable": []},
+                                raised_by="run_x")
+        import filing_support
+        from qa_tools.common import filing
+        filing_support.file(filing.assignment_at("cp-clients", "cp-clients@to4", GAP))
+        held = supply_holds.hold_on(conn, "cp-clients", "cp-clients@to4")
+        assert held.turned_off
+
+    def test_a_turn_off_removed_since_is_no_longer_one(self, conn, using):
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@to5", GAP)
+        using(_unshare(_doc()))
+        held = supply_holds.hold_on(conn, "cp-clients", "cp-clients@to5")
+        assert not held.turned_off
+        assert held.label.covered_by == "2025-Q2"
+        assert held.reason["turned_off"]["reason"] == "supplier paused", "history stays"
+
+
+class TestCoveredHoldsFileThemselves:
+    """Criterion 19: whatever its label, a hold whose receipt now has an
+    open owed slot is filed by the rule on the next pass."""
+
+    def test_a_turned_off_hold_files_once_the_period_is_owed(self, conn, using):
+        from qa_tools.common import filing, schedule_ended
+
+        using(_off_for_a_while())
+        _hold(conn, "cp-clients@to6", GAP)
+        assert schedule_ended.refile_covered(say=lambda line: None) == []
+        using(_unshare(_doc()))
+        done = schedule_ended.refile_covered(say=lambda line: None)
+        assert ("cp-clients", "cp-clients@to6", "2025-Q2") in done
+        assert filing.filing_for("cp-clients", "cp-clients@to6")["slot"] == "2025-Q2"
+        assert supply_holds.hold_on(conn, "cp-clients", "cp-clients@to6") is None

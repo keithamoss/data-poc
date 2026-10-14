@@ -115,16 +115,20 @@ def _holds(db) -> list[Blocker]:
 
     rows = db.execute(
         "SELECT h.dataset_id, h.supply_id, h.kind, h.reason, h.raised_by, h.delivery, "
-        "       h.raised_at, h.resolved_by, h.resolved_at, d.effective_at, "
+        "       h.raised_at, h.resolved_by, h.resolved_at, r.received_instant, d.effective_at, "
         "       (SELECT df.received_at FROM qa.delivery_file df "
         "         WHERE df.delivery = h.delivery AND df.dataset_id = h.dataset_id "
         "         ORDER BY df.received_instant, df.receipt_sequence LIMIT 1) "
-        "FROM qa.hold h LEFT JOIN qa.decision d ON d.id = h.resolved_by "
+        f"FROM qa.hold h LEFT JOIN {supply_holds._receipt_table()} r "
+        "  ON r.dataset_id = h.dataset_id AND r.supply_id = h.supply_id "
+        "LEFT JOIN qa.decision d ON d.id = h.resolved_by "
         "ORDER BY h.dataset_id, h.supply_id").fetchall()
     out = []
     for row in rows:
-        held = supply_holds._held_from(row[:9])
-        effective_at, received_at = row[9], row[10]
+        # THE LABEL FROM CONFIGURATION AS IT STANDS (REQ-PIPE-179 criterion
+        # 18), so the receipt instant travels with the hold.
+        held = supply_holds._held_from(row[:10])
+        effective_at, received_at = row[10], row[11]
         out.append(Blocker(
             kind=HELD, dataset_id=held.dataset_id, supply=held.supply_id,
             # The receipt where the delivery recorded one; the instant it
