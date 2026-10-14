@@ -374,3 +374,10 @@ How they were folded:
 4. **REQ-DASH-220.**
 
 For the full order across both batches, see `../unsigned-triage/summary.md`, "Ready for sign-off".
+
+## Sign-off walk (Keith, 2026-10-14 afternoon)
+
+REQ-DASH-222, REQ-DOCS-219 and REQ-DASH-220 SIGNED as is and moved into
+requirements.yaml; this draft is now empty. REQ-DOCS-219 criterion 16's
+wording for road-testing.md's intro and CLAUDE.md still comes to Keith before
+it is applied.

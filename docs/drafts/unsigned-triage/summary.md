@@ -673,3 +673,15 @@ with #89.
 - 223: **A** - the build commit adds one changelog entry per Evidently check
   ("definition now recorded with the check; behaviour unchanged"); no
   exemption.
+- Sign-off approach (Keith, 2026-10-14 15:20): walk the eight signable ones
+  one at a time in build order; ALSO sign 177, 178 and 221 now (behaviour
+  agreed; only their build waits on 176). 176 itself stays unsigned behind #89.
+
+## Sign-off walk (Keith, 2026-10-14 afternoon)
+
+SIGNED and moved into requirements.yaml (replacing the older unsigned entries
+where they existed): REQ-QAC-223, REQ-DASH-175, REQ-PIPE-164 (c27 already met
+by T12, applied earlier the same afternoon), REQ-PIPE-166, REQ-GHUB-165, and -
+build waiting on REQ-QAC-176 - REQ-PIPE-177, REQ-PIPE-178, REQ-DASH-221.
+LEFT IN THIS DRAFT: REQ-QAC-176, sign-off held behind plans/running-thoughts.md
+#89. Amendments T1-T11 apply when their carrying requirement is built.
