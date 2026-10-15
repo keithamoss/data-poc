@@ -117,7 +117,7 @@ class TestATypoCanNeverLeaveADatasetExpectingNothing:
         then excluded."""
         def mutate(doc):
             dataset = _dataset(doc, "cp-case-workers")
-            dates = _calendar(doc, "quarterly")["versions"][0]["dates"]
+            dates = [e for v in _calendar(doc, "quarterly")["versions"] for e in v["dates"]]
             months = {2: "February", 8: "August"}
             dataset["not_expected"] = [
                 {"period": e["period"], "reason": "test"} for e in dates

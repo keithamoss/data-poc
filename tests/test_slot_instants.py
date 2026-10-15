@@ -16,6 +16,7 @@ import pytest
 import yaml
 
 from qa_tools.common import agreement, asset_time, in_force, period_overlap, schedule, slots
+from tests import before_growth
 
 REAL = Path(__file__).resolve().parent.parent / "contract" / "calendar.yaml"
 
@@ -24,7 +25,9 @@ def _with(tmp_path, dataset_id="cp-clients", versions=None, first=None):
     """The real agreement with one dataset's participation versions
     replaced. `first` updates the existing single version in place;
     `versions` (each merged over the existing one) replaces the list."""
-    doc = yaml.safe_load(REAL.read_text())
+    # As it stood before REQ-GEN-207's growth: "the existing single version"
+    # is the 2023 one (tests/before_growth.py).
+    doc = before_growth.calendar(yaml.safe_load(REAL.read_text()))
     entry = next(d for d in doc["datasets"] if d["id"] == dataset_id)
     base = entry["participation"]["versions"][0]
     if first is not None:
@@ -37,6 +40,12 @@ def _with(tmp_path, dataset_id="cp-clients", versions=None, first=None):
     path = tmp_path / "calendar.yaml"
     path.write_text(yaml.safe_dump(doc, sort_keys=False))
     return agreement.load(path)
+
+
+def _unchanged():
+    """What every `_with` copy is compared against: the real agreement, as it
+    stood before REQ-GEN-207's growth."""
+    return agreement.from_doc(before_growth.calendar(yaml.safe_load(REAL.read_text())))
 
 
 def _slot(dataset_id, name, agreement_value):
@@ -73,7 +82,7 @@ class TestEachSlotTakesTheVersionInForceOnItsOwnDate:
         are unchanged. Its CLOSING instant is not in that list on purpose -
         the last slot before the boundary closes when the next period's
         window opens, from that period's own inputs (criterion 4)."""
-        before = {s.name: s for s in slots.slots_for_dataset("cp-clients")}
+        before = {s.name: s for s in slots.slots_for_dataset("cp-clients", agreement=_unchanged())}
         after = {s.name: s for s in slots.slots_for_dataset("cp-clients", agreement=two_eras)}
         for name, slot in before.items():
             if slot.date < date(2025, 6, 1):
@@ -128,7 +137,7 @@ class TestDaysBefore:
     def test_widening_the_claim_window_never_moves_the_due_instant(self, tmp_path):
         """Criterion 6."""
         wide = _with(tmp_path, first={"claim_window": "30d"})
-        for real, widened in zip(slots.slots_for_dataset("cp-clients"),
+        for real, widened in zip(slots.slots_for_dataset("cp-clients", agreement=_unchanged()),
                                  slots.slots_for_dataset("cp-clients", agreement=wide)):
             assert real.due_at == widened.due_at
             assert widened.claim_opens_at < real.claim_opens_at

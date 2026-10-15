@@ -72,18 +72,19 @@ class TestTheDeliveryTimeInForce:
 
     def test_a_partial_participant_names_its_own_months_and_reason(self):
         got = owed_nothing.sla_timeline("cp-case-workers")
-        assert got["owesFrom"] == "2023-01-01"
-        (version,) = got["versions"]
-        assert version["from"] == "2023-01-01"
+        # Two versions since REQ-GEN-207 grew the history back to 2013.
+        assert got["owesFrom"] == "2013-01-01"
+        assert [v["from"] for v in got["versions"]] == ["2013-01-01", "2023-01-01"]
+        version = got["versions"][-1]
         cadence = version["cadence"]
         assert cadence["anchor_months"] == [2, 8] and cadence["day_of_month"] == 1
         assert (cadence["expected_time"], cadence["latency_minutes"]) == ("09:00", 480)
         assert "staffing register" in version["reason"]
 
     def test_a_full_participant_carries_no_reason(self):
-        (version,) = owed_nothing.sla_timeline("cp-clients")["versions"]
-        assert version["cadence"]["anchor_months"] == [2, 5, 8, 11]
-        assert version["reason"] is None
+        versions = owed_nothing.sla_timeline("cp-clients")["versions"]
+        assert versions and all(v["cadence"]["anchor_months"] == [2, 5, 8, 11]
+                                and v["reason"] is None for v in versions)
 
     def test_a_daily_dataset_keeps_its_rule(self):
         versions = owed_nothing.sla_timeline("birth-registrations")["versions"]

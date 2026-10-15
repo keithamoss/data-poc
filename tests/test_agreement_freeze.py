@@ -17,6 +17,7 @@ import pytest
 import yaml
 
 from qa_tools.common import agreement_freeze as freeze
+from tests import before_growth
 
 CONTRACT = Path(__file__).resolve().parent.parent / "contract"
 PERTH = timezone(timedelta(hours=8))
@@ -26,7 +27,13 @@ KEITH = "fpycnkgvmt@privaterelay.appleid.com"
 
 
 def _load(name):
-    return yaml.safe_load((CONTRACT / name).read_text())
+    """A committed contract file as it stood before REQ-GEN-207's growth:
+    these cases change "the first version", meaning the 2023 one
+    (tests/before_growth.py)."""
+    doc = yaml.safe_load((CONTRACT / name).read_text())
+    strip = {"calendar.yaml": before_growth.calendar,
+             "data-asset.yaml": before_growth.asset}.get(name)
+    return strip(doc) if strip else doc
 
 
 #: The real committed .github/CODEOWNERS, as the base (REQ-GHUB-174).

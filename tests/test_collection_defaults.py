@@ -20,6 +20,7 @@ import yaml
 
 from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
+from tests import before_growth
 
 REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
 LOG = [{"date": "2023-01-01", "author": "a test", "change": "a test"}]
@@ -45,8 +46,6 @@ def _per_dataset(doc: dict) -> dict:
 def _doc() -> dict:
     # AS IT STOOD BEFORE REQ-GEN-207's GROWTH: these cases edit the first
     # version, meaning the 2023 one (tests/before_growth.py).
-    from tests import before_growth
-
     return _per_dataset(before_growth.calendar(copy.deepcopy(
         yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text()))))
 
@@ -187,7 +186,7 @@ def broken(tmp_path):
 
     def apply(mutate):
         path = contract_dir / "calendar.yaml"
-        doc = _per_dataset(_unshare(yaml.safe_load(path.read_text())))
+        doc = _per_dataset(_unshare(before_growth.calendar(yaml.safe_load(path.read_text()))))
         mutate(doc)
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         return validate(src)
@@ -488,9 +487,10 @@ class TestWhereEachValueCameFrom:
         from cli import schedule as schedule_cli
 
         got = CliRunner().invoke(schedule_cli.schedule_group,
-                                 ["show", "--dataset", "cp-clients", "--on", "2020-06-01"])
+                                 ["show", "--dataset", "cp-clients", "--on", "2010-06-01"])
         assert got.exit_code == 0, got.output
-        assert "not yet owing - first version takes effect 1 Jan 2023" in got.output
+        # The real history starts in 2013 since REQ-GEN-207's growth.
+        assert "not yet owing - first version takes effect 1 Jan 2013" in got.output
 
     def test_the_calendar_entry_uses_the_same_renderer(self, supply_dsn, monkeypatch):
         from cli import common

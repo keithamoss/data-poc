@@ -17,6 +17,7 @@ import yaml
 import filing_support
 from qa_tools.common import agreement, assignment, filing, qa_store, supply_db, verdict
 from qa_tools.common import arrival_classification as classify_mod
+from tests import before_growth
 
 PERTH = timezone(timedelta(hours=8))
 DATASET = "cp-clients"
@@ -40,8 +41,9 @@ def _file(slot=SLOT, supply_id="verdict-s", received_at=RECEIVED):
 
 def _agreement(mutate):
     """The committed agreement with one change made to a copy."""
-    doc = yaml.safe_load(agreement.CALENDAR_YAML.read_text())
-    doc = copy.deepcopy(doc)
+    # As it stood before REQ-GEN-207's growth: these cases edit the first
+    # version, meaning the 2023 one (tests/before_growth.py).
+    doc = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
     mutate(doc)
     return agreement.from_doc(doc)
 

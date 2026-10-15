@@ -175,7 +175,8 @@ class TestParticipation:
     def test_saying_nothing_means_every_period(self):
         """The reading that makes ~30 datasets tolerable to configure."""
         assert schedule.delivery_months("cp-clients") is None
-        assert len(schedule.periods_for_dataset("cp-clients")) == 20
+        # 40 grown quarters from 2013 (REQ-GEN-207) plus the 20 from 2023.
+        assert len(schedule.periods_for_dataset("cp-clients")) == 60
 
     def test_a_dataset_naming_months_gets_only_those(self):
         assert schedule.delivery_months("cp-case-workers") == (2, 8)
@@ -280,7 +281,8 @@ class TestVersioningAndEffectiveDates:
         """Editing next year's dates must never retroactively move a
         date a past supply was already judged against."""
         cal = schedule.calendar("quarterly")
-        assert cal.version_in_force(date(2026, 5, 1)) is cal.versions[0]
+        assert cal.version_in_force(date(2026, 5, 1)) is cal.versions[1]
+        assert cal.version_in_force(date(2016, 5, 1)) is cal.versions[0]
 
     def test_a_date_before_any_version_is_an_error(self):
         cal = schedule.calendar("quarterly")
@@ -519,7 +521,7 @@ class TestNothingIsComputedFromAHolidayCalendar:
         raw = _yaml.safe_load(agreement.CALENDAR_YAML.read_text())
         authored = [(d["period"], str(d["date"]))
                     for c in raw["calendars"] if c["name"] == "quarterly"
-                    for d in c["versions"][0]["dates"]]
+                    for d in c["versions"][-1]["dates"]]
         loaded = [(p.name, p.date.isoformat())
                   for p in schedule.calendar("quarterly").current.periods]
         assert loaded == authored

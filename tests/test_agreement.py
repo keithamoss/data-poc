@@ -21,6 +21,7 @@ import yaml
 
 from qa_tools.common import agreement, schedule, slots
 from qa_tools.common.validate_schedule import Source, validate
+from tests import before_growth
 
 REAL_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "contract"
 
@@ -47,7 +48,7 @@ class TestTheDashboardCadenceComesFromTheAgreement:
 
         import yaml
 
-        doc = copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text()))
+        doc = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
         entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
         entry["participation"]["versions"] = copy.deepcopy(entry["participation"]["versions"])
         entry["participation"]["versions"][0]["days_before"] = 60
@@ -119,7 +120,7 @@ class TestParticipation:
     def test_before_the_first_version_nothing_is_owed_yet(self, tmp_path):
         """Criterion 30 - and criterion 27: the first version's
         effective_from IS the date a dataset began owing."""
-        doc = yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())
+        doc = before_growth.calendar(yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text()))
         entry = next(d for d in doc["datasets"] if d["id"] == "cp-clients")
         entry["participation"]["versions"][0] = {
             **entry["participation"]["versions"][0], "effective_from": "2025-01-01"}
@@ -162,7 +163,10 @@ def broken(tmp_path):
 
     def apply(mutate, asset=False):
         path = contract_dir / ("data-asset.yaml" if asset else "calendar.yaml")
-        doc = yaml.safe_load(path.read_text())
+        # As it stood before REQ-GEN-207's growth: these cases edit the
+        # first version, meaning the 2023 one (tests/before_growth.py).
+        doc = (before_growth.asset if asset else before_growth.calendar)(
+            yaml.safe_load(path.read_text()))
         mutate(doc)
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         return validate(src)
