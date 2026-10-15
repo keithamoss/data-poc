@@ -1673,15 +1673,23 @@ function decisionWords(d){
   if(d && d.placedIn) return `placed in ${fmtPeriodOrDay(d.placedIn)}`;
   return DECISION_DONE[d.action] || d.action;
 }
+// WHO FILED IT, under 'How it got here' (REQ-DASH-230 criterion 6); the
+// stated original arrival is statedNote's, beside the receipt in Timing.
 function filedNote(e){
   const by = e && e.filedBy;
   if (!by || by.kind !== "person") return "";
-  const stated = e.statedOriginal == null ? ""
-    : e.statedOriginal === "not-known" ? " · originally: not known (stated)"
-    : " · originally " + fmtInstant(e.statedOriginal) + " (stated)";
-  const title = "Filed by hand (" + (FILING_ROUTE_LABEL[by.route] || by.route) + ") by " + by.who +
-    (e.statedOriginal == null ? "" : ". The original arrival is their statement - recorded, never used to file or judge this supply.");
-  return `<span class="filed-note" title="${escHtml(title)}" style="color:var(--ink-muted); font-size:11.5px;">by hand · ${escHtml(by.who)}${escHtml(stated)}</span>`;
+  const title = "Filed by hand (" + (FILING_ROUTE_LABEL[by.route] || by.route) + ") by " + by.who;
+  return `<div class="filed-note" title="${escHtml(title)}" style="color:var(--ink-muted); font-size:11.5px;">by hand · ${escHtml(by.who)}</div>`;
+}
+// THE FILER'S STATEMENT OF THE ORIGINAL ARRIVAL, beside the receipt (REQ-PIPE-103
+// criterion 19), labelled as stated.
+function statedNote(e){
+  const by = e && e.filedBy;
+  if (!by || by.kind !== "person" || e.statedOriginal == null) return "";
+  const stated = e.statedOriginal === "not-known" ? "originally: not known (stated)"
+    : "originally " + fmtInstant(e.statedOriginal) + " (stated)";
+  const title = "The original arrival is " + by.who + "'s statement - recorded, never used to file or judge this supply.";
+  return `<span data-stated-original title="${escHtml(title)}" style="color:var(--ink-muted); font-size:11.5px;">${escHtml(stated)}</span>`;
 }
 function receivedTitle(e){
   return e && e.filedBy && e.filedBy.kind === "automated" ? "Received automatically" : "When we received this supply";
@@ -6475,13 +6483,25 @@ function correctionNote(datasetId, runId){
   const c = raw && raw.corrections;
   if(!c) return "";
   const said = v => ARRIVAL_STATUS_LABEL[v] || (v ? String(v).replace(/_/g, " ") : "Not judged");
-  const lines = ((c.rejudged || {})[runId] || []).map(r =>
+  const by = r => ` by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}`;
+  return ((c.rejudged || {})[runId] || []).map(r =>
     // THE DATE STRAIGHT AFTER "re-judged" (criterion 7's own shape; delivery-
     // critic on 172, #9): "re-judged on time Sunday" read as a time of day.
     // The new verdict is the pill's, beside it.
-    // A MOVED SUPPLY says where it was and where it went (Keith, 2026-10-11,
-    // (r)); one re-judged in place, only when.
-    `<div class="changed-by" data-rejudged style="color:var(--ink-muted); font-size:12px;">${escHtml(said(r.original))} at the time${r.movedTo ? ` in ${escHtml(fmtPeriodName(r.movedFrom))} · moved to ${escHtml(fmtPeriodName(r.movedTo))} ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))}` : ` · re-judged ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))}`} by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}</div>`);
+    // A MOVED SUPPLY's punctuality stays here and its move is
+    // correctionMoveNote's, under 'How it got here' (REQ-DASH-230, Keith
+    // 2026-10-15); one re-judged in place, only when.
+    `<div class="changed-by" data-rejudged style="color:var(--ink-muted); font-size:12px;">${escHtml(said(r.original))} at the time${r.movedTo ? "" : ` · re-judged ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))}${by(r)}`}</div>`).join("");
+}
+// WHICH CYCLE A CORRECTION PUT A SUPPLY IN, under 'How it got here' (REQ-DASH-230
+// criterion 4): where a correction moved it from and to, or that it was kept
+// against one (REQ-DASH-172 criterion 5).
+function correctionMoveNote(datasetId, runId){
+  const raw = rawRealDatasetById(datasetId);
+  const c = raw && raw.corrections;
+  if(!c) return "";
+  const lines = ((c.rejudged || {})[runId] || []).filter(r => r.movedTo).map(r =>
+    `<div class="changed-by" data-corrected-move style="color:var(--ink-muted); font-size:12px;">In ${escHtml(fmtPeriodName(r.movedFrom))} · moved to ${escHtml(fmtPeriodName(r.movedTo))} ${escHtml(fmtDay(assetDateStrOf(r.appliedAt)))} by correction ${escHtml(r.reference)}${r.approver ? `, approved by ${escHtml(r.approver)}` : ""}</div>`);
   ((c.kept || {})[runId] || []).forEach(k => lines.push(
     `<div class="changed-by" data-kept style="color:var(--ink-muted); font-size:12px;">Kept ${k.period ? `in ${escHtml(fmtPeriodName(k.period))}` : "held"} against correction ${escHtml(k.reference || "")}${k.actor ? ` by ${escHtml(k.actor)}` : ""}: ${escHtml(k.reason)}</div>`));
   return lines.join("");
@@ -6699,11 +6719,16 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     const arrivalCell = e.isResupply
       ? excusedResupply + (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
-          : "") + stillOwedNote(raw, e.run_id) + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id) + settledNote(datasetId, e.run_id)
+          : "") + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id)
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.
-      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillFor(datasetId, e.run_id, e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${waitedChip(e)} ${filedNote(e)}${stillOwedNote(raw, e.run_id)}${excuseNote(datasetId, e.run_id)}${correctionNote(datasetId, e.run_id)}${settledNote(datasetId, e.run_id)}`;
+      : `${e.arrivalStatus ? `<span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillFor(datasetId, e.run_id, e.arrivalStatus,"sm")}</span>` : ""} <span class="mono" title="${receivedTitle(e)}" style="color:var(--ink-muted); font-size:11.5px;">${e.arrivedAt ? fmtInstant(e.arrivedAt, dueZone) : ""}</span> ${statedNote(e)} ${waitedChip(e)}${excuseNote(datasetId, e.run_id)}${correctionNote(datasetId, e.run_id)}`;
+    // HOW IT GOT HERE (REQ-DASH-230 criterion 4): which cycle it is in and
+    // why - empty for an automated first arrival (criterion 7).
+    const howCell = resupplyBadge + placedTag(raw, e.run_id, CURRENT_IN_PLACE_ON) + filedNote(e)
+      + settledNote(datasetId, e.run_id) + correctionMoveNote(datasetId, e.run_id)
+      + stillOwedNote(raw, e.run_id);
     // data-run-id alongside data-run-date: run_date is NOT unique (a
     // resupply shares its base run's date - plans/conceptual-design.md
     // Thread A found 352 real BDM runs across only 123 distinct dates),
@@ -6714,7 +6739,7 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
       <td>${arrivalCell}</td>
       <td class="mono">${e.rowCount!=null ? fmtInt(e.rowCount) : "—"}</td>
       <td>${outcomeCell(datasetId, e.run_id, runsById)}</td>
-      <td>${resupplyBadge}${placedTag(raw, e.run_id, CURRENT_IN_PLACE_ON)}</td>
+      <td>${howCell}</td>
     </tr>`;
   }).join("");
 }
@@ -6726,8 +6751,12 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
 // ONE SET OF COLUMN WIDTHS FOR EVERY CYCLE TABLE (#121 D3, Keith 2026-10-06):
 // each table sized its columns to its own content, so Outcome's left edge
 // swung 499px from one cycle to the next. Fixed layout, shared widths; the
-// blocker table's first two columns line up with them.
-const SUPPLY_CYCLE_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:23%"><col style="width:9%"><col style="width:21%"><col style="width:10%"></colgroup>`;
+// blocker table's first two columns line up with them. The last widened
+// when it took the provenance notes out of Timing (REQ-DASH-230 criterion 8).
+// EVERY COLUMN HEADED (REQ-DASH-230 criterion 1): the last says how the row
+// came to be in its cycle.
+const SUPPLY_CYCLE_HEAD = `<tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th>Outcome</th><th>How it got here</th></tr>`;
+const SUPPLY_CYCLE_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:20%"><col style="width:9%"><col style="width:18%"><col style="width:16%"></colgroup>`;
 // THREE COLUMNS, NOT FIVE (#121 D4): Rows was always a dash and the last
 // column had no heading. The first two still line up with the cycle tables.
 const SUPPLY_BLOCKER_COLS = `<colgroup><col style="width:17%"><col style="width:20%"><col style="width:63%"></colgroup>`;
@@ -6987,7 +7016,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
       </div>
       <div class="overflow-x">
       <table class="dataset-table supply-cycle-table">${SUPPLY_CYCLE_COLS}
-        <thead><tr><th>Arrived</th><th>Status</th><th>Timing</th><th>Rows</th><th>Outcome</th><th></th></tr></thead>
+        <thead>${SUPPLY_CYCLE_HEAD}</thead>
         <tbody>${renderSupplyCycleRows(c.entries, ds.id, c.cycleStart)}</tbody>
       </table>
       </div>

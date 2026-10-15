@@ -176,6 +176,24 @@ _HOW_IT_READS = {
         "[yellow]another version waiting - the period holds a promoted one[/yellow]",
     # REQ-PIPE-164 criterion 15 - _words() gives its new verdict from the reason.
     filing_queue.RECHECKED_WORSE: "[red]Promoted, then re-checked worse[/red]",
+    # REQ-GHUB-229: a version set aside, listed among its period's supplies.
+    filing_queue.SUPERSEDED: "[dim]superseded[/dim]",
+}
+
+#: A SUPPLY LISTED AMONG ITS PERIOD'S (REQ-GHUB-229 criterion 5) - in words
+#: about that supply rather than about the period, which is what
+#: _HOW_IT_READS says. Never a raw state or operation name.
+_LISTED_AS = {
+    slot_state.PROMOTED: "in place (promoted)",
+    slot_state.AWAITING_ACKNOWLEDGEMENT: "in place, awaiting acknowledgement",
+    slot_state.AWAITING_DECISION: "waiting on a decision",
+    slot_state.RETURNED: "taken back out by a person, waiting on a decision",
+    slot_state.AMBER_WAITING: "amber and held for a person",
+    filing_queue.ANOTHER_VERSION_WAITING: "waiting behind the promoted supply",
+    filing_queue.COULD_NOT_LOAD: "could not be loaded",
+    slot_state.REJECTED: "rejected",
+    filing_queue.SUPERSEDED: "superseded",
+    slot_state.TWO_FILES: "an open pair",
 }
 
 
@@ -661,7 +679,7 @@ def queue_table(states) -> Table:
     return table
 
 
-def _label(state: slot_state.SlotState) -> str:
+def _label(state: slot_state.SlotState, count: int = 0) -> str:
     where = f"arrived {arrived(state.supply)}" if state.supply else "nothing arrived"
     # IN WORDS, as the table above it says it (CLI UX critic, #107): the
     # picker used to show the machine id - `awaiting-acknowledgement`.
@@ -669,13 +687,39 @@ def _label(state: slot_state.SlotState) -> str:
     if state.state == filing_queue.RECHECKED_WORSE and state.reason:
         # 'Promoted, then re-checked <verdict>' (REQ-PIPE-164 criterion 15).
         words = state.reason.split(":")[0]
-    return f"{state.period}  {state.dataset_id}  {where}  ({words})"
+    # HOW MANY, where more than one (REQ-GHUB-229 criterion 3).
+    many = f"  - {count} supplies" if count > 1 else ""
+    return f"{state.period}  {state.dataset_id}  {where}  ({words}){many}"
 
 
-def _pick_slot(states, message: str) -> slot_state.SlotState | None:
-    by_label = {_label(s): s for s in states}
+def _pick_slot(states, message: str, counts: dict | None = None) -> slot_state.SlotState | None:
+    counts = counts or {}
+    by_label = {_label(s, counts.get((s.dataset_id, s.period), 0)): s for s in states}
     choice = common.select(message, list(by_label), flag_hint=_FLAG_HINT)
     return by_label.get(choice) if choice else None
+
+
+def listed_words(entry: "filing_queue.FiledSupply") -> str:
+    """One listed supply's state in words (REQ-GHUB-229 criterion 5), with
+    what each needs: why it could not be loaded, who rejected it and when,
+    what superseded it, both files of an open pair."""
+    s = entry.state
+    words = _LISTED_AS.get(s.state, "")
+    if s.state == filing_queue.RECHECKED_WORSE and s.reason:
+        words = "in place - " + s.reason.split(":")[0].lower()
+    elif s.state == slot_state.TWO_FILES:
+        words = f"{words} - {' and '.join(s.files)}" if s.files else words
+    elif s.state in (filing_queue.COULD_NOT_LOAD, slot_state.REJECTED,
+                     filing_queue.SUPERSEDED) and s.reason:
+        words = f"{words} - {s.reason}" if s.state == filing_queue.COULD_NOT_LOAD \
+            else f"{words} {s.reason}"
+    return words
+
+
+def _supply_line(entry: "filing_queue.FiledSupply") -> str:
+    """Arrived, state, verdict (criterion 4) - and the line a person picks."""
+    return (f"arrived {arrived(entry.state.supply)}  {listed_words(entry)}  "
+            f"(verdict: {entry.verdict})")
 
 
 def _excuse_offers(state: slot_state.SlotState) -> tuple[str, ...]:
@@ -750,7 +794,11 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
 
     to_period = stands_on = None
     supply = state.supply
-    if operation == filing_decisions.UN_SUPERSEDE:
+    if operation == filing_decisions.UN_SUPERSEDE and state.state == filing_queue.SUPERSEDED:
+        # ALREADY NAMED: the person chose this version from the period's list
+        # (REQ-GHUB-229 criterion 7), so there is nothing to pick again.
+        pass
+    elif operation == filing_decisions.UN_SUPERSEDE:
         # WHICH VERSION, NAMED, NEVER A DEFAULT (REQ-PIPE-120 criterion 8).
         from qa_tools.common import supersession
 
@@ -1133,17 +1181,76 @@ def period_flow(collection_id: str) -> None:
     try:
         with open_log() as conn:
             states = filing_queue.slots_of(conn, collection_id, dataset_id=dataset_id)
+            counts = filing_queue.filed_counts(conn, dataset_id)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
     if not states:
         console.print(f"{dataset_id} has no periods yet.", style="yellow")
         return
-    state = _pick_slot(states, f"Which period of {dataset_id}?")
+    state = _pick_slot(states, f"Which period of {dataset_id}?", counts)
     if state is None:
         return
     supply_scoped, period_scoped = filing_queue.operations_for(state)
-    _decide_on(state, offer=_offers(state, supply_scoped) + period_scoped)
+    if counts.get((state.dataset_id, state.period), 0) <= 1:
+        # ONE SUPPLY OR NONE: straight to the period's decisions, as before
+        # (REQ-GHUB-229 criterion 2).
+        _decide_on(state, offer=_offers(state, supply_scoped) + period_scoped)
+        return
+    _choose_a_supply(state, period_scoped)
+
+
+#: The choice beside the listed supplies for the period's own decisions
+#: (REQ-GHUB-229 criterion 8) - offered once, never under each supply.
+_THE_PERIOD_ITSELF = "The period itself"
+
+
+def _choose_a_supply(state: slot_state.SlotState, period_scoped: tuple[str, ...]) -> None:
+    """Every supply filed to the period, then the one the decision is about
+    (REQ-GHUB-229 criteria 1, 6, 7, 8 and 9)."""
+    try:
+        with open_log() as conn:
+            entries = filing_queue.supplies_in(conn, state)
+    except filing_queue.LogUnreachable as exc:
+        say_unreachable(exc)   # criterion 10: said, and nothing listed
+        return
+    if state.state in (slot_state.SUBSTITUTED, slot_state.INHERITED) and state.stands_on:
+        # CRITERION 6: the supply in place is not one filed to this period.
+        how = "substituted" if state.state == slot_state.SUBSTITUTED else "inherited"
+        console.print(f"{state.period} stands on {state.stands_on}'s supply ({how}) - the "
+                      f"supply in place is not one of these.", style="cyan")
+    table = Table("Arrived", "Where it stands", "Verdict", box=None, pad_edge=False)
+    for e in entries:
+        table.add_row(arrived(e.state.supply), escape(listed_words(e)), e.verdict)
+    console.print(f"[bold]{len(entries)}[/bold] supplies filed to {state.dataset_id} "
+                  f"{state.period}\n")
+    console.print(table)
+    pair = [e for e in entries if e.state.state == slot_state.TWO_FILES]
+    if pair:
+        # CRITERION 9: the pair is settled first, and nothing else here waits on it.
+        console.print(f"\nNothing else in {state.period} can be decided until the pair is "
+                      f"settled.", style="yellow")
+        choosable = pair
+        period_scoped = ()
+    else:
+        choosable = entries
+    console.print()
+    by_label = {_supply_line(e): e for e in choosable}
+    if period_scoped:
+        words = ", ".join(re.sub(r" -.*", "", _WHAT_IT_DOES[op]).lower()
+                          for op in period_scoped)
+        by_label[f"{_THE_PERIOD_ITSELF} - {words}"] = None
+    picked = common.select("Which is the decision about?", list(by_label),
+                           flag_hint=_FLAG_HINT)
+    if picked is None:
+        return
+    entry = by_label[picked]
+    if entry is None:
+        _decide_on(state, offer=period_scoped)
+        return
+    own = entry.state
+    supply_scoped, _ = filing_queue.operations_for(own)
+    _decide_on(own, offer=_offers(own, supply_scoped))
 
 
 def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
@@ -1156,6 +1263,7 @@ def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
     try:
         with open_log() as conn:
             states = filing_queue.slots_of(conn, collection_id, dataset_id=dataset_id)
+            counts = filing_queue.filed_counts(conn, dataset_id)
     except filing_queue.LogUnreachable as exc:
         say_unreachable(exc)
         return
@@ -1165,7 +1273,10 @@ def standing_view(collection_id: str, dataset_id: str | None = None) -> None:
     table = Table("Period", "Dataset", "State", "Arrived", "Decided by", "Why",
                    box=None, pad_edge=False)
     for s in states:
-        table.add_row(s.period, s.dataset_id, _HOW_IT_READS.get(s.state, s.state),
+        # THE SAME COUNT AS THE PERIOD PICKER (REQ-GHUB-229 criterion 15).
+        n = counts.get((s.dataset_id, s.period), 0)
+        many = f" [dim]- {n} supplies[/dim]" if n > 1 else ""
+        table.add_row(s.period, s.dataset_id, _HOW_IT_READS.get(s.state, s.state) + many,
                        arrived(s.supply) if s.supply else "[dim]-[/dim]",
                        _who_decided(s), _short(s.reason))
     console.print(f"[bold]{len(states)}[/bold] period(s) in "

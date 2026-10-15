@@ -63,6 +63,8 @@ class TestTheQueueHoldsOnlySuppliesSomebodyMustDecideAbout:
         monkeypatch.setattr(filing_queue, "could_not_load", lambda conn, collection_id: [])
         # Nor another version waiting in a promoted period - its own test.
         monkeypatch.setattr(filing_queue, "waiting_over_promoted", lambda conn, states: [])
+        # Nor one waiting behind the slot's own (REQ-GHUB-229) - its own test.
+        monkeypatch.setattr(filing_queue, "waiting_behind", lambda conn, states, u: [])
         return every
 
     def test_it_holds_the_supplies_and_not_the_empty_periods(self, states):
@@ -279,5 +281,6 @@ class TestAnOpenPairLeadsTheQueue:
         monkeypatch.setattr(slot_state, "states_for", lambda conn, c, now=None: [older, pair])
         monkeypatch.setattr(filing_queue, "could_not_load", lambda conn, c: [])
         monkeypatch.setattr(filing_queue, "waiting_over_promoted", lambda conn, states: [])
+        monkeypatch.setattr(filing_queue, "waiting_behind", lambda conn, states, u: [])
         assert [s.state for s in filing_queue.awaiting(None, "child-protection")] == [
             slot_state.TWO_FILES, slot_state.AWAITING_DECISION]

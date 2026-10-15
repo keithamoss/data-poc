@@ -25228,6 +25228,7 @@ requirements:
     - REQ-DASH-225
     - REQ-DASH-226
     decisions:
+    - 'CRITERION 19''S NOTE LANDS IN THE PROVENANCE CELL since REQ-DASH-230 (built 2026-10-15): the supply row''s last column is headed ''How it got here'', and the still-owed-after-a-turn-off note moved there out of Timing.'
     - 'SPLIT FROM REQ-PIPE-110, 2026-10-10 (Keith), as REQ-DASH-155 was split from REQ-PIPE-154: the decision and its record
       are one reviewable unit, the rendering another.'
     - 'REFINED 2026-10-10 by Q-A and T2 below - items about an owed period keep counting; only the gap is left out. WAS: A TURNED-OFF
@@ -26784,6 +26785,7 @@ requirements:
     - REQ-PIPE-194
     - REQ-DASH-180
     decisions:
+    - 'SUPERSEDED IN PART BY REQ-DASH-230 (built 2026-10-15): the row''s last cell now HAS a heading, ''How it got here'', and is the provenance cell this requirement and REQ-DASH-180 refer to - so the built decision below that ''the page has no column named provenance'' no longer holds. The ''Placed in'' tag stays in that cell.'
     - "SPLIT FROM REQ-PIPE-163 AND REQ-PIPE-164 on the REQ-PIPE-154 / REQ-DASH-155 pattern: the decision and its record are one reviewable unit, the rendering another."
     - "PLACEMENT AND EXCUSE IN DIFFERENT CELLS WITH DIFFERENT VERBS (delivery-dashboard-ux pre-build review, 2026-10-08): a supply placed into a closed period reads late, and is exactly the one most likely to be excused too, so sharing a cell would let a reader take one reason for the other."
     - "FOLDED 2026-10-10 (main session): the review blocker on criterion 5 is applied by splitting it - a single re-check says who re-checked it and why, a bulk re-check names the corrected check and its changelog entry (which REQ-PIPE-177 now records). Also applied: no Outcome-cell flip, the as-of rule for a placement, 'Placed in <period>' rather than 'Placed by hand' (filedNote already uses the latter), the resolved hold row in the rejected branch's form, links inside clickable rows, nothing for a trial, and REQ-PIPE-177 as a dependency."
@@ -36130,7 +36132,7 @@ requirements:
     date_written: '2026-10-15'
     story: As a person deciding about a period in the terminal, I want to see every supply filed to that period, each with where it stands, so that a good supply waiting behind a failed resupply (or a failed load behind a good one) is never hidden from every door.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, morning report 5 (plans/morning-reports.md), answer 7, 2026-10-15: ''LIST EVERY FILED SUPPLY in a period on its door. To build; needs a requirement and sign-off.'' Raised by the delivery-critic on REQ-GHUB-165, plans/post-build-review.md #189 F3 and F4. Drafted by delivery-scoper 2026-10-15 against cli/filing_tui.py (period_flow, _pick_slot, _decide_on), qa_tools/common/filing_queue.py (slots_of, awaiting, could_not_load, operations_for, waiting_over_promoted) and qa_tools/common/slot_state.py (filings_by_period, state_of).'
     acceptance_criteria:
     - WHEN a person picks a dataset and a period in the terminal's 'Decide about a period' door and more than one supply is filed to that period, THE SYSTEM SHALL list every supply filed to it (every row of qa.filing_current for that dataset and period) before offering any decision, and SHALL let the person choose which supply the decision is about.
@@ -36176,10 +36178,30 @@ requirements:
     - 'THE QUEUE IS FIXED HERE TOO (Keith, 2026-10-15): it has the same blind spot, a good supply waiting behind a failed resupply, and one blind spot is fixed in one change. REJECTED a separate requirement, and leaving the queue.'
     - '`mothman supply slots` SHOWS THE SAME COUNT (Keith, 2026-10-15), so the two views of a period agree.'
     - MoSCoW should, confirmed at sign-off.
+    - 'ONE FUNCTION, filing_queue.supplies_in(conn, slot), as criterion 12 asks: each filed supply in its OWN SlotState, so operations_for gives what that supply offers with no second menu. Order of judgement: an open pair, then rejected, then superseded, then could not be loaded (the load log), then the slot''s own supply, then waiting behind a promoted one, else waiting (amber or not). The slot''s state is still slot_state''s - the list is an additional reader, per the NFR.'
+    - 'SUPERSEDED IS A LISTED STATE OF ITS OWN (filing_queue.SUPERSEDED), never a queue item - it waits on nobody. It offers un-supersede of THAT version (no version picker, since the person already chose it) and re-file, which the parity test found the flags record: a re-file ends a supersession (supersession._latest).'
+    - 'A FAILED LOAD IS NOT OFFERED EXCUSE-LATENESS either (filing_queue.excuse_offers), so ''only reject'' (criterion 16) holds in the door and the queue alike. Named in the parity test''s HIDDEN with its reason, since the flags still record an excuse.'
+    - 'filing_queue.slots_of NO LONGER ADDS a second line for a version waiting in a promoted period (criterion 3: one line per period). That version is reached through the period''s list; the queue still lists it through waiting_over_promoted.'
+    - 'THE QUEUE''S FIX IS filing_queue.waiting_behind: for each needs-action slot (not an open pair, which blocks its period, and not a promoted one, which waiting_over_promoted covers), every other loadable version still waiting there, as its own entry.'
+    - 'THE COUNT (criteria 3 and 15) is filing_queue.filed_counts - one GROUP BY over qa.filing_current - shown on the picker line and in the standing view''s state cell as ''N supplies'' where N is more than one. A period with one supply or none goes straight to its decisions (criterion 2).'
     open_questions: []
-    linked_tests: []
-    implemented_by: []
-    evidence: []
+    linked_tests:
+    - tests/test_every_filed_supply.py
+    - tests/test_door_flag_parity.py
+    - tests/test_filing_queue.py
+    - tests/test_cli_filing_tui.py
+    implemented_by:
+    - qa_tools/common/filing_queue.py::supplies_in
+    - qa_tools/common/filing_queue.py::filed_counts
+    - qa_tools/common/filing_queue.py::waiting_behind
+    - qa_tools/common/filing_queue.py::operations_for
+    - cli/filing_tui.py::period_flow
+    - cli/filing_tui.py::_choose_a_supply
+    - cli/filing_tui.py::listed_words
+    - cli/filing_tui.py::standing_view
+    evidence:
+    - '2026-10-15: tests/test_every_filed_supply.py builds, in the test worker''s own database, a period holding a good supply and then a resupply that could not be loaded - and its queue test failed against the code before the change (the good supply was in no entry). It drives period_flow itself: the period line says 2 supplies, both are listed with their states, choosing the good one offers promote and the failed one reject alone; verdicts said, and ''verdict could not be read'' when the results cannot be; one slot per period and the same count in standing_view; rejected (listed last, naming who) and superseded (naming what) supplies; an open pair as one entry offering only settle; an unreachable log listing nothing.'
+    - '2026-10-15: tests/test_door_flag_parity.py extended with six multi-supply examples (a supply waiting beside a failed load, the failed load beside it, promoted with another waiting, the one waiting behind it, rejected beside a waiting one, superseded under a promoted one) plus a superseded example among the door states; every operation tried through filing_decisions.apply on each. Its first run found the flags re-file a superseded supply the door did not offer, now offered.'
     signed_off: &id001
       by: Keith
       date: '2026-10-15'
@@ -36188,7 +36210,7 @@ requirements:
     date_written: '2026-10-15'
     story: As someone reading a dataset's supply history, I want how a supply came to be in its cycle (placed, filed by hand, settled from two files, moved by a correction, still owed after a turn-off) in its own labelled cell, apart from whether it was on time, so that I can read punctuality at a glance and the cell REQ-DASH-175 and REQ-DASH-180 already promise exists.
     moscow: could
-    status: not_started
+    status: built
     source: 'Keith, morning report 5 (plans/morning-reports.md), answer 25, 2026-10-15: ''SPLIT IT NOW - a mini requirement to scope a provenance cell split out of the Timing cell, so criterion 19''s note lands where it says.'' Raised by the delivery-critic on REQ-DASH-180, plans/post-build-review.md #195. Drafted by delivery-scoper 2026-10-15 against dashboard/qa-reporting-dashboard.template.html (renderSupplyCycleRows, SUPPLY_CYCLE_COLS, filedNote, stillOwedNote, excuseNote, correctionNote, settledNote, placedTag, waitedChip).'
     acceptance_criteria:
     - THE SYSTEM SHALL give the supply-history cycle table's last column the visible heading 'How it got here' - the provenance cell REQ-DASH-175 and REQ-DASH-180 refer to - so that every column of that table is headed.
@@ -36227,8 +36249,16 @@ requirements:
     - THE HEADING IS 'How it got here' (Keith, 2026-10-15). REJECTED 'Provenance' (jargon to a data team leader reading at a glance) and 'Filed' (undersells corrections and resupplies).
     - 'A SUPPLY A CORRECTION MOVED IS SPLIT (Keith, 2026-10-15): ''Late at the time'' stays in Timing as punctuality, the move goes to ''How it got here''. REJECTED moving the whole line.'
     - COLUMN WIDTHS ARE LEFT TO THE BUILD, within criterion 8 (Keith, 2026-10-15). MoSCoW could, confirmed at sign-off.
+    - 'BUILT AS TWO SPLITS AND A MOVE (2026-10-15): filedNote now says only who filed it (under ''How it got here'') and a new statedNote carries the stated original beside the receipt; correctionNote keeps the re-judged-in-place line and a moved supply''s ''<verdict> at the time'', and a new correctionMoveNote carries ''In <from> · moved to <to> <date> by correction <ref>, approved by <who>'' and the kept line. The move''s line begins ''In'' rather than ''in'' because it now starts its own line - the only change to any wording (criterion 9).'
+    - 'THE HEADING IS ONE CONSTANT, SUPPLY_CYCLE_HEAD, which the page and the test both read - so the test finds cells under the heading the page actually renders (criterion 10).'
+    - 'WIDTHS (criterion 8): Arrived 17% and Status 20% unchanged, so they still line up with the blocker and gap tables; Timing 23% to 20%, Outcome 21% to 18%, How it got here 10% to 16%, since the notes moved out of Timing into it. The 760px minimum is unchanged.'
     open_questions: []
-    linked_tests: []
-    implemented_by: []
-    evidence: []
+    linked_tests:
+    - tests-js/how-it-got-here.test.js
+    - tests-js/filed-note.test.js
+    - tests-js/corrections.test.js
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html
+    evidence:
+    - '2026-10-15: tests-js/how-it-got-here.test.js renders a real row through renderSupplyCycleRows under the page''s own SUPPLY_CYCLE_HEAD, finds each cell by its heading text, and asserts each note - placed, settled, still owed, a correction''s move, kept, who filed it by hand, the resupply badge - is under How it got here and not in Timing, and each punctuality note (excuse, re-judged, ''Late at the time'', the stated original) the other way; an automated first arrival leaves the cell empty.'
     signed_off: *id001

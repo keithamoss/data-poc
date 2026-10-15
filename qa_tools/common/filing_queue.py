@@ -103,6 +103,16 @@ REPROCESS = "fix the fault and reprocess the delivery"
 #: awaiting-acknowledgement - which is what it reads as everywhere else.
 RECHECKED_WORSE = "promoted-then-rechecked"
 
+#: A version of the period's table a newer one, or a person, set aside
+#: (REQ-GHUB-229 criterion 5) - listed among a period's supplies, never in
+#: the queue: it waits on nobody. Its one offer is bringing it back.
+SUPERSEDED = "superseded"
+
+#: A listed supply no check read (REQ-GHUB-229 criterion 4), and one whose
+#: recorded results could not be read (criterion 11) - said, never guessed.
+NO_VERDICT = "no verdict recorded"
+VERDICT_UNREADABLE = "verdict could not be read"
+
 
 def could_not_load(conn: supply_db.SupplyConnection,
                    collection_id: str) -> list[slot_state.SlotState]:
@@ -160,10 +170,11 @@ def awaiting(conn: supply_db.SupplyConnection, collection_id: str, *,
               and (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
     over = [s for s in waiting_over_promoted(conn, every)
             if (s.dataset_id, arrival_key_of(s.supply or "")) not in unloadable]
+    behind = waiting_behind(conn, every, unloadable)
     states = _rechecked_worse(conn, collection_id, states)
     # AN OPEN PAIR LEADS (REQ-PIPE-194 criterion 4): nothing about the
     # dataset is checked until it is settled.
-    return sorted(states + failed + over,
+    return sorted(states + failed + over + behind,
                   key=lambda s: (s.state != slot_state.TWO_FILES, s.period, s.dataset_id))
 
 
@@ -214,6 +225,157 @@ def waiting_over_promoted(conn: supply_db.SupplyConnection,
                 supply=waiting,
                 reason=f"{s.period} holds {s.supply}; promoting this one supersedes it"))
     return out
+
+
+def waiting_behind(conn: supply_db.SupplyConnection, states: list[slot_state.SlotState],
+                   unloadable: set) -> list[slot_state.SlotState]:
+    """A queue item for each loadable version still waiting in a period whose
+    slot speaks for another supply (REQ-GHUB-229 criterion 14).
+
+    THE CASE IT EXISTS FOR: a good supply waiting, then a resupply that could
+    not be loaded. The slot speaks for its latest live filing - the failed
+    one - which the queue lists as could-not-be-loaded, and the good supply
+    was in no entry at all. A promoted period's waiting versions are
+    waiting_over_promoted's; an open pair blocks the rest of its period
+    (REQ-PIPE-194 criterion 4), so neither is asked here.
+    """
+    from qa_tools.common import supersession
+
+    out = []
+    for s in states:
+        if s.state not in WITH_A_SUPPLY or s.state in (
+                slot_state.TWO_FILES, slot_state.AWAITING_ACKNOWLEDGEMENT):
+            continue
+        for waiting in supersession.waiting_in(conn, s.dataset_id, s.period,
+                                               besides=s.supply):
+            if (s.dataset_id, arrival_key_of(waiting)) in unloadable:
+                continue
+            out.append(slot_state.SlotState(
+                dataset_id=s.dataset_id, period=s.period, supply=waiting,
+                state=(slot_state.AMBER_WAITING
+                       if slot_state._amber_waiting(conn, s.dataset_id, waiting)
+                       else slot_state.AWAITING_DECISION)))
+    return out
+
+
+@dataclass(frozen=True)
+class FiledSupply:
+    """One supply filed to a period, where it stands, and its verdict
+    (REQ-GHUB-229 criteria 4 and 5). `state` is the supply's OWN - so
+    operations_for gives what that supply offers (criterion 7) - and its
+    reason carries what the words need: who rejected it, what superseded
+    it, why it could not be loaded."""
+
+    state: slot_state.SlotState
+    verdict: str
+
+
+def filed_counts(conn: supply_db.SupplyConnection,
+                 dataset_id: str | None = None) -> dict[tuple[str, str], int]:
+    """{(dataset, period): supplies filed to it} - the count the period
+    picker and 'Where every period stands' both show (criteria 3 and 15).
+    One query, from the filings alone."""
+    rows = conn.execute(
+        "SELECT dataset_id, slot, count(*) FROM qa.filing_current WHERE slot IS NOT NULL "
+        "AND (?::text IS NULL OR dataset_id = ?) GROUP BY dataset_id, slot",
+        [dataset_id, dataset_id]).fetchall()
+    return {(ds, slot): int(n) for ds, slot, n in rows}
+
+
+def _verdict(conn, dataset_id: str, supply: str, reads) -> str:
+    """green/amber/red from the recorded results, or said that there is
+    none, or that they could not be read - never a verdict it did not read
+    (criterion 11)."""
+    from qa_tools.common import supply_status
+
+    try:
+        got = supply_status.status(conn, dataset_id, supply, reads=reads)
+    except Exception:  # noqa: BLE001 - criterion 11: said, and the supply still listed
+        return VERDICT_UNREADABLE
+    return got or NO_VERDICT
+
+
+def _latest_by(conn, dataset_id: str, supply: str, action: str):
+    """(actor, effective_at) of this supply's latest `action` entry, or None."""
+    from qa_tools.common import decision_log
+
+    rows = conn.execute(
+        f"SELECT actor, effective_at FROM {decision_log.TABLE} WHERE dataset_id = ? "
+        "AND supply = ? AND action = ? ORDER BY effective_at DESC, id DESC LIMIT 1",
+        [dataset_id, supply, action]).fetchall()
+    return rows[0] if rows else None
+
+
+def supplies_in(conn: supply_db.SupplyConnection,
+                slot: slot_state.SlotState) -> list[FiledSupply]:
+    """Every supply filed to this slot's period, oldest receipt first and the
+    decided ones after the rest, each in its own state (REQ-GHUB-229 criteria 1, 4, 5 and 12).
+
+    THE ONE FUNCTION the period door and the REQ-GHUB-165 parity test both
+    call (criterion 12). It reads the filings, the decision log, the load
+    log and the recorded QA results - never a supply row (criterion 17).
+
+    THE ORDER IS THE POINT, as in slot_state.state_of: an open pair first,
+    then what was decided about a supply (rejected, superseded), then what
+    the load log knows (could not be loaded), and only then whether it is
+    the slot's own supply or waiting beside it.
+    """
+    from qa_tools.common import (decision_log, display_time, hierarchy, promotion,
+                                 supersession, supply_files)
+
+    ds, period = slot.dataset_id, slot.period
+    rows = conn.execute(
+        "SELECT f.supply_id FROM qa.filing_current f LEFT JOIN qa.supply_receipt r "
+        "ON r.dataset_id = f.dataset_id AND r.supply_id = f.supply_id "
+        "WHERE f.dataset_id = ? AND f.slot = ? "
+        "ORDER BY r.received_instant NULLS LAST, f.supply_id", [ds, period]).fetchall()
+    failed = {arrival_key_of(f.supply): f.reason
+              for f in could_not_load(conn, hierarchy.dataset(ds).collection_id)
+              if f.dataset_id == ds and f.period == period}
+    holds_promoted = slot.state in (slot_state.PROMOTED, slot_state.AWAITING_ACKNOWLEDGEMENT)
+    reads = promotion._declared_reads()
+    out = []
+    for (supply,) in rows:
+        own = None
+        contest = supply_files.open_contest(conn, ds, supply)
+        if contest is not None:
+            own = slot_state.SlotState(dataset_id=ds, period=period, supply=supply,
+                                       state=slot_state.TWO_FILES,
+                                       files=tuple(contest.files))
+        elif (by := _latest_by(conn, ds, supply, decision_log.REJECT)) is not None:
+            own = slot_state.SlotState(
+                dataset_id=ds, period=period, supply=supply, state=slot_state.REJECTED,
+                decided_by=by[0],
+                reason=f"by {by[0]}, {display_time.format_instant(by[1])}")
+        elif supersession.is_superseded(conn, ds, supply):
+            newer = supersession.superseded_by(conn, ds, supply)
+            by = _latest_by(conn, ds, supply, decision_log.SUPERSEDE)
+            own = slot_state.SlotState(
+                dataset_id=ds, period=period, supply=supply, state=SUPERSEDED,
+                reason=(f"by the supply that arrived {arrival_key_of(newer)}" if newer
+                        else f"set aside by {by[0]}" if by else "set aside"))
+        elif arrival_key_of(supply) in failed:
+            own = slot_state.SlotState(dataset_id=ds, period=period, supply=supply,
+                                       state=COULD_NOT_LOAD,
+                                       reason=failed[arrival_key_of(supply)])
+        elif supply == slot.supply and slot.state != slot_state.TWO_FILES:
+            own = slot
+            if slot.state == slot_state.AWAITING_ACKNOWLEDGEMENT:
+                (own,) = _rechecked_worse(conn, "", [slot])
+        elif holds_promoted:
+            own = slot_state.SlotState(
+                dataset_id=ds, period=period, supply=supply, state=ANOTHER_VERSION_WAITING,
+                reason=f"{period} holds {slot.supply}; promoting this one supersedes it")
+        else:
+            own = slot_state.SlotState(
+                dataset_id=ds, period=period, supply=supply,
+                state=(slot_state.AMBER_WAITING
+                       if slot_state._amber_waiting(conn, ds, supply)
+                       else slot_state.AWAITING_DECISION))
+        out.append(FiledSupply(state=own, verdict=_verdict(conn, ds, supply, reads)))
+    # THE DECIDED ONES LAST (Keith, 2026-10-15, signing off): rejected and
+    # superseded supplies are listed with the rest, after those still in play.
+    return sorted(out, key=lambda e: e.state.state in (slot_state.REJECTED, SUPERSEDED))
 
 
 @dataclass(frozen=True)
@@ -340,7 +502,9 @@ def excuse_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     recorded fact read from the database, not part of the slot's state."""
     from qa_tools.common import excuse
 
-    if not state.supply:
+    if not state.supply or state.state == COULD_NOT_LOAD:
+        # A FAILED LOAD IS OFFERED REJECT ALONE (REQ-GHUB-229 criterion 16,
+        # REQ-PIPE-153 criteria 5 and 6) - its punctuality is not the question.
         return ()
     if excuse.in_force(conn, state.dataset_id, state.supply) is not None:
         return (filing_decisions.WITHDRAW_EXCUSE,)
@@ -372,7 +536,12 @@ def supersede_offers(conn, state: slot_state.SlotState) -> tuple[str, ...]:
     replacement superseded one, that was the only way back."""
     if not state.period:
         return ()
-    return (filing_decisions.UN_SUPERSEDE,) if superseded_to_bring_back(conn, state) else ()
+    back = superseded_to_bring_back(conn, state)
+    if state.state == SUPERSEDED:
+        # A LISTED SUPERSEDED VERSION (REQ-GHUB-229 criterion 7): offered
+        # bringing back only where THIS one could come back.
+        back = [v for v in back if v["supply"] == state.supply]
+    return (filing_decisions.UN_SUPERSEDE,) if back else ()
 
 
 def superseded_to_bring_back(conn, state: slot_state.SlotState) -> list[dict]:
@@ -482,6 +651,11 @@ def operations_for(state: slot_state.SlotState) -> tuple[tuple[str, ...], tuple[
     what to show.
     """
     supply_scoped: tuple[str, ...] = ()
+    if state.state == SUPERSEDED:
+        # Bringing it back is read from the log (supersede_offers). Or moving
+        # it to the period it belongs to, which ends the supersession
+        # (supersession._latest) - the parity test found the flags record it.
+        return (filing_decisions.REFILE,), ()
     if state.state == ANOTHER_VERSION_WAITING:
         # PROMOTE OVER, behind the warning; or set it aside.
         # ...or move it to the period it belongs to (REQ-GHUB-165 parity).
@@ -578,6 +752,7 @@ def slots_of(conn: supply_db.SupplyConnection, collection_id: str, *,
     states = slot_state.states_for(conn, collection_id, now=now)
     if dataset_id:
         states = [s for s in states if s.dataset_id == dataset_id]
-    # The period door reaches a waiting version in a promoted period too.
-    states = states + waiting_over_promoted(conn, states)
+    # ONE LINE PER PERIOD (REQ-GHUB-229 criterion 3): a version waiting in a
+    # promoted period is reached through supplies_in, listed under its
+    # period, and no longer a second line for the same period here.
     return sorted(states, key=lambda s: (s.period, s.dataset_id), reverse=True)

@@ -9,22 +9,27 @@ const load = () => loadDashboard().window;
 describe("who filed a supply, and when they say it arrived", () => {
   it("names the person and the route for a supply filed by hand", () => {
     const w = load();
-    const html = w.filedNote({filedBy: {kind: "person", route: "folder", who: "Keith Moss"},
-                              statedOriginal: "2026-09-20T10:00:00+08:00",
-                              arrivedAt: "2026-09-25T09:00:00+08:00"});
+    const e = {filedBy: {kind: "person", route: "folder", who: "Keith Moss"},
+               statedOriginal: "2026-09-20T10:00:00+08:00",
+               arrivedAt: "2026-09-25T09:00:00+08:00"};
+    // WHO, under 'How it got here'; THE STATEMENT, beside the receipt in
+    // Timing (REQ-DASH-230 criterion 6).
+    const html = w.filedNote(e);
+    const stated = w.statedNote(e);
     expect(html).toContain("by hand");
     expect(html).toContain("Keith Moss");
     expect(html).toContain("a folder");
-    expect(html).toContain("(stated)");
+    expect(html).not.toContain("(stated)");
+    expect(stated).toContain("(stated)");
     // Labelled as a statement and never as the receipt.
-    expect(html).toContain("never used to file or judge");
-    expect(html).not.toMatch(/2026-09-20T10/);
+    expect(stated).toContain("never used to file or judge");
+    expect(stated).not.toMatch(/2026-09-20T10/);
   });
 
   it("says not known as such, never as a time", () => {
     const w = load();
-    const html = w.filedNote({filedBy: {kind: "person", route: "file", who: "a"},
-                              statedOriginal: "not-known"});
+    const html = w.statedNote({filedBy: {kind: "person", route: "file", who: "a"},
+                               statedOriginal: "not-known"});
     expect(html).toContain("not known");
   });
 
@@ -32,6 +37,7 @@ describe("who filed a supply, and when they say it arrived", () => {
     const w = load();
     const e = {filedBy: {kind: "automated"}};
     expect(w.filedNote(e)).toBe("");
+    expect(w.statedNote(e)).toBe("");
     expect(w.receivedTitle(e)).toBe("Received automatically");
   });
 });

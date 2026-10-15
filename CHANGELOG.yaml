@@ -255,6 +255,20 @@ releases:
               both. A placed supply later re-filed elsewhere stops saying
               "Placed in" from that day. Each supply received while turned off
               says how it ended, and the line counts how many are still held.
+          - headline: Every supply in a period, in the terminal
+            components: ["Testing & dev tooling", "Pipeline & publishing"]
+            description: >
+              When more than one supply is filed to a period, Decide about a
+              period lists them all, each with where it stands and its verdict,
+              and you pick the one the decision is about. A good supply waiting
+              behind a resupply that could not be loaded is in the queue again.
+          - headline: "'How it got here' has its own column"
+            components: ["Dashboard UI"]
+            description: >
+              In a dataset's supply history, the last column is now headed How
+              it got here: placed, filed by hand, settled from two files, moved
+              by a correction or still owed after a turn-off. Timing is only
+              about whether it was on time.
   - date: "2026-10-14"
     summary: >
       The dashboard now counts what is not green at every level, and every

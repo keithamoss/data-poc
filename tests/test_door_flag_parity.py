@@ -48,6 +48,10 @@ HIDDEN: dict[tuple[str, str], str] = {
     (filing_queue.COULD_NOT_LOAD, fd.REFILE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUPERSEDE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUBSTITUTE): _QUEUE_ONLY_STATE,
+    (filing_queue.COULD_NOT_LOAD, fd.EXCUSE_LATENESS): (
+        "a failed load is offered reject alone (REQ-GHUB-229 criterion 16, REQ-PIPE-153 "
+        "criteria 5 and 6): whether it was late is not the question while it cannot be "
+        "read - the flags still record an excuse"),
     # KEPT (Keith, 2026-10-15, morning report 5 Q3): the flags record a second
     # substitution over a substituted or inherited period; the door has offered
     # only undoing it since REQ-GHUB-082 phase 3 ("offers undoing it and not
@@ -356,6 +360,21 @@ def ex_two_files(conn, mint):
     return st, p.pair
 
 
+def _listed(conn, slot, supply):
+    """This supply's own entry among its period's supplies (REQ-GHUB-229)."""
+    (entry,) = [e for e in filing_queue.supplies_in(conn, slot) if e.state.supply == supply]
+    return entry.state
+
+
+def ex_superseded(conn, mint):
+    """A version set aside under a promoted one, as its period lists it."""
+    from qa_tools.common import supersession
+
+    slot, newer = ov_superseded_under_promoted(conn, mint)
+    (older,) = [v["supply"] for v in supersession.superseded_in(conn, DS, slot.period)]
+    return _listed(conn, slot, older), older
+
+
 #: Every slot state the door can show (criterion 5): slot_state's own, plus
 #: the two the queue adds - each needs an example below.
 EXAMPLES = {
@@ -375,6 +394,7 @@ EXAMPLES = {
     filing_queue.ANOTHER_VERSION_WAITING: ex_another_version_waiting,
     filing_queue.COULD_NOT_LOAD: ex_could_not_load,
     filing_queue.RECHECKED_WORSE: ex_rechecked_worse,
+    filing_queue.SUPERSEDED: ex_superseded,
     # A closed, unfilled period is OVERDUE with `closed` set: its own offers.
     "closed-unfilled": ex_closed_unfilled,
 }
@@ -431,6 +451,83 @@ OVERLAYS = {
     "excused": (ov_excused, fd.WITHDRAW_EXCUSE),
     "superseded-under-promoted": (ov_superseded_under_promoted, fd.UN_SUPERSEDE),
     "acknowledged": (ov_acknowledged, fd.WITHDRAW_ACKNOWLEDGEMENT),
+}
+
+
+# ---------------------------------------------------------------------------
+# Periods holding more than one filed supply (REQ-GHUB-229 criterion 13).
+# Each returns (the supply's own listed state, the period's slot, supply).
+# ---------------------------------------------------------------------------
+
+def _good_then_failed(conn, mint):
+    import filing_support
+    from qa_tools.common import assignment, load_log
+
+    s = mint("due")
+    good, _ = _filed(conn, s.name, _received_late(s))
+    arrival = f"t{uuid.uuid4().hex[:10]}"
+    load_log.record(f"probe-{arrival}", DS, f"{TABLE}__{arrival}", load_log.FAILED,
+                    _iso(_now()), reason="the file is empty", conn=conn)
+    failed = f"{DS}@{arrival}"
+    filing_support.file(assignment.Assignment(
+        dataset_id=DS, supply_id=failed, slot=s.name, branch=assignment.OPEN_UNFILLED,
+        considered=(s.name,), received_at=_now() - timedelta(minutes=5)))
+    (slot,) = [x for x in filing_queue.slots_of(conn, COL, dataset_id=DS)
+               if x.period == s.name]
+    return slot, good, failed
+
+
+def ls_waiting_beside_a_failed_load(conn, mint):
+    slot, good, _failed = _good_then_failed(conn, mint)
+    return _listed(conn, slot, good), slot, good
+
+
+def ls_failed_load_beside_a_waiting_one(conn, mint):
+    slot, _good, failed = _good_then_failed(conn, mint)
+    return _listed(conn, slot, failed), slot, failed
+
+
+def ls_promoted_with_another_waiting(conn, mint):
+    slot, promoted = ex_promoted(conn, mint)
+    _filed(conn, slot.period, _iso(_now() - timedelta(hours=1)))
+    return _listed(conn, slot, promoted), slot, promoted
+
+
+def ls_waiting_behind_the_promoted(conn, mint):
+    slot, _promoted = ex_promoted(conn, mint)
+    later, _ = _filed(conn, slot.period, _iso(_now() - timedelta(hours=1)))
+    return _listed(conn, slot, later), slot, later
+
+
+def ls_rejected_beside_a_waiting_one(conn, mint):
+    s = mint("due")
+    rejected, _ = _filed(conn, s.name, _received_late(s))
+    _person(conn, fd.REJECT, period=s.name, supply=rejected)
+    _filed(conn, s.name, _iso(_now() - timedelta(hours=1)))
+    (slot,) = [x for x in filing_queue.slots_of(conn, COL, dataset_id=DS)
+               if x.period == s.name]
+    return _listed(conn, slot, rejected), slot, rejected
+
+
+def ls_superseded_under_the_promoted(conn, mint):
+    state, older = ex_superseded(conn, mint)
+    (slot,) = [x for x in filing_queue.slots_of(conn, COL, dataset_id=DS)
+               if x.period == state.period]
+    return state, slot, older
+
+
+#: name -> (builder, the state its supply is listed in).
+LISTED = {
+    "waiting beside a failed load": (ls_waiting_beside_a_failed_load,
+                                     slot_state.AWAITING_DECISION),
+    "failed load beside a waiting one": (ls_failed_load_beside_a_waiting_one,
+                                         filing_queue.COULD_NOT_LOAD),
+    "promoted, another waiting": (ls_promoted_with_another_waiting, slot_state.PROMOTED),
+    "waiting behind the promoted": (ls_waiting_behind_the_promoted,
+                                    filing_queue.ANOTHER_VERSION_WAITING),
+    "rejected beside a waiting one": (ls_rejected_beside_a_waiting_one, slot_state.REJECTED),
+    "superseded under the promoted": (ls_superseded_under_the_promoted,
+                                      filing_queue.SUPERSEDED),
 }
 
 
@@ -576,6 +673,37 @@ def test_the_door_offers_what_the_flags_would_record(conn, minted, quiet, name):
     assert not hidden_here, (
         f"on a {name} slot the flags record {hidden_here} but the door does not offer "
         f"them - offer them, or name them in HIDDEN with a reason")
+
+
+@pytest.mark.parametrize("name", sorted(LISTED))
+def test_each_listed_supply_offers_what_the_flags_would_record(conn, minted, quiet, name):
+    """REQ-GHUB-229 criterion 13: a period holding more than one supply. The
+    door offers the chosen supply its own state's decisions plus the log's
+    (criterion 7) and the period's own once, beside them (criterion 8)."""
+    build, want = LISTED[name]
+    state, _slot, _supply = build(conn, minted)
+    assert state.state == want, f"{name}: listed as {state.state}"
+    hidden_here = []
+    for op in fd.OPERATIONS:
+        state, slot, supply = build(conn, minted)
+        offered = _door_offers(conn, state) - set(filing_queue.operations_for(state)[1])
+        offered |= set(filing_queue.operations_for(slot)[1])
+        if op in offered or (state.state, op) in HIDDEN:
+            continue
+        if _accepted(conn, _request_for(op, state, supply, minted, conn)):
+            hidden_here.append(op)
+    assert not hidden_here, (
+        f"{name}: the flags record {hidden_here} but the door does not offer them")
+
+
+def test_every_listed_state_is_checked():
+    """Criterion 13: every state supplies_in can list a supply in, among the
+    states this module checks against the flag route."""
+    listed = {slot_state.TWO_FILES, slot_state.PROMOTED, slot_state.AWAITING_ACKNOWLEDGEMENT,
+              slot_state.AWAITING_DECISION, slot_state.RETURNED, slot_state.AMBER_WAITING,
+              slot_state.REJECTED, filing_queue.SUPERSEDED, filing_queue.COULD_NOT_LOAD,
+              filing_queue.ANOTHER_VERSION_WAITING, filing_queue.RECHECKED_WORSE}
+    assert listed <= set(EXAMPLES) | {want for _b, want in LISTED.values()}
 
 
 @pytest.mark.parametrize("name", sorted(OVERLAYS))

@@ -35,7 +35,9 @@ describe("a supply a correction re-judged (criteria 2 and 7)", () => {
 describe("a supply kept against a correction (criterion 5)", () => {
   it("says it was kept, where, against which correction, and why", () => {
     const w = withRaw({corrections: {rejudged: {}, kept: {r1: [KEPT]}, awaiting: []}});
-    const note = w.correctionNote("cp-clients", "r1");
+    // Under 'How it got here' since REQ-DASH-230.
+    const note = w.correctionMoveNote("cp-clients", "r1");
+    expect(w.correctionNote("cp-clients", "r1")).toBe("");
     expect(note).toContain("Kept in");
     expect(note).toContain("against correction CAB-1");
     expect(note).toContain("genuinely Q3 data, sent early");
@@ -144,9 +146,14 @@ describe("a supply a correction moved (Keith, 2026-10-11, (r))", () => {
     w.rawRealDatasetById = () => ({corrections: {rejudged: {"run-1": [{
       original: "late", new: "on_time", reference: "CAB-1", approver: "Keith",
       appliedAt: "2026-10-11T09:00:00+08:00", movedFrom: "2023-Q3", movedTo: "2023-Q2"}]}}});
-    const html = w.correctionNote("cp-clients", "run-1");
-    expect(html).toContain("at the time in");
-    expect(html).toContain("moved to");
-    expect(html).toContain("by correction CAB-1, approved by Keith");
+    // SPLIT (REQ-DASH-230, Keith 2026-10-15): punctuality in Timing, the move
+    // under 'How it got here'.
+    const timing = w.correctionNote("cp-clients", "run-1");
+    const move = w.correctionMoveNote("cp-clients", "run-1");
+    expect(timing).toContain("Late at the time");
+    expect(timing).not.toContain("moved to");
+    expect(move).toContain("In ");
+    expect(move).toContain("moved to");
+    expect(move).toContain("by correction CAB-1, approved by Keith");
   });
 });

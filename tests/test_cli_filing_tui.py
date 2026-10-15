@@ -496,9 +496,11 @@ class TestEveryOperationIsReachableFromSomeDoor:
                             lambda conn, s: acknowledgement_offers)
         monkeypatch.setattr(filing_queue, "awaiting", lambda *a, **k: [state])
         monkeypatch.setattr(filing_queue, "slots_of", lambda *a, **k: [state])
+        # One supply or none: straight to its decisions (REQ-GHUB-229 c2).
+        monkeypatch.setattr(filing_queue, "filed_counts", lambda *a, **k: {})
         monkeypatch.setattr(filing_queue, "closed_gaps", lambda *a, **k: [])
         monkeypatch.setattr(filing_queue, "held_in", lambda *a, **k: [])
-        monkeypatch.setattr(filing_tui, "_pick_slot", lambda states, msg: state)
+        monkeypatch.setattr(filing_tui, "_pick_slot", lambda states, msg, counts=None: state)
         monkeypatch.setattr(filing_tui, "_decide_on",
                              lambda s, offer: seen.setdefault("offer", offer))
         monkeypatch.setattr(filing_tui.common, "select",
