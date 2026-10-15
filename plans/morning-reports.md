@@ -1962,3 +1962,7 @@ one or more component tags, and a date.
       cross-cutting change), `mothman check --no-pytest`, commit, push, check CI.
       The local data is a fresh ten-year bootstrap; the pushed branch is red only on
       the arrival golden, which the local checkpoint already re-captures.
+      PUSHED UNGATED TO THE PR BRANCH AT KEITH'S CALL (~20:55, asked between a
+      backup branch, the PR branch and leaving it local), so the work survives
+      the container overnight. CI WILL BE RED on the configuration tests above
+      until the next session finishes them; that red is known, not a new finding.
