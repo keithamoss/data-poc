@@ -17,7 +17,8 @@
     - "THE SYSTEM SHALL capture as S1 every row of every base table in the qa schema, under the clock, surrogate, ordinal and derived-column rules tests/equiv_support.py applies today, so that a column added to the qa schema later is compared by default."
     - "THE SYSTEM SHALL capture as S2 every schema name and every supply table's name, row count and digest of its sorted rows."
     - "THE SYSTEM SHALL capture as S3 every tool_output row's raw_output in a per-tool normalised form, whose every rule (a key removed, a path rewritten, a float rounded, a list sorted) is named in one place with the measured reason for it."
-    - "WHEN two captures are taken of the same commit, THE SYSTEM SHALL compare them equal on all seven surfaces, and this self-check SHALL be kept as an on-demand test; IF a raw_output field cannot be normalised to equality, THEN THE SYSTEM SHALL leave that field out of S3 by name with the measured reason, as UNCOMPARABLE_COLUMNS does today, rather than loosen the comparison silently."
+    - "WHEN two full captures are taken of the same commit, THE SYSTEM SHALL compare them equal on all seven surfaces - the self-check that proves the normaliser quiet - and this self-check SHALL be run and recorded in this requirement's evidence before any other requirement in this set uses the harness, and kept as an on-demand test."
+    - "IF a raw_output field cannot be normalised to equality by the self-check, THEN THE SYSTEM SHALL leave that field out of S3 by name with the measured reason, as UNCOMPARABLE_COLUMNS does today, rather than loosen the comparison silently."
     - "THE SYSTEM SHALL capture as S4 the path and sha256 of every file the generators wrote - every delivery, every receipt, the generator bookkeeping and the scenario placements."
     - "THE SYSTEM SHALL capture as S5 every results JSON and dashboard JSON the bootstrap wrote under reports/, parsed and compared as JSON with only generated_at removed."
     - "THE SYSTEM SHALL capture as S6 the visible text of the built dashboard's executive view and of every real dataset's page, rendered in a real browser with the page clock pinned to the newest recorded receipt instant, and SHALL record the embedded GitHub link values separately, reported but never failing a compare, because they carry the commit SHA and file paths."
@@ -29,7 +30,8 @@
   non_functional_requirements:
     - "BASELINES ARE STATE, NOT CONFIGURATION (CLAUDE.md, Keith 2026-09-27): a baseline file lives in a scratch directory outside the repository and is never committed."
     - "NEVER THE REAL DATABASE: criterion 11; the 2026-09-27 TRUNCATE incident is why."
-    - "COST, STATED SO IT IS PLANNED FOR: a full capture is a from-empty bootstrap, measured 31m52s on 2026-10-15, so a requirement's before-and-after pair costs about an hour of sandbox time; the reduced mode about 3-4 minutes."
+    - "COST, STATED SO IT IS PLANNED FOR, AND APPLYING TO EVERY REQUIREMENT IN THIS SET: each refactor requirement's evidence is a FULL capture before and after - a from-empty bootstrap, measured 31m52s on 2026-10-15, so about an hour of sandbox time per requirement and about ten across the series. The reduced corpus (about 3-4 minutes) is the inner loop for each step within a requirement, never its evidence."
+    - "CI COST ACROSS THE SERIES: a CI cache-miss bootstrap (REQ-TEST-117's deployment half) SHALL NOT be more than 5% slower at the end of this set than at its start, measured on the CI run before REQ-PIPE-240 and the run after REQ-GEN-246; each requirement reports its own CI cache-miss bootstrap time so a regression is found where it happened."
     - "ONLY THROUGH mothman: the snapshot code moves out of tests/equiv_support.py into a module the command imports, and the existing on-demand tests import it from there - test helpers stay in tests/, and this is a command a person runs, not a test helper."
     - "NO NEW DEPENDENCY: PostgreSQL, Playwright and the generators are already required."
   dependencies: []
@@ -38,6 +40,8 @@
     - "RAW OUTPUT IS COMPARED ONLY UNDER A PROVEN-QUIET NORMALISER - a refinement of position.md call 2, which says 'raw tool output with volatile keys normalised'. tests/equiv_support.py excludes raw_output today for a measured reason: over the 2026-10-03 pair, 464 of 627 rows differed between two bootstraps of the SAME code (dbt invocation ids, timings and per-run target paths; Soda scan timestamps, log indices and metric ordering; datacontract-cli run ids; Evidently PSI values differing in the last floating-point digit). Not all of that is a key - ordering and float noise need sort and round rules - so criterion 6's same-commit self-check is what proves the normaliser is quiet, and anything it cannot quieten is excluded by name rather than allowed to make every compare flaky."
     - "S6 IS RENDERED TEXT, NOT BUILT HTML: the built file embeds the commit SHA in its GitHub links, so it can never be byte-identical across commits, and the dashboard step (REQ-DASH-244) changes the template by design. What a reader sees is the thing that must not change."
     - "BASELINE BEFORE EACH REQUIREMENT, FULL CORPUS AT ITS CLOSE; REDUCED CORPUS FOR EACH STEP INSIDE IT (delivery-scoper, proposed). The reduced corpus runs with scripted decisions switched off and covers no correction, knock-on or scenario, so only the full corpus can stand as a requirement's evidence."
+    - "SELF-CHECK AND NAMED EXCLUSIONS AGREED (main session's call, round 2, 2026-10-15, delegated by Keith): raw_output is compared only under a normaliser the same-commit self-check proves quiet (criteria 6 and 7), with any field it cannot quieten excluded by name and reason."
+    - "FULL CAPTURE PER REQUIREMENT, REDUCED CORPUS AS THE INNER LOOP, AND A 5% CI CEILING ACROSS THE SERIES (main session's call, round 2, 2026-10-15)."
     - "REJECTED keeping the harness test-only. A baseline must be captured at the commit BEFORE a change, by a person, which is a command, and CLAUDE.md makes mothman the only entry point."
   open_questions: []
 
@@ -84,6 +88,8 @@
     - "THE GATE CANNOT PASS CLEAN ON THE DAY IT LANDS - every per-collection module still holds literals until its own requirement moves it - so it carries a migration allowlist that may only shrink (criterion 10) and is empty when REQ-GEN-246 lands, which closes REQ-QAC-039 criterion 1."
     - "AN ORPHAN ADAPTER FAILS - ON THIS ASSET, TODAY. The real target is two assets in separate deployments from one codebase (CLAUDE.md, Keith 2026-09-21); there each deployment's hierarchy would hold only its own collections, and this rule would fail both. Kept because an orphan is dead code today; whether a second asset's adapters share this package is out of scope and must revisit this rule."
     - "AWS IS SCOPED OUT (position.md call 9): the two ingest handlers reach collections only through qa_tools/common/s3_arrival and the processing pass, which this requirement rewires, so they keep working unedited; the CDK stack's two fixed handlers and their prefixes are a follow-up once the registry exists. tests/test_lambda_handlers.py must still pass."
+    - "ALL FOUR GATE NARROWINGS AGREED (main session's call, round 2, 2026-10-15, delegated by Keith): run prefixes matched only at an f-string head before a format field or digit; shorts added as exact-equality literals; a migration allowlist that may only shrink; an orphan adapter fails on this asset today, with the two-asset, one-codebase target recorded as the reason to revisit it."
+    - "ELEVEN REQUIREMENTS, NOT position.md call 12's EIGHT, AGREED (main session's call, round 2, 2026-10-15): dashboard and CLI split; behavioural retirement and shape unification split; the fake-collection proof (REQ-TEST-249) added."
     - "THE DISPATCH INVENTORY is groundwork.md section 2 (about 45 sites in 27 files), re-measured 2026-10-15 against the architect's ~20 in ~14. Site 28 (AWS) is out per the decision above."
     - "PROPOSED WORDING FOR REQ-PIPE-170 CRITERION 31, for Keith (built behaviour, outside the delegation; position.md call 13): 'WHEN a replay of every collection the data asset declares finishes - a bootstrap, or `mothman pipeline run` over all of them - THE SYSTEM SHALL confirm every pending correction dated up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager role during playback, and SHALL rebuild every collection's results if any was confirmed; a replay of fewer than every collection SHALL leave them pending. AMENDED <date applied> by REQ-PIPE-240.' Behaviour with two collections is unchanged."
   open_questions:
@@ -205,6 +211,7 @@
     - "THE SYSTEM SHALL preserve Birth Registrations' dashboard JSON shape and its two display drifts (dropping empty pseudo-columns, the reference-reason fallback for not_evaluated) behind named legacy flags."
     - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S5 and S7, and no difference on S6's visible text."
     - "WHEN the raw template is opened with its illustrative mock data, THE SYSTEM SHALL render with zero console errors, as tests-js/dashboard-loads.test.js holds it to today."
+    - "THE SYSTEM SHALL point each real dataset's QA-code link at its collection's adapter module, qa_tools/collections/<id>.py, and SHALL carry a CHANGELOG.yaml line for that visible change in the same push."
   non_functional_requirements:
     - "WHAT A READER SEES DOES NOT CHANGE: criterion 8's S6 is the visible text of the executive view and every real dataset page under a pinned clock. tests/test_dashboard_e2e.py's TestStatusMatchesEachToolsOwnVerdict also passes - CLAUDE.md's own lesson that a green data layer says nothing about a render layer with its own transform."
     - "PAGE SIZE AND RENDER TIME: the built page's size within 1% of the baseline and tests/test_dashboard_e2e.py's duration reported before and after (CLAUDE.md's informal runtime log); growth beyond about 10% is a finding for Keith."
@@ -219,8 +226,9 @@
     - "SPLIT FROM THE CLI FACTORY, against position.md call 12's pairing: a different component (DASH against TEST), a different proof (rendered text against help text) and different reviewers (delivery-dashboard-ux against delivery-cli-ux). Neither depends on the other."
     - "A MISSING COLLECTION FAILS THE BUILD, NOT THE PAGE: groundwork site 19 found an unwired collection renders as 'no data', which is an omission dressed as a fact - the worst kind of false quiet for a register."
     - "THE TWO DISPLAY DRIFTS ARE RETIRED BY REQ-QAC-247 (they change what a reader sees); THE JSON SHAPE BY REQ-PIPE-248 (it must not)."
+    - "A DATASET'S QA-CODE LINK POINTS AT ITS COLLECTION'S ADAPTER MODULE (main session's call, round 2, 2026-10-15, delegated by Keith): it is the one per-collection file that remains once REQ-PIPE-243 deletes qa_tools/bdm/ and qa_tools/cp/, which today's folder links point at. The only visible change in the refactor series, so it gets a CHANGELOG line (criterion 10). Links are excluded from S6 and reported separately. REJECTED pointing at the shared tool modules - they say nothing about this collection."
   open_questions:
-    - "FOR THE MAIN SESSION AND delivery-dashboard-ux: github_links' folder links point today at qa_tools/bdm/ and qa_tools/cp/, which REQ-PIPE-243 deletes. Proposed - a dataset's link points at its collection's adapter module, and an agency's at its first collection's. The links are excluded from S6, so this is the one visible change the refactor series makes; say if it should go elsewhere."
+    - "FOR delivery-dashboard-ux, NOTED NOT OPEN: criterion 10's link target, and what an agency-level link (today github_links' agency folder) should point at once the per-collection folders are gone - a review point, not a fork."
 
 - id: REQ-TEST-245
   title: "One factory builds each collection's mothman command group, and the TUI lists collections from the registry"
@@ -258,7 +266,7 @@
   status: not_started
   source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md section 4 (generator/resupply.py's DatasetProvider and run_slot_chain already have the pattern); main session position.md calls 7 and 8. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
   acceptance_criteria:
-    - "THE SYSTEM SHALL generate every collection's synthetic history through one shared driver - the slot loop, bookkeeping, delivery and receipt writing, and injection placement - with each collection's rows, seeds and period plan in a provider of its own."
+    - "THE SYSTEM SHALL generate every collection's synthetic history through one shared driver - the slot loop, bookkeeping, delivery and receipt writing, and injection placement - with each collection's rows, seeds and period plan in a provider module of its own at generator/collections/<id>.py, separate from the collection's QA adapter."
     - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S4 - every delivery, receipt, the bookkeeping and the scenario placements byte-identical - nor on S1 to S3 and S5 to S7."
     - "WHERE a collection's provider declares the target-trial capability, THE SYSTEM SHALL run its target trial; IF a target trial is asked of a collection without it, THEN THE SYSTEM SHALL refuse naming the collection, replacing the silent fallbacks in generator/targeting.py and generator/targets.py."
     - "THE SYSTEM SHALL route scenario_injection.generated_periods() and generator/output.py's generated_into through the registry, and IF a scenario names a dataset whose collection has no provider, THEN generation SHALL refuse naming it before writing anything."
@@ -278,9 +286,8 @@
     - "A SHARED DRIVER, AND BEFORE EMERGENCY DEPARTMENT (position.md call 7): so ED's generator is a provider from day one. Last among the refactor steps because it is the riskiest for byte-identity, not because anything depends on it - it needs only the registry."
     - "TARGET TRIAL IS AN OPTIONAL CAPABILITY, REFUSED BY NAME ELSEWHERE (position.md call 8): Birth Registrations only today."
     - "SEED RANGES ARE DECLARED PER PROVIDER (criterion 5) because REQ-GEN-232 criterion 2 needs Emergency Department's seeds disjoint from the other two, and a gate makes that a check rather than a promise."
-    - "WHERE A PROVIDER LIVES IS FOR KEITH - see open question. Groundwork estimates bdm's generator part at ~280 lines and cp's at ~210, larger than either's QA part."
-  open_questions:
-    - "FOR KEITH: a collection's generator provider in its own module under generator/ (generator/collections/<id>.py), or inside the one adapter module with its QA and dashboard parts? delivery-scoper recommends its own module - a real deployment's collections have no synthetic generator, so the QA adapter should not carry one, and the ~150-line budget then measures what a real collection costs. It does mean a synthetic collection is two short modules, not one, which is a reading of your 'small adapter per collection' rather than the letter of it."
+    - "SIGNIFICANT, FOR KEITH TO SENSE-CHECK - A GENERATOR PROVIDER IS ITS OWN MODULE, generator/collections/<id>.py (main session's call, round 2, 2026-10-15, delegated by Keith), and the 'small adapter per collection' budget measures the QA and dashboard adapter only. Why: a real deployment's collections have no synthetic generator, so the QA adapter should not carry one, and the budget should measure what a real collection costs; groundwork puts bdm's generator part at ~280 lines and cp's at ~210, larger than either's QA part, so folding them in would make the budget meaningless. What it costs: a synthetic collection is two short modules rather than one - a reading of Keith's definition rather than its letter. REJECTED (b), the provider inside the one adapter module: it would make qa_tools.collections import generator code into every real deployment and swamp the adapter's line budget with synthetic-only content."
+  open_questions: []
 
 - id: REQ-QAC-247
   title: "Birth Registrations' behavioural legacy flags are retired one at a time, each change reported, so it is checked and shown exactly as every other collection"
@@ -322,6 +329,8 @@
     - "THE SYSTEM SHALL delete every template and Python reading path that exists only for Birth Registrations' old shapes, and the shape legacy flags with them."
     - "WHEN Birth Registrations' history is regenerated after this change, THE SYSTEM SHALL report no difference on REQ-TEST-239's S6 - the rendered page reads the same - while S1 and S5 differ only in the shapes this requirement names."
     - "WHEN every shape is unified, THE SYSTEM SHALL fail `mothman check` IF any adapter declares a legacy flag of any kind."
+    - "THE SYSTEM SHALL write every collection's results as reports/results_<collection_id>.json and its dashboard data as reports/<collection_id>_dashboard.json, replacing results_bdm.json, results_cp.json, birth_registrations_dashboard.json and child_protection_dashboard.json, and every reader of those paths in the same change."
+    - "WHEN REQ-TEST-239's S5 comparison is run for this requirement, THE SYSTEM SHALL map each old file name to its new one before comparing, and this mapping SHALL be available to this requirement only."
   non_functional_requirements:
     - "INVISIBLE TO A READER: criterion 5 - a shape change that shows on the page is a defect here."
     - "HISTORY REGENERATED, SYNTHETIC ONLY: as REQ-QAC-247. On a real asset this would need a migration of recorded history, which is out of scope and refused by reset-synthetic."
@@ -333,9 +342,10 @@
     - "UNIFY ON CHILD PROTECTION'S N-TABLE FORMS (main session, position.md call 3, SIGNIFICANT): Birth Registrations' history is regenerated, as synthetic history already may be (REQ-PIPE-038, REQ-PIPE-144)."
     - "REJECTED keeping two shapes behind a per-collection switch: every downstream reader would carry both forever, which is the copy this item exists to remove."
     - "NOT NEEDED BEFORE EMERGENCY DEPARTMENT: ED is born in the N-table forms."
+    - "RESULT FILE NAMES FOLLOW THE COLLECTION ID, CHANGED HERE (main session's call, round 2, 2026-10-15, delegated by Keith): reports/results_<collection_id>.json and reports/<collection_id>_dashboard.json. Changed in this output-changing requirement, never in a byte-identical step; S5 maps old names to new for this requirement only (criteria 7 and 8). REJECTED <short>-based names (delivery-scoper's round-1 proposal): the id is the identity, the short a CLI convenience - the same reason adapters are named by id."
   open_questions:
     - "CHECK AT BUILD: whether Birth Registrations' row-count-growth check reads the previous run's row_count from its Evidently raw output; if it does, criterion 3 moves that read to the dataset stats first, as its own behaviour-preserving step."
-    - "FOR THE MAIN SESSION: result file names. reports/results_bdm.json and results_cp.json already follow the short; birth_registrations_dashboard.json and child_protection_dashboard.json do not. Proposed - <short>_dashboard.json for all, here, since this is the requirement allowed to change outputs."
+
 
 - id: REQ-TEST-249
   title: "A fake collection declared only in a test - its adapter, its configuration and nothing else - goes from generation to a rendered page, proving a collection is a small adapter"
@@ -348,9 +358,10 @@
     - "THE SYSTEM SHALL keep a test-only collection - one agency, one collection, one one-table dataset, at least one check in each of the four tools - declared in a test copy of the hierarchy with its contract, check files, adapter and generator provider, under tests/."
     - "WHEN the test runs, THE SYSTEM SHALL generate the fake collection's history, bootstrap it into a scratch database, record results from all four tools, build its dashboard data and render its dataset page in a real browser with each check's status matching its recorded verdict."
     - "THE SYSTEM SHALL require no edit to any file outside the fake collection's own configuration, check files, adapter and provider for criterion 2 to pass."
-    - "WHEN `mothman check` runs, THE SYSTEM SHALL report each adapter's code lines - QA and dashboard logic, presentation metadata and generator provider separately - against a soft budget of 150 lines for the QA and dashboard logic, and SHALL never fail on it."
+    - "WHEN `mothman check` runs, THE SYSTEM SHALL report each QA adapter's code lines - logic and presentation metadata separately - against a soft budget of 150 lines for its logic, SHALL report each generator provider's lines separately and outside that budget, and SHALL never fail on either."
     - "THE SYSTEM SHALL never register the fake collection in contract/data-asset.yaml, and the test SHALL write nothing under the repository's data/ or reports/."
   non_functional_requirements:
+    - "CI CEILING FOR THE SERIES: this requirement's evidence records REQ-TEST-239's CI cache-miss comparison - the end of the series no more than 5% slower than its start."
     - "TEST COST: under two minutes, run in CI's on-demand job beside REQ-TEST-116's equivalence test rather than in the fast half - it bootstraps."
     - "WHAT IT PROVES: no dispatch site still assumes the collections it knew about (any that does omits or refuses the fake); the adapter Protocol is sufficient for a one-table collection; and the line count of what a new collection actually costs. WHAT IT DOES NOT PROVE: multi-table or cross-table generality beyond what Child Protection's real corpus already exercises, real data shapes, or performance at 30 collections."
     - "ADAPTER LINE BUDGET IS REPORTED, NOT ENFORCED (position.md call 10): groundwork estimates bdm ~230 and cp ~260 lines with presentation metadata in them, so both report over 150 from the start; criterion 4's split makes clear the overage is presentation metadata, which is position.md call 6's follow-up."
