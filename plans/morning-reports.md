@@ -2023,6 +2023,16 @@ one or more component tags, and a date.
          under replacement `never` (critic O1) - acceptable noise, or should
          the grown quarters carry no reds?
 
+    - **KEITH'S ANSWERS, 2026-10-16 ~06:10 Perth** (to a-c above):
+      a. TS-54: KEEP IT GREEN. It stands on a green cp-placements 2024-Q4
+         supply, as its corrected text says. No generator change.
+      b. Evening-before: WIDEN REQ-PIPE-111 CRITERION 9's synthetic
+         exemption to cover restating a frozen version's value at its
+         default. Exact wording goes to Keith (111 is not delegated); then
+         re-apply `docs/drafts/evening-before/evening-before.patch`.
+      c. Grown red chains: SCRIPT DECISIONS, keeping the reds but settling
+         each grown red chain with a scripted decision so the queue clears.
+         This amends REQ-GEN-207, whose wording is delegated.
     - **STANDING DELEGATION, Keith, 2026-10-15 ~22:55 Perth**: "don't bother
       me with the amended wording on the generator requirements, you know,
       044, 203, 205, 218. I'm happy for you just to go ahead and approve
