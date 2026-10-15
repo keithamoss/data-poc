@@ -196,6 +196,14 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
         if deliveries[0]["period"] in injected \
                 and injected[deliveries[0]["period"]][0].keeps_drawn_severity:
             continue
+        # NOR ONE WHOSE LATER DELIVERIES ITS SCENARIO SCRIPTS ITSELF after a
+        # scripted file fault (REQ-GEN-044: TS-14's corrected Client Register,
+        # weeks after TS-12's unreadable one) - not a resupply the drawn
+        # severity chose, which is all this test is about.
+        if deliveries[0]["period"] in injected:
+            first = injected[deliveries[0]["period"]][0]
+            if len(first.arrivals) > 1 and first.arrivals[0].file_shape:
+                continue
         if len(deliveries) > 1:
             assert deliveries[0]["dirty_severity"] == "red", \
                 f"{slot_id} has more than one delivery but the first wasn't red"

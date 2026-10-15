@@ -9772,3 +9772,25 @@ twice. It deliberately did not re-find the `TypeError`.
        owesFrom), F3 (the word once), F4 (slot_timeline._shown: 'a person'
        where no name exists). Tests: tests-js/period-composition.test.js
        (F1-F3) and tests/test_slot_timeline.py (F4), each seen failing first.
+
+205. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on 674399a:
+     two test defects, neither in the product.**
+     - **`test_a_resupply_only_ever_follows_a_red_delivery`** - mine, from
+       421e9f4: TS-14's corrected Client Register rides TS-12 as a second
+       delivery after an UNREADABLE first one, not a red one. The test's
+       invariant is about the resupplies the drawn severity chooses; it
+       already exempted TS-77's scripted chain, and now also exempts a chain
+       whose later deliveries its scenario scripts after a file fault (TS-12;
+       TS-77a was already exempt). Reproduced locally first.
+     - **`test_cp_pair.py`, two shapes of one cause: a CI worker's database
+       carries other modules' Child Protection state.** (a) The queue-item
+       test read the FIRST contested Client Register item, which can be
+       another module's - reproduced locally by running the Child Protection
+       modules serially on one database; it now finds its own pair's item by
+       its receipt. (b) The unloadable-partner fixture's carers run read a
+       `cp_clients` sibling with no `postcode` column from its period - NOT
+       reproduced locally in three runs; `_free_quarter` now also refuses a
+       quarter any Child Protection dataset has filed to, or whose period
+       schema holds any table, which removes every way a foreign sibling
+       could be read there. If it recurs, the period's tables at that moment
+       are the thing to capture.

@@ -25,8 +25,19 @@ def _free_quarter(conn):
     """A cp-clients quarter nothing in this worker's database has filed to."""
     from qa_tools.common import asset_time, slots
 
+    from qa_tools.common import period_schema
+
+    # UNTOUCHED BY ANY CHILD PROTECTION DATASET, and with nothing in its
+    # period's schema: the pair's other five tables read their siblings from
+    # the period, and a table another module left there of another shape
+    # took a run down in CI (674399a, "column postcode does not exist").
     taken = {r[0] for r in conn.execute(
-        "SELECT slot FROM qa.filing_current WHERE dataset_id = ?", [DS]).fetchall()}
+        "SELECT slot FROM qa.filing_current WHERE dataset_id LIKE 'cp-%'").fetchall()}
+    populated = {r[0] for r in conn.execute(
+        "SELECT DISTINCT table_schema FROM information_schema.tables").fetchall()}
+    taken |= {s.name for s in slots.slots_for_dataset(DS, until=asset_time.local_date(
+        asset_time.now()) + timedelta(days=400))
+        if period_schema.period_schema(s.name) in populated}
     today = asset_time.local_date(asset_time.now())
     free = [s for s in slots.slots_for_dataset(DS, until=today + timedelta(days=400))
             if s.name not in taken and s.claim_opens_at < s.due_at
@@ -156,8 +167,15 @@ class TestAContestedClientRegister:
         with supply_db.connect(label="test-cp-pair") as conn:
             items = [i for i in outstanding.survey(conn).items
                      if i.dataset_id == DS and i.kind == "contested-table"]
-        assert items and items[0].blocking
-        said = items[0].headline + " " + items[0].detail
+        from qa_tools.common import display_time
+
+        # THIS PAIR'S ITEM, not the first one: another module on the same
+        # worker may leave its own contested Client Register (CI, 674399a),
+        # so it is found by this pair's own receipt.
+        when = display_time.format_instant(cp_pair_shared["clients"].received_at)
+        mine = [i for i in items if f"cp_clients.csv, received {when}" in i.detail]
+        assert len(mine) == 1 and mine[0].blocking
+        said = mine[0].headline + " " + mine[0].detail
         assert "cp_clients.csv" in said and "cp_clients_part2.csv" in said
 
     def test_the_real_picker_marks_it(self, cp_pair_shared, monkeypatch):
