@@ -135,3 +135,57 @@ sense-check. Evidence: `docs/drafts/item6/groundwork.md`.
     command group, or a handful of collections holding ~30 datasets? It sets
     the 30-collection fixture's realism and #101's priority; nothing in the
     series is blocked on it.
+
+## Round 4 calls, after the architect review (main session)
+
+24. **SIGNIFICANT - proof strategy: captures by commit, in a git worktree,
+    chained** (architect E1a). `capture --ref <sha>` runs that commit's own
+    code in a worktree against a scratch database, so there is no module
+    patching and the harness is never edited per step; requirement N's
+    "after" is N+1's "before"; the dashboard and CLI steps use cheaper
+    surfaces (S5/S6 rebuilt from one kept database; S4 regeneration, S7, the
+    reduced corpus); one full end-to-end compare from before REQ-PIPE-240 to
+    after REQ-GEN-246. About 4-5 hours of captures rather than ~10. Scripted
+    decisions stay ON in a full capture; only `--reduced` turns them off. The
+    harness refuses an asset not declared synthetic and records a harness and
+    normaliser version, refusing to compare across versions; named exclusions
+    apply on every surface. Rejected: a full before/after per requirement
+    with module-patching redirection (the series deletes what it patches).
+25. **Legacy flags on BOTH adapters** (E2a), replacing the "Child Protection
+    has none" criterion: the copies are a NEAR superset, not a strict one -
+    the Soda `[scope]` check-name suffix (Birth Registrations), Child
+    Protection's empty Soda dimensions on 88 checks, divergent
+    row_count_invalid branches, dbt model-level-test routing and test-shape
+    sampling. Every refactor step stays byte-identical; the reader-visible
+    flags (the suffix, the empty dimensions) are added to REQ-QAC-247's
+    retirement list. Rejected: changing Child Protection's output inside a
+    refactor step.
+26. **The fake-collection proof runs in a repo copy** (E3a): git archive of
+    HEAD to a temp dir, the fake's files added there, `mothman` run from the
+    copy against a scratch database, and the copy's diff against HEAD
+    asserted additions-only in the allowed paths. Rejected: in-process
+    redirection, which needs a single config root across 41 modules first.
+27. **Each dispatch site is rewired once** (E4a): REQ-PIPE-240 rewires only
+    the sites whose code survives the series (processing_pass, recheck,
+    checkpoints, bootstrap incl. resume(), the lifecycle and source lists,
+    github_links, ticket_sync); every other site sits on the shrinking
+    allowlist and is rewired, with its third-collection test, by the
+    requirement that rewrites its file.
+28. ADOPTED, the rest of the architect's findings: seed schedules are a
+    provider method and a genuine never-retired difference, with every seed
+    a provider can derive inside its declared range; `AGENCY_BLURB` moves to
+    presentation config in REQ-DASH-244, and the scenario register's
+    exemption names `INJECTIONS` and `INHERITING_DATASET` only; the gate adds
+    unique table names and dbt singular-test names across collections and a
+    run_prefix of `[a-z0-9_]` that fits PostgreSQL's 63 bytes with every
+    suffix and `adhoc_`/`ref_` form; **each collection's dbt models, sources,
+    schema and singular tests live under `dbt_project/models/<collection_id>/`
+    and `dbt_project/tests/<collection_id>/`**, the runner scoping nodes by
+    the adapter's table set; Evidently YAML dates quoted (or coerced to str)
+    so config_hash cannot move, and the base side's sources derived from the
+    base ref's own hierarchy, with the legacy Python reader time-boxed; the
+    adapter is per-tool sub-objects (`.dbt`, `.soda`, `.datacontract`,
+    `.evidently`, `.staging`, `.stats`, `.present`); S6 adds the page's own
+    `buildDatasetsOn()` output for sampled as-of dates; S7 adds the TUI menu
+    text; the CI 5% NFR is replaced by back-to-back sandbox timings with a
+    threshold set from the self-check's measured noise.
