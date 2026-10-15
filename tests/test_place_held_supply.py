@@ -226,7 +226,7 @@ class TestOnePlacer:
 
         monkeypatch.setattr(placing, "place", spy)
         monkeypatch.setattr(schedule_ended, "_covering_slot",
-                            lambda ds, at: type("S", (), {"name": target})())
+                            lambda ds, at, agreement=None: type("S", (), {"name": target})())
         done = schedule_ended.refile_holds(
             lambda c: [h for h in supply_holds.outstanding(c, dataset_id=DS)
                        if h.supply_id == supply],

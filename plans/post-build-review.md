@@ -9470,3 +9470,15 @@ twice. It deliberately did not re-find the `TypeError`.
      on its own (`; echo exit=$?`), never through a pipe, before any commit.
      The database was rebuilt with `mothman env reset-synthetic` then
      `mothman pipeline bootstrap`, and the gate re-run on that tree.
+
+198. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on dc1d82e:
+     a test stub too narrow for the confirmed-agreement check (Q4).**
+     `tests/test_place_held_supply.py`'s stub of `schedule_ended._covering_slot`
+     took two arguments. On CI's empty database the real configuration's
+     REQ-PIPE-181 correction is still pending, so the re-filer's new check
+     (`_covering_slot(..., agreement=confirmed)`) ran and the stub raised
+     TypeError; locally that correction had been confirmed by the bootstrap,
+     so the check never ran. Reproduced on an empty scratch database (fails
+     with the old stub, passes with the new); the stub now takes
+     `agreement=None`. The touched modules (16) also ran on that empty
+     database: 562 passed, no skips reported.
