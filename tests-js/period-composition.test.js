@@ -182,3 +182,37 @@ describe("every subject the scenario map can name has a place on the page", () =
     names.forEach(n => expect(mapped).toContain(n));
   });
 });
+
+describe("post-build-review #204 - the rows that hold nothing", () => {
+  it("F1: a period with a supply received and not promoted reads Waiting, as its supply history does", () => {
+    const w = load();
+    const raw = {id: "x", slotTimeline: [],
+                 runs: [{run_id: "r1", run_date: "2026-02-05", received_at: "2026-02-05T01:00:00+00:00"}],
+                 runStates: {r1: [{at: "2026-02-05T01:00:00+00:00", state: "awaiting"}]}};
+    expect(w.compositionRow(raw, "2025-Q4", "2026-03-01").word).toBe("No supply");
+    expect(w.compositionRow(raw, "2026-Q1", "2026-03-01").word).toBe("Waiting");
+    // Not before it arrived, and not once it was withdrawn.
+    expect(w.compositionRow(raw, "2026-Q1", "2026-02-02").word).not.toBe("Waiting");
+    raw.runStates.r1.push({at: "2026-02-20T01:00:00+00:00", state: "withdrawn"});
+    expect(w.compositionRow(raw, "2026-Q1", "2026-03-01").word).not.toBe("Waiting");
+  });
+
+  it("F2: a period before the dataset owed anything is not owed, whatever the date on show", () => {
+    const w = load();
+    const raw = {id: "x", slotTimeline: [], sla: {owesFrom: "2026-02-01"}};
+    expect(w.compositionRow(raw, "2025-Q4", "2026-06-01")).toMatchObject({kind: "notowed"});
+    expect(w.compositionRow(raw, "2026-Q1", "2026-06-01").kind).toBe("notsupplied");
+  });
+
+  it("F3: a not-owed row says its word once", () => {
+    const w = load();
+    const div = w.document.createElement("div");
+    div.innerHTML = w.compositionHtml(w.eval("DATA.agencies[0]"), COL, "2026-Q1", "2026-03-01");
+    const inherited = {...RAW.inherited, slotTimeline: []};
+    w.rawRealDatasetById = id => (id === "inherited" ? inherited : RAW[id] || null);
+    div.innerHTML = w.compositionHtml(w.eval("DATA.agencies[0]"), COL, "2026-Q1", "2026-03-01");
+    const text = div.querySelector('tr[data-dataset="inherited"]').textContent.replace(/\s+/g, " ");
+    expect(text).toContain("Not owed");
+    expect(text).not.toMatch(/Not owed\W+Not owed/);
+  });
+});

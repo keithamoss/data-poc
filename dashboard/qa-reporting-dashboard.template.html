@@ -7174,6 +7174,12 @@ function notSuppliedWord(raw, period, dateStr){
     if(gaps.open.length) return "No supply";
     if(s.filedAt && assetDateStrOf(s.filedAt) <= dateStr) return "Waiting";
   }
+  // A SUPPLY RECEIVED IN THE PERIOD AND NOT WITHDRAWN BY THE DATE is waiting,
+  // as its cycle in the supply history says (post-build-review #204 F1).
+  const waiting = ((raw && raw.runs) || []).some(r=> r.run_date && r.run_date <= dateStr
+    && periodNameFor(raw.id, r.run_date) === period
+    && runStateInPlaceOn(raw, r.run_id, dateStr) !== "withdrawn");
+  if(waiting) return "Waiting";
   return raw && periodNameFor(raw.id, dateStr) === period ? "Due" : "No supply";
 }
 // THE ACKNOWLEDGEMENT OWED ON A SUPPLY, as at the date (REQ-PIPE-166): null
@@ -7202,13 +7208,22 @@ function compositionRow(raw, period, dateStr){
     const words = owedNothingLabel(owed);
     return {kind: "notowed", word: words.word, label: words.label};
   }
-  const sla = raw ? slaInPlaceOn(raw, dateStr) : {};
-  if(sla.notOwedYet) return {kind: "notowed", word: "Not owed yet", label: notOwedYetText(sla.notOwedYet)};
+  // BY THE PERIOD, NOT THE DATE ON SHOW (post-build-review #204 F2): a period
+  // before the dataset owed anything stays not owed whenever it is looked at.
+  const owesFrom = raw && raw.sla && raw.sla.owesFrom;
+  const periodDate = raw ? periodDateNamed(raw.id, period) : null;
+  if(owesFrom && periodDate && periodDate < owesFrom){
+    return {kind: "notowed", word: "Not owed yet", label: notOwedYetText(owesFrom)};
+  }
   return {kind: "notsupplied", word: notSuppliedWord(raw, period, dateStr)};
 }
 function compositionCells(ag, col, row){
   if(!HELD_KINDS.has(row.kind)){
-    const label = row.kind === "notowed" ? row.label : row.word;
+    // ITS WORD ONCE (post-build-review #204 F3): a not-owed label already
+    // starts with its own word, which may be the group's.
+    let label = row.kind === "notowed" ? row.label : row.word;
+    const lead = `${COMPOSITION_WORD[row.kind]} — `;
+    if(label.startsWith(lead)) label = label.slice(lead.length);
     return `<td><b>${COMPOSITION_WORD[row.kind]}</b> <span style="color:var(--ink-faint);">— ${escHtml(label)}</span></td>
       <td></td><td></td><td></td><td></td><td></td><td></td>`;
   }

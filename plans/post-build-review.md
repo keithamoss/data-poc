@@ -9712,3 +9712,37 @@ twice. It deliberately did not re-find the `TypeError`.
        read `points`, which holds only days the panel's answer changed, and
        on a crowded worker database the placement's day was not one - it now
        asks the day's decisions directly. Both test defects, not page ones.
+
+204. **[in-progress, 2026-10-15]** **[Dashboard UI]** **[Testing & dev tooling]**
+     **delivery-critic on REQ-DASH-209 (421e9f4).** The held kinds agree with
+     qa.slot_holds in all 70,212 dataset-period-days checked from 2023-02-01 to
+     2026-10-15, and with the dataset page's standing-in pill on 8,226
+     dataset-days - 0 mismatches. The rows holding nothing were weaker.
+     - **F1, DEFECT (c1), reproduced**: a period with a supply received but not
+       promoted, and no closed-slot record, read 'No supply' or 'Due' where its
+       supply history says 'Waiting' (Birth Registrations 2026-07-02, 07-05 and
+       five more days; Child Protection 2023-Q2 and 2024-Q1) - against the
+       build's own PROVISIONAL rule.
+     - **F2, DEFECT (c1), latent, reproduced with altered data**: 'Not owed
+       yet' was keyed on the date on show, so a past period before a late
+       joiner owed anything flipped between 'Not supplied' and 'Not owed' with
+       the date. No real dataset joins late today.
+     - **F3, WORDING**: 'Not owed — Not owed — outside its agreed months'.
+     - **F4, PRIVACY, latent**: people.display_name() returns the identity for
+       anyone not in contract/people.yaml, so a person removed from it would
+       reach the embedded slot timeline as an email address. Holds today.
+     - **F5, NOTED (reasoned)**: a collection whose datasets follow different
+       calendars would merge period names and mark a dataset without that
+       period 'Not supplied'. None does today.
+     - **F6, NOTED**: the previous/next links sit on their own line below the
+       sub-line rather than beside the h2; a 'Previous period' link is offered
+       where the period on show had not opened either (within c14's letter).
+     - **F7, NOTED**: page size drifts with build time (10,891,457 and
+       10,898,715 on later rebuilds), so the recorded before/after are two
+       builds made minutes apart, not one diff.
+     - **FIXED, 2026-10-15**: F1 (a supply received in the period and not
+       withdrawn by the date reads Waiting, from the same runs and runStates
+       the supply history reads), F2 (keyed on the period's own date against
+       owesFrom), F3 (the word once), F4 (slot_timeline._shown: 'a person'
+       where no name exists). Tests: tests-js/period-composition.test.js
+       (F1-F3) and tests/test_slot_timeline.py (F4), each seen failing first.

@@ -247,6 +247,12 @@ def run_states(dataset_id: str,
     return out
 
 
+def _shown(name: str) -> str:
+    """A name for the page, never an email: display_name() falls back to the
+    identity for anyone not in contract/people.yaml (post-build-review #204 F4)."""
+    return "a person" if not name or "@" in name else name
+
+
 def with_runs(timeline: list[dict], dataset_id: str,
                conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """The same timeline, each entry naming the run that checked it.
@@ -286,7 +292,7 @@ def with_runs(timeline: list[dict], dataset_id: str,
                     # THE PAGE NAMES A PERSON, NEVER THEIR EMAIL (REQ-DASH-209
                     # PRIVACY NFR, REQ-PIPE-147 criterion 7): this copy is the
                     # one the page embeds, so the name is put here.
-                    "actor": (people.display_name(entry.get("actor"))
+                    "actor": (_shown(people.display_name(entry.get("actor")))
                               if entry.get("actor_kind") == decision_log.PERSON
                               else entry.get("actor"))})
     return out

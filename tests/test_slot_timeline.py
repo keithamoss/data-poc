@@ -305,3 +305,18 @@ class TestWhatTheCompositionViewReads:
         # THE ASSET DAY it took effect, which the page's one lookup
         # (newestOnOrBefore) compares with the date on show.
         assert entry["on"] == "2026-01-01"
+
+    def test_a_person_with_no_entry_is_never_shown_by_email(self, clean, dataset, monkeypatch):
+        """post-build-review #204 F4: display_name falls back to the identity,
+        which is an email address - the embedded copy says 'a person' instead."""
+        from qa_tools.common import people
+
+        monkeypatch.setattr(people, "parse_people_config", lambda: {"people": {}})
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-01-01T00:00:00+00:00", to_slot="2025-Q4",
+                actor="gone.person@example.org")
+        monkeypatch.setattr(slot_timeline, "_run_for", lambda c, d, s: None)
+        [entry] = slot_timeline.with_runs(slot_timeline.for_dataset(dataset, conn=clean),
+                                          dataset, conn=clean)
+        assert "@" not in repr(entry)
+        assert entry["actor"] == "a person"
