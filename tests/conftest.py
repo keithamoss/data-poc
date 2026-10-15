@@ -815,9 +815,12 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
     # resolve through 2026-Q1's tables, and the guard then refuses the drop.
     oldest = period_schema.period_schema("2026-Q1")
     with supply_db.connect(label="pytest:fixture-periods") as conn:
+        # QUARTERLY periods only: other modules make private periods of their
+        # own (period_2099_<token>) which are not this fixture's to drop.
         later = sorted((r[0] for r in conn.execute(
             "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name LIKE 'period\\_%'").fetchall() if r[0] >= oldest), reverse=True)
+            "WHERE schema_name ~ '^period_[0-9]{4}_q[1-4]$'").fetchall() if r[0] >= oldest),
+            reverse=True)
         for schema in later:
             conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
     # A FILING LINKS TO ITS DELIVERY RECORD (REQ-PIPE-144 criterion 10),
