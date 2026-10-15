@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**34 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**38 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -90,13 +90,23 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: daily evening-before - the supply for day D is due 22:00 on D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday. Monday's slot filled. Arrival 17:00 Monday, one hour outside.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202606212100000800`, `birth_registrations__202606221700000800` |
+| Period | 2026-06-22 |
+| Set the in-place-on date to | 2026-06-22 |
 
 ### TS-3d - Daily, prior slot UNFILLED
 
 **What it demonstrates.** Monday is still the open period -> fills **Monday, 19 hours late**.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202606251700000800` |
+| Period | 2026-06-25 |
+| Set the in-place-on date to | 2026-06-25 |
 
 ### TS-4 - Arrival into an already-filled slot
 
@@ -172,13 +182,23 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202606192200000800` |
+| Period | 2026-06-20 |
+| Set the in-place-on date to | 2026-06-20 |
 
 ### TS-10b - Evening-before daily arrival, Monday unfilled
 
 **What it demonstrates.** The 22:00 arrival ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202606272200000800` |
+| Period | 2026-06-28 |
+| Set the in-place-on date to | 2026-06-28 |
 
 ### TS-11 - A re-filed supply reclassifies
 
@@ -1025,7 +1045,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": "Config: daily evening-before - the supply for day D is due 22:00 on D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday. Monday's slot filled. Arrival 17:00 Monday, one hour outside.",
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202606212100000800",
+     "birth_registrations__202606221700000800"
+    ],
+    "period": "2026-06-22",
+    "inPlaceOn": "2026-06-22",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-3d",
@@ -1036,7 +1065,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": null,
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202606251700000800"
+    ],
+    "period": "2026-06-25",
+    "inPlaceOn": "2026-06-25",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-4",
@@ -1173,7 +1210,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": "Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.",
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202606192200000800"
+    ],
+    "period": "2026-06-20",
+    "inPlaceOn": "2026-06-20",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-10b",
@@ -1188,7 +1233,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-118",
     "REQ-PIPE-123"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202606272200000800"
+    ],
+    "period": "2026-06-28",
+    "inPlaceOn": "2026-06-28",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-11",

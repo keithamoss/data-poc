@@ -2033,6 +2033,17 @@ one or more component tags, and a date.
       c. Grown red chains: SCRIPT DECISIONS, keeping the reds but settling
          each grown red chain with a scripted decision so the queue clears.
          This amends REQ-GEN-207, whose wording is delegated.
+    - **KEITH ON ITEM 6, 2026-10-16 ~06:50 Perth**: all ten significant calls
+      in `docs/drafts/item6/proposal.md` STAND. REQ-PIPE-170 criterion 31's
+      proposed wording ("every collection the data asset declares")
+      APPROVED AS WRITTEN, to be applied in REQ-PIPE-240's change. "~30"
+      means ~30 COLLECTIONS (running-thoughts #101 updated). Emergency
+      Department's checks on postcode, sex, age group and arrival time
+      RECORD FAILING ROWS, as the other datasets do - his call, knowing the
+      re-identification risk on real data. ED's 13 checks SIGNED OFF as
+      listed; its ids, names and 09:00 + 8h due time KEPT. CLAUDE.md's "30
+      datasets" is to read "30 collections" (wording to Keith). Still to do:
+      sign-off of the 21 draft requirements themselves.
     - **STANDING DELEGATION, Keith, 2026-10-15 ~22:55 Perth**: "don't bother
       me with the amended wording on the generator requirements, you know,
       044, 203, 205, 218. I'm happy for you just to go ahead and approve

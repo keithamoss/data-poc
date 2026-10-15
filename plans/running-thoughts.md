@@ -5456,4 +5456,7 @@ could never have computed it), and it belongs with batch 5's check work.
     Law at 30 rows (group by agency, or questionary's search filter above a
     threshold), and flag hints listing every collection stop being readable.
     Deliberately NOT in item 6's series, which holds `--help` byte-identical.
-    Waits on Keith's answer to whether "~30" means collections or datasets.
+    ANSWERED (Keith, 2026-10-16 ~06:50 Perth): "~30 collections" - thirty
+    collections, each with its own command group, so this is real work, not
+    a hypothetical. Not yet scoped; it should be before a third collection
+    beyond Emergency Department lands.

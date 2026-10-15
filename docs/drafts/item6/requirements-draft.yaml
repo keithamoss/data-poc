@@ -101,7 +101,7 @@
     - "AWS IS SCOPED OUT (position.md call 9): the ingest handlers reach collections only through s3_arrival and the processing pass, which this rewires; tests/test_lambda_handlers.py must still pass."
     - "PROPOSED WORDING FOR REQ-PIPE-170 CRITERION 31, for Keith (built behaviour, outside the delegation; position.md call 13): 'WHEN a replay of every collection the data asset declares finishes - a bootstrap, or `mothman pipeline run` over all of them - THE SYSTEM SHALL confirm every pending correction dated up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager role during playback, and SHALL rebuild every collection's results if any was confirmed; a replay of fewer than every collection SHALL leave them pending. AMENDED <date applied> by REQ-PIPE-240.'"
   open_questions:
-    - "FOR KEITH: approve criterion 14's wording for REQ-PIPE-170 criterion 31, or say otherwise. Without it, criterion 14 drops and the code still reads 'every collection', with the built criterion's text lagging."
+    - "APPROVED (Keith, 2026-10-16, 'Approve as written'): the proposed wording for REQ-PIPE-170 criterion 31, applied in this requirement's change (criterion 14)."
     - "CHECK AT BUILD (not for Keith): that adding short and run_prefix to a collection entry is not a change agreement_freeze (REQ-PIPE-111) refuses."
 
 - id: REQ-QAC-241

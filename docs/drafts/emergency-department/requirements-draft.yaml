@@ -22,7 +22,7 @@
     - "WHEN `mothman check` runs, THE SYSTEM SHALL pass every configuration gate with the new agency, collection and dataset present - the registry gate (REQ-PIPE-240), the check-source and dbt-folder gates (REQ-QAC-241), the patterns, zero-active-checks and check-lifecycle gates and the agreement freeze - with no exemption added for them."
   non_functional_requirements:
     - "CONFIGURATION ONLY: hierarchy, calendar, contract, check and dbt files; nothing here reads data or the database. The adapter and provider are REQ-PIPE-233's and REQ-GEN-232's."
-    - "PRIVACY, FOR A REAL DEPLOYMENT: age group rather than date of birth is deliberate; postcode, sex, age group and an arrival instant together are a quasi-identifier in real emergency department data, so the contract's description says so. Whether a check on those columns records row-level failing values is Keith's question (open question 2)."
+    - "PRIVACY, FOR A REAL DEPLOYMENT: age group rather than date of birth is deliberate; postcode, sex, age group and an arrival instant together are a quasi-identifier in real emergency department data, so the contract's description says so. Checks on those columns record row-level failing values, as others do (Keith, 2026-10-16)."
     - "NO NEW DEPENDENCY: the four tools already installed."
     - "AGREEMENT FREEZE: adding a new dataset's calendar membership on a synthetic asset needs no declared correction - REQ-PIPE-111 criterion 9 as amended."
   dependencies:
@@ -32,17 +32,17 @@
   decisions:
     - "WHY THIS DATASET EXISTS (Keith, 2026-10-15): to SHRINK Child Protection. Since REQ-GEN-207 grew it ten years the bootstrap went 8m08s to 31m52s (Child Protection 1792s against Birth Registrations 550s), and Child Protection's cost is its run count, not its table count."
     - "GENERALISE FIRST (Keith, 2026-10-15, Q1, confirmed after the architect's pass): plans/publishing-and-history.md item 6 lands before this dataset, which is its first user. REJECTED a third copy of the per-collection modules, and the architect's registry-plus-copied-runners middle path."
-    - "ITEM 6'S CONVENTIONS (docs/drafts/item6): short ed and run_prefix ed_run_ declared, not derived (item 6 call 4); Evidently checks in contract YAML (REQ-QAC-241); dbt files in the collection's own folders (REQ-QAC-241, round-4 call 28); a blurb in presentation configuration (REQ-DASH-244). PROPOSED, NOT KEITH'S: ed and ed_run_."
+    - "ITEM 6'S CONVENTIONS (docs/drafts/item6): short ed and run_prefix ed_run_ declared, not derived (item 6 call 4); Evidently checks in contract YAML (REQ-QAC-241); dbt files in the collection's own folders (REQ-QAC-241, round-4 call 28); a blurb in presentation configuration (REQ-DASH-244). Kept by Keith 2026-10-16: ed and ed_run_."
     - "ONE TABLE, ABOUT EIGHT COLUMNS, ONE CSV PER SUPPLY; ITS OWN AGENCY; ALL FOUR TOOLS, 10 TO 15 CHECKS; QUARTERLY ON THE SHARED CALENDAR (Keith, 2026-10-15). REJECTED joining an existing agency or collection."
     - "ONE SHARED QUARTERLY CALENDAR (Keith, Q2): a correction to it applies to both Child Protection and Emergency Department; the empty-elsewhere rule that follows is REQ-GEN-237's."
     - "SUPERSEDES AN OLDER REJECTION: REQ-GEN-044 decision [B4] rejected 'a third synthetic daily dataset purely to host the other configurations'. Keith's #99 call is the later decision."
     - "DEPENDS ON REQ-PIPE-111 CRITERION 9 AS AMENDED (Keith, Q7, applied to the register 2026-10-15): the synthetic exemption covers adding a new dataset's calendar membership, so the architect's finding that membership is itself a frozen item no longer bites. Not restated here."
-    - "PROPOSED, NOT KEITH'S - IDS AND NAMES: department-of-health, emergency-department, ed-presentations, table ed_presentations, file ed_presentations.csv. plans/running-thoughts.md #100 (mix up dataset names) is separate and unscoped."
-    - "PROPOSED, NOT KEITH'S - DUE 09:00 WITH 8 HOURS' GRACE, AS CHILD PROTECTION: the moved scenarios' quoted instants hold unchanged only if the due time does."
-    - "PROPOSED, NOT KEITH'S - THE CHECK SET (13): datacontract-cli - presentation_id not null, presentation_id unique, triage_category in 1-5, sex in its valid values, row count in band; Soda - postcode missing percentage, departure_status in its valid values, length of stay non-negative and below a plausible ceiling; dbt - arrival_datetime not null, age_group accepted values, length of stay accepted range; Evidently - drift in triage_category and in age_group."
+    - "KEPT BY KEITH 2026-10-16 - IDS AND NAMES: department-of-health, emergency-department, ed-presentations, table ed_presentations, file ed_presentations.csv. plans/running-thoughts.md #100 (mix up dataset names) is separate and unscoped."
+    - "KEPT BY KEITH 2026-10-16 - DUE 09:00 WITH 8 HOURS' GRACE, AS CHILD PROTECTION: the moved scenarios' quoted instants hold unchanged only if the due time does."
+    - "SIGNED OFF BY KEITH 2026-10-16 - THE CHECK SET (13): datacontract-cli - presentation_id not null, presentation_id unique, triage_category in 1-5, sex in its valid values, row count in band; Soda - postcode missing percentage, departure_status in its valid values, length of stay non-negative and below a plausible ceiling; dbt - arrival_datetime not null, age_group accepted values, length of stay accepted range; Evidently - drift in triage_category and in age_group."
   open_questions:
-    - "FOR KEITH AT SIGN-OFF: the proposed check set and names above."
-    - "FOR KEITH (architect finding A8): do Emergency Department checks on postcode, sex, age group or arrival time record row-level failing values, as other checks do, or record counts only? Synthetic today; in a real deployment those four together re-identify a patient."
+    - "ANSWERED (Keith, 2026-10-16): the check set (13) signed off as listed, and the ids, names and due time kept as proposed."
+    - "ANSWERED (Keith, 2026-10-16): Emergency Department checks on postcode, sex, age group and arrival time RECORD FAILING ROWS, as other checks do (architect finding A8) - his call, knowing those four together re-identify a patient in real data."
 
 - id: REQ-GEN-232
   title: "An Emergency Department generator provider writes one quarterly CSV per supply with Child Protection's severity mix, for as many quarters as its scenarios need"
