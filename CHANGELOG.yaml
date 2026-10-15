@@ -270,6 +270,15 @@ releases:
               period lists them all, each with where it stands and its verdict,
               and you pick the one the decision is about. A good supply waiting
               behind a resupply that could not be loaded is in the queue again.
+          - headline: Two Client Register files in one delivery are a contested pair
+            components: ["Pipeline & publishing", "QA checks & contract"]
+            description: >
+              Child Protection's Client Register is now recognised under any
+              name of the form cp_clients_<suffix>.csv, so two of its files in
+              one delivery are held as a contested pair, the same way Birth
+              Registrations' are, and you settle them with the same decision.
+              A check run from a folder now works out each table from its file
+              name and refuses a folder with two files for one table.
           - headline: A scenario link lands on what it is about
             components: ["Dashboard UI", "Data generation"]
             description: >

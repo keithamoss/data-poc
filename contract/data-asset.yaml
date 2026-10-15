@@ -301,7 +301,18 @@ hierarchy:
               name: Client Register
               table: cp_clients
               # REQ-PIPE-058 - see birth-registrations above.
-              arrival_pattern: 'cp_clients\.csv'
+              # WIDENED FOR THIS SYNTHETIC ASSET'S DEMONSTRATION of a
+              # contested Child Protection table (REQ-PIPE-202; Keith,
+              # 2026-10-13): cp_clients.csv or cp_clients_<suffix>.csv, so
+              # two of its files in one delivery are a contested pair, as
+              # Birth Registrations' can be. NOT advice for a real Child
+              # Protection supply - there, a stray suffixed file sent beside
+              # the extract would contest the table and turn the three
+              # tables that read cp_client_id red until a person settles
+              # it. The ODCS contract's keyPattern is a transport value and
+              # stays exact. The other five Child Protection patterns are
+              # exact on purpose.
+              arrival_pattern: 'cp_clients(_[^/]+)?\.csv'
             - id: cp-notifications
               name: Notifications
               table: cp_notifications

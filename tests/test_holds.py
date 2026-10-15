@@ -54,15 +54,25 @@ def _recognise(dirs, name):
 
 class TestItRefusesToChoose:
     def test_two_files_for_one_dataset_are_held(self, dirs):
+        """REQ-PIPE-202 criterion 9: cp_clients' pattern admits a suffixed
+        name, so two files for it in one delivery are the reachable shape -
+        contested, never chosen between."""
         _drop(dirs, "split", {"cp_clients.csv": "a\n1\n",
                                "cp_clients_2.csv": "a\n2\n"})
-        # The second name must also match the pattern for this to be a
-        # hold rather than an unrecognised artefact - so use a dataset
-        # whose real pattern admits both.
         _d, found = _recognise(dirs, "split")
-        assert "cp_clients_2.csv" in found.unmatched, (
-            "cp_clients's real pattern matches exactly one filename, which is "
-            "what makes this shape currently unreachable for Child Protection")
+        assert "cp_clients_2.csv" not in found.unmatched
+        [hold] = holds.holds_in(found)
+        assert hold.dataset_id == "cp-clients"
+        assert hold.files == ("cp_clients.csv", "cp_clients_2.csv")
+
+    def test_ts39_a_second_part_beside_the_extract_is_contested(self, dirs):
+        """TS-39's unit test (REQ-PIPE-202 criterion 9): cp_clients.csv beside
+        cp_clients_part2.csv is held as contested, never chosen between."""
+        _drop(dirs, "parts", {"cp_clients.csv": "a\n1\n",
+                               "cp_clients_part2.csv": "a\n2\n"})
+        _d, found = _recognise(dirs, "parts")
+        [hold] = holds.holds_in(found)
+        assert hold.files == ("cp_clients.csv", "cp_clients_part2.csv")
 
     def test_a_dataset_matching_two_files_is_held(self, dirs):
         """Birth Registrations' pattern carries a placeholder, so two

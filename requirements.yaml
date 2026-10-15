@@ -33251,6 +33251,7 @@ requirements:
     - REQ-GEN-184
     decisions:
     - 'BIRTH REGISTRATIONS, NOT CHILD PROTECTION (2026-10-13, carried from REQ-PIPE-193): Child Protection''s arrival patterns are exact filenames and cannot admit two files for one table (TS-34 and TS-42 record why), while birth_registrations_[^/]+\.csv admits two today. No pattern is widened; TS-42 stays not injectable.'
+    - 'SUPERSEDED IN PART BY REQ-PIPE-202 (Keith, 2026-10-13; recorded 2026-10-15 by REQ-PIPE-202 criterion 12): decision 1''s "No pattern is widened; TS-42 stays not injectable" no longer holds - cp-clients'' arrival pattern is `cp_clients(_[^/]+)?\.csv`, so TS-42 is planted by REQ-GEN-203. Every other Child Protection pattern stays exact, so TS-34 stays not injectable, and this requirement''s own pairs stay on Birth Registrations.'
     - 'TWO PAIRS, TWO OUTCOMES (Keith, 2026-10-13): one duplicate send (file one supply, file two kept but superseded) and one next day''s file sent early (file one supply, file two re-filed to the next day), so both outcomes and two runs and two gates are seen on a real page. Extended to three the same day by A THIRD PAIR, TS-70, below.'
     - 'SPLIT FROM REQ-PIPE-193 CRITERION 21 (2026-10-13, second scoping pass): the generated scenarios are the Data generation component''s outcome, not the filing decision''s, and need criteria of their own - the scripted-decision shape for per-file outcomes and the run-id resolution defect especially.'
     - 'PROPOSED, NOT KEITH''S: files named by RECEIPT POSITION in the script, not by filename. Birth Registrations'' filenames carry the received date, which moves when ANCHOR_DATE is bumped, so a filename in configuration would break on the next refresh; REQ-GEN-135 already names supplies by index for the same reason.'
@@ -33887,7 +33888,7 @@ requirements:
       Client Register to recognise its extract under more than one file name, so that two of its files in one delivery are recognised
       as the contested pair the pipeline already knows how to handle, rather than one supply and one unrecognised file.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -34001,6 +34002,34 @@ requirements:
     - 'SIGNED OFF by Keith, 2026-10-14, with criterion 4''s reader status deferred to running-thoughts #95 (it read ''not evaluated,
       red'', which is today''s false red - Keith: a reader whose cross-table check cannot run against everything should shout,
       shape still being scoped). Batch amendment 7 (REQ-GEN-196''s decision superseded) approved with it.'
+    - 'BUILT 2026-10-15: CONFIGURATION PLUS ONE ATTRIBUTION HELPER. The pattern line and its comment are the whole change to recognition, staging, contest detection, settlement and supersession, all already collection-agnostic. cli/cp.py gains _six_by_pattern, the one way a folder becomes six tables on every route (the trial, run_check, the reference folder): it attributes by contract/data-asset.yaml''s patterns, ignores names no pattern claims (a covering note is not a table), and refuses a table with no file or several, naming the files and supply_files.where_to_settle. REJECTED keeping f"{table}.csv" beside it for "the simple case" - one rule for attribution is what makes a quiet choice between files impossible.'
+    - 'AN OPEN PAIR IS ONE FILED SUPPLY (criterion 6, found writing its test): only the pair''s #1 is filed while it is open, so a later file superseding that supply IS the supersession of both files (REQ-PIPE-194 criterion 9''s "the pair''s supersession by a later arrival"). The test asserts #1 superseded and the contest resolved, not a separate #2 row, which never existed.'
+    - 'THE KNOCK-ON IS ASSERTED IN ITS OWN TERMS (criteria 6 and 7): a settled or superseding supply''s own run already re-runs the cross-table checks that read cp_clients, so knock_on.readers finds the readers NOT stale afterwards. The fixture tests assert exactly that - every reader''s latest cross-table result reads the supply now in place (knock_on._read_as) and none is left contested - rather than counting re-runs, which would pass or fail on scheduling.'
+    - 'CRITERION 4''S READER STATUS STAYS OPEN (Keith, 2026-10-14): the not-evaluated-as-contested record is built and tested; the status it reads as follows running-thoughts #95, unscoped. Listed under unmet_criteria rather than shown provisionally.'
+    unmet_criteria:
+    - criterion: 'Criterion 4, its last clause - the status a reader''s contested not-evaluated record reads as.'
+      why: 'Keith, signing 2026-10-14: today it reads not evaluated, red, which is a false red; a reader whose cross-table check cannot run against everything it reads should shout, and the shape is still being scoped. The record itself (once per reader, contested as its reason) is built and tested.'
+      owner: 'plans/running-thoughts.md #95 (Keith), not yet scoped'
+      blocked_by:
+        unowned: true
+    linked_tests:
+    - tests/test_cp_pair.py
+    - tests/test_cp_load_by_pattern.py
+    - tests/test_cp_clients_pattern.py
+    - tests/test_holds.py
+    - tests/test_asset_time_semantics.py
+    implemented_by:
+    - contract/data-asset.yaml
+    - cli/cp.py::_six_by_pattern
+    - cli/cp.py::_require_all_six
+    - cli/cp.py::_load_delivery_from_folder
+    - cli/cp.py::_refuse_a_contested_arrival
+    - cli/cp.py::load_manifest
+    - cli/cp.py::picker_choices
+    evidence:
+    - 'tests/test_cp_pair.py drives the real Child Protection orchestrator over a seven-file delivery: one contested arrival of cp-clients, the outstanding item naming both files, each reader''s cp_clients check recorded once as contested, file checks under each filename (criteria 3-5); settled as supply plus spare copy and as supply plus re-file, each run''s own supply id and period, readers re-evaluated (criterion 7); a later file supersedes the pair and the knock-on re-evaluates the readers (criterion 6).'
+    - 'tests/test_cp_load_by_pattern.py: every folder route attributes by pattern, refuses a missing or contested table naming the files and where it is settled (criterion 8); the picker marks and refuses a pair (criterion 13). tests/test_cp_clients_pattern.py: the pattern, TS-38''s names unrecognised, every other pattern unchanged, the comment, the ODCS keyPattern unchanged (criteria 1, 2, 11). tests/test_holds.py: the reachable shape and TS-39 (criterion 9). tests/test_asset_time_semantics.py reproduces the characterization pin unchanged (criterion 10).'
+    - 'REQ-GEN-196''s superseding decision and TS-39/TS-34/TS-42 in plans/supply-model.md updated in the same change (criterion 12).'
   - id: REQ-GEN-203
     title: Child Protection's generated history has a contested Client Register pair that a later file supersedes (TS-42) and
       one a scripted person settles (TS-80)

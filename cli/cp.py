@@ -131,7 +131,10 @@ def load_manifest() -> list[dict]:
     supplies from a declaration rather than from what arrived.
     """
     from qa_tools.common import arrivals
+    # A CONTESTED TABLE'S FILES TRAVEL WITH THE ENTRY (REQ-PIPE-202 criterion
+    # 13): the picker marks it and picking it is refused, naming both.
     return [a.as_entry()
+            | {"contested": {ds: sorted(a.files_by_dataset.get(ds, ())) for ds in a.contested}}
             for a in arrivals.arrivals_for("child-protection", "cp_run_")]
 
 
@@ -158,16 +161,49 @@ def default_reference(manifest: list[dict]) -> str:
     return manifest[0]["run_id"]
 
 
-def _require_all_six(folder: str) -> None:
-    """A CP delivery needs all 6 real tables - the cross-table checks
-    cannot run on a partial set. Checked BEFORE anything is filed
-    (REQ-PIPE-103), so an incomplete folder never becomes a delivery
-    record of an arrival that could not be checked."""
-    missing = [t for t in TABLES if not os.path.isfile(os.path.join(folder, f"{t}.csv"))]
+def _six_by_pattern(folder: str) -> dict[str, str]:
+    """{table: path} for the six real tables, each file ATTRIBUTED BY ITS
+    DATASET'S ARRIVAL PATTERN as the commit route attributes it (REQ-PIPE-202
+    criterion 8) - never by assuming `<table>.csv`, which after cp_clients'
+    pattern widened would quietly check one file of a pair and never its
+    partner.
+
+    A CP delivery needs all 6 real tables - the cross-table checks cannot run
+    on a partial set - and ONE file for each: a table two files claim is
+    contested, and nothing here may choose between them (REQ-PIPE-059), so it
+    is refused naming both files and where the pair is settled, and neither
+    is checked. Checked BEFORE anything is filed (REQ-PIPE-103)."""
+    from qa_tools.common import supply_files
+
+    found: dict[str, list[str]] = {}
+    for path in _files_in(folder):
+        dataset_id = delivery.dataset_for_filename(os.path.basename(path))
+        if dataset_id is not None and hierarchy.dataset(dataset_id).table in TABLES:
+            found.setdefault(hierarchy.dataset(dataset_id).table, []).append(path)
+    several = {t: sorted(os.path.basename(p) for p in ps) for t, ps in found.items()
+               if len(ps) > 1}
+    if several:
+        lines = []
+        for table, names in sorted(several.items()):
+            entry = next(d for d in hierarchy.datasets_in_collection(COLLECTION_ID)
+                         if d.table == table)
+            lines.append(f"{entry.dataset_name} ({entry.dataset_id}) has two files - "
+                         f"{' and '.join(names)} - and nothing may choose between them; "
+                         f"the pair is settled at "
+                         f"'{supply_files.where_to_settle(entry.dataset_id)}'")
+        raise click.ClickException(
+            f"{folder}: " + "; ".join(lines) + ". Neither file was checked.")
+    missing = [t for t in TABLES if t not in found]
     if missing:
         raise click.ClickException(
-            f"{folder} is missing: {', '.join(f'{t}.csv' for t in missing)} - "
-            f"a CP delivery needs all 6 real tables, the cross-table checks can't run on a partial set")
+            f"{folder} is missing a file for: {', '.join(missing)} - a CP delivery needs all 6 real "
+            f"tables, the cross-table checks can't run on a partial set")
+    return {table: paths[0] for table, paths in found.items()}
+
+
+def _require_all_six(folder: str) -> None:
+    """All six tables, one file each, by arrival pattern - _six_by_pattern()."""
+    _six_by_pattern(folder)
 
 
 def _files_in(folder: str) -> list[str]:
@@ -184,11 +220,26 @@ def _load_delivery_from_folder(folder: str, run_id: str, received_at=None) -> No
     delivery this run arrived in) and Local files mode
     (run_check_local_folder(), pointed at whatever folder the operator
     browsed to)."""
-    _require_all_six(folder)
+    paths = _six_by_pattern(folder)
     for table in TABLES:
-        build_cp_warehouses.add_table_to_run(
-            run_id, table, os.path.join(folder, f"{table}.csv"),
-            received_at=received_at)
+        build_cp_warehouses.add_table_to_run(run_id, table, paths[table],
+                                             received_at=received_at)
+
+
+def _refuse_a_contested_arrival(entry: dict) -> None:
+    """Refuse an arrival whose table two files claim, naming both and where
+    the pair is settled - neither is checked (REQ-PIPE-202 criterion 13)."""
+    from qa_tools.common import supply_files
+
+    contested = entry.get("contested") or {}
+    if not contested:
+        return
+    lines = [f"{hierarchy.dataset(ds).dataset_name} has two files - {' and '.join(files)} - "
+             f"settled at '{supply_files.where_to_settle(ds)}'"
+             for ds, files in sorted(contested.items())]
+    raise click.ClickException(
+        f"{entry['run_id']} carries two files for one table: " + "; ".join(lines)
+        + ". Nothing may choose between them here, so neither was checked.")
 
 
 def _load_delivery(run_id: str) -> None:
@@ -217,6 +268,9 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         raise click.ClickException(
             f"No manifest entry for run_id={run_id!r} - run generate-synthetic-data first?")
     entry = next(e for e in manifest if e["run_id"] == run_id)
+    # A PAIR'S ARRIVAL IS REFUSED, NAMING BOTH FILES (REQ-PIPE-202 criterion
+    # 13), before anything is staged - kept or trial alike.
+    _refuse_a_contested_arrival(entry)
 
     # NO DEFAULT REFERENCE ANY MORE - see cli/bdm.py's run_check() for
     # the full note (REQ-QAC-108 criterion 4).
@@ -320,9 +374,9 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     else:
         # A TRIAL STILL NEEDS ALL SIX - it stages them under one throwaway id
         # with no period to read siblings from - and its reference.
-        _require_all_six(folder)
+        by_table = _six_by_pattern(folder)
         common.require_reference_for_trial(reference_folder, "--reference-folder")
-        paths = [os.path.join(folder, f"{t}.csv") for t in TABLES]
+        paths = [by_table[t] for t in TABLES]
     # THE WHOLE FOLDER IS ONE DELIVERY (REQ-PIPE-103). Its files arrived
     # together, and a delivery is the transport unit - filing one delivery
     # per file would invent several arrivals out of one.
@@ -555,8 +609,11 @@ def picker_choices(manifest: list[dict]) -> list[str]:
     # MARKED 'recorded' WHERE ITS QA ALREADY IS (REQ-PIPE-086 criterion 6):
     # picking one runs a trial, said before it starts.
     recorded = common.recorded_runs(e["run_id"] for e in manifest)
+    # AND 'two files for one table' WHERE A TABLE IS CONTESTED (REQ-PIPE-202
+    # criterion 13): listed, so it does not vanish, and refused when picked.
     return [f'{e["run_id"]}  ({asset_time.local_date(e["received_at"])}, {e["delivery"]})'
             + ("  - recorded" if e["run_id"] in recorded else "")
+            + ("  - two files for one table" if e.get("contested") else "")
             for e in manifest]
 
 

@@ -3445,6 +3445,10 @@ part is not the hold, it is that the blast radius is neither zero nor
 the whole delivery. Only a rendered dashboard shows whether a reader can
 tell "two tables need a human" apart from "three datasets are red", and
 those are the same event seen from two ends.
+STILL NOT REACHABLE after REQ-PIPE-202 (2026-10-15): that requirement
+widened `cp_clients`' pattern only, and `cp_placements`' is still an exact
+filename, so a second `cp_placements` file falls out unrecognised rather
+than contesting the table. TS-42 plants the one-table shape instead.
 
 **TS-35 `[unit]` A held supply is never chosen between, even when one
 file is obviously newer.**
@@ -3555,6 +3559,11 @@ unrecognised instead, which is the TS-38 shape. Reachable for Birth
 Registrations only because its pattern carries a `{date}` placeholder.
 This scenario is what proves the regex change (`REQ-PIPE-058`,
 2026-09-24) actually closed the gap.
+NOW REACHABLE for `cp_clients` (REQ-PIPE-202, 2026-10-15): its pattern is
+`cp_clients(_[^/]+)?\.csv`, so `cp_clients_part2.csv` matches and the pair
+is held as contested -
+`tests/test_holds.py::test_ts39_a_second_part_beside_the_extract_is_contested`.
+Every other Child Protection pattern is still an exact filename.
 
 **TS-40 `[unit]` A run dies mid-load, and the next run must not trust
 what it finds.**
@@ -3624,11 +3633,10 @@ the period's superseded schema, named as superseded by the resend
 contested.
 
 **TS-42 `[INJECT]` A contested pair of one Child Protection table,
-resolved by a later file.** NOT IN THE DATA, and not for want of a build:
-Child Protection's arrival patterns are exact filenames, so two files in one
-directory can never both match one table - the same finding TS-34 records.
-Planting it means widening a pattern, which is Keith's call (REQ-PIPE-118,
-REQ-PIPE-105 criterion 6).
+resolved by a later file.** NOT IN THE DATA YET, but reachable: REQ-PIPE-202
+(2026-10-15, Keith's call of 2026-10-13) widened `cp_clients`' pattern so two
+of its files in one delivery contest the table, and REQ-GEN-203 plants it.
+`tests/test_cp_pair.py` drives the shape through the real orchestrator.
 
 **TS-43 `[INJECT]` An amber supply held under hold.**
 PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built
