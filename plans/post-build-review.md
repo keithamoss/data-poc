@@ -9705,3 +9705,10 @@ twice. It deliberately did not re-find the `TypeError`.
        found on the way: a random free quarter could be the last one, or one
        whose next period an earlier run had filled, and the re-file test files
        into the next period.
+     - **CI RED ON 249926f, fixed 2026-10-15**: (1) a CI worker running the
+       whole suite ran out of free cp-clients quarters, because every pair
+       test built its own pair in a fresh one - the read-only checks now
+       share one module-scoped pair; (2) test_placements_page's placedIn test
+       read `points`, which holds only days the panel's answer changed, and
+       on a crowded worker database the placement's day was not one - it now
+       asks the day's decisions directly. Both test defects, not page ones.

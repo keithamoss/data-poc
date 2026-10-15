@@ -117,8 +117,15 @@ class TestThePromotionTimelineSaysPlaced:
 
         supply, _ = _held(conn, period)
         _place(conn, supply, target)
-        got = promotion_timeline.for_dataset(DS, slot_timeline.for_dataset(DS, conn=conn),
-                                             conn=conn)
-        decided = [d for p in got["points"] for d in p.get("decisions", [])
+        from qa_tools.common import asset_time
+
+        # THE DAY'S DECISIONS, as a change point carries them. Asked of the
+        # day itself rather than of `points`, which only holds days on which
+        # the panel's answer changed - on a worker database other tests have
+        # filled, the placement's day need not be one (CI, 249926f).
+        h = promotion_timeline._History(conn, DS, slot_timeline.for_dataset(DS, conn=conn))
+        days = {asset_time.local_date(d["_at"]) for d in h.decisions
+                if d["supply"] == supply and d["action"] == dl.REFILE}
+        decided = [d for day in days for d in h.decisions_on(day)
                    if d["supply"] == supply and d["action"] == dl.REFILE]
         assert decided and all(d["placedIn"] == target for d in decided)

@@ -42,6 +42,17 @@ def cp_pair(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
     yield from _make_pair(cp_raw_dir, tmp_path, monkeypatch)
 
 
+@pytest.fixture(scope="module")
+def cp_pair_shared(supply_dsn, cp_raw_dir, tmp_path_factory):
+    """ONE PAIR FOR THE TESTS THAT ONLY READ IT. Each pair files into a quarter
+    nothing else in this worker's database has used, and a CI worker running
+    the whole suite ran out of them once every test built its own (CI,
+    249926f) - so the read-only checks share one, and only the tests that
+    settle or supersede a pair build their own."""
+    with pytest.MonkeyPatch.context() as mp:
+        yield from _make_pair(cp_raw_dir, tmp_path_factory.mktemp("cp_pair"), mp)
+
+
 @pytest.fixture
 def cp_pair_one_unloadable(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
     """The second file is not text the load can read (criterion 5's WHERE)."""
@@ -93,24 +104,24 @@ class TestAContestedClientRegister:
     """Criteria 3, 4 and 5 - through the recognition, staging and lifecycle
     Birth Registrations' pairs use, with nothing specific to Child Protection."""
 
-    def test_recognised_as_one_contested_arrival(self, cp_pair):
-        clients = cp_pair["clients"]
+    def test_recognised_as_one_contested_arrival(self, cp_pair_shared):
+        clients = cp_pair_shared["clients"]
         assert clients.contested == {DS}
         assert clients.files_by_dataset[DS] == ("cp_clients.csv", "cp_clients_part2.csv")
-        others = [a for a in cp_pair["arrivals"] if a is not clients]
+        others = [a for a in cp_pair_shared["arrivals"] if a is not clients]
         assert len(others) == 5 and not any(a.contested for a in others)
 
-    def test_the_outstanding_item_names_both_files(self, cp_pair):
+    def test_the_outstanding_item_names_both_files(self, cp_pair_shared):
         with supply_db.connect(label="test-cp-pair") as conn:
-            contest = supply_files.open_contest(conn, DS, cp_pair["pair"])
+            contest = supply_files.open_contest(conn, DS, cp_pair_shared["pair"])
         assert contest is not None
         assert contest.files == ("cp_clients.csv", "cp_clients_part2.csv")
 
-    def test_each_reader_records_its_cp_clients_check_once_as_contested(self, cp_pair):
+    def test_each_reader_records_its_cp_clients_check_once_as_contested(self, cp_pair_shared):
         """Criterion 4: in the runs of the arrival's other tables, each
         cross-table check that reads cp_clients is recorded once, not
         evaluated, its reason contested."""
-        others = {a.run_id for a in cp_pair["arrivals"] if a is not cp_pair["clients"]}
+        others = {a.run_id for a in cp_pair_shared["arrivals"] if a is not cp_pair_shared["clients"]}
         with supply_db.connect(label="test-cp-pair") as conn:
             rows = _cross_table(conn, others)
         contested = [(r[0], r[1]) for r in rows
@@ -119,14 +130,14 @@ class TestAContestedClientRegister:
         assert contested, "no reader recorded its cp_clients check as contested"
         assert len(contested) == len(set(contested)), "a check recorded more than once"
         # EACH reader, not any one of them (post-build-review #203 F1b).
-        dataset_of = {a.run_id: next(iter(a.files_by_dataset)) for a in cp_pair["arrivals"]}
+        dataset_of = {a.run_id: next(iter(a.files_by_dataset)) for a in cp_pair_shared["arrivals"]}
         assert {dataset_of[run] for run, _ in contested} == {
             "cp-investigations", "cp-notifications", "cp-placements"}
 
-    def test_both_files_staged_and_neither_checked(self, cp_pair):
+    def test_both_files_staged_and_neither_checked(self, cp_pair_shared):
         """Criterion 3 (post-build-review #203 F1c): two staged tables, and the
         arrival's own run holds file checks only - no tool ran over either."""
-        key = supply_db.arrival_segment(cp_pair["clients"].received_at)
+        key = supply_db.arrival_segment(cp_pair_shared["clients"].received_at)
         with supply_db.connect(label="test-cp-pair") as conn:
             staged = {r[0] for r in conn.execute(
                 "SELECT table_name FROM information_schema.tables "
@@ -134,11 +145,11 @@ class TestAContestedClientRegister:
                 [f"cp_clients__{key}__%"]).fetchall()}
             tools = {r[0] for r in conn.execute(
                 "SELECT DISTINCT tool FROM qa.check_result_visible WHERE run_key = ? "
-                "AND filename IS NULL", [cp_pair["clients"].run_id]).fetchall()}
+                "AND filename IS NULL", [cp_pair_shared["clients"].run_id]).fetchall()}
         assert staged == {f"cp_clients__{key}__1", f"cp_clients__{key}__2"}
         assert tools == set(), f"tools ran over a contested table: {tools}"
 
-    def test_the_queue_item_names_both_files(self, cp_pair):
+    def test_the_queue_item_names_both_files(self, cp_pair_shared):
         """Criterion 4's outstanding item itself (post-build-review #203 F1e)."""
         from qa_tools.common import outstanding
 
@@ -149,7 +160,7 @@ class TestAContestedClientRegister:
         said = items[0].headline + " " + items[0].detail
         assert "cp_clients.csv" in said and "cp_clients_part2.csv" in said
 
-    def test_the_real_picker_marks_it(self, cp_pair, monkeypatch):
+    def test_the_real_picker_marks_it(self, cp_pair_shared, monkeypatch):
         """Criterion 13 through the real load_manifest (post-build-review #203
         F1a), not a hand-built entry."""
         import cli.cp as cp
@@ -157,21 +168,21 @@ class TestAContestedClientRegister:
 
         real = arrivals.arrivals_for
         monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: real(
-            c, p, cp_pair["deliveries"], cp_pair["receipts"]))
+            c, p, cp_pair_shared["deliveries"], cp_pair_shared["receipts"]))
         manifest = cp.load_manifest()
-        (entry,) = [e for e in manifest if e["run_id"] == cp_pair["clients"].run_id]
+        (entry,) = [e for e in manifest if e["run_id"] == cp_pair_shared["clients"].run_id]
         assert entry["contested"] == {DS: ["cp_clients.csv", "cp_clients_part2.csv"]}
         others = [e for e in manifest if e is not entry]
         assert others and not any(e["contested"] for e in others)
         marked = [c for c in cp.picker_choices(manifest) if "two files for one table" in c]
-        assert [cp.run_id_from_choice(c) for c in marked] == [cp_pair["clients"].run_id]
+        assert [cp.run_id_from_choice(c) for c in marked] == [cp_pair_shared["clients"].run_id]
 
-    def test_the_file_checks_run_on_each_file_under_its_own_name(self, cp_pair):
+    def test_the_file_checks_run_on_each_file_under_its_own_name(self, cp_pair_shared):
         """Criterion 5."""
         with supply_db.connect(label="test-cp-pair") as conn:
             names = {r[0] for r in conn.execute(
                 "SELECT filename FROM qa.check_result_visible WHERE run_key = ? "
-                "AND filename IS NOT NULL", [cp_pair["clients"].run_id]).fetchall()}
+                "AND filename IS NOT NULL", [cp_pair_shared["clients"].run_id]).fetchall()}
         assert {"cp_clients.csv", "cp_clients_part2.csv"} <= names
 
 
