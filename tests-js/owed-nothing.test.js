@@ -300,3 +300,17 @@ describe("the pill before a dataset owes anything", () => {
     expect(w.statusPill({ ...ds, status: "red" }, "sm", "2023-06-01")).toBe(w.pill("red", "sm"));
   });
 });
+
+// post-build-review #199 F10: a row with no run because the dataset owes
+// nothing yet says that, and the dataset page's pill agrees with the table's.
+describe("a dataset not owed yet, in the table and on its page", () => {
+  it("says it is not owed yet instead of 'No QA run within tolerance'", () => {
+    const w = loadDashboard().window;
+    w.slaInPlaceOn = () => ({notOwedYet: "2026-06-30"});
+    w.rawRealDatasetById = () => ({});
+    const words = w.noRunWords({id: "cp-x", status: "nodata"}, "2026-06-01");
+    expect(words).toContain("Not owed yet");
+    expect(words).not.toContain("No QA run");
+    expect(w.statusPill({id: "cp-x", status: "nodata"})).toContain("Not owed yet");
+  });
+});

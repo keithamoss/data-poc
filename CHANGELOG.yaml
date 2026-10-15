@@ -255,6 +255,14 @@ releases:
               both. A placed supply later re-filed elsewhere stops saying
               "Placed in" from that day. Each supply received while turned off
               says how it ended, and the line counts how many are still held.
+          - headline: Corrections and turn-offs, tightened
+            components: ["Pipeline & publishing", "Dashboard UI"]
+            description: >
+              A supply you placed into a period that a correction turns off is
+              now shown as becoming a turned-off hold. A held supply waits for a
+              pending correction, a timezone correction included, unless the
+              confirmed calendar gives it the same period. A dataset not owed
+              yet says so in the table and on its own page.
           - headline: Every supply in a period, in the terminal
             components: ["Testing & dev tooling", "Pipeline & publishing"]
             description: >

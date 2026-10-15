@@ -4237,6 +4237,14 @@ function notCountedMarker(status, datasets){
 // participation version is not missing anything, so its pill - on its page
 // and in its collection table - says it is not owed yet. Every other status
 // is the ordinary pill.
+// WHY A ROW HAS NO RUN ON THE DATE ON SHOW: not owed yet says so, rather than
+// sitting beside the 'Not owed yet' pill as though a run were missing
+// (post-build-review #199 F10).
+function noRunWords(ds, dateStr){
+  const on = dateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  const owesFrom = ds && slaInPlaceOn(rawRealDatasetById(ds.id) || ds, on).notOwedYet;
+  return owesFrom ? notOwedYetText(owesFrom) : "No QA run within tolerance on the selected date";
+}
 function statusPill(ds, size, dateStr){
   const on = dateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
   if(ds && ds.status === "nodata"
@@ -5544,7 +5552,8 @@ function receivedWhileOffEnding(d, b, inPlaceOnDateStr){
   if(e.action === "reject")
     return quiet(`rejected by ${escHtml(e.actor || "a person")}, ${at}${why}`);
   if(e.action === "supersede")
-    return quiet(`superseded${e.actorKind === "person" && e.actor ? ` by ${escHtml(e.actor)}` : ""}, ${at}${why}`);
+    // BY WHOM, the rule included (post-build-review #199 F11).
+    return quiet(`superseded by ${e.actorKind === "person" && e.actor ? escHtml(e.actor) : "the rule"}, ${at}${why}`);
   return quiet(`resolved ${at}`);
 }
 function receivedWhileOffSection(datasetId, inPlaceOnDateStr, source){
@@ -6329,7 +6338,7 @@ function renderAgency(view, agencyId){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
               <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
-              <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance on the selected date</td>
+              <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">${noRunWords(ds)}</td>
             </tr>`;
           }
           const arrivalPillHtml = arrivalPillFor(ds.id, ds.lastArrival.run_id,
@@ -6974,7 +6983,9 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const raw = (typeof rawRealDatasetById === "function" && rawRealDatasetById(ds.id)) || ds;
   // A CYCLE'S PERIOD is its filed slot's name, or its date where the arrival
   // record has none - so an owed-nothing period is matched on either.
-  const ofCycle = (c, e)=> e.period === c.period || e.date === c.cycleStart;
+  // BY ITS DATE: a cycle carries cycleStart and entries, never a period
+  // (post-build-review #199 F6).
+  const ofCycle = (c, e)=> e.date === c.cycleStart;
   const supplied = new Set(((raw && raw.owedNothing) || [])
     .filter(e=> cycles.some(c=> ofCycle(c, e))).map(e=> e.period));
   const owed = owedNothingRuns(raw, CURRENT_IN_PLACE_ON, supplied);
@@ -7193,7 +7204,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           <h2>${ds.name}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${arrivalBanner(ds)}
       ${noSupplyBanner}
@@ -7212,7 +7223,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           <h2>${ds.name}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${amberSettingLine(ds, CURRENT_IN_PLACE_ON)}
       ${censusBanner(ds, CURRENT_IN_PLACE_ON)}
@@ -7263,7 +7274,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
         <h2>${ds.name}${ds.realRunCount?` <span class="pill tag"><span class="ico"></span>Real pipeline data — ${ds.realRunCount} computed ${pluralize(ds.realRunCount,"run")}</span>`:""}</h2>
         <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}${ds.realRunCount?" · figures below are computed by real dbt/Soda/datacontract-cli/Evidently tools against real generated runs — not fabricated in the browser.":""}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill(ds.status)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill(ds)} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)} ${standingInMarker(ds)} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
     </div>
     ${verdictLine(ds)}
     ${turnOffReasonLine(ds)}

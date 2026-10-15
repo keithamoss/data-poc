@@ -270,7 +270,13 @@ class TestInPlaceOnDatePicking:
         # `.view-head` rather than `#view h2` - see
         # TestAnExhaustedScheduleIsLoud.test_it_is_not_rendered_as_red
         # for why the pill moved (post-build-review #53).
-        assert "No data" in clean_page.locator(".view-head").first.inner_text()
+        # A thousand days before any history is also before the dataset's
+        # first participation version, so the pill says it was not owed yet
+        # (REQ-DASH-182 criterion 3 as amended, Keith 2026-10-15 Q19) - and
+        # never a status it had no supply to earn (post-build-review #200).
+        head = clean_page.locator(".view-head").first.inner_text()
+        assert "Not owed yet" in head
+        assert not any(word in head for word in ("Green", "Amber", "Red"))
 
 
 class TestTheInPlaceOnPanelSaysWhichPeriod:

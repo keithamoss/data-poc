@@ -211,21 +211,22 @@ class TestItWaitsForACorrectionsConfirmation:
 
     _held = TestAddingDatesFilesWhatWasHeld._held
 
-    def _covered_only_by_the_correction(self, monkeypatch, pending):
+    def _covered_only_by_the_correction(self, monkeypatch, pending, *, confirmed=None):
+        """The agreement on disk covers the receipt with 2030-Q1; the
+        CONFIRMED configuration gives `confirmed` (no slot by default)."""
         from qa_tools.common import schedule_ended
 
-        confirmed = object()
         later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
                                datetime(2030, 4, 1, tzinfo=UTC))]
-        monkeypatch.setattr(
-            slots, "slots_for_dataset",
-            lambda dataset_id, until=None, agreement=None, **_:
-                SLOTS if agreement is confirmed else later)
+        monkeypatch.setattr(slots, "slots_for_dataset",
+                            lambda dataset_id, until=None, agreement=None, **_: later)
         monkeypatch.setattr(slots, "claimable_until",
                             lambda dataset_id, at, agreement=None: date(2031, 1, 1))
         monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
         monkeypatch.setattr(schedule_ended, "_awaiting_confirmation",
-                            lambda conn: (pending, confirmed if pending else None))
+                            lambda conn: (pending, ("cal", "asset") if pending else None))
+        monkeypatch.setattr(schedule_ended, "_confirmed_slot",
+                            lambda docs, dataset_id, at: confirmed)
 
     def test_a_pending_correction_does_not_file_it(self, conn, monkeypatch):
         from qa_tools.common import schedule_ended
@@ -238,6 +239,61 @@ class TestItWaitsForACorrectionsConfirmation:
         assert supply not in [s for _, s, _ in done]
         assert supply_holds.hold_on(conn, "cp-carers", supply) is not None
         assert any("REF-PENDING" in line and "confirmed" in line for line in said)
+
+    def test_the_confirmed_agreement_must_give_the_same_slot(self, conn, monkeypatch):
+        """#199 F3: confirmed, it would be 2030-Q2; only the pending
+        correction gives it 2030-Q1 - so it waits, rather than being filed to
+        the slot the unconfirmed correction chose."""
+        from qa_tools.common import schedule_ended
+
+        supply = f"cp-carers@{AFTER:%Y%m%d}s"
+        self._held(conn, supply, AFTER)
+        self._covered_only_by_the_correction(
+            monkeypatch, {"cp-carers": ["REF-SLOT"]},
+            confirmed=_slot("2030-Q2", datetime(2030, 1, 1, tzinfo=UTC),
+                            datetime(2030, 4, 1, tzinfo=UTC)))
+        done = schedule_ended.refile_covered(say=lambda line: None)
+        assert supply not in [s for _, s, _ in done]
+
+    def test_the_confirmed_timezone_is_the_one_read(self, monkeypatch):
+        """#199 F2: a pending TIMEZONE correction - the confirmed slot is
+        read with the confirmed asset document's zone in force, then the
+        file's zone is back."""
+        import copy
+
+        from qa_tools.common import asset_time, correction_trial, schedule_ended
+
+        cal, asset = correction_trial.working()
+        confirmed_asset = copy.deepcopy(asset)
+        confirmed_asset["timezone"]["versions"][0]["zone"] = "Pacific/Auckland"
+        seen = []
+
+        def watching(dataset_id, until=None, agreement=None, **_):
+            seen.append(asset_time.timezone_versions()[0].zone.key)
+            return SLOTS
+        monkeypatch.setattr(slots, "slots_for_dataset", watching)
+        monkeypatch.setattr(slots, "claimable_until",
+                            lambda dataset_id, at, agreement=None: date(2031, 1, 1))
+        schedule_ended._confirmed_slot((cal, confirmed_asset), "cp-carers", AFTER)
+        assert seen == ["Pacific/Auckland"]
+        assert asset_time.timezone_versions()[0].zone.key != "Pacific/Auckland"
+
+    def test_unreadable_corrections_leave_every_hold_held(self, conn, monkeypatch):
+        """#199 F4: a working copy that cannot be read is said, and nothing
+        is re-filed this pass - never an exception out of the pass."""
+        from qa_tools.common import correction_trial, schedule_ended
+
+        supply = f"cp-carers@{AFTER:%Y%m%d}u"
+        self._held(conn, supply, AFTER)
+        self._covered_only_by_the_correction(monkeypatch, {})
+
+        def unreadable(conn):
+            raise correction_trial.Unreadable("the working copy cannot be read")
+        monkeypatch.setattr(schedule_ended, "_awaiting_confirmation", unreadable)
+        said = []
+        done = schedule_ended.refile_covered(say=said.append)
+        assert supply not in [s for _, s, _ in done]
+        assert any("cannot be read" in line for line in said)
 
     def test_once_confirmed_it_is_filed(self, conn, monkeypatch):
         from qa_tools.common import schedule_ended

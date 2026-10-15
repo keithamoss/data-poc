@@ -1758,3 +1758,37 @@ one or more component tags, and a date.
       reads "Waiting for a person" on those dates. REQ-DASH-175 criterion 5
       says "show the supply as held on any earlier date". Is the hold row
       enough, or should the row leave the cycle before the placement?
+    - **PROGRESS, 2026-10-15 morning (Keith away)**: A pushed (b900dac); B
+      pushed (48e67f1, a1fb355, dc1d82e, 37e4d1a, f43c85d - the last a CI
+      fix, post-build-review #198); C built and pushed - REQ-GHUB-229 and
+      REQ-DASH-230 in one commit, their critic running. B's critic reported
+      (post-build-review #199): its defects and gaps are fixed test-first
+      (a person's placement into a period a correction turns off; the
+      re-filer's confirmed check now reads the confirmed timezone, the same
+      slot, and leaves holds held when corrections cannot be read; four
+      polish items). Q23's restyle has no test of its own - it is a CSS
+      merge, checked by eye on the real build.
+    - **QUESTIONS FOR KEITH from post-build-review #199, queued, not built**:
+      - **F5 (Q18, REQ-DASH-182 c12)**: on the real build cp-case-workers'
+        period owed nothing appears as three cycle blocks, one per supply,
+        each saying "Not owed". Should several supplies in a period owed
+        nothing be ONE block? (Recommended: yes - c12 says "that period
+        once", and three blocks is the period three times.)
+      - **F7 (Q24, REQ-DASH-180 c17)**: a dataset whose for-good turn-off is
+        authored but not started has the fewest dates left, so it drives
+        the runway minimum - and the amended wording then drops the
+        add-dates instruction while other datasets on the calendar are also
+        short. Should an authored for-good turn-off stop driving the minimum,
+        as a started one does? (Recommended: yes.)
+      - **F8 (Q11, REQ-PIPE-130 c12)**: while a SECOND re-check of a
+        promoted supply is owed, `_manifest` still reads the first cleared
+        re-check (worse, not acknowledged) while the queue stops listing it
+        as worse until the new one runs. Which is right - "worse until a
+        newer re-check says otherwise" (the view) or "unknown while a
+        re-check is owed" (the queue)? (Recommended: the view's - the last
+        thing we know stands until replaced.) Nothing disagrees in the real
+        database today.
+      - **F12 (Q21)**: the terminal's "Turning off after ... - nothing more
+        owed" headline has no authored-date condition; the page now waits
+        for the authored date. Should the terminal match? (Recommended: yes,
+        for one meaning across surfaces.)

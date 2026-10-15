@@ -338,17 +338,24 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                     was = assignment.open_slot(old_slots, received)
                     now = assignment.open_slot(new_slots, received)
                     was_name, now_name = (was.name if was else None), (now.name if now else None)
-                    # ONLY WHAT THIS CORRECTION CHANGES: the rule's answer
-                    # under the two agreements differs, and the supply is
-                    # not already there.
-                    if was_name == now_name or period == now_name:
-                        continue
                     # A TURN-OFF IS THE EXCEPTION (REQ-PIPE-179 criterion 35 as
                     # amended by Keith, 2026-10-15, morning report 5 Q9): a
                     # person's filing in a period the corrected agreement turns
                     # off becomes a turned-off hold like any other; everything
-                    # else a person decided stays theirs.
-                    off = _turned_off_by(agr, ds, period, old_slots) if now is None else None
+                    # else a person decided stays theirs. ASKED OF THE PERIOD IT
+                    # IS FILED TO, before the rule's answer for its receipt
+                    # (post-build-review #199 F1): a supply received in an owed
+                    # period and placed into the gap has the same answer under
+                    # both agreements, and is still left in a turned-off period.
+                    off = (_turned_off_by(agr, ds, period, old_slots)
+                           if period and period not in owed_now else None)
+                    if off and by_person:
+                        now, now_name = None, None
+                    # ONLY WHAT THIS CORRECTION CHANGES: the rule's answer
+                    # under the two agreements differs, and the supply is
+                    # not already there.
+                    elif was_name == now_name or period == now_name:
+                        continue
                     if by_person and not off:
                         skipped.append(NotProposed(ds, supply, period, now_name))
                         continue
@@ -363,7 +370,10 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                                              f"{period} no longer owes a supply under the "
                                              f"corrected agreement"
                                              if period and period not in owed_now else None),
-                                         turned_off=off))
+                                         # Held as turned off only where it is
+                                         # held - a rule's move to an owed
+                                         # slot is an ordinary move.
+                                         turned_off=off if now is None else None))
         except (ValueError, KeyError, LookupError) as exc:
             # One dataset's schedule that cannot be built is said, not fatal
             # - ScheduleConfigError and a missing timezone version are both

@@ -104,18 +104,18 @@ def _covering_slot(dataset_id: str, received_at, agreement=None):
     return slot
 
 
-def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], object | None]:
-    """({dataset: [pending correction references]}, the agreement as
-    CONFIRMED) - the configuration on disk with every declared correction
-    not yet confirmed reverted - or ({}, None) where none is pending.
+def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], tuple[dict, dict] | None]:
+    """({dataset: [pending correction references]}, the configuration as
+    CONFIRMED - (calendar, asset) documents with every declared correction
+    not yet confirmed reverted) - or ({}, None) where none is pending.
 
     WHY (REQ-PIPE-179 criterion 19 as amended by Keith, 2026-10-15, morning
     report 5 Q4): the rule reads the configuration on disk, so it used to
     file a held supply that only a declared but unconfirmed correction
-    covered, ahead of that correction's confirmation (REQ-PIPE-170). A
-    timezone correction's revert is not read here: slots take the asset's
-    timezone from its own file."""
-    from qa_tools.common import agreement, agreement_freeze, correction_apply, correction_trial
+    covered, ahead of that correction's confirmation (REQ-PIPE-170). BOTH
+    DOCUMENTS (post-build-review #199 F2): a timezone correction is reverted
+    in the asset document, so the caller reads slots under both."""
+    from qa_tools.common import agreement_freeze, correction_apply, correction_trial
 
     docs = correction_trial.working()
     pending = correction_apply.pending(conn, docs)
@@ -128,7 +128,17 @@ def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], object | None]:
     for p in pending:
         for dataset_id in correction_apply.affected_datasets(p, docs[0]):
             waiting.setdefault(dataset_id, []).append(p.reference)
-    return waiting, agreement.from_doc(cal)
+    return waiting, (cal, asset)
+
+
+def _confirmed_slot(docs: tuple[dict, dict], dataset_id: str, received_at):
+    """The slot open at this receipt under the CONFIRMED configuration -
+    calendar and timezone both in force, and the on-calendar test read under
+    it too (post-build-review #199 F2 and F3) - or None."""
+    from qa_tools.common import correction_trial
+
+    with correction_trial.configured(*docs) as agr:
+        return _covering_slot(dataset_id, received_at, agreement=agr)
 
 
 def refile_covered(*, say=print, skip=frozenset()) -> list[tuple[str, str, str]]:
@@ -165,7 +175,17 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
         held = select(conn)
         if not held:
             return done
-        waiting, confirmed = _awaiting_confirmation(conn)
+        from qa_tools.common import correction_trial
+
+        try:
+            waiting, confirmed = _awaiting_confirmation(conn)
+        except (correction_trial.Unreadable, ValueError) as exc:
+            # NOTHING IS RE-FILED ON A GUESS (post-build-review #199 F4): which
+            # corrections are still unconfirmed cannot be told, so every hold
+            # stays held this pass rather than the pass failing.
+            say(f"No held supply was re-filed: whether a correction is still awaiting "
+                f"confirmation could not be read ({exc})")
+            return done
         received = {}
         for h in held:
             rows = conn.execute(
@@ -184,7 +204,10 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
             # ONLY AN UNCONFIRMED CORRECTION COVERS IT: it waits for that
             # confirmation rather than being filed ahead of it.
             refs = waiting.get(h.dataset_id)
-            if refs and _covering_slot(h.dataset_id, at, agreement=confirmed) is None:
+            # THE SAME SLOT, under the confirmed configuration (#199 F3): a
+            # slot only the pending correction chooses is not filed to.
+            same = refs and _confirmed_slot(confirmed, h.dataset_id, at)
+            if refs and (same is None or same.name != slot.name):
                 say(f"{h.supply_id}: only the correction {', '.join(refs)}, not yet confirmed, "
                     f"gives it {slot.name}, so it stays held until that correction is confirmed")
                 continue

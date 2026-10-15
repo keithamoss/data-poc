@@ -35,9 +35,11 @@ def test_the_terminal_and_the_page_word_every_action_alike():
 
 
 def test_every_action_the_log_records_has_words():
-    actions = {v for k, v in vars(dl).items() if k.isupper() and isinstance(v, str)
-               and v in decision_words.DONE}
-    assert actions, "no decision action constants found"
+    # EVERY ACTION THE LOG ACCEPTS, read from the log's own list - so a new
+    # action with no words fails here, naming it (post-build-review #199 F9).
+    assert len(dl.ACTIONS) > 20
+    missing = sorted(set(dl.ACTIONS) - set(decision_words.DONE))
+    assert not missing, f"no words for: {missing}"
     assert decision_words.said(dl.PROMOTE) == "promoted"
     assert decision_words.said("withdraw-not-supplied") == "no longer marked not supplied"
     # An action with no words yet is shown as it is, never dropped.

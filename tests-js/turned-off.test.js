@@ -357,3 +357,14 @@ describe("the asset level says how many datasets are not counted", () => {
     expect(load().assetNotCountedLine(agencies(counted))).toBe("");
   });
 });
+
+// post-build-review #199 F11: a hold the rule superseded says so - by whom,
+// the rule included.
+describe("a received-while-off supply the rule superseded", () => {
+  it("says it was superseded by the rule", () => {
+    const w = loadDashboard().window;
+    const html = w.receivedWhileOffEnding({}, {supply: "s", resolvedAt: "2026-03-01T00:00:00Z",
+      ended: {action: "supersede", actorKind: "rule", at: "2026-03-01T00:00:00Z"}}, "2026-12-31");
+    expect(html).toContain("superseded by the rule");
+  });
+});

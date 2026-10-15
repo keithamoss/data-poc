@@ -9482,3 +9482,92 @@ twice. It deliberately did not re-find the `TypeError`.
      with the old stub, passes with the new); the stub now takes
      `agreement=None`. The touched modules (16) also ran on that empty
      database: 562 passed, no skips reported.
+
+199. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **delivery-critic on the morning report 5 answers (b900dac..f43c85d).**
+     Q6, Q10, Q14, Q16, Q17, Q19, Q21, Q22 and Q23 meet their wording; the
+     findings below are on Q4, Q9, Q11, Q17's test, Q18, Q19, Q24 and
+     REQ-DASH-180 c14. Each claim checked against the code before it was
+     written here.
+     - **F1, DEFECT (Q9, REQ-PIPE-179 c35 as amended), reproduced by the
+       critic**: `correction_trial.trial` skips a supply whose receipt the
+       rule answers the same way under both agreements BEFORE it asks whether
+       the period it is filed to is turned off. So a person's placement into a
+       newly turned-off period only becomes a turned-off hold when that period
+       is also its receipt's own slot - a supply received in Q2's window and
+       placed into Q3 stays where it is, in no list. The shipped test placed
+       a supply received on Q3's own date, the one shape that works. To fix,
+       test first.
+     - **F2, CRITERION GAP (Q4, c19 as amended)**: the confirmed-agreement
+       check reverts the calendar but reads the asset's timezone from disk,
+       so a hold only a pending TIMEZONE correction covers is filed ahead of
+       confirmation. To fix: run the check under
+       `correction_trial.configured(cal, asset)`.
+     - **F3, CRITERION GAP (Q4)**: the check asks whether the confirmed
+       agreement covers the receipt at all, not whether it gives the SAME
+       slot - so a hold the confirmed agreement puts in X and the pending
+       correction in Y is filed to Y. And `_covering_slot`'s on-calendar test
+       read the agreement on disk whatever it was given. To fix: the same slot,
+       read wholly under the confirmed agreement.
+     - **F4, TEST GAP and ROBUSTNESS (Q4)**: both tests stub
+       `_awaiting_confirmation`, so nothing exercises the real revert (the
+       critic drove it read-only and it works); and a working copy that
+       cannot be read, or a revert that fails, now aborts the drain inside
+       the processing pass. To fix: an unreadable correction leaves every
+       hold held this pass, and says so.
+     - **F5, KEITH'S CALL (Q18, REQ-DASH-182 c12)**: on the real build
+       cp-case-workers' period owed nothing shows three cycle blocks, one per
+       supply, each saying "Not owed". The amendment removed the separate
+       label-only block; the one-chain-per-supply grouping still repeats the
+       period. Queued for Keith in plans/morning-reports.md.
+     - **F6, POLISH (Q18)**: `ofCycle`'s `e.period === c.period` half is dead -
+       a cycle carries `cycleStart` and `entries`, never `period`. To remove.
+     - **F7, KEITH'S CALL (Q24, REQ-DASH-180 c17)**: a dataset with an
+       authored, not yet started, for-good turn-off has the fewest dates left
+       by construction, so it drives the runway minimum - and the amended
+       wording then drops the add-dates instruction while other datasets on
+       the calendar are also short. Queued for Keith.
+     - **F8, KEITH'S CALL (Q11, REQ-PIPE-130 c12)**: `_manifest` reads the
+       newest CLEARED re-check; `rechecking.worse_than_promoted` reads the
+       newest re-check DECISION and skips the supply while it is owed. While
+       a second re-check is owed the two disagree. Nothing disagrees in the
+       real database today (every cleared row predates schema 44, so
+       `found_worse` is NULL). Queued for Keith - which reading is right is a
+       product question.
+     - **F9, TEST GAP (Q17)**: `test_every_action_the_log_records_has_words`
+       builds its set from constants already in `DONE`, so it cannot fail.
+       To fix: assert `set(decision_log.ACTIONS) <= set(DONE)`.
+     - **F10, POLISH (Q19)**: in the agency table "Not owed yet" sits beside
+       "No QA run within tolerance on the selected date"; and the dataset
+       page's main branch (a dataset with columns) still calls
+       `pill(ds.status)`. To fix both.
+     - **F11, POLISH (REQ-DASH-180 c14 as amended)**: a hold superseded by the
+       rule reads "superseded, <at>" with no "by". To fix.
+     - **F12, NOTE (Q21)**: the terminal headline "Turning off after ... -
+       nothing more owed" has no authored-date condition; c25 is a dashboard
+       criterion. Queued for Keith with F5, F7 and F8.
+     - **FIXED, 2026-10-15**: F1 (`correction_trial.trial` asks whether the
+       filed period is turned off before the rule's answer; a rule move to an
+       owed slot is not labelled turned off; test
+       `test_received_in_an_owed_period_and_placed_into_the_gap`, failing
+       first). F2-F4 (`schedule_ended._confirmed_slot` reads the slot under
+       `correction_trial.configured`, calendar and timezone both, and must be
+       the same slot; unreadable corrections leave every hold held and say so;
+       five tests in `TestItWaitsForACorrectionsConfirmation`, all failing
+       against the old re-filer). F6 removed. F9 asserts against
+       `decision_log.ACTIONS`. F10 `noRunWords` and `statusPill` on the
+       dataset page's three branches. F11 "superseded by the rule". F5, F7,
+       F8 and F12 queued for Keith in plans/morning-reports.md.
+
+200. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on f43c85d:
+     a dashboard test still expecting Q19's old pill.**
+     `TestInPlaceOnDatePicking::test_a_date_before_any_real_history_shows_no_data`
+     asserted "No data" on Birth Registrations' page a thousand days before
+     any history. That date is also before the dataset's first participation
+     version (2026-06-30), and REQ-DASH-182 criterion 3 as amended for Q19
+     (37e4d1a) makes the pill read "Not owed yet" there - the page was right
+     and the test was out of date. 37e4d1a's own CI run was cancelled by the
+     next push, so f43c85d's was the first to show it. The test now asserts
+     "Not owed yet" and that no earned status (Green, Amber, Red) shows; it
+     passes on the rebuilt local dashboard. Lesson for this session: a
+     cancelled CI run is not a green one - the next run carries its result.

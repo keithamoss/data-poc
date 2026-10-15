@@ -196,6 +196,19 @@ class TestATurnOffHoldsAPersonsFiling:
         line = next(x for x in text.splitlines() if "person-off" in x)
         assert "turned off" in line.lower()
 
+    def test_received_in_an_owed_period_and_placed_into_the_gap(self, conn):
+        """post-build-review #199 F1: received in Q2's window (still owed) and
+        placed by a person into Q3 (turned off) - the rule's answer for its
+        receipt is Q2 under both agreements, which is no reason to leave it in
+        a period the correction turns off."""
+        _file("person-gap", "2023-Q2", datetime(2023, 6, 1, 12, tzinfo=PERTH))
+        filing_support.place(conn, DATASET, "person-gap", "2023-Q3",
+                             "pytest-cp-clients-person-gap")
+        t = _trial(conn, self._turned_off())
+        [held] = [m for m in t.moves if m.supply_id == "person-gap"]
+        assert (held.from_period, held.to_period) == ("2023-Q3", None)
+        assert held.turned_off
+
     def test_a_persons_filing_still_owed_is_left_where_they_put_it(self, conn):
         """Only a turn-off is the exception: a period still owed keeps a
         person's filing out of the proposals, as before."""
