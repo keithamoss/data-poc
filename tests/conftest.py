@@ -809,9 +809,17 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
     # view with it.
     from qa_tools.common import period_schema
 
+    # EVERY period from 2026-Q1 on, newest first - not just the two this
+    # fixture uses: another module on the same worker can leave a later
+    # period (2026-Q4's cp_case_workers view, seen 2026-10-16) whose views
+    # resolve through 2026-Q1's tables, and the guard then refuses the drop.
+    oldest = period_schema.period_schema("2026-Q1")
     with supply_db.connect(label="pytest:fixture-periods") as conn:
-        for period in ("2026-Q2", "2026-Q1"):
-            conn.execute(f'DROP SCHEMA IF EXISTS "{period_schema.period_schema(period)}" CASCADE')
+        later = sorted((r[0] for r in conn.execute(
+            "SELECT schema_name FROM information_schema.schemata "
+            "WHERE schema_name LIKE 'period\\_%'").fetchall() if r[0] >= oldest), reverse=True)
+        for schema in later:
+            conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
     # A FILING LINKS TO ITS DELIVERY RECORD (REQ-PIPE-144 criterion 10),
     # so the deliveries are recorded first, as the batch does.
     for d in delivery_mod.list_deliveries(deliveries_dir, receipts_dir):

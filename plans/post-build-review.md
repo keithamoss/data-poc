@@ -9824,4 +9824,11 @@ twice. It deliberately did not re-find the `TypeError`.
        first version" meaning the 2023 one; they now read the calendar as it
        stood before the growth (`tests/before_growth.py`), and the few that
        run the real configuration take its new expectations.
+     - **A fixture-ordering error in the full gate (12 setup errors, one
+       worker).** On cea40d9's full `mothman check` (5,478 passed), the Child
+       Protection staging fixture's period clean-up dropped 2026-Q1/Q2 only,
+       and the guard refused because another module on the same worker had
+       left a `period_2026_q4.cp_case_workers` view resolving through them.
+       Not reproduced by pairing the obvious modules locally; the fixture now
+       drops every period schema from 2026-Q1 on, newest first. Test-only.
 
