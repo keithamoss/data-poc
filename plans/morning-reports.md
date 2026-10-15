@@ -1969,6 +1969,9 @@ one or more component tags, and a date.
       proposal. Significant calls made along the way are listed for him to
       sense-check, not silently settled. Still a proposal: nothing signed,
       nothing built.
+      AND (Keith, ~23:50): the Emergency Department re-draft happens at
+      the very END, on top of the FINAL item 6 proposal - after the scoper
+      rounds, architect and UX reviews - not prematurely.
       Terms: ungated checkpoints may be pushed (no test claims in their
       messages); amendments to REQ-GEN-044/203/205/207/218 approved by the
       session under his delegation; nothing Emergency Department built.

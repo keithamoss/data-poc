@@ -1,0 +1,369 @@
+# plans/publishing-and-history.md item 6 - generalising the per-collection code.
+# Drafted by delivery-scoper 2026-10-15 night, round 1. PROPOSALS, none signed.
+# Sources: docs/drafts/item6/groundwork.md (evidence), docs/drafts/item6/position.md
+# (the main session's calls, delegated by Keith). Sequence and the ED cut line are
+# in each requirement's dependencies and in the scoper's hand-back.
+
+- id: REQ-TEST-239
+  title: "A before-and-after equivalence harness proves a refactor changed nothing a bootstrap records, generates, builds or offers"
+  date_written: "2026-10-15"
+  story: "As whoever generalises the per-collection code, I want one command that captures everything a from-empty bootstrap produces at one commit and compares it with another, so that every refactor step can show it changed no recorded result, generated file, built page or command, rather than assert it."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6, reopened 2026-10-15 night ('small adapter per collection'); main session position.md call 2 (byte-identical refactor first). Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL offer `mothman debug equivalence capture --label <name>`, which bootstraps from empty into a scratch database named for the label, with every on-disk path redirected under a scratch tree, and writes one baseline file describing seven surfaces, S1 to S7, recording the commit and working-tree state it was taken at."
+    - "THE SYSTEM SHALL offer `mothman debug equivalence compare <a> <b> [--surfaces S1,...]`, which reports every difference between two baseline files surface by surface, and SHALL exit non-zero IF any compared surface differs."
+    - "THE SYSTEM SHALL capture as S1 every row of every base table in the qa schema, under the clock, surrogate, ordinal and derived-column rules tests/equiv_support.py applies today, so that a column added to the qa schema later is compared by default."
+    - "THE SYSTEM SHALL capture as S2 every schema name and every supply table's name, row count and digest of its sorted rows."
+    - "THE SYSTEM SHALL capture as S3 every tool_output row's raw_output in a per-tool normalised form, whose every rule (a key removed, a path rewritten, a float rounded, a list sorted) is named in one place with the measured reason for it."
+    - "WHEN two captures are taken of the same commit, THE SYSTEM SHALL compare them equal on all seven surfaces, and this self-check SHALL be kept as an on-demand test; IF a raw_output field cannot be normalised to equality, THEN THE SYSTEM SHALL leave that field out of S3 by name with the measured reason, as UNCOMPARABLE_COLUMNS does today, rather than loosen the comparison silently."
+    - "THE SYSTEM SHALL capture as S4 the path and sha256 of every file the generators wrote - every delivery, every receipt, the generator bookkeeping and the scenario placements."
+    - "THE SYSTEM SHALL capture as S5 every results JSON and dashboard JSON the bootstrap wrote under reports/, parsed and compared as JSON with only generated_at removed."
+    - "THE SYSTEM SHALL capture as S6 the visible text of the built dashboard's executive view and of every real dataset's page, rendered in a real browser with the page clock pinned to the newest recorded receipt instant, and SHALL record the embedded GitHub link values separately, reported but never failing a compare, because they carry the commit SHA and file paths."
+    - "THE SYSTEM SHALL capture as S7 the `--help` text of every mothman group and command."
+    - "IF the scratch database's DSN equals MOTHMAN_SUPPLY_DSN, THEN THE SYSTEM SHALL refuse before writing anything, naming both."
+    - "THE SYSTEM SHALL write nothing under the repository's data/, reports/ or dashboard/ during a capture, and SHALL drop its scratch database afterwards."
+    - "WHERE `--reduced` is given, THE SYSTEM SHALL capture over the reduced corpus REQ-TEST-116's equivalence test uses, for a quick inner-loop check, and SHALL mark the baseline as reduced so that a reduced and a full baseline are never compared with each other."
+    - "WHEN a capture finishes, THE SYSTEM SHALL record its bootstrap wall-clock time per collection in the baseline, and `compare` SHALL report both times and their difference."
+  non_functional_requirements:
+    - "BASELINES ARE STATE, NOT CONFIGURATION (CLAUDE.md, Keith 2026-09-27): a baseline file lives in a scratch directory outside the repository and is never committed."
+    - "NEVER THE REAL DATABASE: criterion 11; the 2026-09-27 TRUNCATE incident is why."
+    - "COST, STATED SO IT IS PLANNED FOR: a full capture is a from-empty bootstrap, measured 31m52s on 2026-10-15, so a requirement's before-and-after pair costs about an hour of sandbox time; the reduced mode about 3-4 minutes."
+    - "ONLY THROUGH mothman: the snapshot code moves out of tests/equiv_support.py into a module the command imports, and the existing on-demand tests import it from there - test helpers stay in tests/, and this is a command a person runs, not a test helper."
+    - "NO NEW DEPENDENCY: PostgreSQL, Playwright and the generators are already required."
+  dependencies: []
+  decisions:
+    - "BYTE-IDENTICAL REFACTOR FIRST, BEHAVIOUR CHANGES AFTER, NEVER MIXED (main session, position.md call 2, delegated by Keith 2026-10-15). This harness is what makes that checkable."
+    - "RAW OUTPUT IS COMPARED ONLY UNDER A PROVEN-QUIET NORMALISER - a refinement of position.md call 2, which says 'raw tool output with volatile keys normalised'. tests/equiv_support.py excludes raw_output today for a measured reason: over the 2026-10-03 pair, 464 of 627 rows differed between two bootstraps of the SAME code (dbt invocation ids, timings and per-run target paths; Soda scan timestamps, log indices and metric ordering; datacontract-cli run ids; Evidently PSI values differing in the last floating-point digit). Not all of that is a key - ordering and float noise need sort and round rules - so criterion 6's same-commit self-check is what proves the normaliser is quiet, and anything it cannot quieten is excluded by name rather than allowed to make every compare flaky."
+    - "S6 IS RENDERED TEXT, NOT BUILT HTML: the built file embeds the commit SHA in its GitHub links, so it can never be byte-identical across commits, and the dashboard step (REQ-DASH-244) changes the template by design. What a reader sees is the thing that must not change."
+    - "BASELINE BEFORE EACH REQUIREMENT, FULL CORPUS AT ITS CLOSE; REDUCED CORPUS FOR EACH STEP INSIDE IT (delivery-scoper, proposed). The reduced corpus runs with scripted decisions switched off and covers no correction, knock-on or scenario, so only the full corpus can stand as a requirement's evidence."
+    - "REJECTED keeping the harness test-only. A baseline must be captured at the commit BEFORE a change, by a person, which is a command, and CLAUDE.md makes mothman the only entry point."
+  open_questions: []
+
+- id: REQ-PIPE-240
+  title: "One collection registry, derived from the hierarchy, behind every place that names a collection - a third collection is included everywhere or refused by name"
+  date_written: "2026-10-15"
+  story: "As someone adding a collection, I want every part of the system to learn the collections from one registry read from contract/data-asset.yaml, so that a new collection is either picked up everywhere or refused by name, never silently skipped or handed another collection's behaviour."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night) and plans/data-generation.md #12 (the delivery-architect's dispatch findings); main session position.md calls 1, 4 and 10. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL declare on each collection in contract/data-asset.yaml's hierarchy a `short` and a `run_prefix` - bdm and run_ for Civil Registration, cp and cp_run_ for Child Protection."
+    - "THE SYSTEM SHALL provide one registry module that lists collections only from the hierarchy, in hierarchy order, and resolves a collection by id, by short or by run_prefix."
+    - "IF a lookup names a collection, short or run prefix the hierarchy does not declare, THEN THE SYSTEM SHALL refuse with an error naming the value and every known one."
+    - "THE SYSTEM SHALL load each collection's adapter only from the qa_tools.collections package, by a module name derived from the collection id, and SHALL NOT import a module path taken from configuration."
+    - "THE SYSTEM SHALL make every collection-dispatch site in this requirement's inventory (groundwork sites 1 to 27, 29 and 30) obtain its collections from the registry, and SHALL leave none holding a fixed collection list, map, choice list or two-way branch."
+    - "WHEN a test hierarchy declares a third collection with an adapter, THE SYSTEM SHALL, at each entry point those sites serve, either include the collection or refuse it by name, and SHALL NOT give it another collection's behaviour - one test per site, driving the entry point rather than reading its source."
+    - "WHEN `mothman check` runs, IF a collection has no adapter, an adapter names no declared collection, two collections share a short or a run_prefix, one run_prefix begins with another, or a collection's contract file is missing, THEN THE SYSTEM SHALL fail naming each."
+    - "WHEN `mothman check` runs, IF a product file under qa_tools/, pipeline/, generator/, cli/ or dashboard/ (the template included) holds a string literal equal to a hierarchy id or short, containing a hierarchy id as a whole hyphen-, dot- or slash-delimited segment, or beginning an f-string with a run_prefix followed by a format field or digit, and the file is neither exempt nor on the migration allowlist, THEN THE SYSTEM SHALL fail naming the file, line and literal."
+    - "THE SYSTEM SHALL exempt from criterion 8 contract/, qa_tools/collections/, the scenario register's own files and aws/, each exemption listed in the gate with its reason."
+    - "IF the migration allowlist names a file that no longer holds such a literal, THEN THE SYSTEM SHALL fail, so that the allowlist only shrinks."
+    - "WHEN `mothman pipeline bootstrap` or `mothman pipeline run` runs over every collection, THE SYSTEM SHALL run each registered collection in its own spawned process as it does for two today, and `--collection` SHALL accept every registered short and `all`."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S7, and the comparison SHALL be this requirement's evidence."
+    - "THE SYSTEM SHALL delete every constant this replaces - processing_pass.COLLECTIONS, github_links.AGENCY_QA_FOLDER, recheck's map, bootstrap's per-collection names and branches among them - in the same change."
+    - "THE SYSTEM SHALL amend REQ-PIPE-170 criterion 31 in this change to the wording in this requirement's decisions, ONLY IF Keith has approved that wording."
+  non_functional_requirements:
+    - "BYTE-IDENTICAL (REQ-TEST-239): criterion 12. `click.Choice` lists derived from the registry keep today's order, so S7 help text is unchanged."
+    - "BOOTSTRAP TIME NOT WORSE: the two captures' wall clocks within 5% of each other, or the difference reported to Keith as a finding. Keith's hard 12 minutes is separate work (plans/data-generation.md #12, Q5); nothing here may add a per-run cost to it."
+    - "SECURITY: criterion 4 - configuration chooses WHICH adapter of a fixed package loads, never an arbitrary import path; a collection id must match the hierarchy's existing id pattern before it is turned into a module name."
+    - "PRIVACY UNCHANGED: a build may read recorded QA results, never actual data, and never anything else (Keith, 2026-09-27); the registry is configuration and opens no connection."
+    - "SCALE: the target is about 30 datasets on one asset and a project-extraction asset with no cadence; nothing here may assume a collection is on a calendar, and every per-collection loop is over the registry."
+    - "TEST COST: the third-collection tests (criterion 6) use one small fixture collection shared across sites, never a bootstrap per site."
+    - "DOCS: CLAUDE.md, README.md and docs/components.md name the registry and drop the constants it deletes, in the same change."
+  dependencies:
+    - REQ-TEST-239
+    - REQ-QAC-039
+  decisions:
+    - "SHAPE (main session, position.md call 1, delegated): shared per-tool modules built from Child Protection's N-table code, a registry derived from contract/data-asset.yaml, one adapter module per collection behind a CollectionAdapter Protocol, one COLLECTION_DATA const in the dashboard. REJECTED config-only with no Python, and REJECTED fixing only the dispatch points (Keith, 2026-10-15: 'small adapter per collection'). REJECTED the delivery-architect's registry plus copied runners (offered to Keith and declined, plans/data-generation.md #12 Q1)."
+    - "SHORT AND RUN_PREFIX ARE DECLARED, NOT DERIVED (position.md call 4): deriving them would rename every recorded Birth Registrations run, since bdm's prefix is run_ rather than anything derivable from civil-registration."
+    - "REGISTRY AND DISPATCH SITES IN ONE REQUIREMENT, NOT TWO: a registry with no consumers would be product code that only tests call, which Keith's 2026-10-12 rule calls dead code."
+    - "THE ADAPTER PROTOCOL GROWS STEP BY STEP: here it carries only identity, plus temporary pointers to each collection's existing orchestrator and warehouse builder (what processing_pass.COLLECTIONS held), which REQ-PIPE-243 removes. Each member is added by the requirement whose shared code first reads it."
+    - "ADAPTER MODULES ARE NAMED BY COLLECTION ID with hyphens as underscores (qa_tools/collections/civil_registration.py, child_protection.py), not by short - the id is the identity; the short is a CLI convenience."
+    - "THE LITERAL GATE IS NARROWER THAN position.md call 10 WORDS IT, deliberately: Birth Registrations' run prefix is run_, and a substring match on run_ would flag run_id, run_by and run_timestamp in nearly every module. So a prefix is matched only at the head of an f-string followed by a format field or digit. Short names ARE added (exact-equality only), because click.Choice(['bdm', 'cp']) and qa_tools/{code} paths are exactly the dispatch the gate exists to catch."
+    - "THE GATE CANNOT PASS CLEAN ON THE DAY IT LANDS - every per-collection module still holds literals until its own requirement moves it - so it carries a migration allowlist that may only shrink (criterion 10) and is empty when REQ-GEN-246 lands, which closes REQ-QAC-039 criterion 1."
+    - "AN ORPHAN ADAPTER FAILS - ON THIS ASSET, TODAY. The real target is two assets in separate deployments from one codebase (CLAUDE.md, Keith 2026-09-21); there each deployment's hierarchy would hold only its own collections, and this rule would fail both. Kept because an orphan is dead code today; whether a second asset's adapters share this package is out of scope and must revisit this rule."
+    - "AWS IS SCOPED OUT (position.md call 9): the two ingest handlers reach collections only through qa_tools/common/s3_arrival and the processing pass, which this requirement rewires, so they keep working unedited; the CDK stack's two fixed handlers and their prefixes are a follow-up once the registry exists. tests/test_lambda_handlers.py must still pass."
+    - "THE DISPATCH INVENTORY is groundwork.md section 2 (about 45 sites in 27 files), re-measured 2026-10-15 against the architect's ~20 in ~14. Site 28 (AWS) is out per the decision above."
+    - "PROPOSED WORDING FOR REQ-PIPE-170 CRITERION 31, for Keith (built behaviour, outside the delegation; position.md call 13): 'WHEN a replay of every collection the data asset declares finishes - a bootstrap, or `mothman pipeline run` over all of them - THE SYSTEM SHALL confirm every pending correction dated up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager role during playback, and SHALL rebuild every collection's results if any was confirmed; a replay of fewer than every collection SHALL leave them pending. AMENDED <date applied> by REQ-PIPE-240.' Behaviour with two collections is unchanged."
+  open_questions:
+    - "FOR KEITH: approve criterion 14's wording for REQ-PIPE-170 criterion 31, or say otherwise. Without it, criterion 14 drops and the code still reads 'every collection', with the built criterion's text lagging."
+    - "CHECK AT BUILD: that adding short and run_prefix to a collection entry is not a change agreement_freeze (REQ-PIPE-111) refuses."
+
+- id: REQ-QAC-241
+  title: "Every tool's checks are found the same way - Evidently's definitions move from Python into contract YAML, and every check-source list comes from the registry"
+  date_written: "2026-10-15"
+  story: "As someone adding a collection, I want its checks for all four tools to be configuration files found by convention from the registry, so that a new collection's checks are picked up by the lifecycle gate, the band and table-read gates and the runners without editing a list in code."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md call 5 (SIGNIFICANT, for Keith to sense-check). Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL define each collection's Evidently checks in contract/<stem>-evidently-checks.yml, and its retired ones in contract/<stem>-evidently-checks-retired.yml, where <stem> is the collection's contract file name less '-contract.yaml'."
+    - "THE SYSTEM SHALL carry every Evidently check's check_id, category, introduced_date, description, failure_indicates, technical_note, column, method, thresholds and changelog unchanged, and SHALL compute an unchanged config_hash for every one."
+    - "WHEN `mothman check`'s lifecycle gate runs against a base commit from before this change, THE SYSTEM SHALL report no check added, removed, retired or changed, for any of the five check sources (dbt, Soda, the contracts, file checks, Evidently)."
+    - "WHEN the lifecycle gate reads a base ref, THE SYSTEM SHALL read that ref's Evidently checks from wherever they were defined at it, so that comparing across this change is never read as every Evidently check disappearing and reappearing."
+    - "THE SYSTEM SHALL derive the check-source lists in validate_check_lifecycle.py, tables_read.py, soda_common.py, check_bands.py and check_lifecycle.py from the registry - each collection's contract, Soda, Evidently and retired-sibling files - plus the shared dbt schema files and contract/file-checks.yaml."
+    - "IF a registered collection lacks its contract, Soda or Evidently check file, THEN `mothman check` SHALL fail naming the collection and the file; a missing retired sibling SHALL remain allowed, as today."
+    - "WHEN Evidently runs for a collection, THE SYSTEM SHALL read its checks from that collection's Evidently YAML, and no Evidently check_id SHALL remain as a Python constant."
+    - "THE SYSTEM SHALL include the new Evidently files in validate_check_lifecycle.sources_fingerprint(), so that REQ-PIPE-192's cache sees an edit to them."
+    - "THE SYSTEM SHALL NOT change docs/check-authoring-rules.md, and SHALL keep Evidently's config-hash exclusion an explicit list of names, so that that document's 'one real trap' passage stays true; IF the design needs that passage changed, THEN the exact wording SHALL go to Keith before the edit."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S5 and S7, and on S6 any difference SHALL be confined to the reported GitHub link values pointing at the new files."
+    - "THE SYSTEM SHALL delete qa_tools/bdm/evidently_check_lifecycle.py, qa_tools/bdm/evidently_check_lifecycle_retired.py, qa_tools/cp/evidently_check_lifecycle.py and qa_tools/cp/evidently_check_lifecycle_retired.py in the same change, and remove them from REQ-PIPE-240's migration allowlist."
+  non_functional_requirements:
+    - "BYTE-IDENTICAL (REQ-TEST-239): criterion 10, and criterion 3 is the check-definition equivalent - zero lifecycle changes is the proof that moving a definition did not change it."
+    - "THE AUTHORING STANDARD IS UNTOUCHED (CLAUDE.md, Keith 2026-09-20): criterion 9. Writing a check's prose in a YAML file rather than a dict is ordinary work; changing the rules is not."
+    - "YAML HYGIENE: the new files pass pre-commit's check-yaml hook, and every threshold parses to the same float it was in Python (0.10 stays 0.1, not a string)."
+    - "SCALE: at 30 datasets the source lists are 30 files per tool found by convention, not a list maintained by hand."
+    - "NO NEW DEPENDENCY; CONFIGURATION ONLY at gate time - no database and nothing under data/."
+  dependencies:
+    - REQ-PIPE-240
+  decisions:
+    - "EVIDENTLY CHECKS MOVE OUT OF PYTHON (main session, position.md call 5, SIGNIFICANT): every tool's checks found the same way, so a collection's checks are all configuration. Check ids and prose do not change; the authoring standard is untouched. The original reason they were Python dicts (Thread D, Phase 1) was only that Evidently has no YAML definition of its own; a contract-adjacent YAML answers that."
+    - "PER-CHECK PRESENTATION METADATA STAYS IN THE ADAPTERS FOR NOW (position.md call 6): moving labels, dimensions and columns into the check files would roughly halve the adapters but changes the check files' structure. Logged as a follow-up, not part of this work."
+    - "CRITERION 3 IS THE REAL TEST, NOT CRITERION 2: REQ-QAC-039's 258-id rename was proved the same way - zero config_hash changes measured against the previous commit - and a passing hash comparison on a hand-built dict proves less than the gate itself reporting nothing."
+    - "CRITERION 4 EXISTS BECAUSE THE GATE READS THE OLD SIDE AT A GIT REF: validate_check_lifecycle.collect_checks() reads each listed path at the base ref. Derive the list from the current tree and the base side finds no Evidently YAML at all."
+  open_questions: []
+
+- id: REQ-QAC-242
+  title: "One shared module per QA tool and one staging module serve every collection, with Birth Registrations' drift preserved behind named legacy flags"
+  date_written: "2026-10-15"
+  story: "As someone adding a collection, I want dbt-core, Soda Core, datacontract-cli and Evidently each run by one shared module, and supplies staged by one, reading what differs from the collection's adapter, so that a new collection gets all four tools without copying a runner."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md section 1 (Child Protection's runners are a strict superset of Birth Registrations'); main session position.md calls 1, 2 and 11. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL run dbt-core, Soda Core, datacontract-cli and Evidently for every collection through one shared module per tool, and stage every collection's supplies through one shared staging module, built from Child Protection's N-table code."
+    - "THE SYSTEM SHALL take every collection-specific input those modules need - sample keys, business rules, PSI columns, provider and delivery-format strings, column and table metadata - from the collection's adapter."
+    - "THE SYSTEM SHALL preserve each place Birth Registrations' recorded output differs from what the shared code would produce behind a named legacy flag on the Birth Registrations adapter, every flag listed in this requirement's decisions with what it preserves, and SHALL declare no legacy flag on the Child Protection adapter."
+    - "IF an adapter declares a legacy flag the shared modules do not know, THEN `mothman check` SHALL fail naming it."
+    - "THE SYSTEM SHALL NOT, in a shared module, compare a collection's id, short or run prefix to choose behaviour; a difference is either an adapter value or a legacy flag."
+    - "WHEN `mothman debug run-dbt`, `run-soda`, `run-datacontract` or `run-evidently` runs for any registered collection, THE SYSTEM SHALL record the same results as before this change."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S7, S3's raw tool output included under its normaliser."
+    - "THE SYSTEM SHALL delete run_dbt_bdm.py, run_soda_bdm.py, run_datacontract_bdm.py, run_evidently_bdm.py, build_per_run_warehouses.py, run_dbt_cp.py, run_soda_cp.py, run_datacontract_cp.py, run_evidently_cp.py and build_cp_warehouses.py in the same change, and remove them from the migration allowlist."
+    - "THE SYSTEM SHALL move every test that monkeypatches an attribute of a deleted module to the shared module in the same change, and SHALL NOT keep a test whose only assertion is that a deleted module is gone."
+  non_functional_requirements:
+    - "BYTE-IDENTICAL (REQ-TEST-239): criterion 7. The drift list is why this is hard - groundwork.md found bdm lacks left_out.note, dbt's built-model guard, the skipped status case and unrunnable results, and a naive merge changes bdm's recorded output."
+    - "BOTH COLLECTIONS MOVE IN ONE CHANGE: never a period where one collection runs the shared module and the other its copy, so no third path exists even briefly."
+    - "BOOTSTRAP TIME NOT WORSE: within 5% across the pair of captures, or reported. REQ-TEST-116's tool overlap (dbt beside the other three) is preserved exactly."
+    - "TEST COST: shared-tool tests run against one one-table and one N-table fixture, never parametrised over every real collection - at 30 collections a per-collection parametrisation would multiply the suite by 30."
+    - "PRIVACY UNCHANGED: what a runner records as failing values is unchanged per check; a shared module records no more row-level data than the copy it replaces did."
+  dependencies:
+    - REQ-TEST-239
+    - REQ-PIPE-240
+    - REQ-QAC-241
+  decisions:
+    - "SHARED MODULES START FROM CHILD PROTECTION'S CODE (groundwork.md, 2026-10-15): outside the generator its copy is a strict superset of Birth Registrations' - the same code generalised from one table to N plus multi-table and cross-table logic - so plans/qa-pipeline.md #84's 2026-09 finding that 'the per-dataset logic is genuinely different' no longer holds for the tool runners. #84's caveat (do not force genuinely different logic into one abstraction) is honoured by the adapter, not overruled."
+    - "DRIFT IS PRESERVED, THEN RETIRED (position.md call 2): the legacy flags here are retired one at a time by REQ-QAC-247 and REQ-PIPE-248, each allowed to change output."
+    - "LEGACY FLAGS, PROVISIONAL LIST FROM groundwork.md (the build confirms each by a failing comparison without it): no left_out.note; no dbt built-model guard; no skipped status case; no unrunnable results; Evidently raw output carries a row_count snapshot."
+    - "NEW PACKAGE qa_tools/tools/ for the shared modules (groundwork.md section 4), proposed rather than settled - the name is the builder's."
+    - "TESTS FOLLOW THE CODE (position.md call 11): the test modules that monkeypatch per-collection attributes move in the step that moves the code."
+  open_questions: []
+
+- id: REQ-PIPE-243
+  title: "One shared orchestrator, dataset-stats computation and results-from-history rebuild serve every collection"
+  date_written: "2026-10-15"
+  story: "As someone adding a collection, I want the run orchestration, the dataset statistics and the rebuild of results from recorded history shared, so that a new collection's supplies are run, summarised and rebuilt without a fourth and fifth copied module."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sections 1 and 4; main session position.md calls 1, 2 and 12. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL run every collection's single runs and batch pipeline through one shared orchestrator, compute every collection's dataset statistics through one shared module, and rebuild every collection's results from recorded history through one shared module."
+    - "THE SYSTEM SHALL take each collection's aggregate specification, value-count column and claim-window dataset from its adapter, and SHALL NOT fall back to a named dataset when an adapter gives none (groundwork site 25, `_claim_window`'s default of cp-clients)."
+    - "THE SYSTEM SHALL preserve Birth Registrations' recorded dataset-stats shape (row_count rather than row_counts, aggregates keyed by column, zeros kept) and its results JSON shape behind named legacy flags, as REQ-QAC-242 does for the runners."
+    - "THE SYSTEM SHALL remove the cross-module couplings groundwork.md names on this path - qa_tools/cp/dataset_stats.py importing qa_tools.bdm.dataset_stats, and cli/common.py importing RUN_STEPS from orchestrate_bdm."
+    - "WHEN the processing pass, a recheck or a bootstrap runs a collection, THE SYSTEM SHALL reach the shared orchestrator through the registry, and the adapters SHALL lose the temporary orchestrator and warehouse-builder pointers REQ-PIPE-240 gave them."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S7."
+    - "THE SYSTEM SHALL delete orchestrate_bdm.py, orchestrate_cp.py, both dataset_stats.py, both build_results_from_history.py, bdm_common.py and cp_common.py, and with them the qa_tools/bdm/ and qa_tools/cp/ packages, in the same change."
+  non_functional_requirements:
+    - "BYTE-IDENTICAL (REQ-TEST-239): criterion 6."
+    - "A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27): the shared rebuild-from-history reads only the qa schema, as both copies do; anything needing supply rows stays in the orchestrator's run step."
+    - "BOOTSTRAP TIME NOT WORSE: within 5% across the pair, or reported - the orchestrator is the bootstrap's inner loop, so a per-run cost added here is multiplied by every arrival (150 or more today)."
+    - "RELIABILITY: a run that fails partway records what it recorded before, exactly as the copies do; nothing here changes failure handling."
+    - "DOCS: CLAUDE.md's layout table, README.md and docs/components.md (QAC and PIPE own qa_tools/bdm/ and qa_tools/cp/ by name) stop naming the deleted packages in the same change."
+  dependencies:
+    - REQ-QAC-242
+  decisions:
+    - "STATS, RESULTS AND ORCHESTRATOR IN ONE REQUIREMENT (position.md call 12): each is small once the runners are shared, they are the last users of the per-collection packages, and together they let qa_tools/bdm/ and qa_tools/cp/ be deleted whole rather than left as two near-empty packages."
+    - "THE claim-window FALLBACK IS A SILENT DEFAULT TO A CHILD PROTECTION DATASET (groundwork site 25); a third collection would claim under cp-clients' window. Criterion 2 replaces it with an adapter value."
+    - "THE SHAPE LEGACY FLAGS HERE ARE RETIRED BY REQ-PIPE-248, not REQ-QAC-247: they change formats, not verdicts."
+  open_questions: []
+
+- id: REQ-DASH-244
+  title: "The dashboard is built for every collection by one Python builder and rendered from one COLLECTION_DATA const"
+  date_written: "2026-10-15"
+  story: "As a data team leader, I want every real collection on the register built and shown the same way, so that a newly added collection appears with its real results rather than looking as though it has no data because nobody wired it in."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sites 17 to 20; main session position.md call 1. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL build every collection's dashboard data through one shared pipeline/build_dashboard_data.py, taking per-check presentation metadata from the collection's adapter, and SHALL delete pipeline/build_cp_dashboard_data.py in the same change."
+    - "THE SYSTEM SHALL NOT have one collection's dashboard builder import or mutate another's module state (groundwork: build_cp_dashboard_data.py mutates the bdm module's COLUMN_SCOPE_KEY)."
+    - "THE SYSTEM SHALL embed every collection's dashboard data into one template const, COLLECTION_DATA, keyed by collection id, and SHALL remove REAL_BIRTH_REG_DATA and REAL_CP_DATA from the template."
+    - "THE SYSTEM SHALL build every real collection's datasets in the page through one function, replacing buildBirthRegistrations and buildChildProtectionDatasets."
+    - "IF the hierarchy declares a real collection that COLLECTION_DATA has no entry for, THEN the embed step SHALL fail naming the collection, rather than the page rendering it as having no data."
+    - "THE SYSTEM SHALL derive embed_dashboard_data.py's targets, snapshot_dashboard.py's and check_dashboard_renders.py's collection lists from the registry."
+    - "THE SYSTEM SHALL preserve Birth Registrations' dashboard JSON shape and its two display drifts (dropping empty pseudo-columns, the reference-reason fallback for not_evaluated) behind named legacy flags."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S5 and S7, and no difference on S6's visible text."
+    - "WHEN the raw template is opened with its illustrative mock data, THE SYSTEM SHALL render with zero console errors, as tests-js/dashboard-loads.test.js holds it to today."
+  non_functional_requirements:
+    - "WHAT A READER SEES DOES NOT CHANGE: criterion 8's S6 is the visible text of the executive view and every real dataset page under a pinned clock. tests/test_dashboard_e2e.py's TestStatusMatchesEachToolsOwnVerdict also passes - CLAUDE.md's own lesson that a green data layer says nothing about a render layer with its own transform."
+    - "PAGE SIZE AND RENDER TIME: the built page's size within 1% of the baseline and tests/test_dashboard_e2e.py's duration reported before and after (CLAUDE.md's informal runtime log); growth beyond about 10% is a finding for Keith."
+    - "A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27): the shared builder keeps the publisher's least-privilege grant; nothing here widens it."
+    - "COMPATIBILITY: the page still opens from a plain file:// with no network, all assets self-hosted, as today."
+    - "BOTH TOOLCHAINS: npm test and the Python suite both run for the template change, plus tests/test_dashboard_e2e.py."
+    - "POLISH BAR: no visible change at all is the bar for this requirement; anything a reader could notice is out of scope here."
+  dependencies:
+    - REQ-PIPE-243
+  decisions:
+    - "ONE COLLECTION_DATA CONST (position.md call 1); the two REAL_* consts are read in 17 places today."
+    - "SPLIT FROM THE CLI FACTORY, against position.md call 12's pairing: a different component (DASH against TEST), a different proof (rendered text against help text) and different reviewers (delivery-dashboard-ux against delivery-cli-ux). Neither depends on the other."
+    - "A MISSING COLLECTION FAILS THE BUILD, NOT THE PAGE: groundwork site 19 found an unwired collection renders as 'no data', which is an omission dressed as a fact - the worst kind of false quiet for a register."
+    - "THE TWO DISPLAY DRIFTS ARE RETIRED BY REQ-QAC-247 (they change what a reader sees); THE JSON SHAPE BY REQ-PIPE-248 (it must not)."
+  open_questions:
+    - "FOR THE MAIN SESSION AND delivery-dashboard-ux: github_links' folder links point today at qa_tools/bdm/ and qa_tools/cp/, which REQ-PIPE-243 deletes. Proposed - a dataset's link points at its collection's adapter module, and an agency's at its first collection's. The links are excluded from S6, so this is the one visible change the refactor series makes; say if it should go elsewhere."
+
+- id: REQ-TEST-245
+  title: "One factory builds each collection's mothman command group, and the TUI lists collections from the registry"
+  date_written: "2026-10-15"
+  story: "As someone adding a collection, I want `mothman <short>` and the TUI's collection menus to appear for it from the registry, so that a new collection gets its generate and qa commands without a copied CLI module."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sites 13 to 16; main session position.md calls 1 and 12. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL create the `mothman <short>` group for every registered collection through one factory, and SHALL delete cli/bdm.py and cli/cp.py in the same change."
+    - "THE SYSTEM SHALL give a one-table collection's `qa` command a --file option, and an N-table collection's a --folder option and a --table choice listing its tables from the hierarchy, as each has today."
+    - "WHERE a collection's adapter declares the target-trial capability, THE SYSTEM SHALL offer `--skip-target-trial` on its generate-synthetic-data command, and SHALL NOT offer it otherwise."
+    - "THE SYSTEM SHALL list every registered collection in the TUI's collection menus in hierarchy order, with no branch that sends an unknown choice to Child Protection."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S1 to S7, S7's help text included."
+    - "WHEN any existing collection command runs with the same arguments as before, THE SYSTEM SHALL exit with the same code and the same output."
+    - "WHEN `mothman --help` runs, THE SYSTEM SHALL import no QA tool library (dbt, Soda, datacontract-cli, Evidently, pandas) to build the collection groups."
+  non_functional_requirements:
+    - "BYTE-IDENTICAL (REQ-TEST-239): S7 is the CLI's public surface; criterion 6 covers what help text cannot."
+    - "RESPONSIVENESS: `mothman --help` wall time within 10% of the baseline - a factory that imports every adapter's tool dependencies to build a menu would make every command slower at 30 collections."
+    - "ONLY THROUGH mothman: unchanged and reinforced - a new collection's commands exist the moment it is registered."
+    - "DEMO: dashboard/demos/qa_wizard.cast records the Birth Registrations wizard; the TUI's text is unchanged, so the recording stays true and is not re-recorded."
+  dependencies:
+    - REQ-PIPE-243
+  decisions:
+    - "SPLIT FROM THE DASHBOARD (see REQ-DASH-244's decision)."
+    - "THE OPTION SHAPE FOLLOWS THE TABLE COUNT, NOT THE COLLECTION: --file for one table, --folder and --table for several, so an Emergency Department group behaves as Birth Registrations' does without a branch on its name."
+    - "TARGET TRIAL IS AN OPTIONAL ADAPTER CAPABILITY (position.md call 8), here as a CLI option; REQ-GEN-246 owns the refusal in the generator."
+  open_questions: []
+
+- id: REQ-GEN-246
+  title: "One generator driver runs every collection's slot loop, with a provider and period plan per collection, and target trial refused where a collection lacks it"
+  date_written: "2026-10-15"
+  story: "As Keith planting scenarios, I want the generator's slot loop, bookkeeping, delivery writing and injection placement shared, with only each collection's rows and period plan in its own provider, so that the Emergency Department generator is a provider from its first day rather than a third copy to unpick later."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md section 4 (generator/resupply.py's DatasetProvider and run_slot_chain already have the pattern); main session position.md calls 7 and 8. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL generate every collection's synthetic history through one shared driver - the slot loop, bookkeeping, delivery and receipt writing, and injection placement - with each collection's rows, seeds and period plan in a provider of its own."
+    - "WHEN REQ-TEST-239's comparison is run between full captures before and after this change, THE SYSTEM SHALL report no difference on S4 - every delivery, receipt, the bookkeeping and the scenario placements byte-identical - nor on S1 to S3 and S5 to S7."
+    - "WHERE a collection's provider declares the target-trial capability, THE SYSTEM SHALL run its target trial; IF a target trial is asked of a collection without it, THEN THE SYSTEM SHALL refuse naming the collection, replacing the silent fallbacks in generator/targeting.py and generator/targets.py."
+    - "THE SYSTEM SHALL route scenario_injection.generated_periods() and generator/output.py's generated_into through the registry, and IF a scenario names a dataset whose collection has no provider, THEN generation SHALL refuse naming it before writing anything."
+    - "WHEN `mothman check` runs, IF two providers' declared seed ranges overlap, THEN THE SYSTEM SHALL fail naming both."
+    - "THE SYSTEM SHALL delete generator/generate_runs.py and generator/generate_cp_runs.py in the same change, their collection-specific content living in the providers."
+    - "WHEN this change lands, THE SYSTEM SHALL hold REQ-PIPE-240's migration allowlist empty, and REQ-QAC-039 criterion 1 SHALL be recorded as met with this requirement's evidence."
+  non_functional_requirements:
+    - "BYTE-IDENTICAL, HARDEST HERE (position.md call 7): random draw order is part of the output, so every draw keeps its position in each seeded stream. S4 is the proof; a comparison that differs is a failed build, not a tolerance to set."
+    - "DETERMINISM: `mothman <short> generate-synthetic-data` run twice with the same seed writes byte-identical files, as today."
+    - "BOOTSTRAP TIME NOT WORSE: generation is the bootstrap's first phase; within 5% across the pair, or reported."
+    - "SYNTHETIC ONLY: providers draw from the same synthetic sources as today; nothing here reads a real record."
+    - "ISOLATION: the generator tests' redirection (tests/generator_isolation) covers the driver, so no test writes into the real data/ tree (the 2026-09-28 handfiled incident)."
+  dependencies:
+    - REQ-TEST-239
+    - REQ-PIPE-240
+  decisions:
+    - "A SHARED DRIVER, AND BEFORE EMERGENCY DEPARTMENT (position.md call 7): so ED's generator is a provider from day one. Last among the refactor steps because it is the riskiest for byte-identity, not because anything depends on it - it needs only the registry."
+    - "TARGET TRIAL IS AN OPTIONAL CAPABILITY, REFUSED BY NAME ELSEWHERE (position.md call 8): Birth Registrations only today."
+    - "SEED RANGES ARE DECLARED PER PROVIDER (criterion 5) because REQ-GEN-232 criterion 2 needs Emergency Department's seeds disjoint from the other two, and a gate makes that a check rather than a promise."
+    - "WHERE A PROVIDER LIVES IS FOR KEITH - see open question. Groundwork estimates bdm's generator part at ~280 lines and cp's at ~210, larger than either's QA part."
+  open_questions:
+    - "FOR KEITH: a collection's generator provider in its own module under generator/ (generator/collections/<id>.py), or inside the one adapter module with its QA and dashboard parts? delivery-scoper recommends its own module - a real deployment's collections have no synthetic generator, so the QA adapter should not carry one, and the ~150-line budget then measures what a real collection costs. It does mean a synthetic collection is two short modules, not one, which is a reading of your 'small adapter per collection' rather than the letter of it."
+
+- id: REQ-QAC-247
+  title: "Birth Registrations' behavioural legacy flags are retired one at a time, each change reported, so it is checked and shown exactly as every other collection"
+  date_written: "2026-10-15"
+  story: "As an accountable data owner for Birth Registrations, I want its QA held to the same rules as every other collection - skipped and unrunnable checks recorded, the same guards - with every result that changes as a consequence put in front of me, so that a behaviour difference left over from copied code does not quietly decide what I see."
+  moscow: should
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md calls 2 and 3. Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL resolve each behavioural legacy flag on the Birth Registrations adapter - left_out.note, dbt's built-model guard, the skipped status case, unrunnable results, dropping empty pseudo-columns, the not_evaluated reference-reason fallback - either by retiring it, so Birth Registrations takes the shared behaviour, or by reclassifying it as a genuine collection difference with its reason recorded in this requirement's decisions."
+    - "THE SYSTEM SHALL retire each flag in a change of its own, carrying no refactor."
+    - "WHEN a flag is retired, THE SYSTEM SHALL compare full REQ-TEST-239 captures before and after, and every difference SHALL be one the flag's description predicts."
+    - "IF a retirement changes any Birth Registrations check's status on any recorded run, THEN the change SHALL be reported to Keith as a finding with the count of changed results by check, before the requirement is marked built."
+    - "WHEN every flag is resolved, THE SYSTEM SHALL fail `mothman check` IF any adapter declares a behavioural legacy flag."
+  non_functional_requirements:
+    - "OUTPUT-CHANGING, ON PURPOSE: unlike REQ-QAC-242 to REQ-GEN-246 these are behaviour changes; the comparison is a diff to explain, not a zero to reach."
+    - "HISTORY: Birth Registrations' synthetic history is regenerated (`mothman env reset-synthetic` then `mothman pipeline bootstrap`), as synthetic history may be (REQ-PIPE-038, REQ-PIPE-144); reset-synthetic already refuses on a non-synthetic asset."
+    - "OBSERVABILITY: one CHANGELOG.yaml entry per retirement a reader could notice."
+  dependencies:
+    - REQ-QAC-242
+    - REQ-DASH-244
+  decisions:
+    - "BEHAVIOUR AND SHAPE SPLIT INTO TWO REQUIREMENTS, against position.md call 12's one: these change what a Birth Registrations reader sees and need Keith to see each changed verdict; REQ-PIPE-248's shape changes must change nothing a reader sees. Different proofs, different risks."
+    - "A FLAG MAY TURN OUT TO BE A REAL DIFFERENCE (criterion 1): the reference-reason fallback for not_evaluated may be a genuine daily-dataset need rather than drift. Forcing it into the shared behaviour would repeat the mistake plans/qa-pipeline.md #84 warned about."
+    - "NOT NEEDED BEFORE EMERGENCY DEPARTMENT: legacy flags sit only on the Birth Registrations adapter, and ED takes the shared behaviour from the start."
+  open_questions: []
+
+- id: REQ-PIPE-248
+  title: "Every collection records and publishes the same N-table shapes - dataset stats, results JSON, dashboard JSON and Evidently raw output - so Birth Registrations stops being a special case"
+  date_written: "2026-10-15"
+  story: "As whoever maintains the pipeline, I want every collection's recorded and published shapes to be the N-table forms, so that nothing downstream reads one collection differently from another and a single-table collection is simply N equal to one."
+  moscow: should
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md call 3 (SIGNIFICANT, for Keith to sense-check). Drafted by delivery-scoper 2026-10-15; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL record Birth Registrations' dataset stats in Child Protection's form - row_counts per table, aggregates keyed table.column, zero counts treated as Child Protection treats them."
+    - "THE SYSTEM SHALL write Birth Registrations' results JSON in the collection-and-datasets form and its dashboard JSON in the datasets-list form Child Protection uses."
+    - "THE SYSTEM SHALL stop writing the row_count snapshot into Birth Registrations' Evidently raw output, ONLY IF no check or reader depends on it."
+    - "THE SYSTEM SHALL delete every template and Python reading path that exists only for Birth Registrations' old shapes, and the shape legacy flags with them."
+    - "WHEN Birth Registrations' history is regenerated after this change, THE SYSTEM SHALL report no difference on REQ-TEST-239's S6 - the rendered page reads the same - while S1 and S5 differ only in the shapes this requirement names."
+    - "WHEN every shape is unified, THE SYSTEM SHALL fail `mothman check` IF any adapter declares a legacy flag of any kind."
+  non_functional_requirements:
+    - "INVISIBLE TO A READER: criterion 5 - a shape change that shows on the page is a defect here."
+    - "HISTORY REGENERATED, SYNTHETIC ONLY: as REQ-QAC-247. On a real asset this would need a migration of recorded history, which is out of scope and refused by reset-synthetic."
+    - "SCALE: one shape for N tables is what makes the 30th dataset a configuration and adapter exercise rather than a choice of form."
+  dependencies:
+    - REQ-PIPE-243
+    - REQ-DASH-244
+  decisions:
+    - "UNIFY ON CHILD PROTECTION'S N-TABLE FORMS (main session, position.md call 3, SIGNIFICANT): Birth Registrations' history is regenerated, as synthetic history already may be (REQ-PIPE-038, REQ-PIPE-144)."
+    - "REJECTED keeping two shapes behind a per-collection switch: every downstream reader would carry both forever, which is the copy this item exists to remove."
+    - "NOT NEEDED BEFORE EMERGENCY DEPARTMENT: ED is born in the N-table forms."
+  open_questions:
+    - "CHECK AT BUILD: whether Birth Registrations' row-count-growth check reads the previous run's row_count from its Evidently raw output; if it does, criterion 3 moves that read to the dataset stats first, as its own behaviour-preserving step."
+    - "FOR THE MAIN SESSION: result file names. reports/results_bdm.json and results_cp.json already follow the short; birth_registrations_dashboard.json and child_protection_dashboard.json do not. Proposed - <short>_dashboard.json for all, here, since this is the requirement allowed to change outputs."
+
+- id: REQ-TEST-249
+  title: "A fake collection declared only in a test - its adapter, its configuration and nothing else - goes from generation to a rendered page, proving a collection is a small adapter"
+  date_written: "2026-10-15"
+  story: "As Keith, I want a test that adds a collection the way the next real one will be added - configuration, check files, an adapter and a provider, no other edit - and follows it all the way to the page, so that 'adding a collection is a small adapter' is a fact the suite keeps proving rather than a claim made once."
+  moscow: must
+  status: not_started
+  source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night: 'small adapter per collection' as the definition of done). Added by delivery-scoper 2026-10-15 as a requirement of its own, beyond position.md call 12's eight; a PROPOSAL, not signed."
+  acceptance_criteria:
+    - "THE SYSTEM SHALL keep a test-only collection - one agency, one collection, one one-table dataset, at least one check in each of the four tools - declared in a test copy of the hierarchy with its contract, check files, adapter and generator provider, under tests/."
+    - "WHEN the test runs, THE SYSTEM SHALL generate the fake collection's history, bootstrap it into a scratch database, record results from all four tools, build its dashboard data and render its dataset page in a real browser with each check's status matching its recorded verdict."
+    - "THE SYSTEM SHALL require no edit to any file outside the fake collection's own configuration, check files, adapter and provider for criterion 2 to pass."
+    - "WHEN `mothman check` runs, THE SYSTEM SHALL report each adapter's code lines - QA and dashboard logic, presentation metadata and generator provider separately - against a soft budget of 150 lines for the QA and dashboard logic, and SHALL never fail on it."
+    - "THE SYSTEM SHALL never register the fake collection in contract/data-asset.yaml, and the test SHALL write nothing under the repository's data/ or reports/."
+  non_functional_requirements:
+    - "TEST COST: under two minutes, run in CI's on-demand job beside REQ-TEST-116's equivalence test rather than in the fast half - it bootstraps."
+    - "WHAT IT PROVES: no dispatch site still assumes the collections it knew about (any that does omits or refuses the fake); the adapter Protocol is sufficient for a one-table collection; and the line count of what a new collection actually costs. WHAT IT DOES NOT PROVE: multi-table or cross-table generality beyond what Child Protection's real corpus already exercises, real data shapes, or performance at 30 collections."
+    - "ADAPTER LINE BUDGET IS REPORTED, NOT ENFORCED (position.md call 10): groundwork estimates bdm ~230 and cp ~260 lines with presentation metadata in them, so both report over 150 from the start; criterion 4's split makes clear the overage is presentation metadata, which is position.md call 6's follow-up."
+  dependencies:
+    - REQ-PIPE-240
+    - REQ-QAC-241
+    - REQ-QAC-242
+    - REQ-PIPE-243
+    - REQ-DASH-244
+    - REQ-TEST-245
+    - REQ-GEN-246
+  decisions:
+    - "A REQUIREMENT OF ITS OWN, BEYOND position.md call 12: every other requirement in this set proves nothing CHANGED; this is the only one that proves the goal - that a new collection costs an adapter. Emergency Department will prove it once; this keeps proving it after."
+    - "ONE TABLE, NOT N: the next real collection (Emergency Department) is one table, and Child Protection's real corpus already exercises N tables and cross-table checks under REQ-TEST-239's comparison."
+    - "THE ADAPTER PACKAGE IS REDIRECTABLE BY A TEST ONLY: the registry reads qa_tools.collections in production (REQ-PIPE-240 criterion 4); the test redirects it the way tests/equiv_support redirects paths, never through configuration."
+  open_questions: []
