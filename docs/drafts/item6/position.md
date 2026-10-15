@@ -199,3 +199,20 @@ sense-check. Evidence: `docs/drafts/item6/groundwork.md`.
     reader-visible ones; REQ-TEST-249 refuses to run on a dirty tracked tree,
     since git archive proves the last commit; `compare` prints the commit
     distance between baselines, so a gap in the chain shows.
+
+## Round 5 calls, after the architect's verification pass (main session)
+
+30. ACCEPTED all six verification findings: P1 `--keep-database` (a kept
+    scratch database recorded in the baseline, `equivalence drop <label>`
+    removes it; REQ-DASH-244 rebuilds over REQ-PIPE-243's kept "after"); P2 -
+    DECIDED: REQ-GEN-246 lands straight after REQ-PIPE-243 and uses its
+    "after" capture as its "before", so the chain never needs a sixth full
+    capture; P3 target trial declared once, on the generator provider, which
+    stays importable without pandas/numpy at module level, read by the CLI
+    through a temporary pointer until REQ-GEN-246, with bootstrap's
+    `_TARGET_DATASETS` reading the same declaration; P4 the fake-collection
+    proof copies the working tree's tracked files rather than `git archive
+    HEAD` (the dirty-tree refusal goes), and "additions only" is defined;
+    P5 the literal gate ignores docstrings; P6 every temporary pointer is
+    listed with the requirement that removes it, and REQ-TEST-249 asserts no
+    adapter carries one.
