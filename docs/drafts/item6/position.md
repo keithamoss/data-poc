@@ -103,3 +103,35 @@ sense-check. Evidence: `docs/drafts/item6/groundwork.md`.
     across collections (a `mothman check` gate) with one dataset-id index; each
     collection's entry self-contained (an NFR, so lazy loading stays possible
     later); S6 captures each dataset page by cold-loading its URL.
+
+## Round 3 calls, after the CLI UX review (main session)
+
+19. ADOPTED, all four REQ-TEST-245 gaps: the TUI/group label rule (see 21),
+    with a tui_drive check of the "Which dataset?" menus; `--help` imports no
+    tool library (pandas, duckdb, soda, dbt, datacontract, evidently) for
+    every `mothman <short> [qa] --help`, measured against today's baseline
+    first, and adapter declarations stay importable without tool code
+    (a line in REQ-PIPE-243); a 30-collection fixture proves `--help` still
+    imports nothing and lists every group, with absolute times recorded; a
+    collection whose adapter cannot load never takes down the CLI - its own
+    commands refuse by name, everything else works, no traceback. One shared
+    `--collection` helper in cli/common.py with a registry-generated legend.
+20. ADOPTED for REQ-TEST-239: S7 captured with fixed COLUMNS and NO_COLOR=1;
+    named surfaces (`--surfaces` takes names or codes, `--help` lists all
+    seven); capture refuses an existing label unless `--yes`, prints the
+    baseline path, and on failure drops its scratch database, leaves no
+    readable baseline and names the failed stage; compare refuses a reduced
+    baseline against a full one, naming both.
+21. A one-table collection is labelled by its DATASET's name in TUI menus and
+    group help, an N-table one by its collection's name - reproducing today
+    exactly ("Birth Registrations", "Child Protection"). Rejected: collection
+    name always (changes what users see, mid-refactor); a declared display
+    label (one more field, nothing needs it yet).
+22. The CLI at 30 collections (help panels, grouped/searchable picker, short
+    hint forms) is NOT in this series - it is behaviour change, so it waits
+    for its own requirement once the collection count grows; logged as
+    plans/running-thoughts.md #101.
+23. FOR KEITH (a genuine fork): is "~30" thirty COLLECTIONS each with its own
+    command group, or a handful of collections holding ~30 datasets? It sets
+    the 30-collection fixture's realism and #101's priority; nothing in the
+    series is blocked on it.

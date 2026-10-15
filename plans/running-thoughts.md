@@ -5446,3 +5446,14 @@ could never have computed it), and it belongs with batch 5's check work.
     longer and odder names), and whether the dataset IDs change or only
     their display names. IDs are used in the decision log, contracts and
     tests, so changing them costs far more than changing names.
+
+101. **[todo, 2026-10-16]** **[Testing & dev tooling]** **The CLI and TUI at
+    ~30 collections.** Raised by the CLI UX review of item 6's drafts
+    (`docs/drafts/item6/position.md` call 22): with one `mothman <short>`
+    group per collection, `mothman --help` buries the tool groups among ~30
+    collection groups (rich-click `COMMAND_GROUPS` could split a Collections
+    panel from a Tools panel), the TUI's "Which dataset?" picker hits Hick's
+    Law at 30 rows (group by agency, or questionary's search filter above a
+    threshold), and flag hints listing every collection stop being readable.
+    Deliberately NOT in item 6's series, which holds `--help` byte-identical.
+    Waits on Keith's answer to whether "~30" means collections or datasets.
