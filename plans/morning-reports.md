@@ -1948,6 +1948,14 @@ one or more component tags, and a date.
       bootstrap 8m08s -> 31m52s. Next: REQ-GEN-044's evening-before era with
       TS-13 and TS-3a/3b, then REQ-GEN-203, 205 and 218. An aside logged as
       running-thoughts #98 (checks judged against supplies older than them).
+    - **STANDING DELEGATION, Keith, 2026-10-15 ~22:55 Perth**: "don't bother
+      me with the amended wording on the generator requirements, you know,
+      044, 203, 205, 218. I'm happy for you just to go ahead and approve
+      wording and amendments to that." So amendments to REQ-GEN-044,
+      REQ-GEN-203, REQ-GEN-205 and REQ-GEN-218 are approved by the session
+      itself and recorded in each requirement's `decisions:` as such. Scope
+      kept to what he said: new requirements (the Emergency Department
+      dataset, #99) and the REQ-GEN-207 shrink still go to him.
     - **STOPPED HERE, 2026-10-15 ~20:50 - NOT YET GATED OR PUSHED.** REQ-GEN-207 is
       marked built in requirements.yaml on the local checkpoint commits, but the
       configuration tests broke: 122 failures across 13 files, because they edit
