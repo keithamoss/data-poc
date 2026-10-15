@@ -117,6 +117,22 @@ def record(conn, *, agency_id: str, collection_id: str, dataset_id: str, supply:
 _RANK = {"green": 0, "amber": 1, "red": 2}
 
 
+def is_worse(promoted_on: str | None, now: str | None) -> bool:
+    """Whether `now` is worse than the verdict a supply was promoted on, by
+    this module's one ranking (criterion 15); False where either is unknown."""
+    return promoted_on in _RANK and now in _RANK and _RANK[now] > _RANK[promoted_on]
+
+
+def promoted_on(conn, dataset_id: str, period: str) -> str | None:
+    """The status the supply holding `period` was promoted on, or None."""
+    holds = decision_log.held(conn, dataset_id, period)
+    if not holds or holds.held_as != decision_log.PROMOTED:
+        return None
+    rows = conn.execute(f"SELECT promoted_status FROM {decision_log.TABLE} WHERE id = ?",
+                        [holds.decision_id]).fetchall()
+    return rows[0][0] if rows else None
+
+
 @dataclass(frozen=True)
 class Worse:
     """A promoted supply whose re-check came back worse than the verdict it
@@ -181,7 +197,7 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
             now = supply_status.status(conn, ds, held_supply)
         except Exception:  # noqa: BLE001 - an unreadable verdict is not "worse"
             continue
-        if now in _RANK and _RANK[now] > _RANK[promoted_on]:
+        if is_worse(promoted_on, now):
             out.append(Worse(ds, held_supply, period, promoted_on, now, recheck_id,
                              at.isoformat() if hasattr(at, "isoformat") else str(at)))
     return out

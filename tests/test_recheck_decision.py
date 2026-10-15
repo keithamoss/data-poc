@@ -271,6 +271,53 @@ class TestPromotedThenRecheckedWorse:
         _person(conn, fd.DEMOTE, period=state.period, supply=supply)
         assert supply not in {w.supply for w in rechecking.worse_than_promoted(conn, DS)}
 
+    def test_its_period_manifest_says_whether_it_is_acknowledged(self, conn, minted, quiet,
+                                                                  monkeypatch):
+        """REQ-PIPE-130 criterion 12 as amended 2026-10-15 (Keith, morning
+        report 5 Q11): _manifest's acknowledged column covers a promoted
+        supply re-checked worse, from a value recorded when the re-check
+        clears rather than computed in the view."""
+        from qa_tools.common import period_schema
+
+        def manifest():
+            cur = conn.execute(
+                f'SELECT dataset_id, acknowledged FROM '
+                f'"{period_schema.period_schema(state.period)}"._manifest')
+            return {ds: ack for ds, ack in cur.fetchall() if ds == DS}
+
+        from qa_tools.common import supply_status
+
+        verdict = {"now": "green"}
+        monkeypatch.setattr(supply_status, "status", lambda c, ds, s, **k: verdict["now"])
+        state, supply = parity.ex_promoted(conn, minted)
+        assert manifest() == {DS: None}, "a green promotion owes nothing"
+        got = _recheck(conn, state.period, supply)
+        recheck.clear(got.owed[0], "rk", found_worse=True)
+        verdict["now"] = "red"
+        assert manifest() == {DS: False}
+        _person(conn, fd.ACKNOWLEDGE, period=state.period, supply=supply)
+        assert manifest() == {DS: True}
+
+    def test_the_promoted_re_check_records_that_it_came_back_worse(self, conn, minted, quiet,
+                                                                   monkeypatch):
+        from qa_tools.common import supply_status
+
+        # PROMOTED ON GREEN: the promotion records the verdict it was made on.
+        monkeypatch.setattr(supply_status, "status", lambda c, ds, s, **k: "green")
+        state, supply = parity.ex_promoted(conn, minted)
+        got = _recheck(conn, state.period, supply)
+        cleared = []
+        monkeypatch.setattr(recheck, "clear",
+                            lambda owed_id, run_key, found_worse=None: cleared.append(found_worse))
+        monkeypatch.setattr(supply_status, "status", lambda c, ds, s, **k: "red")
+        item, _ = recheck._owed_item(conn, got.owed[0])
+        recheck._promoted_outcome(item, "rk", state.period, "green")
+        assert cleared == [True]
+        cleared.clear()
+        monkeypatch.setattr(supply_status, "status", lambda c, ds, s, **k: "green")
+        recheck._promoted_outcome(item, "rk", state.period, "green")
+        assert cleared == [False]
+
     def test_re_checked_no_worse_is_not_listed(self, conn, worse):
         from qa_tools.common import acknowledgement, rechecking
 

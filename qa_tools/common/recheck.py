@@ -391,14 +391,15 @@ def _promoted_outcome(item, run_key: str, period: str, before: str | None) -> Ou
     new verdict, that it is still promoted and the period keeps it, and - where
     it came back red - demote as what takes it out and acknowledge as what
     records that it stays (criterion 13)."""
-    from qa_tools.common import supply_status
+    from qa_tools.common import rechecking, supply_status
 
-    clear(item.id, run_key)
     with supply_db.connect(label="mothman:recheck") as conn:
         try:
             verdict = supply_status.status(conn, item.dataset_id, item.supply_id)
         except Exception:  # noqa: BLE001 - the message, never the run, depends on it
             verdict = None
+        promoted_on = rechecking.promoted_on(conn, item.dataset_id, period)
+    clear(item.id, run_key, found_worse=rechecking.is_worse(promoted_on, verdict))
     message = (f"Checked against {period}: {verdict or 'no verdict'} (was "
                f"{before or 'no verdict'}). It is still promoted - {period} keeps it.")
     if verdict == "red":
@@ -436,11 +437,18 @@ def fail(owed_id: int, message: str) -> None:
         conn.execute(f"UPDATE {TABLE} SET last_failure = ? WHERE id = ?", [message, owed_id])
 
 
-def clear(owed_id: int, run_key: str) -> None:
-    """Cleared only once its work - run AND gate - is done (criterion 7)."""
+def clear(owed_id: int, run_key: str, found_worse: bool | None = None) -> None:
+    """Cleared only once its work - run AND gate - is done (criterion 7).
+
+    `found_worse` is recorded for a PROMOTED supply's re-check only: whether
+    it came back worse than the verdict it was promoted on - the value a
+    period's _manifest reads for its acknowledged column (REQ-PIPE-130
+    criterion 12 as amended by Keith, 2026-10-15), recorded here rather than
+    computed in the view, which cannot compute a supply's current verdict."""
     with supply_db.connect(label="mothman:recheck") as conn:
         conn.execute(f"UPDATE {TABLE} SET cleared_at = ?, cleared_by_run = ?, "
-                     "last_failure = NULL WHERE id = ?", [_replay_clock.now(), run_key, owed_id])
+                     "last_failure = NULL, found_worse = ? WHERE id = ?",
+                     [_replay_clock.now(), run_key, found_worse, owed_id])
 
 
 def run_all_owed(*, collection_id: str | None = None, kinds=(REEVALUATE,),

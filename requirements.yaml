@@ -29370,8 +29370,11 @@ requirements:
     - qa_tools/common/supply_status.py::status
     - qa_tools/common/validate_hierarchy.py::reserved_table_errors
     - qa_tools/common/census.py::compare
+    - qa_tools/common/recheck.py::clear
+    - qa_tools/common/rechecking.py::is_worse
     linked_tests:
     - tests/test_manifest.py
+    - tests/test_recheck_decision.py::TestPromotedThenRecheckedWorse
     - tests/test_slot_holds.py
     source: 'Keith, group 2 sign-off round 2026-10-04 (plans/road-testing.md #16 - ''NEW IDEA, Keith: A MANIFEST IN EVERY PERIOD SCHEMA'', ''THE MANIFEST: _manifest, a VIEW over the decision log'', ''TABLE NAME GOES INTO THE DECISION LOG''). Drafted by delivery-scoper 2026-10-04.'
     acceptance_criteria:
@@ -29386,7 +29389,7 @@ requirements:
     - THE SYSTEM SHALL answer every question of what a slot holds or held - the promotion gate's filled-slot check, slot states, the stood-on guard, the newest promoted supply, and each period's _manifest - from that one view, and SHALL NOT re-derive it from the decision log anywhere else.
     - THE SYSTEM SHALL record the table name beside dataset_id on every decision-log entry that concerns a table, so that _manifest needs no dataset-to-table mapping of its own.
     - THE SYSTEM SHALL record the supply's status at the moment of promotion on every promotion decision, rule or person, and _manifest SHALL take promoted_status from it.
-    - THE SYSTEM SHALL NOT include a supply's current health - any verdict computed after it was promoted - in _manifest.
+    - THE SYSTEM SHALL NOT include a supply's current health - any verdict computed after it was promoted - in _manifest; except that its acknowledged column SHALL cover a promoted supply re-checked worse (REQ-PIPE-164) as it covers one promoted amber, from a value recorded when the re-check is recorded rather than computed in the view. AMENDED 2026-10-15 by Keith (morning report 5 Q11).
     - THE SYSTEM SHALL refuse in CI any dataset whose table is named _manifest.
     non_functional_requirements:
     - 'Parity, not trust: a test asserts, for every period in a bootstrapped database, that _manifest agrees with what the pipeline itself resolves that period to (REQ-PIPE-091 criterion 9). The view necessarily states ''latest decision for this table in this period'' in SQL, and a second statement of a rule is how two copies drift.'
@@ -29400,6 +29403,7 @@ requirements:
     - REQ-PIPE-129
     - REQ-PIPE-122
     decisions:
+    - 'RE-CHECKED WORSE IS ACKNOWLEDGED IN _manifest TOO (Keith, 2026-10-15, morning report 5 Q11): REQ-PIPE-164 made a promoted supply re-checked worse owe an acknowledgement, which _manifest could not show because the view cannot compute a current verdict. The re-check''s work item (owed_run.found_worse, schema 44) records whether it came back worse when it clears, and the view reads that: an acknowledgement after the newest such re-check counts. Criterion 12 amended to allow exactly this one recorded value; current health is still never computed in the view.'
     - A MANIFEST IN EVERY PERIOD SCHEMA (Keith, 2026-10-04), so external tools query facts rather than parsing names - for example a downstream tool flagging substituted data to its users. It is what lets REQ-PIPE-129's plain names drop the stamp without losing what the stamp said.
     - 'A VIEW OVER THE DECISION LOG (Keith: ''that''s elegant''). REJECTED a maintained manifest table, which can drift from the log it summarises.'
     - THE TABLE NAME GOES INTO THE DECISION LOG beside dataset_id (Keith, confirmed 2026-10-04). REJECTED re-implementing the dataset-to-table mapping in SQL, which would be a second copy of what contract/data-asset.yaml and the pipeline already say.

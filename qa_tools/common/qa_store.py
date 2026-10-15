@@ -144,7 +144,7 @@ _KEY_COLUMNS = ("agency_id", "collection_id", "tool", "scope", "supply_state")
 #: Bumped whenever the DDL below changes shape. `ensure_schema` reads
 #: it and does nothing when it already matches, which is what keeps
 #: migration DDL off the hot write path - see that function.
-SCHEMA_VERSION = 43
+SCHEMA_VERSION = 44
 
 #: The version at which REQ-PIPE-144 RESHAPED qa.filing and qa.delivery
 #: (a column removed, a column replaced by a foreign key). `CREATE TABLE
@@ -1317,6 +1317,13 @@ CREATE TABLE IF NOT EXISTS "{SCHEMA}".owed_run (
     CHECK ((cleared_at IS NULL) = (cleared_by_run IS NULL))
 );
 
+-- WHETHER A PROMOTED SUPPLY'S RE-CHECK CAME BACK WORSE than the verdict it
+-- was promoted on, set when it clears (REQ-PIPE-130 criterion 12 as amended
+-- by Keith, 2026-10-15; schema 44) - what _manifest's acknowledged column
+-- reads, since the view cannot compute a supply's current verdict. NULL for
+-- every other item.
+ALTER TABLE "{SCHEMA}".owed_run ADD COLUMN IF NOT EXISTS found_worse boolean;
+
 --   "what is owed", the only question asked of it routinely
 CREATE INDEX IF NOT EXISTS owed_run_open
     ON "{SCHEMA}".owed_run (owed_at) WHERE cleared_at IS NULL;
@@ -1477,7 +1484,7 @@ WITH present AS (
       AND c.relname <> '_manifest'
 ), held AS (
     SELECT h.dataset_id, h.held_as, h.holder, d.table_name, d.effective_at,
-           d.actor_kind, d.reason, d.stands_on
+           d.actor_kind, d.reason, d.stands_on, h.decision_id
     FROM "{SCHEMA}".slot_holds(NULL, NULL) h
     JOIN "{SCHEMA}".decision d ON d.id = h.decision_id
     WHERE h.slot = for_period AND h.held_as IS NOT NULL
@@ -1485,7 +1492,17 @@ WITH present AS (
 SELECT p.table_name, h.dataset_id, h.held_as, h.holder, r.received_instant,
        CASE WHEN h.held_as = 'promoted' THEN NULL ELSE h.stands_on END,
        h.effective_at, h.actor_kind,
-       CASE WHEN pr.acknowledgement_owed THEN EXISTS (
+       -- RE-CHECKED WORSE FIRST (REQ-PIPE-130 criterion 12 as amended,
+       -- schema 44): owed since that re-check, so only an acknowledgement
+       -- after it counts; else amber on arrival, as before.
+       CASE WHEN rw.decision_id IS NOT NULL THEN EXISTS (
+           SELECT 1 FROM "{SCHEMA}".decision a
+           WHERE a.action = 'acknowledge' AND a.dataset_id = h.dataset_id
+             AND a.supply = h.holder AND a.to_slot = for_period AND a.id > rw.decision_id
+             AND NOT EXISTS (SELECT 1 FROM "{SCHEMA}".decision w
+                             WHERE w.caused_by_decision = a.id
+                               AND w.action = 'withdraw-acknowledgement'))
+            WHEN pr.acknowledgement_owed THEN EXISTS (
            SELECT 1 FROM "{SCHEMA}".decision a
            WHERE a.action = 'acknowledge' AND a.dataset_id = h.dataset_id
              AND a.supply = h.holder AND a.to_slot = pr.to_slot
@@ -1504,6 +1521,15 @@ LEFT JOIN LATERAL (
     FROM "{SCHEMA}".decision x
     WHERE x.action = 'promote' AND x.dataset_id = h.dataset_id AND x.supply = h.holder
     ORDER BY x.effective_at DESC, x.id DESC LIMIT 1) pr ON true
+LEFT JOIN LATERAL (
+    -- The newest re-check of the promoted holder in this period that came
+    -- back worse, after its promotion; a later re-check that did not wins.
+    SELECT CASE WHEN o.found_worse THEN d.id END AS decision_id
+    FROM "{SCHEMA}".owed_run o JOIN "{SCHEMA}".decision d ON d.id = o.caused_by_decision
+    WHERE h.held_as = 'promoted' AND o.kind = 'recheck' AND o.cleared_at IS NOT NULL
+      AND d.action = 're-check' AND d.dataset_id = h.dataset_id AND d.supply = h.holder
+      AND d.to_slot = for_period AND d.id > h.decision_id
+    ORDER BY d.id DESC LIMIT 1) rw ON true
 ORDER BY p.table_name
 $fn$;
 """
