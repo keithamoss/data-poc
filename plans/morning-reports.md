@@ -1961,6 +1961,14 @@ one or more component tags, and a date.
       only, so both are ready for him in one sitting. Offered and NOT
       chosen: a faster test suite beyond the YAML fix, and clearing the old
       [investigate] items.
+      ITEM 6 MANDATE, Keith ~23:40 Perth: do the research, form my own view
+      of the right way forward, take it to delivery-scoper for a couple of
+      rounds, then delivery-architect and the UX reviewers, back to the
+      scoper if needed - "happy for you to make those decisions" - and come
+      back in the morning with a FULLY SCOPED, ARCHITECTED AND REVIEWED
+      proposal. Significant calls made along the way are listed for him to
+      sense-check, not silently settled. Still a proposal: nothing signed,
+      nothing built.
       Terms: ungated checkpoints may be pushed (no test claims in their
       messages); amendments to REQ-GEN-044/203/205/207/218 approved by the
       session under his delegation; nothing Emergency Department built.
