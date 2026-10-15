@@ -1956,6 +1956,11 @@ one or more component tags, and a date.
       (4) REQ-GEN-218 (TS-63 stays on Child Protection, his call tonight);
       (5) REQ-GEN-203 (TS-42/TS-80); (6) profile the bootstrap toward his
       hard 12 minutes, speed-ups only where output stays byte-identical.
+      ADDED minutes later: (7) once (2) lands, re-draft the Emergency
+      Department requirements against item 6's recommended shape - drafts
+      only, so both are ready for him in one sitting. Offered and NOT
+      chosen: a faster test suite beyond the YAML fix, and clearing the old
+      [investigate] items.
       Terms: ungated checkpoints may be pushed (no test claims in their
       messages); amendments to REQ-GEN-044/203/205/207/218 approved by the
       session under his delegation; nothing Emergency Department built.
