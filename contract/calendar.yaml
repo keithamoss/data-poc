@@ -235,6 +235,19 @@ calendars:
       # FIVE MORE, EARLIER AGAIN (post-build-review #172, Keith, 2026-10-13):
       # spacing the seven pairs left the ordinary reds no room to sit apart,
       # and two neighbouring reds' resends claimed one receipt instant.
+      # TWELVE MORE, THE EVENING-BEFORE ERA (REQ-GEN-044, Keith, 2026-10-15):
+      # Birth Registrations' earliest stretch is due the evening before, so
+      # TS-3c, TS-3d and TS-10 sit in the configuration that makes their
+      # outcomes right. Added at the old end, as every growth before it was.
+      - effective_from: "2026-06-18"
+        changelog:
+          - date: "2026-10-16"
+            author: REQ-GEN-044
+            change: >-
+              Twelve days of daily supply before 2026-06-30, the evening-before era: the synthetic history grows from 85 daily supplies to 97 so the evening-before scenarios have a configuration of their own (Keith's call). Added at the old end. The same rule and claim window.
+        claim_window: 4h
+        cadence:
+          rule: daily
       - effective_from: "2026-06-30"
         changelog:
           - date: "2026-10-13"
@@ -327,8 +340,26 @@ datasets:
       versions:
         # FORTY MORE, AS AN EARLIER VERSION AGAIN (REQ-GEN-196 criterion 20).
         # FIVE MORE (post-build-review #172) - see the daily calendar above.
+        # THE EVENING-BEFORE ERA (REQ-GEN-044, Keith, 2026-10-15): twelve
+        # earlier days in which the supply for day D is due at 22:00 on D-1.
+        - effective_from: "2026-06-18"
+          expected_time: "22:00"
+          days_before: 1
+          grace: 1h
+          changelog:
+            - date: "2026-10-16"
+              author: REQ-GEN-044
+              change: >-
+                Birth Registrations owes a supply from 2026-06-18, each due at
+                22:00 the evening before its day - the evening-before era the
+                scenarios TS-3c, TS-3d and TS-10 need. From 2026-06-30 it is
+                due at 14:00 on the day, as before.
         - effective_from: "2026-06-30"
           expected_time: "14:00"
+          # Restated since the evening-before version above states 1: every
+          # version reads as complete on its own. 0 is the default, so no
+          # slot this version governs moves.
+          days_before: 0
           grace: 1h
           changelog:
             - date: "2026-10-13"
@@ -339,6 +370,7 @@ datasets:
                 time and grace as the versions after it.
         - effective_from: "2026-07-05"
           expected_time: "14:00"
+          days_before: 0
           grace: 1h
           changelog:
             - date: "2026-10-13"
@@ -351,6 +383,7 @@ datasets:
         # calendar above for why not by moving the 2026-08-24 one.
         - effective_from: "2026-08-14"
           expected_time: "14:00"
+          days_before: 0
           grace: 1h
           changelog:
             - date: "2026-10-11"
@@ -361,6 +394,7 @@ datasets:
                 as the version after it.
         - effective_from: "2026-08-24"
           expected_time: "14:00"
+          days_before: 0
           grace: 1h
           changelog:
             - date: "2026-10-11"

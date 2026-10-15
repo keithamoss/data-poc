@@ -29,7 +29,8 @@ WHAT NEEDS NO CEREMONY. An item not yet frozen (criterion 10). Dates
 appended after a calendar's last one, even already past, where no dataset
 on it would see its last slot's closing move (criterion 8) - extending an
 exhausted schedule. On a synthetic asset, ADDING a past-dated calendar,
-participation or timezone version (criterion 9).
+participation or timezone version, or restating on a frozen version a value
+it left out at that value's default (criterion 9).
 
 THE CLOCK (criterion 12) is the committer instant of the commit that
 introduced the change, floored at the base commit's - never the author
@@ -835,6 +836,8 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         if added and synthetic and item.kind == "cal_date" and \
                 f"calendar {item.ctx['calendar']} version {item.ctx['version']}" not in old_items:
             continue  # a date inside a version criterion 9 lets a synthetic asset add
+        if synthetic and _restates_at_default(item, old, new, old_cal, old_asset):
+            continue  # criterion 9, amended 2026-10-16
         needs.setdefault(item.owner, []).append((item, old, new, frozen_at))
 
     for owner, rows in needs.items():
@@ -880,6 +883,48 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
             + ("it" if len(rows) == 1 else "them") + ". Nothing was committed.",
             fix))
     return out
+
+
+#: A participation value's own default, where it has one that is not
+#: "unstated" (agreement.py's fallback): the only value criterion 9 lets a
+#: synthetic asset restate on a frozen version that left it out.
+_DEFAULTS = {"days_before": 0}
+
+
+def _collection_states(key: str, dataset_id: str, cal_doc: dict, asset_doc: dict) -> bool:
+    """Whether any participation_defaults version of the dataset's
+    collection states `key` - where it does, leaving the key out took the
+    collection's value rather than the default."""
+    for agency in (((asset_doc or {}).get("hierarchy") or {}).get("agencies") or []):
+        for coll in ((agency or {}).get("collections") or []):
+            if any(str((d or {}).get("id")) == dataset_id for d in (coll or {}).get("datasets") or []):
+                for c in (cal_doc or {}).get("collections") or []:
+                    if (c or {}).get("id") == (coll or {}).get("id"):
+                        versions = ((c.get("participation_defaults") or {}).get("versions")) or []
+                        return any(key in (v or {}) for v in versions)
+    return False
+
+
+def _restates_at_default(item: Item, old, new, old_cal: dict, old_asset: dict) -> bool:
+    """REQ-PIPE-111 criterion 9, amended 2026-10-16 (Keith's wording):
+    RESTATING on a frozen version a value it left out, at that value's
+    default. True only where the new value is the old one plus such keys
+    and nothing else, and the value left out really did resolve to the
+    default - not to a collection's."""
+    if item.kind not in ("participation", "defaults"):
+        return False
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return False
+    added = set(new) - set(old)
+    if not added or set(old) - set(new) or any(new[k] != old[k] for k in old):
+        return False
+    for key in added:
+        if key not in _DEFAULTS or new[key] != _DEFAULTS[key] or isinstance(new[key], bool):
+            return False
+        if item.kind == "participation" and _collection_states(
+                key, item.ctx["dataset"], old_cal, old_asset):
+            return False
+    return True
 
 
 def _appended_dates_allowed(changes, old_items, old_agr, new_agr) -> set[str]:

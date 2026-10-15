@@ -9869,7 +9869,7 @@ twice. It deliberately did not re-find the `TypeError`.
        2024-03-15 too); O5 later supplies listed as "Waiting" at a past date
        (pre-existing). Stale comments at scenario_injection.py TS-76/TS-77a.
 
-208. **[blocked, 2026-10-16]** **[Data generation]** **[QA checks & contract]**
+208. **[done, 2026-10-16]** **[Data generation]** **[QA checks & contract]**
      **REQ-GEN-044's evening-before era was built and shelved.** Byte proof
      clean (449 of 449 existing Birth Registrations deliveries identical, 12
      new), but `mothman schedule validate` refuses the configuration: the
@@ -9879,4 +9879,15 @@ twice. It deliberately did not re-find the `TypeError`.
      configuration tests and the critic before any push. The whole change is
      `docs/drafts/evening-before/evening-before.patch`, with the options for
      Keith in that folder's README.
+     **RESOLVED the same morning.** Keith chose to widen REQ-PIPE-111
+     criterion 9's synthetic exemption to "RESTATING on a frozen version a
+     value it left out, at that value's default" (his approved wording,
+     ~06:30 Perth). Built test-first
+     (`TestRestatingAnOmittedValueAtItsDefault`, the free case failing
+     against the old code, four refusals passing on both), the patch
+     re-applied with `days_before: 0` restated on all four later Birth
+     Registrations versions, the byte proof re-run on that tree (449 of 449
+     identical, 12 new), and the draft folder deleted. A defect fix in the
+     sense of this file's rule? No - a built rule doing what it said, changed
+     by an approved amendment; the test-first order was kept anyway.
 

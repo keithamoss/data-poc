@@ -118,12 +118,11 @@ class TestTheGeneratedHistory:
     @staticmethod
     def _bdm():
         from generator import generate_runs as g
-        from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
 
-        periods = schedule.periods_for_dataset(g.DATASET_ID,
-                                               until=get_anchor_date())[-g.N_DELIVERIES:]
-        _r, by_period, suppressed, _q = g._plan_injections(periods)
+        _r, by_period, suppressed, _q = g._plan_injections(g.generated_periods())
+        # The ordinary plan covers the 85 alone (REQ-GEN-044's evening-before
+        # era carries no ordinary severities).
+        periods = g.original_periods()
         return g, periods, by_period, suppressed, g._ordinary_severities(
             periods, by_period, suppressed | g._covered(by_period))
 
@@ -856,10 +855,8 @@ class TestEachPlantedScenarioSitsInItsEra:
     def test_each_anchor_falls_under_the_setting_it_needs(self):
         from generator import generate_runs as g
         from generator import scenario_injection as si
-        from generator.anchor_date import get_anchor_date
-        from qa_tools.common import amber_setting, asset_time, replacement_setting, schedule
-        periods = schedule.periods_for_dataset(g.DATASET_ID,
-                                               until=get_anchor_date())[-g.N_DELIVERIES:]
+        from qa_tools.common import amber_setting, asset_time, replacement_setting
+        periods = g.generated_periods()
         for inj in si.for_dataset(g.DATASET_ID):
             if inj.scenario_id not in self.ERAS:
                 continue

@@ -38,6 +38,12 @@ substitution names the period it stands on as an offset (`stands_on: -1`),
 resolved at play time through slots.relative_period() - the one resolver -
 with the supply that period then holds as promoted. Nothing in the script
 moves when ANCHOR_DATE is bumped.
+
+AN ORDINARY CHAIN, NOT A SCENARIO (REQ-GEN-207, Keith, 2026-10-16). A red in
+Child Protection's grown years leaves its resend waiting under replacement
+`never`, a permanent queue item no scenario is about. Such an entry names no
+scenario: it names the dataset's PERIOD, an index into the supplies filed to
+that period in receipt order, and only promote or reject.
 """
 from __future__ import annotations
 
@@ -61,6 +67,14 @@ PERIOD = "period"
 #: The decisions that may be period-scoped (criterion 2): the ones about a
 #: period that received no supply of its own.
 PERIOD_SCOPED_OPERATIONS = ("substitute", "de-substitute", "mark-not-supplied")
+#: What an ordinary chain's entry may decide (REQ-GEN-207): settle it.
+CHAIN_OPERATIONS = ("promote", "reject")
+
+
+def label(s) -> str:
+    """What a refusal calls a script: its scenario, or an ordinary chain's
+    dataset and period."""
+    return s.scenario or f"{s.dataset_id} {s.period}"
 
 
 @dataclass(frozen=True)
@@ -106,6 +120,9 @@ class Script:
     day_offset: int = 0
     #: Whether `after_hours:` was written, so `at:` beside it is refused.
     after_hours_given: bool = False
+    #: For an ordinary chain rather than a scenario (REQ-GEN-207): the
+    #: dataset's period whose supplies `supply:` indexes, in receipt order.
+    period: str | None = None
 
 
 def load(path: Path | str | None = None) -> list[Script]:
@@ -133,7 +150,8 @@ def load(path: Path | str | None = None) -> list[Script]:
             files=tuple(str(f) for f in (raw.get("files") or ())),
             at=(str(raw["at"]) if raw.get("at") is not None else None),
             day_offset=int(raw.get("day_offset", 0)),
-            after_hours_given="after_hours" in raw))
+            after_hours_given="after_hours" in raw,
+            period=(str(raw["period"]) if raw.get("period") is not None else None)))
     return out
 
 
@@ -206,8 +224,10 @@ def problems(scripts: list[Script], *, registered: set[str],
 
     out = []
     for i, s in enumerate(scripts, 1):
-        where = f"contract/scripted_decisions.yaml decision {i} ({s.scenario or '?'})"
-        if s.scenario not in registered:
+        where = f"contract/scripted_decisions.yaml decision {i} ({label(s) if s.scenario or s.period else '?'})"
+        if s.period is not None:
+            out += _chain_problems(s, where)
+        elif s.scenario not in registered:
             out.append(f"{where}: scenario {s.scenario!r} is not in the register")
         if s.operation not in filing_decisions.OPERATIONS:
             out.append(f"{where}: {s.operation!r} is not a filing decision - one of "
@@ -220,8 +240,9 @@ def problems(scripts: list[Script], *, registered: set[str],
             hierarchy.dataset(s.dataset_id)
         except hierarchy.UnknownDatasetError:
             out.append(f"{where}: no dataset {s.dataset_id!r} in contract/data-asset.yaml")
-        out += _scope_problems(s, where)
-        out += _settlement_problems(s, where)
+        if s.period is None:
+            out += _scope_problems(s, where)
+            out += _settlement_problems(s, where)
         if s.at is not None and s.after_hours_given:
             out.append(f"{where}: give `at:` (with `day_offset:`) or `after_hours:`, not "
                        f"both - each says when it takes effect")
@@ -243,6 +264,30 @@ def problems(scripts: list[Script], *, registered: set[str],
             out.append(f"contract/scripted_decisions.yaml decisions {first} and {i} "
                        f"{scope} are both named {s.name!r} - a name is unique within the "
                        f"scenarios sharing a placement; rename one")
+    return out
+
+
+def _chain_problems(s: Script, where: str) -> list[str]:
+    """An ordinary chain's entry (REQ-GEN-207): a period, a supply in it,
+    and a settlement - and nothing a scenario's entry needs."""
+    out = []
+    if s.scenario:
+        out.append(f"{where}: names scenario {s.scenario!r} and `period:` - an entry is about "
+                   f"a scenario or an ordinary chain's period, not both")
+    if s.supply_index is None:
+        out.append(f"{where}: a chain entry needs `supply: <index>` - which of the period's "
+                   f"supplies, in receipt order")
+    if s.operation not in CHAIN_OPERATIONS:
+        out.append(f"{where}: an ordinary chain is settled by promote or reject, not "
+                   f"{s.operation!r}")
+    for field_name, is_set in (("scope", s.scope is not None),
+                               ("to_period", s.to_period is not None),
+                               ("period_from", s.period_from != "filed"),
+                               ("names_supply", not s.names_supply),
+                               ("at", s.at is not None), ("name", s.name is not None),
+                               ("files", bool(s.files))):
+        if is_set:
+            out.append(f"{where}: `{field_name}:` means nothing on a chain entry - drop it")
     return out
 
 
@@ -336,6 +381,13 @@ class Player:
 
         ready, waiting = [], []
         for s in self.pending:
+            if s.period is not None:
+                timed, why = _timed_chain(s)
+                if timed is None:
+                    waiting.append((s, why))
+                else:
+                    ready.append(timed)
+                continue
             placement = self.placements.get(s.scenario)
             if s.scope == PERIOD:
                 timed, why = _timed_by_period(s, placement)
@@ -401,7 +453,7 @@ class Player:
         if until is None and waiting:
             s, why = waiting[0]
             raise ScriptRefused(
-                f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} - could "
+                f"scripted decision for {label(s)} - {s.operation} {s.dataset_id} - could "
                 f"not be played by the end of the replay: {why}. The replay stops here rather "
                 f"than finish with a history missing it.")
         # "At or after" (criterion 3): one timed exactly at the arrival plays
@@ -411,6 +463,25 @@ class Player:
             _apply(t)
             self.pending.remove(t.script)
         return len(due)
+
+
+def _timed_chain(s: Script) -> tuple[Timed | None, str]:
+    """An ordinary chain's instant (REQ-GEN-207): `after_hours` after the
+    `supply`-th supply filed to its period, in receipt order - or None and
+    why, while that supply has not arrived."""
+    from qa_tools.common import filing
+
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT supply_id FROM {filing.CURRENT} WHERE dataset_id = ? AND slot = ?",
+            [s.dataset_id, s.period]).fetchall()
+    received = sorted((r, sid) for sid, in rows
+                      if (r := filing.received_at_of(s.dataset_id, sid)) is not None)
+    if not 0 <= s.supply_index < len(received):
+        return None, (f"supply {s.supply_index} of {s.period} has not arrived - "
+                      f"{len(received)} filed so far")
+    at, supply = received[s.supply_index]
+    return Timed(s, at + timedelta(hours=s.after_hours), supply, s.period), ""
 
 
 def _timed_by_period(s: Script, placement) -> tuple[Timed | None, str]:
@@ -556,14 +627,14 @@ def _apply(t: Timed) -> None:
                     raise RuntimeError(f"it changed nothing - {outcome.message}")
         except Exception as exc:  # noqa: BLE001 - criterion 6: ANY failure stops the replay
             raise ScriptRefused(
-                f"scripted decision for {s.scenario} - "
+                f"scripted decision for {label(s)} - "
                 + " ".join(x for x in (s.operation, s.dataset_id, t.period, t.supply,
                                        f"standing on {t.stands_on}" if t.stands_on else None,
                                        f"at {t.at.isoformat()}") if x)
                 + f" - was refused: {str(exc).rstrip('.')}. "
                 f"The replay stops here rather than continue with a history missing it."
             ) from exc
-    print(f"scripted: {s.operation} {s.dataset_id} {t.period} ({s.scenario})")
+    print(f"scripted: {s.operation} {s.dataset_id} {t.period} ({label(s)})")
     # EVERY RE-CHECK IT OWED, in order (REQ-GEN-196 criterion 10): a
     # settlement owes one per file that became a supply.
     for owed_id in outcome.owed:
@@ -588,7 +659,7 @@ def _run_the_re_check_it_owed(t: Timed, owed_id: int) -> None:
         got = recheck.Outcome(owed_id, "", False, str(exc))
     if not got.completed:
         raise ScriptRefused(
-            f"scripted decision for {s.scenario} - {s.operation} {s.dataset_id} - was "
+            f"scripted decision for {label(s)} - {s.operation} {s.dataset_id} - was "
             f"recorded, but the re-check it owed did not complete: {got.message}. The "
             f"replay stops here rather than continue with a history missing it.")
-    print(f"scripted: re-checked {s.dataset_id} ({s.scenario}): {got.status or got.message}")
+    print(f"scripted: re-checked {s.dataset_id} ({label(s)}): {got.status or got.message}")

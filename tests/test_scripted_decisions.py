@@ -547,3 +547,55 @@ class TestThePlantedPairsAreSettled:
                 if outcome == "refiled":
                     assert to_slot == nxt, f"{sid}: {name} re-filed to {to_slot}"
             assert len(decisions) == 1, f"{sid}: {len(decisions)} choose-file decisions"
+
+
+class TestAnOrdinaryChainIsSettledByPeriod:
+    """REQ-GEN-207 criterion (2026-10-16, Keith: "Script decisions", "One
+    entry per chain", "Grown years only"): a grown red chain is not a
+    scenario, so its script names the dataset and PERIOD instead, and an
+    index into that period's supplies in receipt order."""
+
+    @staticmethod
+    def _chain(period, **kw):
+        return _script(**{"scenario": "", "period": period, "supply_index": 1,
+                          "after_hours": 24, **kw})
+
+    def test_a_chain_entry_validates(self):
+        assert sd.problems([self._chain("2013-Q3")], registered=set()) == []
+
+    def test_it_names_a_scenario_or_a_period_not_both(self):
+        found = sd.problems([self._chain("2013-Q3", scenario="TS-1")], registered={"TS-1"})
+        assert any("not both" in f for f in found), found
+
+    def test_it_names_a_supply(self):
+        found = sd.problems([self._chain("2013-Q3", supply_index=None)], registered=set())
+        assert any("supply: <index>" in f for f in found), found
+
+    def test_only_promote_or_reject(self):
+        found = sd.problems([self._chain("2013-Q3", operation="refile", to_period="2013-Q4")],
+                            registered=set())
+        assert any("promote or reject" in f for f in found), found
+
+    def test_it_promotes_the_periods_second_supply_at_its_instant(self, conn, period):
+        a, _ = _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        b, _ = _filed(conn, period, "2026-05-09T01:00:00+00:00")
+        player = sd.Player("child-protection", scripts=[self._chain(period)], placements={})
+        assert player.finish() == 1
+        rows = conn.execute(
+            f"SELECT supply, actor, effective_at FROM {dl.TABLE} "
+            "WHERE dataset_id = ? AND action = 'promote' AND supply IN (?, ?)",
+            [DS, a, b]).fetchall()
+        assert [(r[0], r[1]) for r in rows] == [(b, SYNTHETIC)]
+        assert rows[0][2] == (datetime.fromisoformat("2026-05-09T01:00:00+00:00")
+                              + timedelta(hours=24))
+
+    def test_it_waits_for_the_supply_and_the_end_names_the_chain(self, conn, period):
+        _filed(conn, period, "2026-05-01T01:00:00+00:00")
+        player = sd.Player("child-protection", scripts=[self._chain(period)], placements={})
+        with pytest.raises(sd.ScriptRefused, match=re.escape(f"{DS} {period}")):
+            player.finish()
+
+    def test_the_committed_chains_are_in_the_grown_years(self):
+        chains = [s for s in sd.load() if s.period is not None]
+        assert chains, "no chain entries in contract/scripted_decisions.yaml"
+        assert all(s.period < "2023-Q1" for s in chains)

@@ -20,6 +20,7 @@ directory") - see the `raw_dir` fixture's own docstring."""
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from pathlib import Path
 
 import json
@@ -28,6 +29,7 @@ import pytest
 
 import generator_isolation
 from generator import generate_runs
+from generator import scenario_injection as si
 from qa_tools.common import asset_time
 
 
@@ -93,11 +95,8 @@ def _injected_periods() -> tuple[set[str], set[str]]:
     would quietly stop covering a slot the day somebody renamed one.
     """
     from generator import scenario_injection as si
-    from generator.anchor_date import get_anchor_date
-    from qa_tools.common import schedule
 
-    periods = schedule.periods_for_dataset(
-        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    periods = generate_runs.generated_periods()
     placed = [si.resolve(i, periods) for i in si.for_dataset("birth-registrations")]
     # A COVERED PERIOD is the scenario's own as much as its anchor
     # (REQ-GEN-199, TS-78): its supply is one of the scenario's arrivals.
@@ -109,11 +108,8 @@ def _covered_periods() -> set[str]:
     """Periods whose own supply is written with an injected scenario's
     anchor (Injection.covers), so no slot of their own appears."""
     from generator import scenario_injection as si
-    from generator.anchor_date import get_anchor_date
-    from qa_tools.common import schedule
 
-    periods = schedule.periods_for_dataset(
-        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    periods = generate_runs.generated_periods()
     return {name for i in si.for_dataset("birth-registrations")
             for name in si.resolve(i, periods).covered}
 
@@ -122,13 +118,11 @@ def _planned_severities() -> list:
     """Each slot's severity as the generator plans it - the draw, with
     ordinary ambers moved off periods that cannot carry one (REQ-GEN-184
     criterion 9) - resolved the same way main() resolves it."""
-    from generator.anchor_date import get_anchor_date
-    from qa_tools.common import schedule
 
-    periods = schedule.periods_for_dataset(
-        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    periods = generate_runs.generated_periods()
     _r, by_period, suppressed, _q = generate_runs._plan_injections(periods)
-    return generate_runs._ordinary_severities(periods, by_period, suppressed)
+    return generate_runs._ordinary_severities(generate_runs.original_periods(),
+                                              by_period, suppressed)
 
 
 def _ordinary_slots(manifest) -> dict[str, list[dict]]:
@@ -149,7 +143,8 @@ def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     is not to write one."""
     _, suppressed = _injected_periods()
     slot_ids = {e["slot_id"] for e in manifest}
-    assert len(slot_ids) == len(generate_runs.RUN_PLAN) - len(suppressed)
+    assert len(slot_ids) == (len(generate_runs.RUN_PLAN) + generate_runs.GROWN_DAYS
+                             - len(suppressed))
     assert not ({e["period"] for e in manifest} & suppressed), (
         "a period an injected scenario needs empty carries a supply")
 
@@ -185,7 +180,10 @@ def test_severity_counts_match_run_plan(manifest):
     # RUN_PLAN is in.
     planned_all = _planned_severities()
     for slot_id, entry in first_by_slot.items():
-        planned = planned_all[int(slot_id.split("_")[1]) - 1]
+        index = int(slot_id.split("_")[1]) - 1
+        # The evening-before era's slots come after the 85's and carry no
+        # ordinary severity (REQ-GEN-044).
+        planned = planned_all[index] if index < len(planned_all) else None
         assert entry["dirty_severity"] == planned, (
             f"{slot_id}: planned {planned!r}, generated {entry['dirty_severity']!r}")
     assert first_by_slot, "every slot was excluded - the exclusion is too wide"
@@ -377,11 +375,8 @@ class TestTheInjectedScenariosAreReallyThere:
         """TS-2, and the half that is an ABSENCE - the easiest thing in
         this requirement to stop generating without anyone noticing."""
         from generator import scenario_injection as si
-        from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
 
-        periods = schedule.periods_for_dataset(
-            "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+        periods = generate_runs.generated_periods()
         ts2 = next(i for i in si.INJECTIONS if i.scenario_id == "TS-2")
         suppressed = set(si.resolve(ts2, periods).suppressed)
         assert len(suppressed) == 2, sorted(suppressed)
@@ -392,17 +387,21 @@ class TestTheInjectedScenariosAreReallyThere:
         """Not just "that period has no supply of its own" - NOTHING
         arrives, resupplies of earlier periods included. The supplier is
         down. This is the half that was wrong on the first real run."""
+        from generator import scenario_injection as si
+
         _, suppressed = _injected_periods()
-        landed = {e["received_at"][:10] for e in manifest}
-        assert not (landed & suppressed), sorted(landed & suppressed)
+        assert suppressed, "precondition: some scenario suppresses a day"
+        # By the day's CLAIM WINDOW, not the calendar day of receipt: in the
+        # evening-before era (REQ-GEN-044) a day's supply arrives the evening
+        # before, on the calendar day of the period before it.
+        landed = {(day, e["run_id"]) for day in suppressed for e in manifest
+                  if si._lands_in("birth-registrations", day, e["received_at"])}
+        assert not landed, sorted(landed)
 
 
 def _period_of(si, injection) -> str:
-    from generator.anchor_date import get_anchor_date
-    from qa_tools.common import schedule
 
-    periods = schedule.periods_for_dataset(
-        "birth-registrations", until=get_anchor_date())[-generate_runs.N_DELIVERIES:]
+    periods = generate_runs.generated_periods()
     return si.resolve(injection, periods).period
 
 
@@ -529,7 +528,8 @@ class TestARefusalNamesTheScenarios:
         periods = generate_runs.generated_periods()
         _r, by_period, suppressed, _q = generate_runs._plan_injections(periods)
         with pytest.raises(targeting.TargetError) as refused:
-            generate_runs._ordinary_severities(periods, by_period, suppressed)
+            generate_runs._ordinary_severities(generate_runs.original_periods(),
+                                               by_period, suppressed)
         said = str(refused.value)
         assert "TS-68" in said and "TS-1" in said, said
         assert "lengthen the history or move an anchor" in said, said
@@ -552,3 +552,44 @@ class TestNoResendIsPushedFarFromItsDay:
                     - date.fromisoformat(e["period"])).days > self.LIMIT_DAYS]
         assert manifest, "the generated history is empty"
         assert late == [], late
+
+
+class TestTheEveningBeforeEra:
+    """REQ-GEN-044's evening-before era (Keith, 2026-10-15): twelve more days
+    at the OLD end, generated after the 85 with seeds of their own, in which a
+    day's supply is due at 22:00 the evening before."""
+
+    def test_the_85_keep_their_slots_and_seeds_and_come_first(self, manifest):
+        originals = [e for e in manifest
+                     if int(e["slot_id"].split("_")[1]) <= generate_runs.N_DELIVERIES]
+        assert originals, "precondition: the 85 were generated"
+        assert manifest[:len(originals)] == originals, "the 85 are written first"
+        names = {p.name for p in generate_runs.original_periods()}
+        assert {e["period"] for e in originals} <= names
+
+    def test_the_era_is_twelve_days_before_the_85(self):
+        grown = generate_runs.grown_periods()
+        assert len(grown) == generate_runs.GROWN_DAYS == 12
+        assert grown[-1].date + timedelta(days=1) == generate_runs.original_periods()[0].date
+
+    def test_every_era_supply_arrives_the_evening_before_on_time(self, manifest):
+        from qa_tools.common import asset_time, slots
+
+        era = {p.name for p in generate_runs.grown_periods()}
+        scenario_days = {si.resolve(i, generate_runs.generated_periods()).period
+                         for i in si.for_dataset("birth-registrations")}
+        ordinary = [e for e in manifest if e["period"] in era - scenario_days]
+        assert len(ordinary) >= 6, "precondition: the era's ordinary days were written"
+        for entry in ordinary:
+            due = slots.slot_instants("birth-registrations", date.fromisoformat(entry["period"]))
+            received = asset_time.parse_instant(entry["received_at"], entry["run_id"])
+            assert due.claim_opens_at <= received <= due.due_at, entry
+            assert received.date() == date.fromisoformat(entry["period"]) - timedelta(days=1)
+
+    @pytest.mark.parametrize("scenario_id", ["TS-3c", "TS-3d", "TS-10a", "TS-10b"])
+    def test_each_evening_before_scenario_sits_in_the_era(self, scenario_id):
+        injection = next(i for i in si.INJECTIONS if i.scenario_id == scenario_id)
+        placement = si.resolve(injection, generate_runs.generated_periods())
+        era = {p.name for p in generate_runs.grown_periods()}
+        assert placement.period in era, placement.period
+        assert set(placement.suppressed) <= era

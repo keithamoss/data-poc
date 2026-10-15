@@ -213,3 +213,28 @@ decisions:
     supply: 2
     after_hours: 20
     reason: "Second-parent names missing on more registrations than usual, explained by the supplier; accepted for this day."
+  # GROWN RED CHAINS, SETTLED (REQ-GEN-207; Keith, 2026-10-16: "Script
+  # decisions", "Promote the resend", "One entry per chain", "Grown years
+  # only"). An ordinary red in Child Protection's grown years is promoted, and
+  # under replacement `never` its resend waited for a person for ever - a
+  # permanent queue item no scenario is about. A person promotes the resend a
+  # day after it arrives. No scenario: each names its period, and `supply: 1`
+  # is the period's second supply in receipt order, the resend.
+  - period: 2013-Q3
+    operation: promote
+    dataset: cp-carers
+    supply: 1
+    after_hours: 24
+    reason: "The supplier's corrected carers extract for 2013-Q3; it replaces the version that failed its checks."
+  - period: 2014-Q1
+    operation: promote
+    dataset: cp-carers
+    supply: 1
+    after_hours: 24
+    reason: "The supplier's corrected carers extract for 2014-Q1; it replaces the version that failed its checks."
+  - period: 2014-Q1
+    operation: promote
+    dataset: cp-placements
+    supply: 1
+    after_hours: 24
+    reason: "The supplier's corrected placements extract for 2014-Q1; it replaces the version that failed its checks."

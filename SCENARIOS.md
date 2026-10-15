@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**34 of 56 scenarios marked for injection have data behind them today.** 94 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**34 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -166,11 +166,17 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Period | 2024-Q2 |
 | Set the in-place-on date to | 2024-05-01 |
 
-### TS-10 - Evening-before daily arrival - two variants
+### TS-10a - Evening-before daily arrival, Monday filled
 
-*Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.* - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on time**. - **Monday's slot unfilled** -> it ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code. **Keith, 2026-09-22**: early and late arrivals must be **flagged in the activity feed** for humans to check - see "The activity feed" below.
+**What it demonstrates.** The 22:00 arrival fills **Tuesday, on time**.
 
 *Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.*
+
+**not injected - nothing to look at yet**
+
+### TS-10b - Evening-before daily arrival, Monday unfilled
+
+**What it demonstrates.** The 22:00 arrival ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code.
 
 **not injected - nothing to look at yet**
 
@@ -1159,13 +1165,24 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-10",
+   "id": "TS-10a",
    "mode": "INJECT",
-   "title": "Evening-before daily arrival - two variants",
+   "title": "Evening-before daily arrival, Monday filled",
    "section": "Arrival classification",
-   "demonstrates": "*Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.* - **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on time**. - **Monday's slot unfilled** -> it ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code. **Keith, 2026-09-22**: early and late arrivals must be **flagged in the activity feed** for humans to check - see \"The activity feed\" below.",
+   "demonstrates": "The 22:00 arrival fills **Tuesday, on time**.",
    "breaksAs": null,
    "config": "Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.",
+   "requirements": [],
+   "coordinates": null
+  },
+  {
+   "id": "TS-10b",
+   "mode": "INJECT",
+   "title": "Evening-before daily arrival, Monday unfilled",
+   "section": "Arrival classification",
+   "demonstrates": "The 22:00 arrival ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code.",
+   "breaksAs": null,
+   "config": null,
    "requirements": [
     "REQ-PIPE-131",
     "REQ-PIPE-118",

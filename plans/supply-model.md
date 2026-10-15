@@ -3091,12 +3091,14 @@ a stray test file at 13:45; neither D nor D+1 has a supply of its own.
 **Expect**: one QA run, for D+1; D owed and unfilled, no
 mark-not-supplied. **Breaks as**: the early file checked against D.
 
-**TS-10 `[INJECT]` Evening-before daily arrival - two variants.**
+**TS-10a `[INJECT]` Evening-before daily arrival, Monday filled.**
 *Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours -
 so Tuesday's window opens 18:00 Monday, and Monday closes then.*
-- **Monday's slot filled** -> the 22:00 arrival fills **Tuesday, on
-  time**.
-- **Monday's slot unfilled** -> it ALSO fills **Tuesday, on time**, and
+**Expect**: the 22:00 arrival fills **Tuesday, on time**.
+
+**TS-10b `[INJECT]` Evening-before daily arrival, Monday unfilled.**
+*Same config, but Monday's slot was never filled.*
+**Expect**: the 22:00 arrival ALSO fills **Tuesday, on time**, and
   Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**:
   this variant used to file Monday, late - slot state decided between
   two answers. Keith's worked consequence: Monday's file arriving after

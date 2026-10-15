@@ -6569,6 +6569,7 @@ requirements:
     - REQ-PIPE-049
     - REQ-PIPE-051
     decisions:
+    - 'THE EVENING-BEFORE ERA BUILT 2026-10-16 (criteria 8 to 11''s TS-3c, TS-3d and TS-10; wording approved by the session under Keith''s 2026-10-15 delegation). Birth Registrations grows twelve days at its old end (2026-06-18 to 2026-06-29), generated after the 85 with seeds of their own (GROWN_DAYS 12, GROWN_BASE_SEED 40000), as REQ-GEN-207 grew Child Protection; byte proof from empty, all 449 existing delivery files identical and 12 new. A daily calendar version and a Birth Registrations participation version effective 2026-06-18 make each day due 22:00 the evening before (days_before 1), 1h grace, 4h claim window, and every later version restates days_before 0 under REQ-PIPE-111 criterion 9''s 2026-10-16 amendment. The register''s TS-10 splits into TS-10a (the day before filled) and TS-10b (the day before empty). The era''s ordinary days are clean, one on-time supply at 21:00 the evening before (PROVISIONAL: a red''s resends would land on a scenario''s day). check_suppressed_days_are_empty judges a daily dataset''s suppressed day by its claim window rather than the calendar day of receipt, since an evening-before supply arrives the previous calendar day. First built 2026-10-15 and shelved (post-build-review #208) because the restatement rule and the freeze together refused it; rejected then: teaching both rules a default equals an omission, moving the era to the newest days, unit tests only.'
     - 'TS-14 AND TS-54 PLANTED 2026-10-15, on placements that already existed: TS-14 is TS-12''s refused cp_clients corrected 28 days later by a delivery carrying it alone (a run now takes its siblings from the period, REQ-PIPE-105 criterion 5, so decision 6''s blocker is gone), and TS-54 is TS-76''s substitution onto an earlier promoted supply (Keith, Q13). WHAT STILL HAS NO DATA AND WHY, from a read-only inventory the same day: TS-3c, TS-3d and TS-10 need the evening-before era (criteria 8 to 11) and a growth of Birth Registrations'' history, put to Keith; TS-3a and TS-3b would spend the last free recent Child Protection quarters and TS-3b needs Child Protection suppression, put to Keith; TS-13''s Expect (''one QA run over the delivery'') contradicts REQ-PIPE-105 as built, put to Keith; TS-48, TS-49, TS-51 and TS-53 wait on Keith signing the drafted REQ-GEN-206; TS-34, TS-42, TS-50, TS-52, TS-55 and TS-57 to TS-62 have owners of their own.'
     - 'CRITERIA 12 TO 14 BUILT 2026-10-02, the evening they were signed. `generator/receipt_instants.py` decides each multi-file delivery''s instants - one for all of them about 80% of the time, otherwise a shuffled order with strictly increasing offsets inside ten minutes of the first - seeded from the delivery''s own name. Receipts are one per FILE at `data/receipts/<delivery>/<file>.json`, written by the single `delivery.write_receipts()` (four tests had hand-copied the old format; they call it now). A delivery''s own instant is its FIRST file''s; each arrival - one file since REQ-PIPE-105 - takes its own, and arrivals are processed in the order storage took the files rather than in dataset-name order. An old one-per-delivery receipt is refused with the regenerate instruction, the same clear-and-rebuild call REQ-PIPE-061 made.
   
@@ -25798,8 +25799,9 @@ requirements:
       period had - so that a schedule that ran out can be extended without moving any supply already filed.
     - WHERE the data asset's configuration declares it synthetic both before and after the change, THE SYSTEM
       SHALL allow ADDING a calendar, participation or timezone version with a past effective date, REMOVING
-      or LATER-DATING one, and ADDING a new dataset's calendar membership, without a declared correction,
-      and SHALL still require one to change any other frozen item.
+      or LATER-DATING one, ADDING a new dataset's calendar membership, and RESTATING on a frozen version
+      a value it left out, at that value's default, without a declared correction, and SHALL still require
+      one to change any other frozen item.
     - WHILE an item is not yet frozen, THE SYSTEM SHALL allow it to be added, changed or removed freely.
     - THE SYSTEM SHALL NOT offer any flag, environment variable, configuration key or documented procedure
       that commits a change to a frozen item other than by a declared correction.
@@ -25851,14 +25853,28 @@ requirements:
     - REQ-PIPE-112
     - REQ-PIPE-050
     unmet_criteria:
-    - criterion: Criterion 9's amended half - removing or later-dating a past version, and adding a new dataset's
-        calendar membership, on a synthetic asset. The original half (adding a past version) is built.
+    - criterion: Criterion 9's 2026-10-15 amendment - removing or later-dating a past version, and adding a new
+        dataset's calendar membership, on a synthetic asset. The original half (adding a past version) and
+        the 2026-10-16 restating clause are built.
       why: Amended 2026-10-15 for the Child Protection shrink and the Emergency Department dataset; not yet built.
       owner: the Emergency Department dataset and Child Protection shrink (plans/data-generation.md
         12, drafts REQ-QAC-231 to REQ-GEN-238, not yet in the register)
       blocked_by:
         unowned: true
     decisions:
+    - 'CRITERION 9 AMENDED AGAIN 2026-10-16 (Keith''s approved wording, ~06:30 Perth, "Approved."): a synthetic
+      asset may RESTATE, on a frozen version, a value that version left out, at that value''s default. Why:
+      REQ-GEN-044''s evening-before era states days_before: 1 on a version before the frozen ones, and
+      REQ-PIPE-110''s restatement rule then requires every later version to restate days_before: 0, which
+      the freeze refused as a change - so the two built rules together made the era impossible to add
+      (post-build-review #208). Chosen over teaching both rules that a default equals an omission (it would
+      also relax a real asset''s freeze), over moving the era to the newest days, and over leaving TS-3c,
+      TS-3d and TS-10 unit-tested only. BUILT AS: agreement_freeze._restates_at_default - a participation
+      or collection-defaults item whose new value is the old one plus keys at their own default and nothing
+      else; the only such default today is days_before 0 (agreement.py''s fallback). One case it refuses on
+      purpose, not in the wording but in its intent: where the dataset''s collection defaults state the key,
+      leaving it out took the collection''s value, so restating the fallback default would change what the
+      version governs - a change, not a restatement. Tested in TestRestatingAnOmittedValueAtItsDefault.'
     - 'CRITERION 9 AMENDED 2026-10-15 (Keith''s approved wording, ~23:20 Perth): on a synthetic asset, REMOVING
       or LATER-DATING a past calendar, participation or timezone version, and ADDING a new dataset''s calendar
       membership, are exempt from a declared correction, as adding one already was. Why: shrinking Child
@@ -33854,6 +33870,10 @@ requirements:
       recent earlier promoted period, so 2023-Q1 gains a reference for the first time, and TS-77a stands on 2023-Q1.
     - THE SYSTEM SHALL reword TS-79b's register text, which says its source is the history's first supply with nothing earlier
       to fall back on, to name 'the oldest of the original fifteen quarters' - the inheritance it shows is unchanged.
+    - WHERE an ordinary red in the grown quarters leaves its resend waiting under replacement `never`, THE SYSTEM SHALL settle
+      the chain by a scripted decision of the synthetic person - promoting the resend a day after it arrives - so no grown
+      quarter leaves a permanent item in the decision queue; each entry SHALL name its dataset and period and an index into
+      that period's supplies in receipt order, never a scenario or a generated id.
     non_functional_requirements:
     - 'BOOTSTRAP COST: Child Protection replays about 17s a quarter beside Birth Registrations'' ~330s. The architect counts
       about seventeen quarters of demand (A3), not the scoper''s eight, which would take Child Protection to roughly 550s and
@@ -33880,6 +33900,7 @@ requirements:
       - tests/test_generate_cp_runs.py::test_severity_counts_match_run_plan
       - tests/test_asset_time_semantics.py::TestEveryCommittedArrivalKeepsItsVerdict
       - tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips
+      - tests/test_scripted_decisions.py::TestAnOrdinaryChainIsSettledByPeriod
     implemented_by:
       - generator/generate_cp_runs.py::GROWN_RUN_PLAN
       - generator/generate_cp_runs.py::grown_periods
@@ -33888,6 +33909,8 @@ requirements:
       - generator/scenario_injection.py::stood_on
       - contract/calendar.yaml
       - contract/data-asset.yaml
+      - contract/scripted_decisions.yaml
+      - qa_tools/common/scripted_decisions.py::_timed_chain
     evidence:
       - '2026-10-15: CRITERION 2''s DRY RUN, over the planned scenarios'' period claims as each requirement states them: TS-42 4 and
         TS-80 4 (two lead-ins and a following quarter each), the correction carrying TS-57 to TS-61 7 adjacent or 15 spaced, TS-63
@@ -33907,6 +33930,16 @@ requirements:
         test_scenario_map, test_scenario_subjects, test_asset_time_semantics 184 passed; test_dashboard_e2e TestTheAsAtScenarioChips
         + TestEveryScenarioJumpLands + TestThePeriodComposition 23 passed, on the bootstrapped ten-year history.'
     decisions:
+    - 'CRITERION 12 ADDED 2026-10-16 (Keith''s answers that morning: "Script decisions", "Promote the resend", "One entry per
+      chain", "Grown years only"; wording approved by the session under his 2026-10-15 delegation for REQ-GEN-207). The post-build
+      critic''s O1: three grown red chains (cp-carers 2013-Q3 and 2014-Q1, cp-placements 2014-Q1) each left a promoted red and
+      its waiting resend, a permanent "Awaiting a decision" item. Settled by three entries in contract/scripted_decisions.yaml,
+      the first not keyed by a scenario: a chain entry names `period:` and `supply: 1`, the period''s second supply in receipt
+      order, and may only promote or reject (scripted_decisions._chain_problems). REJECTED: one rule for every grown chain (it
+      would follow the generator automatically, Keith preferred explicit entries); rejecting the resend (the period stays red);
+      drawing no reds in the grown quarters (a generator change). The two original-era items (cp-investigations 2024-Q3,
+      cp-carers 2026-Q2) stay in the queue, deliberately. The entries go stale if the grown history is regenerated differently;
+      the replay refuses a chain whose supply never arrives, loudly, so a stale entry cannot pass unseen.'
     - 'SUPERSEDED BY TEN YEARS below (Keith, the same day, after the dry run). SIX YEARS (Keith, 2026-10-15): grown generously so no second growth is needed. AMENDED criterion 2 the same day (Keith''s approved wording) to count TS-3a and TS-3b, which he placed in the grown quarters rather than in the last free recent ones.'
     - 'GROW EARLIER, NOT INTO TODAY''S QUARTERS (Keith, 2026-10-13, architect review answers, for TS-63): REQ-GEN-199 found
       no clean Child Protection quarter left. REJECTED fitting new scenarios among the fifteen.'

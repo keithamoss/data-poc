@@ -151,6 +151,19 @@ _RUN_PLAN_SEED = 1900  # distinct range from per-delivery seeds (1000+i) and id_
 # on neighbouring days.
 N_DELIVERIES = 85
 
+# THE EVENING-BEFORE ERA (REQ-GEN-044; Keith, 2026-10-15): twelve more days
+# at the OLD end, in which a day's supply is due at 22:00 the evening before
+# (contract/calendar.yaml's 2026-06-18 versions), so TS-3c, TS-3d and TS-10
+# sit in the configuration that makes their outcomes right. GENERATED AFTER
+# the 85 with seeds of their own, exactly as REQ-GEN-207 grew Child
+# Protection: every existing delivery keeps its bytes, slot id and seed, and
+# the 85's own severity plan is drawn over the 85 alone. The era carries no
+# ordinary reds or ambers - its days are the scenarios' and the plain
+# on-time supplies between them, and a red's resends would land on a
+# scenario's day (PROVISIONAL, for Keith to sense-check).
+GROWN_DAYS = 12
+GROWN_BASE_SEED = 40000
+
 
 # The clean/amber/red mix across the scheduled deliveries. Named rather
 # than left as magic numbers in the function below because the RED share
@@ -724,8 +737,27 @@ def _no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
 
 
 def generated_periods() -> list:
-    """The periods this generator writes, oldest first."""
-    return schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-N_DELIVERIES:]
+    """The periods this generator writes, oldest first: the evening-before
+    era's twelve, then the 85."""
+    return schedule.periods_for_dataset(
+        DATASET_ID, until=get_anchor_date())[-(N_DELIVERIES + GROWN_DAYS):]
+
+
+def original_periods() -> list:
+    """The 85 periods generated before the evening-before era existed."""
+    return generated_periods()[GROWN_DAYS:]
+
+
+def grown_periods() -> list:
+    """The evening-before era's twelve periods, oldest first (REQ-GEN-044)."""
+    return generated_periods()[:GROWN_DAYS]
+
+
+def _grown_row_counts() -> list[int]:
+    """The era's row counts, from a seed of its own so the 85's plan is
+    untouched."""
+    rng = np.random.default_rng(GROWN_BASE_SEED - 1000)
+    return [int(n) for n in rng.integers(1_700, 2_050, size=GROWN_DAYS)]
 
 
 def _plan_injections(periods):
@@ -793,6 +825,7 @@ def main() -> None:
     # against an already-failed attempt of the same delivery.
 
     periods = generated_periods()
+    originals, grown = periods[GROWN_DAYS:], periods[:GROWN_DAYS]
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
     # _plan_injections()'s own docstring.
@@ -800,7 +833,7 @@ def main() -> None:
      quiet_periods) = _plan_injections(periods)
     # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
     covered_periods = _covered(injected_by_period)
-    severities = _ordinary_severities(periods, injected_by_period,
+    severities = _ordinary_severities(originals, injected_by_period,
                                       suppressed_periods | covered_periods)
     # ONLY THEN is the last history cleared: a scenario or target refused
     # above leaves the one already on disk standing (REQ-GEN-184
@@ -821,7 +854,7 @@ def main() -> None:
     # the freshness checks, whatever it was built to.
     green_periods = _built_green(injected_by_period)
     provider.amber_dates = frozenset(
-        [p.date for p, sev in zip(periods, severities) if sev == "amber"]
+        [p.date for p, sev in zip(originals, severities) if sev == "amber"]
         + [p.date for p in periods if p.name in green_periods]
         + [p.date for p in periods if p.name in injected_by_period and any(
             x.targets for x in injected_by_period[p.name][0].arrivals)]
@@ -831,10 +864,21 @@ def main() -> None:
         # (REQ-GEN-196): never stale either.
         + [p.date + timedelta(days=1) for p in periods if p.name in injected_by_period
            and any(f.target is not None and f.content == "next_day"
-                   for x in injected_by_period[p.name][0].arrivals for f in x.files)])
+                   for x in injected_by_period[p.name][0].arrivals for f in x.files)]
+        # THE EVENING-BEFORE ERA IS NEVER STALE: its supplies are on time by
+        # construction, and a stale one would read red (REQ-GEN-044).
+        + [p.date for p in grown])
 
-    for i, ((drawn_rows, _drawn), severity, period) in enumerate(
-            zip(RUN_PLAN, severities, periods), start=1):
+    # The 85 first, exactly as before; then the era, with its own seeds and
+    # slot ids after theirs, so nothing the 85 wrote can move.
+    to_write = [(i, drawn_rows, severity, period, False) for i, ((drawn_rows, _drawn), severity, period)
+                in enumerate(zip(RUN_PLAN, severities, originals), start=1)]
+    to_write += [(N_DELIVERIES + j, rows, None, period, True) for j, (rows, period)
+                 in enumerate(zip(_grown_row_counts(), grown), start=1)]
+
+    for i, drawn_rows, severity, period, in_era in to_write:
+        if in_era and i == N_DELIVERIES + 1:
+            previous_row_count = None  # the era is its own run of supplies
         # AN ORDINARY AMBER IS THE SIZE OF THE SUPPLY BEFORE IT (Keith,
         # 2026-10-11): its own row-count check reads no change, and the next
         # supply compares against what it would have anyway. Built at the
@@ -845,7 +889,7 @@ def main() -> None:
             else drawn_rows
         slot_id = f"slot_{i:03d}"
         slot_date = period.date
-        seed = 1000 + i
+        seed = GROWN_BASE_SEED + (i - N_DELIVERIES) if in_era else 1000 + i
         id_offset = i * ID_BLOCK
 
         # A SCENARIO MAY NEED A DAY TO CARRY NO SUPPLY AT ALL, which is
@@ -884,6 +928,12 @@ def main() -> None:
             deliveries = _injected_chain(provider, injected[0], period, seed,
                                           id_offset, n_rows, previous_row_count,
                                           placement=injected[1])
+        elif in_era:
+            # ONE ON-TIME SUPPLY, THE EVENING BEFORE (REQ-GEN-044): no chain.
+            payload = provider.generate(slot_date, seed=seed, n_rows=n_rows,
+                                        id_offset=id_offset)
+            deliveries = [Delivery(received_date=slot_date - timedelta(days=1),
+                                   severity=None, payload=payload)]
         else:
             deliveries = _away_from_suppressed(
                 list(run_slot_chain(provider, slot_date, seed, id_offset,
@@ -937,6 +987,13 @@ def main() -> None:
 
                 due = slots.slot_instants(DATASET_ID, period.date)
                 entry["received_at"] = asset_time.isoformat(due.due_at + due.grace / 2)
+            elif in_era:
+                # AN HOUR BEFORE ITS DUE INSTANT, the evening before (REQ-GEN-044):
+                # on time, and inside its own claim window, which opens at 18:00.
+                from qa_tools.common import slots
+
+                due = slots.slot_instants(DATASET_ID, period.date)
+                entry["received_at"] = asset_time.isoformat(due.due_at - timedelta(hours=1))
             else:
                 entry["received_at"] = _received_at(
                     delivery_obj.payload, delivery_obj.received_date,

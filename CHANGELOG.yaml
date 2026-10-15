@@ -109,6 +109,30 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-16"
+    summary: >
+      Birth Registrations' history now opens with twelve days when each
+      supply was due the evening before, and Child Protection's earliest
+      years no longer leave corrected files waiting for a decision.
+    changes:
+      - category: New
+        items:
+          - headline: An evening-before stretch for Birth Registrations
+            components: ["Data generation"]
+            description: >
+              The synthetic Birth Registrations history now starts on 18 June
+              with twelve days when each day's supply was due at 22:00 the
+              evening before. Arrivals just outside and right on that window
+              are planted there; every later day is unchanged.
+      - category: Fixed
+        items:
+          - headline: Corrected files in the earliest years are accepted
+            components: ["Data generation"]
+            description: >
+              In Child Protection's earliest ten years, three corrected files
+              sat in the decision queue for good. Someone now accepts each one
+              a day after it arrives, so those quarters end on their corrected
+              file and the queue holds only what needs you.
   - date: "2026-10-15"
     summary: >
       A dataset, or a whole collection, can now be turned off for a while or

@@ -1061,7 +1061,7 @@ def check_suppressed_days_are_empty(placements: Sequence[Placement], recognised)
         for day in placement.suppressed:
             landed = [a.run_id for a in recognised
                       if a.received_at is not None
-                      and str(a.received_at)[:10] == day]
+                      and _lands_in(placement.dataset, day, a.received_at)]
             if landed:
                 raise CannotPlace(
                     f"{placement.scenario_id}: {day} was meant to carry no supply at "
@@ -1069,6 +1069,29 @@ def check_suppressed_days_are_empty(placements: Sequence[Placement], recognised)
                     f"of an earlier period landing that day. The scenario would "
                     f"demonstrate something else, so this is not a history to emit. "
                     f"Move the anchor to a stretch no resupply reaches.")
+
+
+def _lands_in(dataset_id: str, day: str, received_at) -> bool:
+    """Whether an arrival received at `received_at` belongs to the suppressed
+    period `day`. For a DAILY dataset that is the period's own claim window,
+    from its opening to the next day's (REQ-GEN-044): in the evening-before
+    era a day's supply arrives the evening before, so the calendar day of
+    receipt names the wrong period. For any other cadence, the calendar day,
+    as before."""
+    from qa_tools.common import hierarchy, schedule, slots
+
+    received = (received_at if isinstance(received_at, datetime)
+                else datetime.fromisoformat(str(received_at)))
+    try:
+        daily = schedule.calendar_for_dataset(dataset_id).name == "daily"
+    except hierarchy.UnknownDatasetError:
+        daily = False  # a dataset the asset does not declare has no window
+    if not daily:
+        return str(received_at)[:10] == day
+    period = date.fromisoformat(day)
+    opens = slots.slot_instants(dataset_id, period).claim_opens_at
+    closes = slots.slot_instants(dataset_id, period + timedelta(days=1)).claim_opens_at
+    return opens <= received < closes
 
 
 def write_placements(placements: Sequence[Placement],
@@ -1231,6 +1254,73 @@ INJECTIONS: tuple[Injection, ...] = (
             ExtraArrival(0, "14:00", None, "the on-time arrival, two days after the outage"),
         ),
         suppress=(-2, -1),
+    ),
+    # THE EVENING-BEFORE ERA (REQ-GEN-044; Keith, 2026-10-15): Birth
+    # Registrations' oldest twelve days, 2026-06-18 to 2026-06-29, in which a
+    # day's supply is due at 22:00 the evening before and its claim window
+    # opens at 18:00 that evening (contract/calendar.yaml). The register tells
+    # these as Monday and Tuesday; here they are a day and the day after it,
+    # wherever the era has room. Ordinary days between them keep each
+    # scenario's neighbours on time.
+    Injection(
+        scenario_id="TS-3c",
+        dataset_id="birth-registrations",
+        # MONDAY 2026-06-22, so its 17:00 resupply lands on a weekday.
+        anchor=-93,
+        config="daily evening-before: the supply for a day is due 22:00 the evening "
+               "before, claim window 4 hours. The day's own supply is filled; an arrival "
+               "at 17:00 that day is one hour before the NEXT day's window opens at 18:00.",
+        arrivals=(
+            ExtraArrival(-1, "21:00", None, "the day's own supply, on time the evening before"),
+            ExtraArrival(0, "17:00", None,
+                         "an hour outside the next day's window - expected to file as a "
+                         "resupply of this day, held and warned, never auto-promoted"),
+        ),
+        # The next day keeps its own supply (at 21:00 this evening) and no
+        # other period's arrival lands on it.
+        quiet=(1,),
+    ),
+    Injection(
+        scenario_id="TS-3d",
+        dataset_id="birth-registrations",
+        anchor=-90,
+        config="daily evening-before: due 22:00 the evening before, claim window 4 "
+               "hours. The day's own supply never came; an arrival at 17:00 that day "
+               "is an hour before the next day's window opens.",
+        arrivals=(
+            ExtraArrival(0, "17:00", None,
+                         "the day's only supply - expected to fill this day, 19 hours late"),
+        ),
+        quiet=(1,),
+    ),
+    Injection(
+        scenario_id="TS-10a",
+        dataset_id="birth-registrations",
+        anchor=-95,
+        config="daily evening-before: this day's supply is due 22:00 the evening "
+               "before, claim window 4 hours, so its window opens at 18:00 and the day "
+               "before closes then. The day before is filled.",
+        arrivals=(
+            ExtraArrival(-1, "22:00", None,
+                         "arrives at 22:00 the evening before - expected to fill this "
+                         "day, on time"),
+        ),
+        # The day before keeps its own supply and nothing else lands on it.
+        quiet=(-1,),
+    ),
+    Injection(
+        scenario_id="TS-10b",
+        dataset_id="birth-registrations",
+        anchor=-87,
+        config="daily evening-before, as TS-10a, but the day before never got a "
+               "supply. Since REQ-PIPE-131 the 22:00 arrival still fills this day, on "
+               "time, and the day before closes with nothing.",
+        arrivals=(
+            ExtraArrival(-1, "22:00", None,
+                         "arrives at 22:00 the evening before - expected to fill this "
+                         "day on time; the day before closes empty"),
+        ),
+        suppress=(-1,),
     ),
     # REQ-GEN-136 and 137 (sprint 11). Each is placed inside the setting era
     # it needs (contract/data-asset.yaml's synthetic versions; criterion 15),

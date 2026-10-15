@@ -340,6 +340,76 @@ class TestVersions:
         assert any("calendar daily version" in (f.scope or "") for f in found), _text(found)
 
 
+class TestRestatingAnOmittedValueAtItsDefault:
+    """REQ-PIPE-111 criterion 9, amended 2026-10-16 (Keith's wording): a
+    synthetic asset may restate, on a frozen version, a value that version
+    left out, at that value's default - so a version before it can state
+    days_before: 1 without the restatement rule and the freeze refusing
+    every version after it."""
+
+    @pytest.fixture
+    def state(self, state):
+        """The committed files as they stood before REQ-GEN-044's evening-
+        before era: Birth Registrations' versions from 2026-06-30, none of
+        them stating days_before - the shape the amendment is about."""
+        cal, asset, people_doc = state
+        cal = copy.deepcopy(cal)
+        versions = _entry(cal, "birth-registrations")["participation"]["versions"]
+        versions[:] = [v for v in versions if str(v["effective_from"]) >= "2026-06-30"]
+        for v in versions:
+            v.pop("days_before", None)
+        return cal, asset, people_doc
+
+    @staticmethod
+    def _restate(value, *, which=0):
+        def mutate(doc):
+            _entry(doc, "birth-registrations")["participation"]["versions"][which][
+                "days_before"] = value
+        return mutate
+
+    def test_restating_days_before_at_its_default_is_free(self, state):
+        assert state[1].get("synthetic") is True
+        assert _check(state, self._restate(0)) == []
+
+    def test_not_on_a_real_asset(self, state):
+        old_cal, old_asset, people = state
+        old_asset = dict(old_asset, synthetic=False)
+        found = _check((old_cal, old_asset, people), self._restate(0),
+                       lambda doc: doc.update(synthetic=False))
+        assert any("birth-registrations participation" in (f.scope or "") for f in found), \
+            _text(found)
+
+    def test_not_at_any_other_value(self, state):
+        found = _check(state, self._restate(1))
+        assert any("birth-registrations participation" in (f.scope or "") for f in found), \
+            _text(found)
+
+    def test_not_alongside_another_change_to_the_version(self, state):
+        def mutate(doc):
+            self._restate(0)(doc)
+            _entry(doc, "birth-registrations")["participation"]["versions"][0][
+                "expected_time"] = "15:00"
+        found = _check(state, mutate)
+        assert any("birth-registrations participation" in (f.scope or "") for f in found), \
+            _text(found)
+
+    def test_not_where_the_collection_gives_another_value(self, state):
+        """Left out, the value came from the collection's defaults, so
+        restating the fallback default would change what the version
+        governs: that is a change, not a restatement."""
+        def give(doc):
+            coll = next(c for c in doc["collections"] if c["id"] == "child-protection")
+            coll["participation_defaults"]["versions"][0]["days_before"] = 1
+        old_cal, old_asset, people = state
+        old_cal = copy.deepcopy(old_cal)
+        give(old_cal)
+
+        def mutate(doc):
+            _entry(doc, "cp-clients")["participation"]["versions"][0]["days_before"] = 0
+        found = _check((old_cal, old_asset, people), mutate)
+        assert any("cp-clients participation" in (f.scope or "") for f in found), _text(found)
+
+
 class TestTheTimezone:
     def test_changing_a_past_timezone_version_is_refused_on_the_timezone(self, state):
         def mutate(asset):

@@ -121,9 +121,9 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         the date could not detect them disagreeing.
         """
         from generator.anchor_date import get_anchor_date
-        from generator.generate_runs import N_DELIVERIES
+        from generator.generate_runs import GROWN_DAYS, N_DELIVERIES
 
-        return get_anchor_date() - timedelta(days=N_DELIVERIES - 1)
+        return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS - 1)
 
     def test_the_calendar_starts_no_earlier_than_the_generator_supplies(self):
         """THE GUARD THAT SURVIVES A RE-ANCHOR. Pinning ANCHOR_DATE made
@@ -154,7 +154,10 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         from qa_tools.common import assignment
 
         first = self._generator_first_period()
-        due = first + timedelta(days=10)
+        # Twenty days in, past REQ-GEN-044's evening-before era (the first
+        # twelve), so "the morning after its grace ran out" is still before
+        # the next day's window opens - the 14:00 era's shape.
+        due = first + timedelta(days=20)
         all_slots = slots.slots_for_dataset("birth-registrations", until=due)
         # Nothing filled, and a supply arriving the morning after its
         # own slot's grace ran out. It is late, and must still file to its
