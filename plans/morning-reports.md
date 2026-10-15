@@ -1948,6 +1948,17 @@ one or more component tags, and a date.
       bootstrap 8m08s -> 31m52s. Next: REQ-GEN-044's evening-before era with
       TS-13 and TS-3a/3b, then REQ-GEN-203, 205 and 218. An aside logged as
       running-thoughts #98 (checks judged against supplies older than them).
+    - **OVERNIGHT PLAN, Keith, 2026-10-15 ~23:30 Perth ("let's squeeze in
+      as much as we can")**: (1) finish REQ-GEN-207 - 8 failing tests, the
+      requirements.yaml parse cost, full gate, CI, post-build critic;
+      (2) publishing-and-history #6 groundwork, research only;
+      (3) REQ-GEN-044's evening-before era (Birth Registrations);
+      (4) REQ-GEN-218 (TS-63 stays on Child Protection, his call tonight);
+      (5) REQ-GEN-203 (TS-42/TS-80); (6) profile the bootstrap toward his
+      hard 12 minutes, speed-ups only where output stays byte-identical.
+      Terms: ungated checkpoints may be pushed (no test claims in their
+      messages); amendments to REQ-GEN-044/203/205/207/218 approved by the
+      session under his delegation; nothing Emergency Department built.
     - **STANDING DELEGATION, Keith, 2026-10-15 ~22:55 Perth**: "don't bother
       me with the amended wording on the generator requirements, you know,
       044, 203, 205, 218. I'm happy for you just to go ahead and approve
