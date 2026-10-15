@@ -2001,6 +2001,17 @@ one or more component tags, and a date.
          would rewrite straight after; better built on the shared driver.
          Bootstrap profiling - folded into the ED plan's REQ-PIPE-250 (your
          hard 12 minutes) rather than done ad hoc.
+      5. **Gate and CI, ~02:00 Perth.** The full local gate (on the tree
+         before 4066586) came back 5400 passed, 1 failed, 91 errors. All 91
+         errors were the CP staging fixture dropping other modules'
+         `period_2099_<token>` schemas, the same thing that turned CI red on
+         d0eae5f. 4066586 narrowed the drop to quarterly names; CI's fast half
+         went green on it. The 1 failure was a stale SCENARIOS.md (TS-54's
+         correction never re-ran `mothman scenarios map`), which was also the
+         only failure in CI's deployment half on 4066586. Regenerated in
+         d69ac87. A targeted rerun on that tree (the 19 modules that errored,
+         plus test_scenario_map and test_dashboard_corrections) passed 236 of
+         236. The "STOPPED HERE ~20:50" note below is resolved by all of this.
       **QUESTIONS FOR THE MORNING** (beyond the proposal's four):
       a. TS-54: should cp-placements' 2024-Q4 supply be amber (a targeted
          amber there), or does TS-54 stand on a green supply as it does now?
