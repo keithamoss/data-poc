@@ -2107,7 +2107,12 @@ class TestTheExecutiveLegendCountsWhatIsActuallyThere:
     """
 
     ALL_QUIET = "2028-01-01"   # past the quarterly calendar's last period
-    NOTHING_YET = "2022-01-01"  # before any real history exists
+    NOTHING_YET = "2012-01-01"  # before any real history exists
+    # One agency green, the other with no data yet: Child Protection's
+    # history reaches back to 2013 since REQ-GEN-207, Birth Registrations'
+    # starts in 2026. The legend once printed this as "(1 agencies)" for
+    # green alone, which no counter could add up (post-build-review #206).
+    ONE_GREEN = "2022-01-01"
     NORMAL = None
 
     def _legend(self, page):
@@ -2131,7 +2136,7 @@ class TestTheExecutiveLegendCountsWhatIsActuallyThere:
     def test_every_counter_sums_to_the_number_of_agencies(self, clean_page, built_dashboard_html):
         """The arithmetic bug was a subtraction that could not be
         checked. Whatever the legend shows must add up."""
-        for in_place_on in (self.NORMAL, self.ALL_QUIET, self.NOTHING_YET):
+        for in_place_on in (self.NORMAL, self.ALL_QUIET, self.NOTHING_YET, self.ONE_GREEN):
             _goto(clean_page, built_dashboard_html, in_place_on=in_place_on)
             total = clean_page.evaluate("() => DATA.agencies.length")
             counted = sum(int(n) for n in re.findall(r"\((\d+)\)", self._legend(clean_page)))
@@ -4387,7 +4392,11 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
                 not_green += said["red"] + said["amber"] > 0
                 _goto(clean_page, built_dashboard_html, {"tier": "agency", "agencyId": agency}, in_place_on)
         assert checked >= 5, "precondition: most real datasets have an ordinary row"
-        if in_place_on is None:
+        # At the build's own date every dataset can legitimately be all
+        # green - it is, since REQ-GEN-207 moved TS-56 to the newest quarter
+        # (held, so nothing amber is in place). The earlier date is the run
+        # that must have something not green, or this proves nothing.
+        if in_place_on is not None:
             assert not_green, "precondition: at least one dataset is not all green, or this proves nothing"
 
 
@@ -4398,10 +4407,15 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
     the column panel's latest row agrees with the checks listed in it."""
 
     _CP = {"tier": "agency", "agencyId": "child-protection-family-support"}
+    # A date with a Child Protection unit not green in place. The build's own
+    # date need not have one (since REQ-GEN-207 every dataset is all green
+    # there), and a test that depends on the newest quarter being red has a
+    # shelf life of one quarter.
+    _ON = "2025-06-15"
 
     def test_trend_title_axis_and_table_agree_with_the_list_and_the_panel(
             self, clean_page, built_dashboard_html):
-        _goto(clean_page, built_dashboard_html, self._CP)
+        _goto(clean_page, built_dashboard_html, self._CP, self._ON)
         row = clean_page.evaluate("""() => [...document.querySelectorAll('tr[data-nav]')]
           .map(tr => ({nav: JSON.parse(tr.dataset.nav), td: tr.querySelector('.not-green-td')}))
           .filter(r => r.td && /\\d+ red, \\d+ amber/.test(r.td.innerText))
@@ -4410,7 +4424,7 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
         import re
         n, m, red, amber = map(int, re.match(r"(\d+) of (\d+) (\d+) red, (\d+) amber", row["text"]).groups())
 
-        _goto(clean_page, built_dashboard_html, row["nav"])
+        _goto(clean_page, built_dashboard_html, row["nav"], self._ON)
         trend = clean_page.locator('[data-unit-trend="dataset"]')
         assert trend.locator(".unit-trend-title").inner_text().strip() == "Columns red and amber, each QA run"
         assert trend.locator(".chart-axis-title").inner_text().strip() == "% of columns"

@@ -27,10 +27,16 @@ def test_every_dataset_computes_what_it_did_before_the_move():
             f"{_first_difference(before.get('slots'), after.get('slots'))}")
 
 
-# The only dataset whose history was lengthened backwards. Every other
-# dataset is compared whole, so an earlier period appearing on one of them
-# still fails (post-build-review #156).
-_EARLIER_DAYS_ADDED = {"birth-registrations"}
+# The datasets whose history was lengthened backwards: Birth Registrations
+# by REQ-GEN-185, and Child Protection's six by REQ-GEN-207's ten years
+# (2013-2022, added as earlier versions, rewriting nothing pinned). Every
+# other dataset is compared whole, so an earlier period appearing on one of
+# them still fails (post-build-review #156).
+_EARLIER_DAYS_ADDED = {
+    "birth-registrations",
+    "cp-carers", "cp-case-workers", "cp-clients",
+    "cp-investigations", "cp-notifications", "cp-placements",
+}
 
 
 def _from_the_pinned_start(after: dict, before: dict) -> dict:

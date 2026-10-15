@@ -60,7 +60,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+
+from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 SPRINTS_FILE = ROOT / "plans" / "supply-model.md"
@@ -204,7 +205,7 @@ class Sprint:
 
 
 def _requirements(path: Path | str = REQUIREMENTS_FILE) -> dict[str, dict]:
-    doc = yaml.safe_load(Path(path).read_text()) or {}
+    doc = config_yaml.load(path) or {}
     return {r["id"]: r for r in doc.get("requirements", [])}
 
 

@@ -62,6 +62,8 @@ from urllib.parse import unquote_to_bytes
 from dashboard.markdown_text import join_wrapped
 from pathlib import Path
 
+from qa_tools.common import config_yaml
+
 _ITEM_RE = re.compile(
     r"^(\d+)\.\s+\*\*\[([a-z-]+),\s*(\d{4}-\d{2}-\d{2})\]\*\*((?:\s*\*\*\[[^\]]+\]\*\*)+)\s*(.*)$"
 )
@@ -439,14 +441,13 @@ def feedback_data(plans_dir: str | Path, requirements_path: str | Path) -> dict:
     same parser the gate uses. REFUSES TO BUILD on any card error
     (criterion 21): a card the gate would reject never reaches the public
     page, whether or not the gate ran."""
-    import yaml
 
     path = Path(plans_dir) / FEEDBACK_FILE
     cards, errors = parse_feedback_cards(path)
     if errors:
         raise ValueError("plans/road-testing.md has feedback card errors - run "
                          "`mothman dashboard validate-feedback`:\n  " + "\n  ".join(errors))
-    reqs = {r["id"]: r for r in (yaml.safe_load(Path(requirements_path).read_text()) or {}).get("requirements", [])}
+    reqs = {r["id"]: r for r in (config_yaml.load(requirements_path) or {}).get("requirements", [])}
     sprints = road_testing_sprints(path.read_text())
     unknown = sorted({i["id"] for c in cards for i in c["evidence"]
                       if i["kind"] == "req" and i["id"] not in reqs})

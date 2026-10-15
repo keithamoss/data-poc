@@ -9794,3 +9794,34 @@ twice. It deliberately did not re-find the `TypeError`.
        schema holds any table, which removes every way a foreign sibling
        could be read there. If it recurs, the period's tables at that moment
        are the thing to capture.
+
+206. **[done, 2026-10-15]** **[Dashboard UI]** **[Testing & dev tooling]**
+     **The executive legend's green counter read "(1 agencies)", and four
+     tests leant on the newest quarter being red.** Found in the first full
+     run after REQ-GEN-207 grew Child Protection back to 2013.
+     - **A real, minor defect.** The legend printed green as
+       `(${n} agencies)` and every other status as `(${n})`. No test had ever
+       seen a green agency there, so nothing caught it; at 2022-01-01 Child
+       Protection is now green and Birth Registrations has no data, and
+       `test_every_counter_sums_to_the_number_of_agencies` could not add the
+       green count up. Fixed test-first: the test gained a ONE_GREEN date
+       (2022-01-01) and failed on it; the legend now reads `(N)` like the
+       rest. NOTHING_YET moved to 2012-01-01, since 2022 is no longer before
+       any history.
+     - **Two test preconditions with a one-quarter shelf life.** The
+       "Columns not green" and dataset-trend tests required a not-green
+       unit AT THE BUILD'S OWN DATE. Since TS-56 moved to the newest quarter
+       (held, so nothing amber is in place), every dataset is all green
+       there - legitimately. The row-count test now requires a not-green
+       unit at its earlier date (2025-06-15) instead; the trend test runs at
+       that date. Same family as the daily-dataset shelf-life note in
+       CLAUDE.md's runtime log.
+     - **`test_calendar_move_pin`** pinned Child Protection's periods from
+       before the move; REQ-GEN-207 added 2013-2022 as earlier versions, so
+       the six Child Protection datasets join Birth Registrations in the
+       "earlier periods may be added, nothing pinned may change" set.
+     - **The configuration tests** (122 failures across 13 files) read "the
+       first version" meaning the 2023 one; they now read the calendar as it
+       stood before the growth (`tests/before_growth.py`), and the few that
+       run the real configuration take its new expectations.
+
