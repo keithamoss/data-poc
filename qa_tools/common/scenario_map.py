@@ -73,7 +73,10 @@ VERDICT_LINE = "verdict-line"
 SUBSTITUTION_DRILL_DOWN = "substitution-drill-down"
 STANDING_IN_PILL = "standing-in-pill"
 SUPPLY_HISTORY_ROW = "supply-history-row"
+#: A period's composition view (REQ-DASH-209 criterion 7) - TS-55's.
+PERIOD_COMPOSITION = "period-composition"
 SUBJECTS = (AS_AT_PANEL, VERDICT_LINE, SUBSTITUTION_DRILL_DOWN, STANDING_IN_PILL,
+            PERIOD_COMPOSITION,
             SUPPLY_HISTORY_ROW)
 
 

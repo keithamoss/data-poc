@@ -263,3 +263,45 @@ class TestEachSuppliesStateOverTime:
                 at="2026-02-01T09:00:00+08:00", from_slot="2026-Q1")
         monkeypatch.setattr(st, "_run_for", lambda conn, d, supply: "run_007")
         assert [e["state"] for e in st.run_states(dataset, conn=clean)["run_007"]] == ["withdrawn"]
+
+
+class TestWhatTheCompositionViewReads:
+    """REQ-DASH-209 criterion 9: each entry names the period a substituted or
+    inherited slot stands on, and the embedded copy names who decided by
+    display name - never an email address (the view's PRIVACY NFR) - and the
+    run that checked the HOLDER, which an inheritance has without filling."""
+
+    def test_a_substitution_names_the_period_it_stands_on(self, clean, dataset):
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-01-01T00:00:00+00:00", to_slot="2025-Q4", kind=decision_log.RULE,
+                actor="promotion rule")
+        with decision_log.apply_decision(clean, decision_log.Decision(
+                agency_id=AGENCY, collection_id=COLLECTION, dataset_id=dataset,
+                action=decision_log.SUBSTITUTE, supply="s1", actor="somebody",
+                actor_kind=decision_log.PERSON, effective_at="2026-02-01T00:00:00+00:00",
+                to_slot="2026-Q1", stands_on="2025-Q4", reason="nothing came")):
+            pass
+        tl = slot_timeline.for_dataset(dataset, conn=clean)
+        by_slot = {e["slot"]: e for e in tl}
+        assert by_slot["2026-Q1"]["stands_on"] == "2025-Q4"
+        assert by_slot["2026-Q1"]["held_as"] == "substituted"
+        assert by_slot["2025-Q4"]["stands_on"] is None
+
+    def test_the_embedded_copy_names_a_person_and_never_their_email(self, clean, dataset,
+                                                                     monkeypatch):
+        from qa_tools.common import people
+
+        monkeypatch.setattr(people, "parse_people_config", lambda: {
+            "people": {"a.person@example.org": {"name": "A Person"}}})
+        _decide(clean, dataset, decision_log.PROMOTE, supply="s1",
+                at="2026-01-01T00:00:00+00:00", to_slot="2025-Q4",
+                actor="a.person@example.org")
+        monkeypatch.setattr(slot_timeline, "_run_for", lambda c, d, s: f"run-of-{s}")
+        [entry] = slot_timeline.with_runs(slot_timeline.for_dataset(dataset, conn=clean),
+                                          dataset, conn=clean)
+        assert entry["actor"] == "A Person"
+        assert "@" not in repr(entry)
+        assert entry["holder_run_id"] == "run-of-s1"
+        # THE ASSET DAY it took effect, which the page's one lookup
+        # (newestOnOrBefore) compares with the date on show.
+        assert entry["on"] == "2026-01-01"

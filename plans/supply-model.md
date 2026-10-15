@@ -3171,6 +3171,11 @@ state is the latest, its history is all of them. Clients arriving also
 re-evaluates the waiting placements' reading checks and re-gates them
 (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089
 moved the history into the database.
+*In the data since 2026-10-15 (REQ-GEN-044 criterion 1)*, riding TS-12's
+placement: TS-12's cp_clients is refused in 2025-Q2, and the corrected
+cp_clients arrives alone 28 days later, 10:00 on 2025-05-29, filed to
+2025-Q2's still-empty slot. TS-12's link sits between the two; TS-14's
+lands on the correction's day.
 
 **TS-15a `[unit]` An UNEXPECTED TABLE - recognised, but not owed.**
 A file that MATCHES a dataset's arrival pattern, for a dataset with no
@@ -3732,8 +3737,11 @@ in either case the gate does not promote it after the un-supersede without
 a further decision. What should the planted shape be?
 
 **TS-54 `[INJECT]` A period substituted onto an earlier promoted supply.**
-NOT IN THE DATA YET: the script has no field for the period stood on
-(REQ-PIPE-084, REQ-GEN-137 criterion 5).
+In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14,
+Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1
+substituted by a scripted person onto 2024-Q4, whose supply was promoted
+green - with its own link while the substitution stands. The script's
+`stands_on` field (REQ-GEN-200) answered the old blocker.
 
 **TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
 THE DATA YET: needs TS-54's substitution beside an inheritance in one

@@ -252,6 +252,8 @@ class TestTheLinksResolveBetweenTheirEvents:
             got.update(dict(si.resolve(_injection(sid), periods).in_place_on))
         assert got == {"TS-75a": "2024-02-08", "TS-75b": "2024-02-25",
                        "TS-76": "2025-02-17", "TS-77a": "2023-05-17",
+                       # TS-54 rides TS-76's placement and date (REQ-GEN-044).
+                       "TS-54": "2025-02-17",
                        "TS-77b": "2023-06-08", "TS-78a": "2026-08-31",
                        "TS-78b": "2026-09-01"}
 

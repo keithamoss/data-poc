@@ -6569,6 +6569,7 @@ requirements:
     - REQ-PIPE-049
     - REQ-PIPE-051
     decisions:
+    - 'TS-14 AND TS-54 PLANTED 2026-10-15, on placements that already existed: TS-14 is TS-12''s refused cp_clients corrected 28 days later by a delivery carrying it alone (a run now takes its siblings from the period, REQ-PIPE-105 criterion 5, so decision 6''s blocker is gone), and TS-54 is TS-76''s substitution onto an earlier promoted supply (Keith, Q13). WHAT STILL HAS NO DATA AND WHY, from a read-only inventory the same day: TS-3c, TS-3d and TS-10 need the evening-before era (criteria 8 to 11) and a growth of Birth Registrations'' history, put to Keith; TS-3a and TS-3b would spend the last free recent Child Protection quarters and TS-3b needs Child Protection suppression, put to Keith; TS-13''s Expect (''one QA run over the delivery'') contradicts REQ-PIPE-105 as built, put to Keith; TS-48, TS-49, TS-51 and TS-53 wait on Keith signing the drafted REQ-GEN-206; TS-34, TS-42, TS-50, TS-52, TS-55 and TS-57 to TS-62 have owners of their own.'
     - 'CRITERIA 12 TO 14 BUILT 2026-10-02, the evening they were signed. `generator/receipt_instants.py` decides each multi-file delivery''s instants - one for all of them about 80% of the time, otherwise a shuffled order with strictly increasing offsets inside ten minutes of the first - seeded from the delivery''s own name. Receipts are one per FILE at `data/receipts/<delivery>/<file>.json`, written by the single `delivery.write_receipts()` (four tests had hand-copied the old format; they call it now). A delivery''s own instant is its FIRST file''s; each arrival - one file since REQ-PIPE-105 - takes its own, and arrivals are processed in the order storage took the files rather than in dataset-name order. An old one-per-delivery receipt is refused with the regenerate instruction, the same clear-and-rebuild call REQ-PIPE-061 made.
   
       AN INJECTED SCENARIO KEEPS ONE INSTANT, deliberately: its stated time is part of what it demonstrates, and spreading its files would make the scenario say something else.
@@ -30053,12 +30054,6 @@ requirements:
       owner: Keith (morning report question).
       blocked_by:
         unowned: true
-    - criterion: Criterion 5 - a period substituted onto an earlier promoted supply
-        (TS-54).
-      why: The script has no field for the period stood on.
-      owner: Unplaced - REQ-GEN-135's script format.
-      blocked_by:
-        unowned: true
     - criterion: Criterion 6 - a period whose _manifest lists promoted, inherited
         and substituted tables together (TS-55).
       why: Needs TS-54's substitution beside an inheritance in one period.
@@ -30098,6 +30093,7 @@ requirements:
       - "The inherited table needs a period a dataset does not participate in. REQ-PIPE-098's own unmet note says no dataset declares one today, so inheritance never fires on the synthetic corpus - this scenario is what first exercises it on real data, and may need a not-expected period added to the synthetic configuration."
     dependencies: [REQ-GEN-135, REQ-GEN-136]
     decisions:
+      - 'CRITERION 5 DELIVERED 2026-10-15 BY REQ-GEN-044 (Keith, 2026-10-14, close-out Q13): TS-54 rides TS-76''s placement - cp-placements'' 2025-Q1 substituted onto 2024-Q4, whose supply was promoted green - with its own link while the substitution stands (generator/scenario_injection.py, tests/test_scenario_injection.py TestTheLaterSingleTableResupplyAndTheStoodOnPeriod). The blocker it recorded, no field for the period stood on, went with REQ-GEN-200''s stands_on.'
       - "SPLIT FROM REQ-GEN-136 because every scenario here needs a person to act, so it cannot be built until REQ-GEN-135 is, while REQ-GEN-136's arrival-driven half can be built alongside each pipeline requirement."
       - "WHICH SCENARIO DEPENDS ON WHICH REQUIREMENT: un-supersede - REQ-PIPE-120 (and 118). Mark as not supplied - REQ-PIPE-132 (and 131, REQ-DASH-133). Acknowledge - REQ-PIPE-122. Substitute - REQ-PIPE-084, already built. The three-kind _manifest - REQ-PIPE-130 (and 128, 129, 098). Every one also needs REQ-GEN-135."
       - "KEITH'S OWN WORKED CASE IS THE UN-SUPERSEDE SCENARIO (option A item 3: 'reject the bad newer file, pull the earlier good one out of superseded, re-run, promote') - in that order, because REQ-PIPE-120 refuses an un-supersede beside a waiting version."
@@ -35315,7 +35311,7 @@ requirements:
       from an earlier period, or one substituted onto an earlier period - so that I can see what a query against that period
       reads without opening the database, and so that TS-55 has a page to show.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35413,6 +35409,12 @@ requirements:
     - REQ-PIPE-179
     - REQ-DASH-182
     decisions:
+    - 'BUILT 2026-10-15: ONE LOOKUP OVER THE SLOT TIMELINE. Every row is the newest embedded slot-timeline entry for that period on or before the date on show (newestOnOrBefore, the qualifier''s own lookup), read for held_as, holder, the decision''s actor, reason and instant, and the new stands_on - qa.slot_holds'' answers, so promoted, substituted and inherited come from the one source _manifest''s ''why'' also reads. The receipt, status when promoted (promotedHealth''s promotedOn) and acknowledgements were already embedded once per supply, keyed by run; the entry carries holder_run_id to reach them. REJECTED reading promotionTimeline.standing for the stand-ins beside the slot timeline for the promoted rows: two sources for one view.'
+    - 'THE PERSON''S NAME IN THE EMBEDDED TIMELINE (PRIVACY NFR): the slot timeline the page embeds carried the decider''s email address, unrendered until now; slot_timeline.with_runs - the embedding layer only - now puts people.display_name in its place for a person, so the view never has an email to show.'
+    - '''NOT SUPPLIED'' WORDS, PROVISIONAL (builder''s reading of criterion 1''s ''the one-word state the supply history shows''): Accepted or No supply for a closed gap as the gap rows say it, Waiting where a supply is filed but none promoted, Due for the period current on the date and otherwise No supply. ''Not owed'' takes REQ-DASH-182''s owedNothingLabel word, plus ''Not owed yet'' before the dataset''s first participation version.'
+    - 'THE COLLECTION CRUMB GOES TO THE AGENCY PAGE: the rail reads Agencies > agency > collection > period, and the dashboard has no collection page, so the collection crumb opens the agency page its collection sits on.'
+    - 'CRITERION 10 ON THE REAL HISTORY, NOT A FIXTURE BUILT FOR IT: the two-way _manifest comparison is made at the build''s own date on the newest Child Protection period whose _manifest lists an inherited table, and an earlier date is held against qa.slot_holds as at that day on TS-76''s substituted quarter. No period of the history holds all three kinds at once until TS-55 is planted (REQ-GEN-206, unsigned), which is recorded under unmet_criteria rather than staged by hand into an append-only log.'
+    - 'A SUB-PIXEL FIX TO REQ-DASH-208 RODE HERE: the drill-down''s new link made TS-77b''s as-at panel land 0.25px past the fold after scrollIntoView(''nearest''); the landing now rounds a fractional overshoot up, caught by TestTheAsAtScenarioChips.'
     - 'A PAGE FOR A PERIOD''S COMPOSITION (Keith, 2026-10-14, close-out Q16, option B, against the recommendation): TS-55 needs
       a page that shows promoted, inherited and substituted tables together, and none does. It must work at about thirty datasets
       per period. REJECTED (the recommendation) TS-55''s Expect quoting the terminal or a query, with its chip on the substituted
@@ -35511,6 +35513,40 @@ requirements:
       link where the collection''s history has no earlier period, and no next link where the next period had not opened by the
       date on show, because the page never offers a date with nothing behind it (REQ-DASH-054). The PROVISIONAL note in the
       G1 decision above is settled. REJECTED (B) showing the next link anyway, landing on ''<period> had not opened by <date>''.'
+    unmet_criteria:
+    - criterion: 'Criterion 7, its last half - TS-55''s chip opening its period''s composition.'
+      why: 'Built for it: ''period-composition'' is a subject name (scenario_map.SUBJECTS) with an element on the page, and a coordinate naming it targets the period''s route. TS-55 itself is not planted - REQ-GEN-206, which plants it, is drafted and unsigned behind running-thoughts #95.'
+      owner: 'REQ-GEN-206 (drafted, unsigned)'
+      blocked_by:
+        unowned: true
+    - criterion: 'Criterion 10, its fixture half - one period holding a promoted, an inherited and a substituted table at once, compared both ways with its _manifest.'
+      why: 'Every kind is compared on the real history (inherited and promoted with _manifest at the build''s date, substituted against qa.slot_holds at TS-76''s date), but no period holds all three together until TS-55 is planted.'
+      owner: 'REQ-GEN-206 (drafted, unsigned)'
+      blocked_by:
+        unowned: true
+    linked_tests:
+    - tests-js/period-composition.test.js
+    - tests/test_dashboard_e2e.py
+    - tests/test_slot_timeline.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html::renderPeriod
+    - dashboard/qa-reporting-dashboard.template.html::compositionHtml
+    - dashboard/qa-reporting-dashboard.template.html::compositionRow
+    - dashboard/qa-reporting-dashboard.template.html::collectionPeriods
+    - dashboard/qa-reporting-dashboard.template.html::periodLinkFor
+    - dashboard/qa-reporting-dashboard.template.html::notSuppliedWord
+    - dashboard/qa-reporting-dashboard.template.html::acknowledgementOn
+    - dashboard/qa-reporting-dashboard.template.html::pathToState
+    - dashboard/qa-reporting-dashboard.template.html::stateToPath
+    - dashboard/qa-reporting-dashboard.template.html::standingInDrill
+    - dashboard/qa-reporting-dashboard.template.html::scenarioTarget
+    - pipeline/slot_timeline.py::for_dataset
+    - pipeline/slot_timeline.py::with_runs
+    - qa_tools/common/scenario_map.py::PERIOD_COMPOSITION
+    evidence:
+    - 'tests-js/period-composition.test.js (seen failing first): each kind and its stood-on period, an earlier date as it stood, the counting line and group order, who decided by name or the schedule, status when promoted, acknowledgement, a reason as text, the dataset and from-period links, the h2/sub-line/caption, previous and next links left out at the ends, had-not-opened, nothing held, the route round trip, the period-composition subject and target.'
+    - 'tests/test_dashboard_e2e.py TestThePeriodComposition on the bootstrapped history: rows agree both ways with the newest Child Protection _manifest listing an inherited table, including Decided by / Applied automatically against its decided_by; TS-76''s date agrees with qa.slot_holds there (cp-placements substituted); reached from a supply history''s period link with focus on the h2; an unknown period is Period not found. tests/test_slot_timeline.py: stands_on, a display name and never an email, holder_run_id, the asset day.'
+    - 'PAGE SIZE (criterion 11), the same recorded history built before (commit 249926f) and after (this change): 10,859,362 -> 10,890,570 bytes, +31,208 (+0.29%). No budget set.'
   - id: REQ-DASH-222
     title: "Each requirement has its own dashboard address that opens the Requirements panel at it"
     date_written: "2026-10-14"

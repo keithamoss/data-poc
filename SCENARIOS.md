@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**32 of 56 scenarios marked for injection have data behind them today.** 94 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**34 of 56 scenarios marked for injection have data behind them today.** 94 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -332,9 +332,9 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 | Where to look | |
 |---|---|
 | Dataset | cp-clients |
-| Supplies | `cp_clients__202505010900000800` |
+| Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
 | Period | 2025-Q2 |
-| Set the in-place-on date to | 2025-05-01 |
+| Set the in-place-on date to | 2025-05-02 |
 
 ### TS-13 - Six tables landing seconds apart
 
@@ -346,9 +346,14 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-14 - A later single-table resupply
 
-**What it demonstrates.** It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no "resupply of table X within delivery Y" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If green, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database.
+**What it demonstrates.** It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no "resupply of table X within delivery Y" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If green, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database. *In the data since 2026-10-15 (REQ-GEN-044 criterion 1)*, riding TS-12's placement: TS-12's cp_clients is refused in 2025-Q2, and the corrected cp_clients arrives alone 28 days later, 10:00 on 2025-05-29, filed to 2025-Q2's still-empty slot. TS-12's link sits between the two; TS-14's lands on the correction's day.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
+| Period | 2025-Q2 |
+| Set the in-place-on date to | 2025-05-29 |
 
 ### TS-15a - An UNEXPECTED TABLE - recognised, but not owed
 
@@ -694,9 +699,14 @@ NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad 
 
 ### TS-54 - A period substituted onto an earlier promoted supply
 
-NOT IN THE DATA YET: the script has no field for the period stood on (REQ-PIPE-084, REQ-GEN-137 criterion 5).
+In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted green - with its own link while the substitution stands. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | — |
+| Period | 2025-Q1 |
+| Set the in-place-on date to | 2025-02-17 |
 
 ### TS-55 - A period whose _manifest lists all three kinds
 
@@ -1194,10 +1204,11 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": {
     "dataset": "cp-clients",
     "supplies": [
-     "cp_clients__202505010900000800"
+     "cp_clients__202505010900000800",
+     "cp_clients__202505291000000800"
     ],
     "period": "2025-Q2",
-    "inPlaceOn": "2025-05-01",
+    "inPlaceOn": "2025-05-02",
     "subject": "supply-history-row"
    }
   },
@@ -1217,14 +1228,24 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A later single-table resupply",
    "section": "Delivery and multi-table",
-   "demonstrates": "It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no \"resupply of table X within delivery Y\" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If green, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database.",
+   "demonstrates": "It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no \"resupply of table X within delivery Y\" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If green, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database. *In the data since 2026-10-15 (REQ-GEN-044 criterion 1)*, riding TS-12's placement: TS-12's cp_clients is refused in 2025-Q2, and the corrected cp_clients arrives alone 28 days later, 10:00 on 2025-05-29, filed to 2025-Q2's still-empty slot. TS-12's link sits between the two; TS-14's lands on the correction's day.",
    "breaksAs": null,
    "config": null,
    "requirements": [
     "REQ-PIPE-121",
-    "REQ-PIPE-089"
+    "REQ-PIPE-089",
+    "REQ-GEN-044"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202505010900000800",
+     "cp_clients__202505291000000800"
+    ],
+    "period": "2025-Q2",
+    "inPlaceOn": "2025-05-29",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-15a",
@@ -1930,14 +1951,20 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A period substituted onto an earlier promoted supply",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET: the script has no field for the period stood on (REQ-PIPE-084, REQ-GEN-137 criterion 5).",
+   "demonstrates": "In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted green - with its own link while the substitution stands. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.",
    "breaksAs": null,
    "config": null,
    "requirements": [
-    "REQ-PIPE-084",
-    "REQ-GEN-137"
+    "REQ-GEN-044",
+    "REQ-GEN-200"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [],
+    "period": "2025-Q1",
+    "inPlaceOn": "2025-02-17",
+    "subject": "substitution-drill-down"
+   }
   },
   {
    "id": "TS-55",

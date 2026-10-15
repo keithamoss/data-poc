@@ -1768,6 +1768,21 @@ one or more component tags, and a date.
       slot, and leaves holds held when corrections cannot be read; four
       polish items). Q23's restyle has no test of its own - it is a CSS
       merge, checked by eye on the real build.
+    - **PROGRESS, 2026-10-15 late morning**: C's critic (#201) fixed
+      (536ecb4). SPRINT 5 DONE: REQ-DASH-208 built (63ba55d), its critic
+      (#202) fixed in a3a5aac - all 32 placed chips now land;
+      REQ-PIPE-202 built (2da963b), its critic (#203) fixed in 249926f. SPRINT 6
+      STOPPED AT TWO OF YOUR CALLS, both below: REQ-GEN-044's remaining
+      scenarios and REQ-GEN-207's growth size. REQ-GEN-203, 205 and 218 all
+      place their scenarios in 207's grown quarters, so they wait with it;
+      REQ-DASH-209 does not, and is next.
+    - **PROGRESS, 2026-10-15 early afternoon**: REQ-GEN-044's plantable
+      remainder done - TS-14 (on TS-12) and TS-54 (on TS-76), one rebuild
+      (7m22s from empty); the rest is with you, listed in its decision.
+      REQ-DASH-209 BUILT: the period-composition page at
+      #/agency/<a>/collection/<c>/period/<p>, linked from every supply
+      history's period headings, gap rows and the stand-in details. Its two
+      unmet halves wait on TS-55 (REQ-GEN-206, unsigned).
     - **QUESTIONS FOR KEITH from post-build-review #199, queued, not built**:
       - **F5 (Q18, REQ-DASH-182 c12)**: on the real build cp-case-workers'
         period owed nothing appears as three cycle blocks, one per supply,
@@ -1831,3 +1846,31 @@ one or more component tags, and a date.
         settle it in Filing decisions"? (Recommended: yes - it names an action
         the person can actually take. Criterion 8's "where the pair is
         settled" would change wording, so it is yours.)
+      - **REQ-GEN-207 - HOW BIG TO GROW CHILD PROTECTION, before I grow it
+        once**: criterion 2 sizes the growth by a dry run over every
+        scenario the batch plans. Counted from the signed criteria with the
+        generator's own defaults (two green lead-in quarters and one
+        following quarter for a targeted supply; a correction claims each
+        changed quarter and its neighbours): TS-42 4, TS-80 4, the confirmed
+        correction for TS-57 to TS-61 7 to 11 (adjacent or spaced changes -
+        REQ-GEN-205's design), TS-63 about 5, and REQ-GEN-206's TS-50/55/81
+        about 4 - roughly 20 to 24 grown quarters, so FIVE OR SIX whole years
+        against the architect's ~17-quarter estimate. At ~17s a Child
+        Protection quarter that is +340s to +400s of bootstrap, Child
+        Protection becoming the critical path at roughly 10 to 11 minutes
+        from empty (7m00s today). And REQ-GEN-206 is unsigned behind #95, so
+        its share is from its draft. Options: (a) grow six years now,
+        sized generously so nothing needs a second growth; (b) grow five
+        years now, counting REQ-GEN-205's changes adjacent and 206 at its
+        draft; (c) wait until #95 and REQ-GEN-206 are settled, then size
+        once. (Recommended: (a) - "grow once" was the point of the
+        requirement, and a year too many costs about a minute of bootstrap
+        while a second growth costs another byte-proof and rebuild.)
+      - **REQ-GEN-044 - THE EVENING-BEFORE ERA (TS-3c, TS-3d, TS-10)**: your
+        2026-09-27 decision put a "due 22:00 the evening before" version at
+        the earliest stretch of the history. Birth Registrations' earliest
+        days today are the five spacing days you added on 2026-06-30 for the
+        contested pairs. Grow about ten more days at the old end for the new
+        era (about +40s of bootstrap), or re-time the existing earliest days?
+        (Recommended: grow - every earlier growth kept existing days as they
+        were, and re-timing would change days the pairs' spacing relies on.)

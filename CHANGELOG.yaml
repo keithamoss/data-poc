@@ -270,6 +270,21 @@ releases:
               period lists them all, each with where it stands and its verdict,
               and you pick the one the decision is about. A good supply waiting
               behind a resupply that could not be loaded is in the queue again.
+          - headline: Two more test scenarios have data behind them
+            components: ["Data generation"]
+            description: >
+              TS-14, a corrected Client Register arriving on its own weeks
+              later, and TS-54, a period stood on an earlier promoted supply,
+              now open from the Scenarios tab like the rest.
+          - headline: What a whole period holds, dataset by dataset
+            components: ["Dashboard UI"]
+            description: >
+              Each period of a collection now has a page of its own: one row
+              per dataset saying whether it holds its own promoted supply, one
+              inherited or substituted from an earlier period, or nothing - with
+              when it arrived, who decided, and the status it was promoted on.
+              Open it from a period's heading in any supply history, or from a
+              stand-in's details.
           - headline: Two Client Register files in one delivery are a contested pair
             components: ["Pipeline & publishing", "QA checks & contract"]
             description: >

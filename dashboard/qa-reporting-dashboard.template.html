@@ -4534,7 +4534,9 @@ function standingInDrill(d){
     : `<div class="promo-why">The checks on this page ran against
     ${escHtml(String(from))}'s supply. They are not
     ${escHtml(String(here))}'s own results.</div>`;
-  if(!to) return said;
+  // WHAT THE WHOLE PERIOD HELD (REQ-DASH-209 criterion 6), dataset by dataset.
+  const composition = `<div class="promo-actions">${periodLinkFor(d.id, st.period, `What ${escHtml(String(here))} held, dataset by dataset`).replace("data-period-link", 'data-period-link data-testid="standing-in-composition"')}</div>`;
+  if(!to) return said + composition;
   // A REAL LINK (criterion 15), carrying everything the arrival needs - the
   // date, the period left, the date left and the kind of drill - so a
   // middle-click or a copied address opens the same framing. A plain click
@@ -4552,7 +4554,7 @@ function standingInDrill(d){
   return said + `<div class="promo-actions"><a class="link-btn" href="${escAttr(href)}"
     data-standing-drill data-to="${escAttr(to)}" data-from="${escAttr(String(st.period))}"
     data-from-on="${escAttr(d.promotionState.on || "")}" data-via="${st.kind === "inherited" ? "inheritance" : "substitution"}"
-    data-testid="standing-in-drill">View ${escHtml(String(from))} — the period that earned them</a></div>`;
+    data-testid="standing-in-drill">View ${escHtml(String(from))} — the period that earned them</a></div>` + composition;
 }
 
 // THE FRAMING A READER GETS ONLY WHEN THEY FOLLOWED A SUBSTITUTION OR
@@ -4862,6 +4864,7 @@ function stateToPath(state){
   if(state.tier==="scenarios") return "/scenarios";
   if(state.tier==="feedback") return "/feedback";
   if(state.tier==="agency") return `/agency/${pathSegment(state.agencyId)}`;
+  if(state.tier==="period") return `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/period/${pathSegment(state.period)}`;
   if(state.tier==="dataset"){
     let p = `/agency/${pathSegment(state.agencyId)}/collection/${pathSegment(state.collectionId)}/dataset/${pathSegment(state.datasetId)}`;
     if(state.columnName){
@@ -4881,6 +4884,10 @@ function pathToState(raw){
   if(parts[0]==="feedback") return {tier:"feedback"};
   if(parts[0]!=="agency" || !parts[1]) return null;
   const state = {tier:"agency", agencyId:parts[1]};
+  // A PERIOD'S COMPOSITION (REQ-DASH-209 criterion 6).
+  if(parts[2]==="collection" && parts[3] && parts[4]==="period" && parts[5]){
+    return {tier:"period", agencyId:parts[1], collectionId:parts[3], period:parts[5]};
+  }
   if(parts[2]==="collection" && parts[3] && parts[4]==="dataset" && parts[5]){
     state.tier = "dataset";
     state.collectionId = parts[3];
@@ -5344,6 +5351,7 @@ function render(){
   if(STATE.tier==="feedback") return done(renderFeedback(view));
   if(STATE.tier==="agency") return done(renderAgency(view, STATE.agencyId));
   if(STATE.tier==="dataset") return done(renderDataset(view, STATE.agencyId, STATE.collectionId, STATE.datasetId));
+  if(STATE.tier==="period") return done(renderPeriod(view, STATE.agencyId, STATE.collectionId, STATE.period));
 }
 
 
@@ -6917,7 +6925,7 @@ function gapHistoryRows(ds, inPlaceOnDateStr){
         <tbody>${groups.map(g=>{
           const mark = g.marks[g.marks.length-1];
           return `<tr data-gap="${g.accepted ? "accepted" : "open"}">
-            <td class="mono">${escHtml(g.periods.length === 1 ? fmtPeriodOrDay(g.periods[0]) : `${fmtPeriodOrDay(g.periods[0])} to ${fmtPeriodOrDay(g.periods[g.periods.length-1])}`)}</td>
+            <td class="mono">${g.periods.length === 1 ? periodLinkFor(ds.id, g.periods[0], escHtml(fmtPeriodOrDay(g.periods[0]))) : `${periodLinkFor(ds.id, g.periods[0], escHtml(fmtPeriodOrDay(g.periods[0])))} to ${periodLinkFor(ds.id, g.periods[g.periods.length-1], escHtml(fmtPeriodOrDay(g.periods[g.periods.length-1])))}`}</td>
             <td>${g.accepted ? `<span class="pill tag sm"><span class="ico"></span>Accepted</span>` : pill("red","sm")}</td>
             <td>${g.accepted
               ? `<b>Not supplied (accepted)</b>${mark ? ` <span style="color:var(--ink-faint);">— ${escHtml(mark.actor)}, ${fmtInstant(mark.at)}</span><div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(mark.reason)}</div>` : ""}`
@@ -7050,7 +7058,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const owedBlock = r => `
     <div class="supply-cycle owed-nothing" data-owed-nothing="${escHtml(r.kind)}">
       <div class="supply-cycle-label">
-        <b>${cycleLabel(ds.sla.cadence, r.firstDate, ds.id)}</b>
+        <b>${periodLinkFor(ds.id, r.periods[0], cycleLabel(ds.sla.cadence, r.firstDate, ds.id))}</b>
         ${r.current ? CURRENT_TAG : ""}
         <span style="color:var(--ink-faint);">${escHtml(r.text)}</span>
         ${r.inheritedFrom ? `<span style="color:var(--ink-faint);">Inherited from ${escHtml(fmtPeriodName(r.inheritedFrom) || r.inheritedFrom)}</span>` : ""}
@@ -7059,7 +7067,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const cycleBlock = c => `
     <div class="supply-cycle">
       <div class="supply-cycle-label">
-        <b>${cycleLabel(ds.sla.cadence, c.cycleStart, ds.id)}</b>
+        <b>${periodLinkFor(ds.id, c.cycleStart && periodNameFor(ds.id, c.cycleStart), cycleLabel(ds.sla.cadence, c.cycleStart, ds.id))}</b>
         ${isCurrent(c) ? CURRENT_TAG : ""}
         <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
         ${owedSub(c)}
@@ -7111,6 +7119,172 @@ function wireSupplyHistorySection(container){
   }
   container.querySelectorAll(".supply-history tbody tr[data-run-date]").forEach(tr=>
     tr.addEventListener("click", ()=> applyInPlaceOn(tr.dataset.runDate)));
+}
+
+/* ---- A period's composition (REQ-DASH-209) ------------------------------
+   One row per dataset of a collection: what it held in one period at the end
+   of the date on show. EVERY ANSWER IS LOOKED UP, never worked out: the build
+   embeds each dataset's slot timeline (pipeline/slot_timeline.py - what
+   qa.slot_holds said after each decision, with the period a stand-in stands
+   on), each run's receipt, the status it was promoted on and its
+   acknowledgements; this page takes the newest entry on or before the date
+   with the same lookup the standing-in qualifier uses (newestOnOrBefore).
+*/
+const COMPOSITION_KINDS = ["notsupplied", "substituted", "inherited", "promoted", "notowed"];
+const COMPOSITION_WORD = {notsupplied:"Not supplied", substituted:"Substituted",
+  inherited:"Inherited", promoted:"Promoted", notowed:"Not owed"};
+const HELD_KINDS = new Set(["promoted", "substituted", "inherited"]);
+
+// THE COLLECTION'S PERIODS, oldest first, from its datasets' own embedded
+// sequences - never date arithmetic in the browser.
+function collectionPeriods(col){
+  const seen = new Map();
+  ((col && col.datasets) || []).forEach(ds=> (periodsFor(ds.id) || []).forEach(p=>{
+    if(!seen.has(p.period)) seen.set(p.period, p);
+  }));
+  return [...seen.values()].sort((a, b)=> a.date.localeCompare(b.date));
+}
+function periodNav(agencyId, collectionId, period){
+  return {tier:"period", agencyId, collectionId, period: String(period)};
+}
+// A REAL LINK TO A PERIOD'S COMPOSITION (criteria 5 and 6). It keeps the date
+// on show, because the href is the route alone and the query stays as it is.
+function periodLinkHtml(agencyId, collectionId, period, label){
+  const nav = periodNav(agencyId, collectionId, period);
+  return `<a href="${escAttr(navHref(nav))}" data-nav='${escAttr(JSON.stringify(nav))}' data-period-link>${label}</a>`;
+}
+// The same link from a dataset's own pages, where only its id is to hand.
+function periodLinkFor(datasetId, period, label){
+  if(!period || typeof DATA === "undefined" || !DATA) return label;
+  for(const ag of DATA.agencies || []){
+    for(const col of ag.collections || []){
+      if((col.datasets || []).some(d=> d.id === datasetId)){
+        return periodLinkHtml(ag.id, col.id, period, label);
+      }
+    }
+  }
+  return label;
+}
+// WHAT A SUPPLY HISTORY SAYS OF A PERIOD THAT HOLDS NOTHING (criterion 1).
+function notSuppliedWord(raw, period, dateStr){
+  const s = ((raw && raw.closedSlots) || []).find(x=> x.period === period);
+  if(s){
+    const gaps = closedGapsInPlaceOn([s], dateStr);
+    if(gaps.accepted.length) return "Accepted";
+    if(gaps.open.length) return "No supply";
+    if(s.filedAt && assetDateStrOf(s.filedAt) <= dateStr) return "Waiting";
+  }
+  return raw && periodNameFor(raw.id, dateStr) === period ? "Due" : "No supply";
+}
+// THE ACKNOWLEDGEMENT OWED ON A SUPPLY, as at the date (REQ-PIPE-166): null
+// where none was owed by then.
+function acknowledgementOn(raw, runId, dateStr){
+  const a = runId && raw && raw.acknowledgements && raw.acknowledgements[runId];
+  if(!a || !a.promotedAt || assetDateStrOf(a.promotedAt) > dateStr) return null;
+  const by = v=> v && assetDateStrOf(v) <= dateStr;
+  const standing = [...(a.acks || [])].reverse()
+    .find(k=> by(k.at) && !(k.withdrawn && by(k.withdrawn.at)));
+  return standing ? {given: true, actor: standing.actor, at: standing.at} : {given: false};
+}
+function compositionRow(raw, period, dateStr){
+  const e = newestOnOrBefore(raw && raw.slotTimeline, dateStr, x=> x.slot === period);
+  if(e && HELD_KINDS.has(e.held_as)){
+    const runId = e.holder_run_id || null;
+    const run = runId ? ((raw.runs || []).find(r=> r.run_id === runId) || null) : null;
+    const health = runId ? ((raw.promotedHealth || {})[runId] || null) : null;
+    return {kind: e.held_as, from: e.held_as === "promoted" ? null : (e.stands_on || null),
+            entry: e, receivedAt: run ? run.received_at : null,
+            promotedOn: health ? health.promotedOn : null,
+            ack: acknowledgementOn(raw, runId, dateStr)};
+  }
+  const owed = ((raw && raw.owedNothing) || []).find(x=> x.period === period);
+  if(owed){
+    const words = owedNothingLabel(owed);
+    return {kind: "notowed", word: words.word, label: words.label};
+  }
+  const sla = raw ? slaInPlaceOn(raw, dateStr) : {};
+  if(sla.notOwedYet) return {kind: "notowed", word: "Not owed yet", label: notOwedYetText(sla.notOwedYet)};
+  return {kind: "notsupplied", word: notSuppliedWord(raw, period, dateStr)};
+}
+function compositionCells(ag, col, row){
+  if(!HELD_KINDS.has(row.kind)){
+    const label = row.kind === "notowed" ? row.label : row.word;
+    return `<td><b>${COMPOSITION_WORD[row.kind]}</b> <span style="color:var(--ink-faint);">— ${escHtml(label)}</span></td>
+      <td></td><td></td><td></td><td></td><td></td><td></td>`;
+  }
+  const e = row.entry;
+  const from = row.from ? ` from ${periodLinkHtml(ag.id, col.id, row.from, escHtml(fmtPeriodName(row.from) || fmtPeriodOrDay(row.from)))}` : "";
+  // THE PAGE'S OWN SENTENCES (criterion 3), as REQ-DASH-198's drill-down says
+  // them; the build has already put a person's NAME in place of their email.
+  const who = e.actor_kind === "person" ? `Decided by ${escHtml(e.actor || "a person")}`
+    : "Applied automatically by the schedule";
+  const ack = !row.ack ? ""
+    : row.ack.given ? `Acknowledged by ${escHtml(row.ack.actor || "")}, ${fmtInstant(row.ack.at)}`
+    : "Not acknowledged";
+  return `<td><b>${COMPOSITION_WORD[row.kind]}</b>${from}</td>
+      <td>${row.receivedAt ? fmtInstant(row.receivedAt) : ""}</td>
+      <td>${fmtInstant(e.at)}</td>
+      <td>${who}</td>
+      <td>${escHtml(e.reason || "")}</td>
+      <td>${row.promotedOn && STATUS_LABEL[row.promotedOn] ? pill(row.promotedOn, "sm") : ""}</td>
+      <td>${ack}</td>`;
+}
+function compositionHtml(ag, col, period, dateStr){
+  const seq = collectionPeriods(col);
+  const at = seq.findIndex(p=> p.period === period);
+  const name = fmtPeriodName(period) || fmtPeriodOrDay(period);
+  const daily = /^\d{4}-\d{2}-\d{2}$/.test(period);
+  const prev = at > 0 ? seq[at - 1] : null;
+  const next = at >= 0 && at + 1 < seq.length && seq[at + 1].date <= dateStr ? seq[at + 1] : null;
+  const step = (p, which)=> {
+    const label = daily ? `${which} day: ${fmtDay(p.period)}` : `${which} period: ${fmtPeriodName(p.period) || p.period}`;
+    return periodLinkHtml(ag.id, col.id, p.period, escHtml(label)).replace("data-period-link", `data-period-link data-period-${which === "Previous" ? "prev" : "next"}`);
+  };
+  const title = `${col.name} · ${name}`;
+  const sub = `What each dataset held at the end of ${fmtDay(dateStr)}`;
+  const head = `<div class="view-head"><div>
+      <h2>${escHtml(title)}</h2>
+      <div class="view-sub">${escHtml(sub)}</div>
+      <div class="promo-actions">${prev ? step(prev, "Previous") : ""} ${next ? step(next, "Next") : ""}</div>
+    </div></div>`;
+  if(at >= 0 && seq[at].date > dateStr){
+    return head + `<p data-not-opened>${escHtml(name)} had not opened by ${fmtDay(dateStr)}.</p>`;
+  }
+  const rows = (col.datasets || []).map(ds=> ({ds, row: compositionRow(rawRealDatasetById(ds.id), period, dateStr)}))
+    .sort((a, b)=> COMPOSITION_KINDS.indexOf(a.row.kind) - COMPOSITION_KINDS.indexOf(b.row.kind)
+      || String(a.ds.name).localeCompare(String(b.ds.name)));
+  const counts = COMPOSITION_KINDS.map(k=> [k, rows.filter(r=> r.row.kind === k).length]).filter(([, n])=> n);
+  const count = `${rows.length} ${pluralize(rows.length, "dataset")}: `
+    + counts.map(([k, n])=> `${n} ${COMPOSITION_WORD[k].toLowerCase()}`).join(", ");
+  const nothing = !rows.some(r=> HELD_KINDS.has(r.row.kind))
+    ? `<p data-nothing-held>No dataset of ${escHtml(col.name)} held anything in ${escHtml(name)} at the end of ${fmtDay(dateStr)}.</p>` : "";
+  return head + `<p data-composition-count>${escHtml(count)}</p>${nothing}
+    <div class="overflow-x" data-testid="period-composition">
+    <table class="dataset-table static-rows">
+      <caption>${escHtml(title)} — ${escHtml(sub.charAt(0).toLowerCase() + sub.slice(1))}</caption>
+      <thead><tr><th>Dataset</th><th>Holds</th><th>Received</th><th>Decided</th><th>Who decided</th><th>Reason</th><th>Status when promoted</th><th>Acknowledgement</th></tr></thead>
+      <tbody>${rows.map(({ds, row})=>{
+        const nav = {tier:"dataset", agencyId: ag.id, collectionId: col.id, datasetId: ds.id};
+        return `<tr data-kind="${row.kind}" data-dataset="${escAttr(ds.id)}">
+          <td><a class="dataset-name dataset-link" href="${escAttr(navHref(nav))}" data-nav='${escAttr(JSON.stringify(nav))}'>${escHtml(ds.name)}</a></td>
+          ${compositionCells(ag, col, row)}</tr>`;
+      }).join("")}</tbody>
+    </table></div>`;
+}
+function renderPeriod(view, agencyId, collectionId, period){
+  const ag = DATA.agencies.find(a=> a.id === agencyId);
+  if(!ag) return renderNotFound(view, "Agency", agencyId);
+  const col = (ag.collections || []).find(c=> c.id === collectionId);
+  if(!col) return renderNotFound(view, "Collection", collectionId);
+  if(!collectionPeriods(col).some(p=> p.period === period)) return renderNotFound(view, "Period", period);
+  const name = fmtPeriodName(period) || fmtPeriodOrDay(period);
+  setRail([
+    {tier:"Tier 1", label:"Agencies", nav:{tier:"exec"}},
+    {tier:"Tier 2", label:escHtml(ag.name), nav:{tier:"agency", agencyId}},
+    {tier:"Tier 3", label:escHtml(col.name), nav:{tier:"agency", agencyId}},
+    {tier:"Tier 4", label:escHtml(name), nav:periodNav(agencyId, collectionId, period)},
+  ]);
+  view.innerHTML = compositionHtml(ag, col, period, CURRENT_IN_PLACE_ON);
 }
 
 function renderDataset(view, agencyId, collectionId, datasetId){
@@ -8751,6 +8925,12 @@ function scenarioTarget(entry){
     for(const collection of (agency.collections||[])){
       for(const dataset of (collection.datasets||[])){
         if(dataset.id === coords.dataset || dataset.name === coords.dataset){
+          // A SCENARIO ABOUT A WHOLE PERIOD lands on its composition (REQ-DASH-209
+          // criterion 7); its coordinate still names the dataset it is about.
+          if(coords.subject === "period-composition" && coords.period){
+            return {inPlaceOn: coords.inPlaceOn || null,
+                    nav: periodNav(agency.id, collection.id, coords.period)};
+          }
           return {inPlaceOn: coords.inPlaceOn || null,
                   nav: {tier:"dataset", agencyId:agency.id,
                         collectionId:collection.id, datasetId:dataset.id}};
@@ -8801,6 +8981,8 @@ const SCENARIO_SUBJECT = {
   "verdict-line": ()=> document.querySelector("#view .verdict-of"),
   "substitution-drill-down": ()=> document.querySelector('#view [data-testid="standing-in-detail"]'),
   "standing-in-pill": ()=> document.querySelector('#view [data-testid="standing-in"]'),
+  // A PERIOD'S COMPOSITION (REQ-DASH-209 criterion 7), for TS-55.
+  "period-composition": ()=> document.querySelector('#view [data-testid="period-composition"]'),
   "supply-history-row": coords=> {
     for(const runId of (coords.supplies || [])){
       const row = [...document.querySelectorAll("#view .supply-history tr[data-run-id]")]
@@ -8917,6 +9099,10 @@ function landOnScenarioSubject(entry, on){
   // above it. From the top, a subject already in view does not move at all.
   window.scrollTo({top: 0, behavior: "instant"});
   if(el.scrollIntoView) el.scrollIntoView({block: "nearest", behavior: "instant"});
+  // A FRACTIONAL HEIGHT can leave the subject's last part-pixel below the
+  // fold after "nearest" (TS-77b: 0.25px); round the overshoot up.
+  const over = el.getBoundingClientRect ? el.getBoundingClientRect().bottom - window.innerHeight : 0;
+  if(over > 0 && over < 2) window.scrollBy({top: Math.ceil(over), behavior: "instant"});
   // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
   // with one open marks the subject beneath it but leaves the reader in it.
   if(!(STATE && (STATE.panel || STATE.columnName || STATE.checkKey))){

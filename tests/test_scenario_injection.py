@@ -673,3 +673,35 @@ class TestAPerFileShape:
 
         with pytest.raises(si.CannotPlace):
             si.apply_file_shape("stray_test_rows", {"a.csv": self.CSV})
+
+
+class TestTheLaterSingleTableResupplyAndTheStoodOnPeriod:
+    """REQ-GEN-044 criterion 1 for TS-14 and TS-54, both on placements that
+    already exist: TS-14 is TS-12's refused Client Register corrected weeks
+    later by a delivery carrying it alone; TS-54 is TS-76's substitution onto
+    an earlier promoted supply (Keith, 2026-10-14, Q13)."""
+
+    @staticmethod
+    def _of(sid):
+        return next(i for i in si.INJECTIONS if i.scenario_id == sid)
+
+    def test_ts14_rides_ts12_with_its_corrected_file_alone(self):
+        ts12 = self._of("TS-12")
+        assert "TS-14" in ts12.also_demonstrates
+        shapes = [a.file_shape for a in ts12.arrivals]
+        assert shapes == ["one_file_unreadable", "one_table_only"]
+        assert ts12.arrivals[1].day_offset > ts12.arrivals[0].day_offset
+
+    def test_ts54_rides_ts76(self):
+        assert "TS-54" in self._of("TS-76").also_demonstrates
+
+    def test_their_links_resolve_on_the_real_calendar(self):
+        from generator import generate_cp_runs
+
+        periods = generate_cp_runs.generated_periods()
+        for sid in ("TS-12", "TS-76"):
+            injection = self._of(sid)
+            dates = si.link_dates(injection, si.resolve(injection, periods))
+            linked = {d.scenario_id for d in dates}
+            assert {"TS-12"} <= linked if sid == "TS-12" else {"TS-54", "TS-76"} <= linked
+            assert not [d.problem for d in dates if d.problem], dates

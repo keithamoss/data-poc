@@ -29,7 +29,7 @@ answer "now" whatever instant was asked for.
 """
 from __future__ import annotations
 
-from qa_tools.common import decision_log, qa_store, supply_db
+from qa_tools.common import asset_time, decision_log, qa_store, supply_db
 
 def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None) -> list[dict]:
     """Every change to what one dataset's slots held, oldest first.
@@ -80,9 +80,9 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None)
         # instant sees the destination rather than the origin.
         for slot, decision_id, fills, held_as, holder in sorted(
                 changed, key=lambda c: (c[2] is not None, c[0])):
-            action, actor, actor_kind, reason = conn.execute(
-                f"SELECT action, actor, actor_kind, reason FROM {decision_log.TABLE} "
-                "WHERE id = ?", [decision_id]).fetchall()[0]
+            action, actor, actor_kind, reason, stands_on = conn.execute(
+                f"SELECT action, actor, actor_kind, reason, stands_on "
+                f"FROM {decision_log.TABLE} WHERE id = ?", [decision_id]).fetchall()[0]
             out.append({"at": at, "action": action, "actor": actor,
                         "actor_kind": actor_kind, "reason": reason or "",
                         "decision_id": decision_id, "slot": slot, "supply": fills,
@@ -90,7 +90,10 @@ def for_dataset(dataset_id: str, conn: supply_db.SupplyConnection | None = None)
                         # not FILL it (an inheritance): what the promotion
                         # panel's as-at walk reads (REQ-DASH-197, REQ-DASH-198),
                         # carried from qa.slot_holds rather than re-derived.
-                        "held_as": held_as, "holder": holder})
+                        "held_as": held_as, "holder": holder,
+                        # THE PERIOD A SUBSTITUTION OR INHERITANCE STANDS ON
+                        # (REQ-DASH-209 criterion 9), from the decision.
+                        "stands_on": stands_on})
     return out
 
 
@@ -261,11 +264,29 @@ def with_runs(timeline: list[dict], dataset_id: str,
         with supply_db.connect(read_only=True, label="mothman:slot-timeline-runs") as opened:
             return with_runs(timeline, dataset_id, conn=opened)
 
+    from qa_tools.common import people
+
     cache: dict[str, str | None] = {}
-    out = []
-    for entry in timeline:
-        supply = entry.get("supply")
+
+    def run_of(supply):
         if supply and supply not in cache:
             cache[supply] = _run_for(conn, dataset_id, supply)
-        out.append({**entry, "run_id": cache.get(supply) if supply else None})
+        return cache.get(supply) if supply else None
+
+    out = []
+    for entry in timeline:
+        out.append({**entry, "run_id": run_of(entry.get("supply")),
+                    # The run that checked the HOLDER, which an inheritance
+                    # has without filling the slot (REQ-DASH-209 criterion 3).
+                    "holder_run_id": run_of(entry.get("holder")),
+                    # The ASSET DAY it took effect, for the page's one as-at
+                    # lookup (newestOnOrBefore), as promotion_timeline's points.
+                    "on": asset_time.local_date(asset_time.parse_instant(
+                        entry["at"], "slot timeline")).isoformat(),
+                    # THE PAGE NAMES A PERSON, NEVER THEIR EMAIL (REQ-DASH-209
+                    # PRIVACY NFR, REQ-PIPE-147 criterion 7): this copy is the
+                    # one the page embeds, so the name is put here.
+                    "actor": (people.display_name(entry.get("actor"))
+                              if entry.get("actor_kind") == decision_log.PERSON
+                              else entry.get("actor"))})
     return out

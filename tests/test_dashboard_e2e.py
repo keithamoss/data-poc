@@ -159,6 +159,9 @@ def _state_to_path(state: dict) -> str:
     if state.get("tier") == "feedback":
         return "/feedback"
     quoted = {k: urllib.parse.quote(str(v), safe="") for k, v in state.items()}
+    if state["tier"] == "period":
+        return (f"/agency/{quoted['agencyId']}/collection/{quoted['collectionId']}"
+                f"/period/{quoted['period']}")
     if state["tier"] == "agency":
         return f"/agency/{quoted['agencyId']}"
     if state["tier"] == "dataset":
@@ -5236,6 +5239,103 @@ class TestEveryScenarioJumpLands:
         clean_page.goto(url)
         clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
         assert "scenario=ts-75a" in clean_page.url and "SCENARIO" not in clean_page.url
+
+
+class TestThePeriodComposition:
+    """REQ-DASH-209 on the real bootstrapped build: the view's rows agree with
+    the period's own _manifest at the build's date, both ways (criterion 10),
+    an earlier date agrees with the decision log's as-at reader, the view is
+    reached from a dataset's supply history and lands with focus on its h2,
+    and an unknown period is the not-found page."""
+
+    AGENCY, COLLECTION = "child-protection-family-support", "child-protection"
+
+    def _open(self, page, html, period, on=None):
+        _goto(page, html, state={"tier": "period", "agencyId": self.AGENCY,
+                                 "collectionId": self.COLLECTION, "period": period},
+              in_place_on=on)
+
+    @staticmethod
+    def _rows(page):
+        return {r["dataset"]: r for r in page.evaluate(
+            """() => [...document.querySelectorAll(
+                 '#view [data-testid="period-composition"] tbody tr')].map(tr => (
+                 {dataset: tr.dataset.dataset, kind: tr.dataset.kind, text: tr.innerText}))""")}
+
+    def test_today_agrees_with_the_periods_manifest_both_ways(
+            self, clean_page, built_dashboard_html, deployment_history):
+        from qa_tools.common import period_schema, supply_db
+
+        from qa_tools.common import slots
+
+        found = None
+        periods = [s.name for s in slots.slots_for_dataset("cp-clients")]
+        with supply_db.connect(read_only=True, label="test-composition") as conn:
+            present = {r[0] for r in conn.execute(
+                "SELECT nspname FROM pg_namespace WHERE nspname LIKE ?",
+                [period_schema.PERIOD_SCHEMA_PREFIX + "%"]).fetchall()}
+            for period in reversed(periods):
+                schema = period_schema.period_schema(period)
+                if schema not in present:
+                    continue
+                rows = conn.execute(
+                    f'SELECT dataset_id, kind, decided_by FROM "{schema}"._manifest '
+                    "WHERE dataset_id LIKE 'cp-%'").fetchall()
+                if rows and (found is None or any(k == "inherited" for _d, k, _b in rows)):
+                    found = (period, rows)
+                    if any(k == "inherited" for _d, k, _b in rows):
+                        break
+        assert found, "no Child Protection period has a _manifest to compare with"
+        period, manifest = found
+        self._open(clean_page, built_dashboard_html, period)
+        page = self._rows(clean_page)
+        held = {d: (k, b) for d, k, b in manifest}
+        for dataset, (kind, by) in held.items():
+            assert page[dataset]["kind"] == kind, (period, dataset, page[dataset], kind)
+            said = "Decided by" if by == "person" else "Applied automatically by the schedule"
+            assert said in page[dataset]["text"], (period, dataset, page[dataset]["text"])
+        for dataset, row in page.items():
+            if row["kind"] not in ("notsupplied", "notowed"):
+                assert dataset in held, (period, dataset, row)
+
+    def test_an_earlier_date_agrees_with_the_decision_log_then(
+            self, clean_page, built_dashboard_html, deployment_history):
+        from qa_tools.common import asset_time, qa_store, scenario_map, supply_db
+
+        placement = scenario_map.read_placements().get("TS-76")
+        assert placement is not None and placement.in_place_on
+        on, period = placement.in_place_on, placement.period
+        self._open(clean_page, built_dashboard_html, period, on=on)
+        page = self._rows(clean_page)
+        assert page["cp-placements"]["kind"] == "substituted", page["cp-placements"]
+        end = asset_time.end_of_day(date.fromisoformat(on))
+        with supply_db.connect(read_only=True, label="test-composition") as conn:
+            for dataset, row in page.items():
+                got = conn.execute(
+                    f'SELECT held_as FROM "{qa_store.SCHEMA}".slot_holds(?, ?) WHERE slot = ?',
+                    [dataset, end, period]).fetchall()
+                held_as = got[0][0] if got else None
+                if held_as:
+                    assert row["kind"] == held_as, (dataset, row, held_as)
+                else:
+                    assert row["kind"] in ("notsupplied", "notowed"), (dataset, row)
+
+    def test_reached_from_a_supply_history_with_focus_on_its_heading(
+            self, clean_page, built_dashboard_html):
+        _goto(clean_page, built_dashboard_html, state={
+            "tier": "dataset", "agencyId": self.AGENCY, "collectionId": self.COLLECTION,
+            "datasetId": "cp-clients"})
+        link = clean_page.locator("#view .supply-history a[data-period-link]").first
+        assert link.count() == 1
+        link.click()
+        clean_page.wait_for_selector('#view [data-testid="period-composition"]')
+        assert "/period/" in clean_page.url
+        assert clean_page.evaluate("document.activeElement && document.activeElement.tagName") == "H2"
+
+    def test_an_unknown_period_is_the_not_found_page(self, clean_page, built_dashboard_html):
+        self._open(clean_page, built_dashboard_html, "1999-Q9")
+        assert "Period not found" in clean_page.locator("#view h2").inner_text()
+        assert clean_page.locator('#view [data-testid="period-composition"]').count() == 0
 
 
 class TestTheAsAtReadingsOnTheRealHistory:

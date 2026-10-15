@@ -1104,22 +1104,13 @@ _ALSO: dict[str, tuple[str, ...]] = {}
 #: claim-window size, and a different window gives a different and
 #: equally correct answer.
 #:
-#: TS-14 IS NOT HERE FOR THE SAME UNDERLYING REASON AS TS-12, which is
-#: what makes the pair worth reading together. Its shape is a corrected
-#: `cp_clients` arriving ALONE weeks later, and that delivery was written
-#: correctly - one file, its own receipt, recognised as clients' own
-#: supply arriving late. The run then died the same way TS-12's did, on
-#: `cp_placements` this time: a run resolves its views from the tables
-#: THIS ARRIVAL carried, so five of the six are simply absent and dbt's
-#: models ref() all six.
-#:
-#: `supply_db.borrow_views()` exists for exactly this - "a delivery
-#: carrying one re-sent table cannot be checked on its own... the run's
-#: schema simply gets a VIEW onto each table the earlier run already
-#: resolved" - and nothing calls it from the ordinary path. So the two
-#: scenarios are one gap wearing two faces: A DELIVERY THAT DOES NOT
-#: CARRY ALL SIX TABLES CANNOT BE QA'D AT ALL TODAY, whether a table is
-#: missing because it never came or because it could not be read.
+#: TS-14 IS HERE SINCE 2026-10-15, riding TS-12's placement: the corrected
+#: cp_clients arrives alone weeks later. It waited because a delivery not
+#: carrying all six tables could not be QA'd - a run resolved its views from
+#: the tables its own arrival carried. That gap closed when every file became
+#: its own arrival (REQ-PIPE-105 criterion 5): a run now reads its own table
+#: and takes its siblings from the period (qa_tools/common/period_overlay.py),
+#: as TS-75a's and TS-77a's lone files already showed.
 #:
 #: TS-12 IS HERE SINCE 2026-10-05 (criterion 15), now that the file
 #: checks refuse a ragged file before it is loaded (REQ-QAC-096) and a
@@ -1329,7 +1320,19 @@ INJECTIONS: tuple[Injection, ...] = (
                           "all six tables, cp_clients ragged partway and refused by the "
                           "fields-per-row file check; the other five load",
                           file_shape="one_file_unreadable"),
+            # TS-14 (REQ-GEN-044 criterion 1, 2026-10-15): the corrected
+            # Client Register, alone and weeks later - its own delivery, filed
+            # to this quarter's still-empty slot, checked against the five
+            # siblings already in place. 28 days: a Thursday, before the next
+            # quarter's claim window opens.
+            ExtraArrival(28, "10:00", None,
+                          "the corrected cp_clients alone, weeks later - TS-14",
+                          file_shape="one_table_only"),
         ),
+        also_demonstrates=("TS-14",),
+        # TS-12 is the refusal, so its link sits before the correction; TS-14
+        # takes the placement's latest day, the correction's own.
+        links=(Link("TS-12", 1, 0, 1),),
     ),
     Injection(
         scenario_id="TS-56",
@@ -1587,7 +1590,12 @@ INJECTIONS: tuple[Injection, ...] = (
                          file_shape="one_table_missing"),
         ),
         links=(Link("TS-76", 14, "TS-76 substitute", "TS-76 de-substitute",
-                    scenario_map.SUBSTITUTION_DRILL_DOWN),),
+                    scenario_map.SUBSTITUTION_DRILL_DOWN),
+               # TS-54 (Keith, 2026-10-14, Q13): a period substituted onto an
+               # earlier PROMOTED supply - TS-76's own, while it stands.
+               Link("TS-54", 14, "TS-76 substitute", "TS-76 de-substitute",
+                    scenario_map.SUBSTITUTION_DRILL_DOWN)),
+        also_demonstrates=("TS-54",),
         keeps_drawn_severity=True,
     ),
     Injection(
