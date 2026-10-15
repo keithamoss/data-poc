@@ -205,6 +205,7 @@ GROWN_QUARTERS = 40
 _GROWN_PLAN_SEED = 29000   # disjoint from _RUN_PLAN_SEED and every BASE_SEED offset
 GROWN_BASE_SEED = 30000    # seeds 30001.. and their +500/+800/+900 offsets
 GROWN_RUN_PLAN = _build_run_plan(GROWN_QUARTERS, _GROWN_PLAN_SEED)
+_CASE_WORKERS = "cp-case-workers"
 
 
 def _quarter_start(d: date) -> date:
@@ -753,6 +754,12 @@ def main() -> None:
             for i, (severity, period) in enumerate(zip(severities, original), start=1)]
     jobs += [(f"cp_slot_{len(original) + j:02d}", GROWN_BASE_SEED + j, severity, period)
              for j, (severity, period) in enumerate(zip(grown_severities, grown), start=1)]
+    # A GROWN QUARTER CASE WORKERS OWES NOTHING IN CARRIES FIVE FILES (Keith,
+    # 2026-10-15): as a supplier sending twice a year would. Twenty held
+    # off-month files back to 2013 otherwise filled the outstanding queue. The
+    # original fifteen keep sending all six, so their held shape stays.
+    grown_names = {p.name for p in grown}
+    case_workers_owed = {p.name for p in schedule.periods_for_dataset(_CASE_WORKERS) if p.expected}
     for slot_id, seed, severity, period in jobs:
         snapshot_date = period.date
 
@@ -781,6 +788,8 @@ def main() -> None:
                 df = delivery_obj.payload[name]
                 cols = [c for c in df.columns if not c.startswith("_")]
                 csvs[f"{name}.csv"] = df[cols].to_csv(index=False)
+            if period.name in grown_names and period.name not in case_workers_owed:
+                csvs.pop(f"{hierarchy.dataset(_CASE_WORKERS).table}.csv")
             if injected is not None:
                 # THE SCENARIO'S OWN FILE SET AND ITS OWN INSTANT. Three
                 # of these scenarios ARE a file set - an unreadable

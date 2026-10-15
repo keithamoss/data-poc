@@ -124,10 +124,16 @@ def _shape_of(entry, manifest) -> str | None:
 def test_every_manifest_entry_has_real_files_on_disk(manifest, raw_dir):
     from generator import scenario_injection as si
 
+    # A GROWN QUARTER CASE WORKERS OWES NOTHING IN CARRIES FIVE FILES (REQ-GEN-207).
+    owed = {p.name for p in generate_cp_runs.schedule.periods_for_dataset("cp-case-workers")
+            if p.expected}
+    grown = {p.name for p in generate_cp_runs.grown_periods()}
     for entry in manifest:
         run_dir = _delivery_dir(raw_dir, entry)
         shape = _shape_of(entry, manifest)
-        for table in (t for t in generate_cp_runs.TABLES if si.carries(shape, t)):
+        five = entry["period"] in grown - owed
+        for table in (t for t in generate_cp_runs.TABLES if si.carries(shape, t)
+                      and not (five and t == "cp_case_workers")):
             path = run_dir / f"{table}.csv"
             assert path.exists(), f"{entry['run_id']}: {path} missing"
             assert path.stat().st_size > 0
@@ -559,3 +565,23 @@ def test_the_original_fifteen_keep_their_slots_and_come_first(manifest):
     # never reach the grown range.
     assert generate_cp_runs.BASE_SEED + 15 + 1000 < generate_cp_runs._GROWN_PLAN_SEED
     assert generate_cp_runs._GROWN_PLAN_SEED < generate_cp_runs.GROWN_BASE_SEED
+
+
+def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, raw_dir):
+    """REQ-GEN-207 (Keith, 2026-10-15): a grown delivery for a quarter
+    cp-case-workers does not take part in carries five files, as a supplier
+    sending twice a year would - the original fifteen keep sending all six,
+    and their off-month Case Workers files stay held as before."""
+    owed = {p.name for p in generate_cp_runs.schedule.periods_for_dataset("cp-case-workers")
+            if p.expected}
+    grown = {p.name for p in generate_cp_runs.grown_periods()}
+    original = {p.name for p in generate_cp_runs.original_periods()}
+    off_grown = [e for e in manifest if e["period"] in grown and e["period"] not in owed]
+    on_grown = [e for e in manifest if e["period"] in grown and e["period"] in owed]
+    off_original = [e for e in manifest if e["period"] in original - owed
+                    and _shape_of(e, manifest) is None]
+    assert off_grown and on_grown and off_original
+    for e in off_grown:
+        assert not (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
+    for e in on_grown + off_original:
+        assert (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]

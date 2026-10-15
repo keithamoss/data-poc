@@ -5207,7 +5207,10 @@ class TestEveryScenarioJumpLands:
         """#202 F7 (Keith, 2026-10-15): the subject lands centred rather than
         flush on the bottom edge - unless the page cannot scroll that far
         (near its top or its end), or the subject is taller than the window,
-        when its top is at the window's top."""
+        when its top is at the window's top; or the page head is brought back
+        above it (Keith, 2026-10-15, REQ-DASH-208), when the subject is whole
+        and either the head's top is in view or the subject sits on the
+        window's bottom edge."""
         _goto(clean_page, built_dashboard_html)
         ids = clean_page.evaluate(
             "SCENARIO_MAP.filter(e => scenarioTarget(e)).map(e => e.id)")
@@ -5221,18 +5224,47 @@ class TestEveryScenarioJumpLands:
                 const el = document.querySelector('#view .scenario-subject');
                 const r = el.getBoundingClientRect();
                 const max = document.documentElement.scrollHeight - innerHeight;
-                return {top: r.top, mid: r.top + r.height / 2, h: r.height,
+                const head = document.querySelector('#view .view-head');
+                return {top: r.top, mid: r.top + r.height / 2, h: r.height, bottom: r.bottom,
+                        headTop: head ? head.getBoundingClientRect().top : null,
                         y: scrollY, atEnd: scrollY >= max - 1, vh: innerHeight};
             }""")
             if got["h"] > got["vh"]:
                 ok = abs(got["top"]) <= 2
             else:
                 centred = abs(got["mid"] - got["vh"] / 2) <= 2
-                ok = (centred or (got["y"] == 0 and got["mid"] < got["vh"] / 2)
+                whole = got["top"] >= 0 and got["bottom"] <= got["vh"] + 1
+                head_back = whole and got["headTop"] is not None and (
+                    0 <= got["headTop"] <= got["top"] or abs(got["bottom"] - got["vh"]) <= 2)
+                ok = (centred or head_back or (got["y"] == 0 and got["mid"] < got["vh"] / 2)
                       or (got["atEnd"] and got["mid"] > got["vh"] / 2))
             if not ok:
                 off.append((sid, got))
         assert not off, f"subjects not centred: {off}"
+
+    def test_the_page_head_stays_in_view_when_it_fits_beside_the_subject(
+            self, clean_page, built_dashboard_html):
+        """REQ-DASH-208 decision (Keith, 2026-10-15): the jump centres its subject,
+        but where the view head and the subject fit in the window together the
+        head is never left above it - TS-76's quoted pill is in the head. A block
+        between them is sized so the pill and the subject span 700px of the
+        800px window, so the test does not depend on how long the queue above
+        happens to be."""
+        self._chip(clean_page, built_dashboard_html, "TS-76")
+        got = clean_page.evaluate("""() => {
+            const head = document.querySelector('#view .view-head');
+            const span = document.querySelector('#view .scenario-subject').getBoundingClientRect().bottom
+                - document.querySelector('[data-testid="standing-in"]').getBoundingClientRect().top;
+            const spacer = document.createElement('div');
+            spacer.style.height = Math.max(0, 700 - span) + 'px';
+            head.after(spacer);
+            const entry = SCENARIO_MAP.find(e => e.id === 'TS-76');
+            landOnScenarioSubject(entry, scenarioTarget(entry).inPlaceOn);
+            const sub = document.querySelector('#view .scenario-subject').getBoundingClientRect();
+            const pill = document.querySelector('[data-testid="standing-in"]').getBoundingClientRect();
+            return {pill: pill.top, subBottom: sub.bottom, vh: innerHeight};
+        }""")
+        assert 0 <= got["pill"] and got["subBottom"] <= got["vh"], got
 
     def test_back_after_a_date_change_restores_the_date(self, clean_page,
                                                         built_dashboard_html):

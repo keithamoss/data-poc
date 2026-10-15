@@ -9138,6 +9138,20 @@ function landOnScenarioSubject(entry, on){
   window.scrollTo({top: 0, behavior: "instant"});
   const tall = el.getBoundingClientRect && el.getBoundingClientRect().height > window.innerHeight;
   if(el.scrollIntoView) el.scrollIntoView({block: tall ? "start" : "center", behavior: "instant"});
+  // BUT AS MUCH OF THE PAGE HEAD AS FITS COMES BACK (Keith, 2026-10-15): a
+  // scenario can quote the head - TS-76's 'Substituted from' pill - and
+  // centring a subject far below it scrolled the head off. Scroll back by the
+  // room left below the subject, never past the head's top, so the subject
+  // stays whole and the head is shown as far as the window allows.
+  const head = !tall && el.getBoundingClientRect && document.querySelector("#view .view-head");
+  if(head){
+    const headTop = head.getBoundingClientRect().top;
+    // WHOLE PIXELS: a fractional height left the subject 0.375px past the
+    // fold, as TS-77b's did once.
+    const room = Math.floor(window.innerHeight - el.getBoundingClientRect().bottom);
+    const back = Math.min(-headTop, room);
+    if(headTop < 0 && back > 0) window.scrollBy({top: -back, behavior: "instant"});
+  }
   // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
   // with one open marks the subject beneath it but leaves the reader in it.
   if(!(STATE && (STATE.panel || STATE.columnName || STATE.checkKey))){

@@ -1929,3 +1929,9 @@ one or more component tags, and a date.
         start and finish markers) is already captured: it is, as
         plans/supply-thoughts.md #2 (zip support) and #3 (upload beginning /
         complete signals), both unscoped.
+      - ~19:40, after the first ten-year bootstrap: the grown quarters' twenty
+        off-month Case Workers files were all held (queue 8 -> 28 held), and
+        the longer queue pushed TS-76/TS-77a's quoted pill off-screen after a
+        centred jump. **Keith: grown deliveries carry no Case Workers file in
+        its off-months; the jump centres but keeps the page head in view when
+        head and subject fit together.**
