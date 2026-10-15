@@ -1782,7 +1782,12 @@ one or more component tags, and a date.
       REQ-DASH-209 BUILT: the period-composition page at
       #/agency/<a>/collection/<c>/period/<p>, linked from every supply
       history's period headings, gap rows and the stand-in details. Its two
-      unmet halves wait on TS-55 (REQ-GEN-206, unsigned).
+      unmet halves wait on TS-55 (REQ-GEN-206, unsigned). CI went red on
+      249926f (two test defects, a worker running out of free quarters and a
+      timeline test reading the wrong list) - fixed and pushed, #203.
+      WHAT IS LEFT IN THE PLAN IS ALL YOURS: REQ-GEN-207's growth size, then
+      REQ-GEN-203, 205 and 218 behind it; REQ-GEN-044's evening-before era
+      and the scenarios listed in its decision.
     - **QUESTIONS FOR KEITH from post-build-review #199, queued, not built**:
       - **F5 (Q18, REQ-DASH-182 c12)**: on the real build cp-case-workers'
         period owed nothing appears as three cycle blocks, one per supply,
