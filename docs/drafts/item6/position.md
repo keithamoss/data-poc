@@ -189,3 +189,13 @@ sense-check. Evidence: `docs/drafts/item6/groundwork.md`.
     `buildDatasetsOn()` output for sampled as-of dates; S7 adds the TUI menu
     text; the CI 5% NFR is replaced by back-to-back sandbox timings with a
     threshold set from the self-check's measured noise.
+
+## Round 3/4 outcome (main session)
+
+29. ACCEPTED all four of the scoper's departures from calls 24-27: the
+    check-source lists and github_links are rewired once, in REQ-QAC-241 and
+    REQ-DASH-244 (call 27's own principle, which call 27 itself broke);
+    REQ-QAC-247 owns EVERY behavioural legacy flag, not only the
+    reader-visible ones; REQ-TEST-249 refuses to run on a dirty tracked tree,
+    since git archive proves the last commit; `compare` prints the commit
+    distance between baselines, so a gap in the chain shows.
