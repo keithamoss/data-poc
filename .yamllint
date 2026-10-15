@@ -29,13 +29,13 @@ extends: default
 # on purpose - dbt's own metricflow ships a fixture with a deliberate
 # duplicate key to test its linter, which would otherwise fail every
 # run here.
-ignore: |
-  .venv/
-  node_modules/
-  dbt_project/dbt_packages/
-  dashboard/snapshots/
-  reports/
-  data/
+#
+# AND NOTHING GIT IGNORES (REQ-TEST-253 criterion 4, 2026-10-16): 169 of
+# the 206 files this linted were gitignored browser snapshots under
+# .playwright-mcp/, 17 of its 24 seconds. The two paths git does not
+# ignore wholesale - the snapshots folder holds committed archives,
+# reports/ is ignored file by file - are listed in .yamllint-ignore.
+ignore-from-file: [.gitignore, .yamllint-ignore]
 
 rules:
   key-duplicates: enable

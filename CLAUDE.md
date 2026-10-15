@@ -267,7 +267,8 @@ is **two data assets, each managed by a different team in a strictly
 separated cloud environment, with its own deployment and its own
 dashboard** (same codebase, entirely separate instances - so the asset
 is a deployment's identity, not a row in the data), and **roughly 30
-datasets on the quarterly asset alone**. A third and possibly fourth
+collections on the quarterly asset alone** (Keith, 2026-10-16 - it said
+"datasets" until then). A third and possibly fourth
 asset shape is coming too: QA of one-off data extractions for individual
 projects, which has supplies but no cadence at all.
 
@@ -927,7 +928,7 @@ Rough layout:
     test-first as before.
   - **B.** Gate in proportion to the edit. An edit to `plans/*.md`,
     `CHANGELOG.yaml` or `requirements.yaml` after the last full gate
-    re-runs only `mothman check --no-pytest` (about 45 seconds). A code or
+    re-runs only `mothman check --docs` (under 15 seconds). A code or
     test edit re-runs the suite.
   - **C.** A small fix touching one or two modules runs its own test files
     plus `--no-pytest`, then pushes, and CI runs the full suite. The full

@@ -230,3 +230,30 @@ class TestItIsRebuiltWithTheHistory:
         assert "write_map" in calls, (
             f"{path}'s generate_synthetic_data no longer rebuilds the scenario map - "
             f"the map and the history can now disagree silently")
+
+
+class TestTheMapCanBeCheckedWithoutWriting:
+    """REQ-TEST-253 criterion 1: the docs gate checks SCENARIOS.md is
+    current - a plans/supply-model.md edit made it stale on 2026-10-15
+    and only pytest noticed."""
+
+    def test_check_passes_on_a_current_map_and_writes_nothing(self, tmp_path):
+        from click.testing import CliRunner
+        from cli.scenarios import scenarios_group
+        before = sm.MAP_PATH.read_text()
+        result = CliRunner().invoke(scenarios_group, ["map", "--check"])
+        assert sm.MAP_PATH.read_text() == before
+        assert result.exit_code in (0, 78), result.output
+
+    def test_check_fails_on_a_stale_map(self, tmp_path, monkeypatch):
+        from click.testing import CliRunner
+        from cli.scenarios import scenarios_group
+        stale = tmp_path / "SCENARIOS.md"
+        stale.write_text("stale\n")
+        monkeypatch.setattr(sm, "MAP_PATH", stale)
+        monkeypatch.setattr(sm, "PLACEMENTS_PATH", tmp_path / "placements.json")
+        (tmp_path / "placements.json").write_text('{"placements": []}')
+        result = CliRunner().invoke(scenarios_group, ["map", "--check"])
+        assert result.exit_code == 1, result.output
+        assert "stale" in result.output
+        assert stale.read_text() == "stale\n"

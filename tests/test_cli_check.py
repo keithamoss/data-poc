@@ -14,6 +14,7 @@ here would mean a test that runs the whole test suite, which cannot
 work, and it would test the gates rather than this module."""
 from __future__ import annotations
 
+import re
 import subprocess
 
 import pytest
@@ -27,6 +28,8 @@ _runner = CliRunner()
 class _Result:
     def __init__(self, returncode: int):
         self.returncode = returncode
+        self.stdout = ""
+        self.stderr = ""
 
 
 @pytest.fixture
@@ -35,7 +38,7 @@ def record(monkeypatch):
     calls: list[list[str]] = []
     codes: dict[str, int] = {}
 
-    def fake_run(argv, cwd=None, env=None):
+    def fake_run(argv, cwd=None, env=None, **_captured):
         calls.append(argv)
         return _Result(codes.get(argv[0], 0))
 
@@ -217,3 +220,76 @@ class TestAGateCanSayPassedWithSomethingToKnow:
         monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
         _runner.invoke(check_cli.check_command, ["--only", "schedule"])
         assert check_cli.WARNING_EXIT_VAR not in os.environ
+
+
+class TestTheDocsGate:
+    """REQ-TEST-253 (Keith, 2026-10-16): a documentation-only change is
+    gated by the checks it can affect, in seconds."""
+
+    DOCS = {"plans", "requirements", "sprints", "changelog", "feedback", "scenarios",
+            "scenario map", "premise", "yamllint"}
+
+    @pytest.fixture
+    def only_docs_changed(self, monkeypatch):
+        monkeypatch.setattr(check_cli, "_changed_paths",
+                            lambda: ["plans/morning-reports.md", "requirements.yaml"])
+
+    def test_it_runs_exactly_the_docs_gates(self, record, only_docs_changed):
+        calls, _ = record
+        result = _runner.invoke(check_cli.check_command, ["--docs"])
+        assert result.exit_code == 0, result.output
+        ran = {label for label, argv, *_ in check_cli._GATES if argv in calls}
+        assert ran == self.DOCS
+        assert len(calls) == len(self.DOCS)
+
+    def test_it_refuses_a_change_outside_the_docs(self, record, monkeypatch):
+        calls, _ = record
+        monkeypatch.setattr(check_cli, "_changed_paths",
+                            lambda: ["plans/x.md", "cli/check.py", "contract/calendar.yaml"])
+        result = _runner.invoke(check_cli.check_command, ["--docs"])
+        assert result.exit_code != 0
+        assert "cli/check.py" in result.output and "contract/calendar.yaml" in result.output
+        assert "--no-pytest" in result.output
+        assert calls == []
+
+    def test_it_says_what_it_ran(self, record, only_docs_changed):
+        result = _runner.invoke(check_cli.check_command, ["--docs"])
+        assert "documentation" in result.output
+
+    def test_a_failing_docs_gate_fails_the_command_and_shows_its_output(
+            self, monkeypatch, only_docs_changed):
+        """Run side by side, a failure must still be shown in full."""
+        class Out:
+            def __init__(self, code, text):
+                self.returncode, self.stdout, self.stderr = code, text, ""
+
+        def fake_run(argv, cwd=None, env=None, **_):
+            if "plans-index" in argv:
+                return Out(1, "plans/INDEX.md is out of date\n")
+            return Out(0, "")
+        monkeypatch.setattr(check_cli.subprocess, "run", fake_run)
+        monkeypatch.setattr(check_cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+        result = _runner.invoke(check_cli.check_command, ["--docs"])
+        assert result.exit_code != 0
+        assert "plans/INDEX.md is out of date" in result.output
+        assert "1 gate(s) failed: plans" in result.output
+
+    def test_it_cannot_be_combined_with_only(self, record, only_docs_changed):
+        result = _runner.invoke(check_cli.check_command, ["--docs", "--only", "ruff"])
+        assert result.exit_code != 0
+
+
+def test_every_gate_reports_its_own_time(record):
+    """REQ-TEST-253 criterion 6: so a slow gate is visible the day it
+    becomes slow."""
+    result = _runner.invoke(check_cli.check_command, ["--only", "ruff"])
+    assert re.search(r"ruff.*\d+(\.\d)?s", result.output), result.output
+
+
+def test_yamllint_lints_only_what_git_tracks():
+    """REQ-TEST-253 criterion 4: 169 of 206 files it linted were gitignored
+    browser snapshots in .playwright-mcp/."""
+    import yaml as _yaml
+    from pathlib import Path
+    cfg = _yaml.safe_load((Path(__file__).resolve().parent.parent / ".yamllint").read_text())
+    assert ".gitignore" in (cfg.get("ignore-from-file") or [])

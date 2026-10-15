@@ -5459,16 +5459,9 @@ could never have computed it), and it belongs with batch 5's check work.
     ANSWERED (Keith, 2026-10-16 ~06:50 Perth): "~30 collections" - thirty
     collections, each with its own command group, so this is real work, not
     a hypothetical. IN ITEM 6'S SCOPE (Keith, 2026-10-16 ~07:10 Perth: "their
-    code is in scope for what we're doing here"), reversing position.md call
-    9's deferral - the CLI and TUI at ~30 collections is part of item 6, not
-    later work. Needs a scoper pass on REQ-TEST-245 before sign-off.
-
-102. **[todo, 2026-10-16]** **[Testing & dev tooling]** **The docs-only gate
-    is too slow.** Keith, 2026-10-16: "the gate to push answers and
-    documentation requirement changes should be a lot faster. I don't know
-    what the hell it's doing." Measured the same morning, each gate alone
-    via `mothman check --only` (a bootstrap was running alongside, so these
-    are high): npm test 140s, yamllint 24s, requirements 24s, then fifteen
-    gates of 1.5-5.6s each - about 236s for `--no-pytest`, against the ~45s
-    CLAUDE.md records. A plans/requirements/changelog edit needs none of npm
-    test, ruff, soda, columns, patterns, guard or the schedule gates.
+    code is in scope for what we're doing here"), reversing the proposal's
+    significant call 9 (position.md call 22) - the CLI and TUI at ~30
+    collections is part of item 6, not later work. SCOPED the same morning as
+    REQ-TEST-252 (docs/drafts/item6/requirements-draft.yaml), with Keith's
+    answers: N_LIST 9, the Collections/Tools help split at every size, and a
+    new `mothman collections` command for the full list. Not yet signed.

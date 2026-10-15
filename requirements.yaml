@@ -32360,6 +32360,67 @@ requirements:
     open_questions:
     - REQ-TEST-117 (built but not yet flipped) owns the input list; build the shared list here and have
       117 adopt it.
+  - id: REQ-TEST-253
+    title: A documentation-only change is gated in seconds, by the checks it can affect
+    date_written: "2026-10-16"
+    signed_off:
+      by: Keith
+      date: "2026-10-16"
+    story: >
+      As Keith, or a session working with him, I want a change to plans, requirements, the changelog or docs
+      gated in seconds, so that recording a decision does not cost four minutes of checks it cannot affect.
+    moscow: should
+    status: built
+    acceptance_criteria:
+    - '`mothman check --docs` SHALL run exactly the checks a documentation change can affect: the plans index, requirements,
+      sprints, changelog, feedback, scenarios (with whether SCENARIOS.md is current), premise and yamllint.'
+    - IF the working tree changes any file outside plans/, docs/, requirements.yaml, CHANGELOG.yaml, CLAUDE.md, SCENARIOS.md
+      and README.md, THEN `--docs` SHALL refuse, naming those files and saying to use `--no-pytest`.
+    - '`--docs` SHALL finish in under 15 seconds on this sandbox, measured and recorded in evidence.'
+    - yamllint SHALL lint only the files git tracks or has staged, never a gitignored path.
+    - Requirements validation SHALL parse each source file once per run and load YAML with the C parser, and its output SHALL
+      be unchanged on today's register.
+    - Every gate SHALL report its own time in `mothman check`'s table, so that a slow gate is visible the day it becomes slow.
+    non_functional_requirements:
+    - 'NOTHING STOPS BEING CHECKED: CI still runs every gate, and `--docs` refuses rather than skips when anything else changed.'
+    dependencies:
+    - REQ-DOCS-029
+    linked_tests:
+    - tests/test_cli_check.py::TestTheDocsGate
+    - tests/test_cli_check.py::test_every_gate_reports_its_own_time
+    - tests/test_cli_check.py::test_yamllint_lints_only_what_git_tracks
+    - tests/test_validate_requirements.py::TestItParsesEachSourceFileOnce
+    - tests/test_scenario_map.py::TestTheMapCanBeCheckedWithoutWriting
+    implemented_by:
+    - cli/check.py::_DOCS_GATES
+    - cli/check.py::_changed_paths
+    - cli/check.py::_run_captured
+    - cli/scenarios.py::_check_map
+    - qa_tools/common/validate_requirements.py::_parsed
+    - .yamllint
+    - .yamllint-ignore
+    evidence:
+    - '2026-10-16, MEASURED before (each gate alone, a bootstrap running alongside): npm test 140s, yamllint 24s,
+      requirements 24s, fifteen others 1.5-5.6s, about 236s for --no-pytest. yamllint: 169 of 206 files were gitignored
+      .playwright-mcp/ snapshots; requirements: about 2,000 re-parses of the same files (18s) and the pure-Python YAML loader (10s).'
+    - '2026-10-16, AFTER, on an idle sandbox: yamllint 36 files 8.1s; requirements validation 6.2s with byte-identical output;
+      `mothman check --docs` 33.2s run one after another, then 12.5s, 12.2s and 12.6s with its gates side by side.
+      tests/test_cli_check.py 22 passed, the new ones failing first.'
+    decisions:
+    - 'SIGNED 2026-10-16 (Keith: "Yep, signed off. Happy for you to build both of those"), after he said "the gate to push
+      answers and documentation requirement changes should be a lot faster. I don''t know what the hell it''s doing."'
+    - 'PARALLEL FOR --docs ONLY: run one after another the nine checks were 33s, over the 15s criterion, so --docs runs them
+      side by side, capturing each one''s output and printing it whole, in order, afterwards. The full gate keeps streaming
+      one at a time, because watching pytest fail while it happens is the reason that gate streams.'
+    - 'REFUSE, NEVER NARROW SILENTLY: a change outside the docs paths refuses --docs rather than running fewer checks, because a
+      narrow gate that passed a code change would be the false green `mothman check` exists to prevent.'
+    - 'SCENARIO MAP WITHOUT PLACEMENTS WARNS: SCENARIOS.md is built from the register and data/scenario_placements.json; on a
+      machine with no placements it cannot be judged, so `scenarios map --check` warns rather than reports it current.'
+    - 'yamllint: ignore-from-file [.gitignore, .yamllint-ignore], because yamllint refuses `ignore` and `ignore-from-file`
+      together; the two paths git does not ignore wholesale (dashboard/snapshots/, reports/) and the rest of the old list sit
+      in .yamllint-ignore.'
+    source: 'Keith, 2026-10-16, plans/running-thoughts.md #102 (now deleted - this requirement carries it).'
+
   - id: REQ-GEN-183
     title: Every SQL-bodied check declares the columns it reads, and the generator reads every check's bands and columns from the committed check definitions
     date_written: '2026-10-11'

@@ -67,6 +67,19 @@ REQUIREMENTS_YAML = ROOT / "requirements.yaml"
 _COMPONENT_CODES = COMPONENT_CODES
 
 
+@lru_cache(maxsize=None)
+def _parsed(path: str, mtime_ns: int, size: int):
+    """One AST per source file per run (REQ-TEST-253 criterion 5): the
+    register names the same files about 2,000 times, and re-parsing them
+    was 18 of this gate's 23 seconds. Keyed on the file's mtime and size
+    as well as its path, so an edited file is parsed again. None for a
+    file that does not parse."""
+    try:
+        return ast.parse(Path(path).read_text())
+    except SyntaxError:
+        return None
+
+
 def _python_symbol_exists(rel_path: str, qualname: list[str]) -> bool:
     """qualname is ["function"] or ["Class", "method"] - real AST parse
     of the referenced file (never a regex/string match, which could be
@@ -79,9 +92,9 @@ def _python_symbol_exists(rel_path: str, qualname: list[str]) -> bool:
     full_path = ROOT / rel_path
     if not full_path.exists():
         return False
-    try:
-        tree = ast.parse(full_path.read_text())
-    except SyntaxError:
+    stat = full_path.stat()
+    tree = _parsed(str(full_path), stat.st_mtime_ns, stat.st_size)
+    if tree is None:
         return False
 
     if len(qualname) == 1:
@@ -324,7 +337,9 @@ def main(path: str | None = None) -> int:
         print(f"requirements YAML not found at {target}", file=sys.stderr)
         return 1
     with open(target) as f:
-        doc = yaml.safe_load(f) or {}
+        # THE C PARSER (REQ-TEST-253 criterion 5): the same safe loader,
+        # about forty times faster on a 3.4MB register.
+        doc = yaml.load(f, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader)) or {}
     raw = doc.get("requirements") if isinstance(doc, dict) else doc
     requirements = [r or {} for r in (raw or [])]
     errors = validate(requirements)

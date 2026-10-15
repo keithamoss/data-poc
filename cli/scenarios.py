@@ -32,13 +32,18 @@ def scenarios_group() -> None:
 @scenarios_group.command("map")
 @click.option("--out", "out_path", default=None,
                help="Write somewhere other than the committed SCENARIOS.md.")
-def map_command(out_path: str | None) -> None:
+@click.option("--check", "check", is_flag=True,
+              help="Write nothing; fail if the committed SCENARIOS.md is out of date.")
+def map_command(out_path: str | None, check: bool) -> None:
     """Rebuild the committed scenario map from the register.
 
     Regenerated in the same act as the synthetic history itself, so the
     two cannot disagree - this command is for rebuilding it on its own,
     after editing the register.
     """
+    if check:
+        _check_map()
+        return
     path = scenario_map.write_map(map_path=out_path)
     entries = scenarios.parse_register()
     placements = scenario_map.read_placements()
@@ -214,3 +219,23 @@ def _bounds_text(c) -> str:
     else:
         parts.append("never fails")
     return "; ".join(parts)
+
+
+def _check_map() -> None:
+    """`map --check` (REQ-TEST-253 criterion 1): the docs gate's view of
+    SCENARIOS.md. The map is built from the register AND the generator's
+    recorded placements; with no placements on this machine it cannot be
+    judged, which is said as a warning rather than passed as current."""
+    import os
+
+    if not scenario_map.PLACEMENTS_PATH.is_file():
+        console.print(f"Cannot check SCENARIOS.md: no {scenario_map.PLACEMENTS_PATH.name} on "
+                      f"this machine (run `mothman pipeline bootstrap`).", style="yellow")
+        if os.environ.get("MOTHMAN_GATE_WARNING_EXIT"):
+            raise SystemExit(int(os.environ["MOTHMAN_GATE_WARNING_EXIT"]))
+        return
+    built = scenario_map.build_map(scenarios.parse_register(), scenario_map.read_placements())
+    if scenario_map.MAP_PATH.read_text() != built:
+        console.print("SCENARIOS.md is stale - run `mothman scenarios map`.", style="red")
+        raise SystemExit(1)
+    console.print("SCENARIOS.md is current.", style="green")

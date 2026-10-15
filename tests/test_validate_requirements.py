@@ -500,3 +500,38 @@ class TestARetiredCriterion:
                                                 "by": "Keith", "replaced_by": ["REQ-QAC-002"]}]),
                 _valid_entry(id="REQ-QAC-002")]
         assert any("only 1" in e for e in validate(reqs))
+
+
+class TestItParsesEachSourceFileOnce:
+    """REQ-TEST-253 criterion 5: it re-parsed the same Python files about
+    2,000 times per run, 18 of its 23 seconds."""
+
+    def test_one_parse_per_file(self, monkeypatch):
+        import ast as _ast
+        from collections import Counter
+        from qa_tools.common import validate_requirements as vr
+
+        seen = Counter()
+        real = _ast.parse
+
+        def counting(source, *a, **kw):
+            seen[hash(source)] += 1
+            return real(source, *a, **kw)
+
+        monkeypatch.setattr(vr.ast, "parse", counting)
+        vr._parsed.cache_clear()
+        for _ in range(3):
+            assert vr._python_symbol_exists("qa_tools/common/validate_requirements.py",
+                                            ["validate"])
+        assert sum(seen.values()) == 1
+
+    def test_an_edited_file_is_parsed_again(self, tmp_path, monkeypatch):
+        from qa_tools.common import validate_requirements as vr
+
+        monkeypatch.setattr(vr, "ROOT", tmp_path)
+        f = tmp_path / "m.py"
+        f.write_text("def a():\n    pass\n")
+        assert vr._python_symbol_exists("m.py", ["a"])
+        f.write_text("def b():\n    pass\n\n\n# longer now\n")
+        assert vr._python_symbol_exists("m.py", ["b"])
+        assert not vr._python_symbol_exists("m.py", ["a"])

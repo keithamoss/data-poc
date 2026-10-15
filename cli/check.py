@@ -38,6 +38,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import rich_click as click
@@ -117,6 +118,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      "every road-testing entry carries a well-formed feedback card", False),
     ("scenarios", ["uv", "run", "mothman", "scenarios", "validate"],
      "every scripted decision names a registered scenario and a real decision", True),
+    # REQ-TEST-253: a plans/supply-model.md edit can make SCENARIOS.md
+    # stale, and until this gate only pytest noticed (2026-10-15).
+    ("scenario map", ["uv", "run", "mothman", "scenarios", "map", "--check"],
+     "SCENARIOS.md matches the register and the recorded placements", True),
     # REQ-GHUB-082 criterion 29. A person without a `github:` is shown
     # on the dashboard, assigned nothing, and discovers they cannot
     # raise a filing decision at the moment they try to raise one -
@@ -142,6 +147,54 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     ("pytest", ["uv", "run", "pytest"],
      "the Python suite", False),
 )
+
+
+#: THE DOCS GATE (REQ-TEST-253, Keith, 2026-10-16): the gates a change to
+#: these paths can affect, and the paths that may change for it to apply.
+#: A change anywhere else refuses `--docs` rather than skipping what it
+#: would need - a narrow gate that silently passed a code change is the
+#: false green this command exists to prevent.
+_DOCS_GATES = frozenset({"yamllint", "plans", "requirements", "sprints", "changelog",
+                         "feedback", "scenarios", "scenario map", "premise"})
+_DOCS_PATHS = ("plans/", "docs/", "requirements.yaml", "CHANGELOG.yaml", "CLAUDE.md",
+               "SCENARIOS.md", "README.md")
+
+
+def _changed_paths() -> list[str]:
+    """Every path the working tree changes against HEAD - staged,
+    unstaged and untracked - as git names it."""
+    out = subprocess.check_output(["git", "status", "--porcelain=v1", "-z",
+                                   "--untracked-files=all"], cwd=ROOT, text=True)
+    entries = [e for e in out.split("\0") if e]
+    paths, skip = [], False
+    for e in entries:
+        if skip:          # the source of a rename, after its target
+            skip = False
+            continue
+        status, path = e[:2], e[3:]
+        paths.append(path)
+        skip = "R" in status or "C" in status
+    return paths
+
+
+def _outside_docs(paths: list[str]) -> list[str]:
+    return [p for p in paths
+            if not any(p == d or (d.endswith("/") and p.startswith(d)) for d in _DOCS_PATHS)]
+
+
+def _run_captured(label: str, argv: list[str], can_warn: bool) -> tuple[int, str]:
+    """One gate with its output captured rather than streamed - for
+    `--docs`, whose gates run side by side (REQ-TEST-253 criterion 3):
+    nine one-to-eight-second checks one after another were 33 seconds,
+    and in parallel they cost the slowest of them."""
+    if shutil.which(argv[0]) is None:
+        return 127, (f"{argv[0]!r} is not installed - skipping {label}. "
+                     f"See CLAUDE.md's environment-setup bullet.\n")
+    env = None
+    if can_warn:
+        env = {**os.environ, WARNING_EXIT_VAR: str(WARNING_EXIT)}
+    done = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True)
+    return done.returncode, (done.stdout or "") + (done.stderr or "")
 
 
 def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
@@ -177,13 +230,25 @@ def _run(label: str, argv: list[str], can_warn: bool = False) -> int:
 @click.command("check")
 @click.option("--no-pytest", is_flag=True,
               help="Skip the Python suite (the slow one). Everything else still runs.")
+@click.option("--docs", is_flag=True,
+              help="Only the gates a documentation change can affect - plans, requirements, "
+                   "changelog, scenarios, YAML. Refuses if anything else changed.")
 @click.option("--only", "only", metavar="GATE",
               help="Run just one gate, by its name in the summary table. For a "
                    "pre-commit hook or a targeted re-run, where the point is "
                    "one fast check rather than the whole sweep.")
-def check_command(no_pytest: bool, only: str | None) -> None:
+def check_command(no_pytest: bool, docs: bool, only: str | None) -> None:
     """Run every gate - lint, YAML, the validators, the JS suite, the Python suite."""
     gates = _GATES
+    if docs:
+        if only is not None or no_pytest:
+            raise click.ClickException("--docs is its own set of gates - give it alone.")
+        outside = _outside_docs(_changed_paths())
+        if outside:
+            raise click.ClickException(
+                "--docs covers documentation only, and this change also touches: "
+                + ", ".join(outside) + ". Use `mothman check --no-pytest` (or the full gate).")
+        gates = tuple(g for g in _GATES if g[0] in _DOCS_GATES)
     if only is not None:
         gates = tuple(g for g in _GATES if g[0] == only)
         if not gates:
@@ -193,18 +258,40 @@ def check_command(no_pytest: bool, only: str | None) -> None:
                 f"no gate called {only!r}. Available: "
                 f"{', '.join(label for label, _, _, _ in _GATES)}.")
 
-    results: list[tuple[str, int, str, bool]] = []
-    for label, argv, why, can_warn in gates:
+    results: list[tuple[str, int, str, bool, float]] = []
+    if docs:
+        # SIDE BY SIDE, PRINTED IN ORDER: each gate's own output, whole,
+        # under its own heading - a failure is still shown in full, only
+        # after rather than while it happens.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def timed(gate):
+            label, argv, why, can_warn = gate
+            started = time.monotonic()
+            code, output = _run_captured(label, argv, can_warn)
+            return label, code, why, can_warn, time.monotonic() - started, output
+
+        with ThreadPoolExecutor(max_workers=len(gates)) as pool:
+            ran = list(pool.map(timed, gates))
+        for label, code, why, can_warn, took, output in ran:
+            console.rule(f"[bold]{label}", style="dim")
+            if output:
+                console.out(output.rstrip("\n"), highlight=False)
+            results.append((label, code, why, can_warn, took))
+    for label, argv, why, can_warn in (() if docs else gates):
         if no_pytest and label == "pytest":
             continue
-        results.append((label, _run(label, argv, can_warn), why, can_warn))
+        started = time.monotonic()
+        code = _run(label, argv, can_warn)
+        results.append((label, code, why, can_warn, time.monotonic() - started))
 
     console.print()
     table = Table(title="mothman check", title_style="bold", header_style="dim")
     table.add_column("Gate")
     table.add_column("Result")
+    table.add_column("Time", justify="right")
     table.add_column("What it covers", style="dim")
-    for label, code, why, can_warn in results:
+    for label, code, why, can_warn, took in results:
         if code == 0:
             outcome = "[green]passed[/green]"
         elif code == 127:
@@ -213,16 +300,16 @@ def check_command(no_pytest: bool, only: str | None) -> None:
             outcome = "[yellow]passed, with a warning[/yellow]"
         else:
             outcome = f"[red]FAILED ({code})[/red]"
-        table.add_row(label, outcome, why)
+        table.add_row(label, outcome, f"{took:.1f}s", why)
     console.print(table)
 
     def _warned(code: int, can_warn: bool) -> bool:
         return can_warn and code == WARNING_EXIT
 
-    failed = [label for label, code, _, can_warn in results
+    failed = [label for label, code, _, can_warn, _t in results
               if code not in (0, 127) and not _warned(code, can_warn)]
-    skipped = [label for label, code, _, _ in results if code == 127]
-    warned = [label for label, code, _, can_warn in results if _warned(code, can_warn)]
+    skipped = [label for label, code, _, _, _t in results if code == 127]
+    warned = [label for label, code, _, can_warn, _t in results if _warned(code, can_warn)]
     if failed:
         raise click.ClickException(f"{len(failed)} gate(s) failed: {', '.join(failed)}")
 
@@ -251,6 +338,10 @@ def check_command(no_pytest: bool, only: str | None) -> None:
         # Same reasoning as the skipped-toolchain branch above: never
         # let a summary overstate what actually ran.
         console.print(f"The {only!r} gate passed. Other gates were not run.",
+                      style="green")
+    elif docs:
+        console.print("Every documentation gate passed. Code, contracts, the JS suite and "
+                      "the Python suite were not run - this change touches none of them.",
                       style="green")
     elif no_pytest:
         console.print("Every gate passed except the Python suite, which was skipped.",
