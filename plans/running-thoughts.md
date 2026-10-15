@@ -5393,3 +5393,25 @@ could never have computed it), and it belongs with batch 5's check work.
     check came later. Question for Keith before anything is scoped: should a
     check skip, or be marked on, a supply received before its introduced
     date? Not built; recorded in the register under TS-79b.
+
+99. **[todo, 2026-10-15]** **[Data generation]** **[Testing & dev tooling]**
+    **A simple, cheap dataset to test with, so not everything rides on Child
+    Protection.** Keith, 2026-10-15 evening, as the first full suite after
+    REQ-GEN-207 ran past 25 minutes: "Let's prioritize adding another simple
+    data set that we can use that's not going to be as intensive as child
+    protection." Context: since the ten-year growth, Child Protection is 55
+    quarters of five tables and costs ~32s a bootstrap quarter (CLAUDE.md's
+    bootstrap log, 8m08s -> 31m52s), and much of the suite and the scenario
+    register leans on it. Priority: tackle tomorrow or over the weekend
+    (Keith, 2026-10-15 evening). Needs scoping with him first: one table or a few, which cadence,
+    how much history, which tests and scenarios move onto it, and whether it
+    joins an existing agency/collection or gets its own.
+
+100. **[todo, 2026-10-15]** **[Data generation]** **[Dashboard UI]**
+    **Mix up the names of some of the datasets.** Keith, 2026-10-15 evening,
+    in the same breath as #99: "Let's also maybe mix up the names of some of
+    the data sets." Not scoped. Questions for him: which datasets, why
+    (names too alike, too obviously synthetic, or exercising display of
+    longer and odder names), and whether the dataset IDs change or only
+    their display names. IDs are used in the decision log, contracts and
+    tests, so changing them costs far more than changing names.
