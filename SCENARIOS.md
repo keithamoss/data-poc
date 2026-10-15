@@ -699,7 +699,7 @@ NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad 
 
 ### TS-54 - A period substituted onto an earlier promoted supply
 
-In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted amber - with its own link while the substitution stands. AMBER SINCE 2026-10-15 (Keith, REQ-GEN-207): TS-56 moved to 2026-Q3, and the ordinary amber drawn there could only go to 2024-Q4; amber promotes itself, so the period still stands on a promoted supply. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
+In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose cp-placements supply was promoted green - with its own link while the substitution stands. CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the ordinary amber drawn for 2026-Q3 to 2024-Q4 and this entry then said "promoted amber", but that amber dirties only cp_carers and cp_clients, so cp-placements' 2024-Q4 supply is still green and promoted. Whether it should be amber is with Keith. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
 
 | Where to look | |
 |---|---|
@@ -1951,7 +1951,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A period substituted onto an earlier promoted supply",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted amber - with its own link while the substitution stands. AMBER SINCE 2026-10-15 (Keith, REQ-GEN-207): TS-56 moved to 2026-Q3, and the ordinary amber drawn there could only go to 2024-Q4; amber promotes itself, so the period still stands on a promoted supply. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.",
+   "demonstrates": "In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose cp-placements supply was promoted green - with its own link while the substitution stands. CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the ordinary amber drawn for 2026-Q3 to 2024-Q4 and this entry then said \"promoted amber\", but that amber dirties only cp_carers and cp_clients, so cp-placements' 2024-Q4 supply is still green and promoted. Whether it should be amber is with Keith. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.",
    "breaksAs": null,
    "config": null,
    "requirements": [
