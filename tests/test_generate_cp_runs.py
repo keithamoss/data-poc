@@ -89,7 +89,8 @@ def test_dirty_module_resolves_to_generators_own_copy():
 
 def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     delivery_ids = {e["slot_id"] for e in manifest}
-    assert len(delivery_ids) == len(generate_cp_runs.RUN_PLAN)
+    # THE GROWN QUARTERS TOO (REQ-GEN-207): one slot per generated period.
+    assert len(delivery_ids) == len(generate_cp_runs.RUN_PLAN) + len(generate_cp_runs.GROWN_RUN_PLAN)
 
 
 def _delivery_dir(raw_dir, entry):
@@ -142,7 +143,7 @@ def test_severity_counts_match_run_plan(manifest):
     first_by_slot = {}
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first_by_slot.setdefault(e["slot_id"], e)
-    assert len(first_by_slot) == len(generate_cp_runs.RUN_PLAN)
+    assert len(first_by_slot) == len(generate_cp_runs.RUN_PLAN) + len(generate_cp_runs.GROWN_RUN_PLAN)
 
     # AN INJECTED SLOT FOLLOWS ITS INJECTION, not the run plan (REQ-GEN-044):
     # the scenario replaces that period's chain with the arrivals it names.
@@ -151,13 +152,17 @@ def test_severity_counts_match_run_plan(manifest):
     from generator.anchor_date import get_anchor_date
     schedule = generate_cp_runs.schedule
 
-    periods = schedule.periods_for_dataset(
-        generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
-    _, injected = generate_cp_runs._plan_injections(periods)
+    del schedule, get_anchor_date
+    # GENERATION ORDER (REQ-GEN-207 criterion 4): the original fifteen, then
+    # the grown quarters oldest first, each from its own plan.
+    original, grown = generate_cp_runs.original_periods(), generate_cp_runs.grown_periods()
+    _, injected = generate_cp_runs._plan_injections(generate_cp_runs.generated_periods())
     # THE PLANNED SEVERITY, ambers moved off periods that cannot take them
     # (REQ-GEN-184 criterion 9) - and a scenario that keeps its period's
     # drawn amber carries it (REQ-GEN-199).
-    planned = generate_cp_runs._ordinary_severities(periods, injected)
+    planned = (generate_cp_runs._ordinary_severities(original, injected)
+               + generate_cp_runs._grown_severities(grown))
+    periods = original + grown
 
     def first_of(name, severity):
         injection = injected[name][0]
@@ -532,3 +537,25 @@ def test_a_partial_resupply_survives_as_a_real_delivery_on_disk(tmp_path, monkey
     # the filenames alone - a partial delivery is not an unplaceable one.
     assert all(a.collection_id == "child-protection" for a in found)
     assert arrivals.unplaceable(deliveries_dir, receipts_dir) == []
+
+
+def test_the_original_fifteen_keep_their_slots_and_come_first(manifest):
+    """REQ-GEN-207 criterion 4: everything counted from the oldest quarter is
+    the original fifteen's as it was - slot ids 01 to 15 in their order and the
+    first run indices - and the grown quarters are numbered after them, oldest
+    first, from a seed range of their own."""
+    original = [p.name for p in generate_cp_runs.original_periods()]
+    grown = [p.name for p in generate_cp_runs.grown_periods()]
+    assert len(grown) == generate_cp_runs.GROWN_QUARTERS
+    first = {}
+    for e in sorted(manifest, key=lambda e: e["run_index"]):
+        first.setdefault(e["slot_id"], e)
+    by_slot = sorted(first.values(), key=lambda e: e["run_index"])
+    assert [e["period"] for e in by_slot] == original + grown
+    assert [e["slot_id"] for e in by_slot][:15] == [f"cp_slot_{i:02d}" for i in range(1, 16)]
+    last_original = max(e["run_index"] for e in manifest if e["period"] in original)
+    assert all(e["run_index"] > last_original for e in manifest if e["period"] in grown)
+    # SEEDS: the original fifteen's plus every offset they take (+500 to +1000)
+    # never reach the grown range.
+    assert generate_cp_runs.BASE_SEED + 15 + 1000 < generate_cp_runs._GROWN_PLAN_SEED
+    assert generate_cp_runs._GROWN_PLAN_SEED < generate_cp_runs.GROWN_BASE_SEED

@@ -269,6 +269,12 @@ class Injection:
     #: scenario, when one does not - never shifting it outside the era.
     hold_days: tuple[int, ...] = ()
 
+    #: THE PERIOD A SCRIPTED SUBSTITUTION STANDS ON, as an offset from the
+    #: anchor (-1, the previous one), or None (REQ-GEN-207 criterion 3). It is
+    #: claimed like the anchor: the scenario's outcome depends on that
+    #: period's own supply, so another scenario there would change it.
+    stands_on: int | None = None
+
     @property
     def is_targeted(self) -> bool:
         return any(a.targets for a in self.arrivals)
@@ -888,7 +894,9 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
                 f"{injection.scenario_id} suppresses {', '.join(sorted(own))}, which is "
                 f"its own lead-in or following period - a targeted supply needs that "
                 f"day generated green")
+        stood = stood_on(injection, periods)
         for name in dict.fromkeys((placement.period, *placement.covered,
+                                   *((stood,) if stood else ()),
                                    *placement.suppressed, *placement.quiet,
                                    *placement.built_green,
                                    *filed_early_into(injection, placement, periods))):
@@ -900,6 +908,20 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
                     f"what it claims - each one's outcome would depend on the other's "
                     f"arrivals. Move one to a different anchor.")
             seen[key] = injection.scenario_id
+
+
+def stood_on(injection: Injection, periods: Sequence) -> str | None:
+    """The period this injection's substitution stands on (REQ-GEN-207
+    criterion 3), or None. Refused, never clamped, outside the history."""
+    if injection.stands_on is None:
+        return None
+    anchor = injection.anchor if injection.anchor >= 0 else len(periods) + injection.anchor
+    index = anchor + injection.stands_on
+    if not 0 <= index < len(periods):
+        raise CannotPlace(
+            f"{injection.scenario_id}: the period it stands on ({injection.stands_on} from its "
+            f"anchor) falls outside the generated history - nothing there to stand on")
+    return periods[index].name
 
 
 def filed_early_into(injection: Injection, placement: Placement,
@@ -939,8 +961,8 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
     configuration, so an ANCHOR_DATE bump moves them with the history.
 
     TS-79a is the newest inherited quarter before the build's own (the last
-    generated one), TS-79b the oldest - whose source is the history's first
-    supply. Each is in place on the MIDDLE of its quarter: the inheritance is
+    generated one), TS-79b the oldest - whose source is the oldest of the
+    original fifteen quarters; the caller passes those fifteen (REQ-GEN-207). Each is in place on the MIDDLE of its quarter: the inheritance is
     recorded when the period is first processed after it falls due, which on
     this history is within two weeks of the quarter's date."""
     from qa_tools.common import schedule
@@ -958,8 +980,9 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
     out = []
     for sid, i, why in (("TS-79a", inherited[-1], "the newest quarter it inherits in "
                                                   "before the build's own"),
-                        ("TS-79b", inherited[0], "the oldest, whose source is the "
-                                                 "history's first supply")):
+                        ("TS-79b", inherited[0], "the oldest of the original fifteen, "
+                                                 "whose source is the oldest of the "
+                                                 "original fifteen quarters")):
         p, nxt = periods[i], periods[i + 1]
         middle = p.date + (nxt.date - p.date) / 2
         # THE QUARTER IT INHERITS FROM is the latest one it was delivered in,
@@ -1337,10 +1360,12 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-56",
         dataset_id="cp-carers",
-        # -8, a clean quarter (no resupply chain), MOVED FROM -9 on 2026-10-05:
-        # -9 is a red chain, and replacing it removed the only knock-on
-        # re-evaluation (REQ-PIPE-121) the generated history had.
-        anchor=-8,
+        # -1, THE NEWEST QUARTER, MOVED FROM -8 on 2026-10-15 (Keith, REQ-GEN-207
+        # criterion 3): -8 is the quarter TS-76 stands on, which the widened
+        # collision rule now claims. Not back to -9: -9 is a red chain, and
+        # replacing it removed the only knock-on re-evaluation (REQ-PIPE-121)
+        # the generated history had - why it moved off -9 on 2026-10-05.
+        anchor=-1,
         config="quarterly, Feb/May/Aug/Nov. cp_carers arrives with its columns in "
                "another order than the contract's; everything else as usual.",
         arrivals=(
@@ -1580,6 +1605,7 @@ INJECTIONS: tuple[Injection, ...] = (
         # STANDS ON -8, TS-56's quarter, whose cp_placements is clean and
         # promoted (only cp_carers' columns are reordered there).
         anchor=-7,
+        stands_on=-1,
         config="quarterly, as TS-75a. The delivery leaves cp_placements out; a person "
                "substitutes the quarter onto the previous one, and when the next "
                "quarter's window has opened removes the substitution and marks the "
@@ -1605,6 +1631,7 @@ INJECTIONS: tuple[Injection, ...] = (
         # promoted cp_placements. Not -13, where TS-67's early delivery files
         # (criterion 28; Keith, 2026-10-13).
         anchor=-14,
+        stands_on=-1,
         config="quarterly, as TS-75a. The delivery leaves cp_placements out and a "
                "person substitutes the quarter onto the previous one; cp_placements "
                "arrives on its own thirty-eight days later, waits a day, and the same person "

@@ -3740,7 +3740,10 @@ a further decision. What should the planted shape be?
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14,
 Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1
 substituted by a scripted person onto 2024-Q4, whose supply was promoted
-green - with its own link while the substitution stands. The script's
+amber - with its own link while the substitution stands. AMBER SINCE
+2026-10-15 (Keith, REQ-GEN-207): TS-56 moved to 2026-Q3, and the ordinary
+amber drawn there could only go to 2024-Q4; amber promotes itself, so the
+period still stands on a promoted supply. The script's
 `stands_on` field (REQ-GEN-200) answered the old blocker.
 
 **TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
@@ -3748,6 +3751,8 @@ THE DATA YET: needs TS-54's substitution beside an inheritance in one
 period (REQ-PIPE-130, REQ-GEN-137 criterion 6).
 
 **TS-56 `[INJECT]` A supply whose columns arrive in another order.**
+2026-Q3, the newest quarter since 2026-10-15 (Keith, REQ-GEN-207 criterion
+3: its old 2024-Q4 is the quarter TS-76 stands on).
 *Config: quarterly, Feb/May/Aug/Nov.*
 `cp_carers` arrives with its first two columns swapped, header and rows
 alike - the same data, laid out differently by an upstream export.
@@ -3986,12 +3991,12 @@ in months it does not take part in, and each is held (TS-52's shape) - the
 pill, not the panel, is what this scenario points at. **Breaks as**: no pill;
 or a stale date after ANCHOR_DATE moves.
 
-**TS-79b `[INJECT]` An inherited quarter - the oldest.** The oldest
-inherited quarter (2023-Q2), whose source is the history's first supply.
-**Expect**: its page looks identical to TS-79a's - the pill "Inherited from
-2023-Q1" - and it is here because its source is the history's first
-supply, so it shows inheritance at the edge where there is nothing earlier
-to fall back on. **Breaks as**: no pill.
+**TS-79b `[INJECT]` An inherited quarter - the oldest of the original fifteen.**
+The oldest inherited quarter of the original fifteen (2023-Q2), whose source
+is the oldest of the original fifteen quarters. REWORDED 2026-10-15
+(REQ-GEN-207 criterion 11): the history now starts six years earlier, and the
+inheritance shown is unchanged. **Expect**: its page looks identical to
+TS-79a's - the pill "Inherited from 2023-Q1". **Breaks as**: no pill.
 
 ### The activity feed
 

@@ -69,6 +69,66 @@ calendars:
       date of supply, then working forwards in three month
       increments") - deliberately NOT calendar quarters.
     versions:
+      # SIX EARLIER YEARS (REQ-GEN-207, Keith, 2026-10-15): an EARLIER version
+      # rather than dates inserted into the 2023-01-01 one, which has governed
+      # filings - as the daily calendar grew (REQ-GEN-196). Nothing was judged
+      # against these quarters, so adding them changes no verdict.
+      - effective_from: "2017-01-01"
+        changelog:
+          - date: "2026-10-15"
+            author: REQ-GEN-207
+            change: >-
+              Twenty-four quarters of supply before 2023-Q1, because the synthetic Child Protection history grows six years at its old end (Keith's call) so the scenarios still to be planted each have a quarter of their own without moving any already planted. The same anchor months and claim window as the version after it.
+        claim_window: 14d
+        dates:
+          - period: "2017-Q1"
+            date: "2017-02-01"
+          - period: "2017-Q2"
+            date: "2017-05-01"
+          - period: "2017-Q3"
+            date: "2017-08-01"
+          - period: "2017-Q4"
+            date: "2017-11-01"
+          - period: "2018-Q1"
+            date: "2018-02-01"
+          - period: "2018-Q2"
+            date: "2018-05-01"
+          - period: "2018-Q3"
+            date: "2018-08-01"
+          - period: "2018-Q4"
+            date: "2018-11-01"
+          - period: "2019-Q1"
+            date: "2019-02-01"
+          - period: "2019-Q2"
+            date: "2019-05-01"
+          - period: "2019-Q3"
+            date: "2019-08-01"
+          - period: "2019-Q4"
+            date: "2019-11-01"
+          - period: "2020-Q1"
+            date: "2020-02-01"
+          - period: "2020-Q2"
+            date: "2020-05-01"
+          - period: "2020-Q3"
+            date: "2020-08-01"
+          - period: "2020-Q4"
+            date: "2020-11-01"
+          - period: "2021-Q1"
+            date: "2021-02-01"
+          - period: "2021-Q2"
+            date: "2021-05-01"
+          - period: "2021-Q3"
+            date: "2021-08-01"
+          - period: "2021-Q4"
+            date: "2021-11-01"
+          - period: "2022-Q1"
+            date: "2022-02-01"
+          - period: "2022-Q2"
+            date: "2022-05-01"
+          - period: "2022-Q3"
+            date: "2022-08-01"
+          - period: "2022-Q4"
+            date: "2022-11-01"
       - effective_from: "2023-01-01"
         changelog:
           - date: "2023-01-01"
@@ -196,6 +256,17 @@ collections:
     # dataset takes its due time and grace from here unless it states its own.
     participation_defaults:
       versions:
+        # SIX EARLIER YEARS (REQ-GEN-207) - see the quarterly calendar above.
+        - effective_from: "2017-01-01"
+          expected_time: "09:00"
+          grace: 8h
+          changelog:
+            - date: "2026-10-15"
+              author: REQ-GEN-207
+              change: >-
+                Child Protection owes supplies from 2017-01-01, six years earlier -
+                the synthetic history grows at its old end. The same due time and
+                grace as the version after it.
         - effective_from: "2023-01-01"
           expected_time: "09:00"
           grace: 8h
@@ -270,6 +341,13 @@ datasets:
   - id: cp-clients
     participation:
       versions:
+        # SIX EARLIER YEARS (REQ-GEN-207) - see the quarterly calendar above.
+        - &cp_grown_participation
+          effective_from: "2017-01-01"
+          changelog:
+            - date: "2026-10-15"
+              author: REQ-GEN-207
+              change: Owes supplies from 2017-01-01, six years earlier - the synthetic history grows at its old end. Due time and grace from Child Protection's participation_defaults, as after it.
         - &cp_participation
           effective_from: "2023-01-01"
           changelog:
@@ -295,6 +373,7 @@ datasets:
   - id: cp-notifications
     participation:
       versions:
+        - *cp_grown_participation
         - *cp_participation
     corrections:
       - change_reference: REQ-PIPE-181
@@ -312,6 +391,7 @@ datasets:
   - id: cp-investigations
     participation:
       versions:
+        - *cp_grown_participation
         - *cp_participation
     corrections:
       - change_reference: REQ-PIPE-181
@@ -329,6 +409,7 @@ datasets:
   - id: cp-placements
     participation:
       versions:
+        - *cp_grown_participation
         - *cp_participation
     corrections:
       - change_reference: REQ-PIPE-181
@@ -346,6 +427,7 @@ datasets:
   - id: cp-carers
     participation:
       versions:
+        - *cp_grown_participation
         - *cp_participation
     corrections:
       - change_reference: REQ-PIPE-181
@@ -363,6 +445,17 @@ datasets:
   - id: cp-case-workers
     participation:
       versions:
+        # SIX EARLIER YEARS (REQ-GEN-207) - the same months and reason as the
+        # version after it.
+        - effective_from: "2017-01-01"
+          participates: [February, August]
+          reason: >-
+            A staffing register rather than casework, so it is resupplied twice a
+            year rather than quarterly.
+          changelog:
+            - date: "2026-10-15"
+              author: REQ-GEN-207
+              change: Owes supplies from 2017-01-01, six years earlier - the synthetic history grows at its old end. The same months and reason as the version after it.
         - effective_from: "2023-01-01"
           # The worked example of partial participation. Month NAMES, in
           # full, never numbers or positions - an index breaks silently the

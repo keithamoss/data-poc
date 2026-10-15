@@ -123,6 +123,35 @@ class TestAHistoryThatCannotHostOneIsRefused:
             [si.Injection("TS-a", "d", -5, "cfg", suppress=(-1,))], {"d": _daily(30)})
 
 
+class TestAStoodOnPeriodIsClaimed:
+    """REQ-GEN-207 criterion 3: the period a scenario's substitution stands
+    on counts as claimed under the collision rule, so a quarter another
+    scenario stands on is never read as free."""
+
+    def test_another_scenario_on_the_stood_on_period_is_refused(self):
+        both = [si.Injection("TS-a", "d", -5, "cfg", stands_on=-1),
+                si.Injection("TS-b", "d", -6, "cfg")]
+        with pytest.raises(si.CannotPlace) as exc:
+            si.no_two_scenarios_share_a_period(both, {"d": _daily(30)})
+        assert "TS-a" in str(exc.value) and "TS-b" in str(exc.value)
+
+    def test_a_stood_on_period_outside_the_history_is_refused(self):
+        with pytest.raises(si.CannotPlace):
+            si.no_two_scenarios_share_a_period(
+                [si.Injection("TS-a", "d", 0, "cfg", stands_on=-1)], {"d": _daily(30)})
+
+    def test_the_real_child_protection_plan_passes(self):
+        """TS-76 stands on 2024-Q4 and TS-77a on 2023-Q1; TS-56 moved to the
+        newest quarter so neither is another scenario's (Keith, 2026-10-15)."""
+        from generator import generate_cp_runs
+
+        periods = generate_cp_runs.generated_periods()
+        resolved, _ = generate_cp_runs._plan_injections(periods)
+        stood = {inj.scenario_id: si.stood_on(inj, periods) for inj, _p in resolved
+                 if inj.stands_on is not None}
+        assert stood == {"TS-76": periods[-8].name, "TS-77a": periods[-15].name}
+
+
 class TestADayMeantToBeEmptyMustBeEmpty:
     """Criterion 4 again, against the case that actually happened.
 

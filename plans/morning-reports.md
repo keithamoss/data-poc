@@ -1906,3 +1906,18 @@ one or more component tags, and a date.
       F7, F8, F12; #201 F4; #202 F7 (centred). Written up under
       post-build-review #199, #201 and #202 (all now done), with decisions on
       REQ-DASH-182, 180, 208, REQ-PIPE-130 and REQ-GHUB-229. Next: REQ-GEN-207.
+    - **ANSWERS, Keith, 2026-10-15 ~18:30 Perth (REQ-GEN-207)**:
+      - Criterion 3's widened rule refuses today's plan: TS-76 stands on
+        2024-Q4, TS-56's quarter. Keith first chose to move TS-56 to 2024-Q3;
+        told that 2024-Q3 is drawn red and that TS-56 was moved off it on
+        2026-10-05 because replacing that red chain removed the only knock-on
+        re-evaluation, he chose **2026-Q3 (anchor -1)** instead. The rule stays
+        as signed. TS-56's quoted dates change; that is his call, not a
+        criterion 4 finding.
+      - The 24 grown quarters draw **the same mix** as the original fifteen
+        (about a quarter amber, two reds with resupply chains, the oldest
+        clean) from a plan seeded on its own.
+      - The amber drawn for 2026-Q3 goes to 2024-Q4, the only clean quarter
+        left, and TS-54's text changes from "promoted green" to "promoted
+        amber" (Keith's recommended option; REJECTED TS-56 keeping the amber,
+        and dropping it).

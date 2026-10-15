@@ -193,6 +193,19 @@ def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
 
 RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
 
+# SIX YEARS MORE AT THE OLD END (REQ-GEN-207, Keith, 2026-10-15): twenty-four
+# quarters before the original fifteen, so the scenarios still to be planted
+# each have a quarter of their own. DRAWN AND WRITTEN SEPARATELY (criterion 4):
+# everything that counts from the oldest quarter - seeds, slot ids, run
+# indices, delivery names, ambers - is the original fifteen's exactly as it was,
+# because those are planned and written first, and the grown quarters take a
+# run plan, seeds and slot ids of their own afterwards. The same mix as the
+# original plan (Keith): about a quarter amber, two reds, the oldest clean.
+GROWN_QUARTERS = 24
+_GROWN_PLAN_SEED = 29000   # disjoint from _RUN_PLAN_SEED and every BASE_SEED offset
+GROWN_BASE_SEED = 30000    # seeds 30001.. and their +500/+800/+900 offsets
+GROWN_RUN_PLAN = _build_run_plan(GROWN_QUARTERS, _GROWN_PLAN_SEED)
+
 
 def _quarter_start(d: date) -> date:
     """The first day of the Feb/May/Aug/Nov-anchored quarter containing
@@ -588,8 +601,28 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
 
 
 def generated_periods() -> list:
-    """The periods this generator writes, oldest first - one delivery each."""
-    return schedule.periods_for_dataset(DATASET_ID, until=get_anchor_date())[-len(RUN_PLAN):]
+    """The periods this generator writes, oldest first - one delivery each:
+    the grown quarters, then the original fifteen (REQ-GEN-207)."""
+    return schedule.periods_for_dataset(
+        DATASET_ID, until=get_anchor_date())[-(len(GROWN_RUN_PLAN) + len(RUN_PLAN)):]
+
+
+def original_periods() -> list:
+    """The original fifteen, whose plan, seeds and slots are RUN_PLAN's."""
+    return generated_periods()[-len(RUN_PLAN):]
+
+
+def grown_periods() -> list:
+    """The quarters REQ-GEN-207 added before them, oldest first."""
+    return generated_periods()[:-len(RUN_PLAN)]
+
+
+def _drawn_by_period(periods) -> dict:
+    """Each period's drawn severity by name, from whichever plan owns it."""
+    names = [p.name for p in periods]
+    grown, original = names[:-len(RUN_PLAN)], names[-len(RUN_PLAN):]
+    return {**dict(zip(grown[-len(GROWN_RUN_PLAN):], (s for _q, s in GROWN_RUN_PLAN))),
+            **dict(zip(original, (s for _q, s in RUN_PLAN)))}
 
 
 def _plan_injections(periods):
@@ -631,8 +664,7 @@ def _plan_injections(periods):
     # scenario keeps only an amber, so a red would be planned and not written.
     for injection, placement in resolved:
         if injection.keeps_drawn_severity:
-            drawn = dict(zip((p.name for p in periods),
-                             (sev for _q, sev in RUN_PLAN[:len(periods)]))).get(placement.period)
+            drawn = _drawn_by_period(periods).get(placement.period)
             if drawn == "red":
                 raise scenario_injection.CannotPlace(
                     f"{injection.scenario_id}: an ordinary red is drawn for {placement.period}, "
@@ -666,6 +698,18 @@ def _ordinary_severities(periods, injected_by_period) -> list:
     return [None if p.name in green else sev for p, sev in zip(periods, out)]
 
 
+def _grown_severities(periods) -> list:
+    """The grown quarters' drawn severities (REQ-GEN-207), placed outside a
+    hold era as _ordinary_severities places the original fifteen's. No
+    scenario is planted in them in this change (criterion 7), so nothing
+    there is unavailable; the oldest stays clean, as the history's first."""
+    from generator import targeting
+
+    return targeting.outside_hold([sev for _q, sev in GROWN_RUN_PLAN[:len(periods)]],
+                                  [p.date for p in periods], "cp-clients",
+                                  keep_clean=frozenset({0}), unavailable=frozenset())
+
+
 def main() -> None:
     print(f"Generating base Child Protection collection (population={POPULATION_N:,}, seed={BASE_SEED})...")
     pop = generate_population(POPULATION_N, seed=BASE_SEED)
@@ -684,11 +728,14 @@ def main() -> None:
     # disagreement would read as a model failure rather than a config
     # duplication.
     periods = generated_periods()
+    original, grown = original_periods(), grown_periods()
 
     # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
     resolved_injections, injected_by_period = _plan_injections(periods)
     # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
-    severities = _ordinary_severities(periods, injected_by_period)
+    # Each plan over its own periods (REQ-GEN-207 criterion 4).
+    severities = _ordinary_severities(original, injected_by_period)
+    grown_severities = _grown_severities(grown)
     # ONLY THEN is the last history cleared: a scenario or target refused
     # above leaves the one already on disk standing (REQ-GEN-184
     # criterion 11).
@@ -700,10 +747,14 @@ def main() -> None:
     delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
     taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
 
-    for i, (severity, period) in enumerate(zip(severities, periods), start=1):
+    # THE ORIGINAL FIFTEEN FIRST, numbered and seeded exactly as before, then
+    # the grown quarters (REQ-GEN-207 criterion 4).
+    jobs = [(f"cp_slot_{i:02d}", BASE_SEED + i, severity, period)
+            for i, (severity, period) in enumerate(zip(severities, original), start=1)]
+    jobs += [(f"cp_slot_{len(original) + j:02d}", GROWN_BASE_SEED + j, severity, period)
+             for j, (severity, period) in enumerate(zip(grown_severities, grown), start=1)]
+    for slot_id, seed, severity, period in jobs:
         snapshot_date = period.date
-        slot_id = f"cp_slot_{i:02d}"
-        seed = BASE_SEED + i
 
         injected = injected_by_period.get(period.name)
         if injected is not None:
@@ -802,13 +853,15 @@ def main() -> None:
         # TS-79 IN THE SAME WRITE (REQ-GEN-199 criterion 20): every Child
         # Protection regeneration replaces its records rather than merging
         # past them, so a stale date cannot survive an ANCHOR_DATE bump.
-        placed += scenario_injection.inheritance_placements(periods)
+        # OVER THE ORIGINAL FIFTEEN (REQ-GEN-207 criterion 4): TS-79b stays on
+        # the quarter it names today rather than the new oldest inherited one.
+        placed += scenario_injection.inheritance_placements(original)
         written = scenario_injection.write_placements(
             placed, merge=True)
         print(f"Recorded {len(placed)} injected scenario placement(s) -> {written}")
     _write_bookkeeping(manifest)
-    n_red_slots = sum(1 for _, sev in RUN_PLAN if sev == "red")
-    print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
+    n_red_slots = sum(1 for _, sev in RUN_PLAN + GROWN_RUN_PLAN if sev == "red")
+    print(f"\nWrote {len(manifest)} deliveries across {len(jobs)} scheduled slots "
           f"({n_red_slots} of which went red and triggered a resupply chain) "
           f"to {os.path.abspath(DELIVERIES_DIR)}")
 

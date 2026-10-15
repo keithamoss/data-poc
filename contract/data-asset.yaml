@@ -137,6 +137,15 @@ synthetic: true
 # and never recomputed from this file.
 amber_setting:
   versions:
+    # BEFORE THE GROWN QUARTERS' FIRST CLAIM WINDOW OPENS (REQ-GEN-207
+    # criterion 5): Child Protection's history starts 2017-Q1, so a supply
+    # from then on meets a setting in force. The value the next version carries.
+    - effective_from: "2017-01-01"
+      value: promote
+      changelog:
+        - date: "2026-10-15"
+          author: REQ-GEN-207
+          change: "the synthetic history grows six years earlier - amber promotes itself, as in the version after it."
     - effective_from: "2023-01-01"
       value: promote
       changelog:
@@ -190,6 +199,13 @@ amber_setting:
 # refuses green-or-amber wherever the amber setting is hold.
 replacement_setting:
   versions:
+    # BEFORE THE GROWN QUARTERS (REQ-GEN-207 criterion 5) - as amber_setting.
+    - effective_from: "2017-01-01"
+      value: never
+      changelog:
+        - date: "2026-10-15"
+          author: REQ-GEN-207
+          change: "the synthetic history grows six years earlier - a filled slot waits for a person, as in the version after it."
     - effective_from: "2023-01-01"
       value: never
       changelog:

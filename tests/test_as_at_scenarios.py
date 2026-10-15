@@ -28,7 +28,9 @@ FILES = {f"{t}.csv": f"{t} rows" for t in
 def _cp_periods():
     from generator import generate_cp_runs
 
-    return generate_cp_runs.generated_periods()
+    # THE ORIGINAL FIFTEEN (REQ-GEN-207): what TS-79 and the as-at scenarios
+    # are placed over; the grown quarters before them carry no scenario.
+    return generate_cp_runs.original_periods()
 
 
 def _bdm_periods():
