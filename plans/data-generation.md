@@ -451,3 +451,18 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     generated history contains the shapes the model needs - a history
     that contradicts its own configured participation is a history
     nobody should measure against.
+
+12. **[todo, 2026-10-15]** **[Data generation]** **[QA checks & contract]**
+    **A cheap Emergency Department dataset so scenarios stop costing Child
+    Protection quarters.** Scoped with Keith 2026-10-15 evening
+    (`plans/running-thoughts.md` #99): Department of Health > Emergency
+    Department > ED Presentations, quarterly on the shared calendar, one
+    8-column CSV per supply, all four tools (~13 checks). Scenarios move
+    unless they need several files, a cross-table check or several datasets
+    in one collection; Child Protection then shrinks by the same dry run.
+    Drafted as REQ-QAC-231 to REQ-GEN-238 by delivery-scoper the same night,
+    in `docs/drafts/emergency-department/requirements-draft.yaml`, NOT
+    SIGNED. Open with Keith: code shape for a third collection, the shared
+    calendar under corrections, TS-61, how Child Protection shrinks, the
+    bootstrap budget, TS-63's dataset, the agreement freeze, Emergency
+    Department's ordinary severity mix.

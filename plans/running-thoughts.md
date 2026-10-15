@@ -5436,6 +5436,7 @@ could never have computed it), and it belongs with batch 5's check work.
     - **Sequence:** draft the requirements now, before finishing REQ-GEN-207's
       failing tests; delivery-scoper then delivery-architect, and Keith
       signs off before anything is built.
+    Drafted the same night: `plans/data-generation.md` #12.
 
 100. **[todo, 2026-10-15]** **[Data generation]** **[Dashboard UI]**
     **Mix up the names of some of the datasets.** Keith, 2026-10-15 evening,
