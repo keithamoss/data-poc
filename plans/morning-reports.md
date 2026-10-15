@@ -1889,7 +1889,11 @@ one or more component tags, and a date.
         the old end. TS-13: reword its Expect to six runs with no cross-table
         red while siblings land, and record the existing trickled delivery as
         its placement. TS-3a/3b: into REQ-GEN-207's grown quarters, with Child
-        Protection suppression.
+        Protection suppression. (What "suppression" meant, clarified the same
+        evening when Keith asked: the generator leaves out the routine supply
+        for the period a scenario needs empty - TS-3b needs May's slot never
+        filled. Nothing about Child Protection's shape, so under #99's rule
+        TS-3a/3b move to Emergency Department.)
       - REQ-PIPE-202 criterion 8 amended (approved wording): the refusal says
         what the person can do, by route.
       - Jump look (#202 F6/F7): keep the focus ring, land the subject centred.
