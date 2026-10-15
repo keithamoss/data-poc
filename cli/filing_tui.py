@@ -1193,6 +1193,21 @@ def period_flow(collection_id: str) -> None:
     if state is None:
         return
     supply_scoped, period_scoped = filing_queue.operations_for(state)
+    if counts.get((state.dataset_id, state.period), 0) == 1:
+        # A FAILED LOAD ALONE IN ITS PERIOD is offered reject only, at the
+        # door as in the queue (post-build-review #201 F4, Keith 2026-10-15;
+        # REQ-GHUB-229's sign-off decision). The slot's state cannot say it
+        # failed - the load log does, read as supplies_in reads it.
+        try:
+            with open_log() as conn:
+                entries = filing_queue.supplies_in(conn, state)
+        except filing_queue.LogUnreachable as exc:
+            say_unreachable(exc)
+            return
+        if len(entries) == 1 and entries[0].state.state == filing_queue.COULD_NOT_LOAD:
+            own = entries[0].state
+            _decide_on(own, offer=_offers(own, filing_queue.operations_for(own)[0]))
+            return
     if counts.get((state.dataset_id, state.period), 0) <= 1:
         # ONE SUPPLY OR NONE: straight to the period's decisions, as before
         # (REQ-GHUB-229 criterion 2).

@@ -131,9 +131,24 @@ def _turn_off_lines(dataset_id: str, on: date,
     headline = None
     if standing.state == agreement_mod.TURNED_OFF and not still:
         headline = "Turned off - nothing due"
-    elif standing.state == agreement_mod.OWING and not still and turn.effective_to >= on:
+    elif (standing.state == agreement_mod.OWING and not still and turn.effective_to >= on
+          and _authored_by(dataset_id, turn.effective_to, on, agr)):
+        # ONLY ONCE IT IS WRITTEN DOWN (post-build-review #199 F12, Keith
+        # 2026-10-15): one meaning across surfaces - the page's marker waits
+        # for the authored date too (REQ-DASH-180 criterion 25).
         headline = f"Turning off after {_day(turn.effective_to)} - nothing more owed"
     return headline, tuple(x for x in lines if x), bool(still)
+
+
+def _authored_by(dataset_id: str, effective_to: date, on: date, agr) -> bool:
+    """Whether the turn-off ending `effective_to` was authored on or before
+    `on` - the date its changelog or a correction records, as the page reads
+    it (turned_off.timeline's authoredOn). None authored is not yet."""
+    from qa_tools.common import turned_off
+
+    return any(t["effectiveTo"] == effective_to.isoformat() and t.get("authoredOn")
+               and t["authoredOn"] <= on.isoformat()
+               for t in turned_off.timeline(dataset_id, agr))
 
 
 def _collection(dataset_id: str) -> str:

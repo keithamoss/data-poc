@@ -9483,7 +9483,7 @@ twice. It deliberately did not re-find the `TypeError`.
      `agreement=None`. The touched modules (16) also ran on that empty
      database: 562 passed, no skips reported.
 
-199. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+199. **[done, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
      **delivery-critic on the morning report 5 answers (b900dac..f43c85d).**
      Q6, Q10, Q14, Q16, Q17, Q19, Q21, Q22 and Q23 meet their wording; the
      findings below are on Q4, Q9, Q11, Q17's test, Q18, Q19, Q24 and
@@ -9558,6 +9558,19 @@ twice. It deliberately did not re-find the `TypeError`.
        `decision_log.ACTIONS`. F10 `noRunWords` and `statusPill` on the
        dataset page's three branches. F11 "superseded by the rule". F5, F7,
        F8 and F12 queued for Keith in plans/morning-reports.md.
+     - **KEITH'S ANSWERS BUILT, 2026-10-15** (all four the recommended
+       option): F5 one block per period owed nothing - cycles sharing an
+       owed-nothing period's date merge in `renderSupplyHistorySection`
+       (tests-js/owed-nothing.test.js, failing first). F7 an authored
+       for-good turn-off stops driving the runway minimum on the page and in
+       the gate, and drives only where every dataset counted is turning off
+       (tests-js/schedule-runway.test.js and tests/test_turn_off.py, failing
+       first; the older gate test now turns the whole collection off, the
+       one case its wording still covers). F8 the queue takes the newest
+       re-check that has RUN (tests/test_recheck_decision.py, failing first).
+       F12 the terminal headline waits for the authored date
+       (tests/test_turn_off.py, failing first). Decisions on REQ-DASH-182,
+       REQ-DASH-180 and REQ-PIPE-130.
 
 200. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on f43c85d:
      a dashboard test still expecting Q19's old pill.**
@@ -9572,7 +9585,7 @@ twice. It deliberately did not re-find the `TypeError`.
      passes on the rebuilt local dashboard. Lesson for this session: a
      cancelled CI run is not a green one - the next run carries its result.
 
-201. **[in-progress, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
+201. **[done, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
      **delivery-critic on REQ-GHUB-229 and REQ-DASH-230 (25116ce).**
      REQ-DASH-230 checked in a real Chromium at 1280px and 390px on all seven
      datasets, zero console errors; REQ-GHUB-229's main case works. Each
@@ -9612,8 +9625,13 @@ twice. It deliberately did not re-find the `TypeError`.
        `open_contest` once per filed supply, heavier than the NFR's "one
        verdict lookup per supply" (0.05-0.15s a period on the real database
        today) - worth watching at thirty datasets.
+     - **F4 BUILT, 2026-10-15 (Keith: reject only at the door too)**:
+       `period_flow` reads `supplies_in` for a period with exactly one filing
+       and, where it could not be loaded, decides on it with reject alone.
+       Test `TestALoneFailedLoadAtTheDoor`, failing first (it offered promote
+       and seven more). Decision on REQ-GHUB-229.
 
-202. **[in-progress, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
+202. **[done, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
      **delivery-critic on REQ-DASH-208 (63ba55d).** Every one of the 32
      placed chips clicked and cold-reloaded in a real Chromium at 1280x800,
      plus hand-edited URLs, every date-change route, drawers, panels, dark
@@ -9665,6 +9683,14 @@ twice. It deliberately did not re-find the `TypeError`.
        a jump's page is "navigating from the page" (c8). Built as NOT - the
        jump stays with a drawer as it already did with a panel - because a
        panel over the page leaves the page and its subject where they were.
+     - **KEITH'S ANSWERS, 2026-10-15**: F6 keep the focus ring - no change.
+       F7 land the subject centred - `landOnScenarioSubject` scrolls from the
+       top to block "center", or "start" for a subject taller than the
+       window; the 0.25px round-up for TS-77b went with "nearest". Test
+       `test_every_subject_lands_centred` over every placed chip, failing
+       first (TS-1 and the rest sat at 670-720px of 800). The drawer
+       question: built as asked - opening one is not leaving the page.
+       Decision on REQ-DASH-208.
 
 203. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Testing & dev tooling]**
      **delivery-critic on REQ-PIPE-202 (2da963b).** All 13 criteria hold in

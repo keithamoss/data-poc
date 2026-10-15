@@ -159,11 +159,17 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
     has ever re-checked can be on the list."""
     from qa_tools.common import recheck, supply_status
 
+    # THE NEWEST RE-CHECK THAT HAS RUN (post-build-review #199 F8, Keith
+    # 2026-10-15): what it found stands until a newer re-check says otherwise,
+    # as _manifest reads it - one still owed does not take the supply off the
+    # list. Until any has run, its verdict is from before them (#192 F2).
     rows = conn.execute(
-        f"SELECT DISTINCT ON (dataset_id, supply) dataset_id, supply, to_slot, id, "
-        f"effective_at FROM {decision_log.TABLE} WHERE action = ? "
-        "AND (?::text IS NULL OR dataset_id = ?) AND (?::text IS NULL OR supply = ?) "
-        "ORDER BY dataset_id, supply, id DESC",
+        f"SELECT DISTINCT ON (d.dataset_id, d.supply) d.dataset_id, d.supply, d.to_slot, d.id, "
+        f"d.effective_at FROM {decision_log.TABLE} d WHERE d.action = ? "
+        "AND (?::text IS NULL OR d.dataset_id = ?) AND (?::text IS NULL OR d.supply = ?) "
+        f"AND EXISTS (SELECT 1 FROM {recheck.TABLE} o WHERE o.caused_by_decision = d.id "
+        "AND o.cleared_at IS NOT NULL) "
+        "ORDER BY d.dataset_id, d.supply, d.id DESC",
         [decision_log.RECHECK, dataset_id, dataset_id, supply, supply]).fetchall()
     out = []
     for ds, held_supply, period, recheck_id, at in rows:
@@ -174,13 +180,6 @@ def worse_than_promoted(conn, dataset_id: str | None = None,
             f"SELECT id, promoted_status FROM {decision_log.TABLE} WHERE id = ?",
             [holds.decision_id]).fetchall()
         if promoted_on not in _RANK or promote_id > recheck_id:
-            continue
-        # ONLY ONCE THAT RE-CHECK HAS RUN (post-build-review #192 F2): until
-        # then its verdict is from before it, whatever made it worse.
-        ran = conn.execute(
-            f"SELECT 1 FROM {recheck.TABLE} WHERE caused_by_decision = ? "
-            "AND cleared_at IS NOT NULL LIMIT 1", [recheck_id]).fetchall()
-        if not ran:
             continue
         # A STANDING ACKNOWLEDGEMENT SINCE (REQ-PIPE-166 criterion 9): one
         # withdrawn lists it again.

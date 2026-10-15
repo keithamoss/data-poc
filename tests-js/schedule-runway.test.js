@@ -285,12 +285,32 @@ describe("a low runway driven by a dataset turning off for good", () => {
     return el.textContent.replace(/\s+/g, " ");
   };
 
+  // Alone on its calendar, so it is still the one the calendar runs out for.
+  const aloneAhead = (authoredOn) => {
+    const r = offAhead(authoredOn);
+    return { ...r, calendars: [{ ...r.calendars[0], datasets: [r.calendars[0].datasets[1]] }] };
+  };
+
   it("says no more dates are needed once the turn-off is authored", () => {
     const w = load();
-    const said = text(w.lowRunwayNotice(w.scheduleRunwayInPlaceOn("2027-03-01", offAhead("2027-01-10"))), w);
+    const said = text(w.lowRunwayNotice(w.scheduleRunwayInPlaceOn("2027-03-01", aloneAhead("2027-01-10"))), w);
     expect(said).toContain(
       `It runs out first for twice-a-year, which turns off for good after ${w.fmtDay("2027-08-31")} - no more dates are needed for it.`);
     expect(said).not.toContain("Add the next dates");
+  });
+
+  it("#199 F7: once authored it stops driving the minimum while another dataset still owes", () => {
+    // Keith, 2026-10-15: an authored for-good turn-off stops driving the
+    // runway minimum, as a started one does - so a sibling that is also short
+    // is warned about, with the instruction to add dates.
+    const w = load();
+    const low = w.scheduleRunwayInPlaceOn("2027-03-01", offAhead("2027-01-10")).low[0];
+    expect(low.drivingDataset).toBe("every-quarter");
+    expect(low.remaining).toBe(3);
+    expect(low.drivingTurnsOffAfter).toBeNull();
+    const said = text(w.lowRunwayNotice(w.scheduleRunwayInPlaceOn("2027-03-01", offAhead("2027-01-10"))), w);
+    expect(said).toContain("Add the next dates");
+    expect(said).not.toContain("no more dates are needed");
   });
 
   it("is the ordinary warning before it was authored", () => {

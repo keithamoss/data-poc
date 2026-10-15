@@ -308,6 +308,47 @@ releases:
               it got here: placed, filed by hand, settled from two files, moved
               by a correction or still owed after a turn-off. Timing is only
               about whether it was on time.
+          - headline: One block for a period owed nothing
+            components: ["Dashboard UI"]
+            description: >
+              When several supplies land in a period a dataset owes nothing
+              in, its supply history now shows that period once, with every
+              delivery in it, rather than repeating "Not owed" for each.
+          - headline: The right dataset in the runway warning
+            components: ["Dashboard UI", "Pipeline & publishing"]
+            description: >
+              A dataset whose turn-off for good is written down no longer
+              decides how short a calendar's dates are, so another dataset
+              that is also running short is the one you are warned about.
+          - headline: Turning off waits until it is written down
+            components: ["Pipeline & publishing"]
+            description: >
+              The terminal only says a dataset is "turning off - nothing more
+              owed" from the day its turn-off was recorded, the same day the
+              dashboard starts saying so.
+          - headline: Re-checked worse stays on the list
+            components: ["Pipeline & publishing", "GitHub workflow & people"]
+            description: >
+              A promoted supply that came back worse on a re-check stays on
+              the list while you ask for another re-check, until that one
+              runs and says otherwise.
+          - headline: Reject only, at the door too
+            components: ["GitHub workflow & people"]
+            description: >
+              A supply that could not be loaded is offered reject alone in the
+              period door, even when it is the only supply in its period - the
+              same choice the queue gives you.
+          - headline: Scenario links land in the middle
+            components: ["Dashboard UI"]
+            description: >
+              Following a scenario now puts what it is about in the middle of
+              the window, not squeezed against the bottom edge.
+          - headline: A pair of files says what to do
+            components: ["Pipeline & publishing"]
+            description: >
+              When a check run from a folder finds two files for one table, it
+              now tells you how to fix it: remove all but one file, or keep the
+              delivery and settle the pair in Filing decisions.
   - date: "2026-10-14"
     summary: >
       The dashboard now counts what is not green at every level, and every

@@ -106,6 +106,34 @@ class TestAFailedResupplyHidesNothing:
         assert offered[failed][1] == (fd.REJECT,)
 
 
+class TestALoneFailedLoadAtTheDoor:
+    """post-build-review #201 F4 (Keith, 2026-10-15): a failed load alone in
+    its period is offered reject only at the door too, as in the queue - the
+    sign-off decision 'reject only, in the door as in the queue'."""
+
+    def test_it_is_offered_reject_alone(self, conn, minted, monkeypatch):
+        from cli import filing_tui
+
+        s = minted("due")
+        failed = _failed_resupply(conn, s.name)
+        (slot,) = [x for x in filing_queue.slots_of(conn, COL, dataset_id=DS)
+                   if x.period == s.name]
+        assert filing_queue.filed_counts(conn, DS).get((DS, s.name)) == 1
+
+        def select(msg, choices, **_k):
+            if msg == "Which dataset?":
+                return DS
+            return next(c for c in choices if c.startswith(slot.period))
+        monkeypatch.setattr(filing_tui.common, "select", select)
+        decided = {}
+        monkeypatch.setattr(filing_tui, "_decide_on",
+                            lambda st, offer: decided.update(state=st, offer=offer))
+        filing_tui.period_flow(COL)
+        assert decided["offer"] == (fd.REJECT,)
+        assert decided["state"].supply == failed
+        assert decided["state"].state == filing_queue.COULD_NOT_LOAD
+
+
 class TestEachListedSupplyCarriesAVerdict:
     """Criteria 4 and 11."""
 

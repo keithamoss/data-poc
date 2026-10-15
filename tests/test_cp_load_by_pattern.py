@@ -150,3 +150,25 @@ class TestATrialOfAPairIsRefused:
         assert "cp_clients.csv" in got.value.message
         assert "cp_clients_part2.csv" in got.value.message
         assert loaded == []
+
+
+class TestTheRefusalSaysWhatToDo:
+    """REQ-PIPE-202 criterion 8 as amended (Keith, 2026-10-15): a trial files
+    nothing, so its refusal names what the person can do rather than a queue
+    the pair never reaches; a recorded arrival is settled in Filing decisions."""
+
+    def test_a_folder_offers_both_ways_out(self, tmp_path, loaded):
+        folder = _folder(tmp_path, SIX | {"cp_clients_part2.csv"})
+        with pytest.raises(click.ClickException) as got:
+            cp._load_delivery_from_folder(folder, "trial_x")
+        said = got.value.message
+        assert "remove all but one file" in said
+        assert "keep the delivery and settle the pair in Filing decisions" in said
+
+    def test_a_recorded_arrival_is_settled_in_filing_decisions(self, tmp_path, loaded):
+        folder = _folder(tmp_path, SIX | {"cp_clients_part2.csv"})
+        with pytest.raises(click.ClickException) as got:
+            cp._load_delivery_from_folder(folder, "cp_run_x", recorded=True)
+        said = got.value.message
+        assert "settle the pair in Filing decisions" in said
+        assert "remove all but one file" not in said

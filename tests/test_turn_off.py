@@ -964,9 +964,23 @@ class TestScheduleShowSaysSo:
         """Owing until 31 July; its last owed period, 2025-Q2, closed on 18
         July when 2025-Q3's window would have opened."""
         doc = _unshare(_doc())
-        _turn_off(_versions(doc, "cp-clients")[0], to="2025-07-31")
+        _turn_off(_versions(doc, "cp-clients")[0], to="2025-07-31",
+                  log=[{"date": "2025-07-01", "author": "a test", "change": "off",
+                        "turns_off": True}])
         v = self._view(doc, date(2025, 7, 25))
         assert v.headline == "Turning off after 31 Jul 2025 - nothing more owed"
+
+    def test_199_f12_the_headline_waits_for_the_authored_date(self):
+        """post-build-review #199 F12 (Keith, 2026-10-15): one meaning across
+        surfaces - like the page's marker (REQ-DASH-180 c25), the terminal's
+        headline waits until the turn-off has been written down."""
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-clients")[0], to="2025-07-31",
+                  log=[{"date": "2025-07-28", "author": "a test", "change": "off",
+                        "turns_off": True}])
+        assert self._view(doc, date(2025, 7, 25)).headline is None
+        assert self._view(doc, date(2025, 7, 29)).headline == (
+            "Turning off after 31 Jul 2025 - nothing more owed")
 
     def test_a_turn_off_ahead_is_shown_with_its_ordinary_edit_window(self):
         doc = _unshare(_doc())
@@ -1074,16 +1088,37 @@ class TestCriticFindingsOn190:
         [gap] = runway.off_gaps("cp-clients")
         assert (gap["from"], gap["until"]) == ("2025-04-01", "2026-01-01")
 
+    def test_199_f7_an_authored_turn_off_stops_driving_the_minimum(self, using):
+        """post-build-review #199 F7 (Keith, 2026-10-15): an authored for-good
+        turn-off stops driving the runway minimum, as a started one does - so
+        while another dataset on the calendar still owes, the minimum is that
+        dataset's and the line asks for dates."""
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-case-workers")[0], to="2027-03-31",
+                  log=[{"date": "2026-09-01", "author": "a test", "change": "off",
+                        "turns_off": True}])
+        using(doc)
+        on = date(2026, 9, 23)
+        cal = runway.schedule.calendar_for_dataset("cp-case-workers").name
+        found = runway.calendar_runway(cal, on)
+        assert found.driving_dataset not in (None, "cp-case-workers")
+        for line in runway.warning_lines(on):
+            assert "no more dates are needed" not in line
+
     def test_the_gate_says_no_more_dates_are_needed_once_authored(self, using):
         """REQ-DASH-180 criterion 17 as amended 2026-10-15 (Keith, morning
         report 5 Q24): 'the gate's warning likewise' - the line for a
         calendar that runs out first for a dataset with a for-good turn-off
         authored by then says no more dates are needed for it, and does not
-        ask for dates."""
+        ask for dates. Every Child Protection dataset turns off here: since
+        #199 F7 a turning-off dataset drives the minimum only where none on
+        its calendar still owes."""
         from qa_tools.common import runway
 
         doc = _unshare(_doc())
-        _turn_off(_versions(doc, "cp-case-workers")[0], to="2027-03-31",
+        _turn_off(_defaults_version(doc), to="2027-03-31",
                   log=[{"date": "2026-09-01", "author": "a test", "change": "off",
                         "turns_off": True}])
         using(doc)

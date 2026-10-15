@@ -3119,7 +3119,6 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
   const out = {exhausted:{}, low:[], exhaustedCount:0};
   if(!source) return out;
   (source.calendars||[]).forEach(cal=>{
-    let fewest = null;
     // TURNED OFF ON THE DATE ON SHOW (REQ-DASH-180 criteria 17 and 20;
     // REQ-PIPE-053 criterion 19 as amended): off for good, it owes no more
     // dates, so it is neither warned about nor exhausted; inside a temporary
@@ -3132,7 +3131,6 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
       // viewed. Strings compare correctly here because both are
       // ISO-8601 - the same reasoning clipDatasetToInPlaceOn() relies on.
       const remaining = (ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length;
-      if(fewest===null || remaining < fewest) fewest = remaining;
       // EXHAUSTED FROM WHEN THE LAST SLOT CLOSES (REQ-DASH-155 criterion 6;
       // Keith, 2026-10-06) - the day the pipeline starts holding, not the
       // last period's own date, a period earlier. `endsOn` null is a last
@@ -3155,6 +3153,19 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
     // The dataset that runs out FIRST decides when this is worth
     // saying - one taking two months of four runs out twice as fast as
     // its siblings.
+    // AN AUTHORED FOR-GOOD TURN-OFF STOPS DRIVING THE MINIMUM (post-build-
+    // review #199 F7, Keith 2026-10-15), as a started one does: it has the
+    // fewest dates left by construction, and would hide a sibling that is
+    // also short. Only where every dataset counted is turning off does one
+    // of them drive, and its line then says no more dates are needed.
+    const turningOff = ds=> (ds.offGaps || []).find(g=> g.until == null
+      && g.authoredOn && g.authoredOn <= inPlaceOnDateStr && inPlaceOnDateStr < g.from);
+    const counted = (cal.datasets||[]).filter(ds=> !inGap(ds, true));
+    const owing = counted.filter(ds=> !turningOff(ds));
+    const drivers = owing.length ? owing : counted;
+    const fewest = drivers.length
+      ? Math.min(...drivers.map(ds=> (ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length))
+      : null;
     if(fewest!==null && fewest < cal.threshold){
       // WHOSE NUMBER IS IT. `fewest` is a minimum across datasets, so a
       // message naming only the calendar pairs it with the CALENDAR's
@@ -3162,15 +3173,14 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
       // objects, which nobody can reconcile against the config. Same
       // correction the CLI's own warning needed
       // (post-build-review #22 and #2).
-      const driver = (cal.datasets||[])
+      const driver = drivers
         .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length}))
         .filter(x=> x.remaining === fewest)
         .sort((a,b)=> String(a.ds.id).localeCompare(String(b.ds.id)))[0];
       // TURNING OFF FOR GOOD, AND AUTHORED (REQ-DASH-180 criterion 17 as
       // amended by Keith, 2026-10-15): the warning stays, but says no more
       // dates are needed for it. Its effective_to, else null.
-      const forGood = driver && (driver.ds.offGaps || []).find(g=> g.until == null
-        && g.authoredOn && g.authoredOn <= inPlaceOnDateStr && inPlaceOnDateStr < g.from);
+      const forGood = driver && turningOff(driver.ds);
       out.low.push({name:cal.name, remaining:fewest, lastPeriod:cal.lastPeriod,
                      lastDate:cal.lastDate, datasetCount:(cal.datasets||[]).length,
                      threshold:cal.threshold,
@@ -7033,6 +7043,18 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   // BY ITS DATE: a cycle carries cycleStart and entries, never a period
   // (post-build-review #199 F6).
   const ofCycle = (c, e)=> e.date === c.cycleStart;
+  // ONE BLOCK PER PERIOD OWED NOTHING (post-build-review #199 F5, Keith
+  // 2026-10-15): buildSupplyHistory gives one cycle per chain, so several
+  // supplies filed into a period the dataset owes nothing in would each
+  // repeat its heading and label. Those are merged; an owed period's chains
+  // are left as they are.
+  const owedDates = new Set(((raw && raw.owedNothing) || []).map(e=> e.date));
+  cycles = cycles.reduce((out, c)=>{
+    const same = owedDates.has(c.cycleStart) && out.find(o=> o.cycleStart === c.cycleStart);
+    if(same) same.entries = [...same.entries, ...c.entries];
+    else out.push(owedDates.has(c.cycleStart) ? {...c, entries: [...c.entries]} : c);
+    return out;
+  }, []);
   const supplied = new Set(((raw && raw.owedNothing) || [])
     .filter(e=> cycles.some(c=> ofCycle(c, e))).map(e=> e.period));
   const owed = owedNothingRuns(raw, CURRENT_IN_PLACE_ON, supplied);
@@ -9108,16 +9130,14 @@ function landOnScenarioSubject(entry, on){
     if(toggle) toggle.click(); else older.hidden = false;
   }
   markScenarioSubject();
-  // FROM THE TOP, THEN ONLY AS FAR AS NEEDED: a reload restores the old scroll
-  // position first, and "nearest" from there pinned the subject to the top
-  // edge with the page head - the standing-in pill a scenario also quotes -
-  // above it. From the top, a subject already in view does not move at all.
+  // CENTRED (post-build-review #202 F7, Keith 2026-10-15): "nearest" met the
+  // criterion and landed every subject flush on the bottom edge. From the top
+  // first, as a reload restores the old position; a subject near the page's
+  // top or end goes as far as the page scrolls, and one taller than the
+  // window starts at its top rather than losing its head above it.
   window.scrollTo({top: 0, behavior: "instant"});
-  if(el.scrollIntoView) el.scrollIntoView({block: "nearest", behavior: "instant"});
-  // A FRACTIONAL HEIGHT can leave the subject's last part-pixel below the
-  // fold after "nearest" (TS-77b: 0.25px); round the overshoot up.
-  const over = el.getBoundingClientRect ? el.getBoundingClientRect().bottom - window.innerHeight : 0;
-  if(over > 0 && over < 2) window.scrollBy({top: Math.ceil(over), behavior: "instant"});
+  const tall = el.getBoundingClientRect && el.getBoundingClientRect().height > window.innerHeight;
+  if(el.scrollIntoView) el.scrollIntoView({block: tall ? "start" : "center", behavior: "instant"});
   // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
   // with one open marks the subject beneath it but leaves the reader in it.
   if(!(STATE && (STATE.panel || STATE.columnName || STATE.checkKey))){

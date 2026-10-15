@@ -137,6 +137,7 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
     # a minimum, and a minimum with no owner is a number nobody can
     # check against the file (post-build-review #22).
     per_dataset: list[tuple[int, str, object]] = []
+    turning_off: list[tuple[int, str, object]] = []
     for dataset_id in _datasets_on(calendar_name):
         if off_for_good(dataset_id, as_of):
             # REQ-PIPE-179 criterion 25: a dataset turned off for good owes
@@ -145,8 +146,15 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
             # those it owes once back on are counted.
             continue
         owed = [p for p in schedule.periods_for_dataset(dataset_id) if p.expected]
-        per_dataset.append((len([p for p in owed if p.date > as_of]),
-                             dataset_id, owed[-1] if owed else None))
+        entry = (len([p for p in owed if p.date > as_of]), dataset_id, owed[-1] if owed else None)
+        # AN AUTHORED FOR-GOOD TURN-OFF STOPS DRIVING THE MINIMUM too
+        # (post-build-review #199 F7, Keith 2026-10-15): it has the fewest
+        # dates left by construction and would hide a sibling that is also
+        # short. It drives only where every dataset counted is turning off,
+        # and its line then says no more dates are needed.
+        (turning_off if _turning_off_for_good(dataset_id, as_of) else per_dataset).append(entry)
+    counted = len(per_dataset) + len(turning_off)
+    per_dataset = per_dataset or turning_off
 
     # min() on the count alone, with the dataset id as a tie-break, so
     # the same configuration always names the same dataset rather than
@@ -159,7 +167,7 @@ def calendar_runway(calendar_name: str, as_of: date) -> CalendarRunway:
         remaining=driver[0] if driver else 0,
         last_period=periods[-1].name if periods else None,
         last_date=periods[-1].date if periods else None,
-        dataset_count=len(per_dataset),
+        dataset_count=counted,
         threshold=_threshold(calendar),
         driving_dataset=driver[1] if driver else None,
         driving_last_period=driving_last.name if driving_last else None,

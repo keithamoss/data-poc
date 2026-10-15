@@ -1882,3 +1882,27 @@ one or more component tags, and a date.
         era (about +40s of bootstrap), or re-time the existing earliest days?
         (Recommended: grow - every earlier growth kept existing days as they
         were, and re-timing would change days the pairs' spacing relies on.)
+    - **ANSWERS, Keith, 2026-10-15 ~12:15 Perth (back at the desk)**:
+      - REQ-GEN-207: grow Child Protection SIX YEARS, once. Criterion 2
+        amended (approved wording) to count TS-3a and TS-3b in the dry run.
+      - REQ-GEN-044's evening-before era: grow Birth Registrations ~10 days at
+        the old end. TS-13: reword its Expect to six runs with no cross-table
+        red while siblings land, and record the existing trickled delivery as
+        its placement. TS-3a/3b: into REQ-GEN-207's grown quarters, with Child
+        Protection suppression.
+      - REQ-PIPE-202 criterion 8 amended (approved wording): the refusal says
+        what the person can do, by route.
+      - Jump look (#202 F6/F7): keep the focus ring, land the subject centred.
+        Drawers/panels are not leaving the page - confirmed.
+      - #199 F5: one block per owed-nothing period. F7: an authored for-good
+        turn-off stops driving the runway minimum. F8: the view's reading -
+        worse until a newer re-check says otherwise; the queue follows.
+        F12: the terminal's turning-off headline waits for the authored date.
+      - #201 F4: a lone failed load is offered reject only at the door too.
+      - ORDER: the quick fixes in one push, then REQ-GEN-207, then REQ-GEN-044's
+        era with TS-13 and TS-3a/3b, then REQ-GEN-203, 205, 218.
+    - **QUICK FIXES BUILT, 2026-10-15 afternoon** - all of the above except the
+      growth, each test-first: the REQ-PIPE-202 c8 refusal wording; #199 F5,
+      F7, F8, F12; #201 F4; #202 F7 (centred). Written up under
+      post-build-review #199, #201 and #202 (all now done), with decisions on
+      REQ-DASH-182, 180, 208, REQ-PIPE-130 and REQ-GHUB-229. Next: REQ-GEN-207.

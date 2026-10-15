@@ -257,6 +257,44 @@ describe("post-build-review #194", () => {
       .toContain("Not owed — outside its agreed months");
   });
 
+  it("#199 F5: several supplies in one period owed nothing are one block, not one per chain", () => {
+    // REQ-DASH-182 criterion 12 (Keith, 2026-10-15: one block per owed-nothing
+    // period). buildSupplyHistory gives one cycle per chain, so two chains
+    // filed in May are two cycles sharing a cycleStart.
+    const raw = dataset();
+    raw.runs.push({ run_id: "r3", run_date: "2026-05-01" }, { run_id: "r4", run_date: "2026-05-01" });
+    const w = withRaw(load(), raw);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
+    const one = w.buildSupplyHistory(raw).find((c) => c.cycleStart === "2026-05-01");
+    const e0 = one.entries[0];
+    const cycles = [
+      ...w.buildSupplyHistory(raw).filter((c) => c.cycleStart !== "2026-05-01"),
+      { ...one, entries: [{ ...e0, run_id: "r3" }] },
+      { ...one, entries: [{ ...e0, run_id: "r4" }] },
+    ];
+    const html = w.renderSupplyHistorySection(raw, cycles, "2026-05-01");
+    const doc = new w.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+    const may = w.cycleLabel(raw.sla.cadence, "2026-05-01", raw.id);
+    const blocks = [...doc.querySelectorAll(".supply-cycle")]
+      .filter((b) => b.querySelector(".supply-cycle-label b")?.textContent === may);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].querySelector(".supply-cycle-label").textContent).toContain("2 deliveries");
+    expect(blocks[0].querySelectorAll("[data-owed-nothing-sub]")).toHaveLength(1);
+  });
+
+  it("#199 F5: an OWED period's chains are left as they are", () => {
+    const raw = dataset();
+    const w = withRaw(load(), raw);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
+    const feb = w.buildSupplyHistory(raw).find((c) => c.cycleStart === "2026-02-01");
+    const cycles = [feb, { ...feb, entries: [{ ...feb.entries[0], run_id: "r9" }] }];
+    const html = w.renderSupplyHistorySection(raw, cycles, "2026-05-01");
+    const doc = new w.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+    const febLabel = w.cycleLabel(raw.sla.cadence, "2026-02-01", raw.id);
+    expect([...doc.querySelectorAll(".supply-cycle")]
+      .filter((b) => b.querySelector(".supply-cycle-label b")?.textContent === febLabel)).toHaveLength(2);
+  });
+
   it("F2: a dataset with nothing supplied yet still shows its owed-nothing rows", () => {
     const raw = dataset({ runs: [] });
     const w = withRaw(load(), raw);

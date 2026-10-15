@@ -25365,6 +25365,17 @@ requirements:
     - 'AMENDMENTS APPLIED AS PROPOSED (criterion 22, 2026-10-15): REQ-DASH-155 criterion 1 and REQ-PIPE-053 criterion 19 now read as batch amendments 1 and 15 worded them. Amendment 1 needed no code: schedule_ended.for_dataset already labels each hold from the configuration as it stands (REQ-PIPE-179 criterion 18).'
     - 'THE REAL CONFIGURATION TURNS NOTHING OFF, so the browser tests add a turn-off to cp-clients'' embedded data and rebuild the page from it (tests/test_dashboard_e2e.py::TestTurnedOffOnThePage). The real cp-clients has a supply waiting for a person on the date used, so the test asserts the rule - out of the rollup exactly when nothing waits - rather than one dataset''s real state.'
     - 'KEITH''S ANSWERS, 2026-10-15 (morning report 5): Q21 criterion 25 amended - nothing more owed, and leaving the rollup, wait for the turn-off''s authored date; Q22 the executive tier carries the not-counted line criterion 10 already named (assetNotCountedLine), a fix against the criterion as signed; Q23 Not counted restyled to the turn-off marker''s style as criterion 12 says, rather than amending it; Q24 criterion 17 amended - once a for-good turn-off of the dataset a calendar runs out first for is authored, the runway line says no more dates are needed for it and drops the add-dates instruction, on the page and in the gate (off_gaps now sends effectiveTo and authoredOn).'
+    - 'AN AUTHORED FOR-GOOD TURN-OFF STOPS DRIVING THE RUNWAY MINIMUM (Keith, 2026-10-15, post-build-review #199 F7), as
+      a started one does: it has the fewest dates left by construction, so it drove the minimum and the criterion 17
+      wording then dropped the add-dates instruction while a sibling on the same calendar was also short. Both the page
+      (scheduleRunwayInPlaceOn) and the gate (runway.calendar_runway) now pick the driver from the datasets still owing,
+      and fall back to the turning-off ones only where every dataset counted is turning off - the one case criterion
+      17''s ''no more dates are needed'' line still describes, so the criterion''s wording needed no change. Its dataset
+      count still counts all of them.'
+    - 'THE TERMINAL''S HEADLINE WAITS FOR THE AUTHORED DATE TOO (Keith, 2026-10-15, post-build-review #199 F12):
+      ''Turning off after <date> - nothing more owed'' in participation_view now has criterion 25''s authored-date
+      condition, read from turned_off.timeline''s authoredOn as the page reads it - one meaning across surfaces. A
+      turn-off with no authored date does not show it.'
     linked_tests:
     - 'tests-js/turned-off.test.js'
     - 'tests-js/datasets-not-green.test.js'
@@ -25696,6 +25707,11 @@ requirements:
     - 'TWO WORDING CHANGES TO BUILT LABELS, AS SIGNED (criteria 7 and 11): months are separated by commas, ''Quarterly (Feb, May, Aug, Nov, day 1)'', where the page said ''Feb/May/Aug/Nov'', and a due-before supply reads ''by 09:00, 60 days before each date'' where it said ''due 60 days before each date, by 09:00''. tests-js/cadence.test.js updated to the signed wording.'
     - '''SHOW ALL HISTORY (N CYCLES)'' NOW COUNTS WHAT IT HIDES (criterion 13): it used to count every cycle including the one on show. N is the number of hidden rows, owed-nothing rows included; the word stays ''cycles''.'
     - 'KEITH''S ANSWERS, 2026-10-15 (morning report 5): Q18 criterion 12 amended - a supply in a period owed nothing shows that period once, its cycle with Not owed - <reason> beneath, matched on the period''s name or date; Q19 criterion 3 amended - before the first participation version the dataset page now has its SLA tile (missed at build, a fix) and the pill reads Not owed yet on the page and in the collection table (statusPill). Q20 (follow calendar versions too) waits, by Keith''s call, for running-thoughts #97.'
+    - 'ONE BLOCK PER PERIOD OWED NOTHING (Keith, 2026-10-15, post-build-review #199 F5): buildSupplyHistory gives one
+      cycle per chain, so several supplies filed into a period owed nothing repeated its heading and label once each -
+      three blocks for cp-case-workers'' 2026-Q2 on the real build. renderSupplyHistorySection merges cycles that share
+      an owed-nothing period''s date into one, its deliveries counted together; an owed period''s chains are left as
+      they are, since splitting chains there is a separate question nobody has asked.'
     linked_tests:
     - 'tests/test_owed_nothing.py'
     - 'tests-js/owed-nothing.test.js'
@@ -29451,6 +29467,11 @@ requirements:
     - 'THE CENSUS AND EVERY TEST THAT LISTS A PERIOD''S TABLES skip _manifest
       by name: it is the period''s account of itself, not a table any decision
       put there.'
+    - 'THE QUEUE FOLLOWS THE VIEW (Keith, 2026-10-15, post-build-review #199 F8): while a second re-check of a promoted
+      supply is owed, _manifest read the newest CLEARED re-check (worse, unacknowledged) and
+      rechecking.worse_than_promoted read the newest re-check DECISION and skipped the supply until it ran. Keith chose
+      the view''s reading - worse until a newer re-check says otherwise, the last thing known stands until replaced - so
+      worse_than_promoted now takes the newest re-check that has run. Until any has run the #192 F2 rule still holds.'
     open_questions: []
 
   - id: REQ-PIPE-131
@@ -33783,7 +33804,7 @@ requirements:
       version, and new, earlier versions of the collection's participation_defaults and of each dataset's participation taking
       effect from the same quarter - as Birth Registrations' history was grown (REQ-GEN-196), each with a changelog line saying
       why.
-    - 'THE SYSTEM SHALL size the growth by a dry run of the generator''s collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-GEN-218), and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206) - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run''s output in this requirement''s evidence. AMENDED 2026-10-14 by REQ-GEN-218 criterion 7.'
+    - 'THE SYSTEM SHALL size the growth by a dry run of the generator''s collision refusal over every Child Protection scenario this batch plans, with every period each claims - TS-42 and TS-80 with the lead-in quarters their green targets need (REQ-GEN-203), the confirmed correction carrying TS-57 to TS-61 with every period it claims (REQ-GEN-205; TS-62, like TS-53, is on Birth Registrations), TS-63 and its correction (REQ-GEN-218), and TS-50 with its lead-ins and green-replacement era, TS-55 and TS-81, the pair with both files rejected (REQ-GEN-206), and TS-3a and TS-3b, a quarterly arrival just outside the claim window with the prior slot filled and unfilled (REQ-GEN-044) - adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the dry run''s output in this requirement''s evidence. AMENDED 2026-10-14 by REQ-GEN-218 criterion 7.'
     - THE SYSTEM SHALL count the period a scenario's substitution stands on (stands_on) as claimed by that scenario under REQ-GEN-044's
       collision rule, so that 2023-Q1, which TS-77a stands on, is no longer read as free. The existing plan SHALL pass the widened
       rule unchanged (TS-76 stands on 2024-Q4, TS-77a on 2023-Q1); IF it does not, THEN generation SHALL refuse naming both
@@ -33832,6 +33853,7 @@ requirements:
     - REQ-PIPE-122
     - REQ-PIPE-123
     decisions:
+    - 'SIX YEARS (Keith, 2026-10-15): grown generously so no second growth is needed. AMENDED criterion 2 the same day (Keith''s approved wording) to count TS-3a and TS-3b, which he placed in the grown quarters rather than in the last free recent ones.'
     - 'GROW EARLIER, NOT INTO TODAY''S QUARTERS (Keith, 2026-10-13, architect review answers, for TS-63): REQ-GEN-199 found
       no clean Child Protection quarter left. REJECTED fitting new scenarios among the fifteen.'
     - 'ITS OWN REQUIREMENT, BUILT FIRST, SIZED BY A DRY RUN (Keith, 2026-10-14, close-out Q1, option A, the architect''s recommendation):
@@ -33917,8 +33939,7 @@ requirements:
     - WHEN Child Protection files are loaded from a folder on any route - the trial (`mothman cp qa --trial`), the Synthetic-mode
       check of a recorded arrival (cli/cp.py run_check) and a trial's reference folder - THE SYSTEM SHALL attribute them by
       arrival pattern as the commit route does, and SHALL leave a contested table out of the load as Birth Registrations' load
-      does; and IF any dataset matches no file or several files, THEN SHALL refuse naming the dataset, the files and where the
-      pair is settled, and SHALL NOT check either file.
+      does; and IF any dataset matches no file or several files, THEN SHALL refuse naming the dataset and the files, and saying what the person can do - for a trial or its reference folder, remove all but one file, or keep the delivery and settle the pair in Filing decisions; for a recorded arrival, settle the pair in Filing decisions - and SHALL NOT check either file.
     - 'THE SYSTEM SHALL change, in the same change, every test that pins cp_clients to one exact filename - tests/test_holds.py''s
       test_two_files_for_one_dataset_are_held asserts `cp_clients_2.csv` is unmatched - to assert the reachable shape instead,
       and SHALL add TS-39''s unit test: `cp_clients.csv` beside `cp_clients_part2.csv` is held as contested, never chosen between.'
@@ -33961,6 +33982,7 @@ requirements:
     - REQ-PIPE-193
     - REQ-PIPE-194
     decisions:
+    - 'CRITERION 8 AMENDED (Keith, 2026-10-15, post-build-review #203 F2, approved wording): a trial files nothing, so naming the Filing decisions queue as ''where the pair is settled'' pointed a person at a place the pair never reaches; the refusal now says what they can do, by route.'
     - 'WIDEN ONE CHILD PROTECTION PATTERN (Keith, 2026-10-13): so TS-42 can be planted. SUPERSEDES REQ-GEN-196''s ''BIRTH REGISTRATIONS,
       NOT CHILD PROTECTION ... No pattern is widened; TS-42 stays not injectable''.'
     - REJECTED widening all six (it would make TS-34 plantable too, but Keith asked for one, and every widened table is another
@@ -34799,6 +34821,12 @@ requirements:
     - 'FROM THE TOP, THEN NEAREST: the jump resets the scroll instantly, then scrolls only as far as the subject needs. Found by the viewport test: after a reload the browser restored the old position, and "nearest" from there pinned the subject to the top edge with the standing-in pill a scenario also quotes above it. A page loaded with a scenario sets history.scrollRestoration to manual for the same reason, and the jump skips navigate()''s smooth scroll to the top.'
     - 'ANY DATE CHANGE DROPS THE JUMP IN ONE PLACE: setInPlaceOnInUrl() drops the parameter and the jump''s state unless the caller is the jump setting its own date (keepJump), and navUrl() carries the jump''s id or none - so a navigation or a date change by any route cannot carry it along.'
     - 'THE CHIP''S HREF STARTS FROM AN EMPTY QUERY: only in-place-on and scenario, then the route - a copied link carries nothing else of the page it was copied from.'
+    - 'THE SUBJECT LANDS CENTRED, AND KEEPS ITS FOCUS RING (Keith, 2026-10-15, post-build-review #202 F6 and F7): ''from
+      the top, then nearest'' met criterion 1 and landed every subject flush on the viewport''s bottom edge. It now
+      scrolls from the top to block ''center'' - a subject near the page''s top or end goes as far as the page scrolls -
+      and one taller than the window to block ''start'', so its head is not lost above it. The focus ring on a reload,
+      shared link or keyboard Enter stays: it is focus''s own, not the mark criterion 4 forbids. Opening a drawer or
+      panel over the jump''s page is NOT navigating from it (criterion 8) - Keith confirmed what was built.'
     open_questions: []
     linked_tests:
     - tests-js/scenario-jump.test.js
@@ -36264,6 +36292,11 @@ requirements:
     - 'THE QUEUE''S FIX IS filing_queue.waiting_behind: for each needs-action slot (not an open pair, which blocks its period, and not a promoted one, which waiting_over_promoted covers), every other loadable version still waiting there, as its own entry.'
     - 'THE SUPPLY IN PLACE IS READ FROM THE LOG (post-build-review #201): decision_log.held names the promoted holder, checked before anything but an open pair - the slot''s state reads TWO_FILES over a promoted period, and a supply rejected then promoted still carries its reject. waiting_behind asks substituted and inherited periods too, since a supply filed there waits on a person.'
     - 'THE COUNT (criteria 3 and 15) is filing_queue.filed_counts - one GROUP BY over qa.filing_current - shown on the picker line and in the standing view''s state cell as ''N supplies'' where N is more than one. A period with one supply or none goes straight to its decisions (criterion 2).'
+    - 'A LONE FAILED LOAD IS OFFERED REJECT ONLY AT THE DOOR TOO (Keith, 2026-10-15, post-build-review #201 F4):
+      criterion 2 sends one supply straight to the period''s decisions ''as it does today'', and the sign-off decision
+      says ''reject only, in the door as in the queue''; the more specific wins. The slot''s own state cannot say its
+      supply failed - the load log does - so period_flow reads supplies_in for a period with exactly one filing and,
+      where that one could not be loaded, decides on it with reject alone.'
     open_questions: []
     linked_tests:
     - tests/test_every_filed_supply.py

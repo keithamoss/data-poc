@@ -318,6 +318,18 @@ class TestPromotedThenRecheckedWorse:
         recheck._promoted_outcome(item, "rk", state.period, "green")
         assert cleared == [False]
 
+    def test_199_f8_still_listed_while_a_second_re_check_is_owed(self, conn, worse):
+        """post-build-review #199 F8 (Keith, 2026-10-15): the view's reading
+        wins - worse until a newer re-check says otherwise - and the queue
+        follows it. A second re-check that has not yet run leaves the first's
+        finding standing, as _manifest already reads it."""
+        from qa_tools.common import rechecking
+
+        state, supply, _ = worse
+        _recheck(conn, state.period, supply)
+        assert supply in {w.supply for w in rechecking.worse_than_promoted(conn, DS)}, (
+            "dropped from the queue while its second re-check is owed")
+
     def test_re_checked_no_worse_is_not_listed(self, conn, worse):
         from qa_tools.common import acknowledgement, rechecking
 

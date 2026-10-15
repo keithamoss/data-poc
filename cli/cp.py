@@ -161,7 +161,7 @@ def default_reference(manifest: list[dict]) -> str:
     return manifest[0]["run_id"]
 
 
-def _six_by_pattern(folder: str) -> dict[str, str]:
+def _six_by_pattern(folder: str, recorded: bool = False) -> dict[str, str]:
     """{table: path} for the six real tables, each file ATTRIBUTED BY ITS
     DATASET'S ARRIVAL PATTERN as the commit route attributes it (REQ-PIPE-202
     criterion 8) - never by assuming `<table>.csv`, which after cp_clients'
@@ -189,11 +189,15 @@ def _six_by_pattern(folder: str) -> dict[str, str]:
                          if d.table == table)
             count = "two" if len(names) == 2 else str(len(names))
             lines.append(f"{entry.dataset_name} ({entry.dataset_id}) has {count} files - "
-                         f"{' and '.join(names)} - and nothing may choose between them; "
-                         f"the pair is settled at "
-                         f"'{supply_files.where_to_settle(entry.dataset_id)}'")
+                         f"{' and '.join(names)} - and nothing may choose between them")
+        # WHAT THE PERSON CAN DO, BY ROUTE (criterion 8 as amended, Keith,
+        # 2026-10-15): a folder is not filed, so its pair is never in the queue.
+        where = supply_files.where_to_settle(entry.dataset_id)
+        todo = (f"settle the pair in Filing decisions ('{where}')" if recorded
+                else f"remove all but one file, or keep the delivery and settle the pair "
+                     f"in Filing decisions ('{where}')")
         raise click.ClickException(
-            f"{folder}: " + "; ".join(lines) + ". Neither file was checked.")
+            f"{folder}: " + "; ".join(lines) + f" - {todo}. Neither file was checked.")
     missing = [t for t in TABLES if t not in found]
     if missing:
         raise click.ClickException(
@@ -213,7 +217,8 @@ def _files_in(folder: str) -> list[str]:
                   if os.path.isfile(os.path.join(folder, n)))
 
 
-def _load_delivery_from_folder(folder: str, run_id: str, received_at=None) -> None:
+def _load_delivery_from_folder(folder: str, run_id: str, received_at=None,
+                               recorded: bool = False) -> None:
     """Loads all 6 real tables for one run_id from an arbitrary folder
     into that run's warehouse - the retired qa_tools/cp/check_delivery.py
     CLI's own _load_delivery() logic, folded in here verbatim (Phase 2).
@@ -221,7 +226,7 @@ def _load_delivery_from_folder(folder: str, run_id: str, received_at=None) -> No
     delivery this run arrived in) and Local files mode
     (run_check_local_folder(), pointed at whatever folder the operator
     browsed to)."""
-    paths = _six_by_pattern(folder)
+    paths = _six_by_pattern(folder, recorded=recorded)
     for table in TABLES:
         build_cp_warehouses.add_table_to_run(run_id, table, paths[table],
                                              received_at=received_at)
@@ -237,7 +242,7 @@ def _refuse_a_contested_arrival(entry: dict) -> None:
         return
     lines = [f"{hierarchy.dataset(ds).dataset_name} has "
              f"{'two' if len(files) == 2 else len(files)} files - {' and '.join(files)} - "
-             f"settled at '{supply_files.where_to_settle(ds)}'"
+             f"settle the pair in Filing decisions ('{supply_files.where_to_settle(ds)}')"
              for ds, files in sorted(contested.items())]
     raise click.ClickException(
         f"{entry['run_id']} carries two files for one table: " + "; ".join(lines)
@@ -258,7 +263,7 @@ def _load_delivery(run_id: str) -> None:
     _load_delivery_from_folder() pointed at the delivery this run
     actually arrived in (REQ-PIPE-102; it used to be pointed at a
     second copy under data/cp_raw/<run_id>/)."""
-    _load_delivery_from_folder(arrival_path(run_id), run_id)
+    _load_delivery_from_folder(arrival_path(run_id), run_id, recorded=True)
 
 
 def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
@@ -316,7 +321,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     # never have been checked here, which is what this load is for.
     if reference_run_id is not None:
         _load_delivery(reference_run_id)
-    _load_delivery_from_folder(arrival_path(run_id), recorded_run_id)
+    _load_delivery_from_folder(arrival_path(run_id), recorded_run_id, recorded=True)
 
     results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
                                         on_step=on_step)

@@ -5203,6 +5203,37 @@ class TestEveryScenarioJumpLands:
         assert not missed, f"chips that said 'nothing to show': {missed}"
         assert not unruled, f"subjects without the 3px accent rule: {unruled}"
 
+    def test_every_subject_lands_centred(self, clean_page, built_dashboard_html):
+        """#202 F7 (Keith, 2026-10-15): the subject lands centred rather than
+        flush on the bottom edge - unless the page cannot scroll that far
+        (near its top or its end), or the subject is taller than the window,
+        when its top is at the window's top."""
+        _goto(clean_page, built_dashboard_html)
+        ids = clean_page.evaluate(
+            "SCENARIO_MAP.filter(e => scenarioTarget(e)).map(e => e.id)")
+        assert ids, "no placed scenario to follow"
+        off = []
+        for sid in ids:
+            self._chip(clean_page, built_dashboard_html, sid)
+            if clean_page.locator("[data-scenario-not-found]").count():
+                continue
+            got = clean_page.evaluate("""() => {
+                const el = document.querySelector('#view .scenario-subject');
+                const r = el.getBoundingClientRect();
+                const max = document.documentElement.scrollHeight - innerHeight;
+                return {top: r.top, mid: r.top + r.height / 2, h: r.height,
+                        y: scrollY, atEnd: scrollY >= max - 1, vh: innerHeight};
+            }""")
+            if got["h"] > got["vh"]:
+                ok = abs(got["top"]) <= 2
+            else:
+                centred = abs(got["mid"] - got["vh"] / 2) <= 2
+                ok = (centred or (got["y"] == 0 and got["mid"] < got["vh"] / 2)
+                      or (got["atEnd"] and got["mid"] > got["vh"] / 2))
+            if not ok:
+                off.append((sid, got))
+        assert not off, f"subjects not centred: {off}"
+
     def test_back_after_a_date_change_restores_the_date(self, clean_page,
                                                         built_dashboard_html):
         self._chip(clean_page, built_dashboard_html, "TS-75a")
