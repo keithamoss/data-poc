@@ -2012,6 +2012,8 @@ one or more component tags, and a date.
          d69ac87. A targeted rerun on that tree (the 19 modules that errored,
          plus test_scenario_map and test_dashboard_corrections) passed 236 of
          236. The "STOPPED HERE ~20:50" note below is resolved by all of this.
+         **CI run 1413 on b66ee9f: ALL GREEN** - both test halves, JS,
+         on-demand and the coverage combine (finished ~02:01 Perth).
       **QUESTIONS FOR THE MORNING** (beyond the proposal's four):
       a. TS-54: should cp-placements' 2024-Q4 supply be amber (a targeted
          amber there), or does TS-54 stand on a green supply as it does now?
