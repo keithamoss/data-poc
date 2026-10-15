@@ -1955,7 +1955,10 @@ one or more component tags, and a date.
       REQ-GEN-203, REQ-GEN-205 and REQ-GEN-218 are approved by the session
       itself and recorded in each requirement's `decisions:` as such. Scope
       kept to what he said: new requirements (the Emergency Department
-      dataset, #99) and the REQ-GEN-207 shrink still go to him.
+      dataset, #99) still go to him. EXTENDED to REQ-GEN-207 minutes later
+      ("Do it", then "Please put the requirement in Gen 207 on the record as
+      one that you can approve"), so its amendment wording - the Child
+      Protection shrink - is approved by the session too.
     - **STOPPED HERE, 2026-10-15 ~20:50 - NOT YET GATED OR PUSHED.** REQ-GEN-207 is
       marked built in requirements.yaml on the local checkpoint commits, but the
       configuration tests broke: 122 failures across 13 files, because they edit

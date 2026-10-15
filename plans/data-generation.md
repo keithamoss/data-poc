@@ -466,3 +466,60 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     calendar under corrections, TS-61, how Child Protection shrinks, the
     bootstrap budget, TS-63's dataset, the agreement freeze, Emergency
     Department's ordinary severity mix.
+
+    **Keith's answers, 2026-10-15 ~23:20 Perth, after the delivery-architect
+    pass:**
+    - Q1 code shape: **generalise first** - resolve
+      `plans/publishing-and-history.md` #6 (one module per tool, not per
+      dataset) before Emergency Department, which becomes its first user.
+      (Not the architect's recommendation, which was a collection registry
+      plus copied runners; his call, made with the trade-off stated.)
+    - Q2 calendar: **one shared calendar**, a correction applies to both
+      collections.
+    - Q3 TS-61: **Emergency Department gets a participation gap** so it has
+      an inheritance of its own; TS-61 moves.
+    - Q6 TS-63: **stays on Child Protection** (the cross-table clause).
+    - Q4 shrink: **drop the oldest grown years** to what a fresh dry run
+      needs; the original fifteen stay byte-identical.
+    - Q5 budget: **a hard 12 minutes** from empty.
+    - Q7 freeze: **widen the synthetic exception** - which amends the built
+      REQ-PIPE-111 criterion 9 (exact wording still to go to him).
+    - Q8 ordinary quarters: **the same severity mix as Child Protection**,
+      from its own seed.
+
+    **What the architect found that the drafts must absorb** (full report
+    summarised here so it survives the session): adding the agency raises
+    KeyError at import in `qa_tools/common/github_links.py`
+    (`AGENCY_QA_FOLDER`), so it is not configuration-only; the check-source
+    lists are hardcoded tuples (`validate_check_lifecycle.py`,
+    `tables_read.py`, `soda_common.py`, `check_bands.py`,
+    `check_lifecycle.py`), so ED would have zero active checks and every
+    supply refused at promotion while the gate passed; `processing_pass.py`
+    iterates a fixed COLLECTIONS map, so it would silently never see an ED
+    arrival; ~20 dispatch sites in ~14 files either fall back to Child
+    Protection, omit ED, or refuse. A shared-calendar correction re-judges
+    every supply in its quarter in BOTH collections, so each corrected
+    quarter must be empty in the other collection (placement or
+    suppression), or the generator's own claim rule refuses it. Amber and
+    replacement settings have no correction route and no synthetic
+    exemption, so their 2013 versions stay. `tests/before_growth.py` keys on
+    the literal 2013-01-01 and must assert it removed something once the
+    versions move. Reuse `generator/names_au.py`'s WA postcode pool (not a
+    licensed Australia Post list). A new dataset's calendar membership is
+    itself a frozen item (traced, not run). The 12-minute budget is below
+    the architect's 15-17 minute estimate for ~30 Child Protection quarters,
+    so profiling the per-quarter cost rise (21s -> 33s) becomes part of it.
+
+    **Keith's follow-up answers, same night, with the architect's findings
+    put to him:** Q1 CONFIRMED - generalise first, knowing the Child
+    Protection shrink now waits on scoping `plans/publishing-and-history.md`
+    #6 (the architect's collection-registry middle path was offered and
+    declined). Q2: add the EMPTY-ELSEWHERE rule - each corrected quarter
+    holds no supply in the other collection, by placement or by suppressing
+    its routine supply. Q5 CONFIRMED - a hard 12 minutes, so profiling the
+    bootstrap is in scope, not optional. Q7: REQ-PIPE-111 criterion 9
+    amended in his approved wording (applied to the register, with the
+    amended half listed as unmet). Still to put to him: REQ-PIPE-170
+    criterion 31's "both collections" -> "every collection" (built, outside
+    the delegation), and whether ED checks on postcode/sex/age group/arrival
+    time record row-level failing values (architect A8). NEXT: scope #6.

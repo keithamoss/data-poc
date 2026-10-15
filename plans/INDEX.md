@@ -337,6 +337,7 @@ one when this line suggests it matters.
 - **#11** `todo` 2026-09-30 - The generator ignores delivery_months:, so partial-participation datasets arrive in quarters they are not due for.
   - *touches:* `contract/data-asset.yaml`
 - **#12** `todo` 2026-10-15 - A cheap Emergency Department dataset so scenarios stop costing Child Protection quarters. Scoped with Keith 2026-10-15...
+  - *touches:* `qa_tools/common/github_links.py`, `tests/before_growth.py`, `generator/names_au.py`
 
 ## plans/tooling.md
 

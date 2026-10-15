@@ -25797,8 +25797,9 @@ requirements:
       instant of the appended entries is no earlier than the closing instant that dataset's previous last
       period had - so that a schedule that ran out can be extended without moving any supply already filed.
     - WHERE the data asset's configuration declares it synthetic both before and after the change, THE SYSTEM
-      SHALL allow ADDING a calendar, participation or timezone version with a past effective date without
-      a declared correction, and SHALL still require one to change or remove a frozen item.
+      SHALL allow ADDING a calendar, participation or timezone version with a past effective date, REMOVING
+      or LATER-DATING one, and ADDING a new dataset's calendar membership, without a declared correction,
+      and SHALL still require one to change any other frozen item.
     - WHILE an item is not yet frozen, THE SYSTEM SHALL allow it to be added, changed or removed freely.
     - THE SYSTEM SHALL NOT offer any flag, environment variable, configuration key or documented procedure
       that commits a change to a frozen item other than by a declared correction.
@@ -25849,7 +25850,24 @@ requirements:
     - REQ-PIPE-110
     - REQ-PIPE-112
     - REQ-PIPE-050
+    unmet_criteria:
+    - criterion: Criterion 9's amended half - removing or later-dating a past version, and adding a new dataset's
+        calendar membership, on a synthetic asset. The original half (adding a past version) is built.
+      why: Amended 2026-10-15 for the Child Protection shrink and the Emergency Department dataset; not yet built.
+      owner: the Emergency Department dataset and Child Protection shrink (plans/data-generation.md
+        12, drafts REQ-QAC-231 to REQ-GEN-238, not yet in the register)
+      blocked_by:
+        unowned: true
     decisions:
+    - 'CRITERION 9 AMENDED 2026-10-15 (Keith''s approved wording, ~23:20 Perth): on a synthetic asset, REMOVING
+      or LATER-DATING a past calendar, participation or timezone version, and ADDING a new dataset''s calendar
+      membership, are exempt from a declared correction, as adding one already was. Why: shrinking Child
+      Protection''s grown history (REQ-GEN-207) and adding the Emergency Department dataset both regenerate
+      the history from empty, so there is no judged past to protect - the same reason the original exemption
+      gave. Rejected: a declared correction with Keith as approver, because the correction replay stages it
+      and the grown years would read as owed and missing until a visible correction is confirmed at the end
+      of the history (delivery-architect). Amber and replacement settings stay OUTSIDE it: they have no
+      correction route at all, and their 2013 versions are left in place, governing no supply.'
     - A DECLARED CORRECTION UNDER CAB (Keith, 2026-10-07, reopening and deciding the same morning; option
       (b) of 2026-10-04, refined). A change to a frozen item is allowed only as its own declared act - a
       declared correction naming the change reference, date, author, approver, reason and each changed item
