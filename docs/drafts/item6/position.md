@@ -75,3 +75,31 @@ sense-check. Evidence: `docs/drafts/item6/groundwork.md`.
 13. **Outside the delegation, to Keith**: REQ-PIPE-170 criterion 31's
     "both collections" -> "every collection" (built); approve in the registry
     step.
+
+## Round 3 calls, after the dashboard UX review (main session)
+
+14. **Zero-run collection vs missing entry** (dashboard UX finding 1):
+    ADOPTED - a registered collection with no runs emits an entry with every
+    declared dataset and an empty history, rendering the existing
+    never-supplied / not-owed-yet notice; only a declared collection with NO
+    entry fails the embed, naming the collection, the expected file and the
+    command that makes it, writing no page; and `mothman check` catches an
+    unwired collection before any build.
+15. **SIGNIFICANT - one missing collection fails the whole build** (UX Q1):
+    kept as (a). With call 14's gate an unwired collection never reaches a
+    build, so a missing entry means a builder crashed - and publishing a
+    page that silently lacks a collection is the false quiet item 6 exists to
+    remove. Rejected (b), a "results not built" tile, for now; revisit when a
+    real deployment has more than a handful of collections.
+16. **SIGNIFICANT - a dataset's "View on GitHub" opens its ODCS contract,
+    anchored at the dataset** (UX Q2 (b)), not the adapter: the contract is
+    what the dataset is held to; the tooltip names the target. This replaces
+    round 2's call 5.
+17. **SIGNIFICANT - the agency-level pill is removed** (UX Q3 (a)): no single
+    file stands for an agency once an agency owns several collections, and a
+    link to a config entry answers no reader's question. A second visible
+    change, with a CHANGELOG line.
+18. ADOPTED: collections iterate in hierarchy order; dataset ids unique
+    across collections (a `mothman check` gate) with one dataset-id index; each
+    collection's entry self-contained (an NFR, so lazy loading stays possible
+    later); S6 captures each dataset page by cold-loading its URL.
