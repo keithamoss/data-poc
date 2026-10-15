@@ -228,6 +228,13 @@ releases:
               as off for good. A turn-off that has not started yet no longer
               silences the runway warning, and a freeze refusal names every
               period the change reaches back into, not only the first.
+          - headline: Corrections wait, and turn-offs hold
+            components: ["Pipeline & publishing"]
+            description: >
+              A held supply that only an unconfirmed correction covers stays
+              held until the correction is confirmed. A correction that turns a
+              period off now holds a supply a person filed there too, and the
+              flags refuse a substitute over two unsettled files.
           - headline: Decisions in words in the terminal
             components: ["Testing & dev tooling"]
             description: >

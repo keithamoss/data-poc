@@ -42,27 +42,22 @@ _QUEUE_ONLY_STATE = (
     "the queue lists a failed load as could-not-be-loaded and offers reject only "
     "(REQ-PIPE-153 criteria 5 and 6). WHERE THE FAILED LOAD IS ALONE IN ITS SLOT the period "
     "door shows that slot as awaiting a decision, which offers this; where another version "
-    "shares the slot, NO door offers it - post-build-review #189 F3/F4, a question for "
-    "Keith (should a door list every filed supply in a period?)")
+    "shares the slot, NO door offers it - post-build-review #189 F3/F4; Keith 2026-10-15: "
+    "REQ-GHUB-229 lists every filed supply and offers a failed load reject only")
 HIDDEN: dict[tuple[str, str], str] = {
     (filing_queue.COULD_NOT_LOAD, fd.REFILE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUPERSEDE): _QUEUE_ONLY_STATE,
     (filing_queue.COULD_NOT_LOAD, fd.SUBSTITUTE): _QUEUE_ONLY_STATE,
-    # PROVISIONAL (overnight #5, a question for Keith in the morning report):
-    # the flags record a second substitution over a substituted or inherited
-    # period; the door has offered only undoing it since REQ-GHUB-082 phase 3
-    # ("offers undoing it and not redoing it").
+    # KEPT (Keith, 2026-10-15, morning report 5 Q3): the flags record a second
+    # substitution over a substituted or inherited period; the door has offered
+    # only undoing it since REQ-GHUB-082 phase 3 ("offers undoing it and not
+    # redoing it").
     (slot_state.SUBSTITUTED, fd.SUBSTITUTE): (
         "redoing a substitution is de-substitute then substitute in the door, each with "
-        "its own reason - kept as REQ-GHUB-082 built it, pending Keith"),
+        "its own reason - kept as REQ-GHUB-082 built it (Keith, 2026-10-15)"),
     (slot_state.INHERITED, fd.SUBSTITUTE): (
         "substituting over an inheritance is un-inherit then substitute in the door - kept "
-        "as REQ-GHUB-082 built it, pending Keith"),
-    # REQ-PIPE-194 criterion 4: nothing but settling is offered on an open pair.
-    # The flags record a substitution over one (#189 F2, a question for Keith).
-    (slot_state.TWO_FILES, fd.SUBSTITUTE): (
-        "REQ-PIPE-194 criterion 4: an open pair is settled before anything else is "
-        "decided for its period; whether the flags should refuse this too is Keith's"),
+        "as REQ-GHUB-082 built it (Keith, 2026-10-15)"),
     ("held:agreement-refused", fd.PLACE): (
         "a hold on a dataset the agreement backstop refuses files itself once the "
         "agreement is put right (REQ-PIPE-173; #188 D9), so the door offers nothing to "

@@ -1103,6 +1103,8 @@ def _refuse_on_an_open_pair(conn, request: Request) -> None:
     """Refused before anything is written, saying where the pair is settled
     - judged by the open contest (dataset_blockers), never by the shape of
     the supply id (REQ-PIPE-194 criterion 8)."""
+    if request.operation == SUBSTITUTE and request.period:
+        _refuse_substituting_over_an_open_pair(conn, request)
     if request.operation not in _NOT_ON_AN_OPEN_PAIR or "@" not in (request.supply or ""):
         return
     from qa_tools.common import supply_files
@@ -1124,6 +1126,29 @@ def _refuse_on_an_open_pair(conn, request: Request) -> None:
         + ". Nothing was recorded.",
         dataset_id=request.dataset_id, period=request.period, supply=request.supply,
         files=contest.files)
+
+
+def _refuse_substituting_over_an_open_pair(conn, request: Request) -> None:
+    """THE FLAGS REFUSE WHAT THE SCREEN HIDES (REQ-PIPE-194's criterion added
+    2026-10-15, Keith, morning report 5 Q6): a substitute into a period whose
+    own two files are still waiting to be settled would decide that period
+    over them. Refused before any reason is asked, carrying the pair so the
+    CLI prints the command that settles it on a line of its own."""
+    from qa_tools.common import dataset_blockers, supply_files
+
+    for blocker in dataset_blockers.contests(conn):
+        if blocker.dataset_id != request.dataset_id or not blocker.is_open:
+            continue
+        found = supply_files.resolve(conn, request.dataset_id, blocker.supply)
+        if found is None or found.period != request.period:
+            continue
+        raise OpenPair(
+            f"Two files arrived for {request.period} ({' and '.join(blocker.files)}), and "
+            f"nobody has said what each file is yet, so a substitute into it is not "
+            f"recorded. Settle the pair first, at "
+            f"'{supply_files.where_to_settle(request.dataset_id)}'. Nothing was recorded.",
+            dataset_id=request.dataset_id, period=request.period, supply=blocker.supply,
+            files=blocker.files)
 
 
 def apply(request: Request, *, effective_at: str, conn=None) -> Outcome:

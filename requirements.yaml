@@ -24253,8 +24253,7 @@ requirements:
       label, THE SYSTEM SHALL file it by the rule on the next processing pass, through REQ-PIPE-163 criterion 40's one shared
       placer, generalising REQ-PIPE-154's schedule-ended re-file rather than adding a second re-filer, and SHALL leave every
       other hold for a person to place (REQ-PIPE-163) or reject, except a schedule-ended hold, which offers only adding dates;
-      and WHERE the hold is one file of a held contested pair, SHALL re-file both files together, still contested (REQ-PIPE-163
-      criterion 37).
+      and WHERE the hold is one file of a held contested pair, SHALL re-file both files together, still contested (REQ-PIPE-163 criterion 37); and WHERE what gives the hold's receipt instant an open owed slot is a declared correction (REQ-PIPE-111) that has not been confirmed (REQ-PIPE-170), SHALL leave the hold where it is until that correction is confirmed. AMENDED 2026-10-15 by Keith (morning report 5 Q4).
     - THE SYSTEM SHALL NOT let any supply be placed (REQ-PIPE-163), re-filed (REQ-PIPE-141), moved by a confirmed correction
       or carried out from a parked move (REQ-PIPE-170 criteria 7 and 26) into a period inside a turned-off gap; and a refusal
       SHALL name the gap and its turned_off_reason and say that changing effective_to or effective_from in contract/calendar.yaml
@@ -24315,7 +24314,7 @@ requirements:
       for <level>). Place it into a period it still owes, reject it, or change effective_to/effective_from in contract/calendar.yaml
       if this period should be owed.'
     - WHEN a declared correction changes effective_to, THE SYSTEM SHALL propose the filing moves that result through REQ-PIPE-170's
-      confirmation, a supply left in a period inside the new gap becoming a turned-off hold.
+      confirmation, a supply left in a period inside the new gap becoming a turned-off hold - one a person filed or placed there included, which the impact preview (REQ-PIPE-169) names as becoming a turned-off hold. AMENDED 2026-10-15 by Keith (morning report 5 Q9).
     - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-170 criteria 5 and 28 so that IF a corrected configuration makes
       a supply's current period one its dataset owes nothing in - by participation, not_expected or a turn-off - THEN keep is
       not offered for that supply, neither when the correction's moves are confirmed nor later while its move is parked, and
@@ -25035,7 +25034,7 @@ requirements:
     - 'CRITERION 14 IS agreement.timing_on: resolve() with ignore_turn_offs=True, used by slots._participation_for and schedule.claim_window for a period inside a gap. A collection version taking effect inside a dataset''s own gap is what tells this apart from ''the last day on''s values'', and the test for exactly that (13:00 rather than 09:00; a 20-day window rather than 14) was seen to fail first. REJECTED reusing the last applying version''s timing, which is the same answer except in that case.'
     - 'A COLLECTION''S TURN-OFF APPLIES TO THE DATASETS TAKING ITS DEFAULTS (defaults_for), so a dataset that names a calendar other than its collection''s - which takes none of its defaults (REQ-PIPE-181 criterion 9) - is not turned off by it. PROVISIONAL: no dataset is configured that way, and criterion 9''s gate check reads ''any inheriting dataset''s calendar'', which is the same reading.'
     - 'THE LABEL IS WORKED OUT LIVE (criterion 18): supply_holds.Held.label calls turned_off.label_at(dataset, our receipt instant) - covered by an open owed slot, turned off, schedule ended, or plain - and Held.schedule_ended now reads that rather than the recorded flag, as REQ-PIPE-154 criterion 2 is amended to say. Every hold reader joins qa.supply_receipt for the receipt. A hold with no recorded receipt - only a test''s - falls back to its recorded reason. The tally, the pass summary and the dashboard''s blockers all count by that label; turned-off holds are counted apart and never as needing a person (criterion 24: outstanding items INFORMATIONAL, non-blocking; Tally.needing_a_person; the page''s blockersOpenInPlaceOn skips them).'
-    - 'ONE RE-FILER (criterion 19): schedule_ended.refile_covered now takes every outstanding assignment-rule hold, whatever its label, whose receipt the configuration as it stands gives an open owed slot - excluding agreement-refused holds, which their own drain files, and datasets the backstop refuses. One file of an open contested pair is placed without owing its checks, and its partner, sharing the receipt, is placed in the same pass, still contested. ARCHITECT''S BUILD CHECK, ANSWERED PROVISIONALLY: the re-filer reads the configuration on disk, so it DOES act on a hold a declared-but-unconfirmed correction now covers, ahead of REQ-PIPE-170''s confirmation. Queued for Keith in morning report 5.'
+    - 'ONE RE-FILER (criterion 19): schedule_ended.refile_covered now takes every outstanding assignment-rule hold, whatever its label, whose receipt the configuration as it stands gives an open owed slot - excluding agreement-refused holds, which their own drain files, and datasets the backstop refuses. One file of an open contested pair is placed without owing its checks, and its partner, sharing the receipt, is placed in the same pass, still contested. ARCHITECT''S BUILD CHECK, ANSWERED BY KEITH 2026-10-15 (morning report 5 Q4): the re-filer read the configuration on disk, so it filed a hold a declared-but-unconfirmed correction covered, ahead of REQ-PIPE-170''s confirmation. It now waits: schedule_ended._awaiting_confirmation reverts every pending correction, and the hold is filed only where that confirmed configuration covers it too, saying which correction it waits for. Criterion 19 amended.'
     - 'THE TURN-OFF IS ITS OWN FREEZE ITEM (criteria 11, 12, 30): agreement_freeze.flatten takes effective_to and turned_off_reason out of the participation (and participation_defaults) version item and adds ''<version key> effective_to'', valued {effective_to, turned_off_reason}. Its freeze instant is the earliest claim-opening, the earlier under old and new configuration, of the first period whose owed-or-not status the change flips; a change of reason alone flips nothing and freezes with the first period the turn-off already turned off. The refusal names each flipped period and its passed instant, prints `mothman schedule draft-correction` on its own line and the mark-not-supplied route. revert() rebuilds the two keys on their version, and restoring the version itself keeps them. A dated calendar entry counts a turned-off dataset only for the first period of its gap.'
     - 'THE BACKSTOP (criterion 38): verdict.compared marks a judged period a turn-off now leaves owed nothing with the TurnOff and words it as the turn-off, not ''not expected''; agreement_drift then accepts only a declared correction of THAT effective_to item - a correction of the version alone does not account for it. Found test-first: before this the period read as ''no longer a period of its schedule'' and any participation correction cleared it.'
     - 'CORRECTIONS (criteria 35-37): a correction''s move out of a period the corrected agreement owes nothing in carries Move.keep_refused, shown in the trial report; confirming with --keep on it is refused, and keeping a parked move whose current period is owed nothing is refused too. A parked move whose confirmed period now lies inside a gap stays parked and says the gap, its reason and how it ends. Criterion 35 needed no code of its own: the trial''s slots exclude gap periods, so a supply left there is held, and its live label reads turned off.'
@@ -25045,14 +25044,19 @@ requirements:
     - 'THE BUILD CARRIES IT (criterion 41): turned_off.timeline(dataset) -> every turn-off the dataset reads with effectiveTo, until, reason, level, versionFrom and authoredOn - the newest declared correction setting or moving that effective_to, else the newest turns_off changelog entry - embedded as ''turnOffs'' by both dashboard builders for REQ-DASH-180.'
     - 'THE 22 AMENDMENTS (decisions above, ''PROPOSED AMENDMENT WORDING ... batch amendment N'', approved by Keith 2026-10-14 in the drafted wording) were applied 2026-10-15 exactly as drafted, ''<date built>'' read as 2026-10-15, each OLD text first checked to match the criterion as it stood.'
     - 'FAIL LOUD: an effective_to that is not a date raises at load rather than reading as absent, which would be a dataset silently owing again. The gate refuses it before anything loads it.'
+    - 'A TURN-OFF HOLDS A PERSON''S FILING TOO (Keith, 2026-10-15, morning report 5 Q9; post-build-review #190 J2): the trial left every person-filed supply where a person put it, so a correction turning its period off never held it. Now a person''s filing in a period the corrected agreement turns off is proposed as a turned-off hold like any other, and the preview says "held as turned off - <reason>"; anything else a person decided is still listed as theirs, not proposed. Criterion 35 amended.'
     - 'CRITERION 28 REWORDED (Keith, 2026-10-15, morning report 5 Q10): the critic found ''ordinary edit'' unclear; the line names calendar.yaml and says when the claim window opens.'
     linked_tests:
     - 'tests/test_turn_off.py'
+    - 'tests/test_schedule_ended_hold.py::TestItWaitsForACorrectionsConfirmation'
+    - 'tests/test_correction_trial.py::TestATurnOffHoldsAPersonsFiling'
     - 'tests/test_correction_apply.py::TestATurnOffDeclaredAsACorrection'
     - 'tests/test_agreement_drift.py::TestATurnOffOverAJudgedPeriod'
     - 'tests-js/blocked-dataset.test.js'
     implemented_by:
     - 'qa_tools/common/agreement.py::Agreement::standing_on'
+    - 'qa_tools/common/schedule_ended.py::_awaiting_confirmation'
+    - 'qa_tools/common/correction_trial.py::_turned_off_by'
     - 'qa_tools/common/agreement.py::Agreement::timing_on'
     - 'qa_tools/common/agreement.py::Agreement::ever_turned_off'
     - 'qa_tools/common/agreement.py::resolve'
@@ -33078,6 +33082,7 @@ requirements:
     - 'WHILE the date on show is before the asset day on which the settlement took effect, THE SYSTEM SHALL show the pair as open on the verdict, the blocker table and the waiting list, and SHALL NOT show any run or result the settlement caused in them; WHILE the date on show is on or after that day, THE SYSTEM SHALL show the settled row and the settled supplies. The supply-history cycle tables are NOT clipped by this criterion: like the rest of that section on a past date (road-testing #19), they list the settlement''s rows whatever the date. DECIDED Keith, 2026-10-13: show it there, decide with #19.'
     - THE SYSTEM SHALL label an open contest 'Two files for one table' on every surface, so that it reads correctly inside the agency and collection cards' comma-separated 'waiting for a person' breakdown, and SHALL use 'say what each file is' as the one phrase for what to do. DECIDED Keith, 2026-10-13.
     - THE SYSTEM SHALL word choose-file in the past-date notice's decision wording (DECISION_DONE) as 'settled', and SHALL NOT render a raw action name there.
+    - 'IF `mothman supply decide` is asked to substitute into a period whose pair''s contest is open, THEN THE SYSTEM SHALL refuse before asking for a reason, saying that two files arrived for that period and nobody has said what each file is, and printing the command that settles the pair on a line of its own. ADDED 2026-10-15 by Keith (morning report 5 Q6).'
     non_functional_requirements:
     - Every message that names the remedy is enumerated mechanically before the change is called done - grep for 'which file is the supply', 'choose one', 'Two files, choose one', 'not built yet', 'not yet possible', 'contested pair' and the `#` supply-id test across qa_tools, cli, pipeline and the template (CLAUDE.md's shape-change rule) - and asserted at the layer a person reads.
     - 'Say where, not what to type: every refusal and item names the place the decision is made - ''mothman > Filing decisions > {collection name} > Supplies waiting on a decision'' - since the TUI drives it (Keith, 2026-10-13); on the CLI route only, a refusal also shows the settle form with the real filenames.'
@@ -33110,8 +33115,10 @@ requirements:
     - 'THE BLOCKER CARRIES ITS SETTLEMENT (criteria 10 and 13): dataset_blockers records who settled a pair, when, why and each file''s outcome, receipt, supply id and run id - or the supply that superseded it - from qa.decision, qa.decision_file and qa.delivery_file alone, so the page draws the Settled row and each settled supply''s note without a second source.'
     - 'THE PAIR''S OWN RUN IS DROPPED IN THE PAGE, not the build (criterion 13): buildSupplyHistory filters a settled pair''s arrival run id, so the build''s runs stay a plain record of what ran and the dashboard decides what a cycle shows.'
     - 'CRITERION 11 ASSERTS THE CONTEST BY DATE as well as the verdict: on a daily dataset the next day is the next period, so a verdict alone would pass trivially once the period moved on.'
+    - 'THE FLAGS REFUSE WHAT THE SCREEN HIDES (Keith, 2026-10-15, morning report 5 Q6, post-build-review #189 F2): a substitute into a period holding an open pair was recorded by the flags while the door hid it; it is refused now, carrying the pair so the CLI prints its settle command. The door/flag parity test no longer names it as hidden.'
     linked_tests:
     - tests/test_choose_file.py
+    - tests/test_filing_decisions.py::TestSevenOfTheEightReallyWork::test_a_substitute_into_a_period_holding_an_open_pair_is_refused
     - tests/test_dataset_blockers.py
     - tests/test_ticket_reconciler.py
     - tests/test_filing_queue.py
@@ -33122,6 +33129,7 @@ requirements:
     - tests-js/standing-in-drill.test.js
     implemented_by:
     - qa_tools/common/outstanding.py::_from_contested_tables
+    - qa_tools/common/filing_decisions.py::_refuse_substituting_over_an_open_pair
     - qa_tools/common/ticket_reconciler.py::body_for
     - qa_tools/common/filing_queue.py::awaiting
     - qa_tools/common/dataset_blockers.py::_how_it_ended

@@ -3,7 +3,7 @@ schedule-ended and says what to edit (REQ-PIPE-154, signed by Keith
 2026-10-06)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -201,6 +201,52 @@ class TestAddingDatesFilesWhatWasHeld:
                                              skip=frozenset({"cp-carers"}))
         assert supply not in [s for _, s, _ in done]
         assert supply_holds.hold_on(conn, "cp-carers", supply) is not None
+
+
+class TestItWaitsForACorrectionsConfirmation:
+    """REQ-PIPE-179 criterion 19 as amended 2026-10-15 (Keith, morning report
+    5 Q4): where only a declared correction that has not been confirmed
+    gives the hold's receipt an open owed slot, the rule leaves it held until
+    that correction is confirmed."""
+
+    _held = TestAddingDatesFilesWhatWasHeld._held
+
+    def _covered_only_by_the_correction(self, monkeypatch, pending):
+        from qa_tools.common import schedule_ended
+
+        confirmed = object()
+        later = SLOTS + [_slot("2030-Q1", datetime(2030, 1, 1, tzinfo=UTC),
+                               datetime(2030, 4, 1, tzinfo=UTC))]
+        monkeypatch.setattr(
+            slots, "slots_for_dataset",
+            lambda dataset_id, until=None, agreement=None, **_:
+                SLOTS if agreement is confirmed else later)
+        monkeypatch.setattr(slots, "claimable_until",
+                            lambda dataset_id, at, agreement=None: date(2031, 1, 1))
+        monkeypatch.setattr(schedule_ended, "_on_calendar", lambda dataset_id, period: True)
+        monkeypatch.setattr(schedule_ended, "_awaiting_confirmation",
+                            lambda conn: (pending, confirmed if pending else None))
+
+    def test_a_pending_correction_does_not_file_it(self, conn, monkeypatch):
+        from qa_tools.common import schedule_ended
+
+        supply = f"cp-carers@{AFTER:%Y%m%d}w"
+        self._held(conn, supply, AFTER)
+        self._covered_only_by_the_correction(monkeypatch, {"cp-carers": ["REF-PENDING"]})
+        said = []
+        done = schedule_ended.refile_covered(say=said.append)
+        assert supply not in [s for _, s, _ in done]
+        assert supply_holds.hold_on(conn, "cp-carers", supply) is not None
+        assert any("REF-PENDING" in line and "confirmed" in line for line in said)
+
+    def test_once_confirmed_it_is_filed(self, conn, monkeypatch):
+        from qa_tools.common import schedule_ended
+
+        supply = f"cp-carers@{AFTER:%Y%m%d}x"
+        self._held(conn, supply, AFTER)
+        self._covered_only_by_the_correction(monkeypatch, {})
+        done = schedule_ended.refile_covered(say=lambda line: None)
+        assert ("cp-carers", supply, "2030-Q1") in done
 
 
 class TestThePassSaysSo:

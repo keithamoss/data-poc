@@ -172,6 +172,41 @@ class TestWhatCannotMove:
         assert "a person put these where they are" in text
 
 
+class TestATurnOffHoldsAPersonsFiling:
+    """REQ-PIPE-179 criterion 35 as amended 2026-10-15 (Keith, morning report
+    5 Q9): a correction that turns a period off makes a supply left in it a
+    turned-off hold - one a PERSON filed there included, which the trial
+    otherwise leaves where a person put it - and the preview names it."""
+
+    def _turned_off(self, to="2023-06-30"):
+        cal, asset = _docs()
+        version = _clients(cal)["participation"]["versions"][0]
+        version["effective_to"] = to
+        version["turned_off_reason"] = "the supplier paused"
+        return cal, asset
+
+    def test_a_persons_filing_in_the_new_gap_becomes_a_turned_off_hold(self, conn):
+        _file("person-off", "2023-Q2", RECEIVED + timedelta(minutes=4))
+        filing_support.place(conn, DATASET, "person-off", "2023-Q3", "pytest-cp-clients-person-off")
+        t = _trial(conn, self._turned_off())
+        assert "person-off" not in [n.supply_id for n in t.not_proposed]
+        [held] = [m for m in t.moves if m.supply_id == "person-off"]
+        assert (held.from_period, held.to_period) == ("2023-Q3", None)
+        text = correction_trial.report(t, as_at=AT, database="d", against="HEAD~1")
+        line = next(x for x in text.splitlines() if "person-off" in x)
+        assert "turned off" in line.lower()
+
+    def test_a_persons_filing_still_owed_is_left_where_they_put_it(self, conn):
+        """Only a turn-off is the exception: a period still owed keeps a
+        person's filing out of the proposals, as before."""
+        _file("person-on", "2023-Q2", RECEIVED + timedelta(minutes=5))
+        filing_support.place(conn, DATASET, "person-on", "2023-Q3", "pytest-cp-clients-person-on")
+        cal, asset = _docs()
+        _move_q3(cal, "2023-10-20")
+        t = _trial(conn, (cal, asset))
+        assert "person-on" in [n.supply_id for n in t.not_proposed]
+
+
 class TestTheReport:
     """Criterion 7, NFR 1 and 3."""
 

@@ -293,6 +293,41 @@ class TestSevenOfTheEightReallyWork:
             conn, supply_db.STAGING_SCHEMA, [dataset.table], arrival=key).get(dataset.table)
         assert sorted(staged) == [f"{dataset.table}__{key}__1", f"{dataset.table}__{key}__2"]
 
+    def test_a_substitute_into_a_period_holding_an_open_pair_is_refused(
+            self, conn, dataset, actor, periods, monkeypatch):
+        """REQ-PIPE-194's criterion added 2026-10-15 (Keith, morning report 5
+        Q6): the flags refuse what the screen already hides, before any
+        reason is asked, saying two files arrived for that period and nobody
+        has said what each is - and the refusal carries the pair, so the
+        CLI prints the command that settles it on a line of its own."""
+        first, second = periods
+        supply, _ = _stage(conn, dataset, filed_to=first)
+        fd.apply(_request(dataset, actor, fd.PROMOTE, period=first, supply=supply),
+                 effective_at=WHEN, conn=conn)
+        pair, _ = self._open_pair(conn, dataset, second)
+        request = _request(dataset, actor, fd.SUBSTITUTE, period=second, stands_on=first,
+                           supply=supply)
+        with pytest.raises(fd.OpenPair) as got:
+            fd.consequences(conn, request)
+        said = str(got.value)
+        assert f"Two files arrived for {second}" in said
+        assert "nobody has said what each file is" in said
+        assert got.value.supply == pair
+        # THE SETTLE COMMAND ON A LINE OF ITS OWN, below the refusal's panel.
+        from cli import filing_tui
+
+        printed = []
+        monkeypatch.setattr(filing_tui.console, "print",
+                            lambda *a, **k: printed.append(a[0] if a else ""))
+        filing_tui._refused(got.value, fd.SUBSTITUTE, flag_route=True)
+        commands = [p for p in printed if isinstance(p, str)]
+        assert len(commands) == 1 and commands[0].startswith(
+            f"mothman supply decide --operation choose-file --dataset {dataset.dataset_id} "
+            f"--period {second}")
+        with pytest.raises(fd.OpenPair):
+            fd.apply(request, effective_at=WHEN, conn=conn)
+        assert substitution.substituted(conn, dataset.dataset_id, second) is None
+
     def test_substitute_then_de_substitute(self, conn, dataset, actor, periods):
         first, second = periods
         supply, _ = _stage(conn, dataset, filed_to=first)

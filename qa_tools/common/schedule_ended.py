@@ -85,21 +85,50 @@ def _on_calendar(dataset_id: str, period: str) -> bool:
     return refiling._on_calendar(dataset_id, period)
 
 
-def _covering_slot(dataset_id: str, received_at):
+def _covering_slot(dataset_id: str, received_at, agreement=None):
     """The slot open at this receipt under the dataset's calendar as it
-    stands now, or None."""
+    stands now - or under `agreement`, where given - or None."""
     from qa_tools.common import assignment
     from qa_tools.common import slots as slots_mod
 
     try:
         found = slots_mod.slots_for_dataset(
-            dataset_id, until=slots_mod.claimable_until(dataset_id, received_at.date()))
+            dataset_id, until=slots_mod.claimable_until(dataset_id, received_at.date(),
+                                                        agreement=agreement),
+            agreement=agreement)
     except (ValueError, KeyError, FileNotFoundError):
         return None
     slot = assignment.open_slot(found, received_at)
     if slot is None or not _on_calendar(dataset_id, slot.name):
         return None
     return slot
+
+
+def _awaiting_confirmation(conn) -> tuple[dict[str, list[str]], object | None]:
+    """({dataset: [pending correction references]}, the agreement as
+    CONFIRMED) - the configuration on disk with every declared correction
+    not yet confirmed reverted - or ({}, None) where none is pending.
+
+    WHY (REQ-PIPE-179 criterion 19 as amended by Keith, 2026-10-15, morning
+    report 5 Q4): the rule reads the configuration on disk, so it used to
+    file a held supply that only a declared but unconfirmed correction
+    covered, ahead of that correction's confirmation (REQ-PIPE-170). A
+    timezone correction's revert is not read here: slots take the asset's
+    timezone from its own file."""
+    from qa_tools.common import agreement, agreement_freeze, correction_apply, correction_trial
+
+    docs = correction_trial.working()
+    pending = correction_apply.pending(conn, docs)
+    if not pending:
+        return {}, None
+    cal, asset = docs
+    for p in reversed(pending):
+        cal, asset = agreement_freeze.revert(cal, asset, list(p.changes))
+    waiting: dict[str, list[str]] = {}
+    for p in pending:
+        for dataset_id in correction_apply.affected_datasets(p, docs[0]):
+            waiting.setdefault(dataset_id, []).append(p.reference)
+    return waiting, agreement.from_doc(cal)
 
 
 def refile_covered(*, say=print, skip=frozenset()) -> list[tuple[str, str, str]]:
@@ -136,6 +165,7 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
         held = select(conn)
         if not held:
             return done
+        waiting, confirmed = _awaiting_confirmation(conn)
         received = {}
         for h in held:
             rows = conn.execute(
@@ -150,6 +180,13 @@ def refile_holds(select, reason, said, *, say=print) -> list[tuple[str, str, str
             at = received[(h.dataset_id, h.supply_id)]
             slot = _covering_slot(h.dataset_id, at)
             if slot is None:
+                continue
+            # ONLY AN UNCONFIRMED CORRECTION COVERS IT: it waits for that
+            # confirmation rather than being filed ahead of it.
+            refs = waiting.get(h.dataset_id)
+            if refs and _covering_slot(h.dataset_id, at, agreement=confirmed) is None:
+                say(f"{h.supply_id}: only the correction {', '.join(refs)}, not yet confirmed, "
+                    f"gives it {slot.name}, so it stays held until that correction is confirmed")
                 continue
             entry = hierarchy.dataset(h.dataset_id)
             # A HELD CONTESTED PAIR is ONE hold on ONE supply whose two files

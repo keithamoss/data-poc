@@ -32,7 +32,7 @@ supply rows.
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 
 #: The instants of a slot a correction can move, in the order a reader
@@ -102,6 +102,10 @@ class Move:
     #: REQ-PIPE-170 criteria 5 and 28): the corrected agreement owes nothing
     #: in its period - by participation, not_expected or a turn-off.
     keep_refused: str | None = None
+    #: THE TURN-OFF IT IS HELD BY, as its reason, where a held move's period
+    #: is one the corrected agreement turns off (REQ-PIPE-179 criterion 35 as
+    #: amended 2026-10-15) - so the preview names it as a turned-off hold.
+    turned_off: str | None = None
 
     @property
     def held(self) -> bool:
@@ -270,6 +274,21 @@ def _blocked(conn, dataset_id: str, supply: str, from_period: str | None,
     return None
 
 
+def _turned_off_by(agr, dataset_id: str, period: str | None, slots_before) -> str | None:
+    """The turn-off's reason where `agr` turns `period` off for this dataset
+    - the period one of its slots before the correction, standing turned off
+    after it - else None. An empty reason reads 'turned off'."""
+    from qa_tools.common import agreement
+
+    slot = next((s for s in slots_before if s.name == period), None)
+    if slot is None:
+        return None
+    standing = agr.standing_on(dataset_id, slot.date)
+    if standing.state != agreement.TURNED_OFF:
+        return None
+    return (standing.turned_off.reason if standing.turned_off else "") or "turned off"
+
+
 def _slots(dataset_id: str, until: date, agr) -> list:
     from qa_tools.common import slots
 
@@ -324,7 +343,13 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                     # not already there.
                     if was_name == now_name or period == now_name:
                         continue
-                    if by_person:
+                    # A TURN-OFF IS THE EXCEPTION (REQ-PIPE-179 criterion 35 as
+                    # amended by Keith, 2026-10-15, morning report 5 Q9): a
+                    # person's filing in a period the corrected agreement turns
+                    # off becomes a turned-off hold like any other; everything
+                    # else a person decided stays theirs.
+                    off = _turned_off_by(agr, ds, period, old_slots) if now is None else None
+                    if by_person and not off:
                         skipped.append(NotProposed(ds, supply, period, now_name))
                         continue
                     judged = verdict.judge(ds, now, received, agr) if now else None
@@ -337,7 +362,8 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
                                          keep_refused=(
                                              f"{period} no longer owes a supply under the "
                                              f"corrected agreement"
-                                             if period and period not in owed_now else None)))
+                                             if period and period not in owed_now else None),
+                                         turned_off=off))
         except (ValueError, KeyError, LookupError) as exc:
             # One dataset's schedule that cannot be built is said, not fatal
             # - ScheduleConfigError and a missing timezone version are both
@@ -360,9 +386,8 @@ def trial(conn, base: tuple[dict, dict], work: tuple[dict, dict], *,
         verdicts += [VerdictChange(ds, r.supply_id, r.slot, r.old.get("classification"),
                                    r.new.classification)
                      for r in rejudged if r.supply_id not in moving]
-        moves += [Move(m.dataset_id, m.supply_id, m.from_period, m.to_period, m.verdict,
-                       _blocked(conn, ds, m.supply_id, m.from_period, m.to_period),
-                       m.old_verdict, m.if_kept, m.keep_refused)
+        moves += [replace(m, blocked=_blocked(conn, ds, m.supply_id, m.from_period,
+                                              m.to_period))
                   for m in proposed]
     return Trial(changes, tuple(slot_moves), tuple(obligations), tuple(verdicts),
                  tuple(moves), tuple(skipped), tuple(unbuildable))
@@ -443,7 +468,9 @@ def report(t: Trial, *, as_at: datetime, database: str, against: str,
         lines += ["", "## Supplies moved or held" if applied
                   else "## Supplies that would move or be held", ""]
         for m in t.moves:
-            if m.held:
+            if m.held and m.turned_off:
+                to = f"held as turned off - {m.turned_off}"
+            elif m.held:
                 to = "held - no period would take it"
             elif m.placing:
                 to = f"placed into {m.to_period}, {_said(m.verdict).lower()}"
