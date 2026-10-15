@@ -223,8 +223,9 @@ def off_for_good(dataset_id: str, on: date, agreement=None) -> bool:
 
 
 def off_gaps(dataset_id: str, agreement=None) -> list[dict]:
-    """[{from, until}] - each turned-off gap's first day (the day after its
-    effective_to) and the day it ends, None for good - for the page, which
+    """[{from, until, effectiveTo, authoredOn}] - each turned-off gap's first
+    day (the day after its effective_to) and the day it ends, None for good,
+    with its effective_to and the date it was authored - for the page, which
     judges them on the date on show (REQ-DASH-180 criteria 17 and 20, and
     REQ-PIPE-053 criterion 19 as it amends)."""
     from datetime import timedelta
@@ -235,7 +236,11 @@ def off_gaps(dataset_id: str, agreement=None) -> list[dict]:
     if not agr.ever_turned_off(dataset_id):
         return []
     return [{"from": (date.fromisoformat(t["effectiveTo"]) + timedelta(days=1)).isoformat(),
-             "until": t["until"]} for t in turned_off.timeline(dataset_id, agr)]
+             "until": t["until"], "effectiveTo": t["effectiveTo"],
+             # WHEN IT WAS WRITTEN DOWN, so the low-runway line can say no more
+             # dates are needed once it is (REQ-DASH-180 criterion 17 as
+             # amended by Keith, 2026-10-15).
+             "authoredOn": t["authoredOn"]} for t in turned_off.timeline(dataset_id, agr)]
 
 
 def schedule_ends_on(dataset_id: str) -> date | None:
@@ -254,6 +259,18 @@ def schedule_ends_on(dataset_id: str) -> date | None:
     if not found or found[-1].closes_at is None:
         return None
     return asset_time.localise(found[-1].closes_at).date()
+
+
+def _turning_off_for_good(dataset_id: str | None, as_of: date) -> str | None:
+    """The effective_to of this dataset's for-good turn-off where it is
+    authored on or before `as_of` and not yet started, else None."""
+    if not dataset_id:
+        return None
+    for gap in off_gaps(dataset_id):
+        if (gap["until"] is None and gap.get("authoredOn")
+                and gap["authoredOn"] <= as_of.isoformat() < gap["from"]):
+            return gap["effectiveTo"]
+    return None
 
 
 def warning_lines(as_of: date) -> list[str]:
@@ -304,6 +321,17 @@ def warning_lines(as_of: date) -> list[str]:
             # REQ-PIPE-053 had already made this fix - "a dataset's
             # message names its OWN last period, not its calendar's" -
             # and the CLI kept the old shape.
+            # TURNING OFF FOR GOOD, AND AUTHORED (REQ-DASH-180 criterion 17 as
+            # amended by Keith, 2026-10-15 - 'the gate's warning likewise'):
+            # still warned, but no dates are asked for that it will not owe.
+            off = _turning_off_for_good(runway.driving_dataset, as_of)
+            if off:
+                lines.append(
+                    f"WARNING (not failing the build): calendar {runway.calendar_name!r} runs out "
+                    f"first for {runway.driving_dataset!r}, which turns off for good after "
+                    f"{off} - no more dates are needed for it. "
+                    f"{datasets[0].upper()}{datasets[1:]}.")
+                continue
             horizon = ""
             if runway.driving_last_period != runway.last_period:
                 horizon = (f" The calendar itself runs to {runway.last_period} on "

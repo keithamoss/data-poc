@@ -261,3 +261,42 @@ describe("the low-runway warning reaches the page", () => {
     expect(low.drivingLastPeriod).toBe("2027-Q3");
   });
 });
+
+// REQ-DASH-180 criterion 17 as amended 2026-10-15 (Keith, morning report 5
+// Q24): the warning stays until the last owed period (Q8), but once a
+// for-good turn-off of the dataset it runs out first for is authored, its
+// line says no more dates are needed, and the instruction to add dates goes
+// where every line is worded so.
+describe("a low runway driven by a dataset turning off for good", () => {
+  const offAhead = (authoredOn) => ({
+    ...RUNWAY,
+    calendars: [{
+      ...RUNWAY.calendars[0],
+      datasets: [
+        RUNWAY.calendars[0].datasets[0],
+        { ...RUNWAY.calendars[0].datasets[1],
+          offGaps: [{ from: "2027-09-01", until: null, effectiveTo: "2027-08-31", authoredOn }] },
+      ],
+    }],
+  });
+  const text = (html, w) => {
+    const el = w.document.createElement("div");
+    el.innerHTML = html;
+    return el.textContent.replace(/\s+/g, " ");
+  };
+
+  it("says no more dates are needed once the turn-off is authored", () => {
+    const w = load();
+    const said = text(w.lowRunwayNotice(w.scheduleRunwayInPlaceOn("2027-03-01", offAhead("2027-01-10"))), w);
+    expect(said).toContain(
+      `It runs out first for twice-a-year, which turns off for good after ${w.fmtDay("2027-08-31")} - no more dates are needed for it.`);
+    expect(said).not.toContain("Add the next dates");
+  });
+
+  it("is the ordinary warning before it was authored", () => {
+    const w = load();
+    const said = text(w.lowRunwayNotice(w.scheduleRunwayInPlaceOn("2027-03-01", offAhead("2027-04-10"))), w);
+    expect(said).not.toContain("no more dates are needed");
+    expect(said).toContain("Add the next dates");
+  });
+});

@@ -233,9 +233,28 @@ describe("post-build-review #194", () => {
     w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
     const html = w.renderSupplyHistorySection(raw, w.buildSupplyHistory(raw), "2026-05-01");
     const doc = new w.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
-    const owed = [...doc.querySelectorAll("[data-owed-nothing]")];
+    // Since Q18 the period is one block - the supply's cycle with the label
+    // beneath - so the label is found on the cycle, still not in the older list.
+    const owed = [...doc.querySelectorAll("[data-owed-nothing], [data-owed-nothing-sub]")];
     expect(owed.map((e) => e.textContent).join(" ")).toContain("Not owed — outside its agreed months");
     expect(owed[0].closest("#supply-history-older")).toBeNull();
+  });
+
+  it("Q18: a supply in a period owed nothing shows that period once, its label the cycle's subheading", () => {
+    // REQ-DASH-182 criterion 12 as amended 2026-10-15 (Keith, morning report 5).
+    const raw = dataset();
+    raw.runs.push({ run_id: "r3", run_date: "2026-05-01" });
+    const w = withRaw(load(), raw);
+    w.eval("CURRENT_IN_PLACE_ON = '2026-06-15'");
+    const html = w.renderSupplyHistorySection(raw, w.buildSupplyHistory(raw), "2026-05-01");
+    const doc = new w.DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+    const may = w.cycleLabel(raw.sla.cadence, "2026-05-01", raw.id);
+    const blocks = [...doc.querySelectorAll(".supply-cycle")]
+      .filter((b) => b.querySelector(".supply-cycle-label b")?.textContent === may);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].querySelector("table")).not.toBeNull();
+    expect(blocks[0].querySelector("[data-owed-nothing-sub]").textContent)
+      .toContain("Not owed — outside its agreed months");
   });
 
   it("F2: a dataset with nothing supplied yet still shows its owed-nothing rows", () => {
@@ -258,5 +277,26 @@ describe("post-build-review #194", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0].text).toMatch(/\(3 days\)$/);
     expect(w.owedNothingRuns(raw, "2026-03-03")[0].text).toMatch(/\(3 days so far\)$/);
+  });
+});
+
+// REQ-DASH-182 criterion 3 as amended 2026-10-15 (Keith, morning report 5
+// Q19): before a dataset's first participation version its status pill, on
+// its page and in its collection table, reads 'Not owed yet', not 'No data'.
+describe("the pill before a dataset owes anything", () => {
+  const ds = { id: "cp-new", status: "nodata", sla: { owesFrom: "2024-01-01" } };
+  it("reads Not owed yet before it owes", () => {
+    const w = load();
+    const html = w.statusPill(ds, "sm", "2023-06-01");
+    expect(html).toContain("Not owed yet");
+    expect(html).not.toContain("No data");
+  });
+  it("reads No data once it owes and has nothing", () => {
+    const w = load();
+    expect(w.statusPill(ds, "sm", "2024-02-01")).toContain("No data");
+  });
+  it("leaves every other status as it is", () => {
+    const w = load();
+    expect(w.statusPill({ ...ds, status: "red" }, "sm", "2023-06-01")).toBe(w.pill("red", "sm"));
   });
 });

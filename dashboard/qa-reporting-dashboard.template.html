@@ -224,22 +224,19 @@ button{font:inherit; color:inherit;}
 .pill.inactive .ico::after{content:""; position:absolute; left:-1px; right:-1px; top:50%;
   height:1.5px; background:var(--ink-muted); transform:rotate(-45deg);}
 
-/* A GROUP WITH NOTHING COUNTED (post-build-review #135). A quiet status,
-   never a verdict: an outline with a SOLID border (on this page dashed
-   means "not yet"), and a hollow marker - not the inactive status's
-   struck-through one, which says "switched off". Said in words. */
-.pill.notcounted{background:transparent; color:var(--ink-muted); border:1px solid var(--ink-faint);}
-.pill.notcounted .ico{background:transparent; border:1.5px solid var(--ink-muted); border-radius:50%;}
-/* TURNED OFF (REQ-DASH-180 criteria 3, 12 and 13): the dataset marker and
-   the group status share one style - an outline in the family of 'No
-   delivery schedule agreed yet' but with a SOLID border, never the
-   inactive status's struck-through icon, 'Schedule ended', 'Late
-   (excused)' or 'Accepted'. Its icon, a short bar, is one no other quiet
-   marker uses. Said in words. */
-.pill.turnedoff, .turnoff-marker{background:transparent; color:var(--ink-muted);
+/* TURNED OFF AND NOT COUNTED (REQ-DASH-180 criteria 3, 12 and 13; a group
+   with nothing counted, post-build-review #135): the dataset marker and BOTH
+   group statuses share one style, as criterion 12 says - Keith restyled
+   'Not counted' to it on 2026-10-15 (morning report 5 Q23) rather than
+   amend the criterion. An outline in the family of 'No delivery schedule
+   agreed yet' but with a SOLID border, never the inactive status's
+   struck-through icon, 'Schedule ended', 'Late (excused)' or 'Accepted'.
+   Its icon, a short bar, is one no other quiet marker uses. The words
+   tell the two statuses apart. */
+.pill.turnedoff, .pill.notcounted, .turnoff-marker{background:transparent; color:var(--ink-muted);
   border:1px solid var(--ink-muted);}
-.pill.turnedoff .ico, .pill.sm.turnoff-marker .ico, .turnoff-marker .ico{background:var(--ink-muted);
-  width:8px; height:2px; border-radius:1px;}
+.pill.turnedoff .ico, .pill.notcounted .ico, .pill.sm.turnoff-marker .ico,
+.turnoff-marker .ico{background:var(--ink-muted); width:8px; height:2px; border-radius:1px;}
 
 /* A dataset nobody has agreed a delivery schedule for (REQ-PIPE-106
    criterion 8). NOT A STATUS - it sits BESIDE the real red/amber/green
@@ -457,9 +454,8 @@ a.snapshots-btn{text-decoration:none; color:inherit;}
    like a colour in the same family as the verdicts (#4). */
 .legend-key i.inactive{background:transparent; border:1.5px solid var(--ink-muted);
   border-radius:50%;}
-.legend-key i.notcounted{background:transparent; border:1.5px solid var(--ink-faint);
-  border-radius:50%;}
-.legend-key i.turnedoff{background:var(--ink-muted); height:2px; border-radius:1px;}
+.legend-key i.turnedoff, .legend-key i.notcounted{background:var(--ink-muted); height:2px;
+  border-radius:1px;}
 
 /* ============ Plans tab (running-thoughts.md #10) ============ */
 .plans-filterbar{margin-top:16px; padding:14px; background:var(--surface-alt); border:1px solid var(--line); border-radius:var(--radius-md);}
@@ -3153,9 +3149,15 @@ function scheduleRunwayInPlaceOn(inPlaceOnDateStr, runway){
         .map(ds=>({ds, remaining:(ds.dates||[]).filter(d=> d > inPlaceOnDateStr).length}))
         .filter(x=> x.remaining === fewest)
         .sort((a,b)=> String(a.ds.id).localeCompare(String(b.ds.id)))[0];
+      // TURNING OFF FOR GOOD, AND AUTHORED (REQ-DASH-180 criterion 17 as
+      // amended by Keith, 2026-10-15): the warning stays, but says no more
+      // dates are needed for it. Its effective_to, else null.
+      const forGood = driver && (driver.ds.offGaps || []).find(g=> g.until == null
+        && g.authoredOn && g.authoredOn <= inPlaceOnDateStr && inPlaceOnDateStr < g.from);
       out.low.push({name:cal.name, remaining:fewest, lastPeriod:cal.lastPeriod,
                      lastDate:cal.lastDate, datasetCount:(cal.datasets||[]).length,
                      threshold:cal.threshold,
+                     drivingTurnsOffAfter: forGood ? forGood.effectiveTo : null,
                      drivingDataset: driver ? driver.ds.id : null,
                      drivingLastPeriod: driver ? (driver.ds.lastPeriod || cal.lastPeriod) : null,
                      drivingLastDate: driver ? (driver.ds.lastDate || cal.lastDate) : null});
@@ -4222,6 +4224,28 @@ function notCountedMarker(status, datasets){
     dataset${total===1?"":"s"} ${said}: ${parts}</div>`;
 }
 
+// NOT OWED YET, NOT NO DATA (REQ-DASH-182 criterion 3 as amended by Keith,
+// 2026-10-15): a dataset with nothing on show before its first
+// participation version is not missing anything, so its pill - on its page
+// and in its collection table - says it is not owed yet. Every other status
+// is the ordinary pill.
+function statusPill(ds, size, dateStr){
+  const on = dateStr || (typeof CURRENT_IN_PLACE_ON !== "undefined" ? CURRENT_IN_PLACE_ON : null);
+  if(ds && ds.status === "nodata"
+     && slaInPlaceOn(rawRealDatasetById(ds.id) || ds, on).notOwedYet){
+    return `<span class="pill nodata ${size||""}" data-not-owed-yet-pill><span class="ico"></span>Not owed yet</span>`;
+  }
+  return pill(ds && ds.status, size);
+}
+// THE EXECUTIVE TIER'S LINE (REQ-DASH-180 criterion 10, which names it;
+// Keith, 2026-10-15, morning report 5 Q22): the same quiet line the cards
+// carry, across every agency's datasets, judged against the asset's own
+// worst-of status.
+function assetNotCountedLine(agencies){
+  const ags = agencies || (DATA && DATA.agencies) || [];
+  const datasets = ags.flatMap(a=> (a.collections || []).flatMap(c=> c.datasets || []));
+  return notCountedMarker(rollupStatuses(ags.map(a=> a.status)), datasets);
+}
 function pill(status, size){ return `<span class="pill ${status} ${size||""}"><span class="ico"></span>${STATUS_LABEL[status]}</span>`; }
 // SAID IN WORDS, AND SAID DIFFERENTLY FOR THE TWO KINDS (REQ-PIPE-106
 // criteria 3 and 8). "No schedule agreed yet" is somebody's outstanding
@@ -4258,8 +4282,12 @@ function turnOffOn(d, dateStr){
     const coll = t.level === "collection";
     const base = {turnOff: t, reason: t.reason || "", level: t.level};
     if(dateStr <= t.effectiveTo){
-      if(closed) return {...base, phase: "nothing-more-owed", leftOut: true,
-        text: `Turning off after ${fmtDay(t.effectiveTo)} - nothing more owed`};
+      // NOTHING MORE OWED ONLY ONCE AUTHORED (criterion 25 as amended by
+      // Keith, 2026-10-15): before the turn-off was written down the page
+      // shows what was known then - still owing, still in the rollup.
+      if(closed && t.authoredOn && t.authoredOn <= dateStr)
+        return {...base, phase: "nothing-more-owed", leftOut: true,
+          text: `Turning off after ${fmtDay(t.effectiveTo)} - nothing more owed`};
       // ANNOUNCED only from when it was authored, and never when authored
       // after its effective_to (criteria 27 and 28).
       if(t.authoredOn && t.authoredOn <= dateStr && t.authoredOn <= t.effectiveTo)
@@ -5362,7 +5390,10 @@ function lowRunwayNotice(runway){
   const file = (SCHEDULE_RUNWAY && SCHEDULE_RUNWAY.configFile) || "contract/calendar.yaml";
   const lines = source.low.map(cal=>{
     const n = cal.datasetCount;
-    const who = cal.drivingDataset
+    const who = cal.drivingDataset && cal.drivingTurnsOffAfter
+      ? `It runs out first for <b style="display:inline">${escHtml(cal.drivingDataset)}</b>,
+         which turns off for good after ${fmtDay(cal.drivingTurnsOffAfter)} - no more dates are needed for it.`
+      : cal.drivingDataset
       ? `It runs out first for <b style="display:inline">${escHtml(cal.drivingDataset)}</b>,
          whose own last is ${escHtml(String(cal.drivingLastPeriod))}.`
       : "";
@@ -5374,9 +5405,9 @@ function lowRunwayNotice(runway){
     <b>Delivery dates are running out — nothing has failed</b>
     <div style="color:var(--ink-muted); font-size:13px;">
       <ul style="margin:6px 0 0; padding-left:18px;">${lines}</ul>
-      <div style="margin-top:6px;">This is a configuration task, not a problem with anyone's
+      ${source.low.every(cal=> cal.drivingTurnsOffAfter) ? "" : `<div style="margin-top:6px;">This is a configuration task, not a problem with anyone's
         data, and it is not failing any build. Add the next dates to <code>${file}</code> —
-        <code>mothman schedule candidate-dates</code> proposes them for review.</div>
+        <code>mothman schedule candidate-dates</code> proposes them for review.</div>`}
     </div>
   </div>`;
 }
@@ -6137,6 +6168,7 @@ function renderExec(view){
         <div class="view-sub">Rolled-up status across every agency in the multi-agency data asset. A red anywhere below makes the parent red; an amber with no red makes it amber — worst-of, so a failure cannot hide behind a healthy average. A dataset with no data, whose schedule has ended, that is turned off and owes nothing, or that has no schedule agreed sits outside that comparison rather than losing to it, and is counted separately below.</div>
       </div>
     </div>
+    ${assetNotCountedLine()}
     <div class="legend-key">
       <span><i class="green"></i>Green — within threshold (${agencyCount("green")} agencies)</span>
       <span><i class="amber"></i>Amber — warning band (${agencyCount("amber")})</span>
@@ -6255,7 +6287,7 @@ function renderAgency(view, agencyId){
           if(ds.blocked){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-blocked="${ds.blocked.kind}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">${escHtml(blockerReasonText(ds.blocked))}
                 — ${blockerReceivedText(ds.blocked)}; nothing is checked until it is resolved</td>
             </tr>`;
@@ -6272,7 +6304,7 @@ function renderAgency(view, agencyId){
           if(ds.noSupply && !ds.lastArrival){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}' data-no-supply="${ds.noSupply.length}">
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">No supply — ${escHtml(ds.noSupply.map(gapText).join("; "))}.
                 Closed with nothing in it, so a person decides: substitute an earlier supply, re-file a late one, or accept it as not supplied</td>
             </tr>`;
@@ -6280,7 +6312,7 @@ function renderAgency(view, agencyId){
           if(ds.scheduleExhausted){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${redPromotedBadge(ds.id, ds.verdictOf && ds.verdictOf.inPlaceRunId)} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}</td>
               <td colspan="4" style="color:var(--ink); font-size:12.5px;">Delivery schedule ended after
                 ${ds.scheduleExhausted.lastPeriod} — no supply expected, and QA cannot run until dates are added</td>
             </tr>`;
@@ -6288,7 +6320,7 @@ function renderAgency(view, agencyId){
           if(ds.noDataInPlaceOn && !ds.noSupply){
             return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
               <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-              <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
+              <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
               <td colspan="4" style="color:var(--ink-faint); font-size:12.5px;">No QA run within tolerance on the selected date</td>
             </tr>`;
           }
@@ -6301,7 +6333,7 @@ function renderAgency(view, agencyId){
           const dsSpark = columnsNotGreenCell(ds.columns, quietOf(ds.status), !!ds.noDataInPlaceOn);
           return `<tr tabindex="0" data-nav='${JSON.stringify({tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id})}'>
             <td>${datasetLink(ag, col, ds)}<div class="dataset-provider">${ds.provider}</div></td>
-            <td>${pill(ds.status,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
+            <td>${statusPill(ds,"sm")} ${ticketBadge(ds.id,"sm")} ${turnOffMarker(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)} ${unagreedMarker(ds)}${noSupplyNote(ds)}</td>
             <td><span title="${ARRIVAL_FOLLOWS_FILING}">${arrivalPillHtml}</span> <span class="mono" style="color:var(--ink-muted); font-size:11.5px;" title="When we received this supply">${fmtArrival(ds.lastArrival)}</span> ${waitedChip(ds.lastArrival)}</td>
             <td class="mono">${fmtInt(ds.rowCount)}</td>
             <td class="mono" style="color:var(--ink-muted);">${fmtDate(ds.lastArrival.date)}</td>
@@ -6828,8 +6860,12 @@ function renderBlockedSupplyHistoryOnly(ds){
 // they stand on are one run, worded as gapText() words a gap, "so far"
 // while the run holds the period current on the date. The periods come
 // from the build (pipeline/owed_nothing.py); the page only filters by date.
-function owedNothingRuns(d, dateStr){
-  const list = ((d && d.owedNothing) || []).filter(e=> !dateStr || e.date <= dateStr);
+function owedNothingRuns(d, dateStr, supplied){
+  // A PERIOD WITH A SUPPLY CYCLE OF ITS OWN is shown once, as that cycle with
+  // its label beneath (REQ-DASH-182 criterion 12 as amended by Keith,
+  // 2026-10-15), so it is left out of the runs.
+  const list = ((d && d.owedNothing) || []).filter(e=> (!dateStr || e.date <= dateStr)
+    && !(supplied && supplied.has(e.period)));
   if(!list.length) return [];
   const seq = periodsFor(d.id) || [];
   const index = new Map(seq.map((p, i)=> [p.period, i]));
@@ -6907,7 +6943,17 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
   const waiting = blockerHistoryRows(ds.id, CURRENT_IN_PLACE_ON) + gapHistoryRows(ds, CURRENT_IN_PLACE_ON)
     + receivedWhileOffSection(ds.id, CURRENT_IN_PLACE_ON);
   const raw = (typeof rawRealDatasetById === "function" && rawRealDatasetById(ds.id)) || ds;
-  const owed = owedNothingRuns(raw, CURRENT_IN_PLACE_ON);
+  // A CYCLE'S PERIOD is its filed slot's name, or its date where the arrival
+  // record has none - so an owed-nothing period is matched on either.
+  const ofCycle = (c, e)=> e.period === c.period || e.date === c.cycleStart;
+  const supplied = new Set(((raw && raw.owedNothing) || [])
+    .filter(e=> cycles.some(c=> ofCycle(c, e))).map(e=> e.period));
+  const owed = owedNothingRuns(raw, CURRENT_IN_PLACE_ON, supplied);
+  const owedSub = c=>{
+    const e = ((raw && raw.owedNothing) || []).find(x=> ofCycle(c, x)
+      && x.date <= CURRENT_IN_PLACE_ON);
+    return e ? `<span style="color:var(--ink-faint);" data-owed-nothing-sub>${escHtml(owedNothingLabel(e).label)}</span>` : "";
+  };
   if(!cycles.length && !owed.length){
     return waiting ? `<div class="supply-history"><div class="supply-history-head"><h3>Supply history</h3></div>${waiting}</div>` : "";
   }
@@ -6937,6 +6983,7 @@ function renderSupplyHistorySection(ds, cycles, currentCycleStart){
         <b>${cycleLabel(ds.sla.cadence, c.cycleStart, ds.id)}</b>
         ${isCurrent(c) ? CURRENT_TAG : ""}
         <span style="color:var(--ink-faint);">${c.entries.length} ${pluralize(c.entries.length,"delivery","deliveries")}</span>
+        ${owedSub(c)}
       </div>
       <div class="overflow-x">
       <table class="dataset-table supply-cycle-table">${SUPPLY_CYCLE_COLS}
@@ -7160,9 +7207,11 @@ function renderDataset(view, agencyId, collectionId, datasetId){
           <h2>${ds.name}</h2>
           <div class="view-sub">${ds.provider} · ${col.name} · ${ag.name}</div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${pill("nodata")} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">${statusPill({...ds, status:"nodata"})} ${ticketBadge(ds.id)} ${githubFolderLink("datasets", ds.id)} ${assignmentBadge("datasets", ds.id)}</div>
       </div>
       ${arrivalBanner(ds)}
+      ${slaInPlaceOn(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON).notOwedYet
+        ? `<div class="sla-strip">${slaTileHtml(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}</div>` : ""}
       ${neverSuppliedNotice(rawRealDatasetById(ds.id) || ds, CURRENT_IN_PLACE_ON)}
       <div id="supply-history-wrap"></div>
     `;

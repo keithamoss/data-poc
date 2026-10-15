@@ -1063,10 +1063,36 @@ class TestCriticFindingsOn190:
         doc = _unshare(_doc())
         _turn_off(_versions(doc, "cp-clients")[0], to="2028-12-31")
         using(doc)
-        assert runway.off_gaps("cp-clients") == [{"from": "2029-01-01", "until": None}]
+        # WITH ITS EFFECTIVE_TO AND WHEN IT WAS AUTHORED (REQ-DASH-180
+        # criterion 17 as amended 2026-10-15, Q24): the runway line words a
+        # for-good turn-off once it is written down.
+        [gap] = runway.off_gaps("cp-clients")
+        assert (gap["from"], gap["until"], gap["effectiveTo"]) == ("2029-01-01", None, "2028-12-31")
+        assert "authoredOn" in gap
         assert runway.off_gaps("cp-carers") == []
         using(_off_for_a_while())
-        assert runway.off_gaps("cp-clients") == [{"from": "2025-04-01", "until": "2026-01-01"}]
+        [gap] = runway.off_gaps("cp-clients")
+        assert (gap["from"], gap["until"]) == ("2025-04-01", "2026-01-01")
+
+    def test_the_gate_says_no_more_dates_are_needed_once_authored(self, using):
+        """REQ-DASH-180 criterion 17 as amended 2026-10-15 (Keith, morning
+        report 5 Q24): 'the gate's warning likewise' - the line for a
+        calendar that runs out first for a dataset with a for-good turn-off
+        authored by then says no more dates are needed for it, and does not
+        ask for dates."""
+        from qa_tools.common import runway
+
+        doc = _unshare(_doc())
+        _turn_off(_versions(doc, "cp-case-workers")[0], to="2027-03-31",
+                  log=[{"date": "2026-09-01", "author": "a test", "change": "off",
+                        "turns_off": True}])
+        using(doc)
+        before = runway.warning_lines(date(2026, 8, 1))
+        assert before and "candidate-dates" in before[0]
+        [line] = runway.warning_lines(date(2026, 9, 23))
+        assert ("runs out first for 'cp-case-workers', which turns off for good after "
+                "2027-03-31 - no more dates are needed for it") in line
+        assert "candidate-dates" not in line and "not failing the build" in line
 
     def test_d1_a_calendar_whose_datasets_are_all_off_is_not_exhausted(self, using):
         """Every Child Protection dataset off for good: no dataset to count,

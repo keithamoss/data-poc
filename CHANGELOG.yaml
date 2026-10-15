@@ -228,6 +228,13 @@ releases:
               as off for good. A turn-off that has not started yet no longer
               silences the runway warning, and a freeze refusal names every
               period the change reaches back into, not only the first.
+          - headline: Turned-off and not-owed, tidied
+            components: ["Dashboard UI"]
+            description: >
+              A dataset not owed anything yet says "Not owed yet", not "No
+              data". A supply in a period owed nothing shows once. "Nothing more
+              owed" waits until the turn-off is written down, and the runway
+              warning stops asking for dates a dataset will never owe.
           - headline: Corrections wait, and turn-offs hold
             components: ["Pipeline & publishing"]
             description: >

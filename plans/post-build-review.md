@@ -9457,3 +9457,16 @@ twice. It deliberately did not re-find the `TypeError`.
        (criterion 6); and that the builders embed `placements` at all.
      - Verified met: c1, c2, c6, c7, c8, c9; c3 for hold rows; the
        thirty-dataset NFR.
+
+197. **[done, 2026-10-15]** **[Testing & dev tooling]** **A false gate claim
+     in a pushed commit (dc1d82e).** Its message says `mothman check
+     --no-pytest` passed. It did not: the `patterns` gate failed with
+     `SchemaVersionError`, because the commit bumps the qa schema to 44 and a
+     schema is never brought up to date in place, so the real `supply`
+     database (43) had to be rebuilt. The command was piped through `tail`,
+     whose exit code let the commit run, and the box the tail showed was the
+     error panel's bottom edge, not "Passed". Recorded here rather than by
+     rewriting a pushed commit. Fix in practice: the gate's exit code is read
+     on its own (`; echo exit=$?`), never through a pipe, before any commit.
+     The database was rebuilt with `mothman env reset-synthetic` then
+     `mothman pipeline bootstrap`, and the gate re-run on that tree.

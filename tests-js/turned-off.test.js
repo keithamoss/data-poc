@@ -70,6 +70,17 @@ describe("the marker, as at the date on show (criteria 1, 4, 25, 27 and 28)", ()
     expect(got.leftOut).toBe(true);
   });
 
+  it("waits for the turn-off to be authored before 'nothing more owed' (criterion 25 as amended, Q21)", () => {
+    // Keith, 2026-10-15: before the date it was authored, the page shows what
+    // was known then - still owing, still in the rollup.
+    const w = load();
+    const later = ds({ ...TURN, effectiveTo: "2025-06-30", authoredOn: "2025-05-20" });
+    expect(w.turnOffOn(later, "2025-05-10")).toBeNull();
+    const got = w.turnOffOn(later, "2025-05-25");
+    expect(got.phase).toBe("nothing-more-owed");
+    expect(got.leftOut).toBe(true);
+  });
+
   it("is gone once the dataset is back on (criterion 18)", () => {
     expect(load().turnOffOn(ds(), "2026-02-01")).toBeNull();
   });
@@ -324,5 +335,25 @@ describe("post-build-review #195", () => {
     const un = { id: "u", scheduleNotAgreed: "not-yet-agreed" };
     el.innerHTML = w.notCountedMarker("notcounted", [off, { ...off, id: "o2" }, un]);
     expect(el.textContent.replace(/\s+/g, " ").trim()).toBe("3 datasets not counted: 2 turned off, 1 no schedule agreed yet");
+  });
+});
+
+// REQ-DASH-180 criterion 10 names the executive tier too (Keith, 2026-10-15,
+// morning report 5 Q22 - #195 F7 found it only on the cards).
+describe("the asset level says how many datasets are not counted", () => {
+  const off = { id: "o", turnedOffOutOfRollup: true, status: "green" };
+  const counted = { id: "c", status: "red" };
+  const agencies = (...ds) => [{ id: "a", status: "red", collections: [{ id: "k", datasets: ds }] }];
+
+  it("one quiet line across every agency", () => {
+    const w = load();
+    const el = w.document.createElement("div");
+    el.innerHTML = w.assetNotCountedLine(agencies(off, { ...off, id: "o2" }, counted));
+    expect(el.textContent.replace(/\s+/g, " ").trim())
+      .toBe("2 datasets not counted in this status: 2 turned off");
+  });
+
+  it("says nothing where every dataset is counted", () => {
+    expect(load().assetNotCountedLine(agencies(counted))).toBe("");
   });
 });

@@ -920,13 +920,17 @@ class TestOwedNothingPeriods:
     def test_the_period_is_a_quiet_row_and_the_tile_names_its_own_months(self, page,
                                                                          built_dashboard_html):
         _goto(page, built_dashboard_html, state=self.DS, in_place_on=self.ON)
-        # THE VISIBLE CURRENT ROW, not the first match, which may be a hidden
-        # older one (post-build-review #194 F1).
-        row = page.locator(".supply-history > [data-owed-nothing]")
-        assert row.count() == 1 and row.is_visible()
-        assert "Not owed — outside its agreed months (Feb, Aug)" in row.inner_text()
-        assert "Current cycle" in row.inner_text()
-        assert row.locator(".pill:not(.tag)").count() == 0
+        # THE VISIBLE CURRENT BLOCK, not the first match, which may be a hidden
+        # older one (post-build-review #194 F1). This period also holds a
+        # supply (cp-case-workers' unfiled May files), so since Q18 (REQ-DASH-
+        # 182 criterion 12 as amended 2026-10-15) it is ONE block - the supply's
+        # cycle with the period's label beneath - never a second row.
+        sub = page.locator(".supply-history > .supply-cycle [data-owed-nothing-sub]")
+        assert sub.count() == 1 and sub.is_visible()
+        assert "Not owed — outside its agreed months (Feb, Aug)" in sub.inner_text()
+        label = sub.locator("xpath=ancestor::div[contains(@class,'supply-cycle-label')][1]")
+        assert "Current cycle" in label.inner_text()
+        assert page.locator(".supply-history > [data-owed-nothing]").count() == 0
         tile = page.locator(".sla-tile", has_text="SLA").first.inner_text()
         assert "Twice a year (Feb, Aug, day 1), by 09:00" in tile
         assert "staffing register" in tile

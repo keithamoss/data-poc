@@ -25182,7 +25182,11 @@ requirements:
       it still owes a period whose slot is open, SHALL show that period's due time labelled with the period.
     - THE SYSTEM SHALL NOT show a dataset turned off for good in the exhausted-schedule notice, its marker or the runway warning;
       SHALL show a dataset in a temporary gap in the runway warning by the periods it owes once back on (REQ-PIPE-179 criterion
-      25); and SHALL show those for a dataset turned back on with no dates left from the moment it is back on.
+      25); and SHALL show those for a dataset turned back on with no dates left from the moment it is back on; and WHERE the
+      dataset a calendar's low-runway warning runs out first for has a for-good turn-off authored on or before the date on
+      show, THE SYSTEM SHALL word its line 'It runs out first for <dataset>, which turns off for good after <date> - no more
+      dates are needed for it.', and SHALL drop the instruction to add dates where every line is worded so; the gate's warning
+      likewise. AMENDED 2026-10-15 by Keith (morning report 5 Q24).
     - WHEN a dataset is turned back on, THE SYSTEM SHALL show it as any dataset between deliveries - the verdict of the supply
       in place, never 'No data' - until its first owed period's slot opens, and SHALL keep the gap's owed-nothing rows in its
       history.
@@ -25196,8 +25200,10 @@ requirements:
     - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
     - THE SYSTEM SHALL judge every instant these criteria turn on at the end of the date on show on the data asset's clock,
       as the page already judges whether a blocker is open on the date on show.
-    - WHILE a dataset's last owed slot before a turn-off has closed and its effective_to has not yet passed, THE SYSTEM SHALL
-      show the marker 'Turning off after <effective_to> - nothing more owed', and SHALL apply criterion 7 from that close.
+    - WHILE a dataset's last owed slot before a turn-off has closed, its turn-off has been authored on or before the date on
+      show (criterion 27's authored date), and its effective_to has not yet passed, THE SYSTEM SHALL show the marker 'Turning
+      off after <effective_to> - nothing more owed', and SHALL apply criterion 7 from the later of that close and that
+      authored date. AMENDED 2026-10-15 by Keith (morning report 5 Q21).
     - WHERE a turned-off dataset has a red promoted supply, THE SYSTEM SHALL keep naming it in its collection card's red-promoted
       line, with '(turned off)' after its name.
     - 'WHILE the date on show falls on or after the date the turn-off was authored and on or before a dataset''s effective_to, THE SYSTEM SHALL show, in the turn-off marker''s place and style (criteria 3 and 13), a marker reading ''Turning off after <effective_to>'' - ''Turning off with <collection> after <effective_to>'' where the turn-off is its collection''s - with the turned_off_reason as its title, SHALL keep the dataset in its rollups and counts as any owed dataset, and SHALL give way to criterion 4''s or criterion 25''s wording once either applies; the date the turn-off was authored SHALL be the one REQ-PIPE-179 criterion 41 works out - the date of the newest declared correction that set or moved that version''s effective_to where there is one, otherwise the date of the newest changelog entry on that version carrying turns_off: true (REQ-PIPE-179 criterion 40) - carried into what the build reads with REQ-PIPE-179''s other turn-off data.'
@@ -25356,6 +25362,7 @@ requirements:
     - 'CRITERION 10 CHANGES BUILT BEHAVIOUR (built 2026-10-15): notCountedMarker() used to say why only beside a ''Not counted'' status. It now also says ''N datasets not counted in this status: <counts by reason>'' wherever only some are left out - for no schedule agreed as much as for turned off - and nothing for a group reading ''Turned off'', which would only repeat it. tests-js/status-rollups.test.js''s ''and nothing else does'' case was rewritten to the new rule.'
     - 'AMENDMENTS APPLIED AS PROPOSED (criterion 22, 2026-10-15): REQ-DASH-155 criterion 1 and REQ-PIPE-053 criterion 19 now read as batch amendments 1 and 15 worded them. Amendment 1 needed no code: schedule_ended.for_dataset already labels each hold from the configuration as it stands (REQ-PIPE-179 criterion 18).'
     - 'THE REAL CONFIGURATION TURNS NOTHING OFF, so the browser tests add a turn-off to cp-clients'' embedded data and rebuild the page from it (tests/test_dashboard_e2e.py::TestTurnedOffOnThePage). The real cp-clients has a supply waiting for a person on the date used, so the test asserts the rule - out of the rollup exactly when nothing waits - rather than one dataset''s real state.'
+    - 'KEITH''S ANSWERS, 2026-10-15 (morning report 5): Q21 criterion 25 amended - nothing more owed, and leaving the rollup, wait for the turn-off''s authored date; Q22 the executive tier carries the not-counted line criterion 10 already named (assetNotCountedLine), a fix against the criterion as signed; Q23 Not counted restyled to the turn-off marker''s style as criterion 12 says, rather than amending it; Q24 criterion 17 amended - once a for-good turn-off of the dataset a calendar runs out first for is authored, the runway line says no more dates are needed for it and drops the add-dates instruction, on the page and in the gate (off_gaps now sends effectiveTo and authoredOn).'
     linked_tests:
     - 'tests-js/turned-off.test.js'
     - 'tests-js/datasets-not-green.test.js'
@@ -25368,7 +25375,10 @@ requirements:
     - 'tests/test_dashboard_e2e.py::TestTurnedOffOnThePage'
     - 'tests/test_turn_off.py::TestCriticFindingsOn190::test_d3_the_backlog_line_reads_the_label_as_it_stands'
     - 'tests/test_turn_off.py::TestNotAStateNeedingAPerson::test_a_resolved_one_says_how_it_ended'
+    - 'tests-js/schedule-runway.test.js'
     implemented_by:
+    - 'dashboard/qa-reporting-dashboard.template.html::assetNotCountedLine'
+    - 'qa_tools/common/runway.py::_turning_off_for_good'
     - 'qa_tools/common/dataset_blockers.py::_ended'
     - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffEnding'
     - 'dashboard/qa-reporting-dashboard.template.html::receivedWhileOffLine'
@@ -25516,8 +25526,10 @@ requirements:
       version, SHALL show 'Not owed yet — owes supplies from <date>', the date that version takes effect, on the SLA tile and
       as the heading of the notice that today reads 'Nothing had been supplied by this date', which it replaces, that notice's
       body keeping only its way-back sentence, 'Pick a later date, or reset to the default, using the 📅 In place on control
-      above.', and dropping 'There is no QA run within the accepted freshness window as of <date>.'; and WHERE the dataset is
-      turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says.
+      above.', and dropping 'There is no QA run within the accepted freshness window as of <date>.', and SHALL show its
+      status pill, on its page and in its collection table, as 'Not owed yet' in place of 'No data'; and WHERE the dataset is
+      turned off on that date (REQ-PIPE-179), SHALL show it as REQ-DASH-180 criterion 16 says. AMENDED 2026-10-15 by Keith
+      (morning report 5 Q19).
     - THE SYSTEM SHALL render every reason it shows as text, never as markup.
     - THE SYSTEM SHALL compute all of this from committed configuration and recorded results, and SHALL NOT read supply rows.
     - THE SYSTEM SHALL NOT show periods before a dataset's first participation version as owed-nothing rows.
@@ -25547,7 +25559,9 @@ requirements:
       (.supply-cycle-label) with no table beneath it, headed by cycleLabel() as its neighbouring cycles are, with its kind label
       where a cycle shows its number of deliveries, in muted text and with no pill of any kind, so that it ranks below a red
       'No supply' and an 'Accepted' tag; SHALL order it newest first among the supply cycles; and SHALL NOT list it under 'Periods
-      with no supply'.
+      with no supply'; and WHERE a supply cycle falls in a period the dataset owes nothing in, SHALL show that period once, as
+      the supply cycle's block with its kind label - 'Not owed — <reason>' - as the block's subheading, and not as a separate
+      label-only block. AMENDED 2026-10-15 by Keith (morning report 5 Q18).
     - WHERE consecutive owed-nothing periods share a kind, a reason and the period they stand on, THE SYSTEM SHALL show them
       as one row reading '<kind label>, <first> to <last> (<n> periods)' - 'days' for a daily dataset - with the range and unit
       worded as gapText() words a gap, and a single period as '<kind label>' under its own heading with no count; WHERE such
@@ -25679,12 +25693,14 @@ requirements:
     - 'THE NOT_EXPECTED STALENESS WAS A REAL DEFECT, NOT ONLY A GUARD (found building criterion 15, 2026-10-15): the participation case passed on today''s page, but the page judged staleness against the start of the period on show whatever the dataset owed in it - so a not_expected period between deliveries read ''nothing has landed yet''. clipDatasetToInPlaceOn now judges against owedPeriodStart(), the newest period on or before the date that the dataset owes; the tests-js test failed before the change.'
     - 'TWO WORDING CHANGES TO BUILT LABELS, AS SIGNED (criteria 7 and 11): months are separated by commas, ''Quarterly (Feb, May, Aug, Nov, day 1)'', where the page said ''Feb/May/Aug/Nov'', and a due-before supply reads ''by 09:00, 60 days before each date'' where it said ''due 60 days before each date, by 09:00''. tests-js/cadence.test.js updated to the signed wording.'
     - '''SHOW ALL HISTORY (N CYCLES)'' NOW COUNTS WHAT IT HIDES (criterion 13): it used to count every cycle including the one on show. N is the number of hidden rows, owed-nothing rows included; the word stays ''cycles''.'
+    - 'KEITH''S ANSWERS, 2026-10-15 (morning report 5): Q18 criterion 12 amended - a supply in a period owed nothing shows that period once, its cycle with Not owed - <reason> beneath, matched on the period''s name or date; Q19 criterion 3 amended - before the first participation version the dataset page now has its SLA tile (missed at build, a fix) and the pill reads Not owed yet on the page and in the collection table (statusPill). Q20 (follow calendar versions too) waits, by Keith''s call, for running-thoughts #97.'
     linked_tests:
     - 'tests/test_owed_nothing.py'
     - 'tests-js/owed-nothing.test.js'
     - 'tests-js/cadence.test.js'
     - 'tests/test_dashboard_e2e.py::TestOwedNothingPeriods'
     implemented_by:
+    - 'dashboard/qa-reporting-dashboard.template.html::statusPill'
     - 'pipeline/owed_nothing.py::for_dataset'
     - 'pipeline/owed_nothing.py::sla_timeline'
     - 'dashboard/qa-reporting-dashboard.template.html::cadenceLabel'
