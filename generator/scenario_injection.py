@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Sequence
 
 from generator.targeting import Target
+from qa_tools.common import scenario_map
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -175,6 +176,9 @@ class Link:
     #: An int is an arrival index; a str is a scripted decision's name.
     first: int | str
     second: int | str
+    #: WHAT THE LINK LANDS ON (REQ-DASH-208 criterion 2), by name from
+    #: scenario_map.SUBJECTS - never a selector.
+    subject: str = scenario_map.SUPPLY_HISTORY_ROW
 
 
 @dataclass(frozen=True)
@@ -292,6 +296,9 @@ class Placement:
     #: Scenario id -> its link's resolved in-place-on date (REQ-GEN-201
     #: criterion 5). Absent ids keep the default.
     in_place_on: tuple[tuple[str, str], ...] = ()
+    #: Scenario id -> what its link lands on (REQ-DASH-208 criterion 2).
+    #: Absent ids land on their first supply's row.
+    subjects: tuple[tuple[str, str], ...] = ()
 
     @property
     def built_green(self) -> tuple[str, ...]:
@@ -310,6 +317,11 @@ class Placement:
                 latest = day
         return latest.isoformat()
 
+    def subject_for(self, scenario_id: str) -> str:
+        """What this id's link lands on (REQ-DASH-208 criterion 2); its first
+        supply's row where no link names one."""
+        return dict(self.subjects).get(scenario_id, scenario_map.SUPPLY_HISTORY_ROW)
+
     def as_record(self) -> dict:
         """The shape qa_tools/common/scenario_map.py reads.
 
@@ -322,6 +334,7 @@ class Placement:
             "dataset": self.dataset,
             "period": self.period,
             "in_place_on": self.in_place_on_for(self.scenario_id),
+            "subject": self.subject_for(self.scenario_id),
             # THE SAME LIST A LINK'S `arrival N` INDEXES (supply_arrivals): a
             # delivery that leaves this dataset's file out takes no index, so
             # a script's `supply N` names the same file (the critic's G1).
@@ -632,7 +645,8 @@ def resolve(injection: Injection, periods: Sequence,
     if refused:
         raise CannotPlace("; ".join(refused))
     return dataclasses.replace(placement, in_place_on=tuple(
-        (d.scenario_id, d.on.isoformat()) for d in dates))
+        (d.scenario_id, d.on.isoformat()) for d in dates),
+        subjects=tuple((link.scenario_id, link.subject) for link in injection.links))
 
 
 def _refuse_outside_hold(injection: Injection, anchor_day: date) -> None:
@@ -958,7 +972,8 @@ def inheritance_placements(periods: Sequence) -> list[Placement]:
             config=(f"quarterly; {INHERITING_DATASET} is delivered only in the quarters "
                     f"contract/calendar.yaml's participation names, so {p.name} - {why} - "
                     f"inherits {source}'s supply. Nothing generated for it."),
-            in_place_on=((sid, middle.isoformat()),)))
+            in_place_on=((sid, middle.isoformat()),),
+            subjects=((sid, scenario_map.STANDING_IN_PILL),)))
     return out
 
 
@@ -1064,7 +1079,11 @@ def write_placements(placements: Sequence[Placement],
         record = placement.as_record()
         for also in _ALSO.get(placement.scenario_id, ()):
             records.append({**record, "scenario_id": also,
-                            "in_place_on": placement.in_place_on_for(also)})
+                            "in_place_on": placement.in_place_on_for(also),
+                            # ITS OWN SUBJECT (REQ-DASH-208 criterion 2): a
+                            # sibling shows a different moment of the same
+                            # placement, often on a different part of the page.
+                            "subject": placement.subject_for(also)})
         records.append(record)
     records.sort(key=lambda r: r["scenario_id"])
     target.write_text(json.dumps({"placements": records}, indent=2) + "\n")
@@ -1548,8 +1567,8 @@ INJECTIONS: tuple[Injection, ...] = (
                          file_shape="one_table_only"),
         ),
         also_demonstrates=("TS-75b",),
-        links=(Link("TS-75a", 7, 0, "TS-75 reject"),
-               Link("TS-75b", 3, "TS-75 reject", 1)),
+        links=(Link("TS-75a", 7, 0, "TS-75 reject", scenario_map.AS_AT_PANEL),
+               Link("TS-75b", 3, "TS-75 reject", 1, scenario_map.AS_AT_PANEL)),
     ),
     Injection(
         scenario_id="TS-76",
@@ -1566,7 +1585,8 @@ INJECTIONS: tuple[Injection, ...] = (
                          "five of the six tables, on time - cp_placements.csv absent",
                          file_shape="one_table_missing"),
         ),
-        links=(Link("TS-76", 14, "TS-76 substitute", "TS-76 de-substitute"),),
+        links=(Link("TS-76", 14, "TS-76 substitute", "TS-76 de-substitute",
+                    scenario_map.SUBSTITUTION_DRILL_DOWN),),
         keeps_drawn_severity=True,
     ),
     Injection(
@@ -1592,8 +1612,9 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-77b",),
         # `0` IS THE LATE FILE: the first delivery carries no cp_placements,
         # so it takes no supply index (carries()).
-        links=(Link("TS-77a", 14, "TS-77 substitute", 0),
-               Link("TS-77b", 0, 0, "TS-77 promote")),
+        links=(Link("TS-77a", 14, "TS-77 substitute", 0,
+                    scenario_map.SUBSTITUTION_DRILL_DOWN),
+               Link("TS-77b", 0, 0, "TS-77 promote", scenario_map.AS_AT_PANEL)),
         keeps_drawn_severity=True,
     ),
     Injection(
@@ -1619,8 +1640,8 @@ INJECTIONS: tuple[Injection, ...] = (
                          target=Target("amber", ("registering_parent_2_name.completeness",))),
         ),
         also_demonstrates=("TS-78b",),
-        links=(Link("TS-78a", 0, "TS-78 promote D", 2),
-               Link("TS-78b", 0, 2, "TS-78 promote D+2")),
+        links=(Link("TS-78a", 0, "TS-78 promote D", 2, scenario_map.AS_AT_PANEL),
+               Link("TS-78b", 0, 2, "TS-78 promote D+2", scenario_map.VERDICT_LINE)),
     ),
 )
 

@@ -65,6 +65,18 @@ PLACEMENTS_PATH = ROOT / "data" / "scenario_placements.json"
 MAP_PATH = ROOT / "SCENARIOS.md"
 
 
+#: WHAT A SCENARIO'S LINK LANDS ON (REQ-DASH-208 criterion 2) - named
+#: semantically, never by a CSS selector or a pixel offset: the page owns the
+#: mapping from each name to its element, so a restyle moves nothing here.
+AS_AT_PANEL = "as-at-panel"
+VERDICT_LINE = "verdict-line"
+SUBSTITUTION_DRILL_DOWN = "substitution-drill-down"
+STANDING_IN_PILL = "standing-in-pill"
+SUPPLY_HISTORY_ROW = "supply-history-row"
+SUBJECTS = (AS_AT_PANEL, VERDICT_LINE, SUBSTITUTION_DRILL_DOWN, STANDING_IN_PILL,
+            SUPPLY_HISTORY_ROW)
+
+
 @dataclass(frozen=True)
 class Placement:
     """Where one scenario actually landed."""
@@ -77,6 +89,9 @@ class Placement:
     #: What each targeted arrival was built to, and the rules moved with
     #: their intended counts (REQ-GEN-184 criterion 12). Never a verdict.
     targets: tuple = ()
+    #: What its link lands on (REQ-DASH-208 criterion 2). A placement written
+    #: before the subject was recorded reads as its first supply's row.
+    subject: str = SUPPLY_HISTORY_ROW
 
     @classmethod
     def of(cls, record: Mapping) -> "Placement":
@@ -89,7 +104,8 @@ class Placement:
             # (REQ-PIPE-081 criterion 25) is still read, so a placements file
             # from an earlier bootstrap keeps its coordinates.
             in_place_on=str(record.get("in_place_on") or record.get("as" + "_of") or ""),
-            targets=tuple(record.get("targets") or ()))
+            targets=tuple(record.get("targets") or ()),
+            subject=str(record.get("subject") or SUPPLY_HISTORY_ROW))
 
     @property
     def is_complete(self) -> bool:
@@ -262,6 +278,8 @@ def _data_block(scenarios: Iterable[scenarios_mod.Scenario],
             }
             if placement.targets:
                 entry["coordinates"]["targets"] = list(placement.targets)
+            # THE SUBJECT, BY NAME (REQ-DASH-208 criterion 2).
+            entry["coordinates"]["subject"] = placement.subject
         entries.append(entry)
     return _DATA_OPEN + json.dumps({"scenarios": entries}, indent=1) + _DATA_CLOSE
 

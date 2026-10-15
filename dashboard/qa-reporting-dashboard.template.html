@@ -608,6 +608,13 @@ a.snapshots-btn{text-decoration:none; color:inherit;}
   border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13.5px;
   color:var(--ink); background:var(--surface); max-width:72ch;}
 .arrival-notice b{display:block; margin-bottom:4px;}
+/* WHERE A SCENARIO JUMP LANDED (REQ-DASH-208 criterion 4): the arrival
+   notice's static left rule and a label - never the 2px focus outline, never
+   animated. */
+.scenario-subject:not(tr){border-left:3px solid var(--accent); padding-left:8px;}
+tr.scenario-subject > td:first-child{border-left:3px solid var(--accent);}
+.scenario-subject-label{display:block; font-size:11.5px; font-weight:600; color:var(--accent); margin:0 0 4px;}
+span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 /* A REQUIREMENT OPENED BY ITS OWN ADDRESS (REQ-DASH-222 criterion 2) wears
    the arrival notice's left accent bar, and says so in words beside its id
    so the mark is not colour alone. */
@@ -3235,6 +3242,9 @@ function defaultInPlaceOn(){
 // carrying it keeps its date, and the address bar is rewritten to the
 // current spelling on the first write, so nothing keeps two spellings.
 const IN_PLACE_ON_PARAM = "in-place-on";
+// A SCENARIO JUMP IN THE URL (REQ-DASH-208 criterion 5) - declared up here,
+// beside the date's own, because the startup rewrite below reads it.
+const SCENARIO_PARAM = "scenario";
 const PREVIOUS_DATE_PARAM = "as" + "of";
 // A REAL CALENDAR DATE, not just the shape of one (post-build-review #165):
 // 2026-13-45 matched the pattern and then rendered "45 undefined 2026" and
@@ -3249,9 +3259,16 @@ function inPlaceOnFromUrl(){
   const v = params.get(IN_PLACE_ON_PARAM) || params.get(PREVIOUS_DATE_PARAM);
   return isRealDateStr(v) ? v : null;
 }
-function setInPlaceOnInUrl(dateStr, defaultDateStr){
+function setInPlaceOnInUrl(dateStr, defaultDateStr, {keepJump = false} = {}){
   const url = new URL(location.href);
   url.searchParams.delete(PREVIOUS_DATE_PARAM);
+  // ANY DATE CHANGE DROPS A SCENARIO JUMP (REQ-DASH-208 criterion 8): its
+  // parameter, its bar and its mark - unless this IS the jump setting its date.
+  if(!keepJump && STATE && STATE.scenarioJump){
+    const {scenarioJump, ...rest} = STATE;
+    STATE = rest;
+  }
+  withScenarioParam(url, keepJump && STATE && STATE.scenarioJump ? STATE.scenarioJump.id : null);
   if(dateStr === defaultDateStr) url.searchParams.delete(IN_PLACE_ON_PARAM);
   else url.searchParams.set(IN_PLACE_ON_PARAM, dateStr);
   // `from` is the ARRIVAL CONTEXT, and it never survives a date change
@@ -5096,6 +5113,9 @@ function navUrl({dropArrival = true} = {}){
   // it on reload.
   if(!STATE.req) url.searchParams.delete("req");
   if(!STATE.panel) url.searchParams.delete("panel");
+  // A NAVIGATION CARRIES ITS OWN SCENARIO JUMP OR NONE (REQ-DASH-208
+  // criteria 5 and 8): a jump does not follow the reader to another page.
+  withScenarioParam(url, STATE.scenarioJump && STATE.scenarioJump.id);
   return url.pathname + url.search + stateToHash(STATE);
 }
 function hashToState(){
@@ -5155,10 +5175,16 @@ let STATE = stateFromLocation();
 // (REQ-PIPE-081 criterion 24; post-build-review #116, D4): honoured where CURRENT_IN_PLACE_ON is read,
 // and replaced in the address bar now, not at the reader's next date change.
 if(new URLSearchParams(location.search).has(PREVIOUS_DATE_PARAM)){
+  const keep = scenarioParamFromUrl();
   setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+  if(keep !== null){
+    const url = new URL(location.href);
+    url.searchParams.set(SCENARIO_PARAM, keep);
+    history.replaceState(STATE, "", url.pathname + url.search + location.hash);
+  }
 }
 
-function navigate(next){
+function navigate(next, {scrollTop = true} = {}){
   STATE = next;
   // THE ARRIVAL CONTEXT BELONGS TO ONE PAGE (REQ-DASH-085 criterion 11,
   // REQ-DASH-100 criterion 10). Cleared BEFORE render(), or the banner
@@ -5171,7 +5197,9 @@ function navigate(next){
   hideAllPanelsDom();
   render();
   history.pushState(STATE, "", navUrl());
-  window.scrollTo({top:0, behavior:"smooth"});
+  // A SCENARIO JUMP SCROLLS ITSELF (REQ-DASH-208 criterion 1): a smooth scroll
+  // to the top still running would carry the page off its subject.
+  if(scrollTop) window.scrollTo({top:0, behavior:"smooth"});
   // FOCUS FOLLOWS THE NAVIGATION (#10). Without this the document
   // replaces itself under the reader and focus stays on body, so the
   // next Tab starts from the top of the page and a screen reader is
@@ -5294,6 +5322,7 @@ function render(){
   const done = r => {
     const bar = scenarioJumpBar();
     if(bar){ view.insertAdjacentHTML("afterbegin", bar); wireScenarioJumpBar(view); }
+    markScenarioSubject();
     // Links rendered anywhere in the view, including the queue's (#123 B5).
     wireNavLinks(view);
     describeRoute();
@@ -8744,8 +8773,132 @@ function goToScenario(index){
   const from = CURRENT_IN_PLACE_ON;
   const to = target.inPlaceOn || from;
   if(to !== from) setInPlaceOnQuietly(to);
-  navigate({...target.nav, scenarioJump: {id: entry.id, from, to}});
-  if(to !== from) setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+  navigate({...target.nav, scenarioJump: {id: entry.id, from, to}}, {scrollTop: false});
+  setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON, {keepJump: true});
+  // AND THE READER IS TAKEN TO WHAT IT IS ABOUT (REQ-DASH-208 criterion 1).
+  landOnScenarioSubject(entry, to);
+}
+
+/* ---- Where a scenario jump lands (REQ-DASH-208) ----------------------
+   THE SUBJECT IS NAMED IN THE PLACEMENT RECORD (criterion 2) - as-at panel,
+   verdict line, substitution drill-down, standing-in pill or supply-history
+   row - and this page alone knows which element each name is, so a restyle
+   changes this table and nothing the generator wrote.
+*/
+const SCENARIO_SUBJECT = {
+  "as-at-panel": ()=> document.querySelector('#view [data-testid="promotion-split"]'),
+  "verdict-line": ()=> document.querySelector("#view .verdict-of"),
+  "substitution-drill-down": ()=> document.querySelector('#view [data-testid="standing-in-detail"]'),
+  "standing-in-pill": ()=> document.querySelector('#view [data-testid="standing-in"]'),
+  "supply-history-row": coords=> {
+    for(const runId of (coords.supplies || [])){
+      const row = [...document.querySelectorAll("#view .supply-history tr[data-run-id]")]
+        .find(tr=> tr.dataset.runId === String(runId));
+      if(row) return row;
+    }
+    return null;
+  },
+};
+// THE PARAMETER'S NAME IN ANY CASE (criterion 11), its raw value or null.
+function scenarioParamFromUrl(){
+  for(const [key, value] of new URLSearchParams(location.search)){
+    if(key.toLowerCase() === SCENARIO_PARAM) return value;
+  }
+  return null;
+}
+// MATCHED AGAINST THE PANEL'S OWN IDS BEFORE ANY USE (criterion 11): the
+// index of the matching record, or -1 - an unmatched value goes nowhere.
+function scenarioIndexById(value){
+  if(typeof value !== "string" || !value) return -1;
+  const want = value.toLowerCase();
+  return SCENARIO_MAP.findIndex(e=> e && typeof e.id === "string" && e.id.toLowerCase() === want);
+}
+// The scenario parameter set to this id, lowercase (criterion 5), or removed
+// in every spelling of its name.
+function withScenarioParam(url, id){
+  [...url.searchParams.keys()].filter(k=> k.toLowerCase() === SCENARIO_PARAM)
+    .forEach(k=> url.searchParams.delete(k));
+  if(id) url.searchParams.set(SCENARIO_PARAM, String(id).toLowerCase());
+  return url;
+}
+// A CHIP'S OWN ADDRESS (criterion 10): its date and its id, so a new tab or a
+// copied link lands exactly where the click does.
+function scenarioChipHref(entry){
+  const target = scenarioTarget(entry);
+  const url = new URL(location.href);
+  url.search = "";
+  if(target.inPlaceOn) url.searchParams.set(IN_PLACE_ON_PARAM, target.inPlaceOn);
+  withScenarioParam(url, entry.id);
+  return url.pathname + url.search + stateToHash(target.nav);
+}
+function scenarioSubjectEl(entry){
+  const coords = entry && entry.coordinates;
+  if(!coords) return null;
+  const find = SCENARIO_SUBJECT[coords.subject || "supply-history-row"];
+  return find ? find(coords) : null;
+}
+// THE MARK (criterion 4): the arrival notice's static accent rule and a label,
+// never the focus ring and never animated - drawn on every render while the
+// jump stands, so a re-render keeps it until the reader leaves or the date
+// changes.
+function markScenarioSubject(){
+  const jump = STATE && STATE.scenarioJump;
+  if(!jump || !jump.id) return null;
+  const index = scenarioIndexById(jump.id);
+  if(index < 0) return null;
+  const entry = SCENARIO_MAP[index];
+  const el = scenarioSubjectEl(entry);
+  if(!el) return null;
+  el.classList.add("scenario-subject");
+  if(!document.querySelector("#view [data-scenario-label]")){
+    const label = document.createElement(el.tagName === "TR" || el.tagName === "SPAN" ? "span" : "div");
+    label.className = "scenario-subject-label";
+    label.dataset.scenarioLabel = "";
+    label.textContent = `${entry.id} \u00b7 in place on ${fmtDay(jump.to)}`;
+    if(el.tagName === "TR" && el.cells[0]) el.cells[0].prepend(label);
+    else el.before(label);
+  }
+  return el;
+}
+// THE JUMP ITSELF, after the page has rendered (criteria 1, 3 and 7): expand
+// the history the subject sits in, scroll it into view at once, mark it, and
+// move focus to it without scrolling again. False where it is not on the page.
+function landOnScenarioSubject(entry, on){
+  const el = scenarioSubjectEl(entry);
+  if(!el){
+    window.scrollTo({top: 0, behavior: "instant"});
+    scenarioNotOnPage(entry.id, on);
+    return false;
+  }
+  const older = el.closest("#supply-history-older");
+  if(older && older.hidden){
+    const toggle = document.getElementById("supply-history-toggle");
+    if(toggle) toggle.click(); else older.hidden = false;
+  }
+  markScenarioSubject();
+  // FROM THE TOP, THEN ONLY AS FAR AS NEEDED: a reload restores the old scroll
+  // position first, and "nearest" from there pinned the subject to the top
+  // edge with the page head - the standing-in pill a scenario also quotes -
+  // above it. From the top, a subject already in view does not move at all.
+  window.scrollTo({top: 0, behavior: "instant"});
+  if(el.scrollIntoView) el.scrollIntoView({block: "nearest", behavior: "instant"});
+  el.setAttribute("tabindex", "-1");
+  el.focus({preventScroll: true});
+  return true;
+}
+// ONE LINE IN THE STALE-LINK NOTICE (criteria 7 and 9). An id is named only
+// once it has matched the panel's own (criterion 11).
+function scenarioNotOnPage(id, on){
+  const view = document.getElementById("view");
+  if(!view) return;
+  const notice = document.createElement("div");
+  notice.className = "stale-link-notice";
+  notice.setAttribute("role", "status");
+  notice.dataset.scenarioNotFound = "";
+  notice.innerHTML = id
+    ? `Scenario <code>${escHtml(id)}</code> has nothing to show on this page in place on ${escHtml(fmtDay(on))}, so the page opens at the top.`
+    : `This link names a test scenario this dashboard does not hold, so the page opens at the top.`;
+  view.prepend(notice);
 }
 
 // The bar a scenario jump leaves on the page it lands on: which date, for
@@ -8787,8 +8940,9 @@ function scenarioEntryHtml(entry, index){
   const where = target
     // NOT `font:inherit` (#121 D8): it overrode .pill.sm's size, so the chip
     // drew at 15px and clipped at phone width. The family only, and it wraps.
-    ? `<button type="button" class="pill tag sm" data-scenario="${index}"
-         style="border:0; cursor:pointer; font-family:inherit; white-space:normal; text-align:left; max-width:100%; min-height:28px;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</button>`
+    // A REAL LINK (REQ-DASH-208 criterion 10): middle-click and copy link work.
+    ? `<a class="pill tag sm" data-scenario="${index}" href="${escAttr(scenarioChipHref(entry))}"
+         style="border:0; cursor:pointer; font-family:inherit; white-space:normal; text-align:left; max-width:100%; min-height:28px; text-decoration:none; color:inherit;"><span class="ico"></span>${escHtml(coords.dataset)} · ${escHtml(coords.period)} · in place on ${escHtml(coords.inPlaceOn)}</a>`
     : `<span style="font-size:11.5px; color:var(--ink-faint);">${
          entry.mode==="INJECT" ? "no data behind it yet" : "no data behind it — a unit test"}</span>`;
   return `<div style="border-top:1px solid var(--line); padding:9px 0;">
@@ -8852,7 +9006,12 @@ function renderScenariosPanel(body){
   // Wired after the markup exists rather than with an inline onclick,
   // matching how every other list on this page binds its rows.
   body.querySelectorAll("[data-scenario]").forEach(el=>{
-    el.addEventListener("click", ()=> goToScenario(Number(el.dataset.scenario)));
+    // A PLAIN CLICK JUMPS IN PAGE; every other click is the browser's.
+    el.addEventListener("click", e=>{
+      if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      goToScenario(Number(el.dataset.scenario));
+    });
   });
 }
 
@@ -9289,7 +9448,7 @@ document.addEventListener("click", e=>{
   const from = CURRENT_IN_PLACE_ON;
   if(inPlaceOn !== from) setInPlaceOnQuietly(inPlaceOn);
   navigate({...nav, scenarioJump: {id: null, from, to: inPlaceOn}});
-  if(inPlaceOn !== from) setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON);
+  if(inPlaceOn !== from) setInPlaceOnInUrl(CURRENT_IN_PLACE_ON, DEFAULT_IN_PLACE_ON, {keepJump: true});
 });
 document.getElementById("feedback-btn").addEventListener("click", e=>{
   if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -9766,8 +9925,40 @@ const INITIAL_URL = new URL(location.href);
 if(INITIAL_URL.searchParams.get("panel") === "scenarios") INITIAL_URL.searchParams.delete("panel");
 // An empty req= names nothing, so it goes too (post-build-review #182).
 if(INITIAL_URL.searchParams.has("req") && (INITIAL_URL.searchParams.get("panel") !== "requirements" || !INITIAL_URL.searchParams.get("req"))) INITIAL_URL.searchParams.delete("req");
+// A SCENARIO JUMP CARRIED IN THE URL (REQ-DASH-208 criteria 5 and 9): its
+// state restored before the first render, so the jump bar and the mark draw.
+const SCENARIO_ON_LOAD = (()=>{
+  const value = scenarioParamFromUrl();
+  if(value === null) return null;
+  const index = scenarioIndexById(value);
+  if(index < 0) return {index: -1};
+  const id = SCENARIO_MAP[index].id;
+  if(!(STATE.scenarioJump && STATE.scenarioJump.id === id)){
+    STATE = {...STATE, scenarioJump: {id, from: DEFAULT_IN_PLACE_ON, to: CURRENT_IN_PLACE_ON}};
+  }
+  return {index};
+})();
+// A RELOADED JUMP OWNS THE SCROLL (criterion 5): the browser restores the
+// old position after this script has run, which would carry the page off
+// the subject the jump has just brought into view.
+if(SCENARIO_ON_LOAD && "scrollRestoration" in history) history.scrollRestoration = "manual";
 history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
+if(SCENARIO_ON_LOAD){
+  const entry = SCENARIO_MAP[SCENARIO_ON_LOAD.index];
+  if(!entry || !landOnScenarioSubject(entry, CURRENT_IN_PLACE_ON)){
+    // A STALE PARAMETER IS REMOVED, NOT PUSHED PAST (criterion 9): no bar for
+    // it, one line saying so, and the address repaired with replaceState.
+    if(STATE.scenarioJump){
+      const {scenarioJump, ...rest} = STATE;
+      STATE = rest;
+    }
+    const bar = document.querySelector('#view [data-testid="scenario-jump-bar"]');
+    if(bar) bar.remove();
+    if(!entry){ window.scrollTo({top: 0, behavior: "instant"}); scenarioNotOnPage(null); }
+    history.replaceState(STATE, "", withScenarioParam(new URL(location.href), null).toString());
+  }
+}
 </script>
 </body>
 </html>

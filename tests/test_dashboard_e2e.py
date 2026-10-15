@@ -3282,7 +3282,8 @@ class TestScenariosTab:
         clean_page.wait_for_timeout(400)
 
         panel = clean_page.locator("#scenarios-panel-body")
-        controls = panel.locator("a").count() + panel.locator("button[data-scenario]").count()
+        # Each placed chip is a real link since REQ-DASH-208 criterion 10.
+        controls = panel.locator("a").count()
         assert controls <= len(placed), (
             f"the panel offers {controls} control(s) for {len(placed)} placed "
             f"scenario(s) - one of them leads nowhere")
@@ -3304,7 +3305,7 @@ class TestScenariosTab:
         clean_page.wait_for_timeout(400)
         index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
         assert index >= 0, "TS-47 is not in the embedded map"
-        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
         clean_page.wait_for_timeout(600)
         assert f"in-place-on={placement.in_place_on}" in clean_page.url
         assert "/dataset/birth-registrations" in clean_page.url
@@ -3324,7 +3325,7 @@ class TestScenariosTab:
         clean_page.locator("#scenarios-btn").click()
         clean_page.wait_for_timeout(400)
         index = clean_page.evaluate("SCENARIO_MAP.findIndex(e => e.id === 'TS-47')")
-        clean_page.locator(f'button[data-scenario="{index}"]').click()
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
         clean_page.wait_for_timeout(600)
         bar = clean_page.locator("[data-testid=scenario-jump-bar]")
         assert bar.count() == 1
@@ -5114,29 +5115,14 @@ _AS_AT_CHIPS = (
     ("TS-79b", '[data-testid="standing-in"]', "Inherited from 2023-Q1"),
 )
 
-#: FOUND BY THIS TEST ON ITS FIRST RUN, 2026-10-13, and recorded as a finding
-#: against the page rather than resolved by loosening it (criterion 34;
-#: post-build-review #174): the element opens below the initial 1280x800
-#: viewport. ONLY THE VIEWPORT CHECK IS INVERTED for these - the quoted text and
-#: the cold reload are asserted for every chip (the critic's T1: a whole-test
-#: expected failure hid content regressions) - so the day the page brings one
-#: into view the inverted check fails and its entry comes out.
-_BELOW_THE_FOLD = {
-    ("TS-75a", '[data-testid="promotion-split"]'),
-    ("TS-75b", '[data-testid="promotion-split"]'),
-    ("TS-76", '[data-testid="standing-in-since"]'),
-    ("TS-77a", '[data-testid="standing-in-since"]'),
-    ("TS-77b", '[data-testid="promotion-split"]'),
-    ("TS-77b", '[data-testid="standing-in-detail"]'),
-    ("TS-78a", '[data-testid="promotion-split"]'),
-}
-
-
 class TestTheAsAtScenarioChips:
-    """REQ-GEN-199 criteria 32-34: each of this requirement's chips opens on a
-    date where the text its register Expect quotes is on the page, in the
-    initial 1280x800 viewport without scrolling, and the same URL cold-loaded
-    shows it again - with no console error (clean_page)."""
+    """REQ-GEN-199 criteria 32-37 as amended by REQ-DASH-208 (Keith, 2026-10-14):
+    each of this requirement's chips opens on a date where the text its
+    register Expect quotes is on the page and, once the scenario jump has
+    brought it there, inside the 1280x800 viewport - and the jump's own URL,
+    cold-reloaded, puts it inside the viewport again. No console error
+    (clean_page). Post-build-review #174's below-the-fold findings are fixed
+    by the jump, so none is carried as an expected failure any more."""
 
     @pytest.mark.parametrize("sid,where,text", [
         pytest.param(sid, where, text, id=f"{sid}-{where}") for sid, where, text in _AS_AT_CHIPS])
@@ -5152,36 +5138,27 @@ class TestTheAsAtScenarioChips:
         clean_page.wait_for_timeout(400)
         index = clean_page.evaluate(f"SCENARIO_MAP.findIndex(e => e.id === '{sid}')")
         assert index >= 0, f"{sid} is not in the embedded map"
-        clean_page.locator(f'button[data-scenario="{index}"]').click()
-        clean_page.wait_for_timeout(700)
-        # THE PAGE'S OWN SMOOTH SCROLL BACK TO THE TOP, to its end (post-build-
-        # review #191): a chip far down the list is scrolled to before it is
-        # clicked, and on CI's Chromium the jump's scroll was still running at
-        # 700ms - TS-79a measured -38px, three runs in a row.
-        clean_page.wait_for_function("window.scrollY === 0", timeout=10000)
+        clean_page.locator(f'a[data-scenario="{index}"]').click()
+        clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
         assert f"in-place-on={placement.in_place_on}" in clean_page.url
+        assert f"scenario={sid.lower()}" in clean_page.url
 
-        def holder():
+        def on_screen():
             found = clean_page.locator(where).filter(has_text=text)
             assert found.count() >= 1, f"{sid}: {text!r} is not in {where}"
-            return found.first
+            el = found.first
+            assert text in " ".join(el.text_content().split())
+            box = el.bounding_box()
+            span = f"{box and int(box['y'])}-{box and int(box['y'] + box['height'])}px"
+            assert box and box["y"] >= 0 and box["y"] + box["height"] <= 800, (
+                f"{sid}: {where} spans {span}, outside the viewport after the jump")
 
-        el = holder()
-        assert text in " ".join(el.text_content().split())
-        box = el.bounding_box()
-        on_screen = bool(box) and box["y"] >= 0 and box["y"] + box["height"] <= 800
-        span = f"{box and int(box['y'])}-{box and int(box['y'] + box['height'])}px"
-        if (sid, where) in _BELOW_THE_FOLD:
-            assert not on_screen, (f"{sid}: {where} is now inside the initial viewport "
-                                   f"({span}) - post-build-review #174 is fixed for it, so "
-                                   f"remove its _BELOW_THE_FOLD entry")
-        else:
-            assert on_screen, f"{sid}: {where} spans {span}, outside the initial viewport"
-
+        on_screen()
         clean_page.reload()
         clean_page.wait_for_function(
             "() => Number(document.documentElement.dataset.renderCount || 0) > 0")
-        assert text in " ".join(holder().text_content().split())
+        clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
+        on_screen()
 
 
 class TestTheAsAtReadingsOnTheRealHistory:

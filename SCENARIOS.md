@@ -939,7 +939,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
-    "inPlaceOn": "2026-09-15"
+    "inPlaceOn": "2026-09-15",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -960,7 +961,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "birth_registrations__202609111400000800"
     ],
     "period": "2026-09-11",
-    "inPlaceOn": "2026-09-11"
+    "inPlaceOn": "2026-09-11",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1041,7 +1043,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
-    "inPlaceOn": "2026-09-15"
+    "inPlaceOn": "2026-09-15",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1141,7 +1144,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202404221000000800"
     ],
     "period": "2024-Q2",
-    "inPlaceOn": "2024-05-01"
+    "inPlaceOn": "2024-05-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1193,7 +1197,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202505010900000800"
     ],
     "period": "2025-Q2",
-    "inPlaceOn": "2025-05-01"
+    "inPlaceOn": "2025-05-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1556,7 +1561,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202602010900000800"
     ],
     "period": "2026-Q1",
-    "inPlaceOn": "2026-02-01"
+    "inPlaceOn": "2026-02-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1602,7 +1608,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "birth_registrations__202609152000000800"
     ],
     "period": "2026-09-15",
-    "inPlaceOn": "2026-09-15"
+    "inPlaceOn": "2026-09-15",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1664,7 +1671,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1710,7 +1718,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1751,7 +1760,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1805,7 +1815,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1828,7 +1839,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "birth_registrations__202609081100000800"
     ],
     "period": "2026-09-07",
-    "inPlaceOn": "2026-09-08"
+    "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -1957,7 +1969,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_carers__202411010900000800"
     ],
     "period": "2024-Q4",
-    "inPlaceOn": "2024-11-01"
+    "inPlaceOn": "2024-11-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2084,7 +2097,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202507191000000800"
     ],
     "period": "2025-Q3",
-    "inPlaceOn": "2025-08-01"
+    "inPlaceOn": "2025-08-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2102,7 +2116,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202510301000000800"
     ],
     "period": "2025-Q4",
-    "inPlaceOn": "2025-11-01"
+    "inPlaceOn": "2025-11-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2124,7 +2139,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202310121000000800"
     ],
     "period": "2023-Q4",
-    "inPlaceOn": "2023-11-01"
+    "inPlaceOn": "2023-11-01",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2154,7 +2170,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
       "rules": [],
       "moved": []
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2201,7 +2218,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2238,7 +2256,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2275,7 +2294,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2312,7 +2332,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2330,7 +2351,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "birth_registrations__202608211320000800"
     ],
     "period": "2026-08-21",
-    "inPlaceOn": "2026-08-21"
+    "inPlaceOn": "2026-08-21",
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2367,7 +2389,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "supply-history-row"
    }
   },
   {
@@ -2388,7 +2411,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202402291000000800"
     ],
     "period": "2024-Q1",
-    "inPlaceOn": "2024-02-08"
+    "inPlaceOn": "2024-02-08",
+    "subject": "as-at-panel"
    }
   },
   {
@@ -2409,7 +2433,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_clients__202402291000000800"
     ],
     "period": "2024-Q1",
-    "inPlaceOn": "2024-02-25"
+    "inPlaceOn": "2024-02-25",
+    "subject": "as-at-panel"
    }
   },
   {
@@ -2428,7 +2453,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "dataset": "cp-placements",
     "supplies": [],
     "period": "2025-Q1",
-    "inPlaceOn": "2025-02-17"
+    "inPlaceOn": "2025-02-17",
+    "subject": "substitution-drill-down"
    }
   },
   {
@@ -2448,7 +2474,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_placements__202306081000000800"
     ],
     "period": "2023-Q2",
-    "inPlaceOn": "2023-05-17"
+    "inPlaceOn": "2023-05-17",
+    "subject": "substitution-drill-down"
    }
   },
   {
@@ -2466,7 +2493,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
      "cp_placements__202306081000000800"
     ],
     "period": "2023-Q2",
-    "inPlaceOn": "2023-06-08"
+    "inPlaceOn": "2023-06-08",
+    "subject": "as-at-panel"
    }
   },
   {
@@ -2544,7 +2572,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "as-at-panel"
    }
   },
   {
@@ -2622,7 +2651,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
        }
       ]
      }
-    ]
+    ],
+    "subject": "verdict-line"
    }
   },
   {
@@ -2640,7 +2670,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "dataset": "cp-case-workers",
     "supplies": [],
     "period": "2026-Q2",
-    "inPlaceOn": "2026-06-16"
+    "inPlaceOn": "2026-06-16",
+    "subject": "standing-in-pill"
    }
   },
   {
@@ -2656,7 +2687,8 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "dataset": "cp-case-workers",
     "supplies": [],
     "period": "2023-Q2",
-    "inPlaceOn": "2023-06-16"
+    "inPlaceOn": "2023-06-16",
+    "subject": "standing-in-pill"
    }
   }
  ]

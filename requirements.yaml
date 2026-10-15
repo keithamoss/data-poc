@@ -33508,11 +33508,6 @@ requirements:
       owner: Keith (post-build-review #175)
       blocked_by:
         unowned: true
-    - criterion: 'Criterion 33, in part - six chips'' quoted elements open below the initial 1280x800 viewport (TS-75a, TS-75b, TS-76''s and TS-77a''s "Since", TS-77b, TS-78a).'
-      why: 'Criterion 34 makes this a finding against the page; the fix is a dashboard change (a scenario jump that scrolls to its subject), which this requirement does not own.'
-      owner: Keith (post-build-review #174)
-      blocked_by:
-        unowned: true
     signed_off:
       by: Keith
       date: "2026-10-13"
@@ -33553,8 +33548,8 @@ requirements:
     - THE SYSTEM SHALL leave every verdict, filing, promotion and reason to the pipeline - the generator places files and instants, the scripted person makes recorded decisions (REQ-GEN-044 criterion 6).
     - WHEN the synthetic history holds TS-75 and TS-78, THE SYSTEM SHALL have REQ-DASH-197 criterion 16's real-browser test take its awaiting-then-rejected date from the built data, and SHALL keep its fixture-history path for a run with no deployment, so that neither half of CI skips.
     - WHEN the synthetic history holds TS-76, TS-77 and TS-79, THE SYSTEM SHALL have REQ-DASH-198 criterion 7's real-browser test take its dates from the built data, and SHALL add to it that TS-76's drill-down reads 'Since removed' and TS-77's 'Since replaced'.
-    - THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each of this requirement's chips in the test-scenarios panel and asserts that the element holding the text its register Expect quotes is inside the initial viewport without scrolling, then cold-reloads that URL and asserts the same text with zero console errors.
-    - IF the Expect's element is outside the initial 1280x800 viewport, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect.
+    - 'THE SYSTEM SHALL have a needs_deployment real-browser test that, at a 1280x800 viewport, clicks each of this requirement''s chips in the test-scenarios panel and asserts that the element holding the text its register Expect quotes is inside the viewport once the scenario jump (REQ-DASH-208) has brought it there, then cold-reloads that URL and asserts the same text inside the viewport again, with zero console errors. AMENDED 2026-10-15 by REQ-DASH-208 criterion 6, wording approved by Keith 2026-10-14 (close-out amendment 9).'
+    - 'IF the Expect''s element is outside the 1280x800 viewport once the scenario jump (REQ-DASH-208) has run, THEN that SHALL be recorded as a finding against the page, and SHALL NOT be resolved by loosening the assertion or the Expect. AMENDED 2026-10-15 by REQ-DASH-208 criterion 6, wording approved by Keith 2026-10-14 (close-out amendment 10).'
     - THE SYSTEM SHALL correct, in the same change, every comment and config text the 2026-08-30 hold version makes stale - contract/data-asset.yaml's 'only TS-43 shows hold', TS-43's config text 'HOLD from 2026-09-01' - and the CP placement notes that list -13 as free. (delivery-architect L1)
     non_functional_requirements:
     - 'Shapes, not verdicts (REQ-GEN-044 criterion 6): the generator places files and instants; scripted people make recorded decisions; every reason the panel and qualifier give is the pipeline''s and the build''s.'
@@ -33581,6 +33576,7 @@ requirements:
     - REQ-GEN-200
     - REQ-GEN-201
     decisions:
+    - 'CRITERION 33''S DEFERRAL CLOSED BY REQ-DASH-208 (built 2026-10-15): the six below-the-fold chips now land with their quoted text in the 1280x800 viewport, after the jump and after a cold reload, so criteria 36 and 37 were amended as REQ-DASH-208 criterion 6 says and every strict expected failure naming post-build-review #174 was removed from tests/test_dashboard_e2e.py.'
     - 'FOUR SHAPES CHOSEN BY KEITH (2026-10-13): awaiting then rejected; a substitution removed and one replaced; a supply promoted out of order; cp-case-workers'' inheritance named. Why each is needed: the bootstrapped history today has no awaiting-then-rejected case (REQ-DASH-197 criterion 16 had to splice a fixture), no substitution at all (the Substituted qualifier is never seen on a real page), and no supply promoted after a newer one.'
     - 'DECIDED Keith, 2026-10-13 (answer 3): SPLIT INTO THREE. This requirement holds only the scenarios; the scripted-decision capability (period-scoped decisions timed from the period''s due instant, stands-on, the one relative-period resolver - v3 criteria 13 and 31 to 34) is REQ-GEN-200, and the per-link date capability (v3 criteria 24 and 25) is REQ-GEN-201, both built and tested before this. Rejected: one 43-criterion requirement, as v2 and v3 proposed.'
     - 'DECIDED Keith, 2026-10-13: after TS-75''s rejection a corrected one-table resupply fills the quarter later, so the history ends healthy and ''rejected'' shows only on past dates. Rejected: nothing in the newest quarter (would show ''rejected'' on today''s page but leave cp-clients unfilled now); nothing mid-history (would leave an unfilled quarter in the history).'
@@ -34653,7 +34649,7 @@ requirements:
     story: As Keith showing someone a scenario from the test-scenarios panel, I want its link to land with the thing the scenario
       is about on screen, so that I am not scrolling below the fold to find the quoted text while they watch.
     moscow: should
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -34774,6 +34770,24 @@ requirements:
       approval.'
     - SIGNED OFF by Keith, 2026-10-14, with the mark's label '<scenario id> · in place on <date>' and the exact wording of close-out
       amendments 9 and 10 (REQ-GEN-199 criteria 36 and 37), which apply to their targets when this requirement is built.
+    - 'BUILT 2026-10-15. THE VOCABULARY LIVES IN qa_tools/common/scenario_map.py (SUBJECTS), the generator''s Link carries a subject per scenario id, the placement record and the committed map carry it as coordinates.subject, and only the page knows which element each name is (SCENARIO_SUBJECT). A scenario with no link names its first supply''s supply-history row. Lettered siblings (TS-77b, TS-78b) carry their OWN subject - found driving the page: the sibling record copied its primary''s, so TS-77b landed on TS-77a''s drill-down.'
+    - 'FROM THE TOP, THEN NEAREST: the jump resets the scroll instantly, then scrolls only as far as the subject needs. Found by the viewport test: after a reload the browser restored the old position, and "nearest" from there pinned the subject to the top edge with the standing-in pill a scenario also quotes above it. A page loaded with a scenario sets history.scrollRestoration to manual for the same reason, and the jump skips navigate()''s smooth scroll to the top.'
+    - 'ANY DATE CHANGE DROPS THE JUMP IN ONE PLACE: setInPlaceOnInUrl() drops the parameter and the jump''s state unless the caller is the jump setting its own date (keepJump), and navUrl() carries the jump''s id or none - so a navigation or a date change by any route cannot carry it along.'
+    - 'THE CHIP''S HREF STARTS FROM AN EMPTY QUERY: only in-place-on and scenario, then the route - a copied link carries nothing else of the page it was copied from.'
+    open_questions: []
+    linked_tests:
+    - tests-js/scenario-jump.test.js
+    - tests/test_scenario_subjects.py
+    - tests/test_dashboard_e2e.py
+    implemented_by:
+    - dashboard/qa-reporting-dashboard.template.html
+    - qa_tools/common/scenario_map.py::Placement
+    - generator/scenario_injection.py::Link
+    - generator/scenario_injection.py::Placement::subject_for
+    - generator/scenario_injection.py::write_placements
+    evidence:
+    - '2026-10-15: tests/test_dashboard_e2e.py TestTheAsAtScenarioChips - every one of REQ-GEN-199''s chips clicked at 1280x800: its quoted text inside the viewport after the jump, and again after a cold reload of the jump''s URL, with no console error; the six findings of post-build-review #174 pass with no expected failure. Its first runs failed on the reload position and on a sibling landing on its primary''s subject, both fixed.'
+    - '2026-10-15: tests-js/scenario-jump.test.js - the parameter matched case-insensitively against the panel''s ids and an unmatched value never used; the chip an <a> carrying in-place-on and scenario; a stale parameter opening at the top with one line, no bar and the parameter removed, with no console error; the mark a labelled left rule; collapsed history expanded and focus moved with preventScroll; a date change and a navigation each dropping the jump.'
   - id: REQ-GEN-205
     title: The synthetic history holds the calendar-correction scenarios TS-57 to TS-62 - a correction confirmed by a scripted
       asset manager who keeps one supply, with others moved, held, parked and re-judged, and one left awaiting confirmation

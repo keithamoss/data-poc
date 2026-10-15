@@ -1801,3 +1801,8 @@ one or more component tags, and a date.
         offered reject only at the door too? (Recommended: yes - the
         sign-off decision is the more specific, and promote is refused on
         every route anyway.)
+      - **HOUSEKEEPING (REQ-DASH-208 criterion 5)**: the signed criterion
+        still ends "(NEW WORDING - for Keith's approval.)" - a drafting marker
+        left in when you signed it whole on 2026-10-14. It is built as
+        worded. May the marker be deleted? Nothing else in the criterion
+        changes. (Recommended: yes.)
