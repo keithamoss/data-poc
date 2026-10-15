@@ -1826,6 +1826,9 @@ one or more component tags, and a date.
         left in when you signed it whole on 2026-10-14. It is built as
         worded. May the marker be deleted? Nothing else in the criterion
         changes. (Recommended: yes.)
+        **ANSWERED (Keith, 2026-10-15 ~11:45): delete it.** Done; the
+        criterion is otherwise unchanged, recorded as a decision on
+        REQ-DASH-208.
       - **F6 and F7 of post-build-review #202 (REQ-DASH-208)**, both about how
         a scenario jump LOOKS when it lands:
         - F6: on a reload, a shared link or keyboard Enter the subject draws

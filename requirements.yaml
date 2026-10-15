@@ -34698,8 +34698,7 @@ requirements:
     - WHEN a scenario jump is made, THE SYSTEM SHALL carry the scenario's id in the URL of the history entry the jump creates,
       as a query parameter named scenario holding the id in lowercase (docs/spa-best-practices.md section A), and WHEN a page
       is loaded or reloaded with that parameter, SHALL repeat the jump once the page has rendered - expanding, scrolling to,
-      focusing and marking the subject as criteria 1 to 4 say - and SHALL show the scenario jump bar. (NEW WORDING - for Keith's
-      approval.)
+      focusing and marking the subject as criteria 1 to 4 say - and SHALL show the scenario jump bar.
     - 'THE SYSTEM SHALL amend, in the same change, REQ-GEN-199 criteria 36 and 37 so that each quoted text is asserted inside
       the viewport once the jump has brought it there, and again after a cold reload of the jump''s URL, rather than inside
       the initial viewport without scrolling, and SHALL remove each strict expected failure naming post-build-review #174 as
@@ -34743,6 +34742,7 @@ requirements:
     - REQ-GEN-199
     - REQ-GEN-045
     decisions:
+    - 'CRITERION 5''S DRAFTING MARKER DELETED (Keith, 2026-10-15): ''(NEW WORDING - for Keith''s approval.)'' was left in when he signed the requirement whole on 2026-10-14; he approved removing it, with no other change to the criterion.'
     - 'A PAGE FIX, NOT A LOOSER TEST (REQ-GEN-199 criterion 37; post-build-review #174): the six below-the-fold texts are findings
       against the page, carried as strict expected failures. REJECTED accepting below-the-fold and loosening the assertion.'
     - 'THE CRITERION NUMBER IS 36, NOT 34 (delivery-scoper, 2026-10-14): post-build-review #174 cites REQ-GEN-199 ''criterion
