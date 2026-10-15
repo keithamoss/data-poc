@@ -2869,6 +2869,20 @@ one Thread's narrative.
    genuinely different still stands, and "fix" here does not mean
    forcing it into one shared abstraction to reduce file count.
 
+   **REOPENED 2026-10-15 night, and now on the critical path (Keith).**
+   He chose to GENERALISE FIRST before adding the Emergency Department
+   dataset (`plans/data-generation.md` #12), so the Child Protection shrink
+   waits on this item. His answer to what DONE means: **"small adapter per
+   collection"** - shared per-tool code, plus one short module per
+   collection for whatever genuinely differs (not "config only, no Python",
+   and not just fixing the dispatch points). Overnight groundwork he
+   approved, research only: re-measure BDM-vs-CP duplication today (#84's
+   method), list every place that names a collection (the
+   delivery-architect's ~20 sites in ~14 files, recorded under
+   data-generation #12, are the starting list), establish which of the
+   eight 2026-09-20 questions below the supply-model work has since
+   settled, and bring back a recommended shape with evidence.
+
    Revisit the per-dataset file
    architecture across `qa_tools/`/`pipeline/` - originally flagged by
    Keith right after Phase 2 landed. This entry originally recorded only
