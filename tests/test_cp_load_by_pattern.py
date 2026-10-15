@@ -85,3 +85,68 @@ class TestThePickerMarksAPair:
             said = got.value.message
             assert "cp_clients.csv" in said and "cp_clients_part2.csv" in said
         assert staged == []
+
+
+PAIR_ENTRY = {"run_id": "cp_run_002", "received_at": "2025-05-01T01:00:00+00:00",
+              "delivery": "d2",
+              "contested": {"cp-clients": ["cp_clients.csv", "cp_clients_part2.csv"]}}
+
+
+class TestAPickedPairIsRefusedBeforeAnyQuestion:
+    """post-build-review #203 F4: criterion 13 refuses a pair's arrival WHEN
+    PICKED - before 'keep or trial?' is asked about a check that cannot run."""
+
+    @pytest.fixture
+    def never_asked(self, monkeypatch):
+        import cli.common as common
+
+        monkeypatch.setattr(cp, "load_manifest", lambda: [PAIR_ENTRY])
+        monkeypatch.setattr(cp, "manifest_exists", lambda: True)
+
+        def asked(*a, **kw):
+            raise AssertionError("asked keep-or-trial about an arrival it then refused")
+        monkeypatch.setattr(common, "decide_record", asked)
+
+    def test_the_run_id_flag(self, never_asked):
+        from click.testing import CliRunner
+
+        got = CliRunner().invoke(cp.cp_group, ["qa", "--run-id", "cp_run_002", "--trial"])
+        assert got.exit_code != 0
+        assert not isinstance(got.exception, AssertionError), got.exception
+        assert "cp_clients.csv" in got.output and "cp_clients_part2.csv" in got.output
+
+    def test_the_picker(self, never_asked, monkeypatch):
+        import cli.common as common
+
+        monkeypatch.setattr(common, "select",
+                            lambda prompt, choices, **kw: choices[0])
+        with pytest.raises(click.ClickException) as got:
+            cp.run_qa_interactive()
+        assert "cp_clients_part2.csv" in got.value.message
+
+
+class TestThreeFilesAreCounted:
+    """post-build-review #203 F6: three files for one table say three."""
+
+    def test_the_count_is_the_files(self, tmp_path, loaded):
+        folder = _folder(tmp_path, SIX | {"cp_clients_part2.csv", "cp_clients_part3.csv"})
+        with pytest.raises(click.ClickException) as got:
+            cp._load_delivery_from_folder(folder, "trial_x")
+        assert "has 3 files" in got.value.message
+
+
+class TestATrialOfAPairIsRefused:
+    """Criterion 8 through the trial's own entry point (post-build-review #203
+    F1f): a pair in the folder or in the reference folder, nothing loaded."""
+
+    @pytest.mark.parametrize("which", ["folder", "reference"])
+    def test_refused_naming_both_and_nothing_loaded(self, tmp_path, loaded, which):
+        pair = _folder(tmp_path / "pair", SIX | {"cp_clients_part2.csv"}) if (
+            tmp_path / "pair").mkdir() is None else None
+        six = _folder(tmp_path / "six", SIX) if (tmp_path / "six").mkdir() is None else None
+        folder, reference = (pair, six) if which == "folder" else (six, pair)
+        with pytest.raises(click.ClickException) as got:
+            cp.run_check_local_folder(folder, reference, "pytest", keep=False)
+        assert "cp_clients.csv" in got.value.message
+        assert "cp_clients_part2.csv" in got.value.message
+        assert loaded == []

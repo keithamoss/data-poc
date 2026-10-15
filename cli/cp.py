@@ -187,7 +187,8 @@ def _six_by_pattern(folder: str) -> dict[str, str]:
         for table, names in sorted(several.items()):
             entry = next(d for d in hierarchy.datasets_in_collection(COLLECTION_ID)
                          if d.table == table)
-            lines.append(f"{entry.dataset_name} ({entry.dataset_id}) has two files - "
+            count = "two" if len(names) == 2 else str(len(names))
+            lines.append(f"{entry.dataset_name} ({entry.dataset_id}) has {count} files - "
                          f"{' and '.join(names)} - and nothing may choose between them; "
                          f"the pair is settled at "
                          f"'{supply_files.where_to_settle(entry.dataset_id)}'")
@@ -234,12 +235,22 @@ def _refuse_a_contested_arrival(entry: dict) -> None:
     contested = entry.get("contested") or {}
     if not contested:
         return
-    lines = [f"{hierarchy.dataset(ds).dataset_name} has two files - {' and '.join(files)} - "
+    lines = [f"{hierarchy.dataset(ds).dataset_name} has "
+             f"{'two' if len(files) == 2 else len(files)} files - {' and '.join(files)} - "
              f"settled at '{supply_files.where_to_settle(ds)}'"
              for ds, files in sorted(contested.items())]
     raise click.ClickException(
         f"{entry['run_id']} carries two files for one table: " + "; ".join(lines)
         + ". Nothing may choose between them here, so neither was checked.")
+
+
+def _refuse_a_contested_run(run_id: str) -> None:
+    """The refusal above, for a run picked by id - asked BEFORE 'keep or
+    trial?', so nobody answers a question about a check that cannot run
+    (REQ-PIPE-202 criterion 13, post-build-review #203 F4)."""
+    entry = next((e for e in load_manifest() if e["run_id"] == run_id), None)
+    if entry is not None:
+        _refuse_a_contested_arrival(entry)
 
 
 def _load_delivery(run_id: str) -> None:
@@ -724,6 +735,7 @@ def run_qa_interactive(commit_default: bool = False) -> None:
 
     # ASKED BEFORE THE CHAIN, and before the "Running..." line - see
     # cli/bdm.py's counterpart (REQ-PIPE-089 criterion 8).
+    _refuse_a_contested_run(run_id)
     keep = common.decide_record(run_id, keep=True if commit_default else None)
 
     console.print(f"Running the real dbt-core/Soda Core/datacontract-cli/Evidently chain for {run_id}...",
@@ -984,6 +996,7 @@ def qa_command(run_id: str | None, reference_run_id: str | None, folder_path: st
         run_qa_interactive(commit_default=commit)
         return
 
+    _refuse_a_contested_run(run_id)
     keep = common.decide_record(run_id, keep=common.keep_from_flags(commit, trial))
     run_by = get_run_by() if keep else "trial:not-recorded"
     with common.chain_progress(run_id) as on_step:

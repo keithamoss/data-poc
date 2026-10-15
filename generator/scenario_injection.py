@@ -1153,10 +1153,11 @@ _ALSO: dict[str, tuple[str, ...]] = {}
 #: TS-34 IS NOT HERE, AND IT IS NOT AN OVERSIGHT. It wants eight files
 #: where six are expected - a second cp_clients and a second
 #: cp_placements, each matching its dataset's own pattern, so neither can
-#: be placed. Child Protection's arrival patterns are EXACT filenames
-#: (`cp_clients\.csv`), so two files in one directory can never both
-#: match one of them: the duplicate-match hold the scenario is about
-#: cannot arise for this collection as configured. Attempted anyway on
+#: be placed. cp_placements' arrival pattern is an EXACT filename, so two
+#: of its files in one directory can never both match it: half the
+#: duplicate-match hold the scenario is about cannot arise as configured.
+#: (cp_clients' pattern WAS widened, by REQ-PIPE-202 on 2026-10-15, for
+#: TS-42's one-table pair; every other pattern stays exact.) Attempted on
 #: 2026-09-28, and the files were reported as matching NO pattern, which
 #: is TS-38's scenario wearing TS-34's name - a shape that demonstrates
 #: the wrong thing is worse than one not yet injected. Widening a

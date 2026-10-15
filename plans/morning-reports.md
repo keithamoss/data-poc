@@ -1822,3 +1822,12 @@ one or more component tags, and a date.
           over a jump's page is NOT "navigating from the page" (criterion 8) -
           the jump stays, as it already did with a panel, and a reload under
           the open panel no longer moves focus behind it.
+      - **F2 of post-build-review #203 (REQ-PIPE-202)**: a TRIAL of a folder
+        holding two Client Register files is refused, naming the Filing
+        decisions queue as where the pair is settled - but a trial files
+        nothing, so the pair never appears there. Likewise, picking any of the
+        five OTHER arrivals of a pair's delivery is refused for the pair. Say
+        instead "a trial cannot check a pair - remove one file, or keep it and
+        settle it in Filing decisions"? (Recommended: yes - it names an action
+        the person can actually take. Criterion 8's "where the pair is
+        settled" would change wording, so it is yours.)

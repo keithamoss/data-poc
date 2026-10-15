@@ -414,18 +414,22 @@ class TestTheChildProtectionScenariosAreReallyThere:
     def test_no_two_files_in_one_delivery_claim_one_dataset(self):
         """Why TS-34 is absent, asserted rather than only written down.
 
-        Child Protection's arrival patterns are exact filenames, so the
-        duplicate-match hold cannot arise for this collection - an
-        attempt to inject it produced TS-38's scenario wearing TS-34's
-        name. If this ever stops holding, a pattern was widened and
-        TS-34 becomes injectable.
+        Every Child Protection arrival pattern but cp_clients' is an exact
+        filename, so the duplicate-match hold cannot arise for those
+        datasets - an attempt to inject TS-34 produced TS-38's scenario
+        wearing TS-34's name. cp_clients' was widened by REQ-PIPE-202 for
+        TS-42's one-table pair (REQ-GEN-203), so it is left out here. If
+        this ever stops holding, another pattern was widened and TS-34
+        becomes injectable.
         """
         from collections import Counter
 
         from qa_tools.common import delivery, hierarchy
 
         tree = self._tree()
-        patterns = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")}
+        patterns = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")
+                    if d.dataset_id != "cp-clients"}
+        assert len(patterns) == 5
         for folder in sorted(tree.iterdir()):
             if not folder.is_dir():
                 continue

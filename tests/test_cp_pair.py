@@ -30,14 +30,25 @@ def _free_quarter(conn):
     today = asset_time.local_date(asset_time.now())
     free = [s for s in slots.slots_for_dataset(DS, until=today + timedelta(days=400))
             if s.name not in taken and s.claim_opens_at < s.due_at
-            # The re-file test files the second file to the NEXT period.
-            and slots.relative_period(DS, s.name, 1)]
+            # The re-file test files the second file to the NEXT period, so it
+            # must exist and be as untouched as this one.
+            and slots.relative_period(DS, s.name, 1) not in taken | {None}]
     assert free, "no free cp-clients quarter in this worker's database"
     return random.choice(free)
 
 
 @pytest.fixture
 def cp_pair(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
+    yield from _make_pair(cp_raw_dir, tmp_path, monkeypatch)
+
+
+@pytest.fixture
+def cp_pair_one_unloadable(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
+    """The second file is not text the load can read (criterion 5's WHERE)."""
+    yield from _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=b"\xff\xfe\x00bad\n")
+
+
+def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
     import fixture_ids
     from qa_tools.common import arrivals, delivery, delivery_log, promotion
     from qa_tools.cp import build_cp_warehouses, orchestrate_cp
@@ -50,7 +61,7 @@ def cp_pair(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
     received = slot.due_at - timedelta(days=2, seconds=random.randrange(1, 3000))
     source = Path(cp_raw_dir) / fixture_ids.CP_REF_RUN_ID
     files = {p.name: p.read_text() for p in sorted(source.glob("*.csv"))}
-    files["cp_clients_part2.csv"] = files["cp_clients.csv"]
+    files["cp_clients_part2.csv"] = files["cp_clients.csv"] if part2 is None else part2
     deliveries, receipts = tmp_path / "deliveries", tmp_path / "receipts"
     name = f"pytest-cp-pair-{random.randrange(10**9)}"
     delivery.write_delivery(name, files,
@@ -66,6 +77,7 @@ def cp_pair(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
     orchestrate_cp.run_arrivals(found, "pytest@example.org")
     (clients,) = [a for a in found if DS in a.files_by_dataset]
     yield {"slot": slot, "arrivals": found, "clients": clients,
+           "deliveries": deliveries, "receipts": receipts,
            "pair": f"{DS}@{supply_db.arrival_segment(clients.received_at)}#1"}
     shutil.rmtree(deliveries, ignore_errors=True)
 
@@ -106,6 +118,53 @@ class TestAContestedClientRegister:
                      and (r[3] or {}).get("unrunnable_table") == "cp_clients"]
         assert contested, "no reader recorded its cp_clients check as contested"
         assert len(contested) == len(set(contested)), "a check recorded more than once"
+        # EACH reader, not any one of them (post-build-review #203 F1b).
+        dataset_of = {a.run_id: next(iter(a.files_by_dataset)) for a in cp_pair["arrivals"]}
+        assert {dataset_of[run] for run, _ in contested} == {
+            "cp-investigations", "cp-notifications", "cp-placements"}
+
+    def test_both_files_staged_and_neither_checked(self, cp_pair):
+        """Criterion 3 (post-build-review #203 F1c): two staged tables, and the
+        arrival's own run holds file checks only - no tool ran over either."""
+        key = supply_db.arrival_segment(cp_pair["clients"].received_at)
+        with supply_db.connect(label="test-cp-pair") as conn:
+            staged = {r[0] for r in conn.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'staging' AND table_name LIKE ?",
+                [f"cp_clients__{key}__%"]).fetchall()}
+            tools = {r[0] for r in conn.execute(
+                "SELECT DISTINCT tool FROM qa.check_result_visible WHERE run_key = ? "
+                "AND filename IS NULL", [cp_pair["clients"].run_id]).fetchall()}
+        assert staged == {f"cp_clients__{key}__1", f"cp_clients__{key}__2"}
+        assert tools == set(), f"tools ran over a contested table: {tools}"
+
+    def test_the_queue_item_names_both_files(self, cp_pair):
+        """Criterion 4's outstanding item itself (post-build-review #203 F1e)."""
+        from qa_tools.common import outstanding
+
+        with supply_db.connect(label="test-cp-pair") as conn:
+            items = [i for i in outstanding.survey(conn).items
+                     if i.dataset_id == DS and i.kind == "contested-table"]
+        assert items and items[0].blocking
+        said = items[0].headline + " " + items[0].detail
+        assert "cp_clients.csv" in said and "cp_clients_part2.csv" in said
+
+    def test_the_real_picker_marks_it(self, cp_pair, monkeypatch):
+        """Criterion 13 through the real load_manifest (post-build-review #203
+        F1a), not a hand-built entry."""
+        import cli.cp as cp
+        from qa_tools.common import arrivals
+
+        real = arrivals.arrivals_for
+        monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: real(
+            c, p, cp_pair["deliveries"], cp_pair["receipts"]))
+        manifest = cp.load_manifest()
+        (entry,) = [e for e in manifest if e["run_id"] == cp_pair["clients"].run_id]
+        assert entry["contested"] == {DS: ["cp_clients.csv", "cp_clients_part2.csv"]}
+        others = [e for e in manifest if e is not entry]
+        assert others and not any(e["contested"] for e in others)
+        marked = [c for c in cp.picker_choices(manifest) if "two files for one table" in c]
+        assert [cp.run_id_from_choice(c) for c in marked] == [cp_pair["clients"].run_id]
 
     def test_the_file_checks_run_on_each_file_under_its_own_name(self, cp_pair):
         """Criterion 5."""
@@ -250,3 +309,17 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
     knock_on.follow_up("child-protection", run_by="pytest@example.org")
     with supply_db.connect(label="test-cp-pair") as conn:
         _readers_now_read(conn, cp_pair, later)
+
+
+def test_a_partner_the_load_refuses_keeps_the_pair_contested(cp_pair_one_unloadable):
+    """Criterion 5's WHERE (post-build-review #203 F1d): the file that loads is
+    not taken as the supply - the pair stays contested, naming the refusal."""
+    pair = cp_pair_one_unloadable
+    with supply_db.connect(label="test-cp-pair") as conn:
+        contest = supply_files.open_contest(conn, DS, pair["pair"])
+        assert contest is not None
+        assert contest.files == ("cp_clients.csv", "cp_clients_part2.csv")
+        names = {r[0] for r in conn.execute(
+            "SELECT filename FROM qa.check_result_visible WHERE run_key = ? "
+            "AND filename IS NOT NULL", [pair["clients"].run_id]).fetchall()}
+    assert {"cp_clients.csv", "cp_clients_part2.csv"} <= names

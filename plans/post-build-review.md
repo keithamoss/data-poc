@@ -9665,3 +9665,43 @@ twice. It deliberately did not re-find the `TypeError`.
        a jump's page is "navigating from the page" (c8). Built as NOT - the
        jump stays with a drawer as it already did with a panel - because a
        panel over the page leaves the page and its subject where they were.
+
+203. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **delivery-critic on REQ-PIPE-202 (2da963b).** All 13 criteria hold in
+     behaviour, criterion 4's last clause openly deferred; no Child Protection
+     load route still assumes `<table>.csv` and no path quietly picks one of
+     two cp_clients files. The weaknesses were in the tests.
+     - **F1, TEST GAPS, each reproduced by the critic as holding today**:
+       (a) the picker's mark was tested on a hand-built entry, never through
+       the real `load_manifest`; (b) "each reader" was asserted as "at least
+       one"; (c) "staging both and checking neither" had no test; (d)
+       criterion 5's WHERE - a partner the load refuses keeps the pair
+       contested - had none; (e) the queue item itself was not read, only the
+       blocker; (f) the trial's own entry point was not driven.
+     - **F2, KEITH'S CALL**: a pair in a TRIAL folder (or its reference) is
+       refused naming the Filing decisions queue as where it is settled - but
+       a trial files nothing, so it will never appear there. Met to the
+       letter. Queued in plans/morning-reports.md.
+     - **F3, NOTED**: the five sibling arrivals of a pair's delivery are
+       listed unmarked, and picking one is refused because its load reads the
+       whole folder - loud rather than a quiet choice, so criterion 13 is met;
+       it surprises, about a table the person did not pick. Folded into F2's
+       question.
+     - **F4, DEFECT (c13), reasoned**: picking a pair asked "keep or trial?"
+       and printed "Running the real ... chain" before refusing.
+     - **F5, STALE PROSE**: generator/scenario_injection.py and
+       tests/test_scenario_injection.py still said every Child Protection
+       pattern is exact - and that test would go red when REQ-GEN-203 plants
+       TS-42, because the work succeeded (CLAUDE.md test rule 4).
+     - **F6, NIT**: three files said "has two files".
+     - **FIXED, 2026-10-15**: F1 (tests/test_cp_pair.py - each of the three
+       readers, two staged tables and no tool results, the queue item, the
+       real picker, an unloadable partner; tests/test_cp_load_by_pattern.py -
+       the trial and reference folders through `run_check_local_folder`), F4
+       (`_refuse_a_contested_run` before `decide_record` on both routes), F5
+       (both rewritten; the test now covers the five exact patterns), F6 (the
+       count). F4 and F6 seen failing first; F1's tests passed at once, being
+       coverage of behaviour that already held. Also fixed a fixture flake
+       found on the way: a random free quarter could be the last one, or one
+       whose next period an earlier run had filled, and the re-file test files
+       into the next period.
