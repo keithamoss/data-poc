@@ -95,6 +95,12 @@ class Placement:
 
     @classmethod
     def of(cls, record: Mapping) -> "Placement":
+        # A NAME OUTSIDE THE VOCABULARY FAILS HERE, at build time, rather than
+        # reading on the page as "nothing to show" (post-build-review #202 F10).
+        subject = str(record.get("subject") or SUPPLY_HISTORY_ROW)
+        if subject not in SUBJECTS:
+            raise ValueError(f"scenario {record.get('scenario_id')!r} names subject "
+                             f"{subject!r}, which is not one of {sorted(SUBJECTS)}")
         return cls(
             scenario_id=str(record.get("scenario_id") or ""),
             dataset=str(record.get("dataset") or ""),
@@ -105,7 +111,7 @@ class Placement:
             # from an earlier bootstrap keeps its coordinates.
             in_place_on=str(record.get("in_place_on") or record.get("as" + "_of") or ""),
             targets=tuple(record.get("targets") or ()),
-            subject=str(record.get("subject") or SUPPLY_HISTORY_ROW))
+            subject=subject)
 
     @property
     def is_complete(self) -> bool:

@@ -611,7 +611,9 @@ a.snapshots-btn{text-decoration:none; color:inherit;}
 /* WHERE A SCENARIO JUMP LANDED (REQ-DASH-208 criterion 4): the arrival
    notice's static left rule and a label - never the 2px focus outline, never
    animated. */
-.scenario-subject:not(tr){border-left:3px solid var(--accent); padding-left:8px;}
+/* Repeated so it outranks .pill.standing-in.<kind>'s own border, 0,3,0
+   (post-build-review #202 F5). */
+.scenario-subject.scenario-subject.scenario-subject:not(tr){border-left:3px solid var(--accent); padding-left:8px;}
 tr.scenario-subject > td:first-child{border-left:3px solid var(--accent);}
 .scenario-subject-label{display:block; font-size:11.5px; font-weight:600; color:var(--accent); margin:0 0 4px;}
 span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
@@ -3264,9 +3266,11 @@ function setInPlaceOnInUrl(dateStr, defaultDateStr, {keepJump = false} = {}){
   url.searchParams.delete(PREVIOUS_DATE_PARAM);
   // ANY DATE CHANGE DROPS A SCENARIO JUMP (REQ-DASH-208 criterion 8): its
   // parameter, its bar and its mark - unless this IS the jump setting its date.
+  // The date it came from stays behind, so Back off this entry still undoes
+  // the jump (#123 B4, post-build-review #202 F2).
   if(!keepJump && STATE && STATE.scenarioJump){
     const {scenarioJump, ...rest} = STATE;
-    STATE = rest;
+    STATE = {...rest, jumpedFrom: scenarioJump.from};
   }
   withScenarioParam(url, keepJump && STATE && STATE.scenarioJump ? STATE.scenarioJump.id : null);
   if(dateStr === defaultDateStr) url.searchParams.delete(IN_PLACE_ON_PARAM);
@@ -5185,7 +5189,9 @@ if(new URLSearchParams(location.search).has(PREVIOUS_DATE_PARAM)){
 }
 
 function navigate(next, {scrollTop = true} = {}){
-  STATE = next;
+  // A jump's date belongs to the entry it was changed on (#202 F2).
+  const {jumpedFrom, ...rest} = next || {};
+  STATE = next ? rest : next;
   // THE ARRIVAL CONTEXT BELONGS TO ONE PAGE (REQ-DASH-085 criterion 11,
   // REQ-DASH-100 criterion 10). Cleared BEFORE render(), or the banner
   // draws once more on the page the reader has just moved to - and
@@ -5270,8 +5276,9 @@ window.addEventListener("popstate", (e)=>{
   STATE = e.state || stateFromLocation();
   // BACK UNDOES A SCENARIO JUMP, and Forward redoes it (#123 B4): the date
   // is otherwise a filter over the page that history does not step through.
-  if(leaving && leaving.scenarioJump && !(STATE && STATE.scenarioJump)){
-    setInPlaceOnQuietly(inPlaceOnFromUrl() || leaving.scenarioJump.from || DEFAULT_IN_PLACE_ON);
+  const jumpedFrom = leaving && (leaving.scenarioJump ? leaving.scenarioJump.from : leaving.jumpedFrom);
+  if(jumpedFrom && !(STATE && STATE.scenarioJump)){
+    setInPlaceOnQuietly(inPlaceOnFromUrl() || jumpedFrom || DEFAULT_IN_PLACE_ON);
   } else if(STATE && STATE.scenarioJump && STATE.scenarioJump.to !== CURRENT_IN_PLACE_ON){
     setInPlaceOnQuietly(STATE.scenarioJump.to);
   }
@@ -6833,7 +6840,7 @@ function blockerHistoryRows(datasetId, inPlaceOnDateStr, source){
             ? ` <span style="color:var(--ink-faint);">— superseded by the supply received ${b.supersededBy.receivedAt ? fmtInstant(b.supersededBy.receivedAt) : "later"}</span>`
             : placed ? ""
             : ` <span style="color:var(--ink-faint);">— resolved ${fmtInstant(b.resolvedAt)}</span>`;
-          return `<tr data-blocker="${b.kind}">
+          return `<tr data-blocker="${b.kind}" data-supply="${escAttr(b.supply || "")}">
             <td>${fmtInstant(b.openedAt)}</td>
             <td>${resolved ? pill("nodata","sm") : pill("red","sm")}</td>
             <td><b>${escHtml(blockerLabel(b))}</b>${resolved || b.kind === "contested" ? placed : ""}${ending}<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(b.reason)}</div></td>
@@ -6866,7 +6873,7 @@ function settledPairRow(b, datasetId, inPlaceOnDateStr){
       : escHtml(SETTLED_SAID[f.outcome] || f.outcome);
     return `<div data-settled-file="${escAttr(f.outcome)}"><span class="mono">${escHtml(f.filename)}</span>${f.receivedAt ? `, received ${fmtInstant(f.receivedAt)}` : ""} — ${said}${never}</div>`;
   }).join("");
-  return `<tr data-blocker="${b.kind}" data-settled>
+  return `<tr data-blocker="${b.kind}" data-settled data-supply="${escAttr(b.supply || "")}">
     <td>${fmtInstant(b.openedAt)}</td>
     <td><span class="pill tag sm"><span class="ico"></span>Settled</span></td>
     <td><b>${escHtml(blockerLabel(b))}</b>${placedHoldNote(rawRealDatasetById(datasetId), b.supply, inPlaceOnDateStr)} <span style="color:var(--ink-faint);">— settled by ${escHtml(s.actor || "a person")}, ${fmtInstant(s.at)}</span>${s.reason ? `<div style="color:var(--ink-muted); font-size:12px; max-width:60ch;">${escHtml(s.reason)}</div>` : ""}
@@ -7515,7 +7522,11 @@ function openColumnDrawer(ag, col, ds, column, opts){
     // stale checkKey from whatever was open before can't leak through.
     // drawerPushed: THIS entry is ours, so Close may step back to the
     // one beneath it (road-testing #8 - see closeDrawer()).
-    STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:columnKey(column), drawerPushed:true};
+    // The jump stays with it, as a panel's spread keeps it, so its address
+    // and its state agree (post-build-review #202 F3).
+    const jump = STATE && STATE.scenarioJump;
+    STATE = {tier:"dataset", agencyId:ag.id, collectionId:col.id, datasetId:ds.id, columnName:columnKey(column), drawerPushed:true,
+             ...(jump ? {scenarioJump: jump} : {})};
     history.pushState(STATE, "", stateToHash(STATE));
   }
   document.getElementById("drawer-eyebrow").innerHTML = `<span>${ag.name} / ${col.name} / ${ds.name}</span>`;
@@ -8793,12 +8804,36 @@ const SCENARIO_SUBJECT = {
   "supply-history-row": coords=> {
     for(const runId of (coords.supplies || [])){
       const row = [...document.querySelectorAll("#view .supply-history tr[data-run-id]")]
-        .find(tr=> tr.dataset.runId === String(runId));
+        .find(tr=> sameSupplyRun(tr.dataset.runId, runId));
+      if(row) return row;
+    }
+    // A PAIR NOBODY CHECKED has no run, only its row under 'Needed a person',
+    // found by the key its supply and its run id share (#202 F1, TS-73).
+    for(const runId of (coords.supplies || [])){
+      const key = String(runId).split("__")[1];
+      const row = key && [...document.querySelectorAll("#view .supply-history tr[data-supply]")]
+        .find(tr=> (tr.dataset.supply.split("@")[1] || "").split("#")[0] === key);
       if(row) return row;
     }
     return null;
   },
 };
+// A SUPPLY'S ROW BY ITS OWN RUN ID OR ONE OF ITS RUNS (post-build-review #202
+// F1): a placement names the supply, and its row carries the run that is in
+// place - `<run id>__1__r1` - as settledBeforeIt treats them as one supply.
+function sameSupplyRun(rowRunId, runId){
+  const row = String(rowRunId || ""), want = String(runId);
+  return row === want || row.startsWith(want + "__");
+}
+// THE SCENARIO'S OWN PAGE AND DATE (criteria 7 and 9, post-build-review #202
+// F4): an element of the same kind on another dataset's page, or on another
+// date, is a different thing and never the subject.
+function onScenarioPage(entry){
+  const target = scenarioTarget(entry);
+  if(!target || !STATE) return false;
+  if(target.inPlaceOn && target.inPlaceOn !== CURRENT_IN_PLACE_ON) return false;
+  return Object.keys(target.nav).every(k=> STATE[k] === target.nav[k]);
+}
 // THE PARAMETER'S NAME IN ANY CASE (criterion 11), its raw value or null.
 function scenarioParamFromUrl(){
   for(const [key, value] of new URLSearchParams(location.search)){
@@ -8833,7 +8868,7 @@ function scenarioChipHref(entry){
 }
 function scenarioSubjectEl(entry){
   const coords = entry && entry.coordinates;
-  if(!coords) return null;
+  if(!coords || !onScenarioPage(entry)) return null;
   const find = SCENARIO_SUBJECT[coords.subject || "supply-history-row"];
   return find ? find(coords) : null;
 }
@@ -8882,8 +8917,12 @@ function landOnScenarioSubject(entry, on){
   // above it. From the top, a subject already in view does not move at all.
   window.scrollTo({top: 0, behavior: "instant"});
   if(el.scrollIntoView) el.scrollIntoView({block: "nearest", behavior: "instant"});
-  el.setAttribute("tabindex", "-1");
-  el.focus({preventScroll: true});
+  // AN OPEN PANEL OR DRAWER KEEPS FOCUS (post-build-review #202 F3): a reload
+  // with one open marks the subject beneath it but leaves the reader in it.
+  if(!(STATE && (STATE.panel || STATE.columnName || STATE.checkKey))){
+    el.setAttribute("tabindex", "-1");
+    el.focus({preventScroll: true});
+  }
   return true;
 }
 // ONE LINE IN THE STALE-LINK NOTICE (criteria 7 and 9). An id is named only
@@ -9933,6 +9972,8 @@ const SCENARIO_ON_LOAD = (()=>{
   const index = scenarioIndexById(value);
   if(index < 0) return {index: -1};
   const id = SCENARIO_MAP[index].id;
+  // Written back lowercase in one spelling (criterion 5, post-build-review #202 F9).
+  withScenarioParam(INITIAL_URL, id);
   if(!(STATE.scenarioJump && STATE.scenarioJump.id === id)){
     STATE = {...STATE, scenarioJump: {id, from: DEFAULT_IN_PLACE_ON, to: CURRENT_IN_PLACE_ON}};
   }
@@ -9941,7 +9982,13 @@ const SCENARIO_ON_LOAD = (()=>{
 // A RELOADED JUMP OWNS THE SCROLL (criterion 5): the browser restores the
 // old position after this script has run, which would carry the page off
 // the subject the jump has just brought into view.
-if(SCENARIO_ON_LOAD && "scrollRestoration" in history) history.scrollRestoration = "manual";
+if(SCENARIO_ON_LOAD && "scrollRestoration" in history){
+  history.scrollRestoration = "manual";
+  // ...for this load only: the mode is the entry's, and later entries copy
+  // it, so every Back afterwards would lose its scroll (post-build-review
+  // #202 F8). Handed back once the reload's own restore has passed.
+  window.addEventListener("load", ()=> setTimeout(()=>{ history.scrollRestoration = "auto"; }, 0), {once: true});
+}
 history.replaceState(STATE, "", INITIAL_URL.pathname + INITIAL_URL.search + stateToHash(STATE));
 renderFromState();
 if(SCENARIO_ON_LOAD){

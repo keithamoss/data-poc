@@ -67,3 +67,15 @@ class TestALetteredSiblingCarriesItsOwnSubject:
         records = {r["scenario_id"]: r for r in json.loads(out.read_text())["placements"]}
         assert records["TS-77a"]["subject"] == scenario_map.SUBSTITUTION_DRILL_DOWN
         assert records["TS-77b"]["subject"] == scenario_map.AS_AT_PANEL
+
+
+class TestAnUnknownSubjectIsRefused:
+    """post-build-review #202 F10: a subject name outside the vocabulary
+    fails the build, rather than reading on the page as 'nothing to show'."""
+
+    def test_reading_a_record_with_an_unknown_subject_raises(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="no-such-thing"):
+            scenario_map.Placement.of({"scenario_id": "TS-1", "dataset": "d", "period": "p",
+                                       "in_place_on": "2025-01-01", "subject": "no-such-thing"})

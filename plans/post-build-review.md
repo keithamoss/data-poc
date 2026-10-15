@@ -9612,3 +9612,56 @@ twice. It deliberately did not re-find the `TypeError`.
        `open_contest` once per filed supply, heavier than the NFR's "one
        verdict lookup per supply" (0.05-0.15s a period on the real database
        today) - worth watching at thirty datasets.
+
+202. **[in-progress, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
+     **delivery-critic on REQ-DASH-208 (63ba55d).** Every one of the 32
+     placed chips clicked and cold-reloaded in a real Chromium at 1280x800,
+     plus hand-edited URLs, every date-change route, drawers, panels, dark
+     mode and 390px. Each finding was checked against the code and turned into
+     a test before its fix.
+     - **F1, DEFECT (c1, c7), reproduced**: 8 of 32 chips (TS-67, TS-68 to
+       TS-74) said "nothing to show" with the row on the page. The placement
+       names the supply's run id; the row carries the run in place
+       (`<id>__1__r1`), and the match was exact. TS-73 (both files rejected,
+       no run at all) had no run row, only its "Two files for one table" row,
+       which carried no id.
+     - **F2, REGRESSION (c8 against #123 B4), reproduced**: change the date
+       after a jump, press Back, and the Scenarios tab showed the changed date
+       while its address carried none. Dropping the jump on a date change also
+       dropped the date Back undoes to.
+     - **F3, DEFECT, reproduced**: a reload with a drawer or panel open moved
+       focus to the subject BEHIND it; the column drawer also kept
+       `scenario=` in its address while its state had dropped the jump.
+     - **F4, DEFECT (c7, c9), reproduced**: the subject was found by element
+       kind alone, so `scenario=ts-75a` on Birth Registrations marked that
+       dataset's as-at panel as TS-75a's, and a wrong date marked that day's.
+     - **F5, DEFECT (c4), reproduced**: the standing-in pill (TS-79a/b) got
+       no accent rule - `.pill.standing-in.<kind>`, 0,3,0, outranked it.
+     - **F6, KEITH'S CALL**: on a reload, a shared link or keyboard Enter the
+       subject also draws the focus ring beside the rule - focus is c1's, the
+       ring is c4's "never the mark". Queued in plans/morning-reports.md.
+     - **F7, KEITH'S CALL**: every subject lands flush on the viewport's
+       bottom edge ("from the top, then nearest") - meets c1, least
+       comfortable place to land. Queued with F6.
+     - **F8, DEFECT, reasoned**: `history.scrollRestoration = "manual"` stayed
+       set for the page's life, and later entries copy it.
+     - **F9, POLISH**: a mixed-case parameter matched but was not rewritten.
+     - **F10, POLISH**: an unknown subject name read on the page as "nothing
+       to show" instead of failing the build.
+     - **FIXED, 2026-10-15**: F1 (`sameSupplyRun` matches a supply's own
+       runs; a blocker row carries `data-supply` and is found by the key its
+       supply and run id share), F2 (the dropped jump leaves `jumpedFrom`, which
+       popstate honours and `navigate()` strips), F3 (no focus while a panel
+       or drawer is open; the column drawer carries the jump as the panels'
+       spread already did), F4 (`onScenarioPage`: the scenario's own dataset
+       and date), F5 (the rule's selector outranks the pill's), F8 (manual
+       for that load only, handed back after `load`), F9 (written back
+       lowercase on load), F10 (`Placement.of` refuses a name outside
+       `SUBJECTS`). Tests: tests/test_dashboard_e2e.py's
+       TestEveryScenarioJumpLands (every chip, F2, F3, F8, F9),
+       tests-js/scenario-jump.test.js (F1, F3, F4), tests/
+       test_scenario_subjects.py (F10) - each seen failing first.
+     - **Open, for Keith with F6/F7**: whether opening a drawer or panel over
+       a jump's page is "navigating from the page" (c8). Built as NOT - the
+       jump stays with a drawer as it already did with a panel - because a
+       panel over the page leaves the page and its subject where they were.

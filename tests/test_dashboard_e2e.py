@@ -5161,6 +5161,83 @@ class TestTheAsAtScenarioChips:
         on_screen()
 
 
+class TestEveryScenarioJumpLands:
+    """post-build-review #202 - the REQ-DASH-208 critic's findings, on the
+    real built history: every placed chip lands on its subject with the
+    accent rule (F1, F5); Back after a date change still restores the date
+    (F2); a reload under an open panel leaves focus to the panel (F3); the
+    browser's own scroll restoration comes back after a reloaded jump (F8);
+    and a mixed-case parameter is rewritten lowercase (F9)."""
+
+    def _chip(self, page, html, sid):
+        page.set_viewport_size({"width": 1280, "height": 800})
+        _goto(page, html)
+        page.locator("#scenarios-btn").click()
+        page.wait_for_timeout(300)
+        index = page.evaluate(f"SCENARIO_MAP.findIndex(e => e.id === '{sid}')")
+        assert index >= 0, f"{sid} is not in the embedded map"
+        page.locator(f'a[data-scenario="{index}"]').click()
+        page.wait_for_selector("[data-scenario-label], [data-scenario-not-found]",
+                               timeout=10000)
+
+    def test_every_placed_chip_lands_with_the_accent_rule(self, clean_page,
+                                                          built_dashboard_html):
+        _goto(clean_page, built_dashboard_html)
+        ids = clean_page.evaluate(
+            "SCENARIO_MAP.filter(e => scenarioTarget(e)).map(e => e.id)")
+        assert ids, "no placed scenario to follow"
+        missed, unruled = [], []
+        for sid in ids:
+            self._chip(clean_page, built_dashboard_html, sid)
+            if clean_page.locator("[data-scenario-not-found]").count():
+                missed.append(sid)
+                continue
+            width = clean_page.evaluate(
+                "getComputedStyle(document.querySelector('#view .scenario-subject:not(tr)')"
+                " || document.querySelector('#view tr.scenario-subject > td')).borderLeftWidth")
+            if width != "3px":
+                unruled.append((sid, width))
+        assert not missed, f"chips that said 'nothing to show': {missed}"
+        assert not unruled, f"subjects without the 3px accent rule: {unruled}"
+
+    def test_back_after_a_date_change_restores_the_date(self, clean_page,
+                                                        built_dashboard_html):
+        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        clean_page.evaluate("applyInPlaceOn('2024-03-01')")
+        clean_page.go_back()
+        clean_page.wait_for_timeout(400)
+        shown, url_date = clean_page.evaluate(
+            "[CURRENT_IN_PLACE_ON, inPlaceOnFromUrl() || DEFAULT_IN_PLACE_ON]")
+        assert shown == url_date, f"showing {shown} while the address says {url_date}"
+
+    def test_a_reload_under_an_open_panel_leaves_focus_to_it(self, clean_page,
+                                                             built_dashboard_html):
+        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        clean_page.evaluate("openPanel('activity')")
+        clean_page.reload()
+        clean_page.wait_for_function(
+            "() => Number(document.documentElement.dataset.renderCount || 0) > 0")
+        clean_page.wait_for_timeout(400)
+        assert not clean_page.evaluate(
+            "document.activeElement && document.activeElement.classList.contains('scenario-subject')")
+
+    def test_scroll_restoration_comes_back_after_a_reloaded_jump(self, clean_page,
+                                                                 built_dashboard_html):
+        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        clean_page.reload()
+        clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
+        clean_page.wait_for_timeout(500)
+        assert clean_page.evaluate("history.scrollRestoration") == "auto"
+
+    def test_a_mixed_case_parameter_is_rewritten_lowercase(self, clean_page,
+                                                          built_dashboard_html):
+        self._chip(clean_page, built_dashboard_html, "TS-75a")
+        url = clean_page.url.replace("scenario=ts-75a", "SCENARIO=Ts-75A")
+        clean_page.goto(url)
+        clean_page.wait_for_selector("[data-scenario-label]", timeout=10000)
+        assert "scenario=ts-75a" in clean_page.url and "SCENARIO" not in clean_page.url
+
+
 class TestTheAsAtReadingsOnTheRealHistory:
     """REQ-GEN-199 criteria 30 and 31: REQ-DASH-197 criterion 16's
     awaiting-then-rejected reading and REQ-DASH-198 criterion 7's removed and

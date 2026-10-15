@@ -529,7 +529,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 ### TS-39 - A split extract, once patterns are regexes
 
-**What it demonstrates.** A duplicate match, so the dataset is HELD (TS-34's machinery), not a silent choice between them. Verified 2026-09-24 that under today's `keyPattern` reuse this is NOT reachable for Child Protection - `cp/{delivery_id}/cp_clients.csv` reduces to `^cp_clients\.csv$`, so `part2` matches nothing and falls out as unrecognised instead, which is the TS-38 shape. Reachable for Birth Registrations only because its pattern carries a `{date}` placeholder. This scenario is what proves the regex change (`REQ-PIPE-058`, 2026-09-24) actually closed the gap.
+**What it demonstrates.** A duplicate match, so the dataset is HELD (TS-34's machinery), not a silent choice between them. Verified 2026-09-24 that under today's `keyPattern` reuse this is NOT reachable for Child Protection - `cp/{delivery_id}/cp_clients.csv` reduces to `^cp_clients\.csv$`, so `part2` matches nothing and falls out as unrecognised instead, which is the TS-38 shape. Reachable for Birth Registrations only because its pattern carries a `{date}` placeholder. This scenario is what proves the regex change (`REQ-PIPE-058`, 2026-09-24) actually closed the gap. NOW REACHABLE for `cp_clients` (REQ-PIPE-202, 2026-10-15): its pattern is `cp_clients(_[^/]+)?\.csv`, so `cp_clients_part2.csv` matches and the pair is held as contested - `tests/test_holds.py::test_ts39_a_second_part_beside_the_extract_is_contested`. Every other Child Protection pattern is still an exact filename.
 
 *unit test - no generated data, nothing to navigate to*
 
@@ -572,7 +572,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 ### TS-42 - A contested pair of one Child Protection table, resolved by a later file
 
-NOT IN THE DATA, and not for want of a build: Child Protection's arrival patterns are exact filenames, so two files in one directory can never both match one table - the same finding TS-34 records. Planting it means widening a pattern, which is Keith's call (REQ-PIPE-118, REQ-PIPE-105 criterion 6).
+NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 2026-10-13) widened `cp_clients`' pattern so two of its files in one delivery contest the table, and REQ-GEN-203 plants it. `tests/test_cp_pair.py` drives the shape through the real orchestrator.
 
 **not injected - nothing to look at yet**
 
@@ -1471,7 +1471,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "demonstrates": "`cp_clients` and `cp_placements` are HELD, each reported as needing action naming every file that matched. No view is built for either, so they are unqueryable for that run. The other four datasets are staged, assigned, classified and QA'd normally. Every cross-table check reading a held table reads RED naming it - which is three real checks against `cp_clients` alone (`cp_notifications`, `cp_investigations`, `cp_placements` each carry a referential check on `cp_client_id`). Neither held dataset's slot is filled, so both go overdue in the ordinary way.",
    "breaksAs": null,
    "config": null,
-   "requirements": [],
+   "requirements": [
+    "REQ-PIPE-202"
+   ],
    "coordinates": null
   },
   {
@@ -1570,11 +1572,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "unit",
    "title": "A split extract, once patterns are regexes",
    "section": "Timestamps",
-   "demonstrates": "A duplicate match, so the dataset is HELD (TS-34's machinery), not a silent choice between them. Verified 2026-09-24 that under today's `keyPattern` reuse this is NOT reachable for Child Protection - `cp/{delivery_id}/cp_clients.csv` reduces to `^cp_clients\\.csv$`, so `part2` matches nothing and falls out as unrecognised instead, which is the TS-38 shape. Reachable for Birth Registrations only because its pattern carries a `{date}` placeholder. This scenario is what proves the regex change (`REQ-PIPE-058`, 2026-09-24) actually closed the gap.",
+   "demonstrates": "A duplicate match, so the dataset is HELD (TS-34's machinery), not a silent choice between them. Verified 2026-09-24 that under today's `keyPattern` reuse this is NOT reachable for Child Protection - `cp/{delivery_id}/cp_clients.csv` reduces to `^cp_clients\\.csv$`, so `part2` matches nothing and falls out as unrecognised instead, which is the TS-38 shape. Reachable for Birth Registrations only because its pattern carries a `{date}` placeholder. This scenario is what proves the regex change (`REQ-PIPE-058`, 2026-09-24) actually closed the gap. NOW REACHABLE for `cp_clients` (REQ-PIPE-202, 2026-10-15): its pattern is `cp_clients(_[^/]+)?\\.csv`, so `cp_clients_part2.csv` matches and the pair is held as contested - `tests/test_holds.py::test_ts39_a_second_part_beside_the_extract_is_contested`. Every other Child Protection pattern is still an exact filename.",
    "breaksAs": null,
    "config": null,
    "requirements": [
-    "REQ-PIPE-058"
+    "REQ-PIPE-058",
+    "REQ-PIPE-202"
    ],
    "coordinates": null
   },
@@ -1617,12 +1620,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A contested pair of one Child Protection table, resolved by a later file",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA, and not for want of a build: Child Protection's arrival patterns are exact filenames, so two files in one directory can never both match one table - the same finding TS-34 records. Planting it means widening a pattern, which is Keith's call (REQ-PIPE-118, REQ-PIPE-105 criterion 6).",
+   "demonstrates": "NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 2026-10-13) widened `cp_clients`' pattern so two of its files in one delivery contest the table, and REQ-GEN-203 plants it. `tests/test_cp_pair.py` drives the shape through the real orchestrator.",
    "breaksAs": null,
    "config": null,
    "requirements": [
-    "REQ-PIPE-118",
-    "REQ-PIPE-105"
+    "REQ-PIPE-202",
+    "REQ-GEN-203"
    ],
    "coordinates": null
   },

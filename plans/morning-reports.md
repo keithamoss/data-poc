@@ -1806,3 +1806,19 @@ one or more component tags, and a date.
         left in when you signed it whole on 2026-10-14. It is built as
         worded. May the marker be deleted? Nothing else in the criterion
         changes. (Recommended: yes.)
+      - **F6 and F7 of post-build-review #202 (REQ-DASH-208)**, both about how
+        a scenario jump LOOKS when it lands:
+        - F6: on a reload, a shared link or keyboard Enter the subject draws
+          the focus ring beside its accent rule (a mouse click shows none).
+          Criterion 1 asks for focus; criterion 4 says the mark is never the
+          focus ring. Keep the ring (accessible, and it is focus rather than
+          the mark), or suppress it on the jumped-to subject only?
+          (Recommended: keep it - a keyboard user needs to see where focus is.)
+        - F7: every subject lands flush on the viewport's bottom edge
+          (scrolled from the top, then only as far as needed). Meets
+          criterion 1. Land it centred instead? (Recommended: centred, unless
+          the page head carrying the standing-in pill should stay in view.)
+        - Built as my reading, for you to confirm: opening a drawer or panel
+          over a jump's page is NOT "navigating from the page" (criterion 8) -
+          the jump stays, as it already did with a panel, and a reload under
+          the open panel no longer moves focus behind it.

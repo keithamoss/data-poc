@@ -93,7 +93,7 @@ describe("the mark (criterion 4)", () => {
     const w = load();
     const view = w.document.getElementById("view");
     view.innerHTML = `<div class="view-head"><span class="pill" data-testid="standing-in">Substituted</span></div>`;
-    w.eval(`STATE = {...STATE, scenarioJump: {id: "TS-75a", from: "2026-01-01", to: "2025-03-10"}}`);
+    onItsPage(w);
     const el = w.markScenarioSubject();
     expect(el.classList.contains("scenario-subject")).toBe(true);
     const label = view.querySelector("[data-scenario-label]");
@@ -115,7 +115,7 @@ describe("the mark (criterion 4)", () => {
     let focusedWith = null;
     const row = view.querySelector("tr");
     row.focus = opts => { focusedWith = opts; };
-    w.eval(`STATE = {...STATE, scenarioJump: {id: "TS-75a", from: "2026-01-01", to: "2025-03-10"}}`);
+    onItsPage(w);
     expect(w.landOnScenarioSubject(entry, "2025-03-10")).toBe(true);
     expect(view.querySelector("#supply-history-older").hidden).toBe(false);
     expect(focusedWith).toEqual({preventScroll: true});
@@ -138,5 +138,94 @@ describe("any date change drops the jump (criterion 8)", () => {
     w.history.replaceState(null, "", "/?scenario=ts-75a#/exec");
     w.navigate({tier: "exec"});
     expect(w.location.search).not.toContain("scenario");
+  });
+});
+
+// post-build-review #202 - the REQ-DASH-208 critic's findings, each seen
+// failing first.
+function onItsPage(w, extra = ""){
+  w.eval(`STATE = {...scenarioTarget(SCENARIO_MAP[0]).nav,
+                   scenarioJump: {id: "TS-75a", from: "2026-01-01", to: "2025-03-10"}${extra}};
+          CURRENT_IN_PLACE_ON = "2025-03-10";`);
+}
+function historyRow(w, runId){
+  const view = w.document.getElementById("view");
+  view.innerHTML = `<div class="supply-history"><table><tbody>
+    <tr data-run-id="${runId}"><td>a</td></tr></tbody></table></div>`;
+  return view.querySelector("tr");
+}
+const ROW_ENTRY = {...ENTRY, coordinates: {...ENTRY.coordinates, subject: "supply-history-row"}};
+
+describe("#202 F1 - a supply's row is found by its run id's own prefix", () => {
+  it("finds the row of a supply whose run id carries a run suffix", () => {
+    const w = load(undefined, [ROW_ENTRY]);
+    onItsPage(w);
+    const row = historyRow(w, "cp_run_009__1__r1");
+    expect(w.scenarioSubjectEl(ROW_ENTRY)).toBe(row);
+  });
+
+  it("never a different supply that only shares the first characters", () => {
+    const w = load(undefined, [ROW_ENTRY]);
+    onItsPage(w);
+    historyRow(w, "cp_run_0091__r1");
+    expect(w.scenarioSubjectEl(ROW_ENTRY)).toBeNull();
+  });
+});
+
+describe("#202 F4 - the subject counts only on the scenario's own page and date", () => {
+  it("is not found on another dataset's page", () => {
+    const w = load();
+    w.eval(`STATE = {...scenarioTarget(SCENARIO_MAP[0]).nav, datasetId: "birth-registrations",
+                     collectionId: "civil-registration", agencyId: "registry-services"};
+            CURRENT_IN_PLACE_ON = "2025-03-10";`);
+    w.document.getElementById("view").innerHTML =
+      `<span class="pill" data-testid="standing-in">Substituted</span>`;
+    expect(w.scenarioSubjectEl(ENTRY)).toBeNull();
+  });
+
+  it("is not found on another date", () => {
+    const w = load();
+    onItsPage(w);
+    w.eval(`CURRENT_IN_PLACE_ON = "2025-03-11"`);
+    w.document.getElementById("view").innerHTML =
+      `<span class="pill" data-testid="standing-in">Substituted</span>`;
+    expect(w.scenarioSubjectEl(ENTRY)).toBeNull();
+  });
+
+  it("is found on its own page and date", () => {
+    const w = load();
+    onItsPage(w);
+    w.document.getElementById("view").innerHTML =
+      `<span class="pill" data-testid="standing-in">Substituted</span>`;
+    expect(w.scenarioSubjectEl(ENTRY)).not.toBeNull();
+  });
+});
+
+describe("#202 F3 - a jump under an open panel or drawer does not take focus", () => {
+  it("marks the subject but leaves focus to the panel", () => {
+    const w = load(undefined, [ROW_ENTRY]);
+    onItsPage(w, `, panel: "activity"`);
+    const row = historyRow(w, "cp_run_009");
+    let focused = false;
+    row.focus = ()=> { focused = true; };
+    expect(w.landOnScenarioSubject(ROW_ENTRY, "2025-03-10")).toBe(true);
+    expect(focused).toBe(false);
+    expect(row.classList.contains("scenario-subject")).toBe(true);
+  });
+});
+
+
+describe("#202 F1 - a pair nobody checked lands on its blocker row", () => {
+  it("finds the 'two files for one table' row by the supply's key", () => {
+    const entry = {...ROW_ENTRY, coordinates: {...ROW_ENTRY.coordinates,
+                   supplies: ["birth_registrations__202608211320000800"]}};
+    const w = load(undefined, [entry]);
+    onItsPage(w);
+    const view = w.document.getElementById("view");
+    view.innerHTML = `<div class="supply-history"><table><tbody>
+      <tr data-blocker="contested" data-supply="birth-registrations@202608211320000800#1"><td>a</td></tr>
+      <tr data-blocker="contested" data-supply="birth-registrations@202608211320000801#1"><td>b</td></tr>
+      </tbody></table></div>`;
+    expect(w.scenarioSubjectEl(entry)).toBe(view.querySelector("tr"));
   });
 });
