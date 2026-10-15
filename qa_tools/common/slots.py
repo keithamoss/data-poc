@@ -221,7 +221,19 @@ def claimable_until(dataset_id: str, at: date, agreement=None) -> date:
                    default=timedelta(0))
     reach = (window - earliest + timedelta(days=1) - timedelta(microseconds=1)) \
         // timedelta(days=1)
-    return at + timedelta(days=max(reach, 0) + max_days_before(dataset_id, agreement))
+    # ONLY THE VERSIONS IN FORCE ACROSS THE HORIZON (2026-10-16): the largest
+    # days_before EVER stated widened every later day's horizon too, so
+    # Birth Registrations' twelve evening-before days in June offered
+    # September supplies the next day's slot (test_claim_window_lookahead).
+    # A period is governed by the version in force on its date, so only a
+    # version whose span meets [at, at + reach + the largest ever] counts.
+    reach = max(reach, 0)
+    versions = schedule._agreement(agreement).resolved_versions(dataset_id)
+    widest = at + timedelta(days=reach + max_days_before(dataset_id, agreement))
+    spans = zip(versions, [v.effective_from for v in versions[1:]] + [None])
+    days = max((v.days_before for v, until in spans
+                if v.effective_from <= widest and (until is None or until > at)), default=0)
+    return at + timedelta(days=reach + days)
 
 
 def claim_window(dataset_id: str, agreement=None) -> timedelta:

@@ -255,7 +255,7 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     in its off-months there; the two quarters Keith changed swap run ids - 2024-Q4, now an
     ordinary amber delivery, and 2026-Q3, now TS-56 - because their receipt
     instants moved; and TS-14's corrected Client Register, planted in 421e9f4
-    without this pin being re-captured. 441 arrivals.
+    without this pin being re-captured. 453 arrivals (441 before REQ-GEN-044's evening-before era added 12).
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
@@ -465,8 +465,14 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         # resupplies, one per dataset each); nothing unfiled, because a grown
         # delivery sends no Case Workers file in its off-months (Keith); and
         # TS-14's corrected Client Register adds 1 late. Early is unchanged.
-        assert counts == {"on_time": 354, "early": 38, "late": 41, "unfiled": 8}
-        assert sum(counts.values()) == 441
+        # 356 / 46 / 43 / 8 over 453 FOR REQ-GEN-044's evening-before era
+        # (2026-10-16): its twelve arrivals, each checked by hand - eight
+        # ordinary days at 21:00, an hour before their 22:00 due, early;
+        # TS-10a and TS-10b at 22:00 exactly, on time; TS-3c's 17:00 resupply
+        # and TS-3d's 19-hours-late supply, late. No arrival in both captures
+        # changed its verdict.
+        assert counts == {"on_time": 356, "early": 46, "late": 43, "unfiled": 8}
+        assert sum(counts.values()) == 453
 
 
 class TestTheClassificationBoundaries:

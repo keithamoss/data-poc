@@ -437,14 +437,18 @@ def test_the_schedule_ended_notice_names_the_file_dates_are_authored_in(monkeypa
 
 def test_slot_due_dates_carry_only_the_slots_due_off_their_period_date(monkeypatch, tmp_path):
     """REQ-PIPE-167 criterion 5: the page is told a slot's own due date
-    wherever it differs from the period's date - and today, with no
-    dataset due ahead of its period, that is nowhere."""
+    wherever it differs from the period's date - today, exactly Birth
+    Registrations' twelve evening-before days (REQ-GEN-044, 2026-06-18 to
+    2026-06-29), each due the day before, and nowhere else."""
     out_html = tmp_path / "out.html"
     monkeypatch.setattr(edd, "DASHBOARD_HTML", out_html)
     edd.embed()
     match = re.search(r"const SLOT_DUE_DATES = (.*?);\n", out_html.read_text())
     assert match, "SLOT_DUE_DATES const not found in built output"
-    assert json.loads(match.group(1)) == {}
+    from datetime import date, timedelta
+    era = [date(2026, 6, 18) + timedelta(days=n) for n in range(12)]
+    assert json.loads(match.group(1)) == {
+        "birth-registrations": {d.isoformat(): (d - timedelta(days=1)).isoformat() for d in era}}
 
 
 def test_slot_due_dates_name_a_following_period_datasets_due_date():

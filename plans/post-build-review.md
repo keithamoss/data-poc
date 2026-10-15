@@ -9891,3 +9891,23 @@ twice. It deliberately did not re-find the `TypeError`.
      sense of this file's rule? No - a built rule doing what it said, changed
      by an approved amendment; the test-first order was kept anyway.
 
+
+209. **[done, 2026-10-16]** **[Supply model]** **The slot horizon took the
+     largest `days_before` ever stated, not the one in force.** Found by the
+     full gate after the evening-before era landed:
+     `test_claim_window_lookahead.py::test_the_daily_feed_is_unchanged`
+     failed because `slots.claimable_until()` added
+     `max_days_before()` - the largest of every version Birth Registrations
+     ever had - so twelve evening-before days in June widened every later
+     day's horizon by one, and a supply on 5 September was offered the 6th.
+     Harmless in effect (`assignment.open_slot()` still filters on the
+     window, so nothing could claim it), but the list the docstring
+     promises is "every claimable slot and no more" and it was not. Fixed:
+     only the versions whose span meets the horizon count. The failing test
+     was already there and failed first; 304 tests across every module
+     touching `days_before` pass. Minor, so fixed under Keith's polish rule.
+     The same gate's other four failures were re-pins the era made true on
+     purpose: Birth Registrations owes from 2026-06-18, TS-10 is TS-10a and
+     TS-10b, SLOT_DUE_DATES now holds exactly the twelve era days, and the
+     arrival golden was re-captured from the rebuilt history - 441 arrivals
+     in both, zero verdicts moved, the 12 era arrivals added.

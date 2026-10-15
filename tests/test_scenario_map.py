@@ -77,7 +77,7 @@ class TestTheRegisterReadsAsData:
     def test_scenarios_sort_by_number_then_suffix(self):
         ids = [s.id for s in sorted(sc.parse_register(), key=lambda s: s.sort_key)]
         assert ids.index("TS-3") < ids.index("TS-3a") < ids.index("TS-3b")
-        assert ids.index("TS-9") < ids.index("TS-10")
+        assert ids.index("TS-9") < ids.index("TS-10a") < ids.index("TS-10b")
 
 
 class TestWhereEachScenarioLanded:

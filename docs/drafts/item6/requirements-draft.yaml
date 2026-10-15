@@ -50,10 +50,14 @@
     - "S6 COLD-LOADS EACH DATASET URL AND ADDS buildDatasetsOn() OUTPUT FOR SAMPLED AS-OF DATES; S7 ADDS THE TUI MENU TEXT (main session's round-3/4 calls 18 and 28). S6 is rendered text, not built HTML: the built file embeds the commit SHA in its links."
     - "KEPT DATABASES (main session's round-5 call 30, P1, after the architect's verification pass): `--rebuild-from` needs a database that outlives its capture, so a capture can keep its scratch database, recorded in the baseline and dropped by `equivalence drop`. REJECTED re-bootstrapping for REQ-DASH-244's rebuild - it would spend a full capture to compare two builds of identical recorded results."
     - "SUPERSEDED - round 2's CI ceiling ('a CI cache-miss bootstrap no more than 5% slower across the series') is REPLACED by back-to-back sandbox timings with a threshold from the self-check's measured noise (main session's round-4 call 28): CI runner timings vary too much run to run for a 5% line to mean anything."
-  open_questions: []
+  open_questions:
+    - "KEITH, 2026-10-16, asked why this exists, then chose the LEAN VERSION: keep the worktree capture and compare, but only S1 (recorded results), S4 (generated files), S5 (results and dashboard JSON) and S7 (help and menus); drop S3 (raw tool output), S6 (the browser render) and the reduced, rebuild-from and keep-database options. To be re-drafted and re-presented; REQ-PIPE-240 criterion 12 and REQ-QAC-241 criterion 12 name surfaces and follow it."
 
 - id: REQ-PIPE-240
   title: "One collection registry, derived from the hierarchy, behind the dispatch sites whose code survives the series - with a gate, and an allowlist that hands every other site to the requirement that rewrites it"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As someone adding a collection, I want every part of the system to learn the collections from one registry read from contract/data-asset.yaml, so that a new collection is either picked up everywhere or refused by name, never silently skipped or handed another collection's behaviour."
   moscow: must
@@ -79,7 +83,7 @@
     - "BOOTSTRAP TIME, MEASURED: before and after captures timed back to back; a difference above the self-check's measured noise is a finding (REQ-TEST-239). Nothing here may add a per-run cost."
     - "SECURITY: criterion 4 - configuration chooses WHICH adapter of a fixed package loads, never an arbitrary import path; a collection id must match the hierarchy's id pattern before it becomes a module name."
     - "PRIVACY UNCHANGED: a build may read recorded QA results, never actual data, and never anything else (Keith, 2026-09-27); the registry is configuration and opens no connection."
-    - "SCALE: the target is about 30 datasets on one asset and a project-extraction asset with no cadence; nothing here may assume a collection is on a calendar."
+    - "SCALE: the target is about 30 collections on one asset (Keith, 2026-10-16) and a project-extraction asset with no cadence; nothing here may assume a collection is on a calendar."
     - "TEST COST: the third-collection tests use one small fixture collection shared across sites, never a bootstrap per site."
     - "DOCS: CLAUDE.md, README.md and docs/components.md name the registry and drop the constants it deletes, in the same change."
   dependencies:
@@ -106,6 +110,9 @@
 
 - id: REQ-QAC-241
   title: "Every tool's checks are found the same way - Evidently's definitions in contract YAML, each collection's dbt files in a folder of its own, and every check-source list from the registry"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As someone adding a collection, I want its checks for all four tools to sit in files found by convention from the registry, so that the lifecycle gate, the band and table-read gates and the runners pick up a new collection's checks without anyone editing a list in code."
   moscow: must
