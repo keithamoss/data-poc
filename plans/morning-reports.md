@@ -1935,3 +1935,30 @@ one or more component tags, and a date.
         centred jump. **Keith: grown deliveries carry no Case Workers file in
         its off-months; the jump centres but keeps the page head in view when
         head and subject fit together.**
+      - Criteria 4 and 7 amended with Keith's exact-wording approval (~20:55):
+        2024-Q4 and 2026-Q3 are the named exception to byte-identical, and a
+        grown off-month quarter carries five files.
+    - **REQ-GEN-207 BUILT, 2026-10-15 evening**: ten years from 2013-Q1; 418 of
+      434 original files byte-identical (the other 16 are Keith's two
+      quarters); 7 results changed, all 2023-Q1 nodata -> pass, reported;
+      bootstrap 8m08s -> 31m52s. Next: REQ-GEN-044's evening-before era with
+      TS-13 and TS-3a/3b, then REQ-GEN-203, 205 and 218. An aside logged as
+      running-thoughts #98 (checks judged against supplies older than them).
+    - **STOPPED HERE, 2026-10-15 ~20:50 - NOT YET GATED OR PUSHED.** REQ-GEN-207 is
+      marked built in requirements.yaml on the local checkpoint commits, but the
+      configuration tests broke: 122 failures across 13 files, because they edit
+      "the first participation version" meaning the 2023 one, and since the growth
+      the first is the 2013 one. FIX IN PROGRESS: tests/before_growth.py strips the
+      2013-01-01 versions; applied to `_docs()` in test_agreement_drift,
+      test_correction_apply, test_correction_trial, test_readers_read_no_supply_rows,
+      to `_doc()` in test_collection_defaults (used by test_turn_off and
+      test_owed_nothing) and to test_turn_off's `broken` fixture. Still to do:
+      test_collection_defaults' own fixture (line ~190), test_agreement (its inline
+      loaders), test_agreement_freeze, test_schedule, test_slot_instants,
+      test_validate_schedule, test_verdict_record; and the tests that run the REAL
+      configuration through the CLI, whose expectations change legitimately (e.g.
+      "first version takes effect 1 Jan 2023" is now 2013) - update those
+      expectations, not the config. Then the full local suite (it is a
+      cross-cutting change), `mothman check --no-pytest`, commit, push, check CI.
+      The local data is a fresh ten-year bootstrap; the pushed branch is red only on
+      the arrival golden, which the local checkpoint already re-captures.

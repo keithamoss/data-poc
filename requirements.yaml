@@ -33790,7 +33790,7 @@ requirements:
       as the planned scenarios need, so that each new scenario has a quarter of its own without moving any scenario already
       planted and quoted.
     moscow: must
-    status: not_started
+    status: built
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -33809,22 +33809,25 @@ requirements:
       collision rule, so that 2023-Q1, which TS-77a stands on, is no longer read as free. The existing plan SHALL pass the widened
       rule unchanged (TS-76 stands on 2024-Q4, TS-77a on 2023-Q1); IF it does not, THEN generation SHALL refuse naming both
       scenarios, and the case goes to Keith.
-    - THE SYSTEM SHALL leave every existing Child Protection quarter's generated deliveries and receipts byte-identical, drawing
-      the added quarters' run plan, seeds (from a seed range of their own, disjoint from BASE_SEED+1..+15 and every offset derived
-      from them), slot ids, ambers and delivery names separately, generated after the existing fifteen - so that no index counted
-      from the oldest quarter (the seed, slot id, run index, delivery name, amber placement, the run plan's slice of generated_periods
-      and inheritance_placements) moves - and SHALL prove it by a byte comparison of every existing delivery and receipt before
-      and after; every planted scenario, the characterization pin (tests/fixtures/arrival_semantics_golden.json) and every quoted
-      register text stay as they are, or the difference is reported (criterion 10). TS-79b stays on the quarter it names today
-      rather than the new oldest inherited quarter.
+    - 'THE SYSTEM SHALL leave every existing Child Protection quarter''s generated deliveries and receipts byte-identical, drawing
+      the added quarters'' run plan, seeds (from a seed range of their own, disjoint from BASE_SEED+1..+15 and every offset
+      derived from them), slot ids, ambers and delivery names separately, generated after the existing fifteen - so that no index
+      counted from the oldest quarter (the seed, slot id, run index, delivery name, amber placement, the run plan''s slice of
+      generated_periods and inheritance_placements) moves - and SHALL prove it by a byte comparison of every existing delivery and
+      receipt before and after; every planted scenario, the characterization pin (tests/fixtures/arrival_semantics_golden.json)
+      and every quoted register text stay as they are, or the difference is reported (criterion 10), except 2024-Q4 and 2026-Q3,
+      which change by Keith''s decision (2026-10-15): TS-56 moves to 2026-Q3 and the amber drawn there goes to 2024-Q4. TS-79b
+      stays on the quarter it names today rather than the new oldest inherited quarter. AMENDED 2026-10-15 by Keith (exact wording
+      approved).'
     - THE SYSTEM SHALL add, in the same change, amber_setting and replacement_setting versions taking effect on or before the
       earliest claim-opening instant of the first added quarter, carrying the values today's 2023-01-01 versions carry, so that
       no grown supply meets a setting with no version in force.
     - THE SYSTEM SHALL record, in the register beside the scenarios placed in grown quarters, that checks introduced on 2023-01-15
       did not exist for supplies before that date, and what the page shows for them there as observed on the first bootstrapped
       build.
-    - THE SYSTEM SHALL generate the added quarters as ordinary deliveries - the usual six files, whole - and SHALL NOT plant
-      any scenario in them in this change.
+    - 'THE SYSTEM SHALL generate the added quarters as ordinary deliveries - the usual six files, whole, except that a quarter
+      cp-case-workers does not take part in carries the other five (Keith, 2026-10-15) - and SHALL NOT plant any scenario in them
+      in this change. AMENDED 2026-10-15 by Keith (exact wording approved).'
     - THE SYSTEM SHALL land the growth in a change of its own, before any declared correction edits a grown quarter.
     - THE SYSTEM SHALL measure a bootstrap from empty before and after the growth and log both in CLAUDE.md's running log.
     - THE SYSTEM SHALL compare every existing Child Protection supply's recorded status, and run every REQ-GEN-199 and REQ-GEN-203
@@ -33852,6 +33855,39 @@ requirements:
     - REQ-PIPE-111
     - REQ-PIPE-122
     - REQ-PIPE-123
+    linked_tests:
+      - tests/test_scenario_injection.py::TestAStoodOnPeriodIsClaimed
+      - tests/test_generate_cp_runs.py::test_the_original_fifteen_keep_their_slots_and_come_first
+      - tests/test_generate_cp_runs.py::test_a_grown_delivery_leaves_case_workers_out_of_its_off_months
+      - tests/test_generate_cp_runs.py::test_severity_counts_match_run_plan
+      - tests/test_asset_time_semantics.py::TestEveryCommittedArrivalKeepsItsVerdict
+      - tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips
+    implemented_by:
+      - generator/generate_cp_runs.py::GROWN_RUN_PLAN
+      - generator/generate_cp_runs.py::grown_periods
+      - generator/generate_cp_runs.py::original_periods
+      - generator/generate_cp_runs.py::_grown_severities
+      - generator/scenario_injection.py::stood_on
+      - contract/calendar.yaml
+      - contract/data-asset.yaml
+    evidence:
+      - '2026-10-15: CRITERION 2''s DRY RUN, over the planned scenarios'' period claims as each requirement states them: TS-42 4 and
+        TS-80 4 (two lead-ins and a following quarter each), the correction carrying TS-57 to TS-61 7 adjacent or 15 spaced, TS-63
+        and its gap 4 (5 at most), TS-50 4, TS-55 2, TS-81 1, TS-3a 2, TS-3b 2 - 30 at the minimum, 39 spaced, 44 at worst. Six
+        years (24) does not fit; ten (40 quarters, 2013-Q1 to 2022-Q4) fits the spaced case, Keith''s choice. Criterion 3''s widened
+        rule refused the plan as it stood - ''TS-76 and TS-56 both need 2024-Q4'' - and passes since TS-56 moved to 2026-Q3.'
+      - '2026-10-15: CRITERION 4''s BYTE PROOF - both generators run from empty into scratch directories, the tree before this
+        change (d0d8753, its own code) and after: 434 original files, 418 byte-identical; the 16 that differ are the deliveries and
+        receipts of 2024-Q4 and 2026-Q3, Keith''s two changes; 464 files added. Seeds 30001 on, plan seed 29000, slot ids cp_slot_16
+        on, generated after the original fifteen.'
+      - '2026-10-15: CRITERION 9 - bootstrap from empty 8m08s before (Birth Registrations 393s, Child Protection 317s) and 31m52s
+        after (550s, 1792s), logged in CLAUDE.md. CRITERION 10 - every result on a surviving run compared before and after: 3,273
+        results, 7 changed, all nodata to pass on 2023-Q1''s six runs (row-count growth and cp_notifications'' drift, now with an
+        earlier promoted period to measure against), as the criterion predicted; reported to Keith. Arrival golden re-captured: zero
+        verdicts and zero instants moved on any run in both; 441 arrivals, 354 / 38 / 41 / 8.'
+      - '2026-10-15: tests on this tree - test_generate_cp_runs, test_scenario_injection, test_as_at_scenarios, test_scenario_links,
+        test_scenario_map, test_scenario_subjects, test_asset_time_semantics 184 passed; test_dashboard_e2e TestTheAsAtScenarioChips
+        + TestEveryScenarioJumpLands + TestThePeriodComposition 23 passed, on the bootstrapped ten-year history.'
     decisions:
     - 'SIX YEARS (Keith, 2026-10-15): grown generously so no second growth is needed. AMENDED criterion 2 the same day (Keith''s approved wording) to count TS-3a and TS-3b, which he placed in the grown quarters rather than in the last free recent ones.'
     - 'GROW EARLIER, NOT INTO TODAY''S QUARTERS (Keith, 2026-10-13, architect review answers, for TS-63): REQ-GEN-199 found

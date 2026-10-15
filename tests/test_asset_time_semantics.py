@@ -250,11 +250,12 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
     grown at the old end. Procedure first: 162 deliveries, the same names a
     from-empty generation writes, no `handfiled-*`. Old entries matched to new
     by run id: zero verdicts and zero instants moved. What changed, all of it
-    expected: 42 grown runs per Child Protection dataset (2013-Q1 to
-    2022-Q4); the two quarters Keith changed swap run ids - 2024-Q4, now an
+    expected: 40 grown runs per Child Protection dataset (2013-Q1 to
+    2022-Q4, plus two resupplies) and 22 for Case Workers, which sends nothing
+    in its off-months there; the two quarters Keith changed swap run ids - 2024-Q4, now an
     ordinary amber delivery, and 2026-Q3, now TS-56 - because their receipt
     instants moved; and TS-14's corrected Client Register, planted in 421e9f4
-    without this pin being re-captured. 461 arrivals.
+    without this pin being re-captured. 441 arrivals.
     """
 
     def test_the_golden_covers_every_dataset_and_run_that_exists_now(self):
@@ -459,13 +460,13 @@ class TestEveryCommittedArrivalKeepsItsVerdict:
         for runs in golden.values():
             for a in runs.values():
                 counts[a["arrivalStatus"]] = counts.get(a["arrivalStatus"], 0) + 1
-        # 354 / 38 / 41 / 28 over 461 FOR REQ-GEN-207 (2026-10-15): the 252
-        # grown runs add 220 on time, 12 late (the two grown red chains'
-        # resupplies, one per dataset each) and 20 unfiled (Case Workers'
-        # off-months); TS-14's corrected Client Register adds 1 late. Early is
-        # unchanged - no grown delivery arrives inside its claim window early.
-        assert counts == {"on_time": 354, "early": 38, "late": 41, "unfiled": 28}
-        assert sum(counts.values()) == 461
+        # 354 / 38 / 41 / 8 over 441 FOR REQ-GEN-207 (2026-10-15): the 232
+        # grown runs add 220 on time and 12 late (the two grown red chains'
+        # resupplies, one per dataset each); nothing unfiled, because a grown
+        # delivery sends no Case Workers file in its off-months (Keith); and
+        # TS-14's corrected Client Register adds 1 late. Early is unchanged.
+        assert counts == {"on_time": 354, "early": 38, "late": 41, "unfiled": 8}
+        assert sum(counts.values()) == 441
 
 
 class TestTheClassificationBoundaries:

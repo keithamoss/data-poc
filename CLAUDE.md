@@ -878,6 +878,12 @@ Rough layout:
   same night at 85 days with the pairs spaced out (post-build-review #172).
   Re-measured 2026-10-13 night after REQ-GEN-199 (TS-75 to TS-79): **7m00s**
   from empty, Birth Registrations 342s and Child Protection 270s in parallel.
+  Re-measured 2026-10-15 for REQ-GEN-207 criterion 9, Child Protection grown
+  ten years at its old end (Keith's call, 55 quarters where there were 15):
+  **8m08s before** (Birth Registrations 393s, Child Protection 317s) and
+  **31m52s after** (Birth Registrations 550s, Child Protection 1792s) - Child
+  Protection now dominates, at roughly 32s a quarter. Budget a cache-miss CI
+  bootstrap accordingly; profiling it is the obvious next speed-up.
 
   So a RED IN THE COMMON CASE reports in about SEVEN minutes rather
   than nineteen - 2,622 of 2,898 tests are in the fast half. The whole

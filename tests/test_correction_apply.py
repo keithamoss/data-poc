@@ -77,8 +77,12 @@ def _docs():
     """The committed files with no corrections declared - the ones the real
     contract carries (REQ-PIPE-181's migration, for one) are not this
     module's subject, and would read as pending beside its own."""
-    cal = copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text()))
-    asset = copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text()))
+    # THE CONFIGURATION AS IT STOOD BEFORE REQ-GEN-207's GROWTH: these cases
+    # edit the version that governs the judged supplies (tests/before_growth.py).
+    from tests import before_growth
+
+    cal = before_growth.calendar(copy.deepcopy(yaml.safe_load(agreement.CALENDAR_YAML.read_text())))
+    asset = before_growth.asset(copy.deepcopy(yaml.safe_load(asset_time.DATA_ASSET_YAML.read_text())))
     for owner in (cal.get("calendars") or []) + (cal.get("datasets") or []) \
             + (cal.get("collections") or []):
         owner.pop("corrections", None)

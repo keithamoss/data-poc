@@ -43,8 +43,12 @@ def _per_dataset(doc: dict) -> dict:
 
 
 def _doc() -> dict:
-    return _per_dataset(copy.deepcopy(
-        yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text())))
+    # AS IT STOOD BEFORE REQ-GEN-207's GROWTH: these cases edit the first
+    # version, meaning the 2023 one (tests/before_growth.py).
+    from tests import before_growth
+
+    return _per_dataset(before_growth.calendar(copy.deepcopy(
+        yaml.safe_load((REAL_CONTRACT_DIR / "calendar.yaml").read_text()))))
 
 
 def _entry(doc, dataset_id):

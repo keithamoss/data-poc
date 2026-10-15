@@ -5383,3 +5383,13 @@ could never have computed it), and it belongs with batch 5's check work.
     correction adds a past-dated calendar version - 205 is about
     corrections; a deliberate second calendar version is its own
     conversation.
+
+98. **[todo, 2026-10-15]** **[QA checks & contract]** **[Dashboard UI]**
+    **A check is judged against supplies that arrived before it existed.**
+    Seen building REQ-GEN-207: every Child Protection check carries
+    `introduced_date: 2023-01-15`, and the forty grown quarters (2013-2022)
+    are run and shown against all of them - 111 fails and 24 warns on supplies
+    no such check was ever agreed for - with nothing on the page saying the
+    check came later. Question for Keith before anything is scoped: should a
+    check skip, or be marked on, a supply received before its introduced
+    date? Not built; recorded in the register under TS-79b.

@@ -3998,6 +3998,16 @@ is the oldest of the original fifteen quarters. REWORDED 2026-10-15
 inheritance shown is unchanged. **Expect**: its page looks identical to
 TS-79a's - the pill "Inherited from 2023-Q1". **Breaks as**: no pill.
 
+**The grown quarters, 2013-Q1 to 2022-Q4 (REQ-GEN-207 criterion 6).** Ordinary
+deliveries only, no scenario planted (criterion 7); a Case Workers file only
+in February and August (Keith, 2026-10-15). Every check in the Child
+Protection contract carries `introduced_date: 2023-01-15`, so none of them
+existed for these supplies when they arrived - and the page does not say so:
+observed on the first bootstrapped build (2026-10-15), the checks are run and
+shown on the grown supplies like any other, 8,529 results (8,225 pass, 111
+fail, 24 warn, 169 no data), with nothing marking them as introduced later.
+A scenario placed in a grown quarter should quote its verdicts knowing that.
+
 ### The activity feed
 
 Keith, 2026-09-22, arising from TS-10 and TS-15: the existing

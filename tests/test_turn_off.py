@@ -40,7 +40,9 @@ def broken(tmp_path):
 
     def apply(mutate):
         path = contract_dir / "calendar.yaml"
-        doc = _per_dataset(_unshare(yaml.safe_load(path.read_text())))
+        from tests import before_growth
+
+        doc = _per_dataset(_unshare(before_growth.calendar(yaml.safe_load(path.read_text()))))
         mutate(doc)
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         return validate(src)
