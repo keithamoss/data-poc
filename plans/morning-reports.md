@@ -1975,6 +1975,41 @@ one or more component tags, and a date.
       Terms: ungated checkpoints may be pushed (no test claims in their
       messages); amendments to REQ-GEN-044/203/205/207/218 approved by the
       session under his delegation; nothing Emergency Department built.
+    - **OVERNIGHT 6 - WHAT HAPPENED (written ~00:45 Perth, 2026-10-16)**:
+      1. **Item 6 + Emergency Department: DONE as a proposal**, nothing
+         signed or built. Read `docs/drafts/item6/proposal.md` first - one
+         page: what it is, 11 + 10 requirements, ten significant calls to
+         sense-check, four questions. Research -> position -> scoper (5
+         rounds) -> architect + CLI UX + dashboard UX -> architect
+         verification -> ED re-drafted last, as you asked.
+      2. **REQ-GEN-207 finished**: the configuration tests moved onto
+         `tests/before_growth.py`; the legend's "(1 agencies)" fixed
+         test-first (#206); two test preconditions with a one-quarter shelf
+         life moved to a dated as-of; the dashboard build reads
+         requirements.yaml through the cached C loader (35s -> 10s); a
+         fixture-ordering error from the full gate fixed. Post-build critic
+         run (#207): two text errors fixed, one latent generator defect fixed
+         test-first, and TS-54's "promoted amber" turned out to be false -
+         cp-placements' 2024-Q4 is still green (question below).
+      3. **REQ-GEN-044's evening-before era: built, then SHELVED** (#208).
+         Byte proof clean, but the schedule validator and the agreement
+         freeze together refuse a days_before era before frozen versions.
+         Patch and options in `docs/drafts/evening-before/`.
+      4. **NOT DONE, and why**: REQ-GEN-218 - its criterion 8 must be built
+         after REQ-GEN-205, which now waits on item 6 and ED. REQ-GEN-203 -
+         a large Child Protection generator build that item 6's REQ-GEN-246
+         would rewrite straight after; better built on the shared driver.
+         Bootstrap profiling - folded into the ED plan's REQ-PIPE-250 (your
+         hard 12 minutes) rather than done ad hoc.
+      **QUESTIONS FOR THE MORNING** (beyond the proposal's four):
+      a. TS-54: should cp-placements' 2024-Q4 supply be amber (a targeted
+         amber there), or does TS-54 stand on a green supply as it does now?
+      b. The evening-before era: which of the four options in
+         `docs/drafts/evening-before/README.md`?
+      c. Grown red chains leave permanent "Awaiting a decision" queue items
+         under replacement `never` (critic O1) - acceptable noise, or should
+         the grown quarters carry no reds?
+
     - **STANDING DELEGATION, Keith, 2026-10-15 ~22:55 Perth**: "don't bother
       me with the amended wording on the generator requirements, you know,
       044, 203, 205, 218. I'm happy for you just to go ahead and approve
