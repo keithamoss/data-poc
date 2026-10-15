@@ -699,7 +699,7 @@ NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad 
 
 ### TS-54 - A period substituted onto an earlier promoted supply
 
-In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted green - with its own link while the substitution stands. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
+In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted amber - with its own link while the substitution stands. AMBER SINCE 2026-10-15 (Keith, REQ-GEN-207): TS-56 moved to 2026-Q3, and the ordinary amber drawn there could only go to 2024-Q4; amber promotes itself, so the period still stands on a promoted supply. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
 
 | Where to look | |
 |---|---|
@@ -725,9 +725,9 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 | Where to look | |
 |---|---|
 | Dataset | cp-carers |
-| Supplies | `cp_carers__202411010900000800` |
-| Period | 2024-Q4 |
-| Set the in-place-on date to | 2024-11-01 |
+| Supplies | `cp_carers__202608010900000800` |
+| Period | 2026-Q3 |
+| Set the in-place-on date to | 2026-08-01 |
 
 ## Calendar corrections
 
@@ -913,9 +913,9 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 | Period | 2026-Q2 |
 | Set the in-place-on date to | 2026-06-16 |
 
-### TS-79b - An inherited quarter - the oldest
+### TS-79b - An inherited quarter - the oldest of the original fifteen
 
-**What it demonstrates.** Its page looks identical to TS-79a's - the pill "Inherited from 2023-Q1" - and it is here because its source is the history's first supply, so it shows inheritance at the edge where there is nothing earlier to fall back on. **Breaks as**: no pill.
+**What it demonstrates.** Its page looks identical to TS-79a's - the pill "Inherited from 2023-Q1". **Breaks as**: no pill.
 
 **What it would look like if the rule were wrong.** No pill.
 
@@ -1951,11 +1951,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "A period substituted onto an earlier promoted supply",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted green - with its own link while the substitution stands. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.",
+   "demonstrates": "In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose supply was promoted amber - with its own link while the substitution stands. AMBER SINCE 2026-10-15 (Keith, REQ-GEN-207): TS-56 moved to 2026-Q3, and the ordinary amber drawn there could only go to 2024-Q4; amber promotes itself, so the period still stands on a promoted supply. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.",
    "breaksAs": null,
    "config": null,
    "requirements": [
     "REQ-GEN-044",
+    "REQ-GEN-207",
     "REQ-GEN-200"
    ],
    "coordinates": {
@@ -1991,15 +1992,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-QAC-096",
     "REQ-DASH-097",
-    "REQ-GEN-044"
+    "REQ-GEN-044",
+    "REQ-GEN-207"
    ],
    "coordinates": {
     "dataset": "cp-carers",
     "supplies": [
-     "cp_carers__202411010900000800"
+     "cp_carers__202608010900000800"
     ],
-    "period": "2024-Q4",
-    "inPlaceOn": "2024-11-01",
+    "period": "2026-Q3",
+    "inPlaceOn": "2026-08-01",
     "subject": "supply-history-row"
    }
   },
@@ -2707,12 +2709,14 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
   {
    "id": "TS-79b",
    "mode": "INJECT",
-   "title": "An inherited quarter - the oldest",
+   "title": "An inherited quarter - the oldest of the original fifteen",
    "section": "Calendar corrections",
-   "demonstrates": "Its page looks identical to TS-79a's - the pill \"Inherited from 2023-Q1\" - and it is here because its source is the history's first supply, so it shows inheritance at the edge where there is nothing earlier to fall back on. **Breaks as**: no pill.",
+   "demonstrates": "Its page looks identical to TS-79a's - the pill \"Inherited from 2023-Q1\". **Breaks as**: no pill.",
    "breaksAs": "No pill.",
    "config": null,
-   "requirements": [],
+   "requirements": [
+    "REQ-GEN-207"
+   ],
    "coordinates": {
     "dataset": "cp-case-workers",
     "supplies": [],

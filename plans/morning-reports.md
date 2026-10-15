@@ -1921,3 +1921,11 @@ one or more component tags, and a date.
         left, and TS-54's text changes from "promoted green" to "promoted
         amber" (Keith's recommended option; REJECTED TS-56 keeping the amber,
         and dropping it).
+      - Asked again at Keith's request (~18:55): all three answers stand. And
+        criterion 2's dry run came back: the planned scenarios claim at least
+        30 quarters (39 with the correction's edits spaced), so six years is
+        not enough. **Keith: ten years, 40 quarters from 2013-Q1.**
+      - Keith also asked whether the multi-table-delivery idea (zip files,
+        start and finish markers) is already captured: it is, as
+        plans/supply-thoughts.md #2 (zip support) and #3 (upload beginning /
+        complete signals), both unscoped.

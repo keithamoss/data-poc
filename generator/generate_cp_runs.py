@@ -193,7 +193,7 @@ def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
 
 RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
 
-# SIX YEARS MORE AT THE OLD END (REQ-GEN-207, Keith, 2026-10-15): twenty-four
+# TEN YEARS MORE AT THE OLD END (REQ-GEN-207, Keith, 2026-10-15): forty
 # quarters before the original fifteen, so the scenarios still to be planted
 # each have a quarter of their own. DRAWN AND WRITTEN SEPARATELY (criterion 4):
 # everything that counts from the oldest quarter - seeds, slot ids, run
@@ -201,7 +201,7 @@ RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
 # because those are planned and written first, and the grown quarters take a
 # run plan, seeds and slot ids of their own afterwards. The same mix as the
 # original plan (Keith): about a quarter amber, two reds, the oldest clean.
-GROWN_QUARTERS = 24
+GROWN_QUARTERS = 40
 _GROWN_PLAN_SEED = 29000   # disjoint from _RUN_PLAN_SEED and every BASE_SEED offset
 GROWN_BASE_SEED = 30000    # seeds 30001.. and their +500/+800/+900 offsets
 GROWN_RUN_PLAN = _build_run_plan(GROWN_QUARTERS, _GROWN_PLAN_SEED)
