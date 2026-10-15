@@ -243,8 +243,10 @@ def waiting_behind(conn: supply_db.SupplyConnection, states: list[slot_state.Slo
 
     out = []
     for s in states:
-        if s.state not in WITH_A_SUPPLY or s.state in (
-                slot_state.TWO_FILES, slot_state.AWAITING_ACKNOWLEDGEMENT):
+        # AND A PERIOD STANDING ON ANOTHER'S SUPPLY (#201 F3): a supply filed
+        # there waits on a person as much as one filed to an empty period.
+        if s.state not in WITH_A_SUPPLY + (slot_state.SUBSTITUTED, slot_state.INHERITED) \
+                or s.state in (slot_state.TWO_FILES, slot_state.AWAITING_ACKNOWLEDGEMENT):
             continue
         for waiting in supersession.waiting_in(conn, s.dataset_id, s.period,
                                                besides=s.supply):
@@ -332,7 +334,11 @@ def supplies_in(conn: supply_db.SupplyConnection,
     failed = {arrival_key_of(f.supply): f.reason
               for f in could_not_load(conn, hierarchy.dataset(ds).collection_id)
               if f.dataset_id == ds and f.period == period}
-    holds_promoted = slot.state in (slot_state.PROMOTED, slot_state.AWAITING_ACKNOWLEDGEMENT)
+    # THE SUPPLY IN PLACE, from the log rather than from the slot's state
+    # (post-build-review #201 F1 and F2): an open pair over a promoted period
+    # reads TWO_FILES, and a supply rejected then promoted carries a reject.
+    h = decision_log.held(conn, ds, period)
+    in_place = h.holder if h and h.held_as == decision_log.PROMOTED else None
     reads = promotion._declared_reads()
     out = []
     for (supply,) in rows:
@@ -342,6 +348,12 @@ def supplies_in(conn: supply_db.SupplyConnection,
             own = slot_state.SlotState(dataset_id=ds, period=period, supply=supply,
                                        state=slot_state.TWO_FILES,
                                        files=tuple(contest.files))
+        elif supply == in_place:
+            own = (slot if supply == slot.supply and slot.state in (
+                       slot_state.PROMOTED, slot_state.AWAITING_ACKNOWLEDGEMENT)
+                   else _in_place(conn, ds, period, supply))
+            if own.state == slot_state.AWAITING_ACKNOWLEDGEMENT:
+                (own,) = _rechecked_worse(conn, "", [own])
         elif (by := _latest_by(conn, ds, supply, decision_log.REJECT)) is not None:
             own = slot_state.SlotState(
                 dataset_id=ds, period=period, supply=supply, state=slot_state.REJECTED,
@@ -350,9 +362,12 @@ def supplies_in(conn: supply_db.SupplyConnection,
         elif supersession.is_superseded(conn, ds, supply):
             newer = supersession.superseded_by(conn, ds, supply)
             by = _latest_by(conn, ds, supply, decision_log.SUPERSEDE)
+            at = supersession._receipt(conn, ds, newer) if newer else None
+            # A TIME A PERSON READS, never the arrival key (#201 F6).
             own = slot_state.SlotState(
                 dataset_id=ds, period=period, supply=supply, state=SUPERSEDED,
-                reason=(f"by the supply that arrived {arrival_key_of(newer)}" if newer
+                reason=(f"by the supply that arrived {display_time.format_instant(at)}"
+                        if at else "by a newer supply" if newer
                         else f"set aside by {by[0]}" if by else "set aside"))
         elif arrival_key_of(supply) in failed:
             own = slot_state.SlotState(dataset_id=ds, period=period, supply=supply,
@@ -360,12 +375,10 @@ def supplies_in(conn: supply_db.SupplyConnection,
                                        reason=failed[arrival_key_of(supply)])
         elif supply == slot.supply and slot.state != slot_state.TWO_FILES:
             own = slot
-            if slot.state == slot_state.AWAITING_ACKNOWLEDGEMENT:
-                (own,) = _rechecked_worse(conn, "", [slot])
-        elif holds_promoted:
+        elif in_place:
             own = slot_state.SlotState(
                 dataset_id=ds, period=period, supply=supply, state=ANOTHER_VERSION_WAITING,
-                reason=f"{period} holds {slot.supply}; promoting this one supersedes it")
+                reason=f"{period} holds {in_place}; promoting this one supersedes it")
         else:
             own = slot_state.SlotState(
                 dataset_id=ds, period=period, supply=supply,
@@ -376,6 +389,17 @@ def supplies_in(conn: supply_db.SupplyConnection,
     # THE DECIDED ONES LAST (Keith, 2026-10-15, signing off): rejected and
     # superseded supplies are listed with the rest, after those still in play.
     return sorted(out, key=lambda e: e.state.state in (slot_state.REJECTED, SUPERSEDED))
+
+
+def _in_place(conn, dataset_id: str, period: str, supply: str) -> slot_state.SlotState:
+    """The promoted supply's own state where the slot speaks for another
+    (#201): promoted, or awaiting acknowledgement where one is owed."""
+    from qa_tools.common import acknowledgement
+
+    owed = acknowledgement.owed(conn, dataset_id, period) == supply
+    return slot_state.SlotState(
+        dataset_id=dataset_id, period=period, supply=supply,
+        state=slot_state.AWAITING_ACKNOWLEDGEMENT if owed else slot_state.PROMOTED)
 
 
 @dataclass(frozen=True)

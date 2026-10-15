@@ -6728,7 +6728,10 @@ function renderSupplyCycleRows(entries, datasetId, cycleStart){
     const arrivalCell = e.isResupply
       ? excusedResupply + (e.daysSincePrevious!=null
           ? `<span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${e.daysSincePrevious} ${pluralize(e.daysSincePrevious,"day")} since previous</span>`
-          : "") + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id)
+          : "") + (statedNote(e) ? " " + statedNote(e) : "")
+          // A HAND-FILED RESUPPLY'S STATED ORIGINAL, here too (post-build-review
+          // #201 F5): who filed it is under 'How it got here'.
+          + excuseNote(datasetId, e.run_id) + correctionNote(datasetId, e.run_id)
       // e.arrivedAt used to be emitted RAW here - offset, microseconds
       // and all ("2026-09-16T05:17:30.280161+00:00"), 43 of them down
       // one column. REQ-DASH-071.

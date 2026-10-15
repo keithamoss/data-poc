@@ -1792,3 +1792,12 @@ one or more component tags, and a date.
         owed" headline has no authored-date condition; the page now waits
         for the authored date. Should the terminal match? (Recommended: yes,
         for one meaning across surfaces.)
+      - **F4 of post-build-review #201 (REQ-GHUB-229)**: a failed load ALONE
+        in its period still goes straight to the period's decisions, so the
+        door offers it promote, re-file, supersede and the rest while the
+        queue offers reject only. Criterion 2 says one supply goes straight
+        to decisions "as it does today"; your sign-off decision says "reject
+        only, in the door as in the queue". Should a lone failed load be
+        offered reject only at the door too? (Recommended: yes - the
+        sign-off decision is the more specific, and promote is refused on
+        every route anyway.)

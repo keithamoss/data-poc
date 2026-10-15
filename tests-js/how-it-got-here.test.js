@@ -90,6 +90,9 @@ describe("each note in its own cell (criteria 3, 4, 5 and 6)", () => {
     expect(how.textContent).toContain("Resupply, attempt 2");
     expect(timing.textContent).not.toContain("Resupply, attempt");
     expect(timing.textContent).toContain("3 days since previous");
+    // Its stated original, beside it (post-build-review #201 F5).
+    expect(timing.querySelector("[data-stated-original]")).not.toBeNull();
+    expect(how.textContent).toContain("Keith Moss");
   });
 });
 

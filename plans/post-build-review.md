@@ -9571,3 +9571,44 @@ twice. It deliberately did not re-find the `TypeError`.
      "Not owed yet" and that no earned status (Green, Amber, Red) shows; it
      passes on the rebuilt local dashboard. Lesson for this session: a
      cancelled CI run is not a green one - the next run carries its result.
+
+201. **[in-progress, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
+     **delivery-critic on REQ-GHUB-229 and REQ-DASH-230 (25116ce).**
+     REQ-DASH-230 checked in a real Chromium at 1280px and 390px on all seven
+     datasets, zero console errors; REQ-GHUB-229's main case works. Each
+     finding below checked against the code and turned into a test before
+     the fix.
+     - **F1, DEFECT (229 c9), reproduced**: an open pair over a promoted
+       period listed the promoted supply as "waiting on a decision" - the
+       in-place check read the slot's state, which is TWO_FILES there.
+     - **F2, DEFECT (229 c5, c7), reproduced**: a supply rejected and later
+       promoted was listed "rejected", offering promote and re-file, while it
+       was the period's promoted supply - the reject check came first.
+     - **F3, DEFECT (229 c14), reproduced**: supplies filed into a SUBSTITUTED
+       (or inherited) period were listed at the door and in no queue entry.
+     - **F4, KEITH'S CALL**: a failed load ALONE in its period goes straight
+       to the period's decisions "as today" (criterion 2), so the door still
+       offers it promote, re-file and the rest, while the queue offers reject
+       only - against the signed decision "reject only, in the door as in the
+       queue". Queued in plans/morning-reports.md.
+     - **F5, GAP (230 c6), reproduced**: a hand-filed RESUPPLY row showed the
+       filer's stated original arrival nowhere.
+     - **F6, POLISH (229 c5)**: "superseded by the supply that arrived
+       202605270100000000" - a raw arrival key.
+     - **F7, POLISH**: un-supersede on a chosen superseded version still said
+       "(N earlier versions)" for the whole period.
+     - Test gaps: the door's pair-only choice, "The period itself", and an
+       unreachable log at the list step had no test.
+     - **FIXED, 2026-10-15**: F1 and F2 (`supplies_in` reads the promoted
+       holder from `decision_log.held` and checks it before anything else
+       but an open pair), F3 (`waiting_behind` asks substituted and inherited
+       slots too), F5 (`statedNote` on the resupply branch), F6 (the newer
+       supply's receipt via `display_time.format_instant`), F7 (no count on a
+       chosen version); the door's three branches now have tests. All in
+       tests/test_every_filed_supply.py and tests-js/how-it-got-here.test.js,
+       F1-F3 and F6 seen failing first.
+     - Noted, not changed: `_rechecked_worse(conn, "", ...)` passes a dummy
+       collection id to a parameter it does not use; `supplies_in` calls
+       `open_contest` once per filed supply, heavier than the NFR's "one
+       verdict lookup per supply" (0.05-0.15s a period on the real database
+       today) - worth watching at thirty datasets.

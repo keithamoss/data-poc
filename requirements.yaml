@@ -36183,6 +36183,7 @@ requirements:
     - 'A FAILED LOAD IS NOT OFFERED EXCUSE-LATENESS either (filing_queue.excuse_offers), so ''only reject'' (criterion 16) holds in the door and the queue alike. Named in the parity test''s HIDDEN with its reason, since the flags still record an excuse.'
     - 'filing_queue.slots_of NO LONGER ADDS a second line for a version waiting in a promoted period (criterion 3: one line per period). That version is reached through the period''s list; the queue still lists it through waiting_over_promoted.'
     - 'THE QUEUE''S FIX IS filing_queue.waiting_behind: for each needs-action slot (not an open pair, which blocks its period, and not a promoted one, which waiting_over_promoted covers), every other loadable version still waiting there, as its own entry.'
+    - 'THE SUPPLY IN PLACE IS READ FROM THE LOG (post-build-review #201): decision_log.held names the promoted holder, checked before anything but an open pair - the slot''s state reads TWO_FILES over a promoted period, and a supply rejected then promoted still carries its reject. waiting_behind asks substituted and inherited periods too, since a supply filed there waits on a person.'
     - 'THE COUNT (criteria 3 and 15) is filing_queue.filed_counts - one GROUP BY over qa.filing_current - shown on the picker line and in the standing view''s state cell as ''N supplies'' where N is more than one. A period with one supply or none goes straight to its decisions (criterion 2).'
     open_questions: []
     linked_tests:

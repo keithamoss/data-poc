@@ -773,7 +773,8 @@ def _decide_on(state: slot_state.SlotState, *, offer: tuple[str, ...]) -> None:
     words = dict(_WHAT_IT_DOES)
     if state.state == filing_queue.ANOTHER_VERSION_WAITING:
         words.update(_WHAT_IT_DOES_TO_ANOTHER_VERSION)
-    if filing_decisions.UN_SUPERSEDE in offer:
+    if filing_decisions.UN_SUPERSEDE in offer and state.state != filing_queue.SUPERSEDED:
+        # NO COUNT ON A CHOSEN VERSION (#201 F7): only it comes back.
         # THE OFFER CARRIES A COUNT (REQ-GHUB-165 criterion 1): a choice is
         # coming, and the person sees that before taking it.
         try:
