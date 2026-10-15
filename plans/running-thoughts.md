@@ -5407,6 +5407,36 @@ could never have computed it), and it belongs with batch 5's check work.
     how much history, which tests and scenarios move onto it, and whether it
     joins an existing agency/collection or gets its own.
 
+    **Scoped with Keith the same evening (22:40-ish Perth), answers in his
+    own choices:** the purpose is to SHRINK Child Protection, so adding a
+    scenario stops costing a Child Protection quarter. A Department of
+    Health Emergency Department dataset:
+    - **Quarterly, on the existing quarterly calendar**, so quarterly
+      scenarios move across unchanged.
+    - **One table, about eight columns, one CSV per supply** (presentation
+      id, arrival date/time, triage category 1-5, age group, sex, postcode,
+      departure status, length of stay - my proposal, he chose it).
+    - **A new agency**: Department of Health > Emergency Department > one
+      dataset, so the executive view shows a third agency.
+    - **All four QA tools, a few checks each** (roughly 10-15 in total), so a
+      scenario that moves still exercises the tools it did before.
+    - **History: as many quarters as its scenarios need**, worked out by a
+      dry run, the same rule as REQ-GEN-207's growth.
+    - **What stays on Child Protection:** only a scenario that needs a supply
+      of several files (TS-12, TS-38, TS-56, TS-75a, TS-76, TS-77a today), a
+      cross-table check, or several datasets in one collection (collection
+      participation defaults, a dataset that supplies only some quarters
+      like Case Workers, knock-ons between datasets). Everything else moves
+      and keeps its TS number - TS-9, TS-65, TS-66, TS-67 today, and the
+      unbuilt TS-3a/3b, TS-63, TS-57 to TS-62 get planted on Emergency
+      Department instead.
+    - **Child Protection then shrinks to whatever its remaining scenarios
+      need** (not straight back to 15 quarters, not kept at ten years) -
+      an amendment to the built, signed REQ-GEN-207.
+    - **Sequence:** draft the requirements now, before finishing REQ-GEN-207's
+      failing tests; delivery-scoper then delivery-architect, and Keith
+      signs off before anything is built.
+
 100. **[todo, 2026-10-15]** **[Data generation]** **[Dashboard UI]**
     **Mix up the names of some of the datasets.** Keith, 2026-10-15 evening,
     in the same breath as #99: "Let's also maybe mix up the names of some of
