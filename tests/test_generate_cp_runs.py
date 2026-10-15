@@ -167,7 +167,7 @@ def test_severity_counts_match_run_plan(manifest):
     # (REQ-GEN-184 criterion 9) - and a scenario that keeps its period's
     # drawn amber carries it (REQ-GEN-199).
     planned = (generate_cp_runs._ordinary_severities(original, injected)
-               + generate_cp_runs._grown_severities(grown))
+               + generate_cp_runs._grown_severities(grown, injected))
     periods = original + grown
 
     def first_of(name, severity):
@@ -585,3 +585,27 @@ def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, ra
         assert not (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
     for e in on_grown + off_original:
         assert (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
+
+
+class TestAScenarioInAGrownQuarterIsRefused:
+    """post-build-review #207 D3: the grown quarters' plan assumed no
+    scenario sits in them and ignored the injections - so the first scenario
+    planted there (REQ-GEN-203, 205, 206 all plan to) would silently swallow
+    a drawn amber, leave a lead-in unforced and drop a red. Refused, naming
+    the scenario, until the grown plan learns to move them as the original
+    fifteen's does."""
+
+    def test_it_names_the_scenario(self):
+        from generator import scenario_injection as si
+
+        grown = generate_cp_runs.grown_periods()
+        injection = si.Injection("TS-99", "cp-clients", 0, "a test")
+        placed = si.resolve(injection, grown)
+        with pytest.raises(si.CannotPlace) as refused:
+            generate_cp_runs._grown_severities(grown, {placed.period: (injection, placed)})
+        assert "TS-99" in str(refused.value) and placed.period in str(refused.value)
+
+    def test_the_real_plan_has_none_and_passes(self):
+        _, injected = generate_cp_runs._plan_injections(generate_cp_runs.generated_periods())
+        grown = generate_cp_runs.grown_periods()
+        assert len(generate_cp_runs._grown_severities(grown, injected)) == len(grown)

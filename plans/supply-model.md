@@ -3739,11 +3739,13 @@ a further decision. What should the planted shape be?
 **TS-54 `[INJECT]` A period substituted onto an earlier promoted supply.**
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14,
 Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1
-substituted by a scripted person onto 2024-Q4, whose supply was promoted
-amber - with its own link while the substitution stands. AMBER SINCE
-2026-10-15 (Keith, REQ-GEN-207): TS-56 moved to 2026-Q3, and the ordinary
-amber drawn there could only go to 2024-Q4; amber promotes itself, so the
-period still stands on a promoted supply. The script's
+substituted by a scripted person onto 2024-Q4, whose cp-placements supply
+was promoted green - with its own link while the substitution stands.
+CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the
+ordinary amber drawn for 2026-Q3 to 2024-Q4 and this entry then said
+"promoted amber", but that amber dirties only cp_carers and cp_clients, so
+cp-placements' 2024-Q4 supply is still green and promoted. Whether it should
+be amber is with Keith. The script's
 `stands_on` field (REQ-GEN-200) answered the old blocker.
 
 **TS-55 `[INJECT]` A period whose _manifest lists all three kinds.** NOT IN
@@ -3994,7 +3996,7 @@ or a stale date after ANCHOR_DATE moves.
 **TS-79b `[INJECT]` An inherited quarter - the oldest of the original fifteen.**
 The oldest inherited quarter of the original fifteen (2023-Q2), whose source
 is the oldest of the original fifteen quarters. REWORDED 2026-10-15
-(REQ-GEN-207 criterion 11): the history now starts six years earlier, and the
+(REQ-GEN-207 criterion 11): the history now starts ten years earlier, and the
 inheritance shown is unchanged. **Expect**: its page looks identical to
 TS-79a's - the pill "Inherited from 2023-Q1". **Breaks as**: no pill.
 

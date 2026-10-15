@@ -9832,3 +9832,51 @@ twice. It deliberately did not re-find the `TypeError`.
        Not reproduced by pairing the obvious modules locally; the fixture now
        drops every period schema from 2026-Q1 on, newest first. Test-only.
 
+207. **[in-progress, 2026-10-16]** **[Data generation]** **[Testing & dev tooling]**
+     **delivery-critic on REQ-GEN-207 (Child Protection grown ten years).**
+     Ran while a bootstrap rebuilt the database, so criteria 6 and 10's
+     counts went unchecked against the DB; the byte proof it re-ran itself
+     (206 of 222 original Child Protection files identical, 16 differing, all
+     in 2024-Q4 and 2026-Q3) agrees with the evidence.
+     - **D1 (fixed in text; question for Keith).** TS-54's register entry and
+       REQ-GEN-207's decision said cp-placements' 2024-Q4 supply was "promoted
+       amber". The amber moved there dirties only cp_carers and cp_clients, so
+       that supply is green, promoted - TS-54 still stands on a green one.
+       Both now say so; whether it should be amber is Keith's.
+     - **D2 (fixed).** TS-79b said "six years earlier" (ten); the SIX YEARS
+       decision is now marked superseded by TEN YEARS.
+     - **D3 (fixed, test-first).** `_grown_severities()` ignored injections: the
+       first scenario planted in a grown quarter (REQ-GEN-203/205/206 plan
+       to) would silently swallow a drawn amber, leave a lead-in unforced and
+       drop a red. It now refuses, naming the scenario, until it learns to
+       move them. `TestAScenarioInAGrownQuarterIsRefused` failed first.
+     - **E3 (fixed).** `tests/before_growth.py` now asserts it stripped
+       something, so a moved `GROWN_FROM` cannot turn the configuration tests
+       into edits of the wrong version.
+     - **Not fixed, recorded:** criterion 2's evidence is a hand count, not a
+       recorded dry run (superseded by the Emergency Department plan's
+       REQ-GEN-238, which re-runs it for the shrink); no ongoing byte pin for
+       the original fifteen (E1); `test_severity_counts_match_run_plan` is
+       circular for the grown quarters (E2 - checked by hand: the mix is from
+       seed 29000, oldest clean, 2 reds, 10 ambers).
+     - **Observations for Keith:** O1 the grown reds leave permanent
+       "Awaiting a decision" queue items (replacement `never`), visible on
+       today's pages and the TS-76/TS-77a jumps; O2 running-thoughts #98 seen
+       for real - checks shown on 2013 supplies with nothing saying they came
+       later; O3 grown extracts carry rows dated up to 13 years after the
+       extract (the base data is not date-filtered); O4 a knock-on headline
+       reads Red while its history row reads Green (pre-existing at
+       2024-03-15 too); O5 later supplies listed as "Waiting" at a past date
+       (pre-existing). Stale comments at scenario_injection.py TS-76/TS-77a.
+
+208. **[blocked, 2026-10-16]** **[Data generation]** **[QA checks & contract]**
+     **REQ-GEN-044's evening-before era was built and shelved.** Byte proof
+     clean (449 of 449 existing Birth Registrations deliveries identical, 12
+     new), but `mothman schedule validate` refuses the configuration: the
+     2026-06-30 participation version leaves out the new version's
+     `days_before: 1`, restating `days_before: 0` there is refused by the
+     agreement freeze, and every later version needs the same. Caught by the
+     configuration tests and the critic before any push. The whole change is
+     `docs/drafts/evening-before/evening-before.patch`, with the options for
+     Keith in that folder's README.
+

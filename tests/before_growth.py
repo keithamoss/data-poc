@@ -17,8 +17,12 @@ GROWN_FROM = "2013-01-01"
 def calendar(doc: dict) -> dict:
     """`doc` (a parsed calendar.yaml) with every version effective from the
     grown history's first day removed, in place; returns it."""
+    stripped = []
+
     def keep(versions):
-        return [v for v in versions if str(v.get("effective_from")) != GROWN_FROM]
+        kept = [v for v in versions if str(v.get("effective_from")) != GROWN_FROM]
+        stripped.append(len(versions) - len(kept))
+        return kept
 
     for cal in doc.get("calendars") or []:
         cal["versions"] = keep(cal.get("versions") or [])
@@ -30,6 +34,10 @@ def calendar(doc: dict) -> dict:
         block = entry.get("participation")
         if block and block.get("versions"):
             block["versions"] = keep(block["versions"])
+    # IT MUST HAVE REMOVED SOMETHING (post-build-review #207 E3): if the grown
+    # versions ever move off GROWN_FROM, this would strip nothing and every
+    # test edits the grown version instead, passing for the wrong reason.
+    assert sum(stripped), f"before_growth stripped nothing: no version is effective {GROWN_FROM}"
     return doc
 
 

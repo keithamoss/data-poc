@@ -699,12 +699,27 @@ def _ordinary_severities(periods, injected_by_period) -> list:
     return [None if p.name in green else sev for p, sev in zip(periods, out)]
 
 
-def _grown_severities(periods) -> list:
+def _grown_severities(periods, injected_by_period) -> list:
     """The grown quarters' drawn severities (REQ-GEN-207), placed outside a
     hold era as _ordinary_severities places the original fifteen's. No
     scenario is planted in them in this change (criterion 7), so nothing
-    there is unavailable; the oldest stays clean, as the history's first."""
+    there is unavailable; the oldest stays clean, as the history's first.
+
+    REFUSED, NAMING THE SCENARIO, the moment one is (post-build-review #207
+    D3): this plan does not move a drawn amber or red off a scenario's
+    quarter or force its lead-ins clean, so a scenario here would silently
+    swallow them. Teach it to, as _ordinary_severities does, before planting
+    one in a grown quarter."""
     from generator import targeting
+
+    names = {p.name for p in periods}
+    for period, (injection, _placement) in injected_by_period.items():
+        if period in names:
+            raise scenario_injection.CannotPlace(
+                f"{injection.scenario_id} sits in the grown quarter {period}, and the grown "
+                f"quarters' plan cannot yet move a drawn amber or red off a scenario's quarter "
+                f"or keep its lead-ins clean - teach _grown_severities to, as "
+                f"_ordinary_severities does, before planting a scenario there")
 
     return targeting.outside_hold([sev for _q, sev in GROWN_RUN_PLAN[:len(periods)]],
                                   [p.date for p in periods], "cp-clients",
@@ -736,7 +751,7 @@ def main() -> None:
     # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
     # Each plan over its own periods (REQ-GEN-207 criterion 4).
     severities = _ordinary_severities(original, injected_by_period)
-    grown_severities = _grown_severities(grown)
+    grown_severities = _grown_severities(grown, injected_by_period)
     # ONLY THEN is the last history cleared: a scenario or target refused
     # above leaves the one already on disk standing (REQ-GEN-184
     # criterion 11).
