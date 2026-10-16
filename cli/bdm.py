@@ -23,7 +23,8 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
-from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
+from qa_tools.bdm import bdm_common, orchestrate_bdm
+from qa_tools.tools import stage
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common import trial as trial_mod
@@ -143,7 +144,7 @@ def try_targets(say=None) -> int:
         raise TargetTrialFailed(f"what the generator built could not be read, so the "
                                 f"deliveries just written were removed: {exc}") from exc
     tried = [b for b in built
-             if b.injected and b.dataset_id == build_per_run_warehouses.DATASET_ID]
+             if b.injected and b.dataset_id == bdm_common.DATASET_ID]
     found = []
     for built in tried:
         say(f"Trying {built.label} against the real tools (built to {built.target})")
@@ -252,7 +253,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
         arrival = common.kept_arrival("civil-registration", "run_", run_id)
         common.record_delivery_of(arrival)
-        build_per_run_warehouses.stage_arrival(arrival)
+        stage.stage_arrival(orchestrate_bdm.COLLECTION_ID, arrival)
         return orchestrate_bdm.run_arrivals([arrival], run_by, on_step=on_step), run_id
 
     csv_path = entry["csv_path"]
@@ -341,15 +342,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
         # Keith, 2026-10-02). --reference-file applies to a trial only.
         found = hand_filing.arrivals_of(filed, "civil-registration", "run_")
         for arrival in found:
-            for ordinal, name in enumerate(sorted(arrival.files_by_dataset[
-                    build_per_run_warehouses.DATASET_ID]), start=1):
-                build_per_run_warehouses.build_one(
-                    arrival.run_id, str(arrival.path / name),
-                    asset_time.local_date(arrival.received_at).isoformat(),
-                    ordinal=ordinal if len(arrival.files_by_dataset[
-                        build_per_run_warehouses.DATASET_ID]) > 1 else 0,
-                    received_at=arrival.received_at,
-                    delivery_name=arrival.delivery_name)
+            stage.stage_arrival(orchestrate_bdm.COLLECTION_ID, arrival)
         return orchestrate_bdm.run_arrivals(found, run_by, on_step=on_step), filed
     run_id = filed.run_id
     csv_path = filed.paths[0]
@@ -366,7 +359,8 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     # this flow that was checked against a file rather than the
     # warehouse. Child Protection's own local-folder mode already
     # staged both sides; this is BDM catching up.
-    build_per_run_warehouses.build_one(reference_run_id, reference_csv, run_date)
+    stage.stage_table(orchestrate_bdm.COLLECTION_ID, reference_run_id, bdm_common.TABLE,
+                      reference_csv, run_date=run_date)
 
     try:
         results = _run_single_preserving_manifest(

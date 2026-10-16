@@ -15,7 +15,7 @@ from click.testing import CliRunner
 
 import cli.common as common
 import cli.cp as cp
-import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
+from qa_tools.tools import stage
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
@@ -544,10 +544,10 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
 
     add_table_calls = []
 
-    def _fake_add_table_to_run(run_id, table, csv_path, **kwargs):
+    def _fake_add_table_to_run(collection_id, run_id, table, csv_path, **kwargs):
         add_table_calls.append((run_id, table, csv_path))
 
-    monkeypatch.setattr(build_cp_warehouses, "add_table_to_run", _fake_add_table_to_run)
+    monkeypatch.setattr(stage, "stage_table", _fake_add_table_to_run)
 
     borrowed = {}
 

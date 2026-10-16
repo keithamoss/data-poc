@@ -1,5 +1,5 @@
 """Covers the "this arrival has already been staged" branch in
-qa_tools/{bdm,cp}/build_*_warehouses.py's build_all().
+qa_tools/tools/stage.py's build_all().
 
 Every other test that uses the shared bdm_duckdb_dir/cp_duckdb_dir
 fixtures (tests/conftest.py) stages into a fresh database, so that
@@ -26,10 +26,13 @@ raw.<table>` did.
 """
 from __future__ import annotations
 
-from qa_tools.bdm.build_per_run_warehouses import build_all as build_all_bdm
-from qa_tools.common import supply_db
-from qa_tools.cp.build_cp_warehouses import build_all as build_all_cp
+import functools
 
+from qa_tools.common import supply_db
+from qa_tools.tools import stage
+
+build_all_bdm = functools.partial(stage.build_all, "civil-registration")
+build_all_cp = functools.partial(stage.build_all, "child-protection")
 
 def _staged(dsn, logical):
     conn = supply_db.connect(read_only=True, dsn=dsn)

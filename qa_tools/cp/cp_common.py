@@ -1,8 +1,8 @@
 """
 Child Protection's own place in the hierarchy, resolved rather than
 restated (REQ-QAC-039), plus the genuinely CP-specific lookups the four
-real-tool scripts share (run_dbt_cp.py, run_soda_cp.py,
-run_datacontract_cp.py, run_evidently_cp.py, orchestrate_cp.py, and
+real-tool scripts share (qa_tools/tools/run_dbt.py, qa_tools/tools/run_soda.py,
+qa_tools/tools/run_datacontract.py, qa_tools/tools/run_evidently.py, orchestrate_cp.py, and
 pipeline/build_cp_dashboard_data.py).
 
 WHAT CHANGED, 2026-09-23. The agency/collection ids and names, the list
@@ -46,7 +46,7 @@ from qa_tools.collections.child_protection import TABLE_PK as TABLE_PK  # noqa: 
 # associated with for the same reason (see dbt_project/tests/*.sql).
 #: Which LOGICAL TABLES each singular business-rule test reads
 #: (REQ-PIPE-078 criterion 9). Stated rather than parsed out of the
-#: SQL, for the same reason run_dbt_cp.py selects an explicit node list
+#: SQL, for the same reason qa_tools/tools/run_dbt.py selects an explicit node list
 #: rather than a graph selector: a derivation that silently gets it
 #: wrong drops a test nobody notices is missing.
 #:

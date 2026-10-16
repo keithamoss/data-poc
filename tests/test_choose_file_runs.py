@@ -19,6 +19,7 @@ import pytest
 
 from qa_tools.common import qa_store, recheck, settlement, supply_db, supply_files
 from qa_tools.common import filing_decisions as fd
+from qa_tools.tools import stage
 
 DS = "birth-registrations"
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
@@ -27,7 +28,7 @@ REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
 @pytest.fixture
 def pair(supply_dsn, tmp_path, monkeypatch):
     from generator.daily_batch import generate_daily_batch
-    from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
+    from qa_tools.bdm import orchestrate_bdm
     from qa_tools.common import arrivals, delivery, delivery_log, promotion
 
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
@@ -53,7 +54,7 @@ def pair(supply_dsn, tmp_path, monkeypatch):
     (arrival,) = [a for a in arrivals.arrivals_for("civil-registration", "run_",
                                                    deliveries, receipts)
                   if a.delivery_name == name]
-    build_per_run_warehouses.stage_arrival(arrival)
+    stage.stage_arrival("civil-registration", arrival)
     orchestrate_bdm.run_arrivals([arrival], "pytest@example.org")
     pair_id = f"{DS}@{supply_db.arrival_segment(arrival.received_at)}#1"
     return pair_id, day.isoformat(), chosen, spare

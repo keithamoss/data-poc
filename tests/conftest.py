@@ -641,9 +641,9 @@ def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
     """
     from pathlib import Path
 
-    from qa_tools.bdm.build_per_run_warehouses import build_all
+    from qa_tools.tools import stage
 
-    build_all(deliveries_dir=Path(bdm_raw_dir) / "deliveries",
+    stage.build_all("civil-registration", deliveries_dir=Path(bdm_raw_dir) / "deliveries",
                receipts_dir=Path(bdm_raw_dir) / "receipts")
     return supply_dsn
 
@@ -748,16 +748,16 @@ def cp_duckdb_dir(supply_dsn, cp_raw_dir):
     """
     from pathlib import Path
 
-    from qa_tools.cp.build_cp_warehouses import build_all
+    from qa_tools.tools import stage
 
     # deliveries_dir/receipts_dir passed EXPLICITLY. Without them
     # build_all() recognises arrivals from the real data/deliveries/
     # tree (REQ-GEN-043) - a real leak this fixture hit for exactly one
     # run, building 18 real CP warehouses into a pytest tmp dir while
     # the fixture's own two sat unread.
-    build_all(
-               deliveries_dir=Path(cp_raw_dir) / "deliveries",
-               receipts_dir=Path(cp_raw_dir) / "receipts")
+    stage.build_all(
+        "child-protection", deliveries_dir=Path(cp_raw_dir) / "deliveries",
+        receipts_dir=Path(cp_raw_dir) / "receipts")
     _file_and_overlay_cp(Path(cp_raw_dir) / "deliveries", Path(cp_raw_dir) / "receipts")
     return supply_dsn
 
@@ -790,7 +790,7 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
 
     from qa_tools.common import arrivals, decision_log, filing, period_overlay, promotion
     from qa_tools.common import asset_time, qa_store, supply_db
-    from qa_tools.cp.build_cp_warehouses import TABLES
+    from qa_tools.cp.cp_common import TABLES
 
     from qa_tools.common import delivery as delivery_mod
     from qa_tools.common import delivery_log

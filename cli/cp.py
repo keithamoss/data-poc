@@ -5,7 +5,7 @@ cli/bdm.py, adapted for CP's real differences from Birth Registrations:
 a 6-table-per-run collection (not one CSV), no row-count-growth check
 at all, and orchestrate_cp.run_single() needing all 6
 tables already loaded into that run's warehouse (via
-build_cp_warehouses.add_table_to_run()) before it's called at all.
+qa_tools.tools.stage.stage_table()) before it's called at all.
 
 The Local files mode (Phase 2) folds in qa_tools/cp/check_delivery.py's
 own retired standalone-CLI logic verbatim (that module is gone - this is
@@ -25,7 +25,8 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
-from qa_tools.cp import build_cp_warehouses, cp_common, orchestrate_cp
+from qa_tools.cp import cp_common, orchestrate_cp
+from qa_tools.tools import stage
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
 from qa_tools.common import delivery, hand_filing, hierarchy
@@ -228,8 +229,8 @@ def _load_delivery_from_folder(folder: str, run_id: str, received_at=None,
     browsed to)."""
     paths = _six_by_pattern(folder, recorded=recorded)
     for table in TABLES:
-        build_cp_warehouses.add_table_to_run(run_id, table, paths[table],
-                                             received_at=received_at)
+        stage.stage_table(cp_common.COLLECTION_ID, run_id, table, paths[table],
+                          received_at=received_at)
 
 
 def _refuse_a_contested_arrival(entry: dict) -> None:
@@ -310,7 +311,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
         arrival = common.kept_arrival("child-protection", "cp_run_", run_id)
         common.record_delivery_of(arrival)
-        build_cp_warehouses.stage_arrival(arrival)
+        stage.stage_arrival(cp_common.COLLECTION_ID, arrival)
         return orchestrate_cp.run_arrivals([arrival], run_by, on_step=on_step), run_id
     recorded_run_id = trial_mod.trial_run_id()
     entry = {**entry, "run_id": recorded_run_id}
@@ -335,14 +336,7 @@ def _check_filed_delivery(filed, run_by: str, on_step=None) -> list[dict]:
     recognition, never from the folder's own listing."""
     found = hand_filing.arrivals_of(filed, "child-protection", "cp_run_")
     for arrival in found:
-        (dataset_id, names), = arrival.files_by_dataset.items()
-        table = hierarchy.dataset(dataset_id).table
-        for ordinal, name in enumerate(sorted(names), start=1):
-            build_cp_warehouses.add_table_to_run(
-                arrival.run_id, table, str(arrival.path / name),
-                ordinal=ordinal if len(names) > 1 else 0,
-                received_at=arrival.received_at, dataset_id=dataset_id,
-                delivery_name=arrival.delivery_name)
+        stage.stage_arrival(cp_common.COLLECTION_ID, arrival)
     return orchestrate_cp.run_arrivals(found, run_by, on_step=on_step)
 
 
@@ -541,8 +535,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
 
     _load_delivery(other_tables_run_id)  # full 6-table warehouse, doubles as the Evidently reference
 
-    build_cp_warehouses.add_table_to_run(run_id, table, file_path,
-                                          received_at=filed.received_at)
+    stage.stage_table(cp_common.COLLECTION_ID, run_id, table, file_path,
+                      received_at=filed.received_at)
     # THE OTHER FIVE ARE BORROWED, NEVER RE-STAGED (REQ-PIPE-103). They
     # were staged when they really arrived, in the run this one is
     # reading them from; staging them again under THIS arrival would

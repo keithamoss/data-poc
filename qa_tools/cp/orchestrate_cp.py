@@ -15,7 +15,7 @@ orchestrate_bdm.py's docstring for why it stopped running in parallel.
 Reads the arrivals recognised in the delivery tree (data/deliveries/,
 generator/generate_cp_runs.py's output) and stages each table as it
 arrives, into the PostgreSQL supply database's staging schema
-(build_cp_warehouses.stage_arrival, REQ-PIPE-068) - nothing is staged up
+(qa_tools/tools/stage.py's stage_arrival, REQ-PIPE-068) - nothing is staged up
 front.
 
 Run through `mothman pipeline run`/`bootstrap` or `mothman cp qa`, never
@@ -50,13 +50,13 @@ from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_writer import (
     finish_run, open_run, run_owner, scope_of_run, write_qa_result)
-from . import build_cp_warehouses
 from . import cp_common
 from . import dataset_stats
 from qa_tools.tools import run_dbt
 from qa_tools.tools import run_soda
 from qa_tools.tools import run_datacontract
 from qa_tools.tools import run_evidently
+from qa_tools.tools import stage
 from qa_tools.common import arrival_lifecycle
 from qa_tools.common import replay_clock
 from qa_tools.common import asset_time
@@ -472,7 +472,7 @@ def file_and_overlay(arrival, among=None) -> None:
     sibling here and again at its own turn is the same filing.
     """
     filing.file_arrivals(simultaneous_with(arrival, among))
-    period_overlay.rebuild_for_arrival(arrival, tables=build_cp_warehouses.TABLES)
+    period_overlay.rebuild_for_arrival(arrival, tables=cp_common.TABLES)
 
 
 def simultaneous_with(arrival, among) -> list:
@@ -645,7 +645,7 @@ def run_pipeline_cp(sequential: bool = False,
     all_results = arrival_lifecycle.process_all(
         found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp,
         player=player if player is not None else scripted_decisions.Player(cp_common.COLLECTION_ID),
-        prepare=arrival_lifecycle.staged_as_it_arrives(build_cp_warehouses.stage_arrival),
+        prepare=arrival_lifecycle.staged_as_it_arrives(stage.stager(cp_common.COLLECTION_ID)),
         start_at=start_at, after_each=after_each)
 
     # A DELIVERY NO ARRIVAL CLAIMED is recorded once the arrivals are done

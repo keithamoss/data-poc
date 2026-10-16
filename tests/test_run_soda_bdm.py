@@ -1,5 +1,5 @@
-"""Real Soda Core integration test for qa_tools/bdm/run_soda_bdm.py's
-evaluate_soda_bdm() - the actual "parse Soda's real scan results into
+"""Real Soda Core integration test for qa_tools/tools/run_soda.py's
+evaluate() - the actual "parse Soda's real scan results into
 our check-result shape" logic, not previously exercised under pytest
 at all (see tests/conftest.py's own docstring). Runs a REAL Soda Scan
 against the real contract/bdm-birth-registrations-soda-checks.yml and

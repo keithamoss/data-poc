@@ -1,5 +1,5 @@
 """Real Evidently AI integration test for qa_tools/bdm/
-run_evidently_bdm.py's evaluate_evidently_bdm() - the actual "compute a
+qa_tools/tools/run_evidently.py's evaluate() - the actual "compute a
 real PSI drift metric and a real row-count-growth comparison, then
 shape them into our check-result records" logic, not previously
 exercised under pytest at all (see tests/conftest.py's own docstring

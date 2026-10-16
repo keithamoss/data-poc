@@ -1,5 +1,5 @@
 """Real datacontract-cli integration test for qa_tools/cp/
-run_datacontract_cp.py's evaluate_datacontract_cp() - the CP
+qa_tools/tools/run_datacontract.py's evaluate() - the CP
 counterpart to tests/test_run_datacontract_bdm.py. Unlike BDM's single
 CSV, this reads all 6 real tables from the warehouse -
 no explicit csv_filename argument needed."""

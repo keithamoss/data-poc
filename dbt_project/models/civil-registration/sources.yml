@@ -1,8 +1,7 @@
 version: 2
 
 # The raw tables one arrival's rows are staged into
-# (qa_tools/bdm/build_per_run_warehouses.py,
-# qa_tools/cp/build_cp_warehouses.py) - declared as a dbt source so
+# (qa_tools/tools/stage.py) - declared as a dbt source so
 # stg_birth_registrations.sql below is a genuine staging-layer model
 # (source -> typed/cleaned staging view), not a check running on raw
 # input directly.

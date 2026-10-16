@@ -63,7 +63,6 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
 
 def _code(calls: list) -> types.ModuleType:
     code = types.ModuleType(CODE)
-    code.TABLES = [FAKE_TABLE]
     code.run_pipeline = lambda **kw: calls.append(("run_pipeline", kw))
     code.build_results_from_history = lambda: calls.append(("rebuild",))
     code.generate = lambda *, trial: calls.append(("generate", trial))
@@ -82,7 +81,7 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     adapter = types.ModuleType("qa_tools.collections.fake_collection")
     adapter.ADAPTER = CollectionAdapter(
         collection_id=FAKE_ID, label="Fake Things", orchestrator=CODE,
-        run_pipeline_function="run_pipeline", warehouse_builder=CODE, warehouse_tables="TABLES",
+        run_pipeline_function="run_pipeline",
         results_rebuild=CODE, generator=f"{CODE}:generate", target_datasets=(FAKE_DATASET,),
         dashboard_json="fake_collection_dashboard.json",
         dashboard_datasets=lambda doc: list(doc["datasets"]),

@@ -310,11 +310,10 @@ def _red(results) -> bool:
     return any((r or {}).get("status") in ("fail", "error") for r in results or ())
 
 
-def _modules(collection_id):
+def _orchestrator(collection_id):
     from qa_tools import collections
 
-    adapter = collections.adapter(collections.by_id(collection_id))
-    return adapter.orchestrator_module(), adapter.builder_module()
+    return collections.adapter(collections.by_id(collection_id)).orchestrator_module()
 
 
 def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = None,
@@ -470,8 +469,9 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
         if out_of_time():
             break
         try:
-            _, builder = _modules(arrival.collection_id)
-            builder.stage_arrival(arrival)
+            from qa_tools.tools import stage
+
+            stage.stage_arrival(arrival.collection_id, arrival)
             staged.add(arrival.run_id)
         except Exception as exc:  # noqa: BLE001 - criterion 14: reported, left owed
             fail_arrival(arrival, exc)
@@ -560,7 +560,7 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
         state = state_of(arrival, recorded(conn))
     if state == PROCESSED:
         return
-    orchestrator, _ = _modules(arrival.collection_id)
+    orchestrator = _orchestrator(arrival.collection_id)
     if state == UNGATED:
         # CHECKED BUT NOT GATED: its recorded results, the gate, nothing
         # re-run - a second set of results under the same run id is what

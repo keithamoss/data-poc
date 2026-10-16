@@ -23,7 +23,7 @@ uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
 
 `dbt deps` is a one-time step (re-run only if `dbt_project/packages.yml`
 changes) that installs `dbt_utils` - both `dbt build` calls
-(`qa_tools/bdm/run_dbt_bdm.py`/`qa_tools/cp/run_dbt_cp.py`) will fail to
+(`qa_tools/tools/run_dbt.py`, one shared runner for every collection) will fail to
 compile without it, since several of this project's real dbt tests
 (`dbt_utils.accepted_range`/`expression_is_true`/`recency` - see
 `plans/qa-pipeline.md`'s dbt_utils switch) reference macros that package
@@ -124,10 +124,10 @@ nothing here is a hand-rolled stand-in:
 
 | Tool | What's real | What runs it |
 |---|---|---|
-| **datacontract-cli** | `contract/registry-services/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/bdm/run_datacontract_bdm.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
-| **Soda Core** | `contract/registry-services/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/bdm/run_soda_bdm.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
-| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/bdm/run_dbt_bdm.py` shells out to the real `dbt` CLI (`dbt build`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
-| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/bdm/run_evidently_bdm.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
+| **datacontract-cli** | `contract/registry-services/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/tools/run_datacontract.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's own view schema in the warehouse. |
+| **Soda Core** | `contract/registry-services/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/tools/run_soda.py` runs the real `soda-core` `Scan` API against each run's own view schema. |
+| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/tools/run_dbt.py` shells out to the real `dbt` CLI (`dbt build`) against each run's own view schema. |
+| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/tools/run_evidently.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `pyproject.toml` lists the exact package set verified to install and run
 together. It includes a real, documented conflict: `soda-core-duckdb`
@@ -198,21 +198,21 @@ qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently
     parallel_orchestrate.py       generic parallel-or-sequential dispatch across a manifest, shared by
                                  orchestrate_bdm.py and orchestrate_cp.py - see "Speed" below
     dbt_common.py, soda_common.py, datacontract_common.py, evidently_common.py
-                                   tool-generic subprocess/API invocation + parsing, shared by each tool's
-                                 bdm/cp pair - see "Code layout" below
+                                   tool-generic subprocess/API invocation + parsing, shared by the
+                                 runners in tools/ - see "Code layout" below
+  tools/                     one module per real tool, run for any collection by its id (REQ-QAC-242)
+    stage.py                  stages each arriving file and builds the run's own view schema
+    run_dbt.py                shells out to the real `dbt` CLI
+    run_soda.py               runs the real soda-core Scan API
+    run_datacontract.py       runs the real datacontract-cli Python API
+    run_evidently.py          runs the real evidently.Report + DataDriftPreset
+    legacy.py                 the named flags that keep each collection's recorded output unchanged
+  collections/               the collection registry, and each collection's adapter (what the tools read)
   bdm/
-    build_per_run_warehouses.py   one DuckDB file per run, for dbt/Soda to connect to
-    run_dbt_bdm.py            shells out to the real `dbt` CLI
-    run_soda_bdm.py           runs the real soda-core Scan API
-    run_datacontract_bdm.py   runs the real datacontract-cli Python API
-    run_evidently_bdm.py      runs the real evidently.Report + DataDriftPreset
-    orchestrate_bdm.py        all four, across every run (parallel by default) -> reports/results_bdm.json
+    orchestrate_bdm.py        all four tools, across every run -> reports/results_bdm.json
   cp/
-    cp_common.py                   shared agency/collection/dataset id constants for the 6 CP scripts below
-    build_cp_warehouses.py         one DuckDB file per CP snapshot run, all 6 tables under a `raw` schema
-    run_dbt_cp.py, run_soda_cp.py, run_datacontract_cp.py, run_evidently_cp.py
-                                    the CP counterparts to the 4 bdm/ real-tool scripts above
-    orchestrate_cp.py         all four, across every CP run (parallel by default) -> reports/results_cp.json
+    cp_common.py              shared agency/collection/dataset id constants for Child Protection
+    orchestrate_cp.py         all four tools, across every CP run -> reports/results_cp.json
 pipeline/                    a real package (pipeline/__init__.py) - invoked via `mothman pipeline
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   load.py                       loads every generated run into one combined DuckDB table (still needed -
@@ -610,9 +610,9 @@ held from the original equivalent-only build.
   partial parsing, forcing `--store-failures`, and substituting `SUM` for
   `COUNT` — none of it was the cause, and no SQL-level explanation was
   found despite extensive isolation (documented in `schema.yml` and
-  `qa_tools/bdm/run_dbt_bdm.py`). The two affected tests now use
+  `qa_tools/tools/run_dbt.py`). The two affected tests now use
   absolute row-count thresholds instead of a computed percentage, and
-  `run_dbt_bdm.py` independently re-verifies both tests' result via a
+  `qa_tools/tools/run_dbt.py` independently re-verifies both tests' result via a
   direct query against the same warehouse dbt just tested, rather than
   trust a demonstrated-unreliable number — dbt-core still genuinely runs
   the real check; only the two known-unreliable numbers are cross-checked.
@@ -666,11 +666,11 @@ held from the original equivalent-only build.
   single value violate a rule") — not a miscalibration.
 - **A single warn/fail threshold can't represent every real rule shape.**
   ODCS severity is single-tier (a rule is either strictly pass/fail, or
-  pass/warn-only, never a three-way band) — `run_datacontract_bdm.py`
+  pass/warn-only, never a three-way band) — `qa_tools/tools/run_datacontract.py`
   encodes that into the dashboard's two-threshold shape as warn==fail
   (error severity) or an unreachable fail ceiling (warning/info severity).
   Soda's `row_count` check is a genuine two-sided range (too few *or* too
-  many rows); `run_soda_bdm.py`'s threshold handling reduces it to the
+  many rows); `qa_tools/tools/run_soda.py`'s threshold handling reduces it to the
   upper bound only for display, and this is the one place where a piece
   of real information (the lower bound) is dropped for the sake of a
   single scalar.

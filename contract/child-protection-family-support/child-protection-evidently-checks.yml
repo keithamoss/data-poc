@@ -1,19 +1,19 @@
 # Child Protection's Evidently checks (REQ-QAC-241). They used to be a Python
 # dict in qa_tools/cp/evidently_check_lifecycle.py; see
 # contract/registry-services/bdm-birth-registrations-evidently-checks.yml
-# for why they live here now, and how run_evidently_cp.py reads them.
+# for why they live here now, and how qa_tools/tools/run_evidently.py reads them.
 #
 # ONE ROW-COUNT CHECK PER DATASET (REQ-QAC-108 criterion 1), six rather than
 # one, because the question is about a TABLE: a collection-wide count would
 # say something shrank without saying what. Each check's dataset is the
-# fourth segment of its id, and run_evidently_cp.py counts that dataset's
+# fourth segment of its id, and qa_tools/tools/run_evidently.py counts that dataset's
 # table.
 #
 # Every date is quoted, so it stays the string it was. Writing the
 # reader-facing prose: docs/check-authoring-rules.md.
 checks:
   - check_id: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.drift_psi_evidently
-    # Matches the "dimension": "consistency" run_evidently_cp.py's result
+    # Matches the "dimension": "consistency" qa_tools/tools/run_evidently.py's result
     # has always carried. PSI over the column, tripped on a strict >.
     category: consistency
     introduced_date: "2023-01-15"
@@ -33,7 +33,7 @@ checks:
     # Introduced the day it was authored, not the day the collection started:
     # a check cannot have found anything before it existed. A whole-table
     # count, filed in "Supply-level checks" (column "(table)", see
-    # run_evidently_cp.py).
+    # qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-09-29"
     description: The number of rows must not drop sharply against the last promoted supply.
@@ -52,7 +52,7 @@ checks:
     # Introduced the day it was authored, not the day the collection started:
     # a check cannot have found anything before it existed. A whole-table
     # count, filed in "Supply-level checks" (column "(table)", see
-    # run_evidently_cp.py).
+    # qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-09-29"
     description: The number of rows must not drop sharply against the last promoted supply.
@@ -71,7 +71,7 @@ checks:
     # Introduced the day it was authored, not the day the collection started:
     # a check cannot have found anything before it existed. A whole-table
     # count, filed in "Supply-level checks" (column "(table)", see
-    # run_evidently_cp.py).
+    # qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-09-29"
     description: The number of rows must not drop sharply against the last promoted supply.
@@ -90,7 +90,7 @@ checks:
     # Introduced the day it was authored, not the day the collection started:
     # a check cannot have found anything before it existed. A whole-table
     # count, filed in "Supply-level checks" (column "(table)", see
-    # run_evidently_cp.py).
+    # qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-09-29"
     description: The number of rows must not drop sharply against the last promoted supply.
@@ -109,7 +109,7 @@ checks:
     # Introduced the day it was authored, not the day the collection started:
     # a check cannot have found anything before it existed. A whole-table
     # count, filed in "Supply-level checks" (column "(table)", see
-    # run_evidently_cp.py).
+    # qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-09-29"
     description: The number of rows must not drop sharply against the last promoted supply.
@@ -128,7 +128,7 @@ checks:
     # Introduced the day it was authored, not the day the collection started:
     # a check cannot have found anything before it existed. A whole-table
     # count, filed in "Supply-level checks" (column "(table)", see
-    # run_evidently_cp.py).
+    # qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-09-29"
     description: The number of rows must not drop sharply against the last promoted supply.

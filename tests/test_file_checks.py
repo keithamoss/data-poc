@@ -121,9 +121,8 @@ class TestIdentity:
 
 
 import dbsupport  # noqa: E402
-
-from qa_tools.bdm import build_per_run_warehouses as bdm  # noqa: E402
 from qa_tools.common import load_log, qa_store, supply_db  # noqa: E402
+from staging_support import stage_bdm, stage_cp
 
 _RECEIPT = "2026-09-25T09:00:00+08:00"
 _LATER = "2026-09-26T09:00:00+08:00"
@@ -153,7 +152,7 @@ def _staged():
 
 
 def _stage(path, received=_RECEIPT, run="run_001"):
-    return bdm.build_one(run, str(path), "2026-09-25", received_at=received,
+    return stage_bdm(run, str(path), "2026-09-25", received_at=received,
                           delivery_name="drop-1")
 
 
@@ -244,11 +243,10 @@ def test_an_evaluator_bug_fails_the_load_and_records_nothing(staging, monkeypatc
 
 def test_child_protection_is_screened_too(staging):
     """Criterion 15, the other collection's loader."""
-    from qa_tools.cp import build_cp_warehouses as cp
 
     path = staging / "cp_carers.csv"
     path.write_text("carer_id,given_name\nC1\n")
-    assert cp.add_table_to_run("run_001", "cp_carers", str(path), received_at=_RECEIPT,
+    assert stage_cp("run_001", "cp_carers", str(path), received_at=_RECEIPT,
                                dataset_id="cp-carers", delivery_name="drop-1") is None
     assert any(r[1] == fc.FAIL and r[0].endswith(".fields_per_row_file")
                for r in _results())
@@ -260,11 +258,10 @@ def test_a_load_with_no_dataset_id_is_recorded_under_the_real_dataset(staging):
     it no dataset id, so its load record was filed under 'cp_carers' - a
     dataset that does not exist, which a failed-load blocker keyed on
     'cp-carers' never sees."""
-    from qa_tools.cp import build_cp_warehouses as cp
 
     path = staging / "cp_carers.csv"
     path.write_text("carer_id,given_name\nC1,Ann\n")
-    cp.add_table_to_run("run_001", "cp_carers", str(path), received_at=_RECEIPT,
+    stage_cp("run_001", "cp_carers", str(path), received_at=_RECEIPT,
                         delivery_name="drop-1")
     assert {r.dataset_id for r in load_log.records()} == {"cp-carers"}
 

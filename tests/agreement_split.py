@@ -155,11 +155,15 @@ def write(contract_dir: Path, merged: dict, base: dict | None = None) -> None:
 
 
 def clear_caches() -> None:
-    """Forget every parsed copy of either file."""
+    """Forget every parsed copy of either file - the collection registry's
+    included, which is built from the hierarchy and would otherwise outlive
+    a test that swapped it (REQ-QAC-242)."""
+    from qa_tools import collections
     from qa_tools.common import agreement, asset_time, hierarchy
 
     agreement.current.cache_clear()
     hierarchy._load.cache_clear()
+    collections._load.cache_clear()
     asset_time.timezone_versions.cache_clear()
 
 

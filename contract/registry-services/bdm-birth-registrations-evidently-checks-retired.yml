@@ -6,5 +6,5 @@
 # bdm-birth-registrations-evidently-checks.yml, adding `retired_as_of` and
 # `retired_reason` (both required together - see check_lifecycle.py's
 # CheckMetadata). Never edit a check_id, never delete an entry outright.
-# run_evidently_bdm.py stops evaluating a check the day its entry moves.
+# qa_tools/tools/run_evidently.py stops evaluating a check the day its entry moves.
 checks: []

@@ -1,5 +1,5 @@
-"""Real dbt-core integration test for qa_tools/bdm/run_dbt_bdm.py's
-evaluate_dbt_bdm() - the actual "parse dbt's real manifest.json/
+"""Real dbt-core integration test for qa_tools/tools/run_dbt.py's
+evaluate() - the actual "parse dbt's real manifest.json/
 run_results.json into our check-result shape, and re-verify counts via
 the audit-table workaround for the real dbt-core#11312 bug" logic, not
 previously exercised under pytest at all (see tests/conftest.py's own
@@ -15,11 +15,11 @@ import pytest
 import qa_tools.tools.run_dbt as run_dbt
 
 # The run_ids bdm_duckdb_dir's fixture deliveries are RECOGNISED as, not
-# the names the fixture wrote (REQ-GEN-043) - evaluate_dbt_bdm() looks up
+# the names the fixture wrote (REQ-GEN-043) - evaluate() looks up
 # db_path purely from this run_id, so the two can never drift apart. See
 # tests/fixture_ids.py, and tests/test_fixture_ids.py for the guard that
 # keeps it honest. (Real parallel-test safety for dbt's own target-path
-# output lives in evaluate_dbt_bdm() itself now - see that function's own
+# output lives in evaluate() itself now - see that function's own
 # comment, plans/running-thoughts.md #12 - not here.)
 from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
 
@@ -27,7 +27,7 @@ from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _RE
 @pytest.fixture
 def _dbt_bdm(monkeypatch, bdm_duckdb_dir):
     # dbt's scratch database and its target_path both hang off the
-    # supply database's own directory (see evaluate_dbt_bdm() and
+    # supply database's own directory (see evaluate() and
     # supply_db.dbt_target_path()) - a per-worker pytest tmp dir, not a
     # real repo-relative location, so no manual cleanup is needed here
     # (pytest's own tmp dir retention handles it, same as every other

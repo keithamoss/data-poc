@@ -7,8 +7,6 @@ ADAPTER = CollectionAdapter(
     label="Birth Registrations",
     orchestrator="qa_tools.bdm.orchestrate_bdm",
     run_pipeline_function="run_pipeline",
-    warehouse_builder="qa_tools.bdm.build_per_run_warehouses",
-    warehouse_tables="TABLE",
     results_rebuild="qa_tools.bdm.build_results_from_history",
     generator="cli.bdm:generate_synthetic_data",
     target_datasets=("birth-registrations",),
@@ -95,5 +93,6 @@ ADAPTER = CollectionAdapter(
         "dbt.no_built_model_guard",
         "dbt.audits_skipped_tests",
         "dbt.no_left_out_note",
+        "stage.stamps_run_columns",
     }),
 )

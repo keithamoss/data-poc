@@ -12,8 +12,6 @@ from __future__ import annotations
 import os
 
 from qa_tools.common import supply_db, trial
-
-import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.tools.run_datacontract as run_datacontract
 import qa_tools.tools.run_dbt as run_dbt
@@ -23,6 +21,8 @@ import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
 from fixture_ids import (BDM_REF_RUN_ID as _REF_RUN_ID,
                           CP_DIRTY_RUN_ID as _CP_DIRTY_RUN_ID, CP_REF_RUN_ID as _CP_REF_RUN_ID)
+from staging_support import stage_bdm, stage_cp
+from qa_tools.cp import cp_common
 
 # The flat CSVs tests/conftest.py writes alongside its deliveries - the
 # "a human downloaded this file" shape run_single() exists for, which is
@@ -32,11 +32,6 @@ _DIRTY_CSV = "pytest_bdm_dirty.csv"
 
 
 def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
-    # run_single() copies the arrived file into build_per_run_warehouses.
-    # RAW_DIR itself (see that function's own docstring on why) - in real
-    # production this is the same literal path run_datacontract_bdm.py/
-    # run_evidently_bdm.py already default to, so all three must point at
-    # the SAME tmp dir here for the same reason.
     # One supply database, named by the environment - the three
     # module attributes this replaces pointed at a directory of
     # per-run DuckDB files (REQ-PIPE-068).
@@ -76,7 +71,7 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
             dst.write(src.read())
     # No out_dir: there is one supply database and it is named by the
     # environment, which _patch_bdm_dirs() above has already set.
-    build_per_run_warehouses.build_one(
+    stage_bdm(
         _REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01")
 
     # No injected severity is passed - run_single() has nowhere to put
@@ -140,10 +135,9 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # nothing the generator knew (REQ-GEN-043).
     # A TRIAL ID, staged the way the terminal's trial route stages one:
     # run_single runs trials only (REQ-PIPE-086 criterion 10).
-    import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
     run_id = trial.trial_run_id()
-    for table in build_cp_warehouses.TABLES:
-        build_cp_warehouses.add_table_to_run(
+    for table in cp_common.TABLES:
+        stage_cp(
             run_id, table, os.path.join(cp_raw_dir, _CP_DIRTY_RUN_ID, f"{table}.csv"))
     entry = {"run_id": run_id, "run_index": 2,
              "received_at": "2026-04-01T09:00:00+08:00",

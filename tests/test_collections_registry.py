@@ -16,7 +16,7 @@ from qa_tools.common import hierarchy
 from qa_tools.common import validate_collections as gate
 # The fixtures `third_collection` and `without_adapter` come from
 # tests/third_collection.py, made available by tests/conftest.py.
-from third_collection import BARE_ID, CODE, FAKE_DATASET, FAKE_ID, FAKE_SHORT, FAKE_TABLE
+from third_collection import BARE_ID, CODE, FAKE_DATASET, FAKE_ID, FAKE_PREFIX, FAKE_SHORT, FAKE_TABLE
 
 
 class TestTheRegistry:
@@ -92,14 +92,15 @@ class TestAThirdCollectionAtEverySite:
     def test_the_processing_pass_runs_it_with_its_own_code(self, third_collection):
         from qa_tools.common import processing_pass
 
-        orchestrator, builder = processing_pass._modules(FAKE_ID)
-        assert orchestrator is sys.modules[CODE] and builder is sys.modules[CODE]
+        # Staging is no longer the collection's own code: the shared stager
+        # takes the collection id (TestTheSharedStagingModule).
+        assert processing_pass._orchestrator(FAKE_ID) is sys.modules[CODE]
 
     def test_the_processing_pass_refuses_one_with_no_adapter(self, without_adapter):
         from qa_tools.common import processing_pass
 
         with pytest.raises(collections.NoAdapterError, match=BARE_ID):
-            processing_pass._modules(BARE_ID)
+            processing_pass._orchestrator(BARE_ID)
 
     @pytest.fixture
     def filed(self, supply_dsn):
@@ -720,3 +721,59 @@ class TestTheSharedToolModules:
                                             "fake_collection"))
         assert got == ["qa_tools/collections/fake_collection.py declares legacy flag "
                        "'no.such.flag', which no shared module knows (qa_tools/tools/legacy.py)"]
+
+
+class TestTheSharedStagingModule:
+    """Criterion 9 for staging, for real: a third collection's file staged
+    through qa_tools/tools/stage.py into this worker's own database, its
+    table, dataset and run prefix all from the registry."""
+
+    RECEIVED = "2026-01-01T01:00:00+00:00"
+
+    def _stage(self, tmp_path, monkeypatch, legacy=frozenset()):
+        import dataclasses
+
+        from qa_tools.common import supply_db
+        from qa_tools.tools import stage
+
+        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=legacy)
+        contract = tmp_path / "fake-contract.yaml"
+        contract.write_text(yaml.safe_dump({"schema": [{"name": FAKE_TABLE, "properties": [
+            {"name": "fake_id"}, {"name": "things"}]}]}))
+        csv = tmp_path / "fake_things.csv"
+        csv.write_text("fake_id,things\nF1,2\nF2,3\n")
+        run_id = f"{FAKE_PREFIX}001"
+        physical = stage.stage_table(FAKE_ID, run_id, FAKE_TABLE, str(csv),
+                                     contract_path=str(contract), received_at=self.RECEIVED,
+                                     run_date="2026-01-01")
+        with supply_db.connect(read_only=True, label="test-third-stage") as conn:
+            cols = [r[0] for r in conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position",
+                [supply_db.STAGING_SCHEMA, physical]).fetchall()]
+            viewed = conn.execute(
+                f'SELECT count(*) FROM "{supply_db.run_schema(run_id)}"."{FAKE_TABLE}"').fetchone()[0]
+        return physical, cols, viewed
+
+    def test_a_third_collections_file_is_staged_and_readable(
+            self, third_collection, supply_dsn, tmp_path, monkeypatch):
+        from qa_tools.common import load_log
+
+        physical, cols, viewed = self._stage(tmp_path, monkeypatch)
+        assert physical.startswith(FAKE_TABLE) and viewed == 2
+        assert cols == ["fake_id", "things"]
+        [record] = [r for r in load_log.records() if r.physical == physical]
+        assert record.dataset_id == FAKE_DATASET
+
+    @pytest.mark.parametrize("legacy,stamped", [
+        (frozenset(), False),
+        (frozenset({"stage.stamps_run_columns"}), True),
+    ])
+    def test_stamps_run_columns_keeps_birth_registrations_behaviour(
+            self, third_collection, supply_dsn, tmp_path, monkeypatch, legacy, stamped):
+        """The flag's whole effect, on the one thing it changes: the staged
+        table's columns."""
+        _, cols, _ = self._stage(tmp_path, monkeypatch, legacy)
+        assert ("run_id" in cols and "run_date" in cols) is stamped
+        assert cols[:2] == ["fake_id", "things"]

@@ -1,8 +1,7 @@
 """
 Explicit, contract-driven null handling for every CSV this pipeline
-reads - shared by qa_tools/bdm/build_per_run_warehouses.py,
-qa_tools/bdm/run_evidently_bdm.py, qa_tools/cp/build_cp_warehouses.py,
-and qa_tools/cp/run_evidently_cp.py.
+reads - shared by qa_tools/tools/stage.py and
+qa_tools/tools/run_evidently.py.
 
 Built after a real bug (plans/qa-pipeline.md #17): pandas' and DuckDB's
 default CSV readers each have their own hardcoded list of "these strings

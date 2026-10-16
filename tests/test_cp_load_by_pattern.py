@@ -7,7 +7,7 @@ import click
 import pytest
 
 import cli.cp as cp
-import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
+from qa_tools.tools import stage
 
 SIX = {"cp_clients.csv", "cp_notifications.csv", "cp_investigations.csv",
        "cp_placements.csv", "cp_carers.csv", "cp_case_workers.csv"}
@@ -22,8 +22,8 @@ def _folder(tmp_path, names):
 @pytest.fixture
 def loaded(monkeypatch):
     calls = []
-    monkeypatch.setattr(build_cp_warehouses, "add_table_to_run",
-                        lambda run_id, table, path, **kw: calls.append((table, path)))
+    monkeypatch.setattr(stage, "stage_table",
+                        lambda collection_id, run_id, table, path, **kw: calls.append((table, path)))
     return calls
 
 
@@ -78,7 +78,7 @@ class TestThePickerMarksAPair:
              "delivery": "d2",
              "contested": {"cp-clients": ["cp_clients.csv", "cp_clients_part2.csv"]}}])
         staged = []
-        monkeypatch.setattr(build_cp_warehouses, "stage_arrival", staged.append)
+        monkeypatch.setattr(stage, "stage_arrival", lambda collection_id, arrival: staged.append(arrival))
         for keep in (True, False):
             with pytest.raises(click.ClickException) as got:
                 cp.run_check("cp_run_002", "pytest", keep=keep)

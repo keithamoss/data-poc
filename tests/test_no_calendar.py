@@ -34,7 +34,7 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
     agency = doc["hierarchy"]["agencies"][0]
     agency["collections"] = [{
-        "id": "civil-registration", "name": "Civil Registration",
+        "id": "civil-registration", "name": "Civil Registration", "short": "bdm", "run_prefix": "run_",
         "contract": "registry-services/bdm-birth-registrations-contract.yaml",
         "delivery_boundary": "directory",
         "datasets": datasets,

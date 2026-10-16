@@ -1,5 +1,5 @@
 """Real datacontract-cli integration test for qa_tools/bdm/
-run_datacontract_bdm.py's evaluate_datacontract_bdm() - the actual
+qa_tools/tools/run_datacontract.py's evaluate() - the actual
 "parse datacontract-cli's real DataContract.test() result into our
 check-result shape" logic, not previously exercised under pytest at
 all (see tests/conftest.py's own docstring). Runs the REAL

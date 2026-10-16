@@ -206,7 +206,7 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
 
     adapter = collections.adapter(collections.by_id(entry_ds.collection_id))
     module = adapter.orchestrator_module()
-    tables = adapter.tables()
+    tables = [d.table for d in collections.by_id(entry_ds.collection_id).datasets]
     from qa_tools.common import supply_files
 
     arrival = SimpleNamespace(

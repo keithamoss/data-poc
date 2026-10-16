@@ -20,6 +20,7 @@ supply that really arrived and exactly wrong for one nobody accepted.
 from __future__ import annotations
 
 from qa_tools.common import supply_db, trial
+from staging_support import stage_bdm
 
 
 def _database_state(conn) -> tuple[set[str], set[str]]:
@@ -224,14 +225,13 @@ class TestARealTrialStagesAndVanishes:
 
     def test_a_real_trial_stages_into_its_own_schema_and_leaves_no_trace(
             self, supply_dsn, bdm_delivery_dirs, tmp_path):
-        from qa_tools.bdm import build_per_run_warehouses
 
         run_id = trial.trial_run_id()
         with supply_db.connect(label="test-trial") as conn:
             supply_db.ensure_schemas(conn)
             before_staged, before_schemas = _database_state(conn)
 
-        physical = build_per_run_warehouses.build_one(
+        physical = stage_bdm(
             run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
         assert physical, "the real loader staged nothing"
 
@@ -279,13 +279,12 @@ class TestARealTrialStagesAndVanishes:
         half-discarded trial. It is now a column, and the delete runs
         inside the same transaction as the DROPs.
         """
-        from qa_tools.bdm import build_per_run_warehouses
         from qa_tools.common import load_log
 
         run_id = trial.trial_run_id()
         before = len(load_log.records())
 
-        physical = build_per_run_warehouses.build_one(
+        physical = stage_bdm(
             run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
 
         assert len(load_log.records()) == before, \
@@ -308,9 +307,8 @@ class TestARealTrialStagesAndVanishes:
         """The other half, and the one a mistake here would break
         silently: a real arrival must still land in the history staging
         exists to keep."""
-        from qa_tools.bdm import build_per_run_warehouses
 
-        physical = build_per_run_warehouses.build_one(
+        physical = stage_bdm(
             "run_999", self._csv(bdm_delivery_dirs), "2099-03-03",
             received_at="2099-03-03T01:02:03+00:00")
         with supply_db.connect(label="test-trial") as conn:
@@ -326,11 +324,10 @@ class TestARealTrialStagesAndVanishes:
         """post-build-review #118 D-C: staging screened the file and
         registered a qa.run for its file-check results; discarding the
         trial left that run - never completed - in the crashed-run list."""
-        from qa_tools.bdm import build_per_run_warehouses
         from qa_tools.common import qa_store
 
         run_id = trial.trial_run_id(reference=True)
-        build_per_run_warehouses.build_one(run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
+        stage_bdm(run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
         with supply_db.connect(label="test-trial") as conn:
             trial.discard(conn, run_id)
             assert not conn.execute(

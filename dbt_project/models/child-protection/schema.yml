@@ -9,7 +9,7 @@ version: 2
 # now exists below, on the 6 Child Protection staging models - real dbt
 # generic-test syntax (`relationships: {to: ref('...'), field: ...}`),
 # confirmed by actually running `dbt test` against a real per-run CP
-# warehouse (qa_tools/cp/build_cp_warehouses.py). All 7 still pass 0/0 on
+# warehouse (qa_tools/tools/stage.py). All 7 still pass 0/0 on
 # every CLEAN run - child_protection.py's own generation logic never
 # produces a dangling FK by construction - and generator/dirty.py's
 # placement/investigation presets still ALSO reassign a placement's

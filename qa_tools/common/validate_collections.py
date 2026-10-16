@@ -75,8 +75,6 @@ ALLOWLIST: dict[str, str] = {
     "qa_tools/common/validate_check_lifecycle.py": "REQ-PIPE-248",
     # One shared module per QA tool, and one staging module.
     "qa_tools/bdm/bdm_common.py": "REQ-QAC-242",
-    "qa_tools/bdm/build_per_run_warehouses.py": "REQ-QAC-242",
-    "qa_tools/cp/build_cp_warehouses.py": "REQ-QAC-242",
     "qa_tools/cp/cp_common.py": "REQ-QAC-242",
     # One shared orchestrator, dataset-stats computation and rebuild.
     "qa_tools/bdm/orchestrate_bdm.py": "REQ-PIPE-243",

@@ -135,11 +135,10 @@ def run_evidently_command(collection: str, run_id: str, reference_run_id: str | 
               help="bdm = civil-registration, cp = child-protection.")
 def build_warehouses_command(collection: str) -> None:
     """Build every per-run DuckDB warehouse for one dataset's real synthetic manifest."""
-    if collection == "bdm":
-        from qa_tools.bdm.build_per_run_warehouses import build_all
-    else:
-        from qa_tools.cp.build_cp_warehouses import build_all
-    build_all()
+    from qa_tools import collections
+    from qa_tools.tools import stage
+
+    stage.build_all(collections.by_short(collection).id)
     console.print("Built.", style="green")
 
 

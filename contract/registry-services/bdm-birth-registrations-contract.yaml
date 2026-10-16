@@ -830,7 +830,7 @@ customProperties:
     value: "Contains personal information. Confirm and record the correct security/handling classification for your agency before this leaves draft status."
   # mothman CLI Phase 3 (plans/tooling.md #1) - S3 QA source mode config.
   # s3Source/localSource verified 2026-09-19 against real datacontract-cli
-  # parsing (qa_tools/bdm/run_datacontract_bdm.py) before landing here.
+  # parsing (qa_tools/tools/run_datacontract.py) before landing here.
   # arrivalPattern was previously a design-doc-only proposal
   # (docs/aws-event-driven-mvp-design.md's own flagged "confirm in the
   # morning" item) - Keith's own explicit go-ahead, 2026-09-19, to wire
@@ -847,7 +847,7 @@ customProperties:
     value: data/raw
     # Default local root `mothman bdm qa`'s Local files source mode
     # browses from - the same real RAW_DIR
-    # qa_tools/bdm/build_per_run_warehouses.py already uses.
+    # qa_tools/tools/stage.py already uses.
   - property: arrivalPattern
     value:
       - type: single_file

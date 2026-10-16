@@ -1,5 +1,5 @@
-"""Real Evidently AI integration test for qa_tools/cp/run_evidently_cp.py's
-evaluate_evidently_cp() - the CP counterpart to
+"""Real Evidently AI integration test for qa_tools/tools/run_evidently.py's
+evaluate() - the CP counterpart to
 tests/test_run_evidently_bdm.py (concern_type PSI drift, not sex - see
 that module's own docstring). Named test_run_evidently_cp_real.py, not
 test_run_evidently_cp.py, since tests/test_run_evidently_cp.py already

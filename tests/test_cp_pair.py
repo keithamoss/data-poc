@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from qa_tools.common import qa_store, supply_db, supply_files
+from qa_tools.tools import stage
 
 DS = "cp-clients"
 REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
@@ -73,7 +74,7 @@ def cp_pair_one_unloadable(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
 def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
     import fixture_ids
     from qa_tools.common import arrivals, delivery, delivery_log, promotion
-    from qa_tools.cp import build_cp_warehouses, orchestrate_cp
+    from qa_tools.cp import orchestrate_cp
 
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
     monkeypatch.setattr(promotion, "report", lambda outcome: None)
@@ -95,7 +96,7 @@ def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
     found = [a for a in arrivals.arrivals_for("child-protection", "cp_run_", deliveries,
                                               receipts) if a.delivery_name == name]
     for arrival in found:
-        build_cp_warehouses.stage_arrival(arrival)
+        stage.stage_arrival("child-protection", arrival)
     orchestrate_cp.run_arrivals(found, "pytest@example.org")
     (clients,) = [a for a in found if DS in a.files_by_dataset]
     yield {"slot": slot, "arrivals": found, "clients": clients,
@@ -310,7 +311,7 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
     both files, and the contest is resolved."""
     import fixture_ids
     from qa_tools.common import arrivals, delivery, delivery_log, knock_on, supersession
-    from qa_tools.cp import build_cp_warehouses, orchestrate_cp
+    from qa_tools.cp import orchestrate_cp
 
     later_at = cp_pair["clients"].received_at + timedelta(hours=6)
     source = Path(cp_raw_dir) / fixture_ids.CP_REF_RUN_ID
@@ -324,7 +325,7 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
     found = [a for a in arrivals.arrivals_for("child-protection", "cp_run_", deliveries,
                                               receipts) if a.delivery_name == name]
     for arrival in found:
-        build_cp_warehouses.stage_arrival(arrival)
+        stage.stage_arrival("child-protection", arrival)
     orchestrate_cp.run_arrivals(found, "pytest@example.org")
     # An open pair is ONE filed supply - its '#1' - so superseding that
     # supply is the supersession of both files (REQ-PIPE-194 criterion 9).

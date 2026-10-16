@@ -4,7 +4,7 @@
 # Soda files now, found the same way, so a collection's checks for all four
 # tools are found by convention from the registry.
 #
-# Evidently's checks are hand-written evaluations in run_evidently_bdm.py,
+# Evidently's checks are hand-written evaluations in qa_tools/tools/run_evidently.py,
 # which reads each check's id from here: the psi check, and the row_drop
 # check. What a check DOES - its column, method and warn/fail bands - is
 # here, where the definition hash sees it (REQ-QAC-223 criterion 3); a band
@@ -20,7 +20,7 @@
 checks:
   - check_id: data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently
     # A distribution shift between supplies, read as a cross-run logical
-    # consistency concern - the "dimension" run_evidently_bdm.py's result
+    # consistency concern - the "dimension" qa_tools/tools/run_evidently.py's result
     # has always carried.
     category: consistency
     introduced_date: "2026-01-15"
@@ -35,7 +35,7 @@ checks:
         description: "Definition now recorded with the check (its column, method and warn/fail bands, REQ-QAC-223); behaviour unchanged."
   - check_id: data-asset-1.registry-services.civil-registration.birth-registrations.row_count_growth_evidently
     # A growth-over-time concern read as timeliness, not completeness. The
-    # result is attributed to registration_number (see run_evidently_bdm.py).
+    # result is attributed to registration_number (see qa_tools/tools/run_evidently.py).
     category: timeliness
     introduced_date: "2026-01-15"
     description: The number of rows must not drop sharply against the previous supply.

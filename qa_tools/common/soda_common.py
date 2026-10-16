@@ -1,6 +1,5 @@
 """
-Tool-generic Soda Core helpers, shared by qa_tools/bdm/run_soda_bdm.py
-and qa_tools/cp/run_soda_cp.py. The actual check-to-dashboard-field
+Tool-generic Soda Core helpers, shared by qa_tools/tools/run_soda.py. The actual check-to-dashboard-field
 mapping (dimension/label per check, custom-name handling) is genuinely
 different per dataset and stays in each dataset's own file - see
 plans/qa-pipeline.md #84.

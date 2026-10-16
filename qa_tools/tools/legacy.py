@@ -49,4 +49,8 @@ KNOWN: dict[str, str] = {
     "dbt.no_left_out_note": (
         "tests left out for an unreadable model are not noted as left out "
         "(REQ-PIPE-115 criterion 17) - the models are still excluded."),
+    "stage.stamps_run_columns": (
+        "every staged row is stamped with `run_id` and `run_date` columns, which "
+        "Birth Registrations' dbt model selects and Child Protection's tables have "
+        "never carried."),
 }

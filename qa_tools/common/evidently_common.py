@@ -1,7 +1,6 @@
 """
 Tool-generic Evidently PSI-drift computation, shared by
-qa_tools/bdm/run_evidently_bdm.py and
-qa_tools/cp/run_evidently_cp.py. The actual reference run,
+qa_tools/tools/run_evidently.py. The actual reference run,
 comparison column, and any dataset-specific extra checks (e.g. birth
 registrations' row-count-growth check, which Child Protection doesn't
 have) stay in each dataset's own file - see plans/qa-pipeline.md #84.

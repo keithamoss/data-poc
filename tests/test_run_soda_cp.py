@@ -1,5 +1,5 @@
-"""Real Soda Core integration test for qa_tools/cp/run_soda_cp.py's
-evaluate_soda_cp() - the CP counterpart to tests/test_run_soda_bdm.py."""
+"""Real Soda Core integration test for qa_tools/tools/run_soda.py's
+evaluate() - the CP counterpart to tests/test_run_soda_bdm.py."""
 from __future__ import annotations
 
 import qa_tools.tools.run_soda as run_soda

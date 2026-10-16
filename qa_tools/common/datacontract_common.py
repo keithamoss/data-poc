@@ -1,7 +1,6 @@
 """
 Tool-generic datacontract-cli helpers, shared by
-qa_tools/bdm/run_datacontract_bdm.py and
-qa_tools/cp/run_datacontract_cp.py. Constructing an in-memory
+qa_tools/tools/run_datacontract.py. Constructing an in-memory
 contract copy with a "local_test" server added and calling
 DataContract.test() is identical regardless of dataset; only which
 contract file and which local CSV path get used differs.
@@ -166,7 +165,7 @@ def selection_for(contract_path: str, asked: list[str]) -> dict:
 # but, unlike the other two, its own samples are shaped {field: value,
 # duplicate_count: N} - the offending VALUE, not the identifier - so
 # failing_sample_keys() below correctly returns [] for it (same class of
-# gap as dbt's own `unique` test - see run_dbt_bdm.py's
+# gap as dbt's own `unique` test - see qa_tools/tools/run_dbt.py's
 # failing_sample_keys_via_values, not replicated here since it needs
 # a fresh read of the source CSV this module doesn't otherwise hold).
 # Soda and dbt each already cover the equivalent duplicate/unique check

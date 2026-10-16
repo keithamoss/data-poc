@@ -197,7 +197,7 @@ class TestAFrozenArrivalIsNotAFailure:
         monkeypatch.setattr(pp, "recorded", lambda conn: None)
         monkeypatch.setattr(pp, "state_of", lambda a, rec: pp.UNGATED)
         steps = SimpleNamespace(promote_after=lambda *a, **k: None)
-        monkeypatch.setattr(pp, "_modules", lambda c: (SimpleNamespace(STEPS=steps), None))
+        monkeypatch.setattr(pp, "_orchestrator", lambda c: SimpleNamespace(STEPS=steps))
         _refuse(monkeypatch, *refused)
         report = pp.PassReport()
         pp._one(arrival, [arrival], "ts", "me", report, say=lambda m: None)

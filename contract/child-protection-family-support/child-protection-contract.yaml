@@ -1639,7 +1639,7 @@ customProperties:
     value: "Contains sensitive personal information about children and families. Confirm and record the correct security/handling classification for your agency before this leaves draft status."
   # mothman CLI Phase 3 (plans/tooling.md #1) - S3 QA source mode config.
   # s3Source/localSource verified 2026-09-19 against real datacontract-cli
-  # parsing (qa_tools/cp/run_datacontract_cp.py) before landing here.
+  # parsing (qa_tools/tools/run_datacontract.py) before landing here.
   # arrivalPattern was previously a design-doc-only proposal
   # (docs/aws-event-driven-mvp-design.md's own flagged "confirm in the
   # morning" item) - Keith's own explicit go-ahead, 2026-09-19, to wire
@@ -1656,7 +1656,7 @@ customProperties:
     value: data/cp_raw
     # Default local root `mothman cp qa`'s Local files source mode
     # browses from - the same real CP_RAW_DIR
-    # qa_tools/cp/build_cp_warehouses.py already uses.
+    # qa_tools/tools/stage.py already uses.
   - property: arrivalPattern
     value:
       - type: nested_folder

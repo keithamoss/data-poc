@@ -55,7 +55,7 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
 def _patch_delivery_dirs(monkeypatch, root):
     """Point arrival recognition at an isolated tree (REQ-GEN-043).
 
-    Patching build_per_run_warehouses.RAW_DIR alone is no longer enough
+    Patching the old builder's RAW_DIR alone is no longer enough
     for anything that asks "is there data yet?": that question is now
     answered by recognising deliveries on disk, so an unpatched test
     would read - and answer from - the real data/deliveries/ tree."""

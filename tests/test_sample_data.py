@@ -20,6 +20,7 @@ import pytest
 import agreement_split
 from qa_tools.common import qa_store, sample_data, schedule, supply_db
 from qa_tools.common.qa_results_writer import write_qa_result
+from staging_support import stage_bdm, stage_cp
 
 
 def _clear():
@@ -55,7 +56,7 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     doc = agreement_split.merged_view(agreement_split.REAL_CONTRACT_DIR)
     agency = doc["hierarchy"]["agencies"][0]
     agency["collections"] = [{
-        "id": "civil-registration", "name": "Civil Registration",
+        "id": "civil-registration", "name": "Civil Registration", "short": "bdm", "run_prefix": "run_",
         "contract": "registry-services/bdm-birth-registrations-contract.yaml",
         "delivery_boundary": "directory",
         "datasets": datasets,
@@ -495,20 +496,21 @@ class TestARunCanReadBothSchemasAtOnce:
                 conn.execute(
                     f'DROP TABLE IF EXISTS "{supply_db.STAGING_SCHEMA}"."{physical}" CASCADE')
 
-    def test_the_cp_builder_splits_its_tables_by_what_is_agreed(
+    def test_the_stager_splits_its_tables_by_what_is_agreed(
             self, tmp_path, monkeypatch):
         """Read from configuration on every call rather than at import,
         because graduation IS a configuration change."""
-        from qa_tools.cp import build_cp_warehouses
 
-        monkeypatch.setattr(build_cp_warehouses, "TABLES",
-                            ["birth_registrations", "cp_referrals"])
+        from qa_tools.tools import stage
+
+        monkeypatch.setattr(stage, "tables",
+                            lambda collection_id: ["birth_registrations", "cp_referrals"])
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
-        assert build_cp_warehouses._sample_and_agreed_tables() == (
+        assert stage._sample_and_agreed_tables("child-protection") == (
             ["cp_referrals"], ["birth_registrations"])
 
         _asset_with([AGREED, GRADUATED], tmp_path, monkeypatch)
-        assert build_cp_warehouses._sample_and_agreed_tables() == (
+        assert stage._sample_and_agreed_tables("child-protection") == (
             [], ["birth_registrations", "cp_referrals"])
 
 
@@ -580,7 +582,7 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
 class TestATableNameIsNotADatasetId:
     """A real regression, found by CI on 2026-09-28 and fixed here.
 
-    `build_cp_warehouses.add_table_to_run()` defaults `dataset_id` to the
+    `stage.stage_table()` defaults `dataset_id` to the
     TABLE name when a caller does not pass one, so the first version of the
     staging change asked `is_sample("cp_clients")` and got
     UnknownDatasetError - six CLI tests down, every real Child Protection
@@ -617,8 +619,6 @@ class TestATableNameIsNotADatasetId:
         sample dataset's file, by its TABLE name, and the rows land in the
         sample schema. A builder asking the dataset-id form instead raises
         on the table name or files the rows as a real supply."""
-        from qa_tools.bdm import build_per_run_warehouses
-        from qa_tools.cp import build_cp_warehouses
 
         bdm_sample = {k: v for k, v in AGREED.items() if k != "calendar"}
         bdm_sample["no_calendar"] = "not-yet-agreed"
@@ -637,11 +637,11 @@ class TestATableNameIsNotADatasetId:
         csv = tmp_path / "supply.csv"
         if builder == "cp":
             csv.write_text("referral_id\nR1\n")
-            physical = build_cp_warehouses.add_table_to_run(
+            physical = stage_cp(
                 "sample_table_run", "cp_referrals", str(csv))
         else:
             csv.write_text("registration_id,child_family_name\nBR0001,SMITH\n")
-            physical = build_per_run_warehouses.build_one(
+            physical = stage_bdm(
                 "sample_table_run", str(csv), "2026-01-01")
         assert physical, "the builder staged nothing"
         try:

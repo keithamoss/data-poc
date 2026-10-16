@@ -189,7 +189,7 @@ class TestTheGateOnlyPathFeedsTheGateItsResults:
         monkeypatch.setattr(pp, "state_of", lambda arrival, rec: next(states))
         fake = SimpleNamespace(STEPS=SimpleNamespace(
             promote_after=lambda arrival, got, run_by: seen.setdefault("got", got)))
-        monkeypatch.setattr(pp, "_modules", lambda collection: (fake, None))
+        monkeypatch.setattr(pp, "_orchestrator", lambda collection: fake)
         report = pp.PassReport()
         pp._one(a, [a], WHEN, "a@b.c", report, say=lambda m: None)
         assert seen["got"] and all(r["run_id"] == a.run_id for r in seen["got"])
@@ -355,7 +355,7 @@ class _FakeBuilder:
     def __init__(self, fail_on=()):
         self.fail_on, self.staged = set(fail_on), []
 
-    def stage_arrival(self, arrival):
+    def stage_arrival(self, collection_id, arrival):
         if arrival.run_id in self.fail_on:
             raise OSError("disk full")
         self.staged.append(arrival.run_id)
@@ -381,7 +381,9 @@ class TestThePassItself:
         monkeypatch.setattr(pp, "all_arrivals", lambda: list(world.arrivals))
         monkeypatch.setattr(pp, "unprocessed", lambda found, conn=None: list(found))
         monkeypatch.setattr(pp, "state_of", lambda arrival, rec: pp.UNCHECKED)
-        monkeypatch.setattr(pp, "_modules", lambda c: (None, world.builder))
+        from qa_tools.tools import stage
+
+        monkeypatch.setattr(stage, "stage_arrival", world.builder.stage_arrival)
 
         def one(arrival, among, ts, run_by, report, say):
             if arrival.run_id in world.one_fails:

@@ -10,6 +10,7 @@ real functions write to committed qa_results/ history as a side effect
 under pytest."""
 from __future__ import annotations
 
+import pytest
 import rich_click as click
 from click.testing import CliRunner
 
@@ -186,28 +187,18 @@ def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypat
     assert seen == {"run_id": "cp_run_02", "reference_run_id": "cp_run_01"}
 
 
-def test_build_warehouses_bdm_calls_build_per_run_warehouses(monkeypatch):
-    import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
+@pytest.mark.parametrize("short,collection_id", [("bdm", "civil-registration"),
+                                                   ("cp", "child-protection")])
+def test_build_warehouses_stages_that_collection(monkeypatch, short, collection_id):
+    from qa_tools.tools import stage
 
     called = []
-    monkeypatch.setattr(build_per_run_warehouses, "build_all", lambda: called.append("bdm"))
+    monkeypatch.setattr(stage, "build_all", called.append)
 
-    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--collection", "bdm"])
-
-    assert result.exit_code == 0, result.output
-    assert called == ["bdm"]
-
-
-def test_build_warehouses_cp_calls_build_cp_warehouses(monkeypatch):
-    import qa_tools.cp.build_cp_warehouses as build_cp_warehouses
-
-    called = []
-    monkeypatch.setattr(build_cp_warehouses, "build_all", lambda: called.append("cp"))
-
-    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--collection", "cp"])
+    result = _runner.invoke(debug_cli.debug_group, ["build-warehouses", "--collection", short])
 
     assert result.exit_code == 0, result.output
-    assert called == ["cp"]
+    assert called == [collection_id]
 
 
 def test_changelog_prints_real_build_changelog_output_as_json(monkeypatch):

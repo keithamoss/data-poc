@@ -77,11 +77,6 @@ class CollectionAdapter:
     #: orchestrator module, and its whole-history run function.
     orchestrator: str
     run_pipeline_function: str
-    #: TEMPORARY POINTER (2), removed by REQ-QAC-242 (shared staging), gone by
-    #: REQ-PIPE-243 in any case: the per-run warehouse builder, and the name of
-    #: its table list there (a bare name or a list).
-    warehouse_builder: str
-    warehouse_tables: str
     #: TEMPORARY POINTER (3), removed by REQ-PIPE-243: the results-from-history
     #: rebuild.
     results_rebuild: str
@@ -110,13 +105,6 @@ class CollectionAdapter:
 
     def orchestrator_module(self):
         return importlib.import_module(self.orchestrator)
-
-    def builder_module(self):
-        return importlib.import_module(self.warehouse_builder)
-
-    def tables(self) -> list[str]:
-        tables = getattr(self.builder_module(), self.warehouse_tables)
-        return [tables] if isinstance(tables, str) else list(tables)
 
     def run_pipeline(self, **kwargs):
         return getattr(self.orchestrator_module(), self.run_pipeline_function)(**kwargs)

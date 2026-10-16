@@ -23,7 +23,7 @@ reproducible.
 Reads the arrivals recognised in the delivery tree (data/deliveries/,
 the generator's output) and STAGES EACH ONE AS IT ARRIVES, into the
 PostgreSQL supply database's staging schema
-(build_per_run_warehouses.stage_arrival, REQ-PIPE-068) - nothing is staged
+(qa_tools/tools/stage.py's stage_arrival, REQ-PIPE-068) - nothing is staged
 up front. `mothman pipeline run` and `mothman pipeline bootstrap`
 (cli/pipeline.py) generate the synthetic data and then call
 run_pipeline().
@@ -61,9 +61,8 @@ from qa_tools.common.qa_results_reader import read_dataset_stats
 from qa_tools.common.qa_results_reader import canonical_order
 from qa_tools.common.qa_results_writer import (
     finish_run, open_run, scope_of_run, write_qa_result)
-from . import build_per_run_warehouses
 from . import dataset_stats
-from qa_tools.tools import run_dbt
+from qa_tools.tools import run_dbt, stage
 from qa_tools.tools import run_soda
 from qa_tools.tools import run_datacontract
 from qa_tools.tools import run_evidently
@@ -176,12 +175,12 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
     # wrong, and recording nothing for it would be a silent gap.
     with supply_db.connect(read_only=True, label="mothman:bdm-readable") as conn:
         why = own_table.why_unreadable(
-            conn, run_id, build_per_run_warehouses.TABLE,
+            conn, run_id, bdm_common.TABLE,
             supply_db.resolution_for(conn, run_id), own_dataset=DATASET_ID,
             arrival_key=_arrival_key(entry))
     readable = why is None
     if not readable:
-        print(own_table.describe(run_id, build_per_run_warehouses.TABLE, why))
+        print(own_table.describe(run_id, bdm_common.TABLE, why))
     run_step = _run_step if readable else (lambda collection, tool, rid, call: [])
 
     # THE REFERENCE IS RESOLVED PER SUPPLY, HERE (REQ-QAC-108 criteria
@@ -452,12 +451,12 @@ def run_single(run_id: str, csv_path: str, run_date: str, reference_run_id: str,
     # both paths open the same database and read through the run's own
     # view schema, which is what scoped the rows all along.
     # THE RECEIPT IS PASSED ON ONLY WHERE THERE REALLY IS ONE. With
-    # none, build_one() names the staged table after the RUN rather
+    # none, stage_table() names the staged table after the RUN rather
     # than after a day - which is what every caller without a receipt
     # needs, because two runs sharing a run_date would otherwise claim
     # one physical table in shared staging.
-    build_per_run_warehouses.build_one(run_id, csv_path, run_date,
-                                        received_at=received_at)
+    stage.stage_table(COLLECTION_ID, run_id, bdm_common.TABLE, csv_path,
+                      run_date=run_date, received_at=received_at)
 
     return _run_one(entry, run_timestamp, run_by, reference_run_id, on_step=on_step)
 
@@ -481,7 +480,7 @@ def file_and_overlay(arrival) -> None:
     leave two versions staged for one day.
     """
     filing.file_arrivals([arrival])
-    period_overlay.rebuild_for_arrival(arrival, tables=[build_per_run_warehouses.TABLE])
+    period_overlay.rebuild_for_arrival(arrival, tables=[bdm_common.TABLE])
 
 
 def _claim_window(arrival):
@@ -635,7 +634,7 @@ def run_pipeline(sequential: bool = False,
     all_results = arrival_lifecycle.process_all(
         found_arrivals, steps=STEPS, run_by=run_by, run_timestamp=run_timestamp,
         player=player if player is not None else scripted_decisions.Player(COLLECTION_ID),
-        prepare=arrival_lifecycle.staged_as_it_arrives(build_per_run_warehouses.stage_arrival),
+        prepare=arrival_lifecycle.staged_as_it_arrives(stage.stager(COLLECTION_ID)),
         start_at=start_at, after_each=after_each)
 
     # A DELIVERY NO ARRIVAL CLAIMED is recorded once the arrivals are done

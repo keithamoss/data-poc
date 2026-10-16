@@ -346,8 +346,10 @@ def load_command(collection_id: str | None) -> None:
     # fan out afterwards, over views that are already built.
     from qa_tools.common import load_log
 
-    known = {"bdm": ("civil-registration", "qa_tools.bdm.build_per_run_warehouses"),
-             "cp": ("child-protection", "qa_tools.cp.build_cp_warehouses")}
+    from qa_tools import collections
+    from qa_tools.tools import stage
+
+    known = {c.short: c.id for c in collections.all_collections()}
     if collection_id is not None and collection_id not in known:
         raise click.ClickException(
             f"unknown collection {collection_id!r} - one of {', '.join(sorted(known))}")
@@ -356,12 +358,9 @@ def load_command(collection_id: str | None) -> None:
     failed_before = {r.physical for r in load_log.failures()}
     records_before = len(load_log.records())
 
-    import importlib
-
     for key in sorted(known) if collection_id is None else [collection_id]:
-        _collection, module = known[key]
         console.print(f"[bold]{key}[/bold] - staging every recognised delivery")
-        importlib.import_module(module).build_all()
+        stage.build_all(known[key])
 
     staged = sorted(set(load_log.loaded_tables()) - before)
     changed = len(load_log.records()) - records_before

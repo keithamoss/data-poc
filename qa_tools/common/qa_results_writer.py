@@ -31,7 +31,7 @@ memory every run, captured here too. Added 2026-09-16
 (plans/publishing-and-history.md Phase 2, Keith's explicit call) once a
 real gap was found: `raw_output` alone isn't trustworthy or sufficient
 for two dbt-side bugs plus one Soda-side gap, all already investigated
-in full in `plans/qa-pipeline.md` and `qa_tools/bdm/run_dbt_bdm.py`'s
+in full in `plans/qa-pipeline.md` and `qa_tools/tools/run_dbt.py`'s
 own docstring - not re-derived here, just cited:
 
 1. **dbt-core's `failures=0` accounting bug**, root-caused
@@ -60,7 +60,7 @@ own docstring - not re-derived here, just cited:
    Soda bug, just a genuine gap in what that structure exposes (no
    issue to cite, upstream or otherwise).
 
-Both dbt problems are exactly what `run_dbt_bdm.py`'s/`run_dbt_cp.py`'s
+Both dbt problems are exactly what `qa_tools/tools/run_dbt.py`'s
 `_AUDIT_AGGREGATE_SQL` audit-table re-query protects against "at once"
 (their own docstrings' wording) - it doesn't care which of the two
 produced a wrong number, it re-derives the truth from dbt's own

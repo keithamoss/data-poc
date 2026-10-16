@@ -17,6 +17,7 @@ import psycopg
 import pytest
 
 import generator_isolation
+from staging_support import stage_cp
 
 _supply_files = generator_isolation.supply_files_under_data
 
@@ -24,7 +25,6 @@ _supply_files = generator_isolation.supply_files_under_data
 def test_staging_writes_no_second_copy_of_the_file_it_was_given(tmp_path, supply_dsn):
     """Criterion 1, behaviourally. Stage a CSV from a directory of its
     own and assert no new supply file appears anywhere under data/."""
-    from qa_tools.cp import build_cp_warehouses
 
     source_dir = tmp_path / "delivery"
     source_dir.mkdir()
@@ -33,7 +33,7 @@ def test_staging_writes_no_second_copy_of_the_file_it_was_given(tmp_path, supply
                     "W1,A Worker,Perth,2026-01-01T00:00:00+00:00\n")
 
     before = _supply_files()
-    build_cp_warehouses.add_table_to_run(
+    stage_cp(
         "one_area_run", "cp_case_workers", str(csv), dataset_id="cp-case-workers")
 
     # The loader's own scratch CSV is written and removed inside the
@@ -50,19 +50,21 @@ def test_a_bdm_single_arrival_is_staged_from_where_it_is(tmp_path, supply_dsn, m
 
     The four tools are stubbed out - they are not what this is about,
     and they run in test_orchestrate_single_run.py - but staging is the
-    real build_one(), against this worker's own database.
+    real stage_table(), against this worker's own database.
     """
-    from qa_tools.bdm import build_per_run_warehouses, orchestrate_bdm
+    from qa_tools.bdm import orchestrate_bdm
     from qa_tools.common import supply_db, trial
 
     staged_from = []
-    real_build_one = build_per_run_warehouses.build_one
+    from qa_tools.tools import stage
 
-    def recording_build_one(run_id, csv_path, *args, **kwargs):
+    real_stage_table = stage.stage_table
+
+    def recording_stage_table(collection_id, run_id, table, csv_path, *args, **kwargs):
         staged_from.append(csv_path)
-        return real_build_one(run_id, csv_path, *args, **kwargs)
+        return real_stage_table(collection_id, run_id, table, csv_path, *args, **kwargs)
 
-    monkeypatch.setattr(build_per_run_warehouses, "build_one", recording_build_one)
+    monkeypatch.setattr(stage, "stage_table", recording_stage_table)
     monkeypatch.setattr(orchestrate_bdm, "_run_one", lambda *a, **k: [])
 
     arrived = tmp_path / "incoming.csv"

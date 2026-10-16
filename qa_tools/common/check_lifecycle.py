@@ -115,8 +115,7 @@ class InvalidCategoryError(ValueError):
 # retrofit: dbt's/Soda's own per-module dimension dicts used "validity"
 # for the same conformity-type checks (accepted_values/matches_regex/
 # invalid_percent) the contract already correctly tagged "conformity" -
-# normalized to "conformity" everywhere (qa_tools/bdm/run_dbt_bdm.py,
-# qa_tools/cp/run_dbt_cp.py, qa_tools/bdm/run_soda_bdm.py,
+# normalized to "conformity" everywhere (qa_tools/tools/run_dbt.py, qa_tools/tools/run_soda.py,
 # qa_tools/common/datacontract_common.py). No category beyond ODCS's own
 # 5 was needed even for Evidently's own PSI drift checks, which already
 # had a real dimension value (consistency) before this retrofit too.
@@ -439,8 +438,7 @@ def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, s
     in the key, the second one parsed silently overwrote the first's
     check_id, so BDM's real results were coming back tagged with CP's
     check_id (or vice versa) whenever a column name + test type repeated
-    across datasets. Model matches exactly what run_dbt_bdm.py's/
-    run_dbt_cp.py's own result-construction loop already has on hand
+    across datasets. Model matches exactly what qa_tools/tools/run_dbt.py's own result-construction loop already has on hand
     (its own dataset's one constant model name, or
     cp_common.TABLE_DATASET_ID's `f"stg_{table}"` via `_table_for_test()`)
     - used to tag each real check result with its own check_id at write
@@ -462,8 +460,8 @@ def dbt_check_id_lookup(schema_yml_path: Path | str) -> dict[tuple[str | None, s
             # (test_metadata["name"] == "accepted_range", the package
             # living separately in test_metadata["namespace"]) - confirmed
             # empirically, 2026-09-16, against a real compiled manifest
-            # node, not assumed. Strip to match what run_dbt_bdm.py's/
-            # run_dbt_cp.py's own `test_name` is actually resolved to, or
+            # node, not assumed. Strip to match what qa_tools/tools/run_dbt.py's
+            # own `test_name` is actually resolved to, or
             # every dbt_utils-sourced check_id would silently never match.
             lookup[(model, column, test_type.rsplit(".", 1)[-1])] = check_id
 

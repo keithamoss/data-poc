@@ -369,7 +369,7 @@ def _as_record(finding: Finding, dataset, definition: Definition | None) -> dict
 
 def _dataset(dataset_id: str):
     """The dataset a loader named - by id, or by TABLE where a caller handed
-    the loader a table name in its place. build_cp_warehouses falls back to
+    the loader a table name in its place. The staging module falls back to
     the table name when it is given no dataset id (the `mothman cp qa`
     path), and the first full run of the suite with this module in it
     stopped on exactly that: 'cp_clients' is not a dataset."""

@@ -1,5 +1,5 @@
-"""Real dbt-core integration test for qa_tools/cp/run_dbt_cp.py's
-evaluate_dbt_cp() - the CP counterpart to tests/test_run_dbt_bdm.py,
+"""Real dbt-core integration test for qa_tools/tools/run_dbt.py's
+evaluate() - the CP counterpart to tests/test_run_dbt_bdm.py,
 covering the same real "parse dbt's real output, re-verify via the
 audit-table workaround" logic, plus CP-specific routing (which of the
 6 real tables a test result belongs to, via dbt's own attached_node /
@@ -13,7 +13,7 @@ from qa_tools import collections
 
 # The run_ids cp_duckdb_dir's fixture deliveries are RECOGNISED as - see
 # tests/test_run_dbt_bdm.py's own comment on why (real parallel-test
-# safety for dbt's target-path output lives in evaluate_dbt_cp() itself,
+# safety for dbt's target-path output lives in evaluate() itself,
 # not here - plans/running-thoughts.md #12).
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
@@ -22,7 +22,7 @@ from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_
 def _dbt_cp(monkeypatch, cp_duckdb_dir):
     # dbt's scratch database and its target_path hang off the supply
     # database's own directory (see
-    # evaluate_dbt_cp()'s own comment) - a per-worker pytest tmp dir, so
+    # evaluate()'s own comment) - a per-worker pytest tmp dir, so
     # no manual cleanup is needed here any more, same as
     # tests/test_run_dbt_bdm.py's own equivalent fixture.
     # The environment already points at this worker's database

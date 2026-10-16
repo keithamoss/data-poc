@@ -1,6 +1,6 @@
 """
 Tool-generic dbt-core invocation and manifest-parsing helpers, shared by
-qa_tools/bdm/run_dbt_bdm.py and qa_tools/cp/run_dbt_cp.py.
+qa_tools/tools/run_dbt.py.
 The actual test-to-dashboard-field mapping (which tests exist, what
 dimension/label each one gets, any tool-reliability workarounds a
 dataset needed) is genuinely different per dataset and stays in each
