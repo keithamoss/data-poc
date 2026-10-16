@@ -30,7 +30,6 @@ it - tests/test_recheck.py asserts the import graph.
 """
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -41,14 +40,9 @@ RECHECK = "recheck"
 REEVALUATE = "reevaluate"
 TABLE = f'"{qa_store.SCHEMA}".owed_run'
 
-#: The orchestrator module per collection - imported lazily, so importing
-#: this does not import every collection's tools.
-_ORCHESTRATORS = {
-    "civil-registration": ("qa_tools.bdm.orchestrate_bdm",
-                           "qa_tools.bdm.build_per_run_warehouses", "TABLE"),
-    "child-protection": ("qa_tools.cp.orchestrate_cp",
-                         "qa_tools.cp.build_cp_warehouses", "TABLES"),
-}
+#: The orchestrator per collection comes from its adapter (REQ-PIPE-240),
+#: imported lazily, so importing this does not import every collection's
+#: tools.
 
 
 class RecheckRefused(RuntimeError):
@@ -208,10 +202,11 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     period, delivery = filed[0]
     received_at = filing.received_at_of(dataset_id, supply_id)
     entry_ds = hierarchy.dataset(dataset_id)
-    module_name, tables_module, tables_name = _ORCHESTRATORS[entry_ds.collection_id]
-    module = importlib.import_module(module_name)
-    tables = getattr(importlib.import_module(tables_module), tables_name)
-    tables = [tables] if isinstance(tables, str) else list(tables)
+    from qa_tools import collections
+
+    adapter = collections.adapter(collections.by_id(entry_ds.collection_id))
+    module = adapter.orchestrator_module()
+    tables = adapter.tables()
     from qa_tools.common import supply_files
 
     arrival = SimpleNamespace(

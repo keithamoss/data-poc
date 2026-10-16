@@ -877,6 +877,10 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
 #: so the marker is applied from the fixture rather than by hand.
 DEPLOYMENT_FIXTURE = "deployment_history"
 
+# REQ-PIPE-240 criterion 6's shared third collection - one small fixture
+# every site's test uses (tests/third_collection.py).
+from third_collection import third_collection, without_adapter  # noqa: E402, F401
+
 #: The marker both halves of CI select on.
 NEEDS_DEPLOYMENT = "needs_deployment"
 

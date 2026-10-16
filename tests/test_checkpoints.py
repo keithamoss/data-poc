@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
+from qa_tools import collections
 from qa_tools.common import bootstrap, checkpoints, replay_inputs, supply_db
 
 
@@ -298,7 +299,7 @@ class TestAResumeRecordsWhatAFullReplayDoes:
 
     @pytest.mark.parametrize("short,before", [("bdm", 3), ("cp", 7)])
     def test_identical(self, corpus, worker_id, short, before):  # noqa: F811
-        collection_id = checkpoints.COLLECTIONS[short]
+        collection_id = collections.by_short(short).id
         taken = []
 
         def full():

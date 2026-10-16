@@ -76,6 +76,11 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
      ".claude/agents/*.md frontmatter actually parses", False),
     ("hierarchy", ["uv", "run", "mothman", "dashboard", "validate-hierarchy"],
      "every contract agrees with the one agency/collection/dataset tree", False),
+    # REQ-PIPE-240 criteria 7 to 10: one registry, and no product file that
+    # names a collection outside it unless the file waits, by name, on the
+    # requirement that rewires it.
+    ("collections", ["uv", "run", "python3", "-m", "qa_tools.common.validate_collections"],
+     "every collection has an adapter and nothing else names one", False),
     # The one gate with a warning state today: REQ-PIPE-053's low
     # runway, which must be visible without failing the build.
     ("schedule", ["uv", "run", "mothman", "schedule", "validate"],

@@ -420,9 +420,10 @@ def checkpoint_list_command() -> None:
 def checkpoint_arrivals_command(collection: str) -> None:
     """The arrival numbers `--checkpoint-before N` counts, with the delivery
     and receipt instant of each - from a regeneration, never data/."""
+    from qa_tools import collections
     from qa_tools.common import checkpoints
 
-    found = checkpoints.arrivals_of(checkpoints.COLLECTIONS[collection])
+    found = checkpoints.arrivals_of(collections.by_short(collection).id)
     for i, a in enumerate(found, start=1):
         files = ", ".join(f for names in a.files_by_dataset.values() for f in names)
         console.print(f"{i:>4}  {_on_asset_clock(a.received_at)}  "

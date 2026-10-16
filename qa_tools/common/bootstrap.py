@@ -138,20 +138,33 @@ def bootstrap(collection: str = "all", force: bool = False,
     # both side by side are never both between arrivals at once.
     if checkpoint_before is not None:
         from qa_tools.common import checkpoints
-        if collection not in checkpoints.COLLECTIONS:
+        if collection not in _shorts():
             return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                    refused=True,
                                    reason="a checkpoint is taken of one collection at a time - "
-                                          "choose --collection bdm or --collection cp")
+                                          "choose " + " or ".join(
+                                              f"--collection {s}" for s in _shorts()))
         try:
             checkpoints.require_synthetic()
             # N IS CHECKED BEFORE ANYTHING IS TOUCHED (post-build-review #133
             # B3): against a regeneration somewhere of its own, so a refusal
             # never follows a rewritten data/ tree.
             say("Checking where the checkpoint can be taken")
-            checkpoints.snapped(checkpoints.arrivals_of(checkpoints.COLLECTIONS[collection]),
+            checkpoints.snapped(checkpoints.arrivals_of(_collection(collection).id),
                                 checkpoint_before)
         except checkpoints.CheckpointRefused as exc:
+            return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                                   refused=True, reason=str(exc))
+
+    # EVERY COLLECTION TO BE RUN HAS AN ADAPTER, OR NOTHING RUNS (REQ-PIPE-240
+    # criterion 6): refused by name before anything is generated, rather than
+    # part-way through, after the collections before it.
+    from qa_tools import collections as _collections
+
+    for name in [n for n in _shorts() if collection in ("all", n)]:
+        try:
+            _adapter(name)
+        except _collections.NoAdapterError as exc:
             return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                    refused=True, reason=str(exc))
 
@@ -195,15 +208,12 @@ def bootstrap(collection: str = "all", force: bool = False,
         return BootstrapResult(populated=False, staged_before=before,
                                staged_after=before, refused=True, reason=str(exc))
     try:
-        # IMPORTED HERE, NOT AT MODULE LEVEL. cli/ imports this module, and
-        # the orchestrators pull in all four QA tools - several seconds of
-        # import time that a caller only checking `already_populated()`
-        # should not pay.
-        from cli import bdm, cp
-
+        # THE COLLECTIONS COME FROM THE REGISTRY (REQ-PIPE-240), each run
+        # through its adapter - imported lazily, because the orchestrators
+        # pull in all four QA tools, several seconds of import time that a
+        # caller only checking `already_populated()` should not pay.
         started = time.monotonic()
-        names = [n for n in ("bdm", "cp") if collection in ("all", n)]
-        generate = {"bdm": bdm.generate_synthetic_data, "cp": cp.generate_synthetic_data}
+        names = [n for n in _shorts() if collection in ("all", n)]
 
         if sequential or len(names) < 2:
             # ONE AFTER THE OTHER - the reference REQ-TEST-116 criterion 4
@@ -211,13 +221,13 @@ def bootstrap(collection: str = "all", force: bool = False,
             # collection always was.
             timings = {}
             for name in names:
-                say(f"Generating synthetic data ({_LABEL[name]})")
-                generate[name](trial=not skip_target_trial)
+                say(f"Generating synthetic data ({_label(name)})")
+                _adapter(name).generate(trial=not skip_target_trial)
                 after_each = None
                 if checkpoint_before is not None:
                     after_each = _checkpoint_hook(name, checkpoint_before, held, say,
                                                   taken.append)
-                say(f"Running the real checks against every {_LABEL[name]} supply")
+                say(f"Running the real checks against every {_label(name)} supply")
                 timings[name] = _run_collection(name, sequential, record_deliveries=True,
                                                 after_each=after_each)
         else:
@@ -229,10 +239,10 @@ def bootstrap(collection: str = "all", force: bool = False,
             # records a delivery at its first arrival (REQ-TEST-159); THE
             # DELIVERIES NEITHER CLAIMED are recorded once both are done.
             for name in names:
-                say(f"Generating synthetic data ({_LABEL[name]})")
-                generate[name](trial=not skip_target_trial)
+                say(f"Generating synthetic data ({_label(name)})")
+                _adapter(name).generate(trial=not skip_target_trial)
             say("Running the real checks against every supply - "
-                + " and ".join(_LABEL[n] for n in names) + " side by side")
+                + " and ".join(_label(n) for n in names) + " side by side")
             timings = _run_concurrently(names, sequential)
             _record_deliveries()
         if collection == "all":
@@ -242,7 +252,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             # supplies a correction can move (PROVISIONAL).
             _confirm_corrections(say)
         timings["total"] = time.monotonic() - started
-        say("Took " + ", ".join(f"{_LABEL.get(k, k)} {v:.0f}s" for k, v in timings.items()))
+        say("Took " + ", ".join(f"{_label(k)} {v:.0f}s" for k, v in timings.items()))
     finally:
         lock.__exit__(None, None, None)
 
@@ -255,8 +265,25 @@ def bootstrap(collection: str = "all", force: bool = False,
                            disagreements=disagreements)
 
 
-#: Which datasets' targets each collection's replay records.
-_TARGET_DATASETS = {"bdm": ("birth-registrations",), "cp": ("cp-clients",)}
+def _collection(short: str):
+    from qa_tools import collections
+    return collections.by_short(short)
+
+
+def _shorts() -> list[str]:
+    """Every collection's short name, hierarchy order (REQ-PIPE-240)."""
+    from qa_tools import collections
+    return [c.short for c in collections.all_collections()]
+
+
+def _adapter(short: str):
+    from qa_tools import collections
+    return collections.adapter(_collection(short))
+
+
+def _label(key: str) -> str:
+    """How a collection's work is named when it is reported - or the total."""
+    return "in total" if key == "total" else _adapter(key).label
 
 
 def targets_agree(names) -> tuple[str, ...]:
@@ -272,7 +299,9 @@ def targets_agree(names) -> tuple[str, ...]:
     from cli.pipeline import generated_targets
     from qa_tools.common import target_agreement
 
-    wanted = {d for n in names for d in _TARGET_DATASETS[n]}
+    # Which datasets' targets each collection's replay records - its
+    # adapter's temporary pointer until REQ-GEN-246 puts it on the provider.
+    wanted = {d for n in names for d in _adapter(n).target_datasets}
     try:
         built = [b for b in generated_targets() if b.dataset_id in wanted]
     except ValueError as exc:
@@ -281,9 +310,6 @@ def targets_agree(names) -> tuple[str, ...]:
         return (f"what the generator built could not be read: {exc}",)
     with supply_db.connect(label="mothman:bootstrap") as conn:
         return tuple(str(d) for d in target_agreement.after_replay(conn, built))
-
-
-_LABEL = {"bdm": "Birth Registrations", "cp": "Child Protection", "total": "in total"}
 
 
 def _confirm_corrections(say) -> None:
@@ -299,7 +325,7 @@ def _confirm_corrections(say) -> None:
                 end = correction_replay.history_end(conn)
         done = correction_replay.confirm_due(history_end=end, say=say)
     if done:
-        for short in ("bdm", "cp"):
+        for short in _shorts():
             _rebuild_results(short)
 
 
@@ -320,12 +346,8 @@ def _run_collection(name: str, sequential: bool, record_deliveries: bool = False
     TOP LEVEL, so a spawned process can import it by name.
     """
     started = time.monotonic()
-    if name == "bdm":
-        from qa_tools.bdm.orchestrate_bdm import run_pipeline
-        run_pipeline(sequential=sequential, record_deliveries=record_deliveries, **replay)
-    else:
-        from qa_tools.cp.orchestrate_cp import run_pipeline_cp
-        run_pipeline_cp(sequential=sequential, record_deliveries=record_deliveries, **replay)
+    _adapter(name).run_pipeline(sequential=sequential, record_deliveries=record_deliveries,
+                                **replay)
     return time.monotonic() - started
 
 
@@ -335,7 +357,7 @@ def _checkpoint_hook(name: str, before: int, held, say, on_name=None):
     moves, and every arrival named with its delivery (#133 B4)."""
     from qa_tools.common import arrivals, checkpoints
 
-    collection_id = checkpoints.COLLECTIONS[name]
+    collection_id = _collection(name).id
     found = arrivals.arrivals_for(collection_id, "")
     at = checkpoints.snapped(found, before)
     if at != before:
@@ -405,19 +427,19 @@ def resume(name: str, sequential: bool = False,
             reason=f"{first.reason}, which is before this checkpoint (arrival {cp.before}) - "
                    f"nothing was copied or replayed. {instead}.")
 
-    from cli import bdm, cp as cp_cli
+    from qa_tools import collections
 
-    short = next(k for k, v in checkpoints.COLLECTIONS.items() if v == cp.collection_id)
+    short = collections.by_id(cp.collection_id).short
     say("Generating the synthetic data the replay reads")
     # NO TRIAL HERE (post-build-review #157 finding 3): this runs before the
     # resume has a database of its own, so a trial would write - and discard -
     # a run in the database the person was pointed at, which a resume never
     # writes to. The comparison after the replay below still runs.
-    bdm.generate_synthetic_data(trial=False)
-    cp_cli.generate_synthetic_data(trial=False)
+    for every in collections.adapters():
+        every.generate(trial=False)
     total = len(dict.fromkeys(a.run_id for a in cp.recorded.arrivals))
     # SAID BEFORE THE COPY, so a wrong resume can be stopped early (#133 B9).
-    say(f"{first.reason}. Replaying arrivals {cp.before} to {total} of {_LABEL[short]} into "
+    say(f"{first.reason}. Replaying arrivals {cp.before} to {total} of {_label(short)} into "
         f"a new database of the resume's own, copied from {cp.name}.")
     dsn = checkpoints.copy_for_resume(cp)
     resume_db = psycopg.conninfo.conninfo_to_dict(dsn)["dbname"]
@@ -430,7 +452,7 @@ def resume(name: str, sequential: bool = False,
             player = scripted_decisions.Player(
                 cp.collection_id,
                 scripts=[scripted_decisions.Script(**s) for s in cp.pending_scripts])
-            say(f"Replaying {_LABEL[short]} from arrival {cp.before}")
+            say(f"Replaying {_label(short)} from arrival {cp.before}")
             _run_collection(short, sequential, record_deliveries=True,
                             start_at=cp.before, player=player)
         _rebuild_results(short)
@@ -461,12 +483,8 @@ def _rebuild_results(short: str) -> None:
     import contextlib
     import io
 
-    if short == "bdm":
-        from qa_tools.bdm.build_results_from_history import build_results_from_history
-    else:
-        from qa_tools.cp.build_results_from_history import build_results_from_history
     with contextlib.redirect_stdout(io.StringIO()):
-        build_results_from_history()
+        _adapter(short).rebuild_results()
 
 
 def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:

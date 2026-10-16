@@ -50,7 +50,8 @@ RESUME_PREFIX = "mothman_resume_"
 KEEP_ENV = "MOTHMAN_CHECKPOINTS_KEPT"
 DEFAULT_KEEP = 3
 
-COLLECTIONS = {"bdm": "civil-registration", "cp": "child-protection"}
+# Which collection a checkpoint is of, and the short name its database is
+# named with, come from the registry (REQ-PIPE-240).
 
 
 class CheckpointRefused(RuntimeError):
@@ -156,7 +157,9 @@ def save(collection_id: str, before: int, *, recorded: replay_inputs.Recorded,
     let go of the pass lock; every pooled connection is closed here."""
     require_synthetic()
     source = _dbname(dsn or supply_db.supply_db_dsn())
-    short = next(k for k, v in COLLECTIONS.items() if v == collection_id)
+    from qa_tools import collections
+
+    short = collections.by_id(collection_id).short
     name = f"{PREFIX}{short}_{before:03d}_{_stamp()}"
     supply_db.release_connections()
     cp = Checkpoint(name=name, collection_id=collection_id, before=before,
@@ -253,7 +256,9 @@ def prune(keep_n: int, dsn: str | None = None, *, source: str) -> list[str]:
 def copy_for_resume(cp: Checkpoint, dsn: str | None = None) -> str:
     """Criterion 2: a database of the resume's own, copied from the
     checkpoint, which is left unchanged. Returns its DSN."""
-    short = next(k for k, v in COLLECTIONS.items() if v == cp.collection_id)
+    from qa_tools import collections
+
+    short = collections.by_id(cp.collection_id).short
     name = f"{RESUME_PREFIX}{short}_{cp.before:03d}_{_stamp()}"
     with _admin(dsn) as admin:
         _copy(admin, cp.name, name)

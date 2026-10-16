@@ -55,13 +55,9 @@ EXIT_REFUSED = 3
 #: The decision-log actions that mean "the gate ran on this supply".
 GATED_ACTIONS = ("promote", "promotion-withheld", "promotion-refused")
 
-#: Which collection's lifecycle handles an arrival, and how it is named.
-COLLECTIONS = {
-    "civil-registration": ("qa_tools.bdm.orchestrate_bdm",
-                           "qa_tools.bdm.build_per_run_warehouses", "run_"),
-    "child-protection": ("qa_tools.cp.orchestrate_cp",
-                         "qa_tools.cp.build_cp_warehouses", "cp_run_"),
-}
+#: Which collection's lifecycle handles an arrival comes from the registry
+#: (REQ-PIPE-240) - every collection the hierarchy declares, through its
+#: adapter. It was a two-entry map here until then.
 
 UNCHECKED, UNGATED, PROCESSED = "unchecked", "ungated", "processed"
 
@@ -227,8 +223,10 @@ def all_arrivals(deliveries_dir=None, receipts_dir=None) -> list:
     from qa_tools.common import arrivals
 
     found = []
-    for collection_id in COLLECTIONS:
-        found.extend(arrivals.arrivals_from_records(collection_id, deliveries_dir))
+    from qa_tools import collections
+
+    for collection in collections.all_collections():
+        found.extend(arrivals.arrivals_from_records(collection.id, deliveries_dir))
     found.sort(key=lambda a: (a.received_at, a.sequence, a.run_id))
     return found
 
@@ -313,10 +311,10 @@ def _red(results) -> bool:
 
 
 def _modules(collection_id):
-    import importlib
+    from qa_tools import collections
 
-    orchestrator, builder, _ = COLLECTIONS[collection_id]
-    return importlib.import_module(orchestrator), importlib.import_module(builder)
+    adapter = collections.adapter(collections.by_id(collection_id))
+    return adapter.orchestrator_module(), adapter.builder_module()
 
 
 def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = None,
@@ -537,8 +535,10 @@ def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = N
             report.tickets.append("No ticketing is configured for this environment, so no "
                                   "ticket was reconciled.")
         else:
-            for collection_id in COLLECTIONS:
-                outcome = ticket_reconciler.after_runs(collection_id)
+            from qa_tools import collections
+
+            for collection in collections.all_collections():
+                outcome = ticket_reconciler.after_runs(collection.id)
                 ticket_reconciler.report(outcome)
                 # A TICKET THAT COULD NOT BE RECONCILED IS A FAILED STAGE
                 # (criterion 20; Keith, 2026-10-06, #120 Q1), so a scheduler

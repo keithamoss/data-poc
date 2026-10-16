@@ -105,9 +105,11 @@ public dashboard reflects it."
 **Owns:** `pipeline/` (`orchestrate.py`'s warehouse build,
 `build_dashboard_data.py`/`build_cp_dashboard_data.py`), `qa_tools/
 common/qa_results_writer.py`/`qa_results_reader.py`/`git_identity.py`/
-`changelog.py`/`cadence.py`/`parallel_orchestrate.py`, `qa_tools/bdm/
-build_results_from_history.py`/`orchestrate_bdm.py` and their Child
-Protection equivalents, `.github/workflows/deploy-pages.yml`, `aws/`
+`changelog.py`/`cadence.py`/`parallel_orchestrate.py`, `qa_tools/
+collections/` (the collection registry and each collection's adapter,
+REQ-PIPE-240) and `qa_tools/common/validate_collections.py` (its gate),
+`qa_tools/bdm/build_results_from_history.py`/`orchestrate_bdm.py` and
+their Child Protection equivalents, `.github/workflows/deploy-pages.yml`, `aws/`
 (the event-driven MVP design, real code + doc, not yet the live
 pipeline).
 

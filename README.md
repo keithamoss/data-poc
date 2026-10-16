@@ -187,6 +187,11 @@ dbt_project/                 a real (if minimal) dbt project — dbt_project.yml
 qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
                                package now (qa_tools/__init__.py etc.), one subpackage per dataset plus
                                a common/ of tool-generic code shared between them (see "Code layout" below)
+  collections/                 the collection registry (REQ-PIPE-240): every collection the hierarchy in
+                               contract/data-asset.yaml declares, each run through a small adapter module
+                               named by its id - civil_registration.py, child_protection.py. A new collection
+                               is picked up everywhere through it, or refused by name; `mothman check`'s
+                               collections gate fails on one without an adapter
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
                                datasets, since there's one dbt_project/
   common/

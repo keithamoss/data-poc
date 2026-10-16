@@ -269,6 +269,14 @@ hierarchy:
       collections:
         - id: civil-registration
           name: Civil Registration
+          # REQ-PIPE-240. The collection's short name - its mothman command
+          # group, its checkpoints' names - and the prefix its runs are named
+          # with. DECLARED, not derived from the id: deriving them would
+          # rename every recorded Birth Registrations run, whose prefix is
+          # the bare `run_` it has always had. Unique across the asset, and
+          # no run prefix may begin another; `mothman check` enforces both.
+          short: bdm
+          run_prefix: run_
           # The ODCS contract covering this collection - where its
           # arrivalPattern lives, so "which dataset does this file
           # belong to" resolves through one lookup rather than a map
@@ -310,6 +318,8 @@ hierarchy:
       collections:
         - id: child-protection
           name: Child Protection
+          short: cp                # REQ-PIPE-240 - see civil-registration above.
+          run_prefix: cp_run_
           contract: child-protection-contract.yaml
           delivery_boundary: directory   # REQ-PIPE-057 - see above.
           datasets:

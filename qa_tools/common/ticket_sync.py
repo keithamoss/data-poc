@@ -78,8 +78,9 @@ from qa_tools.common.people import PEOPLE_YAML, github_usernames_for, parse_peop
 from qa_tools.common.ticket_check_summary import build_check_summary
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-BDM_DASHBOARD_JSON = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
-CP_DASHBOARD_JSON = os.path.join(ROOT, "reports", "child_protection_dashboard.json")
+#: Where each collection's built dashboard JSON lives - named by its
+#: adapter (REQ-PIPE-240) until REQ-PIPE-248 names every one from its id.
+REPORTS_DIR = os.path.join(ROOT, "reports")
 
 # Every real ticket this module ever opens carries this label too (on top
 # of its own dataset:<id> one) - the "one unified queue, filterable"
@@ -113,26 +114,27 @@ class DatasetScope:
 
 
 def _load_scopes() -> list[tuple[DatasetScope, dict]]:
-    """Every real dataset scope this MVP covers, paired with its own
-    already-built dashboard JSON - real order: Birth Registrations
-    first, then Child Protection's 6 tables in their own file's own
-    order (never re-sorted)."""
-    scopes: list[tuple[DatasetScope, dict]] = []
-    with open(BDM_DASHBOARD_JSON) as f:
-        bdm = json.load(f)
-    scopes.append((_scope_for(bdm), bdm))
+    """Every real dataset scope, paired with its own already-built
+    dashboard JSON - every collection the registry declares, hierarchy
+    order, each collection's datasets in its own file's own order (never
+    re-sorted)."""
+    from qa_tools import collections
 
-    with open(CP_DASHBOARD_JSON) as f:
-        cp = json.load(f)
-    for ds in cp["datasets"]:
-        scopes.append((_scope_for(ds), ds))
+    scopes: list[tuple[DatasetScope, dict]] = []
+    for adapter in collections.adapters():
+        with open(os.path.join(REPORTS_DIR, adapter.dashboard_json)) as f:
+            doc = json.load(f)
+        for ds in adapter.dashboard_datasets(doc):
+            scopes.append((_scope_for(ds), ds))
     return scopes
 
 
 def _scope_for(dataset: dict) -> DatasetScope:
-    agency_id, collection_id = DATASET_SCOPE[dataset["id"]]
+    # Resolved when asked, not from the import-time map, so a collection the
+    # registry declares is never missing here (REQ-PIPE-240 criterion 6).
+    entry = hierarchy.dataset(dataset["id"])
     return DatasetScope(id=dataset["id"], name=dataset["name"],
-                        agency_id=agency_id, collection_id=collection_id)
+                        agency_id=entry.agency_id, collection_id=entry.collection_id)
 
 
 def _dataset_label(dataset_id: str) -> str:

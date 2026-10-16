@@ -580,6 +580,12 @@ class DatasetConfig(_Strict):
 class CollectionConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
+    #: The collection's short name and the prefix its runs are named with
+    #: (REQ-PIPE-240 criterion 1). Required: the registry reads every
+    #: collection through them, and the collections gate checks their
+    #: uniqueness and shape.
+    short: NonEmptyStr
+    run_prefix: NonEmptyStr
     contract: NonEmptyStr
     #: What one delivery IS, for this source (REQ-PIPE-057 criteria 2
     #: and 3). Optional HERE and a hard failure at recognition time -
