@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-import qa_tools.cp.run_dbt_cp as run_dbt_cp
+import qa_tools.tools.run_dbt as run_dbt
+from qa_tools import collections
 
 # The run_ids cp_duckdb_dir's fixture deliveries are RECOGNISED as - see
 # tests/test_run_dbt_bdm.py's own comment on why (real parallel-test
@@ -26,7 +27,7 @@ def _dbt_cp(monkeypatch, cp_duckdb_dir):
     # tests/test_run_dbt_bdm.py's own equivalent fixture.
     # The environment already points at this worker's database
     # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
-    monkeypatch.setattr(run_dbt_cp, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
 
 
 def test_clean_run_resolves_every_check_id_across_all_6_tables(_dbt_cp):
@@ -41,7 +42,7 @@ def test_clean_run_resolves_every_check_id_across_all_6_tables(_dbt_cp):
     run_id = f"cp_whole_{uuid.uuid4().hex[:8]}"
     with supply_db.connect(label="test-run-dbt-cp") as conn:
         clone_run_views(conn, _REF_RUN_ID, run_id)
-    results = run_dbt_cp.evaluate_dbt_cp(run_id, "2026-01-01T09:00:00Z")
+    results = run_dbt.evaluate("child-protection", run_id, "2026-01-01T09:00:00Z")
 
     assert results, "the real dbt build produced no CP test results at all"
     assert all(r["check_id"] for r in results), "every result must resolve a real check_id (evaluate_dbt_cp raises if not)"
@@ -52,7 +53,7 @@ def test_clean_run_resolves_every_check_id_across_all_6_tables(_dbt_cp):
 
 
 def test_dirty_run_produces_a_real_failure(_dbt_cp):
-    results = run_dbt_cp.evaluate_dbt_cp(_DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
+    results = run_dbt.evaluate("child-protection", _DIRTY_RUN_ID, "2026-04-01T09:00:00Z")
 
     assert results
     assert all(r["check_id"] for r in results)
@@ -65,9 +66,9 @@ def test_relationships_and_business_rule_tests_resolve_a_real_table(_dbt_cp):
     singular cross-table business-rule tests have no natural column of
     their own - each must still resolve to one of the 6 real tables via
     attached_node/BUSINESS_RULE_HOME_TABLE, never silently dropped."""
-    results = run_dbt_cp.evaluate_dbt_cp(_REF_RUN_ID, "2026-01-01T09:00:00Z")
+    results = run_dbt.evaluate("child-protection", _REF_RUN_ID, "2026-01-01T09:00:00Z")
     relationships = [r for r in results if r["check_name"] == "dbt:relationships"]
-    business_rules = [r for r in results if r["check_name"].removeprefix("dbt:") in run_dbt_cp.cp_common.BUSINESS_RULE_HOME_TABLE]
+    business_rules = [r for r in results if r["check_name"].removeprefix("dbt:") in collections.adapter("child-protection").dbt.singular_home]
     assert relationships, "no relationships (FK) test results found - fixture/test drifted from the real schema.yml"
     assert business_rules, "no business-rule singular test results found"
     assert all(r["dataset_id"] for r in relationships + business_rules)
@@ -115,7 +116,7 @@ class TestAnUnreadableTableDoesNotTakeTheRunDown:
         assert "cp_clients" in res.held, "the held table must not have resolved"
 
         try:
-            results = run_dbt_cp.evaluate_dbt_cp(mine, "2026-01-01T09:00:00Z")
+            results = run_dbt.evaluate("child-protection", mine, "2026-01-01T09:00:00Z")
 
             assert results, "one unreadable table must not cost the other five their QA"
             seen = {r["dataset_id"] for r in results}

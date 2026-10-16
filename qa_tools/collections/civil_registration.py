@@ -1,6 +1,6 @@
 """Civil Registration's adapter (REQ-PIPE-240). Every pointer below is
 temporary and names its remover in qa_tools/collections/base.py."""
-from qa_tools.collections.base import CollectionAdapter, DatacontractSpec, SodaSpec
+from qa_tools.collections.base import CollectionAdapter, DatacontractSpec, DbtSpec, SodaSpec
 
 ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
@@ -25,6 +25,27 @@ ADAPTER = CollectionAdapter(
         },
     ),
     sample_key={"birth_registrations": "registration_number"},
+    dbt=DbtSpec(
+        singular_home={"multiple_birth_sibling": "birth_registrations",
+                       "recency": "birth_registrations"},
+        singular_column={"multiple_birth_sibling": "is_multiple_birth", "recency": "date_of_birth"},
+        # recency is a NOT EXISTS check: its audit table holds one synthetic
+        # row and no registration number to sample.
+        singular_unsampled=frozenset({"recency"}),
+        model_level_column={"expression_is_true": "date_registered"},
+        dimension_by_test={
+            "unique": "uniqueness", "not_null": "completeness", "accepted_values": "conformity",
+            "matches_regex": "conformity", "multiple_birth_sibling": "consistency",
+            "accepted_range": "conformity", "expression_is_true": "consistency",
+            "recency": "timeliness",
+        },
+        label_by_test={
+            "unique": "Duplicate rate", "not_null": "Null rate", "accepted_values": "Invalid values",
+            "matches_regex": "Invalid values", "multiple_birth_sibling": "Sibling record match",
+            "accepted_range": "Date-of-birth range",
+            "expression_is_true": "Registration/birth date ordering", "recency": "Freshness",
+        },
+    ),
     soda=SodaSpec(
         data_source="birth_registrations",
         # A `failed rows` check has no column of its own; each is routed to
@@ -71,5 +92,8 @@ ADAPTER = CollectionAdapter(
         "soda.named_check_value_is_invalid_count",
         "evidently.reads_unreadable_tables",
         "evidently.volume_from_drift_frame",
+        "dbt.no_built_model_guard",
+        "dbt.audits_skipped_tests",
+        "dbt.no_left_out_note",
     }),
 )

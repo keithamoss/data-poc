@@ -107,8 +107,7 @@ class TestEveryLongLivedConnectSiteIsGuarded:
 
     MODULES = [
         "qa_tools/tools/run_soda.py",
-        "qa_tools/bdm/run_dbt_bdm.py",
-        "qa_tools/cp/run_dbt_cp.py",
+        "qa_tools/tools/run_dbt.py",
     ]
 
     @pytest.mark.parametrize("module", MODULES)

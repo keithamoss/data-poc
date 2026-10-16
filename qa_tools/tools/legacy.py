@@ -39,4 +39,14 @@ KNOWN: dict[str, str] = {
         "with no recorded count is counted from its rows; a reference of zero rows "
         "reads as no drop; and the result sits on the check's own column rather than "
         "the table - Birth Registrations' single-table copy."),
+    "dbt.no_built_model_guard": (
+        "the table's row count, the audit recount and the failing-row samples are "
+        "taken whether or not dbt built the model - Birth Registrations' copy never "
+        "checked."),
+    "dbt.audits_skipped_tests": (
+        "a test dbt reports as skipped is still recounted from its audit table; only "
+        "an errored one is not."),
+    "dbt.no_left_out_note": (
+        "tests left out for an unreadable model are not noted as left out "
+        "(REQ-PIPE-115 criterion 17) - the models are still excluded."),
 }

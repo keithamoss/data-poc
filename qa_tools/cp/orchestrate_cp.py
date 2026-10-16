@@ -53,7 +53,7 @@ from qa_tools.common.qa_results_writer import (
 from . import build_cp_warehouses
 from . import cp_common
 from . import dataset_stats
-from . import run_dbt_cp
+from qa_tools.tools import run_dbt
 from qa_tools.tools import run_soda
 from qa_tools.tools import run_datacontract
 from qa_tools.tools import run_evidently
@@ -207,7 +207,7 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
 
     def _dbt() -> list[dict]:
         return run_step(cp_common.COLLECTION_ID, "dbt-core", run_id,
-            lambda: run_dbt_cp.evaluate_dbt_cp(run_id, run_timestamp))
+            lambda: run_dbt.evaluate(cp_common.COLLECTION_ID, run_id, run_timestamp))
 
     def _the_rest() -> list[dict]:
         got: list[dict] = []

@@ -63,7 +63,7 @@ from qa_tools.common.qa_results_writer import (
     finish_run, open_run, scope_of_run, write_qa_result)
 from . import build_per_run_warehouses
 from . import dataset_stats
-from . import run_dbt_bdm
+from qa_tools.tools import run_dbt
 from qa_tools.tools import run_soda
 from qa_tools.tools import run_datacontract
 from qa_tools.tools import run_evidently
@@ -215,7 +215,7 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
 
     def _dbt() -> list[dict]:
         return run_step(COLLECTION_ID, "dbt-core", run_id,
-            lambda: run_dbt_bdm.evaluate_dbt_bdm(run_id, run_timestamp))
+            lambda: run_dbt.evaluate(COLLECTION_ID, run_id, run_timestamp))
 
     def _the_rest() -> list[dict]:
         got: list[dict] = []

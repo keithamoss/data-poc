@@ -13,7 +13,7 @@ import random
 
 import pytest
 
-import qa_tools.cp.run_dbt_cp as run_dbt_cp
+import qa_tools.tools.run_dbt as run_dbt
 from fixture_ids import CP_DIRTY_RUN_ID
 from qa_tools.common import asked_for, dbt_common, left_out, qa_results_writer, supply_db
 
@@ -23,8 +23,8 @@ P = "data-asset-1.child-protection-family-support.child-protection"
 
 @pytest.fixture
 def _quiet(monkeypatch, cp_duckdb_dir):
-    monkeypatch.setattr(run_dbt_cp, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(run_dbt_cp.asked_for, "record", lambda *a, **k: None)
+    monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(run_dbt.asked_for, "record", lambda *a, **k: None)
 
 
 def _clone(table: str, **withheld) -> str:
@@ -39,7 +39,7 @@ def _clone(table: str, **withheld) -> str:
 def _evaluate(run_id: str, monkeypatch, *, scoped: bool) -> list[dict]:
     monkeypatch.setattr(asked_for, "SCOPED",
                         frozenset({"dbt"}) if scoped else frozenset())
-    got = run_dbt_cp.evaluate_dbt_cp(run_id, "2026-04-01T09:00:00Z")
+    got = run_dbt.evaluate("child-protection", run_id, "2026-04-01T09:00:00Z")
     left_out.take(run_id)
     return got
 
@@ -55,25 +55,19 @@ def _ran(run_id: str) -> set[str]:
 
 class TestTheSelection:
 
-    @pytest.mark.parametrize("module,collection", [
-        ("qa_tools.cp.run_dbt_cp", CP), ("qa_tools.bdm.run_dbt_bdm", "civil-registration")])
-    def test_every_active_dbt_check_names_a_test(self, module, collection):
+    @pytest.mark.parametrize("collection", [CP, "civil-registration"])
+    def test_every_active_dbt_check_names_a_test(self, collection):
         """Through the project's own node-to-check-id lookup, never a list
         of node names kept by hand (NFR 1) - and every check that can be
         asked for has a node to ask for."""
-        import importlib
-
-        mod = importlib.import_module(module)
-        names = mod.test_names_by_check_id()
+        names = run_dbt.test_names_by_check_id(collection)
         assert set(asked_for.collection_checks(collection, "dbt")) <= set(names)
 
     def test_each_collection_claims_only_its_own_tests(self):
         """Critic F4: Child Protection's lookup claimed two Birth Registrations
         singular tests, which names_by_check_id's contract says it must not."""
-        import qa_tools.bdm.run_dbt_bdm as bdm
-
-        cp = run_dbt_cp.test_names_by_check_id()
-        br = bdm.test_names_by_check_id()
+        cp = run_dbt.test_names_by_check_id("child-protection")
+        br = run_dbt.test_names_by_check_id("civil-registration")
         assert cp and br
         assert all(".child-protection." in c for c in cp), sorted(
             c for c in cp if ".child-protection." not in c)
@@ -93,17 +87,17 @@ class TestTheSelection:
             return real(args, env, target_path)
         monkeypatch.setattr(dbt_worker, "invoke", counted)
         for _ in range(3):
-            run_dbt_cp.test_names_by_check_id()
+            run_dbt.test_names_by_check_id("child-protection")
         assert calls == ["parse"]
 
     def test_a_selection_names_tests_with_their_parents(self):
         check = f"{P}.cp-notifications.cp_client_id.relationships_dbt"
-        (selected,) = run_dbt_cp.selection_for([check])
+        (selected,) = run_dbt.selection_for("child-protection", [check])
         assert selected.startswith("+relationships_stg_cp_notifications")
 
     def test_a_check_with_no_test_refuses(self):
         with pytest.raises(dbt_common.UnknownCheck, match="no_such"):
-            run_dbt_cp.selection_for([f"{P}.cp-clients.no_such_dbt"])
+            run_dbt.selection_for("child-protection", [f"{P}.cp-clients.no_such_dbt"])
 
 
 class TestTheSameVerdicts:
@@ -127,7 +121,7 @@ class TestTheSameVerdicts:
 
         # NOTHING OUTSIDE THE SCOPE RAN (criterion 2), by node.
         nodes = {uid for uid in ran if uid.startswith("test.")}
-        names = run_dbt_cp.test_names_by_check_id()
+        names = run_dbt.test_names_by_check_id("child-protection")
         asked = asked_for.for_run(run_id, CP, "dbt", in_scope)
         assert {n.split(".")[2] for n in nodes} == {n for c in asked for n in names[c]}
 
@@ -140,7 +134,7 @@ class TestAnUnreadableTableLeavesItsTestsOut:
                                                                    monkeypatch):
         run_id = _clone("cp_placements", absent={"cp_carers"})
         monkeypatch.setattr(asked_for, "SCOPED", frozenset({"dbt"}))
-        got = run_dbt_cp.evaluate_dbt_cp(run_id, "2026-04-01T09:00:00Z")
+        got = run_dbt.evaluate("child-protection", run_id, "2026-04-01T09:00:00Z")
         noted = left_out.take(run_id).get("dbt", set())
         carer_checks = {f"{P}.cp-placements.carer_id.relationships_dbt",
                         f"{P}.cp-placements.carer_id.placement_carer_approval_dbt"}
@@ -165,9 +159,9 @@ class TestNothingAskedRunsNothing:
         monkeypatch.setattr(dbt_worker, "invoke",
                             lambda *a, **k: pytest.fail("dbt was invoked with nothing asked"))
         written = []
-        monkeypatch.setattr(run_dbt_cp, "write_qa_result",
+        monkeypatch.setattr(run_dbt, "write_qa_result",
                             lambda *a, **k: written.append((a[4], a[5])))
-        assert run_dbt_cp.evaluate_dbt_cp(run_id, "2026-04-01T09:00:00Z") == []
+        assert run_dbt.evaluate("child-protection", run_id, "2026-04-01T09:00:00Z") == []
         assert written == [("dbt", {"asked": []})]
 
 
@@ -176,12 +170,12 @@ class TestBirthRegistrationsTakesTheSamePath:
     table, and what it records does not change."""
 
     def test_the_same_records_scoped(self, bdm_duckdb_dir, monkeypatch):
-        import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
+        import qa_tools.tools.run_dbt as run_dbt
         from conftest import clone_run_views
         from fixture_ids import BDM_DIRTY_RUN_ID
 
-        monkeypatch.setattr(run_dbt_bdm, "write_qa_result", lambda *a, **k: None)
-        monkeypatch.setattr(run_dbt_bdm.asked_for, "record", lambda *a, **k: None)
+        monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
+        monkeypatch.setattr(run_dbt.asked_for, "record", lambda *a, **k: None)
         run_id = f"birth_registrations__{random.randrange(10**17, 10**18)}"
         with supply_db.connect(label="test-dbt-scoped") as conn:
             clone_run_views(conn, BDM_DIRTY_RUN_ID, run_id)
@@ -189,7 +183,7 @@ class TestBirthRegistrationsTakesTheSamePath:
         def evaluate(scoped):
             monkeypatch.setattr(asked_for, "SCOPED",
                                 frozenset({"dbt"}) if scoped else frozenset())
-            got = run_dbt_bdm.evaluate_dbt_bdm(run_id, "2026-01-02T09:00:00Z")
+            got = run_dbt.evaluate("civil-registration", run_id, "2026-01-02T09:00:00Z")
             left_out.take(run_id)
             return {r["check_id"]: r for r in got}
 

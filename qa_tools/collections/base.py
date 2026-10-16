@@ -35,6 +35,21 @@ class DatacontractSpec:
 
 
 @dataclass(frozen=True)
+class DbtSpec:
+    #: Each singular test's home table - it has no attached model - and the
+    #: column it is routed to; the singular tests whose audit table holds no
+    #: row keys to sample.
+    singular_home: dict = field(default_factory=dict)
+    singular_column: dict = field(default_factory=dict)
+    singular_unsampled: frozenset = frozenset()
+    #: A model-level generic test's column, by test type.
+    model_level_column: dict = field(default_factory=dict)
+    #: Each test type's dimension and cross-tool label.
+    dimension_by_test: dict = field(default_factory=dict)
+    label_by_test: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class SodaSpec:
     #: The name the scan's data source goes by - it is in the raw output.
     data_source: str = "collection"
@@ -84,6 +99,7 @@ class CollectionAdapter:
     #: never full row content (plans/qa-pipeline.md #15).
     sample_key: dict = field(default_factory=dict)
     #: What each shared tool module reads (REQ-QAC-242 criterion 2).
+    dbt: DbtSpec = field(default_factory=DbtSpec)
     datacontract: DatacontractSpec = field(default_factory=DatacontractSpec)
     soda: SodaSpec = field(default_factory=SodaSpec)
     #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place

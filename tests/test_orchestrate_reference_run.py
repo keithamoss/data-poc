@@ -83,7 +83,7 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
         captured["reference_run_id"] = reference_run_id
         return []
 
-    monkeypatch.setattr(orchestrate_bdm.run_dbt_bdm, "evaluate_dbt_bdm", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate_bdm.run_dbt, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_soda, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_datacontract, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_evidently, "evaluate", fake_evaluate_evidently_bdm)
@@ -146,7 +146,7 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
         captured["reference_run_id"] = reference_run_id
         return []
 
-    monkeypatch.setattr(orchestrate_cp.run_dbt_cp, "evaluate_dbt_cp", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate_cp.run_dbt, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_soda, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_datacontract, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_evidently, "evaluate", fake_evaluate_evidently_cp)

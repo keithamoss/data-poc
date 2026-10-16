@@ -316,7 +316,7 @@ class TestBirthRegistrationsAskedForNothing:
     path too (critic F5: these three branches were untested)."""
 
     @pytest.mark.parametrize("module,evaluate,tool,invoker,lead", [
-        ("qa_tools.bdm.run_dbt_bdm", "evaluate_dbt_bdm", "dbt", "run_dbt", ()),
+        ("qa_tools.tools.run_dbt", "evaluate", "dbt", "run_dbt", ("civil-registration",)),
         ("qa_tools.tools.run_soda", "evaluate", "soda", "execute_scan", ("civil-registration",)),
         ("qa_tools.tools.run_datacontract", "evaluate", "datacontract",
          "run_against_warehouse", ("civil-registration",)),

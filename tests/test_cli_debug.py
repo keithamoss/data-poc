@@ -52,14 +52,15 @@ def test_bdm_manifest_entry_raises_click_exception_when_missing(monkeypatch):
 
 
 def test_run_dbt_bdm_looks_up_nothing_and_calls_evaluate_dbt_bdm(monkeypatch):
-    import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
+    import qa_tools.tools.run_dbt as run_dbt
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp):
+    def _fake_evaluate(collection_id, run_id, run_timestamp):
         seen["run_id"] = run_id
+        assert collection_id == "civil-registration"
         return [{"engine": "dbt", "check": "x", "status": "pass"}]
-    monkeypatch.setattr(run_dbt_bdm, "evaluate_dbt_bdm", _fake_evaluate)
+    monkeypatch.setattr(run_dbt, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-dbt", "--collection", "bdm", "--run-id", "run_001"])
 
@@ -68,14 +69,15 @@ def test_run_dbt_bdm_looks_up_nothing_and_calls_evaluate_dbt_bdm(monkeypatch):
 
 
 def test_run_dbt_cp_calls_evaluate_dbt_cp(monkeypatch):
-    import qa_tools.cp.run_dbt_cp as run_dbt_cp
+    import qa_tools.tools.run_dbt as run_dbt
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp):
+    def _fake_evaluate(collection_id, run_id, run_timestamp):
         seen["run_id"] = run_id
+        assert collection_id == "child-protection"
         return []
-    monkeypatch.setattr(run_dbt_cp, "evaluate_dbt_cp", _fake_evaluate)
+    monkeypatch.setattr(run_dbt, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-dbt", "--collection", "cp", "--run-id", "cp_run_01"])
 

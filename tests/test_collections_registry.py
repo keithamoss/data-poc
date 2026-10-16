@@ -628,6 +628,89 @@ class TestTheSharedToolModules:
         got, _, notes = self._evidently(monkeypatch, legacy=legacy, readable=False)
         assert ("drift:PSI" in got, bool(notes)) == (evaluated, noted)
 
+    def _dbt(self, monkeypatch, tmp_path, legacy=frozenset(), status="pass", built=True,
+             unreadable=frozenset(), asked=(), ran=True):
+        """The shared dbt runner for the third collection, dbt itself and the
+        warehouse stood in for: one not_null test on its one model, and one
+        test of another collection's model, which it must leave alone."""
+        import dataclasses
+        import json
+
+        from qa_tools.collections.base import DbtSpec
+        from qa_tools.tools import run_dbt
+
+        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter.ADAPTER = dataclasses.replace(
+            adapter.ADAPTER, legacy=legacy,
+            dbt=DbtSpec(dimension_by_test={"not_null": "completeness"},
+                        label_by_test={"not_null": "Null rate"}))
+        mine = {"name": "not_null_x", "resource_type": "test", "column_name": "things",
+                "test_metadata": {"name": "not_null"}, "attached_node": f"model.p.stg_{FAKE_TABLE}",
+                "config": {}, "relation_name": '"audit"."not_null_x"'}
+        theirs = dict(mine, name="not_null_y", attached_node="model.p.stg_cp_clients")
+        (tmp_path / "manifest.json").write_text(json.dumps(
+            {"nodes": {"test.p.mine": mine, "test.p.theirs": theirs}}))
+        (tmp_path / "run_results.json").write_text(json.dumps({"results": [
+            {"unique_id": "test.p.mine", "status": status, "failures": 0},
+            {"unique_id": "test.p.theirs", "status": "pass", "failures": 0}][0 if ran else 1:]}))
+        queries, built_models, built_runs = [], {f"stg_{FAKE_TABLE}"} if built else set(), []
+
+        class _Conn:
+            def execute(self, sql, *a):
+                queries.append(sql)
+                rows = [(m,) for m in built_models] if "information_schema" in sql else [(4,)]
+                return SimpleNamespace(fetchall=lambda: rows, fetchone=lambda: rows[0])
+
+            def close(self):
+                pass
+        notes = []
+        monkeypatch.setattr(run_dbt.asked_for, "ask", lambda *a, **k: list(asked))
+        monkeypatch.setattr(run_dbt.asked_for, "SCOPED", frozenset())
+        monkeypatch.setattr(run_dbt.supply_db, "dbt_target_path", lambda run_id: tmp_path)
+        monkeypatch.setattr(run_dbt.supply_db, "connect_dbt", lambda run_id: _Conn())
+        monkeypatch.setattr(run_dbt, "_unreadable_in", lambda run_id: unreadable)
+        monkeypatch.setattr(run_dbt, "exclude_unreadable", lambda models, unreadable:
+                            [f"stg_{t}" for t in unreadable])
+        monkeypatch.setattr(run_dbt, "run_dbt", lambda command, select, *a, **k: built_runs.append(select))
+        monkeypatch.setattr(run_dbt, "_check_ids", lambda path: {
+            (f"stg_{FAKE_TABLE}", "things", "not_null"): "fake.not_null_dbt"})
+        monkeypatch.setattr(run_dbt, "failing_sample_keys_direct", lambda *a: [])
+        monkeypatch.setattr(run_dbt.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
+        monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
+        got = run_dbt.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
+        return got, built_runs, queries, notes
+
+    def test_dbt_builds_only_this_collections_models_and_reads_the_adapter(
+            self, third_collection, monkeypatch, tmp_path):
+        got, built_runs, _, _ = self._dbt(monkeypatch, tmp_path)
+        assert built_runs == [[f"stg_{FAKE_TABLE}"]]
+        [r] = got  # the other collection's test is left alone
+        assert (r["collection_id"], r["dataset_id"], r["dimension"], r["label"]) == \
+            (FAKE_ID, FAKE_DATASET, "completeness", "Null rate")
+        assert (r["metric_value"], r["status"], r["row_count_total"]) == (4, "fail", 4)
+
+    @pytest.mark.parametrize("legacy,recounted", [
+        (frozenset(), False), (frozenset({"dbt.audits_skipped_tests"}), True)])
+    def test_dbt_audits_skipped_tests(self, third_collection, monkeypatch, tmp_path,
+                                      legacy, recounted):
+        _, _, queries, _ = self._dbt(monkeypatch, tmp_path, legacy=legacy, status="skipped")
+        assert any('"audit"' in q for q in queries) is recounted
+
+    @pytest.mark.parametrize("legacy,total", [
+        (frozenset(), None), (frozenset({"dbt.no_built_model_guard"}), 4)])
+    def test_dbt_no_built_model_guard(self, third_collection, monkeypatch, tmp_path, legacy, total):
+        [r], _, _, _ = self._dbt(monkeypatch, tmp_path, legacy=legacy, built=False)
+        assert r["row_count_total"] == total
+
+    @pytest.mark.parametrize("legacy,noted", [
+        (frozenset(), ["fake.not_null_dbt"]), (frozenset({"dbt.no_left_out_note"}), [])])
+    def test_dbt_no_left_out_note(self, third_collection, monkeypatch, tmp_path, legacy, noted):
+        """A test excluded for an unreadable model never runs, so it is absent
+        from run_results - and is noted as left out unless the flag says not."""
+        _, _, _, notes = self._dbt(monkeypatch, tmp_path, legacy=legacy, unreadable={FAKE_TABLE},
+                                   asked=["fake.not_null_dbt"], ran=False)
+        assert notes == noted
+
     def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
         import dataclasses
 

@@ -61,17 +61,7 @@ BUSINESS_RULE_READS = {
     "placement_carer_approval": ("cp_carers", "cp_placements"),
 }
 
-BUSINESS_RULE_HOME_TABLE = {
-    "escalation_completeness": "cp_notifications",
-    "closed_case_investigation_hygiene": "cp_investigations",
-    "placement_carer_approval": "cp_placements",
-    # cp_client_date_of_birth_range (a genuine single-table/single-column
-    # singular test, never a cross-table business rule like the 3 above)
-    # retired 2026-09-15, replaced by dbt_utils.accepted_range - see
-    # plans/qa-pipeline.md's dbt_utils switch. The 3 real business rules
-    # stay singular tests: no generic test, dbt_utils/dbt-expectations
-    # included, abstracts away an arbitrary cross-table join condition.
-}
+from qa_tools.collections.child_protection import BUSINESS_RULE_HOME_TABLE as BUSINESS_RULE_HOME_TABLE  # noqa: E402
 
 BUSINESS_RULE_DISPLAY_NAME = {
     "escalation_completeness": "Escalation completeness",

@@ -66,12 +66,9 @@ def debug_group() -> None:
 def run_dbt_command(collection: str, run_id: str) -> None:
     """Run real dbt-core in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
-    if collection == "bdm":
-        from qa_tools.bdm.run_dbt_bdm import evaluate_dbt_bdm
-        results = evaluate_dbt_bdm(run_id, run_timestamp)
-    else:
-        from qa_tools.cp.run_dbt_cp import evaluate_dbt_cp
-        results = evaluate_dbt_cp(run_id, run_timestamp)
+    from qa_tools import collections
+    from qa_tools.tools import run_dbt
+    results = run_dbt.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
     _print_results(results, run_id)
 
 

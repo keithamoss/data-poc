@@ -16,7 +16,7 @@ from qa_tools.common import supply_db, trial
 import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.tools.run_datacontract as run_datacontract
-import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
+import qa_tools.tools.run_dbt as run_dbt
 import qa_tools.tools.run_evidently as run_evidently
 import qa_tools.tools.run_soda as run_soda
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
@@ -43,7 +43,7 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     # The environment already points at this worker's database
     # (conftest's supply_dsn); duckdb_dir is what staged the data into it.
     monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(run_dbt_bdm, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
@@ -120,7 +120,7 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     case. Nothing waits for a completion signal any more, and there is no
     completion tracker left to consult."""
     import qa_tools.tools.run_datacontract as run_datacontract
-    import qa_tools.cp.run_dbt_cp as run_dbt_cp
+    import qa_tools.tools.run_dbt as run_dbt
     import qa_tools.tools.run_evidently as run_evidently
     import qa_tools.tools.run_soda as run_soda
 
@@ -132,7 +132,7 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # NOTHING LEFT TO REDIRECT ON DISK (REQ-PIPE-102) - both of these
     # modules read the warehouse now, so the CP_RAW_DIR they used to
     # carry is gone rather than pointed somewhere else.
-    for mod in (run_dbt_cp, run_soda, run_datacontract, run_evidently):
+    for mod in (run_dbt, run_soda, run_datacontract, run_evidently):
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
 
