@@ -216,3 +216,78 @@ def capture_arrival_golden_command(yes: bool) -> None:
     golden.write_text(json.dumps(captured, indent=2, sort_keys=True) + "\n")
     n = sum(len(v) for v in captured.values())
     console.print(f"Captured {n} arrivals across {len(captured)} datasets -> {golden}", style="green")
+
+
+@debug_group.group("equivalence")
+def equivalence_group() -> None:
+    """Capture a commit and compare two captures (REQ-TEST-239).
+
+    \b
+    Surfaces:
+      S1 recorded-results  every row of every qa table, normalised
+      S4 generated-files   path and sha256 of every generated file
+      S5 reports           every results and dashboard JSON, generated_at removed
+      S7 help-and-menus    every --help text and the TUI's menu screens
+    """
+
+
+@equivalence_group.command("capture")
+@click.option("--ref", required=True, help="The commit (or branch, tag) to capture.")
+@click.option("--label", required=True,
+              help="Names the baseline file and its scratch database (a-z, 0-9, - and _).")
+@click.option("--yes", is_flag=True, help="Replace a baseline with this label if one exists.")
+def equivalence_capture_command(ref: str, label: str, yes: bool) -> None:
+    """Check REF out into a worktree of its own, bootstrap it from empty into a
+    scratch database, build it, and record S1, S4, S5 and S7 as one baseline.
+    A full bootstrap: budget about half an hour."""
+    from qa_tools.common import equivalence
+
+    try:
+        path = equivalence.capture(ref, label, yes=yes, say=console.print)
+    except equivalence.Refused as exc:
+        raise click.ClickException(str(exc)) from None
+    except equivalence.StageFailed as exc:
+        raise click.ClickException(
+            f"{exc} - the scratch database was dropped and no baseline was written") from None
+    console.print(f"Baseline written: {path}", style="green")
+
+
+@equivalence_group.command("compare")
+@click.argument("a")
+@click.argument("b")
+@click.option("--surfaces", "surfaces", multiple=True, metavar="SURFACE",
+              help="Compare only these, by code or name (S1 recorded-results, S4 "
+                   "generated-files, S5 reports, S7 help-and-menus). Repeatable; all "
+                   "four when absent.")
+def equivalence_compare_command(a: str, b: str, surfaces: tuple[str, ...]) -> None:
+    """Compare baselines A and B (labels or paths) surface by surface. Exits
+    non-zero if any compared surface differs."""
+    from qa_tools.common import equivalence
+
+    try:
+        codes = equivalence.surface_codes(surfaces)
+        ba, bb = equivalence.load(a), equivalence.load(b)
+        diffs = equivalence.compare(ba, bb, codes)
+    except equivalence.Refused as exc:
+        raise click.ClickException(str(exc)) from None
+    between = equivalence.commits_between(ba["commit"], bb["commit"])
+    console.print(f"A: {ba['label']} at {ba['commit'][:10]}   B: {bb['label']} at "
+                  f"{bb['commit'][:10]}   commits between: "
+                  f"{between if between is not None else 'unknown'}")
+    ta, tb = ba.get("bootstrap_seconds"), bb.get("bootstrap_seconds")
+    if ta is not None and tb is not None:
+        console.print(f"bootstrap: A {ta:.0f}s, B {tb:.0f}s, difference {tb - ta:+.0f}s "
+                      f"(A {ba.get('timings') or {}}, B {bb.get('timings') or {}})")
+    names = {code: name for code, name, _ in equivalence.SURFACES}
+    differing = []
+    for code in codes:
+        lines = diffs[code]
+        console.print(f"{code} {names[code]}: " + ("same" if not lines else
+                                                     f"DIFFERS ({len(lines)} line(s))"),
+                      style="green" if not lines else "red", highlight=False)
+        for line in lines:
+            console.print(line, highlight=False, markup=False)
+        if lines:
+            differing.append(code)
+    if differing:
+        raise SystemExit(1)
