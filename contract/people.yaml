@@ -34,19 +34,33 @@
 #     name: Keith Amoss          # a real display name.
 #     nickname: Keith            # optional - shown in the dashboard's own "Owned by" badge
 #                                 # instead of the full name when set.
+#     placeholder: true          # OPTIONAL, default false. A stand-in for a colleague not
+#                                 # yet named for real (REQ-GHUB-082 criterion 29). A
+#                                 # placeholder is SHOWN - the dashboard's "Owned by" badge
+#                                 # reads better with a name than with a gap - and can do
+#                                 # nothing: it raises no filing decision and is assigned no
+#                                 # GitHub ticket. `mothman check`'s people gate requires a
+#                                 # `github:` on everybody who is NOT one, so a real person
+#                                 # added without a username fails the build rather than
+#                                 # silently being unable to act.
 #     github: keithamoss         # a real GitHub username - required for real ticket
 #                                 # assignment (`gh issue create --assignee`), optional
 #                                 # otherwise (a person can be listed/shown without ever
 #                                 # being assignable to a ticket).
-#     roles: [qa, manager]       # one or more roles - not a closed/exhaustive list (Keith's
-#                                 # own framing when this was first raised): qa, peer_review,
-#                                 # and manager have been mentioned so far, but a new role is
-#                                 # just a new string, no schema change needed.
+#     roles: [qa, manager]       # one or more of the roles DECLARED under `roles:` below
+#                                 # (REQ-GHUB-171 criterion 1) - a new role is one new line
+#                                 # there, and a typo'd one fails the people gate.
 #
 # assignments:
-#   - agency: registry-services  # EITHER `agency:` (an agencyId) OR `dataset:` (a datasetId)
-#     person: keith@example.com  # - never both on the same entry. `person` references a
-#     role: qa                   # real people[].email above.
+#   - data_asset: data-asset-1   # EXACTLY ONE LEVEL (REQ-GHUB-171 criterion 2): the whole
+#     person: keith@example.com  # data asset (`data_asset:`, its data_asset_id), an agency
+#     role: manager              # (`agency:`) or a dataset (`dataset:`). The manager at
+#                                 # data-asset level is the ASSET MANAGER, accountable for
+#                                 # the whole asset; a manager at agency level is that
+#                                 # agency's own. The gate fails without a real asset manager.
+#   - agency: registry-services
+#     person: keith@example.com  # `person` references a real people[].email above.
+#     role: qa
 #   - dataset: cp-clients        # A dataset-level entry OVERRIDES its whole agency's entries
 #     person: keith@example.com  # outright for that one dataset (never merged with the
 #     role: peer_review          # agency-level list) - qa_tools/common/people.py's own
@@ -56,6 +70,12 @@
 # the same) roles - a real ticket gets assigned to everyone currently
 # responsible for that dataset/agency, not just one arbitrarily-picked
 # role.
+
+# The roles a person may hold or be assigned (REQ-GHUB-171 criterion 1).
+roles:
+  - qa
+  - peer_review
+  - manager
 
 people:
   - email: fpycnkgvmt@privaterelay.appleid.com
@@ -67,16 +87,36 @@ people:
     name: Brian Cohen
     nickname: Brian
     roles: [qa]
+    placeholder: true
   - email: reg@example.com
     name: Reg
     nickname: Reg
     roles: [peer_review]
+    placeholder: true
   - email: arthur.pendragon@example.com
     name: Arthur, King of the Britons
     nickname: Arthur
     roles: [manager]
+    placeholder: true
+  # THE SCRIPTED HISTORY'S ACTOR (REQ-GEN-135). Raises the person decisions a
+  # synthetic history plays back, and nothing else: no GitHub username, never
+  # assigned, refused on every route outside scripted playback, and only on an
+  # asset that declares itself synthetic.
+  # Its NAME is an ordinary fictional one on purpose (REQ-GEN-135 criterion 12:
+  # the dataset pages show a scripted decision exactly as any person's, never
+  # labelled); its EMAIL is what names it as synthetic in the log and the
+  # terminal (NFR, auditability).
+  - email: scripted-history@synthetic.invalid
+    name: Robin Hale
+    nickname: Robin
+    roles: [qa]
+    synthetic: true
 
 assignments:
+  # The data asset's manager (REQ-GHUB-171 criterion 5; Keith, 2026-10-07).
+  - data_asset: data-asset-1
+    person: fpycnkgvmt@privaterelay.appleid.com
+    role: manager
   - agency: registry-services
     person: fpycnkgvmt@privaterelay.appleid.com
     role: qa

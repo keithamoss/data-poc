@@ -46,17 +46,49 @@ name: Sync QA status to GitHub Issues
 # anyway, accepting that those first real tickets may reflect real,
 # not-yet-diagnosed problems rather than something already understood.
 # Paths mirror deploy-pages.yml's own trigger (same build chain this
-# job reads), minus dashboard/**/CHANGELOG.md/requirements.yaml - this
+# job reads), minus dashboard/**/CHANGELOG.yaml/requirements.yaml - this
 # job never touches the dashboard itself.
 on:
   push:
-    branches: [claude/new-session-en9qen]
+    # A glob, not a single named branch - same fix and reason as
+    # test.yml/deploy-pages.yml (plans/publishing-and-history.md #7,
+    # 2026-09-19). Worth recording what that actually changed HERE,
+    # because this is the one of the three with `issues: write`: the
+    # push trigger below was deliberately enabled (see the note above),
+    # but the dead branch pin meant it had never once fired. So this
+    # workflow's first real automatic run is a consequence of fixing the
+    # pin, not of enabling anything new - Keith's call, 2026-09-19, made
+    # with the real number in front of him: 3 datasets currently read
+    # red (birth-registrations, cp-carers, cp-placements), down from all
+    # 7 before plans/qa-pipeline.md item 74's fix, so the first run opens
+    # 3 tickets rather than the noise-storm that item's own write-up had
+    # been holding this back to avoid.
+    #
+    # THE PUSH TRIGGER IS DISABLED, AND THIS WORKFLOW CANNOT CURRENTLY RUN
+    # (REQ-PIPE-089). It opens a ticket per failing check by rebuilding
+    # the check results first - which it did from the committed
+    # `qa_results/` tree, and that tree is gone: the results are rows in a
+    # PostgreSQL database, and a GitHub runner has no route to it.
+    #
+    # DISABLED RATHER THAN DELETED, deliberately. The ticketing logic is
+    # real, tested and wanted; what it needs is to run somewhere that can
+    # read the results, which inverts the direction of the whole
+    # integration - something inside the secure environment posting OUT to
+    # GitHub, rather than a workflow reaching in. That inversion is
+    # plans/running-thoughts.md #53, and it is not scoped yet, so leaving
+    # this file in place with its trigger removed records the gap instead
+    # of hiding it. `workflow_dispatch` stays so the failure is
+    # reproducible on demand rather than only in theory.
+    #
+    # The trigger it used to carry, kept so restoring it needs no
+    # archaeology:
+    #   branches: ["claude/**"]
+    #   paths: qa_results/**, contract/**,
+    #          dbt_project/models/staging/schema.yml,
+    #          qa_tools/**, pipeline/**
+    branches: ["disabled-see-the-note-above"]
     paths:
-      - "qa_results/**"
-      - "contract/**"
-      - "dbt_project/models/staging/schema.yml"
-      - "qa_tools/**"
-      - "pipeline/**"
+      - ".github/workflows/ticket-sync.yml"
       - ".github/workflows/ticket-sync.yml"
   workflow_dispatch:
 

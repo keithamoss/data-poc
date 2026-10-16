@@ -1,0 +1,15 @@
+# Who may approve a correction to the delivery agreement (REQ-GHUB-174).
+#
+# The configuration gate refuses a declared correction whose approver is
+# not a code owner of the file it is declared in, matched through
+# contract/people.yaml's `github:` field - both files read as they stood
+# at the BASE of the change, so a change cannot make its own approver.
+#
+# REQUIRING these owners' review before a merge is a GitHub
+# branch-protection setting, not something this file can switch on. It is
+# OFF in this proof of concept; see docs/code-owner-review.md for what a
+# real deployment turns on.
+/contract/calendar.yaml   @keithamoss
+/contract/data-asset.yaml @keithamoss
+/contract/people.yaml     @keithamoss
+/.github/CODEOWNERS       @keithamoss

@@ -29,6 +29,7 @@ from typing import Any
 
 import duckdb
 
+from qa_tools.common import asset_time
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 
 _SEX_VALID = ["M", "F", "X"]
@@ -96,10 +97,24 @@ def _sex_value_counts(conn: duckdb.DuckDBPyConnection, run_id: str) -> list[list
 
 
 def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
-    max_lag_hours = conn.execute(
-        """SELECT MAX(date_diff('second', date_registered, extract_timestamp)) / 3600.0
-           FROM birth_registrations WHERE run_id = ?""", [run_id]
-    ).fetchone()[0]
+    # MAX_LAG_HOURS RETIRED 2026-09-25 (REQ-PIPE-066 criterion 12). It
+    # was never an arrival measure despite living in this block: it was
+    # MAX(extract_timestamp minus date_registered), a WITHIN-SUPPLY
+    # staleness figure. Verified before deleting - computed, committed,
+    # carried through BOTH dashboard build paths as maxLagHours, and
+    # rendered NOWHERE; zero references in the dashboard template and
+    # zero in the JS suite, with the only references outside the
+    # pipeline being tests asserting it was carried. Dead weight with a
+    # misleading name.
+    #
+    # The real finding it gestured at is EXTRACT-TO-RECEIPT LAG - the
+    # gap between when a supplier extracted and when WE received -
+    # which is genuine signal about supplier behaviour and quite
+    # different from whether a supply was on time. Keith's call is that
+    # it belongs as a CHECK rather than a committed stat, where a
+    # tolerance and a verdict can live: plans/running-thoughts.md #43.
+    # It needs this batch's receipt instant to compute, so it is not
+    # this field wearing a new name.
     # A real bug found 2026-09-17 (Phase 5j's arrival-status work): a
     # plain MIN(extract_timestamp) over every row picks up
     # generator.dirty.inject_extract_timestamp_disorder's own rows too -
@@ -127,19 +142,59 @@ def _arrival(conn: duckdb.DuckDBPyConnection, run_id: str) -> dict:
         earliest_extract = conn.execute(
             "SELECT MIN(extract_timestamp) FROM birth_registrations WHERE run_id = ?", [run_id]
         ).fetchone()[0]
-    return {"max_lag_hours": max_lag_hours, "earliest_extract": str(earliest_extract) if earliest_extract else None}
+    return {"earliest_extract": asset_time.record_source_instant(
+                earliest_extract, f"earliest_extract for run {run_id}")}
 
 
-def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, run_id: str, manifest_entry: dict) -> dict[str, Any]:
+def _arrival_record(arrival: dict) -> dict:
+    """The observed facts about one arrival, and nothing else.
+
+    An allowlist rather than a copy-minus-some-keys, deliberately: a
+    field added to the arrival dict later must not silently find its
+    way into committed history. Criterion 7 is a rule about what may
+    be in qa_results/, and a permissive shape would let the next field
+    through without anybody deciding.
+    """
+    return {key: arrival[key] for key in ("run_id", "run_index", "received_at", "delivery")
+            if key in arrival}
+
+
+def compute_dataset_stats(conn: duckdb.DuckDBPyConnection, run_id: str, arrival: dict) -> dict[str, Any]:
     """`conn` is a connection to the combined warehouse (birth_registrations
     table, tagged by run_id) - the same one build_dashboard_data.py used
-    to open directly. `manifest_entry` is this run's own entry from
-    data/raw/manifest.json (delivery date, resupply flags, etc.) -
-    embedded here so it becomes part of committed history too, rather
-    than build_results_from_history.py needing to keep reading local,
-    regenerated data/raw/manifest.json on top of qa_results/."""
+    to open directly.
+
+    THE ARRIVAL RECORD, NOT THE GENERATOR'S MANIFEST ENTRY
+    (REQ-GEN-043 criterion 7). This used to embed the whole entry -
+    injected severity, seed, id_offset, which slot it filled - into
+    committed qa_results/, where acceptance_sync.py then read it back.
+    That put the generator's own bookkeeping inside the permanent QA
+    record and let a downstream module file supplies from a
+    declaration.
+
+    What survives is what the pipeline legitimately observed: which run
+    this is, when WE received it, and which delivery it came from. The
+    rest is in data/generator_bookkeeping.json, which nothing here may
+    read.
+    """
+    # A RUN THAT COULD READ NOTHING still has an arrival worth recording -
+    # see orchestrate_bdm's own note on why its table can be unreadable
+    # (REQ-PIPE-105). What was measured is left empty rather than invented.
+    if not conn.execute(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = 'birth_registrations'"
+            ).fetchall():
+        return {"arrival_record": _arrival_record(arrival), "row_count": None,
+                "value_counts": {}, "arrival": {}, "check_aggregates": {}}
     return {
-        "manifest_entry": manifest_entry,
+        "arrival_record": _arrival_record(arrival),
+        # MEASURED, not declared. This used to reach the dashboard as
+        # the generator's own `n_rows_generated` - a number from
+        # bookkeeping rather than from the data that actually landed
+        # (REQ-GEN-043 criterion 7). Counted here because this is the
+        # one point in the pipeline with a legitimate live connection.
+        "row_count": conn.execute(
+            "SELECT COUNT(*) FROM birth_registrations WHERE run_id = ?", [run_id]).fetchone()[0],
         "value_counts": {"sex": _sex_value_counts(conn, run_id)},
         "arrival": _arrival(conn, run_id),
         "check_aggregates": _check_aggregates(conn, run_id),

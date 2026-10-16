@@ -117,6 +117,56 @@ async def _check_render(html_path: Path, label: str) -> list[str]:
         if not view_html.strip():
             console_errors.append("#view is empty after load - the dashboard app never rendered")
 
+        # EVERY DATASET, not just the landing page
+        # (plans/post-build-review.md #43). This gate is cited as "what
+        # would catch a throw reaching a viewer", and for a long time it
+        # could not: it loaded the front door and stopped, while three
+        # of seven dataset pages threw an uncaught TypeError on
+        # drill-down. Proven blind before this was written - the bug was
+        # reintroduced into a built copy and the gate still reported
+        # zero console errors.
+        #
+        # Routes come from the page's own DATA and its own
+        # stateToHash(), so a dataset added later is covered without
+        # anybody remembering to add it here, and the gate can never
+        # visit a route the app would not build.
+        routes = await page.evaluate("""() => {
+            // `typeof DATA`, not `window.DATA`: a top-level `const`
+            // creates a global BINDING but not a window property, so
+            // window.DATA is undefined while DATA itself is fine. The
+            // first version tested window.DATA, got nothing, and
+            // enumerated zero routes - the second no-op in a row while
+            // extending this gate.
+            if(typeof DATA === "undefined" || !DATA || !DATA.agencies) return [];
+            const out = [];
+            DATA.agencies.forEach(ag => {
+                out.push(stateToHash({tier:"agency", agencyId:ag.id}));
+                ag.collections.forEach(col => col.datasets.forEach(ds =>
+                    out.push(stateToHash({tier:"dataset", agencyId:ag.id,
+                                           collectionId:col.id, datasetId:ds.id}))));
+            });
+            return out;
+        }""")
+        # A REAL LOAD PER ROUTE, not an assignment to location.hash.
+        # The first version of this did the latter and was a no-op: the
+        # app listens for `popstate`, which a programmatic hash
+        # assignment does not fire, so the gate "visited" nine routes
+        # without re-rendering once and still reported zero errors.
+        # Caught by re-proving it against the reintroduced bug rather
+        # than trusting the change - which is the same
+        # a-check-that-never-runs-looks-like-success shape this gate was
+        # being extended to close.
+        #
+        # A full load is also what a person opening a shared deep link
+        # actually does, so it exercises the initial-state resolution
+        # path as well as the render.
+        for route in routes:
+            await page.goto(f"file://{html_path.resolve()}{route}")
+            await page.wait_for_timeout(400)
+            body = await page.locator("#view").inner_html()
+            if not body.strip():
+                console_errors.append(f"#view is empty at {route}")
+
         await browser.close()
     return [f"{label} render check: {e}" for e in console_errors]
 

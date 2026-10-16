@@ -25,18 +25,6 @@ def test_sync_tickets_calls_ticket_sync_main(monkeypatch):
     assert called == [True]
 
 
-def test_sync_acceptances_calls_acceptance_sync_main(monkeypatch):
-    import qa_tools.common.acceptance_sync as acceptance_sync
-
-    called = []
-    monkeypatch.setattr(acceptance_sync, "main", lambda: called.append(True))
-
-    result = _runner.invoke(github_cli.github_group, ["sync-acceptances"])
-
-    assert result.exit_code == 0, result.output
-    assert called == [True]
-
-
 def test_sync_leaderboard_calls_leaderboard_main(monkeypatch):
     import qa_tools.common.leaderboard as leaderboard
 

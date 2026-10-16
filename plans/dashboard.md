@@ -736,7 +736,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
     find out what he actually wants here before anything can be
     scoped, let alone built.
 
-    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
 
 11. **[done, 2026-09-19]** **[Testing & dev tooling]** CLI/TUI splash
@@ -828,7 +828,7 @@ common/check_lifecycle.py`'s own `check_id` convention.
     **Priority: work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
 
-13. **[todo, 2026-09-19]** **[Dashboard UI]** Revisit the Demo tab's
+13. **[done, 2026-09-19]** **[Dashboard UI]** Revisit the Demo tab's
     playback pacing again - Keith's own follow-up, same day, after the
     2 earlier real speed changes this session (`speed: 0.5` then `0.4`
     in the `AsciinemaPlayer.create()` call, `dashboard/qa-reporting-
@@ -867,6 +867,106 @@ common/check_lifecycle.py`'s own `check_id` convention.
     recording-side scripting change. Still parked - not built this
     session, captured here so it survives to whichever session picks
     this up next.
+
+    **Built 2026-09-19 evening, and Keith's hypothesis was right - with
+    a mechanism behind it that explains why two speed tweaks couldn't
+    have worked.** Decoding the committed `.cast` before changing
+    anything gave the real numbers: a uniform **0.78s** from every menu
+    rendering to its keypress, **0.48s** to read the dense results
+    table, and **zero arrow keys in the entire recording** - every
+    choice was just the already-highlighted first option. The
+    interactive part of a 19.4s recording was only ~4.2s; the other
+    ~14.8s was the real tool chain.
+
+    The mechanism: `speed` in `AsciinemaPlayer.create()` is an INVERSE
+    multiplier, so `0.4` played the whole thing 2.5x slower - ~48s, of
+    which ~37s was the frozen tool-chain stretch. A global multiplier
+    cannot fix a DISTRIBUTION problem: it stretched the dead air by
+    exactly as much as the reading time. That's why 0.5 and then 0.4
+    both failed, and it's worth recording as the general lesson rather
+    than just this instance.
+
+    Built, per Keith's own fix direction (recording-side, not
+    player-side):
+    - A new **`pause:<seconds>` step type** in `scripts/dev/
+      record_cast.py`, alongside the existing `wait:`/`key:`. Explicit
+      per-step rather than a global delay or random jitter, so pauses
+      can genuinely differ (a first-time menu earns more than a familiar
+      y/N) while the recording stays deterministic.
+    - **Re-scripted `qa_wizard.cast`** with real reading time (~1.4-1.9s
+      per new menu, **5.5s on the report**) and real scanning: the
+      highlight moves down past the other options and comes back up to
+      the target on all four menus. Equal `down`/`up` counts land back
+      on the first item whether a menu wraps or clamps, so it's safe for
+      any menu length. The run-picker scan now visibly passes over a
+      real amber run (`run_003_2026-05-25`), which is incidentally more
+      informative than the original.
+    - **Player `speed` back to `1`** - real time. With honest pacing in
+      the `.cast` there's nothing left for the multiplier to fix, and
+      the chain plays at its true ~13.5s instead of a punishing ~37s.
+      Total runtime ~48s, essentially unchanged from the old effective
+      playback; the time is simply spent where a viewer needs it.
+    - **`dashboard/demos/README.md` finally written.** `record_cast.py`'s
+      own docstring had pointed at it for "the actual recorded script"
+      since Phase 6 and it never existed - so the exact `--step`
+      sequence behind the committed `.cast` was recorded nowhere, and
+      reconstructing it meant decoding the recording. It now holds the
+      canonical command, the reasoning, and the regeneration steps.
+
+    **One real thing this surfaced, logged not fixed** (`plans/tooling.md`
+    #13): the ~13.5s chain shows up as a gap with zero terminal events,
+    because the CLI genuinely prints nothing while it runs. That's a
+    real gap in the shipped CLI, not a recording artifact - and fixing
+    it there (a spinner or per-tool step indicator, both already
+    implied by `plans/tooling.md` #1's own TUI research notes) would
+    remove the demo's dead patch for free, without the recording having
+    to fake anything.
+
+    **A second real defect, found after publishing and fixed the same
+    evening - Keith spotted it on the live site**: "the first three
+    clicks through the TUI, there is a very brief flash of orange text
+    appearing on the first line. I can't read it, but there's a flash of
+    orange happening." Decoding the `.cast` located it precisely -
+    `ESC[0;38;5;214;1m`, 256-colour 214, appearing 5 times. That's
+    `questionary`'s own **"answered" style**: the line it leaves behind
+    after a prompt is answered (`? What would you like to do? Quality
+    Assurance - run the real check chain against a dataset`). It was
+    being drawn and destroyed in the same frame.
+
+    The cause was in `scripts/dev/record_cast.py`, not the CLI.
+    Every CPR (cursor-position-request, `ESC[6n`) `prompt_toolkit` sends
+    on a fresh prompt render was answered with a **constant**
+    `ESC[1;1R` - "you are at the top-left". That constant was added
+    deliberately, to stop an unanswered probe printing a "your terminal
+    doesn't support cursor position requests" warning into the
+    recording, and it did fix that. But it replaced a missing answer
+    with a false one: `prompt_toolkit` believed it was at row 0 on every
+    render, so it re-rendered each prompt from the top of the screen and
+    erased everything above - the splash screen and the whole accumulated
+    trail of answered lines. Worth being precise, because it's the
+    opposite of the last defect: **this one was purely a recording
+    artifact**. A real terminal always answered truthfully, so a real
+    `mothman` session never behaved this way; only the published demo
+    did.
+
+    Fixed at the source. The recorder already had `pyte` available (
+    `scripts/dev/tui_screenshot.py` uses it to resolve in-place TUI
+    redraws), so it now feeds every byte the child writes through a real
+    `pyte.Screen` and answers each CPR with that screen's genuine
+    cursor position. Verified by replaying the new `.cast` through a
+    terminal emulator: at t=16s the splash occupies rows 1-18 and rows
+    20/22/23 carry the real answered trail, where the old recording had
+    4 non-blank rows and nothing above the current prompt. Re-recorded
+    (164 events, 46.1s, 67.8KB) and re-embedded. Covered by
+    `tests/test_record_cast.py`, which drives a real pty and asserts the
+    reply names the true row - it reports `1;1` against the pre-fix
+    recorder, confirmed by running it against the stashed original.
+
+    Recording it here as a general lesson too: answering a terminal
+    query with a plausible constant is not the same as answering it.
+    The warning it silenced was the visible symptom; the lie it told
+    was a quieter, worse bug that took a published artifact and a user
+    noticing a flash of colour to surface.
 
 14. **[todo, 2026-09-19]** **[Dashboard UI]** Decode a requirement's id
     into a real component badge/icon in the Requirements panel, the
@@ -958,3 +1058,119 @@ common/check_lifecycle.py`'s own `check_id` convention.
     sandbox (`dashboard/check_dashboard_renders.py` now auto-detects
     this environment's own `/opt/pw-browsers/chromium` symlink instead
     of requiring `PLAYWRIGHT_CHROMIUM_PATH` set by hand).
+
+17. **[done, 2026-09-19]** **[Dashboard UI]** `dashboard/changelog_md.py`
+    silently drops a `**[Component]**` tag whenever it doesn't sit on the
+    bullet's own FIRST source line - 3 of 92 real `CHANGELOG.md` entries
+    are affected today, and all 3 render in the live Release Notes panel
+    with no component icon/badge and the raw `**[Docs & process]**`
+    markup showing as literal body text.
+
+    Found 2026-09-19 while renaming the 25 stale `requirements-*`
+    references in `CHANGELOG.md` (Keith's own call, reversing that
+    entry's original "leave history alone" decision) - the rename itself
+    is parse-neutral, verified by diffing the parser's own output
+    before and after (92 entries, same 3 broken, same 7 stray-asterisk
+    texts, identical either way), so this is genuinely pre-existing and
+    not something that rename introduced.
+
+    Real root cause, read from the code rather than inferred:
+    `parse_changelog()` calls `_parse_item()` on the bullet's first line
+    ONLY (`stripped[2:]`), then appends every soft-wrapped continuation
+    line afterwards with a plain `items[-1]["text"] += " " + stripped`.
+    So `_ITEM_COMPONENT_RE` only ever gets a chance to match what fits on
+    line one. Three distinct real instances, two causes:
+    - **Component tag wrapped onto the continuation line** (the 4:27pm
+      "Requirements-Analysis Agents: Real Polish Bar..." entry): the
+      headline fills line one, `**[Docs & process]**` starts line two,
+      never seen.
+    - **Component tag split mid-tag across lines** (the 4:23pm "A
+      Requirements-Analysis Agent System..." entry): the source reads
+      `**[Docs &` / `process]**`, so even a joined-first parser would
+      need `[^\]]+` to span the break.
+    - **A backslash-escaped asterisk in the headline** (the 7:25pm
+      rename entry, `...Renamed to delivery-\*`): `\*` immediately
+      before the closing `**` produces `***`;
+      `_ITEM_HEADLINE_RE`'s `\*\*` consumes two, leaving a stray `*`
+      that then blocks `_ITEM_COMPONENT_RE`. A separate regex problem
+      from the other two, same visible symptom.
+
+    **Fixed 2026-09-19, Keith's own call** - the parser, not the
+    content, so the trap can't re-arm the next time a headline happens
+    to run long. Two changes, one per cause:
+    - `parse_changelog()` now buffers a bullet's source lines and parses
+      the headline/components off the WHOLE joined text at flush time
+      (a new `flush_item()`, called on the next bullet, the next `###`/
+      `## ` heading, and at EOF), instead of calling `_parse_item()` on
+      line one and appending continuations straight onto `["text"]`.
+      The mid-tag split case (`**[Docs &` / `process]**`) falls out for
+      free, since the join restores the single space.
+    - `_ITEM_HEADLINE_RE`'s `[^*]*` became `(?:[^*\\]|\\.)*`, so a
+      backslash-escaped asterisk is consumed as one unit rather than
+      stopping the match at the backslash. The two alternatives are
+      deliberately non-overlapping (a backslash only ever matches via
+      `\\.`), so there's no ambiguity for the regex engine to backtrack
+      through. A new `_MD_ESCAPE_RE` then strips the backslash from the
+      captured headline - `\*` is markdown escaping, not content, so
+      the panel shows `delivery-*` rather than `delivery-\*`.
+
+    4 new tests (`tests/test_changelog_md.py`, 18 total), each confirmed
+    failing against the pre-fix parser first per this project's standing
+    bug convention: a tag wrapped onto the continuation line, a tag
+    split mid-tag across the wrap, an escaped asterisk in the headline,
+    and two components with the wrap landing between them. Verified
+    against the real committed `CHANGELOG.md` too, not just fixtures:
+    all 92 entries now parse with components (was 89), zero stray-
+    asterisk texts (was 7).
+
+18. **[todo, 2026-09-20]** **[Dashboard UI]** `--ink-faint` fails WCAG AA
+    contrast in both themes - 3.03:1 in light, 4.16:1 in dark, against
+    a 4.5:1 threshold for normal text. Used in 47 places.
+
+    Found incidentally, and the way it was found is the point. Keith's
+    call to mandate `requirements.yaml`'s `evidence` field on every
+    built requirement with **no exceptions** (`plans/tooling.md` #20)
+    forced a real measurement for `REQ-DASH-012` (dark mode), which had
+    looked like the one case where no measurement applied. Demanding one
+    turned up this instead. The toggle-persists Playwright test that
+    verifies that requirement today could never have caught it - it
+    asserts a flag survives a reload, not that anything is legible.
+
+    Measured directly off the real built page (`getComputedStyle` in a
+    real browser, both themes, WCAG relative-luminance formula):
+
+    | token | theme | value | on `--paper` | contrast |
+    |---|---|---|---|---|
+    | `--ink-faint` | light | `#8A8D80` | `#F5F2EA` | **3.03:1** |
+    | `--ink-faint` | dark | `#767A6C` | `#12160F` | **4.16:1** |
+
+    For context, the neighbouring tokens are comfortable: `--ink` is
+    14.95:1 on `--paper` in dark mode, `--ink-muted` 7.66:1. Only the
+    faintest tier falls short, which fits how it got there - it is the
+    de-emphasis colour, and de-emphasis was presumably pushed until it
+    looked right rather than until it measured right.
+
+    **Directly caused a real test to be written, 2026-09-20.** Keith's
+    response on seeing this: "just write a test that checks that it
+    actually flips to dark mode."
+    `tests/test_dashboard_e2e.py::TestDarkModeToggle::
+    test_dark_mode_actually_renders_dark` now measures `body`'s resolved
+    background and text luminance in both themes and asserts the page is
+    genuinely dark in one and genuinely light in the other, with the text
+    inverting to match - rather than merely different, which a swap of
+    one mid-grey for another would satisfy. Proven by breaking it:
+    disabling the dark-theme CSS block made the new test fail with
+    `dark background is not dark (luminance 0.889)` while **both
+    pre-existing dark-mode tests still passed** - the attribute flipped,
+    survived a reload, and the page stayed light. That is the gap in
+    exact terms.
+
+    **The contrast ratios themselves are not fixed here, deliberately.** Changing a design token is a
+    visual decision across 47 usages, not a mechanical one, and
+    `REQ-DASH-012`'s own acceptance criterion is narrowly "the choice
+    persists across a reload" - contrast is genuinely out of that
+    requirement's scope, so this is a new finding rather than a
+    regression against something already promised. Worth scoping with
+    Keith: whether to darken the token, restrict where the faintest tier
+    may be used, or accept it for non-essential text with a stated
+    rationale. 3.03:1 in light mode is the more serious of the two.

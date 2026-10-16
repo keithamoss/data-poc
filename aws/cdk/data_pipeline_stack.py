@@ -2,7 +2,8 @@
 CDK (Python) infra for the event-driven MVP - plans/running-thoughts.md #5
 Thread B, full design at docs/aws-event-driven-mvp-design.md (read that
 first; this module doesn't repeat the architecture, trust-boundary
-decision, or completion-tracker discussion, only encodes the "Infra (AWS
+decision, or (since REQ-PIPE-105, retired) completion-tracker
+discussion, only encodes the "Infra (AWS
 CDK, Python)" section of it).
 
 **Never `cdk synth`'d or deployed.** This sandbox has no AWS CLI, no CDK
@@ -21,7 +22,6 @@ from aws_cdk import (
     Duration,
     Stack,
 )
-from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_notifications as s3n
@@ -41,8 +41,15 @@ LAMBDA_HANDLERS_DIR = "aws/lambda_handlers"
 
 
 class DataPipelineStack(Stack):
-    """Two S3 buckets, two Lambdas, one DynamoDB table, and the IAM/event
-    wiring between them - the whole of docs/aws-event-driven-mvp-design.md's
+    """Two S3 buckets, two Lambdas, and the IAM/event wiring between them.
+
+    THE DYNAMODB TABLE IS GONE (REQ-PIPE-105, 2026-09-28). It existed to
+    count which of Child Protection's six tables had landed, so the
+    cross-table checks could wait for all of them. Nothing waits now -
+    every arriving file is checked against the newest supply staged for
+    its period - so there is no completion state to keep, and a table
+    provisioned "so switching strategies later is a config change" is
+    infrastructure for a strategy that no longer exists - the whole of docs/aws-event-driven-mvp-design.md's
     "Infra (AWS CDK, Python)" section, nothing else. No git/GitHub
     credentials anywhere in this stack, by design (the "Getting results
     back into git" trust-boundary decision in the design doc - Lambda only
@@ -58,32 +65,31 @@ class DataPipelineStack(Stack):
         # for exactly one account. CDK auto-generates a unique name from
         # the construct/stack id; the real name is only known post-deploy,
         # which is exactly what the CfnOutputs below are for.
+        # A STATED ENVIRONMENT AND A DATABASE, OR NO STACK (REQ-PIPE-152).
+        # Every connection refuses without MOTHMAN_ENVIRONMENT and a matching
+        # qa.identity row (REQ-PIPE-093, REQ-PIPE-107), so a handler deployed
+        # without either fails on its first object. Both come from CDK
+        # context and neither has a default: `cdk synth -c
+        # mothman_environment=production -c supply_dsn=...`. The database
+        # must already be marked with the same environment by a person
+        # (`mothman env mark`) - the stack cannot do that for them.
+        #
+        # FLAGGED, NOT SOLVED: a DSN carries a password, and a Lambda
+        # environment variable is readable by anyone who can read the
+        # function's configuration. A real deployment should hold it in
+        # Secrets Manager and have supply_db read it from there; that is a
+        # security decision for whoever deploys this, not one to make in a
+        # sketch nobody has synthesised.
+        handler_environment = {
+            "MOTHMAN_ENVIRONMENT": self._required_context("mothman_environment"),
+            "MOTHMAN_SUPPLY_DSN": self._required_context("supply_dsn"),
+        }
+
         raw_bucket = s3.Bucket(
             self,
             "RawDataBucket",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
-        )
-
-        results_bucket = s3.Bucket(
-            self,
-            "ResultsBucket",
-            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
-            enforce_ssl=True,
-        )
-
-        # Provisioned per the design doc even though ManifestMarkerCompletion
-        # Tracker (a marker file + a live S3 HeadObject check, no state store
-        # at all) is the recommended MVP default, not this table - so that
-        # switching to DynamoDBCompletionTracker later (if Keith's real CP
-        # source systems can't guarantee a marker lands last) is a config
-        # change, not an infra change.
-        completion_table = dynamodb.Table(
-            self,
-            "CpDeliveryCompletionTable",
-            table_name="cp-delivery-completion",
-            partition_key=dynamodb.Attribute(name="delivery_id", type=dynamodb.AttributeType.STRING),
-            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
         )
 
         # Real dependency bundling (this repo's own qa_tools/generator/
@@ -108,9 +114,7 @@ class DataPipelineStack(Stack):
             # this limit is one of the design doc's own open questions, never checked against a real
             # invocation.
             memory_size=1024,
-            environment={
-                "RESULTS_BUCKET_NAME": results_bucket.bucket_name,
-            },
+            environment=dict(handler_environment),
         )
 
         cp_lambda = lambda_.Function(
@@ -122,10 +126,10 @@ class DataPipelineStack(Stack):
             code=lambda_.Code.from_asset(LAMBDA_HANDLERS_DIR),
             timeout=Duration.minutes(15),
             memory_size=1024,
-            environment={
-                "RESULTS_BUCKET_NAME": results_bucket.bucket_name,
-                "COMPLETION_TABLE_NAME": completion_table.table_name,
-            },
+            # The completion table it used to name is gone with the
+            # completion tracking (REQ-PIPE-105); what it needs now is the
+            # same stated environment and database as the other handler.
+            environment=dict(handler_environment),
         )
 
         # S3 ObjectCreated -> Lambda wiring, filtered by prefix so each
@@ -158,20 +162,29 @@ class DataPipelineStack(Stack):
         raw_bucket.grant_read(bdm_lambda, "bdm/*")
         raw_bucket.grant_read(cp_lambda, "cp/*")
 
-        # Both Lambdas write results bucket-wide, not prefix-scoped - the
-        # design doc's trust-boundary section only requires "S3 write on the
-        # results bucket," and each Lambda's own qa_results/<agency>/... key
-        # layout already keeps their outputs from colliding without needing
-        # IAM to enforce it too.
-        results_bucket.grant_write(bdm_lambda)
-        results_bucket.grant_write(cp_lambda)
+        # THERE IS NO RESULTS BUCKET (REQ-PIPE-089), and the grant that went
+        # with it is the part worth noting rather than the bucket. Both
+        # Lambdas used to hold bucket-wide S3 write so they could upload
+        # qa_results/ JSON files for a sync workflow to lay back into git.
+        # Results are recorded in the database now, so the bucket, the two
+        # write grants and the RESULTS_BUCKET_NAME environment variable are
+        # all gone - a write permission nothing needs is worth removing on
+        # its own terms, not only for tidiness.
 
-        # Completion-tracking table: CP only. record_arrival()/is_complete()
-        # (qa_tools/cp/completion_tracker.py's DynamoDBCompletionTracker)
-        # both read and write, so this needs full read/write, not read-only.
-        completion_table.grant_read_write_data(cp_lambda)
+        # No DynamoDB grant either. The CP Lambda used to need read/write on
+        # a completion table; it has nothing to count (REQ-PIPE-105), and a
+        # permission nothing needs is worth removing on its own terms.
 
         CfnOutput(self, "RawBucketName", value=raw_bucket.bucket_name)
-        CfnOutput(self, "ResultsBucketName", value=results_bucket.bucket_name)
         CfnOutput(self, "BdmIngestHandlerFunctionName", value=bdm_lambda.function_name)
         CfnOutput(self, "CpIngestHandlerFunctionName", value=cp_lambda.function_name)
+
+    def _required_context(self, key: str) -> str:
+        """A CDK context value this stack cannot be built without - refused
+        by name rather than defaulted, as MOTHMAN_ENVIRONMENT itself is."""
+        value = self.node.try_get_context(key)
+        if not value:
+            raise ValueError(f"cdk context '{key}' is required (-c {key}=...) - the handlers "
+                             f"refuse to connect without it, so the stack is not built "
+                             f"without it either.")
+        return str(value)

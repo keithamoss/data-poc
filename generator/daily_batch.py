@@ -27,11 +27,11 @@ FACILITY_SUFFIXES = ["Community Hospital", "Birth Centre", "District Hospital", 
 
 # Real-world arrival calibration (Keith, 2026-09-17): "on time about 80%
 # of the time... early for 5%... late 15%" - against BDM's real cadence
-# (contract/bdm-birth-registrations-contract.yaml's slaProperties: -
-# daily, 14:00 AWST expected, 60 min latency grace; see pipeline/
-# cadence.py's classify_arrival()). 14:00 AWST is UTC-8h = 06:00 UTC the
-# SAME day as date_registered's own midnight (that same contract entry's
-# own comment explains why 14:00, not the more obvious-sounding 06:00 -
+# (birth-registrations' participation in contract/calendar.yaml -
+# daily, 14:00 AWST expected, 1h grace; it was the contract's
+# slaProperties until REQ-PIPE-110). 14:00 AWST is UTC-8h = 06:00 UTC the
+# SAME day as date_registered's own midnight (that entry's own changelog
+# explains why 14:00, not the more obvious-sounding 06:00 -
 # AWST hours before 08:00 convert to a UTC moment on the PREVIOUS
 # calendar day, which the real "extract timestamp ordering" check
 # always rejects - 06:00 AWST made "on time" structurally unreachable),

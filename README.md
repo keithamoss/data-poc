@@ -23,7 +23,7 @@ uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
 
 `dbt deps` is a one-time step (re-run only if `dbt_project/packages.yml`
 changes) that installs `dbt_utils` - both `dbt build` calls
-(`qa_tools/bdm/run_dbt_bdm.py`/`qa_tools/cp/run_dbt_cp.py`) will fail to
+(`qa_tools/tools/run_dbt.py`, one shared runner for every collection) will fail to
 compile without it, since several of this project's real dbt tests
 (`dbt_utils.accepted_range`/`expression_is_true`/`recency` - see
 `plans/qa-pipeline.md`'s dbt_utils switch) reference macros that package
@@ -46,7 +46,7 @@ dashboard rebuild/embed/validate/snapshot chain, Tier 2), `github`
 (GitHub Issues ticket/acceptance/leaderboard sync, Tier 2), `debug`
 (per-tool debug runners against a run already on disk - `run-dbt`/
 `run-soda`/`run-datacontract`/`run-evidently`/`build-warehouses`/
-`load-warehouse`/`changelog`, Tier 3), `pipeline` (the full real-tool
+`changelog`, Tier 3), `pipeline` (the full real-tool
 batch run this section just ran, Tier 2), and `population` (a
 population-scale, cross-agency-identity-linked synthetic dataset via
 the separate `synthetic_data_generator/` package - Tier 4, explicitly
@@ -79,12 +79,21 @@ instead.** The template is the real, hand-authored UI source (HTML/CSS/
 JS), committed and edited directly; `dashboard/embed_dashboard_data.py`
 reads it and writes the real, viewable `.html` file, which is gitignored
 and never committed (2026-09-16, `plans/publishing-and-history.md` Phase
-3). CI (`.github/workflows/deploy-pages.yml`) rebuilds it fresh from
-committed `qa_results/` history on every relevant push, gates the
-result, and deploys — it doesn't commit anything back to git either.
-Running the pipeline locally still builds the file for your own
-viewing; there's just nothing to accidentally commit any more, since
-git never tracks that path.
+3). It is rebuilt fresh from the recorded QA results on every publish,
+gated, and deployed — nothing is committed back to git either.
+
+**CI no longer builds it** (REQ-PIPE-089/092). It used to:
+`.github/workflows/deploy-pages.yml` rebuilt the whole dashboard from the
+committed `qa_results/` tree on every relevant push and was the only path
+to the published site. The results are rows in a PostgreSQL database now,
+which a GitHub runner has no route to, so the build moved to the
+environment that can read them and that workflow is replaced by
+`.github/workflows/validate-config.yml` — every gate that reads only
+committed configuration, and nothing that needs the results.
+
+Running the pipeline locally still builds the file for your own viewing;
+there's just nothing to accidentally commit, since git never tracks that
+path.
 
 Pass `--snapshot` (`./mothman pipeline run --snapshot`, same effect as
 `SNAPSHOT_DASHBOARD=1`) to also archive the freshly re-embedded
@@ -105,8 +114,8 @@ regenerated automatically — every `mothman pipeline run` run backfills them
 regardless of the `--snapshot` flag above, so the picker works
 even when opening the dashboard straight off disk via `file://`. On the
 published GitHub Pages site the same decompression happens at deploy time
-instead (`.github/workflows/deploy-pages.yml`) — either way, only the
-`.gz` files are ever actually committed to git.
+instead, in whichever step publishes — either way, only the `.gz` files
+are ever actually committed to git.
 
 ## What's actually running
 
@@ -115,10 +124,10 @@ nothing here is a hand-rolled stand-in:
 
 | Tool | What's real | What runs it |
 |---|---|---|
-| **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/bdm/run_datacontract_bdm.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
-| **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/bdm/run_soda_bdm.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
-| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/bdm/run_dbt_bdm.py` shells out to the real `dbt` CLI (`dbt build`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
-| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/bdm/run_evidently_bdm.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
+| **datacontract-cli** | `contract/registry-services/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/tools/run_datacontract.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's own view schema in the warehouse. |
+| **Soda Core** | `contract/registry-services/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/tools/run_soda.py` runs the real `soda-core` `Scan` API against each run's own view schema. |
+| **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/tools/run_dbt.py` shells out to the real `dbt` CLI (`dbt build`) against each run's own view schema. |
+| **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/tools/run_evidently.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
 `pyproject.toml` lists the exact package set verified to install and run
 together. It includes a real, documented conflict: `soda-core-duckdb`
@@ -178,32 +187,37 @@ dbt_project/                 a real (if minimal) dbt project — dbt_project.yml
 qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently tools - a proper Python
                                package now (qa_tools/__init__.py etc.), one subpackage per dataset plus
                                a common/ of tool-generic code shared between them (see "Code layout" below)
+  collections/                 the collection registry (REQ-PIPE-240): every collection the hierarchy in
+                               contract/data-asset.yaml declares, each run through a small adapter module
+                               named by its id - civil_registration.py, child_protection.py. A new collection
+                               is picked up everywhere through it, or refused by name; `mothman check`'s
+                               collections gate fails on one without an adapter
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
                                datasets, since there's one dbt_project/
   common/
     parallel_orchestrate.py       generic parallel-or-sequential dispatch across a manifest, shared by
                                  orchestrate_bdm.py and orchestrate_cp.py - see "Speed" below
     dbt_common.py, soda_common.py, datacontract_common.py, evidently_common.py
-                                   tool-generic subprocess/API invocation + parsing, shared by each tool's
-                                 bdm/cp pair - see "Code layout" below
+                                   tool-generic subprocess/API invocation + parsing, shared by the
+                                 runners in tools/ - see "Code layout" below
+  tools/                     one module per real tool, run for any collection by its id (REQ-QAC-242)
+    stage.py                  stages each arriving file and builds the run's own view schema
+    run_dbt.py                shells out to the real `dbt` CLI
+    run_soda.py               runs the real soda-core Scan API
+    run_datacontract.py       runs the real datacontract-cli Python API
+    run_evidently.py          runs the real evidently.Report + DataDriftPreset
+    legacy.py                 the named flags that keep each collection's recorded output unchanged
+  collections/               the collection registry, and each collection's adapter (what the tools read)
   bdm/
-    build_per_run_warehouses.py   one DuckDB file per run, for dbt/Soda to connect to
-    run_dbt_bdm.py            shells out to the real `dbt` CLI
-    run_soda_bdm.py           runs the real soda-core Scan API
-    run_datacontract_bdm.py   runs the real datacontract-cli Python API
-    run_evidently_bdm.py      runs the real evidently.Report + DataDriftPreset
-    orchestrate_bdm.py        all four, across every run (parallel by default) -> reports/results_bdm.json
+    orchestrate_bdm.py        all four tools, across every run -> reports/results_bdm.json
   cp/
-    cp_common.py                   shared agency/collection/dataset id constants for the 6 CP scripts below
-    build_cp_warehouses.py         one DuckDB file per CP snapshot run, all 6 tables under a `raw` schema
-    run_dbt_cp.py, run_soda_cp.py, run_datacontract_cp.py, run_evidently_cp.py
-                                    the CP counterparts to the 4 bdm/ real-tool scripts above
-    orchestrate_cp.py         all four, across every CP run (parallel by default) -> reports/results_cp.json
+    cp_common.py              shared agency/collection/dataset id constants for Child Protection
+    orchestrate_cp.py         all four tools, across every CP run -> reports/results_cp.json
 pipeline/                    a real package (pipeline/__init__.py) - invoked via `mothman pipeline
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
-                               chart, run against it; qa_tools/ builds its own separate per-run warehouses)
+                               chart, run against it; qa_tools/ stages supplies into data/supply.duckdb)
   orchestrate.py                generate -> load the combined warehouse (qa_tools/bdm/orchestrate_bdm.py
                                is the next step, run separately - see `mothman pipeline run`)
   build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
@@ -216,8 +230,9 @@ dashboard/
                                collection wired to real data
   embed_dashboard_data.py       builds qa-reporting-dashboard.html from the template above, embedding
                                both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA)
-data/                          generated - raw run CSVs, manifest.json, warehouse.duckdb, duckdb_runs/,
-                               cp_raw/, cp_duckdb_runs/ (not checked in)
+data/                          generated - raw run CSVs, manifest.json, cp_raw/, and supply.duckdb:
+                               ONE database holding every staged supply, which each QA run reads
+                               through a schema of views of its own (REQ-PIPE-068). Not checked in.
 reports/                       generated - results_bdm.json, results_cp.json,
                                birth_registrations_dashboard.json, child_protection_dashboard.json
                                (not checked in)
@@ -232,11 +247,34 @@ tests/                         pytest smoke tests - generator and dashboard-buil
 
 ## Development
 
+This project needs a **PostgreSQL 16** to talk to (REQ-PIPE-087), and that
+is a real change to what it costs to evaluate the PoC rather than a detail:
+there is no longer a database file in the repository to open, so `uv sync
+--dev` is no longer the whole of setup.
+
+**A password is not optional, even locally.** datacontract-cli requires
+`DATACONTRACT_POSTGRES_PASSWORD` and treats an empty value as missing, so
+it refuses to run at all against a trust-authenticated database. The
+pipeline checks for this and says so rather than letting the tool fail
+obscurely.
+
 ```bash
 uv sync --dev              # installs everything, including dev tooling
 uv run dbt deps --project-dir dbt_project --profiles-dir qa_tools/dbt_profiles
                             # one-time: installs dbt_utils (see the top of this
                             # README for why a real-tool dbt build needs it)
+
+# Where the pipeline's own warehouse lives. NO DEFAULT, on purpose: there is
+# no local file to fall back to, so a default would have to name somebody's
+# database - and the one thing worse than failing to connect is connecting
+# to the wrong environment.
+export MOTHMAN_SUPPLY_DSN="postgresql://user:password@localhost:5432/supply"
+
+# Where the TEST SUITE connects. It creates a database per test worker and
+# never starts a server itself - a suite that starts its own server tests a
+# server nobody deploys. Point it at a maintenance database.
+export MOTHMAN_TEST_DSN="postgresql://user:password@localhost:5432/postgres"
+
 uv run pytest              # smoke tests - generator layer (real, seeded runs) +
                             # dashboard-builder layer (fixture-based, no slow real-tool run needed)
 uv run ruff check .        # lint - a lean rule set (real bugs: unused imports/vars,
@@ -256,9 +294,19 @@ a system-installed Python or any package installed outside `.venv`
 (Playwright's browser binary included, via `uv run playwright install
 chromium` above). This matters more than usual for this repo specifically:
 it's meant to be checked out and run by other people evaluating the PoC,
-on their own machines, not just the one it was built on — `uv sync --dev`
-plus the one-time `playwright install` should be the entire setup, with no
-implicit "also have X on your PATH already" assumptions anywhere.
+on their own machines, not just the one it was built on.
+
+**That claim used to be stronger and is now honestly weaker** (REQ-PIPE-087,
+2026-09-27). It used to read "`uv sync --dev` plus the one-time `playwright
+install` should be the entire setup, with no implicit 'also have X on your
+PATH already' assumptions anywhere". A PostgreSQL is exactly such an
+assumption, and the trade was made deliberately: a warehouse that only
+works because it is a file in the repository is not the warehouse
+production runs, so every property this design leans on was being read from
+documentation rather than exercised. What remains true is the narrower
+claim — nothing depends on a system Python, an activated `.venv`, or any
+package installed outside it; the one external dependency is a database,
+and it is named in the Development section above rather than discovered.
 
 ## On-demand checks against a file you already have
 
@@ -290,10 +338,15 @@ reachable interactively — bare `./mothman`, then Quality Assurance → pick a
 dataset → "Local files" — browsed via real filesystem tab-completion
 instead of typed paths.
 
-**Defaults to a throwaway, local-only check** — nothing gets written into
-this repo's real, committed `qa_results/` history unless you pass
-`--commit` (Keith's own explicit call: an ad hoc sanity check on your own
-pull usually isn't meant to become part of the permanent QA record).
+**Asks whether to keep it, and defaults to a TRIAL** (REQ-PIPE-103).
+Keeping files the supply as a real delivery received now — so the
+delivery log and the dashboard describe everything we actually
+received, not only what arrived automatically — and the run takes its
+id from recognition exactly as an automatic arrival would. Declining
+gives a trial: the same four tools against the same rows, filed
+nowhere and recorded nowhere, with every schema it touched dropped
+when the command ends. `--commit` and `--trial` state the answer for a
+script; with neither, and no terminal to ask, it runs as a trial.
 
 `mothman`'s **S3 QA source mode** (`plans/tooling.md` #1 Phase 3) covers the
 same real use case one step earlier — before you've pulled the file down
@@ -454,12 +507,12 @@ from the start rather than retrofitting them for something they were
 never built to do.
 
 ```bash
-./mothman pipeline run --dataset cp
+./mothman pipeline run --collection cp
 ```
 
 (Generates data/cp_raw/'s 15 quarterly snapshots, runs the real tools ->
 reports/results_cp.json, reshapes -> reports/child_protection_dashboard.json,
-then re-embeds BOTH real datasets into the dashboard HTML. `--dataset all`,
+then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
 the default, does the same for Birth Registrations too in one call.)
 
 A few things specific to this collection, each found by actually running
@@ -557,9 +610,9 @@ held from the original equivalent-only build.
   partial parsing, forcing `--store-failures`, and substituting `SUM` for
   `COUNT` — none of it was the cause, and no SQL-level explanation was
   found despite extensive isolation (documented in `schema.yml` and
-  `qa_tools/bdm/run_dbt_bdm.py`). The two affected tests now use
+  `qa_tools/tools/run_dbt.py`). The two affected tests now use
   absolute row-count thresholds instead of a computed percentage, and
-  `run_dbt_bdm.py` independently re-verifies both tests' result via a
+  `qa_tools/tools/run_dbt.py` independently re-verifies both tests' result via a
   direct query against the same warehouse dbt just tested, rather than
   trust a demonstrated-unreliable number — dbt-core still genuinely runs
   the real check; only the two known-unreliable numbers are cross-checked.
@@ -613,11 +666,11 @@ held from the original equivalent-only build.
   single value violate a rule") — not a miscalibration.
 - **A single warn/fail threshold can't represent every real rule shape.**
   ODCS severity is single-tier (a rule is either strictly pass/fail, or
-  pass/warn-only, never a three-way band) — `run_datacontract_bdm.py`
+  pass/warn-only, never a three-way band) — `qa_tools/tools/run_datacontract.py`
   encodes that into the dashboard's two-threshold shape as warn==fail
   (error severity) or an unreachable fail ceiling (warning/info severity).
   Soda's `row_count` check is a genuine two-sided range (too few *or* too
-  many rows); `run_soda_bdm.py`'s threshold handling reduces it to the
+  many rows); `qa_tools/tools/run_soda.py`'s threshold handling reduces it to the
   upper bound only for display, and this is the one place where a piece
   of real information (the lower bound) is dropped for the sake of a
   single scalar.

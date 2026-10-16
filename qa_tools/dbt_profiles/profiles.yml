@@ -1,20 +1,43 @@
-# Real dbt-duckdb connection profile - no secrets, just a local file path,
-# so this is committed rather than gitignored like a normal profiles.yml
-# with credentials would be.
+# Real dbt-postgres connection profile. Still committed rather than
+# gitignored, and the reason SURVIVED the move off DuckDB even though the
+# old reason ("no secrets, just a local file path") did not: every value
+# is an env_var reference, so the file holds the SHAPE of a connection
+# and none of its content. The password, host and database name arrive
+# from the environment at invocation time.
 #
-# DBT_DB_PATH is set per-invocation by qa_tools/bdm/run_dbt_bdm.py
-# (or qa_tools/cp/run_dbt_cp.py), pointed at either the combined
-# data/warehouse.duckdb or one of the per-run data/duckdb_runs/<run_id>
-# .duckdb files - see that file's docstring for why dbt is run once per
-# run rather than once against the combined warehouse. This one profile
-# is shared by both datasets (one dbt_project/), even though its name
-# ("birth_registrations") predates Child Protection being added.
+# Every DBT_PG_* variable is set per invocation by
+# qa_tools/common/dbt_common.py's run_dbt(), which parses them out of
+# MOTHMAN_SUPPLY_DSN with psycopg's own conninfo parser rather than a
+# regex - that handles the URL form, the keyword form, and the
+# unix-socket form (`?host=/tmp`) identically, and a hand-written parser
+# would get one of the three wrong.
+#
+# WHAT IS GONE, and why it is worth knowing if you read the old file:
+# dbt used to be pointed at a small DuckDB scratch file of its OWN, with
+# the supply database ATTACHed read-only, purely because DuckDB gives a
+# writer an exclusive lock over the whole file and these calls fan out
+# over a process pool. PostgreSQL has no such contention, so dbt now
+# writes into its own SCHEMA in the one database - which is what the
+# ATTACH arrangement was imitating (REQ-PIPE-087).
+#
+# DBT_PG_SCHEMA is dbt's own schema, never a supply schema. Named rather
+# than defaulted: dbt would otherwise use `public`, and a dbt model
+# sitting in `public` beside real supply schemas is exactly the
+# ambiguity the four-kinds-of-schema design removes.
+#
+# This one profile is shared by both datasets (one dbt_project/), even
+# though its name ("birth_registrations") predates Child Protection.
 #
 # Usage: dbt run --profiles-dir qa_tools/dbt_profiles --project-dir dbt_project
 birth_registrations:
   target: dev
   outputs:
     dev:
-      type: duckdb
-      path: "{{ env_var('DBT_DB_PATH') }}"
+      type: postgres
+      host: "{{ env_var('DBT_PG_HOST') }}"
+      port: "{{ env_var('DBT_PG_PORT') | int }}"
+      user: "{{ env_var('DBT_PG_USER') }}"
+      password: "{{ env_var('DBT_PG_PASSWORD', '') }}"
+      dbname: "{{ env_var('DBT_PG_DBNAME') }}"
+      schema: "{{ env_var('DBT_PG_SCHEMA') }}"
       threads: 1

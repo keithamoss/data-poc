@@ -1,0 +1,1708 @@
+# Open Data Contract Standard (ODCS) v3.2.0 contract for the Child
+# Protection Casework collection - six related tables, one contract,
+# matching how a real "collection" (Agency -> Collection -> Dataset ->
+# Column, per docs/data-contract-engines-landscape.md's QA reporting
+# layers section) is genuinely one governed unit, not six independent
+# datasets that happen to share a name.
+#
+# Phase 2 adds the seven real foreign-key relationships between these
+# tables, plus three cross-table business rules (escalation completeness,
+# placement/carer approval compliance, closed-case investigation hygiene) -
+# all as `type: sql` rules on the child table, referencing the parent
+# table's view by its literal name (datacontract-cli only substitutes
+# `{model}` for the rule's OWN schema object; every other schema object's
+# name is created as a real view/table on the same connection, so a
+# literal join to it works - confirmed by actually running `datacontract
+# test`, not assumed from the docs).
+#
+# All three business rules pass cleanly (0 violations) on every clean run,
+# by construction: child_protection.py only ever assigns Approved carers
+# to a placement, and only ever closes a case once none of its own
+# investigations are still open. Two of the three business rules used to
+# fail on EVERY run, dirty or clean, before that fix (see
+# plans/qa-pipeline.md #9 for the full account, kept as a resolved entry
+# rather than deleted) - generator/dirty.py's apply_cp_placements_presets
+# and apply_cp_investigations_presets are what reintroduce a controlled,
+# real violation count on amber/red runs now, the same traffic-light
+# pattern as concern_type/escalation completeness.
+#
+# Vocabulary matches contract/bdm-birth-registrations-contract.yaml exactly
+# (metric: nullValues/invalidValues/duplicateValues/rowCount, the real
+# dimension enum, apiVersion v3.2.0) - see that file's comments and
+# README.md's known-disagreements section for why, found the hard way by
+# actually running datacontract-cli against the birth-registrations
+# contract first.
+#
+# Every quality rule below carries a `customProperties:` block with
+# check-lifecycle metadata (check_id/introduced_date/changelog) - plans/
+# publishing-and-history.md Thread D, Phase 1. FK and cross-table
+# business-rule checks are deliberately given a `_datacontract`-suffixed
+# check_name - the Soda checks file implements the same 7 FKs and 3
+# business rules in its own vocabulary, and a real collision was found
+# (and fixed) between Soda's and the contract's identically-named checks
+# on the BDM side before this suffix convention was adopted - applied
+# proactively here, mirroring Soda's own `_soda` suffix.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
+
+apiVersion: v3.2.0
+kind: DataContract
+# `id`, `name` and `domain` are held to the hierarchy in
+# contract/data-asset.yaml (REQ-QAC-039, gated by
+# `mothman dashboard validate-hierarchy`): `id` names what this
+# contract describes, `domain` names the agency that owns it, and
+# `name` is that thing's display name. Corrected 2026-09-23 - all
+# three previously disagreed with the ids every check_id,
+# qa_results/ path and dashboard URL already used, and nothing read
+# them, so they had drifted unnoticed.
+id: child-protection
+status: draft
+version: 1.0.0
+
+name: Child Protection
+domain: child-protection-family-support
+description:
+  purpose: >
+    The Child Protection Casework collection: notifications received about
+    a child, the investigations they may escalate to, the carer placements
+    that may result, and the case workers and carers involved. Six related
+    tables under one collection, with real foreign keys between them -
+    unlike the single-table Birth Registrations feed, this is where the
+    QA pipeline demonstrates whole-collection checks (see phase 2).
+
+team:
+  members:
+    - role: dataOwner
+      name: Department for Child Protection and Family Support
+      username: cp-data-owner@example.gov.au  # placeholder - update before use
+    - role: dataSteward
+      username: cp-data-steward@example.gov.au  # placeholder - update before use
+      description: Child Protection data governance contact - update with a real name/email before use
+    - role: consumer
+      name: Central multi-agency data asset
+      username: multi-agency-data-asset@example.gov.au  # placeholder - update before use
+
+support:
+  - channel: email
+    tool: email
+    description: Child Protection data supply team - replace with a real contact before use
+
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/child-protection/casework/
+    format: csv
+    delimiter: comma
+    description: >
+      Current delivery mechanism: a full periodic extract of the active
+      casework collection, dropped into this bucket. No direct source
+      connection yet.
+
+# `nullValues` (a project convention on top of ODCS, not a real ODCS
+# property) - see bdm-birth-registrations-contract.yaml's identical
+# comment for the full rationale. No property here sets one today.
+schema:
+  - name: cp_clients
+    physicalType: table
+    description: One row per child with a Child Protection casework history.
+    properties:
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: This agency's unique client identifier. Primary key of this table.
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:cp_client_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:cp_client_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.cp_client_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: given_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:given_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.given_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:family_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.family_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: date_of_birth
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:date_of_birth:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
+          # triplication pass): both Soda (a `failed rows` check) and dbt
+          # (tests/cp_client_date_of_birth_range.sql) already implement
+          # this range check - the contract was the one place it was
+          # missing. Same shape as bdm-birth-registrations-contract.yaml's
+          # matching date_of_birth rule, but no upper bound (> CURRENT_DATE)
+          # here - Soda's/dbt's own versions of this check only ever test
+          # the lower bound (generator/dirty.py's apply_cp_clients_presets
+          # only ever injects implausibly old dates, never future ones,
+          # same as BDM's own _BAD_DATE_OF_BIRTH_POOL) - mirroring their
+          # actual condition rather than silently adding stricter coverage
+          # than either real tool enforces.
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:date_of_birth:range_check_datacontract
+            type: sql
+            dimension: conformity
+            query: "SELECT COUNT(*) FROM {model} WHERE date_of_birth < DATE '1900-01-01'"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be a plausible real date, neither in the future nor absurdly old.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.date_of_birth.range_check_datacontract
+              - property: reads_columns
+                value: ["cp_clients.date_of_birth"]
+              - property: name
+                value: Date of birth in a plausible range
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:sex:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["M", "F", "X"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.sex.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed
+                  in the contract, usually a new code introduced upstream without notice.
+      - name: suburb
+        logicalType: string
+        physicalType: varchar(100)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:suburb:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.suburb.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: postcode
+        logicalType: string
+        physicalType: varchar(4)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:postcode:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          # Closed value set - generator/names_au.py's SUBURBS pool's own
+          # postcodes (49 distinct values paired with the 51 suburb names),
+          # same real-and-bounded rationale as BDM's place_of_birth_suburb
+          # conversion (plans/qa-pipeline.md #15's aggregate-invalid-values
+          # follow-up) - previously had no invalid-value check at all.
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:postcode:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056", "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148", "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225", "6230", "6258", "6280", "6285", "6312", "6330", "6401", "6430", "6450", "6530", "6714", "6721", "6725"]
+            # A TOLERANCE (REQ-QAC-187; Keith, 2026-10-11), matching Soda's
+            # invalid_percent(postcode) fail bound, so a few unrecognised
+            # postcodes read amber across the tools rather than red here.
+            # mustBeLessThan fails AT 3%, where Soda's `> 3%` does not -
+            # the place_of_birth_facility precedent.
+            unit: percent
+            mustBeLessThan: 3
+            severity: error
+            description: >
+              A few unrecognised values are tolerated; a sustained rise fails.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.postcode.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: '[{"date": "2026-10-11T00:00:00Z", "description": "Tolerance added: unrecognised client postcodes now fail at 3% or more (unit percent, mustBeLessThan 3) instead of on a single value, matching this column''s own Soda and dbt fail bounds, so a supply with a few unrecognised postcodes reads amber rather than red. REQ-QAC-187, so that the synthetic history can carry genuinely amber Child Protection supplies (REQ-GEN-184).", "author": "Claude (for Keith Moss)", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: case_opened_date
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:case_opened_date:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_opened_date.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: case_status
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: Open or Closed.
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:case_status:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Open", "Closed"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-clients.case_status.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: When this snapshot was extracted from the casework system.
+    quality:
+      - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [300, 900]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.child-protection.cp-clients.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              self-evident
+
+  - name: cp_notifications
+    physicalType: table
+    description: >
+      One row per notification (a report of concern about a child) -
+      1-4 per client, more for children with a higher-risk history.
+    properties:
+      - name: notification_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:notification_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:notification_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be unique.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:notification_id:escalation_completeness_datacontract
+            type: sql
+            dimension: completeness
+            query: >-
+              SELECT COUNT(*) FROM {model} n LEFT JOIN cp_investigations i
+              ON n.notification_id = i.notification_id
+              WHERE n.outcome = 'Investigation opened' AND i.investigation_id IS NULL
+            mustBe: 0
+            severity: error
+            description: >
+              Every notification escalated to an investigation must have that investigation recorded.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_id.escalation_completeness_datacontract
+              - property: reads_columns
+                value: ["cp_notifications.notification_id", "cp_notifications.outcome", "cp_investigations.notification_id", "cp_investigations.investigation_id"]
+              - property: reads_tables
+                value: ["cp_investigations"]
+              - property: name
+                value: Escalation completeness
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:cp_client_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:cp_client_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_clients c ON n.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing client.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.cp_client_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_notifications.cp_client_id", "cp_clients.cp_client_id"]
+              - property: reads_tables
+                value: ["cp_clients"]
+              - property: name
+                value: Client reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: notification_date
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:notification_date:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.notification_date.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: source_type
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:source_type:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["School", "Police", "Health service", "Family member", "Neighbour", "Anonymous", "Self-report"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.source_type.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: concern_type
+        logicalType: string
+        physicalType: varchar(50)
+        required: true
+        description: >
+          Closed value set. The dirty(amber/red) presets inject unknown
+          codes here - the deliberate traffic-light demo column for this
+          collection, same role sex plays for Birth Registrations.
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:concern_type:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Neglect", "Physical abuse", "Emotional abuse", "Sexual abuse",
+                            "Domestic violence exposure", "Parental substance use", "Parental mental health concern"]
+            mustBe: 0
+            severity: error
+            description: >
+              A single unrecognised value fails.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.concern_type.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: risk_rating
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:risk_rating:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Low", "Medium", "High", "Critical"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.risk_rating.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: assigned_worker_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:assigned_worker_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:assigned_worker_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} n LEFT JOIN cp_case_workers w ON n.assigned_worker_id = w.worker_id WHERE w.worker_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing case worker.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.assigned_worker_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_notifications.assigned_worker_id", "cp_case_workers.worker_id"]
+              - property: reads_tables
+                value: ["cp_case_workers"]
+              - property: name
+                value: Assigned worker reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: outcome
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:outcome:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["No further action", "Referred to family support", "Investigation opened"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.outcome.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [600, 1600]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.child-protection.cp-notifications.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
+
+  - name: cp_investigations
+    physicalType: table
+    description: One row per investigation opened from an escalated notification.
+    properties:
+      - name: investigation_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:investigation_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:investigation_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:investigation_id:closed_case_hygiene_datacontract
+            type: sql
+            dimension: consistency
+            query: >-
+              SELECT COUNT(*) FROM {model} i JOIN cp_clients c
+              ON i.cp_client_id = c.cp_client_id
+              WHERE c.case_status = 'Closed' AND i.end_date IS NULL
+            mustBe: 0
+            severity: error
+            description: >
+              An investigation must not still be open once its client's case has been closed.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.investigation_id.closed_case_hygiene_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.cp_client_id", "cp_investigations.end_date", "cp_clients.cp_client_id", "cp_clients.case_status"]
+              - property: reads_tables
+                value: ["cp_clients"]
+              - property: name
+                value: Closed-case hygiene
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: notification_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:notification_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:notification_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_notifications n ON i.notification_id = n.notification_id WHERE n.notification_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing notification.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.notification_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.notification_id", "cp_notifications.notification_id"]
+              - property: reads_tables
+                value: ["cp_notifications"]
+              - property: name
+                value: Notification reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:cp_client_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:cp_client_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_clients c ON i.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing client.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.cp_client_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.cp_client_id", "cp_clients.cp_client_id"]
+              - property: reads_tables
+                value: ["cp_clients"]
+              - property: name
+                value: Client reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: start_date
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:start_date:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.start_date.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: end_date
+        logicalType: date
+        physicalType: date
+        required: false
+        description: Nullable - the investigation may still be open (~12% of them are, by generator design).
+      - name: substantiated
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:substantiated:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Substantiated", "Not substantiated", "Inconclusive"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.substantiated.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: lead_worker_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:lead_worker_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:lead_worker_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} i LEFT JOIN cp_case_workers w ON i.lead_worker_id = w.worker_id WHERE w.worker_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing case worker.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.lead_worker_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_investigations.lead_worker_id", "cp_case_workers.worker_id"]
+              - property: reads_tables
+                value: ["cp_case_workers"]
+              - property: name
+                value: Lead worker reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [80, 350]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.child-protection.cp-investigations.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
+
+  - name: cp_placements
+    physicalType: table
+    description: One row per out-of-home-care placement (0-2 per client; not every client has one).
+    properties:
+      - name: placement_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: cp_client_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:cp_client_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:cp_client_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_clients c ON p.cp_client_id = c.cp_client_id WHERE c.cp_client_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing client.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.cp_client_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_placements.cp_client_id", "cp_clients.cp_client_id"]
+              - property: reads_tables
+                value: ["cp_clients"]
+              - property: name
+                value: Client reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: placement_type
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_type:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Kinship care", "Foster care", "Residential care", "Family group home"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_type.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: carer_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:carer_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:carer_id:relationships_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} p LEFT JOIN cp_carers c ON p.carer_id = c.carer_id WHERE c.carer_id IS NULL"
+            mustBe: 0
+            severity: error
+            description: >
+              Every value must match an existing carer.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.relationships_datacontract
+              - property: reads_columns
+                value: ["cp_placements.carer_id", "cp_carers.carer_id"]
+              - property: reads_tables
+                value: ["cp_carers"]
+              - property: name
+                value: Carer reference
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:carer_id:approval_compliance_datacontract
+            type: sql
+            dimension: consistency
+            query: >-
+              SELECT COUNT(*) FROM {model} p JOIN cp_carers c
+              ON p.carer_id = c.carer_id
+              WHERE c.approval_status != 'Approved'
+            mustBe: 0
+            severity: error
+            description: >
+              A placement's carer must hold an approved status.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.carer_id.approval_compliance_datacontract
+              - property: reads_columns
+                value: ["cp_placements.carer_id", "cp_carers.carer_id", "cp_carers.approval_status"]
+              - property: reads_tables
+                value: ["cp_carers"]
+              - property: name
+                value: Carer approval compliance
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: placement_start
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_start:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_start.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: placement_end
+        logicalType: date
+        physicalType: date
+        required: false
+        description: Nullable - the placement may still be ongoing (~22% of them are, by generator design).
+      - name: placement_suburb
+        logicalType: string
+        physicalType: varchar(100)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_suburb:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-placements.placement_suburb.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [100, 450]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.child-protection.cp-placements.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
+
+  - name: cp_carers
+    physicalType: table
+    description: One row per approved (or in-approval) carer available for placements.
+    properties:
+      - name: carer_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:carer_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:carer_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: given_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:given_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.given_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:family_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.family_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: carer_type
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:carer_type:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Kinship", "Foster", "Residential-staff"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.carer_type.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: approval_status
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:approval_status:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Approved", "Provisional", "Under review"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-carers.approval_status.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [150, 500]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.child-protection.cp-carers.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
+
+  - name: cp_case_workers
+    physicalType: table
+    description: One row per case worker who may be assigned notifications or lead investigations.
+    properties:
+      - name: worker_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:worker_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:worker_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.worker_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: given_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:given_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.given_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:family_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.family_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+      - name: team_region
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        quality:
+          - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:team_region:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["Metro North", "Metro South", "Metro East", "South West", "Great Southern",
+                            "Goldfields", "Kimberley", "Pilbara", "Wheatbelt", "Midwest-Gascoyne"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.team_region.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-15"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+    quality:
+      - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [40, 80]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.child-protection-family-support.child-protection.cp-case-workers.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              The supply arrived truncated or partly empty if it came in under the band, or the same data has been loaded twice if it came in over.
+          - property: failure_indicates
+            value: >
+              self-evident
+
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: piiClassification
+    value: "Contains sensitive personal information about children and families. Confirm and record the correct security/handling classification for your agency before this leaves draft status."
+  # mothman CLI Phase 3 (plans/tooling.md #1) - S3 QA source mode config.
+  # s3Source/localSource verified 2026-09-19 against real datacontract-cli
+  # parsing (qa_tools/tools/run_datacontract.py) before landing here.
+  # arrivalPattern was previously a design-doc-only proposal
+  # (docs/aws-event-driven-mvp-design.md's own flagged "confirm in the
+  # morning" item) - Keith's own explicit go-ahead, 2026-09-19, to wire
+  # it into the real contract now that it's been verified this way.
+  - property: s3Source
+    value: "cp/"
+    # Real prefix within the raw-data landing bucket
+    # (aws/cdk/data_pipeline_stack.py's RawDataBucket) - matches the
+    # exact prefix its own S3 event-notification wiring already filters
+    # on. The bucket's own name is env-provided (MOTHMAN_RAW_BUCKET_NAME),
+    # never hardcoded here, since CDK auto-generates a globally-unique
+    # name at deploy time.
+  - property: localSource
+    value: data/cp_raw
+    # Default local root `mothman cp qa`'s Local files source mode
+    # browses from - the same real CP_RAW_DIR
+    # qa_tools/tools/stage.py already uses.
+  - property: arrivalPattern
+    value:
+      - type: nested_folder
+        keyPattern: "cp/{slot_id}/cp_clients.csv"
+        dataset_id: cp-clients
+        extractTo: cp_clients
+      - type: nested_folder
+        keyPattern: "cp/{slot_id}/cp_notifications.csv"
+        dataset_id: cp-notifications
+        extractTo: cp_notifications
+      - type: nested_folder
+        keyPattern: "cp/{slot_id}/cp_investigations.csv"
+        dataset_id: cp-investigations
+        extractTo: cp_investigations
+      - type: nested_folder
+        keyPattern: "cp/{slot_id}/cp_placements.csv"
+        dataset_id: cp-placements
+        extractTo: cp_placements
+      - type: nested_folder
+        keyPattern: "cp/{slot_id}/cp_carers.csv"
+        dataset_id: cp-carers
+        extractTo: cp_carers
+      - type: nested_folder
+        keyPattern: "cp/{slot_id}/cp_case_workers.csv"
+        dataset_id: cp-case-workers
+        extractTo: cp_case_workers
+    # qa_tools/common/file_arrival.py's real, tested pattern-matching
+    # shape - one nested_folder pattern per real table, since one CP
+    # delivery is all 6 tables landing together under a shared
+    # {slot_id}/ prefix, not a single flat key the way BDM's is.
+    #
+    # The placeholder was {delivery_id} until 2026-09-24 (Keith,
+    # pre-build Q12). It names the LOGICAL OBLIGATION - one slot, many
+    # deliveries - which is what REQ-GEN-042 already renamed in the
+    # generator, where generate_runs.py emits slot_id with its own note
+    # that "this is not called delivery_id any more". The contract was
+    # the last place carrying the old word, and it was the dangerous
+    # one: the supply model uses DELIVERY for the observed transport
+    # unit, so somebody building recognition off this config would have
+    # read "delivery" and got the wrong concept. Safe to rename alone -
+    # nothing reads this capture group by name (only run_id is, in the
+    # aws/ ingest handlers); the group name is documentation of what
+    # that path segment holds.
+    #
+    # NOT YET RENAMED: the VALUES in real paths still read
+    # "delivery_120", because changing them changes generator output and
+    # therefore committed history, which REQ-PIPE-038 regenerates
+    # wholesale under its own delete-and-regenerate rule. The config is
+    # now honest about what the segment means; the values follow there.

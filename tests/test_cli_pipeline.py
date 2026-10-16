@@ -10,11 +10,68 @@ effect (same as any other real pipeline run) and must never run for
 real under pytest."""
 from __future__ import annotations
 
+import pytest
 from click.testing import CliRunner
 
 import cli.pipeline as pipeline_cli
 
 _runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _no_history_yet(monkeypatch):
+    """These tests stub the real work, on a worker database other modules
+    have already written history into - so `pipeline run` would refuse
+    (REQ-PIPE-144 criterion 39). They are about what a run DOES, so they
+    run as though on an empty database; the refusal has its own tests."""
+    import qa_tools.common.bootstrap as boot
+    monkeypatch.setattr(boot, "holds_history", lambda conn: False)
+    # The corrections step after a full replay is its own subject below.
+    monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
+    # Nothing was replayed, so there is no recorded verdict to compare a
+    # target with; REQ-GEN-186's comparison has tests of its own
+    # (tests/test_target_agreement.py).
+    monkeypatch.setattr(boot, "targets_agree", lambda names: ())
+
+
+class TestCorrectionsAfterAFullRun:
+    """Keith, 2026-10-11, (n): `pipeline run` over both collections confirms
+    each due correction once both are replayed, as a bootstrap does."""
+
+    def _run(self, monkeypatch, *args):
+        import qa_tools.common.bootstrap as boot
+        calls = []
+        monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+        monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+        monkeypatch.setattr(boot, "_confirm_corrections", lambda say: calls.append("confirm"))
+        _patch_dashboard_build_embed(monkeypatch, calls)
+        _patch_snapshot(monkeypatch, calls)
+        result = _runner.invoke(pipeline_cli.pipeline_group, ["run", *args])
+        assert result.exit_code == 0, result.output
+        return calls
+
+    def test_after_both(self, monkeypatch):
+        calls = self._run(monkeypatch)
+        assert calls.index("confirm") > max(calls.index("bdm"), calls.index("cp"))
+        assert calls.index("confirm") < calls.index("build-data")
+
+    def test_not_for_one_collection(self, monkeypatch):
+        assert "confirm" not in self._run(monkeypatch, "--collection", "bdm")
+
+
+class TestARunOverRecordedHistoryIsRefused:
+    """REQ-PIPE-144 criterion 39."""
+
+    def test_it_refuses_and_runs_nothing(self, monkeypatch):
+        import qa_tools.common.bootstrap as boot
+        monkeypatch.setattr(boot, "holds_history", lambda conn: True)
+        calls = []
+        monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+        monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+        result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
+        assert result.exit_code != 0 and calls == []
+        flat = " ".join(result.output.split())
+        assert "already holds QA history" in flat and "reset-synthetic" in flat
 
 
 def _patch_dashboard_build_embed(monkeypatch, calls):
@@ -35,10 +92,10 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: calls.append("bdm-generate"))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline",
                          lambda sequential=False: calls.append(("bdm-run", sequential)))
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: calls.append("cp-generate"))
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp",
                          lambda sequential=False: calls.append(("cp-run", sequential)))
     _patch_dashboard_build_embed(monkeypatch, calls)
@@ -59,7 +116,7 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
     import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: calls.append("bdm-generate"))
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: calls.append("bdm-run"))
 
     def _fail_if_called():
@@ -68,7 +125,7 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
-    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--dataset", "bdm"])
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "bdm"])
 
     assert result.exit_code == 0, result.output
     assert calls == ["bdm-generate", "bdm-run", "build-data", "embed", "sync"]
@@ -84,12 +141,12 @@ def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
         raise AssertionError("--dataset cp must not touch Birth Registrations")
     monkeypatch.setattr(bdm, "generate_synthetic_data", _fail_if_called)
 
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: calls.append("cp-generate"))
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: calls.append("cp-run"))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
-    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--dataset", "cp"])
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "cp"])
 
     assert result.exit_code == 0, result.output
     assert calls == ["cp-generate", "cp-run", "build-data", "embed", "sync"]
@@ -101,9 +158,9 @@ def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     seen = {}
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: seen.__setitem__("bdm", sequential))
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: seen.__setitem__("cp", sequential))
     _patch_dashboard_build_embed(monkeypatch, [])
     _patch_snapshot(monkeypatch, [])
@@ -120,9 +177,9 @@ def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -141,9 +198,9 @@ def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
     import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_bdm, "run_pipeline", lambda sequential=False: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda: None)
+    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
     monkeypatch.setattr(orchestrate_cp, "run_pipeline_cp", lambda sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -153,3 +210,138 @@ def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
     assert result.exit_code == 0, result.output
     assert calls[-1] == "sync"
     assert "snapshot" not in calls
+
+
+def _log_one(conn, name):
+    """One delivery record, by the shortest real route.
+
+    Written through the module rather than as an INSERT, so these tests
+    keep exercising the writer they are about rather than a hand-rolled
+    copy of its schema.
+    """
+    from types import SimpleNamespace
+
+    from qa_tools.common import asset_time, delivery, delivery_log
+
+    return delivery_log.record(
+        SimpleNamespace(name=name, files=[], anomalies=[],
+                        received_at=asset_time.parse_instant(
+                            "2026-01-01T09:00:00+08:00", name),
+                        # Which clock stamped it (REQ-PIPE-105 criterion 4).
+                        # OUR_CLOCK because this fixture is the one taking
+                        # the instant, which is the weaker claim and the
+                        # honest one.
+                        received_from=delivery.RECEIVED_FROM_OUR_CLOCK),
+        SimpleNamespace(by_dataset={}, contested={}, collections=[]),
+        conn=conn)
+
+
+def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
+        monkeypatch, tmp_path, clean_delivery_log):
+    """A real incident, 2026-09-25 - and, since REQ-PIPE-144 criterion 19,
+    the stronger rule: a run deletes NO delivery record at all, even one
+    whose files are no longer on disk (in production, every delivery's
+    files move on).
+
+    `mothman pipeline run` used to clear the whole delivery log at the
+    top, on the reasoning that the run would rewrite it. The tests
+    above invoke exactly that command with the real work STUBBED OUT -
+    so the next gate run deleted sixty committed records and nothing
+    rewrote them, because the thing that would have was the part being
+    stubbed.
+
+    The general shape is worth more than the fix: a command that
+    destroys committed state before recreating it is only correct when
+    the recreation actually happens, and a test suite is precisely the
+    place where it does not.
+    """
+    import cli.pipeline as pipeline_cli
+    from qa_tools.common import delivery, delivery_log
+
+    # A record for a delivery, straight into this worker's own database
+    # - REQ-PIPE-089 made the delivery log a table, so there is no
+    # directory to point anywhere and no file to hand-write.
+    _log_one(clean_delivery_log, "monday")
+    # Nothing on disk, so a delivery still recorded is one the prune
+    # has every reason to think is gone - the worst case for the log.
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "no-deliveries")
+
+    calls = []
+    monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+    monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+    _patch_dashboard_build_embed(monkeypatch, calls)
+    _patch_snapshot(monkeypatch, calls)
+
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
+    assert result.exit_code == 0, result.output
+
+    # KEPT, though its files are gone: a delivery record is history.
+    assert [r["delivery"] for r in delivery_log.records()] == ["monday"]
+
+
+def test_a_delivery_still_present_keeps_its_record_across_a_run(
+        monkeypatch, tmp_path, clean_delivery_log):
+    """The other half, and the one that actually guards the incident."""
+    import cli.pipeline as pipeline_cli
+    from qa_tools.common import delivery, delivery_log
+
+    # A record for a delivery, straight into this worker's own database
+    # - REQ-PIPE-089 made the delivery log a table, so there is no
+    # directory to point anywhere and no file to hand-write.
+    _log_one(clean_delivery_log, "monday")
+
+    deliveries = tmp_path / "deliveries"
+    (deliveries / "monday").mkdir(parents=True)
+    (deliveries / "monday" / "cp_clients.csv").write_text("a\n1\n")
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    # The `sequence` is not decoration: without it the arrival cannot
+    # be placed in the processing order and read_delivery() refuses
+    # (REQ-PIPE-061).
+    delivery.write_receipts("monday", "2026-09-25T09:00:00+08:00", receipts,
+                            files=["cp_clients.csv"], sequence=1)
+    monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
+    monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
+
+    calls = []
+    monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
+    monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+    _patch_dashboard_build_embed(monkeypatch, calls)
+    _patch_snapshot(monkeypatch, calls)
+
+    result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
+    assert result.exit_code == 0, result.output
+    assert [r["delivery"] for r in delivery_log.records()] == ["monday"], \
+        "a run that rewrote nothing must not take the record with it"
+
+
+def test_the_committed_history_trees_are_never_the_real_ones_in_a_test():
+    """The guard in conftest, asserted rather than trusted.
+
+    Six tests in this file invoke `pipeline run` without redirecting
+    anything, and that command USED TO prune the delivery log against
+    what was on disk (it deletes nothing since REQ-PIPE-144). On a freshly-cloned CI runner there is no `data/` at all,
+    so the honest answer to "which deliveries are present" is NONE and
+    every committed record would go. A test that merely passes is not
+    evidence the tree survived, which is why this asserts the
+    redirection itself.
+    """
+    from qa_tools.common import delivery_log, in_flight_log
+
+    root = delivery_log.ROOT
+    # Neither load_log nor delivery_log nor filing is here any more:
+    # REQ-PIPE-089 moved the first two records into the database and
+    # REQ-PIPE-104 the third. There is no tree of any of them left to
+    # point anywhere, and a test writing one now writes to its own
+    # worker's database, which cannot be the real one.
+    #
+    # ONE ENTRY LEFT, which is worth saying because a single-item loop
+    # invites being flattened: `observations/in_flight/` is the last
+    # committed tree a test can still write into, and the loop is what
+    # this assertion will grow back through when another appears.
+    for module, name in ((in_flight_log, "OBSERVATIONS_DIR"),):
+        current = getattr(module, name)
+        assert root not in current.parents and current != root, (
+            f"{module.__name__}.{name} points into the real repo at {current} - a test "
+            f"that writes there puts temporary names into permanent history, and a test "
+            f"that prunes there deletes it")

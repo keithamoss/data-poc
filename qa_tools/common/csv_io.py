@@ -1,8 +1,7 @@
 """
 Explicit, contract-driven null handling for every CSV this pipeline
-reads - shared by pipeline/load.py, qa_tools/bdm/build_per_run_warehouses
-.py, qa_tools/bdm/run_evidently_bdm.py, qa_tools/cp/build_cp_warehouses.py,
-and qa_tools/cp/run_evidently_cp.py.
+reads - shared by qa_tools/tools/stage.py and
+qa_tools/tools/run_evidently.py.
 
 Built after a real bug (plans/qa-pipeline.md #17): pandas' and DuckDB's
 default CSV readers each have their own hardcoded list of "these strings
@@ -30,12 +29,12 @@ as opposed to a source-format parsing accident) needs representing.
 from __future__ import annotations
 
 import pandas as pd
-import yaml
+from qa_tools.common import config_yaml
 
 # DuckDB's own read_csv_auto/read_csv only ever sees an already-pandas-
 # written intermediate CSV in this pipeline (every read_csv_auto call
-# site reads a file pipeline/load.py or a build_*_warehouses.py module
-# just wrote via pandas, never a raw generator CSV directly) - so by the
+# site reads a file a build_*_warehouses.py module just wrote via
+# pandas, never a raw generator CSV directly) - so by the
 # time DuckDB reads it, every null has already been resolved down to a
 # genuinely empty field by the pandas read below, and every non-null
 # value is unambiguous literal text. A single explicit empty-string
@@ -50,7 +49,7 @@ def load_null_values_by_column(contract_path: str) -> dict[str, dict[str, list[s
     handled separately below). A table/column with no `nullValues` entry
     simply won't appear here; callers treat that as an empty list."""
     with open(contract_path) as f:
-        contract = yaml.safe_load(f)
+        contract = config_yaml.parse(f)
     out: dict[str, dict[str, list[str]]] = {}
     for table in contract.get("schema", []):
         cols = {}

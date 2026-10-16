@@ -103,7 +103,7 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
      `_load_delivery()` already established for local-folder CP checks,
      reused here against an existing Synthetic manifest run's own
      `data/cp_raw/<run_id>/` directory instead of an arbitrary folder),
-     and no row-count-growth/`previous_run_id` concept (CP has none).
+     and no row-count-growth concept at all (CP has none).
      `mothman cp generate-synthetic-data` and `mothman cp qa
      [--run-id/--reference-run-id/--commit]` are real, working, both
      flag-invocable and TUI-navigable - verified against the real
@@ -1109,3 +1109,1978 @@ wider.md`/`plans/dashboard.md`/etc. already state for their own items).
    since that would either slow down an otherwise-fully-mocked test
    file or couple it to questionary's own internal implementation. All
    13 `tests/test_cli_common.py` tests still pass; `ruff` clean.
+
+10. **[done, 2026-09-19]** **[Testing & dev tooling]** A real, pre-existing
+    test-isolation gap between `tests/test_embed_dashboard_data.py` and
+    `tests/test_dashboard_e2e.py` under `pytest-xdist`. Found
+    incidentally while verifying `plans/qa-pipeline.md` item 74's fix -
+    a full `uv run pytest -n auto` came back with 4 failures in
+    `test_embed_dashboard_data.py` that passed cleanly the moment the
+    same file was run on its own, and that an EARLIER `-n auto` run of
+    the very same code had passed. So: a real race, not a deterministic
+    break, and order-dependent on how xdist happens to distribute tests
+    across workers that run.
+
+    **Confirmed pre-existing, not caused by item 74's change** - checked
+    properly rather than assumed, by `git stash`-ing every change and
+    re-running the same two files together under `-n auto` on the clean
+    tree: the untouched code produced the same class of collision (9
+    errors) as the changed tree did (11). The difference in count is
+    itself just the race landing differently, not a signal about either
+    tree.
+
+    Root cause not yet confirmed, but the obvious candidate: both
+    modules drive `dashboard/embed_dashboard_data.py`'s own `embed()`,
+    which reads and writes real, shared, repo-relative paths under
+    `reports/` (`birth_registrations_dashboard.json`, etc.). Each test
+    monkeypatches the specific module attributes it cares about
+    (`QA_COMMENTS_JSON`/`DASHBOARD_HTML`/...), but monkeypatching is
+    per-process, so two xdist WORKERS running `embed()` concurrently
+    still contend for the same real files on disk - the same class of
+    problem `plans/running-thoughts.md` #12 already found and fixed for
+    dbt's shared `target/` directory, just in a different shared
+    resource that the dbt fix didn't cover.
+
+    **Fixed 2026-09-19** (Keith's own go-ahead, same message that made
+    `-n auto` the default - the two are the same piece of work, since a
+    flaky default is worse than a slow one). The diagnosis above was
+    right about the shared `reports/` paths but incomplete: there were
+    **two** independent races, and fixing either alone would have left
+    the suite flaky.
+
+    1. **A cross-module read/write race.**
+       `test_dashboard_e2e.py`'s session-scoped `built_dashboard_html`
+       shells out to the real build chain, rewriting the real
+       `reports/birth_registrations_dashboard.json` (6.5MB) and its CP
+       sibling. `test_embed_dashboard_data.py` monkeypatched every other
+       real path `embed()` touches - `DASHBOARD_HTML`,
+       `OPEN_TICKETS_JSON`, `TICKET_RESOLUTIONS_JSON`,
+       `CHANGELOG_SOURCES` - but never `TARGETS`, so it read those two
+       files live, and on a different worker could read one mid-rewrite
+       and get truncated JSON. Fixed with an autouse
+       `_isolate_embed_data_targets` fixture pointing `TARGETS` at tiny
+       local stubs. This is the honest fix rather than a workaround:
+       nothing in that module asserts anything about those files'
+       CONTENTS (they're unit tests of `embed()`'s own wiring), and
+       `embed()` only `json.load`s each target and substitutes it into a
+       const. Real side benefit, not the goal: that module went from
+       6.8s to 2.9s by not reading 7MB of JSON per test.
+    2. **A worker-vs-worker clobber, not in the original diagnosis.**
+       Under xdist's default `--dist load`, tests from one file are
+       spread across workers, so `built_dashboard_html` - session-scoped,
+       meaning once *per worker* - ran the whole build chain several
+       times concurrently, each writing the same real files. Fixed with
+       `--dist loadfile` (every test in a file stays on one worker),
+       which is why that flag is load-bearing in `pyproject.toml`'s
+       `addopts` rather than a tuning knob.
+
+    Verified rather than assumed: the two modules run together 3/3 clean
+    where they had failed reliably before, and the full suite is **649
+    passed in 78s** under the new default, against 220s serial - a real
+    2.8x. (Not the ~4x a naive `-n auto` would suggest: `--dist
+    loadfile` keeps the big e2e module on one worker, which is the
+    price of correctness here.)
+
+    A regression test was deliberately NOT written for the race itself -
+    this is the environment/wiring class `CLAUDE.md`'s bug-test
+    convention carves out, and both fixes REMOVE the shared mechanism
+    rather than guard it, so a test would document a hack that no longer
+    exists. The autouse fixture is itself the standing guarantee.
+
+11. **[done, 2026-09-27]** **[Testing & dev tooling]** A real
+    `.claude/settings.json` with a SessionStart hook, so a fresh session
+    doesn't start from a half-configured sandbox. Keith's own ask,
+    2026-09-19, after watching this session rediscover the same three
+    gaps by hitting test failures rather than by reading setup docs.
+
+    **The concrete problem.** This project needs three things that
+    aren't (and shouldn't be) in git, because they're all correctly
+    gitignored build artifacts:
+    - `dbt_project/dbt_packages/` - `dbt_utils`, which several real dbt
+      checks' macros come from. Missing it fails 8 real tests.
+      (`uv run dbt deps --project-dir dbt_project --profiles-dir
+      qa_tools/dbt_profiles`)
+    - `node_modules/` - Vitest won't start at all without it.
+      (`npm ci`)
+    - Playwright's Chromium - 16 e2e errors without it.
+      (`uv run playwright install chromium`, or this sandbox's own
+      `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` escape hatch,
+      since the pre-installed build here lags what the pinned package
+      expects)
+
+    **What's already right, and what isn't.** `.github/workflows/
+    test.yml` runs all three as explicit steps, so CI is genuinely fine
+    - this is not a broken-pipeline problem. What has no equivalent is
+    the INTERACTIVE session: a fresh cloud container clones the repo and
+    runs no setup at all, and there is no `.claude/settings.json` in
+    this repo today (only `.claude/agents/` and `.claude/skills/`). So
+    every new session re-derives the same three failures from scratch.
+
+    Not scoped yet, and worth a real think rather than just writing the
+    obvious hook: whether all three belong in one SessionStart hook or
+    whether the Playwright one should stay opt-in (it's a real download,
+    and plenty of sessions never touch the e2e suite); whether the hook
+    should be idempotent-and-silent or actually report what it did;
+    whether `PLAYWRIGHT_CHROMIUM_PATH` belongs in `env` rather than a
+    hook, given `dashboard/check_dashboard_renders.py` already
+    auto-detects the symlink (2026-09-19) so the gap may be narrower
+    than it looks; and whether any of this wants to be shared with
+    `README.md`'s own setup instructions rather than duplicated. There's
+    a real `session-start-hook` skill available for building this.
+
+    Related but genuinely separate, worth not conflating: `CLAUDE.md`
+    already documents the `dbt deps` step in prose. The gap this closes
+    is automation, not documentation - and the standing process fix for
+    the documentation half (read and run setup BEFORE running the
+    suite, rather than diagnosing failures backwards) landed as its own
+    `CLAUDE.md` convention bullet the same day, at Keith's explicit ask.
+
+
+    **BUILT 2026-09-27**, as `.claude/hooks/session-start.sh` plus a
+    real `.claude/settings.json`. It covers the three artifacts above
+    and a FOURTH this item predates: a running PostgreSQL, with its role
+    and database created if missing. That one is not a build artifact
+    but a server, it does not survive the container, and its absence
+    reports as "password authentication failed" rather than as anything
+    about a missing role - this session restarted it three times before
+    the hook existed.
+
+    It deliberately does NOT populate the warehouse. `mothman pipeline
+    bootstrap` (plans/running-thoughts.md #48) takes minutes, and a
+    session start that blocks that long is one people disable - so the
+    hook reports whether there is data and names the command instead.
+    Synchronous rather than async for now, so nothing races it.
+
+12. **[todo, 2026-09-19]** **[Testing & dev tooling]**
+    **Priority: HIGH - to FIX, not just to record (2026-09-19, Keith's own
+    explicit ask, in as many words: "this is a priority issue to fix,
+    so make that known").** Flagged at the top of this item rather than
+    buried at the end because it changes what "done" means here: the
+    closing paragraph below originally left "how much is worth acting
+    on versus just recording" as an open question, and Keith has
+    answered it - the output of this pass is real changes to the
+    codebase, not a findings list. See the rubric below before touching
+    anything though: "fix" still means fix the right category, and
+    collapsing (b) or (c) would make things worse, not better.
+
+    A real DRY /
+    duplication pass across the whole codebase, to find the rest of what
+    `plans/qa-pipeline.md` item 74 turned up by accident. Keith's own
+    ask, immediately after that: the status logic existed in FOUR places
+    (the dashboard's JS, two Python modules, and a dead rollup in
+    `build_dashboard_data.py`), nobody knew, and the drift between two
+    of them shipped a real `TypeError` to CI and a false GREEN to the
+    rendered page. That was found by chasing one bug, not by looking -
+    so the question is what else is sitting there unfound.
+
+    **One real candidate already found and waiting, 2026-09-20:** the
+    `label` field (`pipeline/dashboard_check_labels.py`'s shared
+    cross-tool vocabulary - "Duplicate rate", "Null rate", "Invalid
+    values") becomes **dead data** once `plans/qa-pipeline.md` item 25's
+    REQ-DASH-026 lands. Its only consumer is
+    `display_name(check_name, engine_short, label)` in the two dashboard
+    builders - i.e. the card headline the plain-English sentence
+    replaces. Nothing else reads it, confirmed by grep. It is still SET
+    by all 8 `run_*.py` modules (dbt/Soda via lookup dicts, which are
+    fine; the two datacontract ones derive it from description text and
+    die as part of REQ-QAC-023). Removing the field itself is a real
+    cleanup across 8 modules plus both builders - deliberately kept out
+    of item 25's scope rather than smuggled in, and logged here instead.
+    Worth checking when this pass runs whether the cross-tool
+    equivalence signal it provided should be preserved some other way or
+    genuinely dropped: 85 of 105 (column, label) groups are checked by
+    2+ engines, so it was doing real work right up until the sentence
+    took over.
+
+**A second real candidate, found 2026-09-20 while scoping check
+    explanations.** `pipeline/build_dashboard_data.py`'s `COLUMN_META`
+    hand-maintains a prose description per column, duplicating the ODCS
+    contract's own property descriptions. They have already drifted -
+    the contract says *"BDM's unique registration identifier. Primary
+    key of the feed."*, `COLUMN_META` says *"BDM's unique registration
+    identifier - primary key of the feed."* Identical content, two
+    hand-maintained copies, and only punctuation separating them so far.
+    Sorts as (a) an accidental copy under this item's own rubric, since
+    the contract is the obvious single source and the dashboard builder
+    is already reading that file for other reasons - but check whether
+    the contract's own descriptions are complete enough to replace
+    `COLUMN_META` wholesale before assuming it collapses cleanly.
+
+        **The rubric matters more than the findings, and is the part to
+    settle first.** Today's incident is NOT an argument that duplication
+    is bad: `pipeline/cadence.py` duplicates real logic into the
+    dashboard's own JS deliberately and correctly (a static site has no
+    backend, so the browser must re-roll cadence for any as-of date a
+    viewer picks), and it has never drifted - because its own docstring
+    commits both sides to being tested against the same real configs and
+    dates. The status mirror had the same unavoidable split and no such
+    cross-check, and that is the whole difference. So the pass should
+    sort what it finds into: **(a) accidental copies** that should
+    collapse to one implementation; **(b) genuinely unavoidable
+    duplication** (a real client/server or language boundary) that needs
+    a shared-fixture cross-check rather than removal; and **(c)
+    deliberate, justified separation** that should be left alone -
+    `plans/qa-pipeline.md` #84 already established, by real diffing,
+    that the per-dataset BDM/CP split is genuinely different
+    check-to-dashboard logic rather than copy-paste - a finding a
+    mechanical duplication scan cannot reproduce and would contradict.
+    Re-measure it rather than re-litigate it (see the note on #84 just
+    below: it was measured at 2 datasets, and more has been built since).
+
+    **Read `plans/qa-pipeline.md` #84 before starting - it is this exact
+    pass, already done once, narrower** (Keith's own pointer,
+    2026-09-19). In 2026-09-14 it asked the same question of the BDM/CP
+    tool-runner file pairs, and it is the closest thing this project has
+    to a proven method for the work:
+    - **It diffed the pairs in full rather than reasoning about them.**
+      That is what produced a defensible split (~30-40 shared lines per
+      pair vs the rest genuinely dataset-specific) instead of a guess.
+    - **The diff found MORE shared code than predicted** - two further
+      bits (datacontract-cli's "local_test" server + `DataContract
+      .test()` construction, and Evidently's PSI-via-DataDriftPreset
+      computation) turned out byte-identical "once written side by
+      side," in that item's own words, and were "found while doing the
+      extraction, not predicted in advance." A strong argument that this
+      pass has to actually put candidates next to each other rather
+      than eyeball them from a filename similarity scan.
+    - **It extracted ONLY the confirmed-shared part** and deliberately
+      left the rest, landing on "not a false-DRY situation, but not
+      nothing either." That is exactly the (a)/(b)/(c) judgement this
+      item's rubric above is asking for, arrived at independently two
+      months earlier - so the rubric is not a new invention to be
+      trusted on faith, it is a restatement of what already worked here.
+    - **Its own unresolved residue is still open and belongs to this
+      pass**: "every new dataset currently means copy-pasting a whole
+      file and manually picking apart which parts to keep." That cost
+      was acceptable at 2 datasets and is the thing
+      `plans/publishing-and-history.md` #6 later reopened at the
+      project's stated ~30-dataset target. Worth treating #84's finding
+      as correct FOR ITS TIME rather than as a permanent ruling - it
+      measured 2 datasets, and the seeds below are what 2 more years of
+      building on top of it produced.
+
+    **Real seeds found in a 10-minute reconnaissance while parking this**
+    - concrete starting points, not a guess that duplication exists:
+    - **`_run_gh()` is byte-identical in THREE modules in the same
+      directory** - `qa_tools/common/ticket_sync.py`,
+      `acceptance_sync.py`, `leaderboard.py` each carry a private
+      copy of the same 2-line `subprocess.run(["gh", *args], ...)`
+      helper. Category (a), and about as clear-cut as it gets.
+    - **`cli/bdm.py` and `cli/cp.py` share 19 identically-named
+      functions across 1,067 lines** (`run_check`, `report_table`,
+      `picker_choices`, `load_manifest`, `default_reference`,
+      `_offer_promote`, ...). Needs real judgement rather than a
+      mechanical merge - CP genuinely differs (6 tables vs 1 CSV, no
+      row-count-growth concept) - so this is likely (b) or (c) in
+      places and (a) in others.
+    - **9 mirrored filenames across `qa_tools/bdm/` and `qa_tools/cp/`**
+      (`build_results_from_history.py`, `dataset_stats.py`,
+      `evidently_check_lifecycle.py`, ...). This overlaps
+      `plans/publishing-and-history.md` #6, which owns the per-dataset
+      file ARCHITECTURE question - deliberately not duplicated here: #6
+      is "is one file per dataset per concern the right shape at ~30
+      datasets", this item is the narrower "is the CONTENT of these
+      pairs actually the same code". **#6 stopped being parked on
+      2026-09-19** - Keith named the copy-paste-a-file cost as "not
+      tolerable in the short term", so it is now `todo` and HIGH
+      priority alongside this item. That makes the earlier "resolve #6
+      first, or at least together" a real sequencing call rather than a
+      politeness: #6 is the one with a concrete felt cost attached, and
+      this sweep would otherwise keep rediscovering symptoms of it.
+      Don't let this item quietly re-answer it.
+    - **Known JS<->Python mirrors to audit as a class** (each needs a
+      (b)-style cross-check, not removal): `cadence.py`/
+      `cycleStartDate()` (has one, informally), `dataset_status.py`/
+      `checkStatus()` (now has one, `tests/test_dashboard_e2e.py`'s own
+      `TestStatusMatchesEachToolsOwnVerdict`), and
+      `tests/test_dashboard_e2e.py`'s `_state_to_path()`/`stateToPath()`
+      (test-only, documented as hand-synced - probably fine, worth
+      confirming).
+    - **Dead code specifically, since ruff demonstrably misses it**: the
+      `worst` rollup sat unused in `build_dashboard_data.py` and `F841`
+      never fired, because the variable is read inside its own
+      accumulating loop. `plans/tooling.md` #2 already names `vulture`
+      as a real candidate for exactly this - that item and this one
+      should probably be picked up together, since a real dead-code
+      detector is a mechanical way to find one whole category here.
+
+    **Resolved by the priority flag above**: how much of this is worth
+    acting on versus just recording. The answer is act - this is a fix,
+    and a findings list alone doesn't close it.
+
+    Still not scoped: whether the pass itself is a one-off manual sweep,
+    a `delivery-*`-style agent doing it (cf. #3's code-reviewer agent
+    idea), or a real tool in CI - and in what order the seeds above get
+    worked, since they differ a lot in risk (`_run_gh` is a safe,
+    obvious collapse; `cli/bdm.py`/`cli/cp.py` needs real judgement
+    about what genuinely differs). Worth a short scoping round with
+    Keith on approach and order before starting, not a full design
+    conversation - the appetite question that would normally gate it is
+    already answered.
+
+13. **[done, 2026-09-19]** **[Testing & dev tooling]** The QA wizard
+    goes completely silent for ~13.5 seconds while the real check chain
+    runs. `cli/bdm.py`'s `_run_qa_interactive_synthetic()` prints one
+    `"Running the real dbt-core/Soda Core/datacontract-cli/Evidently
+    chain for <run_id>..."` line and then calls `run_check()`, which
+    emits nothing until it's done. A real operator gets a static screen
+    with no indication the tool is alive, working, or hung. `cli/cp.py`
+    has the same shape.
+
+    Found 2026-09-19 while re-recording the demo (`plans/dashboard.md`
+    #13) - the recording made it impossible to miss, because that
+    stretch shows up as a gap with **zero terminal events at all**, so
+    the Demo tab freezes on one line for 13.5s of its ~48s runtime.
+    Worth being precise that this is a real CLI gap, not a recording
+    artifact: the recording is faithful, and what it faithfully shows is
+    a CLI that says nothing for 14 seconds.
+
+    This was actually designed and then not built. `plans/tooling.md` #1's
+    own TUI research notes say "the planned spinner-under-10s /
+    step-progress-bar-otherwise split for `rich.progress.Progress`
+    already matches real progress-indicator UX guidance" - so the
+    intended behaviour is on record; it just never made it into the
+    synthetic-source path.
+
+    Not fixed with the demo work, deliberately: that was scoped to
+    recording-side pacing, and this is a change to the real shipped CLI
+    that deserves its own decision. Real options when picked up, in
+    rough order of effort: a `rich` `console.status()` spinner around the
+    whole call (smallest, and honest - it genuinely is one opaque
+    operation from the CLI's point of view); or a real per-tool
+    step indicator (dbt -> Soda -> datacontract-cli -> Evidently), which
+    is more informative and matches the "step progress bar over 10s" half
+    of the design above, but needs `run_check()` to report progress back
+    rather than returning once at the end. Either would also fix the
+    demo's dead patch for free, without faking anything - the fix is
+    that the tool starts saying something, not that the recording hides
+    the silence.
+
+    **Built the same evening, Keith's own ask on seeing the demo**: "it
+    says 20 seconds of like nothing and waiting and there's no progress
+    indicator. Is it possible to show a progress bar while that's
+    happening?" It is, and genuinely rather than decoratively - the
+    chain has real, discrete steps, so a bar over them measures actual
+    position rather than animating to look busy.
+
+    - **`RUN_STEPS`** on both orchestrators (identical, cross-checked by
+      a test) is one source of truth for the step labels AND the count:
+      the 4 real tools plus the `dataset_stats` computation. A bar sized
+      from it can't drift from what actually runs.
+    - **An optional `on_step` callback** threaded through
+      `_run_one()` -> `run_single()` -> each `cli/` `run_check*`. Optional
+      by design and defaulting to `None`, so the full-manifest batch
+      loop, the AWS Lambda handlers and every existing test behave
+      exactly as before - only the interactive CLI, where a human is
+      actually watching, opts in.
+    - **`cli/common.chain_progress()`** renders it: a spinner, the
+      current tool's name, a real bar, the step count and elapsed time,
+      `transient=True` so the report lands on a clean screen. It falls
+      back to a plain one-line print when stdout isn't a TTY - a
+      redirected log or CI runner gets no cursor-control spam.
+
+    Honest caveat, documented in the code rather than smoothed over: the
+    steps are very unevenly sized (dbt-core ~3.5s and datacontract-cli
+    ~5.5s dominate; Soda Core and Evidently are a fraction of a second -
+    matching `plans/performance.md`'s own measurements), so the bar
+    advances in real but lumpy jumps. The spinner and elapsed-time
+    columns are what carry continuity across the two long steps, which
+    is precisely where a bare bar would look stalled.
+
+    Verified by re-recording the demo against the real CLI, which is the
+    same artifact that exposed the problem: the chain window went from
+    **~0 terminal events and a 13.5s frozen gap** to **133 events with a
+    largest gap of 1.5s**, with each tool visibly named as it runs
+    (dbt-core -> Soda Core -> datacontract-cli -> Evidently). Real
+    rendered frames confirmed rather than assumed, e.g. at t=35s:
+    `⠹ Running datacontract-cli ━━━━━━━━━━━╺━━━━━━━━━━ 2/5 0:00:06`.
+    5 new tests (`tests/test_chain_progress.py`) cover the plumbing -
+    the two orchestrators agreeing on the steps, `_announce` being a
+    genuine no-op without a callback, ordered reporting, and the non-TTY
+    fallback. One pre-existing test double needed widening
+    (`tests/test_cli_cp.py`'s `_fake_run_single` mirrored the real
+    signature exactly and rejected the new optional kwarg) - fixed with
+    `**kwargs` so it stops re-breaking on unrelated signature growth.
+
+    **Completed properly after Keith caught that the first pass was
+    partial.** He asked what "wired it into the BDM synthetic path"
+    actually meant and whether CP needed it too - a question worth
+    checking rather than answering from memory, and the audit found the
+    first pass had covered only 5 of 13 real call sites. CP's Synthetic
+    and Local-files paths did have it; **eight others did not**: both S3
+    modes, CP's single-table mode (2 sites), and every flag-invocable
+    `mothman <ds> qa` form (5 sites). That last group matters most - a
+    human typing `mothman bdm qa --run-id X` waits the same ~13.5s, and
+    it's the route someone uses repeatedly once they know the tool.
+    Flag-mode parity is also `plans/tooling.md` #1's own stated design
+    rule ("just put everything in the TUI" - no CLI-only/TUI-only
+    split), so leaving it out would have been a real inconsistency, not
+    just a gap. `on_step` now threads through the S3 wrappers too (they
+    delegate down to the local-file/local-folder bodies), and all 13
+    sites are covered.
+
+    Two new tests specifically guard the thing that went wrong, since
+    "I wired some of them" is not a mistake a functional test would
+    catch: one asserts **no** `results, tmp_dir = run_check*(...)` call
+    site anywhere in `cli/` sits outside a `chain_progress()` block, and
+    one asserts flag mode and interactive mode both show it. Structural
+    rather than driving 13 real chain runs, which would cost minutes -
+    and deliberately blunt, so a future call site that genuinely
+    shouldn't show a bar has to be an explicit decision rather than an
+    omission. Verified by removing one wrapper and confirming the guard
+    fails naming the exact `file:line`.
+
+14. **[done, 2026-09-19]** **[Testing & dev tooling]** Confirming a
+    Promote ended the flow the same way declining it did. Keith's own
+    words, watching the demo: "after the user confirms promotion of
+    results, they should get a success message rather than being bumped
+    straight back to the menu."
+
+    Worth separating two things that looked like one problem, because
+    the first turned out not to be one. **A message did already exist**:
+    `cli/bdm.py`/`cli/cp.py`'s `_offer_promote()` printed a green
+    `Promoted -> <path>` plus a dim "commit and push it yourself to
+    publish" follow-up. Part of why it read as absent in the recorded
+    demo is `plans/dashboard.md` #13's CPR bug, fixed the same evening:
+    every prompt re-rendered from row 0 and erased the lines above it,
+    so in the demo that message was genuinely wiped the instant the
+    main menu came back. But the underlying complaint stands on its own
+    even with the recording fixed: two ordinary printed lines
+    immediately followed by a full menu redraw makes the single most
+    consequential action in the tool - writing into the permanent,
+    committed `qa_results/` history - end exactly like a no-op.
+
+    Built: `cli/common.report_promoted(dst)`, shared by both datasets'
+    interactive flows.
+    - **A bordered `rich` panel** rather than loose lines, so the
+      completion has a visible boundary instead of dissolving into
+      whatever prints next.
+    - **A real, checkable outcome**: how many result files were written
+      and where, counted from the destination directory rather than
+      asserted. Someone who wants to verify the claim has the number
+      and the path to check it against.
+    - **An explicit acknowledgement**
+      (`questionary.press_any_key_to_continue`) before the menu returns - the "rather
+      than being bumped straight back" half of the ask. Guarded on both
+      `stdin` and `stdout` being real terminals, so a piped or scripted
+      run can never hang on a keypress that will never come.
+    - **The flag-based `--commit` paths deliberately keep their
+      one-liner.** `_finish_flag_mode()` in both modules is the
+      scriptable form, where a panel is noise and a blocking keypress is
+      a hang. The parity rule in #1 is about capability, not about
+      making a script sit through a human's affordances.
+
+    Three tests in `tests/test_cli_common.py` cover the file count and
+    destination, the keypress firing in a real terminal, and - the one
+    that actually guards a hang - that it never prompts when stdout
+    isn't a terminal.
+
+    Not shown in the committed demo recording, which answers **no** at
+    the Promote prompt on purpose: saying yes there would write a real
+    run into the permanent, committed `qa_results/` history as a
+    side effect of making a video. Worth knowing when re-recording.
+
+15. **[todo, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
+    **Former priority, cleared by Keith 2026-10-04 - pick up tomorrow morning (2026-09-19, Keith's own words,
+    after watching a real `delivery-scoper` run take 5+ minutes: "in
+    terms of making the agents run faster, flag all that stuff, and
+    we'll come back to that tomorrow morning").**
+
+    The `delivery-*` subagents are slow, and the cost is real, measured
+    and mostly avoidable. Raised by Keith's own question - "why is it
+    taking so long to run? It doesn't have to do a whole lot, does it?
+    Or is there a large setup cost?" - during the first real end-to-end
+    `delivery-scoper` run (item 25's scoping, `plans/qa-pipeline.md`).
+    There is a large setup cost, and separately the slow part isn't the
+    part that looks slow.
+
+    **Real numbers from that run**, both passes of the same agent:
+
+    | | tokens | tool calls | wall clock |
+    |---|---|---|---|
+    | First pass (cold) | 97,907 | 29 | 5m21s |
+    | Second pass (resumed, answers relayed) | 119,130 | **2** | 3m28s |
+
+    The second pass is the informative one: **2 tool calls, 3.5
+    minutes**. It read essentially nothing and still took most as long
+    as the cold pass, because what dominates is GENERATION over a large
+    context, not file reading. Any fix aimed only at "make it read less"
+    addresses the smaller half. Worth stating plainly before anyone
+    optimises the wrong thing.
+
+    **Where the ~98k of cold context goes** (approximate, `wc -w` x 4/3;
+    the exact read set isn't inspectable without pulling the agent's own
+    transcript into the main session's context, which would cost more
+    than it tells us):
+
+    - **`plans/qa-pipeline.md` - ~58,000 tokens.** 5,180 lines. The
+      single largest item by a wide margin, and the agent had to go
+      there because item 25 lives in it.
+    - **`CLAUDE.md` - ~11,800 tokens**, loaded into every subagent
+      automatically (see below).
+    - Soda checks YAML + `check_lifecycle.py` + `requirements.yaml` -
+      ~12,000.
+    - `docs/components.md` + `docs/project-context-for-agents.md` -
+      ~3,700.
+    - The agent's own prompt - ~2,200.
+
+    **Three real levers, none decided - this is the part to work through
+    with Keith, not to guess at:**
+
+    1. **`plans/qa-pipeline.md` has outgrown a single file** - every
+       agent touching any QA-check question pays the full ~58k to read
+       one item out of it. **Split out into its own item, #17**, at
+       Keith's own ask: the same cost is paid by every SESSION at
+       start, not just by agents, so it's broader than agent speed.
+       See #17 for the real numbers and the options.
+    2. **`omitClaudeMd: true` is a real, documented frontmatter option**
+       (verified against Claude Code's own subagent docs while checking
+       the `AskUserQuestion` question - see #16). A subagent loads
+       "every level of the CLAUDE.md hierarchy the main conversation
+       loads" unless it opts out, and none of the 8 `delivery-*` agents
+       opts out - so each pays ~11,800 tokens for it.
+
+       **A first version of this bullet claimed that cost was
+       duplicated, because all 8 are also told to read the condensed
+       `docs/project-context-for-agents.md`. That claim was asserted,
+       not checked, and checking it showed it was wrong** - recorded
+       here rather than quietly deleted, since the mistake is the
+       instructive part. The two documents are largely
+       COMPLEMENTARY: the agents doc is domain orientation (who the
+       users are, what each wants, what's real vs illustrative,
+       maturity) and explicitly defers to `CLAUDE.md` for architecture;
+       `CLAUDE.md` carries the operational rules the agents doc barely
+       touches. Real counts - `mothman` entry-point rule 22 mentions vs
+       3, the no-live-data rule 5 vs 0, `uv run` 17 vs 0,
+       enumerate-every-consumer 2 vs 0.
+
+       So this lever is **much weaker than it first looked**, and worth
+       keeping only as a documented option rather than a recommendation.
+       `delivery-scoper` visibly USED `CLAUDE.md` on its first real run:
+       its NFRs cite the "enumerate every consumer mechanically"
+       convention, Thread D's settled "no CLI" call, and the real
+       check-yaml pre-commit incident with shell-style quoting - none of
+       which is in the agents doc. Dropping it would have cost real
+       output quality to save ~12k tokens. If this is revisited, the
+       question is narrower than "opt out": whether the handful of
+       operational conventions an agent genuinely needs should be
+       promoted into the agents doc, and only THEN the full file
+       dropped - and whether that differs between pre-build agents
+       (which reason about requirements) and post-build critics (which
+       actually run commands and need the `uv run`/`mothman` rules).
+    3. **Point an agent at an item, not a file.** The scoper was told
+       to read "`plans/qa-pipeline.md` item 25 (around line 1131)" and
+       appears to have read the file. A prompt that hands over the
+       relevant extract directly, or names a line range, would sidestep
+       most of the single largest cost without any restructuring at
+       all - the cheapest of the three, and testable immediately.
+
+    **Measure, don't guess** - the same standing lesson the `pytest
+    --durations` profile established for test runtime. A real before/
+    after on one identical scoping task is the way to tell which of the
+    three actually moved the number, rather than doing all three and
+    assuming.
+
+    **RESOLVED 2026-09-20, and mostly in the direction of "this is not a
+    problem".** Two things settled it.
+
+    **New evidence, from the same day's `delivery-architect` and
+    `delivery-dashboard-ux` runs.** Lever 3 was used on both without
+    labelling it a test - each was handed a 181-line extract in a
+    scratchpad file rather than told to go read `plans/qa-pipeline.md`
+    item 25. Neither got cheaper:
+
+    | agent | tokens | tool calls | wall clock |
+    |---|---|---|---|
+    | `delivery-scoper` (cold, no extract) | 97,907 | 29 | 5m21s |
+    | `delivery-architect` (given the extract) | 109,458 | 31 | 5m06s |
+    | `delivery-dashboard-ux` (given the extract) | 106,865 | 28 | 5m27s |
+
+    They skipped the ~58k file and spent it elsewhere, on reading real
+    code - which is what they are for. The architect's note cites line
+    numbers across a dozen files and found three config-hash traps
+    nobody had spotted; it earned those tokens. Honest limit on this
+    evidence - only totals are visible, since inspecting what each
+    agent actually read means pulling its transcript into the main
+    session and costs more than it tells us.
+
+    **So the reframe: ~100-130k and ~5 minutes is the price of a
+    thorough agent pass, not waste.** The levers move WHERE the context
+    goes, not how much of it there is.
+
+    **Keith's call, same day, on being shown that: latency is "definitely
+    not an impact".** That closes the speed motivation entirely, and
+    with it levers 1 and 3 as speed measures - lever 1 (splitting
+    `plans/qa-pipeline.md`) still stands on its own merits under #17,
+    which is about every session's start cost rather than agents.
+
+    **Lever 2 (`omitClaudeMd`) is formally CLOSED, not merely
+    deprioritised.** This item's own correction already showed it was
+    weak; the deciding evidence is that `delivery-scoper` visibly USED
+    `CLAUDE.md` on its first real run, citing the enumerate-every-
+    consumer convention, Thread D's settled "no CLI" call and the real
+    check-yaml quoting incident in its NFRs - none of which appear in
+    `docs/project-context-for-agents.md`. Dropping it would have cost
+    real output quality to save ~12k tokens nobody is short of.
+
+    **What remains live is a different lever this item never considered -
+    model choice**, which acts on generation, the half that actually
+    dominates. All 8 agents default to `model: opus`. Keith, same day -
+    "I'm open to experimenting with different model choices". Being set
+    up as a real controlled comparison rather than a guess, since the
+    2026-09-19 runs left high-quality Opus baselines on a task whose
+    answers are now known - see this item's own follow-up once the
+    result is in.
+
+16. **[done, 2026-09-19]** **[Testing & dev tooling]** **[Docs & process]**
+    All 8 `delivery-*` agents declared a tool that can never work, and
+    `docs/agent-orchestration.md` documents a workflow that cannot
+    happen. Found live during the first real `delivery-scoper` run, and
+    caught by Keith reading the agent's own log rather than by anything
+    here noticing: the agent tried to ask him a question and got
+    `Error: No such tool available: AskUserQuestion`.
+
+    **Verified against Claude Code's own subagent documentation, not
+    left at the error string** - Keith's own explicit ask ("verify
+    through looking at Claude's subagent documentation whether you can
+    give AskUserQuestion to a subagent rather than just assuming").
+    The docs list the tools removed by the first filter, introduced as:
+    *"The first filter removes these tools, even when listed in the
+    `tools` field"* - and `AskUserQuestion` is on it, alongside
+    `EndConversation`, `EnterPlanMode`, `ScheduleWakeup`, `TaskOutput`,
+    `WaitForMcpServers`, `Workflow`, `ExitPlanMode` (unless
+    `permissionMode: plan`) and `Agent` at the depth limit. So this is
+    documented, universal to all subagents, and explicitly NOT
+    fixable by listing it in `tools:`. The runtime error says "in this
+    environment", which is what initially led this session to log it as
+    an environment quirk - the docs are clearer than the error message,
+    and the first write-up here was wrong until Keith pushed for the
+    real source.
+
+    Worth recording HOW that mattered, not just that it was wrong: the
+    whole roster was designed around agents interrogating Keith
+    directly. `delivery-scoper`'s own description is "stress-tests the
+    idea with clarifying questions rather than assuming", it references
+    the tool 3 times in its own body, and the other 7 reference it
+    once or twice each. The premise held for none of them, and nobody
+    noticed until an agent actually tried.
+
+    **The fix, in two parts:**
+
+    - **Strip the dead grant from all 8 agent files** and rewrite the
+      instructions that tell each one to ask directly. They should
+      instead hand questions back in relay-ready shape - which is what
+      `delivery-scoper` improvised on its own when blocked, writing its
+      forks as pre-formed `AskUserQuestion`-shaped sets with 2-4
+      options each, and it worked well enough that the main session
+      relayed them verbatim across 3 rounds.
+    - **Rewrite `docs/agent-orchestration.md`'s flow** into the relay
+      loop, with the doc citation so a future session doesn't
+      re-litigate it. The loop: the agent hands questions back, the
+      main session puts them to Keith with its own `AskUserQuestion`,
+      then `SendMessage`s the answers to the SAME agent, which resumes
+      with its context intact rather than starting over. The docs name
+      resumption as the pattern here: *"When Claude sends a completed
+      subagent a message with the `SendMessage` tool, the subagent
+      resumes in the background without a new `Agent` invocation."*
+      Verified working for real across 3 rounds on item 25's scoping.
+
+    What's genuinely lost, and should be said in the doc rather than
+    glossed: the agent can't adaptively follow up mid-flight without a
+    round trip through the main session, so it has to front-load its
+    questions into batches. That is a real constraint on the design,
+    not just a transport detail - it pushes each agent toward asking
+    everything it might need at once rather than following a thread.
+
+    Also worth a look while in there: `#15`'s own finding that none of
+    the 8 sets `omitClaudeMd`, which is a second frontmatter-level
+    thing nobody has audited since these files were written.
+
+    **Built the same night.** `AskUserQuestion` stripped from all 8
+    `tools:` lines, and each agent given a real "Asking Keith a
+    question" section instead: it states plainly that the tool is
+    unavailable and why, cites the documentation so a future session
+    doesn't re-litigate it, and specifies the relay shape - batch at
+    most 4 questions with 2-4 real options each, give the trade-off
+    both ways, never offer an "other" option (the tool adds one), and
+    say which parts of the draft are provisional on an answer.
+    `delivery-scoper`'s own step 2 rewritten, since it was the only one
+    whose body actively instructed asking; it now also has to report
+    which angles it judged and answered itself versus ruled out, so a
+    thin pass is visible as one and Keith isn't asked things the
+    codebase already answers.
+
+    `docs/agent-orchestration.md` gained a real section for the loop,
+    with the sequence diagram updated to point at it. Two things in it
+    are worth more than the mechanism: the front-loading constraint
+    (an agent can't follow a thread adaptively, so every follow-up
+    costs a round trip through Keith's attention - which pushes toward
+    broader, less responsive question sets, and that's the design
+    rather than sloppiness), and three practices that made the real
+    item 25 run work - relay the agent's own framing rather than a
+    paraphrase, verify its factual claims at source before putting
+    them to Keith as fact, and answer whatever the codebase or
+    `plans/*.md` already answers rather than spending his attention on
+    it.
+
+    Not done, deliberately: the `omitClaudeMd` audit above stays with
+    #15, since #15's own correction established the lever is much
+    weaker than it first looked.
+
+17. **[todo, 2026-09-19]** **[Docs & process]**
+    **Former priority, cleared by Keith 2026-10-04 - pick up tomorrow morning alongside #15 (2026-09-19,
+    Keith's own ask - "yes, please log the QA pipeline token problem").**
+
+    This project's own orientation instruction now costs **~159,000
+    tokens before any work begins**. `CLAUDE.md` opens by telling every
+    new session to read seven `plans/*.md` files "in full before doing
+    anything else", and that instruction has quietly become one of the
+    most expensive things in the repo:
+
+    | file | ~tokens |
+    |---|---|
+    | `plans/qa-pipeline.md` | **57,962** |
+    | `plans/publishing-and-history.md` | 34,656 |
+    | `plans/tooling.md` | 18,764 |
+    | `plans/wider.md` | 16,752 |
+    | `plans/dashboard.md` | 12,744 |
+    | `CLAUDE.md` itself | 11,830 |
+    | `plans/data-generation.md` | 4,264 |
+    | `plans/conceptual-design.md` | 2,050 |
+    | **total** | **~159,022** |
+
+    Split out from #15 (agent speed) at Keith's own ask, because it
+    isn't only an agent problem - #15 found it, but **every session pays
+    this, including the main one, at every start.** A subagent reading
+    one file is the cheap case.
+
+    **The real finding is not file size, it's the `done`/`todo` ratio.**
+    Parsed through `dashboard/plans_md.py`'s own parser: 137 items, of
+    which **78 `done` plus 3 `superseded`** - and those account for
+    **~85,000 of the ~107,000 tokens of item text, 79% of it.** The
+    numbered-item files have become mostly a record of completed work,
+    because this project's convention is to append a full build write-up
+    to an item when it lands rather than collapse it to a line. Current
+    live work - 37 `todo`, 12 `parked`, 7 `investigate` - is under a
+    quarter of the volume.
+
+    **And that is exactly what makes this hard rather than obvious.**
+    Those completed write-ups are not dead weight: they exist precisely
+    so a session doesn't re-derive a settled decision, which is
+    `CLAUDE.md`'s own stated reason for the read-everything rule
+    ("don't re-derive a decision that's already recorded there, and
+    don't re-propose something already logged"). Cutting them to save
+    tokens would cause the exact failure the instruction was written to
+    prevent. This item is NOT "the plans files are too big, trim them".
+
+    Real options to weigh tomorrow, none decided:
+
+    - **Split `qa-pipeline.md`.** 5,180 lines, nominally scoped to one
+      dataset's pipeline while plainly carrying everything. Direct
+      precedent twice: `wider.md` split 2026-09-18, `tooling.md` split
+      out of it 2026-09-19. Reduces the per-question cost without
+      losing anything - but doesn't reduce the session-start total at
+      all if the instruction still says read all of them.
+    - **Change the instruction, not the files.** Read the live items in
+      full; read `done`/`superseded` as an index (id, title, one line)
+      and drill in on demand. This is the only option that actually
+      moves the ~159k number, and it's the one with real risk attached -
+      it trades a guaranteed cost for a probabilistic one, where the
+      failure mode is a session confidently re-proposing something
+      settled months ago.
+    - **Generate the digest rather than hand-maintain it.**
+      `dashboard/plans_md.py` already parses every item into structured
+      fields (status, components, file, number, text) for the Plans tab.
+      A generated per-file index is close to free and can't drift from
+      the source the way a hand-written summary would.
+    - **Do nothing deliberately.** ~159k is affordable in a large
+      context window, and the instruction demonstrably works - this
+      session alone caught two stale items (`plans/qa-pipeline.md` #74's
+      partly-fixed threshold bug, item 25's half-built premise) because
+      the context was actually there. Worth stating as a real option
+      rather than assuming the cost must be paid down.
+
+    Measure before and after, same standing lesson as #15 and the
+    `pytest --durations` work: a real token count on one identical task
+    is the way to tell whether a change helped.
+
+    **BUILT 2026-09-20 - the generated-digest option, and three real
+    proof runs against it.** `plans/INDEX.md`, built by `dashboard/
+    plans_index.py` from the same parser the Plans tab already uses, one
+    entry per numbered item and per Thread/Phase, CI-gated by `mothman
+    dashboard plans-index --check` so the committed copy cannot drift
+    from its source. Nothing is deleted - Keith's own condition when
+    this was scoped - every entry still exists in full in its own file.
+    Grew over the day as each proof found a real limit: sub-entries for
+    the two essay files (a Thread was one line for 400 lines of prose),
+    sub-entry headers that carry the text they introduce rather than
+    truncating at the colon, and - Keith's own suggestion - a `touches:`
+    line per entry naming the source files that entry's own text refers
+    to. Final shape: 358 lines, ~6,945 tokens, 92 `touches:` lines,
+    against the ~159,000 the read-everything instruction costs.
+
+    **The third proof was the decisive one**, and it is worth recording
+    honestly because it did not simply confirm the thing was working.
+    Method: a pristine git worktree at the pre-scoping commit, a
+    `delivery-scoper` run on item 25 with only the index as its entry
+    point, scored on three questions set before it ran. Its own account,
+    in full, plus the tool trace it left:
+
+    - **The index did what it was built for.** The agent never opened a
+      `plans/*.md` file in full. Its entire plans reading was two slices
+      of `qa-pipeline.md` (items 25 and 43) and ~40 lines of
+      `publishing-and-history.md`. It ruled out four whole files -
+      `data-generation.md`, `conceptual-design.md`, `wider.md`,
+      `tooling.md` - from their index lines alone, correctly. That is
+      most of a 159k read avoided for two wrong turns.
+    - **But neither of the two findings that actually mattered came from
+      the index.** The decisive one - that item 25's feature was already
+      ~70% built - came from opening item 43 on a judgement call, off a
+      summary line that never mentions descriptions. The index pointed
+      at a door without saying what was behind it. The second - Phase
+      5c's real build of the "What this check does" panel - did not come
+      from the index at all: the agent found it by grepping the
+      template, then grepped `publishing-and-history.md` for the string
+      it had found. At step 172 of 183.
+    - **`touches:` was useful, useless and misleading, all three.**
+      Genuinely useful on `dashboard.md` #8 and Thread D, where it gave
+      an accurate multi-file map the agent reasoned from without opening
+      anything. Useless but harmless on `done` items already ruled out.
+      And **misleading by omission in the one place it mattered most**:
+      item 25's `touches:` names `dbt_project/models/staging/schema.yml`
+      and `pipeline/dashboard_check_labels.py`, both honest readings of
+      that item's own text, neither anywhere near where the mechanism
+      actually lives. The agent read `dashboard_check_labels.py` in full
+      and found it was about card titles and status ranking. The
+      field's contract is "files this entry's text refers to", which is
+      exactly why a stale entry yields stale pointers - `touches:`
+      inherits the staleness of the prose it is derived from, while
+      looking like ground truth.
+
+    **The conclusion, stated plainly: an index over stale text is a
+    faithful index of stale text.** Every current-state fact in that
+    run's report - the real description counts, `cli/bdm.py:241`'s raw
+    `check_id`, `COLUMN_META`'s third hardcoded copy, `description`
+    being unvalidated while `check_id`/`category` are hard errors - came
+    from reading the code, not the plans. The index makes the plans
+    cheap to navigate. It does not make them true, and this run's most
+    valuable output was catching that they weren't.
+
+    Two concrete follow-ups the run named, both still open: the
+    `Build order` entry in `publishing-and-history.md` is one `done`
+    line with ~44 sub-entries and a `touches:` list ending "+34 more" -
+    in practice a "read the whole file" pointer, and Phase 5c is not
+    named anywhere in it. And several sub-entries truncate one clause
+    short of the decision they record - Thread D's field list stops
+    immediately before `description`, `dashboard.md` #8's stops at
+    "category axis: a real per-check". The truncation is not random; the
+    interesting part of a line of this project's prose tends to be near
+    its end.
+
+    **Truncation FIXED 2026-09-20 (Keith's own call - do this one, park
+    the other two).** Measured first rather than guessed, and the
+    measurement changed the fix: **72% of entry summaries and 98% of
+    sub-entries are longer than the 120-character cap**, so where the
+    cut lands is the normal case, not an edge case. Raising the cap was
+    the obvious move and the wrong one - 120 -> 250 would have doubled
+    the index (~7,000 -> ~12,600 tokens) and spent almost all of it on
+    ordinary prose that was never the problem. The two real failures
+    were both structural, and both cheap to fix directly:
+
+    - **A cut that lands inside an open bracket.** This project's prose
+      habitually puts the decision inside a parenthetical - `dashboard.md`
+      #8's entire outcome (the category axis AND the UI surface) is
+      inside one. An unclosed bracket is the one truncation that is
+      actively misleading rather than merely short: it promises a
+      qualification and then withholds it. Now the parenthetical is
+      either carried whole or dropped entirely.
+    - **A colon-ended header followed by a list.** Carrying the
+      following prose verbatim spends the whole budget naming the FIRST
+      member and none of the others - which is exactly how Thread D's
+      field list stopped before `description`. Now the item TERMS are
+      listed instead: "check_id, introduced_date, retired_as_of +
+      retired_reason, description, changelog". It answers the question
+      and is *shorter* than the truncation it replaces.
+
+    Only 21 sub-entries are term lists and only 27 summaries would stop
+    inside a bracket, so letting each run to its natural end cost ~8%
+    (45,297 -> 49,068 bytes), not the ~80% a bigger cap would have.
+
+    Two real bugs found in that fix, both caught by a test written to
+    fail first: a per-term cap that sliced mid-word ("a real visual
+    gap/sp"), and a clause splitter that broke at any `.`, renaming
+    `CLAUDE.md` to `CLAUDE` and `qa_results_writer.py` to
+    `qa_results_writer` - a term list of filenames whose filenames had
+    silently lost their extensions.
+
+18. **[done, 2026-09-20]** **[Docs & process]**
+    **BUILT 2026-09-20** - parked earlier the same day, then unparked
+    once the verification-methods question below settled what it was
+    actually for.
+
+    Point a requirement at the code that implements it, not just at the
+    tests that verify it. `requirements.yaml` has `linked_tests`, which
+    CI resolves against a real AST parse - `tests/test_x.py::TestY::test_z`
+    fails the build if that method does not exist. There is no
+    equivalent for implementation. The full field set today is `id`,
+    `title`, `story`, `moscow`, `status`, `acceptance_criteria`,
+    `linked_tests`, `source`, `date_written`,
+    `non_functional_requirements`, `open_questions`, `dependencies`,
+    `evidence` - and `evidence`, the only free-text candidate, is used
+    by **zero of the 27** requirements.
+
+    **Why this came up, and why it probably matters more than the
+    alternative it displaced.** The third index proof (#17 above) found
+    that `touches:` pointed at the wrong files for item 25 - honestly
+    derived from that item's own prose, but the prose was stale, so the
+    pointers inherited the staleness while looking like ground truth.
+    The obvious response was a manual backfill of `touches:` across
+    ~150 plans entries. Keith's own reaction, and it reframes the
+    problem: *"now that I say it, going forward we're going to have
+    requirements for everything and the requirements point to the files
+    involved, right? Because that's a better source than the plan
+    files, which are going to be high level, kind of almost like
+    ephemeral artifacts."*
+
+    That is the right split. A plans entry is a narrative written at a
+    moment in time and never revisited; a requirement is checked against
+    reality by CI. `linked_tests` already proves the mechanism works. A
+    hand-backfilled `touches:` would be a second, unverified copy of
+    something a requirement could hold authoritatively - so the backfill
+    is parked with this, not scheduled alongside it.
+
+    **Decided in advance (Keith, 2026-09-20), so the build does not have
+    to re-ask:** the field is **required once `status` is `built`** -
+    the same rule `linked_tests` already carries. That is the stronger
+    of the two options considered and it has a real, known cost: all
+    22 already-built requirements need backfilling before CI can go
+    green, so this cannot land incrementally.
+
+    **Named `implemented_by`, not `implements` (Keith, 2026-09-20).**
+    It shipped as `implements:` and he caught the direction the same
+    hour: "REQ-QAC-006 implements `check_lifecycle.py::CheckMetadata`"
+    is backwards - the code implements the requirement, not the
+    reverse, exactly as "class X implements interface Y" puts the
+    implementer in the subject position. The rename also fixed an
+    inconsistency shipped alongside it: the panel label already read
+    "Implemented in:" while the field said the opposite. It now reads
+    "Implemented by:" directly above `linked_tests`' existing "Verified
+    by:", so the two render as a matched pair - where it lives, what
+    proves it works. Renamed 30 minutes after landing, across 14
+    entries, the validator, the JS test (and its filename), the
+    template label, the parser default and the header docs; both
+    break-it proofs re-run afterwards.
+
+    **Symbols, decided 2026-09-20** (Keith: "let's definitely go
+    symbols... CI validates the files and the symbols with an AST pass").
+    The rule, and the asymmetry in it, is the whole point:
+
+    - A `.py` entry **must** name a symbol (`file.py::function` or
+      `file.py::Class::method`) and is AST-verified. A bare Python path
+      is rejected outright. `Path.exists()` stays green while a module
+      is gutted, stubbed, or renamed-and-recreated - which is precisely
+      how `touches:` rotted while continuing to look authoritative.
+    - A front-end path (`.html`/`.js`/`.ts`) may be bare, since there is
+      no JS parser on the Python side and this project's own validator
+      docstring rules out a regex for exactly this job ("never a regex/
+      string match, which could be fooled by a comment or a docstring
+      mentioning the same name"). Keith's framing: "for the HTML we'll
+      probably end up with a separate TypeScript or JavaScript file, and
+      maybe we can take it up later."
+    - A `::` on a front-end file IS allowed and IS verified - just in
+      the Node toolchain, by the new `tests-js/implemented-by.test.js`. It
+      reuses `tests-js/support/loadDashboard.js`, which already loads
+      the real committed template into a real jsdom window with
+      `runScripts: "dangerously"`, so every top-level `function foo(){}`
+      genuinely becomes `window.foo`. That is **stronger** than the AST
+      check it stands in for, not weaker: it is real execution, so a
+      name appearing only in a comment cannot pass.
+    - A `::` on anything else (`.yaml`, `.sql`) is rejected. Nothing
+      verifies it, and an unchecked claim inside a checked field is
+      worse than a plain path.
+
+    Both halves were proven by breaking them on purpose rather than
+    assumed: renaming a real Python symbol produced
+    `REQ-QAC-006: implemented_by entry '...::parse_contract_check_metadataX'
+    names no real function/class/method in that file`, and typo-ing a
+    template symbol failed `npm test` naming `REQ-DASH-012` and the
+    exact entry.
+
+    All **14** `built` requirements backfilled in the same change, since
+    "required once built" cannot land incrementally. The panel renders
+    "Implemented by:" directly above "Verified by:" - verified in a real
+    browser, 14 rendered blocks, zero console errors - because they are
+    two halves of one question and reading them apart is what let the
+    register answer only the second for a year.
+
+    **The four verification methods, and what this means for
+    `evidence`.** Recognised practice has four: analysis, inspection,
+    testing, demonstration. Keith's own read, 2026-09-20, and it holds
+    up better than the framing it corrected:
+
+    - **Testing** - `linked_tests`, already.
+    - **Demonstration** - also `linked_tests`. `tests/
+      test_dashboard_e2e.py` drives a real browser through the real
+      flow. Once a demonstration is automated and committed it stops
+      being a separate method and becomes a test; the distinction is
+      about who watches, not about what is verified.
+    - **Inspection** - this field, with one honest caveat: it gives the
+      *object* of inspection, not a record that one happened. That is
+      the better half to hold, though. A prose note saying "read lines
+      42-88 on 2026-09-20" is an unverifiable claim about the past that
+      decays silently; a CI-verified pointer stays true or breaks the
+      build.
+    - **Analysis** - the genuine remainder. Deriving that a requirement
+      holds by measurement rather than execution (the 72%/98%
+      truncation figures, the token-cost tables, REQ-QAC-023's
+      byte-identical `config_hash` proof) has no field. In practice it
+      already lands in `plans/*.md` and `CHANGELOG.md`, which is a
+      reasonable home.
+
+    So `evidence` is now largely redundant - three of the four methods
+    are covered by fields that CI enforces, and the fourth has a home
+    elsewhere. **Not retired here**, deliberately: removing a field is a
+    separate decision from adding one, and it is Keith's to make. Logged
+    as #20 below.
+
+    **Provenance of `evidence`, traced 2026-09-20 at Keith's ask**,
+    because the lesson shaped this field's design. It arrived in
+    `6cc10f1` (2026-09-19) as one of five optional fields, spec'd
+    clearly in `requirements.yaml`'s own header: "populated by the
+    requirements-reviewer agent, not the scoper... a real paper trail
+    distinct from just which tests pass." It has **zero uses**, and not
+    through neglect.
+
+    **First diagnosis, and it was wrong.** This entry originally said
+    the field had been assigned to `delivery-critic`, which is
+    read-only, so nothing could write it. Keith corrected that the same
+    day: the main session does all the writing regardless, so write
+    permission was never the constraint. He is right, and the real
+    numbers make it plain. Of the five fields added in that one commit,
+    counted across the five requirements written since:
+
+    | field | used |
+    |---|---|
+    | `source` | 5/5 |
+    | `non_functional_requirements` | 5/5 |
+    | `dependencies` | 4/5 |
+    | `open_questions` | 2/5 |
+    | `evidence` | **0/5** |
+
+    Same author, same file, same commit, same session. Permission
+    explains none of that spread.
+
+    **What does explain it is the handoff FORMAT.** The four populated
+    fields are all ones `delivery-scoper` produces, and its output
+    contract is a YAML block that gets pasted straight in. `evidence` is
+    the only one assigned to a stage - the critic - whose output
+    contract is a **prose report**. It never arrives in a shape that
+    lands in the file, so it does not land. `open_questions` at 2/5
+    rather than 5/5 is honest absence (not every requirement has one);
+    `evidence` at 0/5 is not, because all five of those requirements
+    genuinely WERE verified against real code. The evidence existed and
+    had nowhere to go.
+
+    A grep of every `.claude/agents/*.md` and `docs/*.md` still finds
+    not one mention of the field, which is the same point from the other
+    side: no stage is told to emit it in a form anything can use.
+
+    The actionable version, then, is narrow and cheap: give the critic's
+    output contract a YAML fragment alongside its report, the way the
+    scoper's already has one. Whether that is worth doing at all is #20.
+
+    Neither cited source prescribes it. EARS is purely a phrasing
+    template set and has no opinion on attributes at all. The
+    `zhsama/claude-sub-agent` precedent (README fetched and read, not
+    assumed) has no `evidence` concept: its `spec-validator` outputs
+    "Validation report, quality score" - a *separate artifact*, never an
+    amendment to `requirements.md`. The field is this project's own
+    invention.
+
+    **That is why `implemented_by` is required rather than optional.** A
+    field with no forcing function stays empty however well its schema
+    is written - `evidence` proves it, with a better spec than most.
+    Keith's "required once built" call supplies the forcing function,
+    because CI refusing to go green is one.
+
+20. **[done, 2026-09-20]** **[Docs & process]**
+    Decide whether `requirements.yaml`'s `evidence` field survives -
+    **DECIDED: keep it, narrowed to analysis.**
+
+    Raised by #18's own build, not a fresh idea: with `implemented_by`
+    landed, three of the four recognised verification methods are
+    covered by CI-enforced fields (`linked_tests` for testing and
+    demonstration, `implemented_by` for inspection) and the fourth
+    (analysis) already lands in `plans/*.md`/`CHANGELOG.md`. `evidence`
+    has zero uses across 27 requirements - and, per #18's own corrected
+    diagnosis, that is a handoff-format problem rather than a
+    permissions one: it is the only optional field assigned to a stage
+    whose output is prose rather than a pasteable YAML block.
+
+    Three real options, none picked:
+
+    - **Retire it.** A field nothing fills is noise in a schema whose
+      whole value is that its fields are real, and it quietly teaches
+      whoever reads the schema next that optional fields here are
+      decorative.
+    - **Give it a write path.** Concretely: add a YAML fragment to
+      `delivery-critic`'s output contract, the way `delivery-scoper`
+      already has one. Cheap, and it would work - the four fields the
+      scoper emits are at 4/5 or 5/5. The question is whether the
+      content is worth having once `implemented_by` and `linked_tests`
+      cover inspection, testing and demonstration between them.
+    - **Narrow it to analysis specifically** - the one method genuinely
+      uncovered (a measurement or derivation that proves a requirement
+      holds without executing it). That would give it a reason to exist
+      that it currently lacks, and a much clearer authoring rule than
+      "what was checked and how", which today overlaps three fields.
+
+    **Decided 2026-09-20 (Keith): narrow it to analysis. No digit
+    check.**
+
+    What changed the answer was not the options themselves - it was
+    Keith saying, in the same conversation, that he intends to make the
+    plans files ephemeral, tie everything to requirements, and rewrite
+    `CHANGELOG.md` short and human-first (`plans/running-thoughts.md`
+    #13). The strongest argument for retiring `evidence` had been that
+    its content already lives in `CLAUDE.md`, `plans/*.md` and
+    `CHANGELOG.md`, so the field would be a second copy that drifts.
+    **If those three stop being the durable record, that argument
+    collapses**: `requirements.yaml` becomes the permanent home, and a
+    measured verification result has nowhere else to live. "94.76%
+    against a 92% floor" is exactly what a human-first changelog should
+    not carry and an ephemeral plans file cannot.
+
+    The authoring rule, now in `requirements.yaml`'s own header: each
+    entry says WHAT was measured, THE NUMBER, WHAT IT WAS MEASURED
+    AGAINST, and WHEN. No figure means it does not belong - a
+    walkthrough is `linked_tests`, a file-and-line reference is
+    `implemented_by`. That is what rules out the three shapes the old
+    "what was actually checked and how" wording invited, each of which
+    overlapped a field that already existed.
+
+    **Required once `built`, no exceptions** - Keith, 2026-09-20, asked
+    directly. The content stays un-enforced (a digit check was offered
+    and declined); only its presence is gated, exactly as
+    `implemented_by` is, and for the same reason: the field went unused
+    on all 27 requirements for the day and a half it was optional and
+    nothing noticed.
+
+    He was asked whether a requirement with no obvious measurement
+    should get an explicit opt-out, since the awkward case looked
+    genuinely unanswerable: `REQ-DASH-012` is "Dark mode", whose only
+    acceptance criterion is that the choice survives a reload - a
+    boolean, verified by demonstration, which the narrowed rule says
+    belongs in `linked_tests`. He said no exceptions, **and that was the
+    right call.** Demanding a real number produced one: all 21 colour
+    tokens are redefined under the dark theme, zero falling through to
+    their light value, measured by resolving `getComputedStyle` on the
+    real built page in both themes and diffing. That says the theme is
+    COMPLETE rather than partial - a stronger claim than the
+    toggle-persists test sitting beside it, and one nothing in the
+    register previously made.
+
+    **It also turned up a real defect**, which is the better argument
+    for the mandate than anything reasoned in advance. Reaching for a
+    dark-mode measurement first led to contrast ratios, and `--ink-faint`
+    fails WCAG AA in both themes - 3.03:1 in light, 4.16:1 in dark,
+    against 4.5:1, across 47 usages. Out of `REQ-DASH-012`'s own scope,
+    so logged separately as `plans/dashboard.md` #18, but it had sat
+    unnoticed and the existing test could never have found it. **A
+    requirement forced to produce a number produces one, and sometimes
+    the number is bad.** That is the whole value.
+
+    **Backfilled the same day** - 0 uses to **all 14 built
+    requirements**, since the mandate cannot land incrementally. Five
+    came from measurements already recorded elsewhere; the rest were
+    measured fresh and dated today (committed run counts, parsed check
+    counts, the two contracts' genuinely different cadences, resolved
+    changelog events, snapshot count, dark-theme token coverage). Each
+    was checked against its source before being written, not recalled;
+    none was invented to make the gate go green. The first five, for
+    the record, rather than
+    re-specifying an empty field and calling it done. Each was checked
+    against its source before being written, not recalled:
+    REQ-TEST-011 (94.76% against the 92% floor), REQ-DASH-003 (30,561
+    live statuses compared against each tool's own verdict, zero
+    disagreements), REQ-PIPE-004 (two separate byte-identical diffs -
+    the history-only rebuild against a live run, and two generation
+    runs against each other, which is what makes it determinism rather
+    than one lucky match), REQ-QAC-008 (byte-identical counts for both
+    datasets).
+
+19. **[superseded, 2026-09-20]** **[Docs & process]**
+    **NOT DOING THIS - Keith, 2026-09-20.** Superseded rather than
+    parked, and by something larger: the plan is to write real
+    requirements for everything, then delete every `done` item from
+    `tooling.md` and the other plans files, and rewrite `CHANGELOG.md`
+    from the ground up as a short, human-first document (see
+    `plans/running-thoughts.md` #13). `Build order` is ~1,700 lines of
+    `done` write-ups. Splitting it into seven index entries is careful
+    work on text that is scheduled for deletion.
+
+    Kept as a record of the finding, because the finding itself is real
+    and outlives the fix that was proposed for it.
+
+    `plans/publishing-and-history.md`'s `## Build order` section is one
+    heading over **1,711 lines** - 53% of that whole file - containing
+    Phases 1 through 7, each with its own full build write-up. The index
+    parser keys threads on `##`, so all of it collapses to a single
+    entry: one `done` line, ~44 sub-entries, and a `touches:` list
+    ending "+34 more". In practice that is a "read the whole file"
+    pointer.
+
+    It is not really an index bug. That section is structurally seven
+    sections wearing one heading, and Phase 5c - the sub-heading a real
+    proof run needed and never found - sits three levels inside it. The
+    phases are consistently marked (`**Phase N (...)** - [DONE, date]:`),
+    so promoting them to real entries is tractable; whether to do that
+    in the parser or by splitting the source file is the open question.
+
+
+21. **[todo, 2026-09-20]** **[Testing & dev tooling]** Two real friction points hit while building `mothman check`.
+
+**Status:** todo · **Category:** Testing & dev tooling
+
+Both found live on 2026-09-20, neither serious enough to block
+anything, both certain to waste someone's time again.
+
+**`mothman check` runs the e2e tests without the browser path this
+sandbox needs.** The command runs a bare `uv run pytest`, so in a fresh
+remote container `tests/test_dashboard_e2e.py` reports 19 errors and
+the summary shows a red `pytest` gate - with nothing wrong with the
+code. `PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium` fixes it, as
+CLAUDE.md's own environment-setup bullet already says. The command
+makes this MORE visible than before, because it now reports a single
+red gate rather than a test-by-test failure list someone would read
+properly. Options: have the command detect the sandbox build and set
+it, have it notice the specific error and say what to do, or leave it
+to #11's SessionStart hook - which is the real fix and would cover all
+three setup steps at once.
+
+**`npm test -- <pattern>` crashes rather than filtering.** Passing a
+pattern through npm gives `Error: EISDIR: illegal operation on a
+directory, read` from vitest's own stack-trace parser - an error that
+looks like a broken test file and is not. `npx vitest run <path>` works
+correctly. Worth either documenting or wrapping, since the natural
+thing to type is the one that breaks.
+
+
+22. **[investigate, 2026-09-25]** **[Testing & dev tooling]** What the test suite actually touches in the real trees, measured - and what a structural guarantee would cost.
+
+**Status:** investigate · **Category:** Testing & dev tooling
+
+Keith's ask, 2026-09-25, in his own words: "I don't want tests or
+anything of that shape touching real outputs, real data, or the real
+database." This is the measurement that question deserved, plus the
+options for making it structurally true rather than true today. Audit
+only - he chose that over building the guard now, so nothing here is
+scoped work yet.
+
+**What prompted it.** `REQ-PIPE-060` found the processing log one day
+old and already carrying 109 test-run records out of 259 - table names
+that had only ever existed inside a temporary directory, committed
+permanently. The same hole was live and worse for the delivery log:
+six tests invoke `mothman pipeline run`, which prunes that log against
+what is on disk, and a freshly-cloned CI runner has no `data/` at all,
+so the correct answer to "which deliveries are present" is NONE and
+all sixty committed records would go. Both are fixed by a
+session-scoped autouse fixture in `tests/conftest.py`.
+
+**The measurement.** A content-hash inventory of 10,683 files across
+`data/`, `reports/`, `processing_log/`, `delivery_log/`,
+`observations/`, `qa_results/`, `dashboard/snapshots/` and
+`dbt_project/target/`, taken before and after a full `uv run pytest`
+(1565 tests, all passing, 171.79s), with the fix in place:
+
+```
+CREATED:  0
+DELETED:  0
+MODIFIED: 3
+   dashboard/qa-reporting-dashboard.html
+   reports/results_bdm.json
+   reports/results_cp.json
+```
+
+Git working tree clean afterwards. All three are gitignored build
+artifacts written by `tests/test_dashboard_e2e.py`'s build fixture, and
+they are why `--dist loadfile` is load-bearing rather than tuning -
+they are shared files parallel workers would otherwise race to rewrite
+(#10).
+
+**A correction worth keeping, because the reasoning was wrong rather
+than merely cautious.** Three further exposures were reported to Keith
+from READING the code - `data/raw/`, `data/cp_raw/` (CP's loader copies
+CSVs into `raw_dir`, which defaults to the real tree) and the real
+`data/supply.duckdb` (redirected by `MOTHMAN_SUPPLY_DB`, but only for
+the 9 test files that request the fixture, out of 16 that mention it).
+The measurement says no test actually takes any of those paths. They
+are reachable, not taken. Inferring risk from a default instead of
+measuring it is the same shape as every other incident CLAUDE.md
+records, just in the safe direction - and it is worth noting that the
+direction was safe only by luck.
+
+**The options, for whenever this is scoped.**
+
+1. **Leave it.** The committed trees are covered and the residue is
+   three ephemeral files. Cheapest, and it stays true only as long as
+   nobody adds a test that takes one of the reachable paths - which is
+   precisely what nothing would flag.
+2. **Extend the redirect list.** Point `MOTHMAN_SUPPLY_DB`, `RAW_DIR`,
+   `CP_RAW_DIR` and `reports/` at temporary directories for the whole
+   session, the same way the three committed trees now are. Small,
+   and it shares the current fix's real weakness: a fourth tree added
+   next month is not covered, because nobody updates the list. That is
+   the same failure mode that produced the original bug.
+3. **Deny by default.** A session fixture intercepting writes
+   (`open`, `Path.write_*`, `mkdir`, `unlink`, `duckdb.connect`) that
+   RAISES when the resolved path is under one of this repo's real
+   output paths, with a named opt-in fixture for the handful of tests
+   that legitimately want the real tree - `real_committed_history`
+   already exists and does exactly that for reads. This is the only
+   option that covers a tree added later, because it denies everything
+   under the repo rather than enumerating what to protect.
+
+   Two things it would not cover, both worth knowing before anyone
+   scopes it as complete: SUBPROCESSES (dbt and Soda are separate
+   processes and inherit no monkeypatched builtin - they are pointed
+   at per-worker temp dirs today, which should be verified rather than
+   assumed), and any module that reads a path constant into a local at
+   import time.
+
+**Worth pairing with whoever does this**: the e2e build fixture's three
+files are the one real case where a test's legitimate job is to write
+somewhere shared. Option 3 would need it moved to a temporary output
+or given the opt-in, and that choice is the interesting part of the
+work rather than an implementation detail.
+
+**AND THE AUDIT WENT STALE IN TWO DAYS - option 1 failing exactly as
+it said it would, 2026-09-28.** The measurement above reported
+`CREATED: 0` and was true when taken. `REQ-PIPE-103` then landed hand
+filing on 2026-09-27, `mothman cp qa --commit` gained the ability to
+FILE a supply by design, and one CLI test invoked it without
+redirecting the delivery directories. From that day every single run
+of the suite wrote a real `handfiled-*` delivery into
+`data/deliveries/`. Twenty-six had accumulated when CI found it.
+
+This is worth reading against option 1's own sentence - "it stays true
+only as long as nobody adds a test that takes one of the reachable
+paths, which is precisely what nothing would flag". Nobody added such
+a test; a COMMAND an existing test already called grew the ability.
+The gap was not in the list of protected trees, it was that a
+measurement is a snapshot and the code kept moving.
+
+**What the damage actually was, because the clutter was the least of
+it.** Everything that recognises arrivals reads that tree, so those
+directories became RUNS - 44 Child Protection arrivals against a clean
+checkout's 18. They pushed a bootstrap from 151 staged tables to 275.
+And two of them were captured into
+`tests/fixtures/arrival_semantics_golden.json` as `cp_run_019` and
+`cp_run_020`: a characterization pin, committed, that then disagreed
+with every clean checkout and failed CI three ways inside a module
+about asset time. A test artefact had become part of the corpus this
+project measures itself against.
+
+**Option 3, applied narrowly rather than wholesale.**
+`tests/conftest.py`'s `_no_test_files_a_real_delivery` wraps
+`delivery.write_delivery` and RAISES when the target resolves to the
+real tree. It is the deny-by-default shape, scoped to one function
+rather than to `open`/`mkdir`/`unlink` - which is a smaller claim than
+option 3 makes and covers the one hole that actually opened. Note it
+REFUSES rather than redirecting, unlike the fixture beside it: every
+write here comes from a test that asked for `--commit`, so it knows it
+is filing something and can say where, and a silent redirect would
+leave it passing while asserting about a directory it never named.
+
+**AND THE DATABASE KEEPS A RUN AFTER ITS DELIVERY IS GONE - a second
+copy of the same pollution, one layer down.** Deleting the twenty-six
+directories did not remove the two runs they had produced, and
+`mothman pipeline bootstrap --force` did not either: a bootstrap
+re-runs the arrivals it FINDS, and nothing deletes a recorded run whose
+delivery has since disappeared. `qa.run` still held `cp_run_019` and
+`cp_run_020` with 178 results each, the dashboard build read them, and
+the golden went on failing after the tree was clean - which reads as
+"the fix did not work" rather than as a second instance.
+
+Removed by hand this time. The check is one query - compare `SELECT
+run_key FROM qa.run` against what `arrivals.arrivals_for()` recognises
+- and there is no command for it: `mothman supply tidy` clears orphaned
+SCHEMAS, not orphaned runs. Worth one, and worth thinking about first,
+because "the delivery is gone" and "this run should be forgotten" are
+not obviously the same statement: a real deployment may well delete an
+old delivery directory while wanting to keep years of QA history about
+it. That is the design question, and it is why this is a note rather
+than a fix.
+
+**The remaining options are unchanged and still worth doing.** This
+covers deliveries and nothing else, and the next capability to grow
+this way will not be a delivery.
+
+**THE INVERSE QUESTION, audited 2026-09-26 and CLEAN.** Everything
+above measures what the suite WRITES to real trees. The other half is
+what it ASSUMES ALREADY EXISTS, which is a different failure mode
+entirely: it passes locally and fails on a freshly-cloned runner, and
+`CLAUDE.md` records two real incidents of it - a test asserting a
+gitignored path exists, and one asserting on `HEAD~2` where
+`actions/checkout@v4`'s default depth is 1. Both were fixed at the
+source; this checks whether the pattern spread. It has not:
+
+- **No test asserts a gitignored path EXISTS.** Six candidates matched
+  the grep and all six are sound: three assert a CONFIG STRING
+  (`config["local_source"] == "data/raw"`), and three assert the
+  NEGATIVE - `assert not [p for p in opened if "/data/" in p ...]` in
+  `test_runway.py`, `test_slots.py` and `test_validate_schedule.py`,
+  which is the never-touch-data rule being PROVEN rather than a
+  dependency on the tree.
+- **No test depends on git history beyond depth 1.** Every git-using
+  module (`test_changelog.py`, `test_git_identity.py`,
+  `test_github_links.py`, `test_pre_commit_hooks.py`,
+  `test_validate_check_lifecycle.py`, `test_validate_schedule.py`)
+  builds its own repository in `tmp_path` via `_init_repo` and
+  monkeypatches `ROOT`, so a `HEAD~1` reference resolves to a commit
+  the test itself made.
+- **`conftest.py` is already explicitly careful** - its own comments
+  name the fresh-clone case ("on this machine `data/deliveries/` exists
+  so nothing is pruned; on a freshly-cloned CI runner there is no
+  `data/`").
+- **One real-tree read of a gitignored path exists and is handled**:
+  `test_asset_time_semantics.py` reads `reports/` from the repo root
+  and `pytest.skip`s with an actionable message when absent. And it no
+  longer silently skips in CI either - `test.yml` now runs
+  `mothman dashboard rebuild-results` and `build-data` before pytest
+  (added 2026-09-26, `plans/post-build-review.md` #62).
+- `test_scenario_map.py` matched the grep by asserting on SOURCE TEXT
+  (`'ROOT / "data" / ...' in source`) rather than reading the path.
+
+**So there is nothing to fix on this half**, which is itself the useful
+result: both documented incidents were fixed at the source and neither
+pattern recurred. Re-run the two greps rather than the reasoning if it
+needs checking again - assertions naming `data/`/`reports/`, and any
+reference to `HEAD~`, `rev-parse` or `--depth` outside a `tmp_path`
+repository.
+
+
+23. **[investigate, 2026-09-25]** **[Testing & dev tooling]** Making a duplicate YAML key loud at READ time - researched, built, and reverted unbuilt.
+
+**Status:** investigate · **Category:** Testing & dev tooling
+
+Keith's ask, after this bug landed for the SECOND time in five days:
+"there's a way to have it just be very shouty when we do things like
+that." Then, having seen a first attempt: don't build it until I
+approve and until you've done more research, including online. That
+research is below, and it is why the entry exists - the attempt was
+reverted, and without this the reasoning would only be in a commit
+nobody knows to look for.
+
+**The bug.** PyYAML's `safe_load` accepts a repeated mapping key
+silently and keeps only the LAST one - `yaml.safe_load("a: 1\na: 2")`
+is `{'a': 2}`. It has cost this project twice:
+
+- 2026-09-20: `requirements.yaml`'s REQ-QAC-023 had two `decisions:`
+  blocks. Five real decisions were discarded with no error, including
+  a rejected design alternative deliberately moved there before the
+  prose describing it was deleted.
+- 2026-09-25: REQ-PIPE-053 gained a second `unmet_criteria:` block and
+  its original five entries vanished from every parsed view.
+
+**The second one is the instructive one.** A read-back check ran
+straight after the edit - the discipline CLAUDE.md asks for, precisely
+so an edit is confirmed rather than assumed - and printed a healthy
+"unmet: 1", because `safe_load` had already thrown the original away.
+The check was not skipped. It was performed, and it lied, because it
+was built on the same silent primitive as the bug.
+
+**What already covers it, and how well.** `.yamllint` enables
+`key-duplicates` for exactly this and it caught BOTH incidents - it is
+in pre-commit and in `mothman check`. What it cannot do is fail at the
+moment of the mistake; it fires at commit or at the next gate, after
+whatever has been built on the wrong value. In the 2026-09-25 case one
+duplicate key failed THREE gates at once and none of them was the
+thing that first read the file.
+
+**Upstream status, checked against the primary source rather than
+memory.** `yaml/pyyaml#165` has been open since May 2018. There is no
+flag: `safe_load(stream)` takes a stream and nothing else, so a loader
+subclass is the only in-library route. Duplicate keys violate the YAML
+spec, so this is non-conformance rather than fussiness.
+
+**THE FINDING THAT MATTERS, and the reason "just subclass it" is not
+the answer.** Three implementations, all run rather than reasoned
+about, against five cases:
+
+| approach | plain dup | merge `<<:` | merge WITH override |
+|---|---|---|---|
+| no `flatten_mapping` | raises | **crashes** | crashes |
+| `flatten_mapping` first | raises | passes | **false positive** |
+| skip the `<<` node, let SafeLoader flatten | raises | passes | passes |
+
+The first row is what was built and reverted - it raises
+`could not determine a constructor for the tag 'tag:yaml.org,2002:merge'`
+on any merge key. The second row is the fix suggested in the canonical
+gist's own comments, and it breaks the PRIMARY use of merge keys:
+`<<: *defaults` followed by overriding one field reads as a duplicate.
+The gist's comments flag both traps ("does not seem to work when the
+duplicate key comes from an anchor").
+
+Only the third row is correct: a merge is an INSTRUCTION, not a key,
+so the check skips that node and lets `SafeLoader` do its own
+flattening. Verified on plain duplicates, nested duplicates, merge
+without override, merge with override, and a two-anchor merge.
+
+**Why it was reverted anyway** (Keith, 2026-09-25, after seeing the
+above): the shipped version carried the row-one defect, latent rather
+than live - this repo has zero merge keys and zero anchors in its own
+YAML today, so nothing was broken - and `yamllint` already catches the
+real bug. Backing out and redoing it deliberately beat fixing forward
+on a repo-wide change made without the research.
+
+**If this is picked up again**, the pieces that were built and are
+worth rebuilding rather than rediscovering: a `SafeLoader` subclass
+raising an error naming the key and BOTH line numbers (the useful
+question is never "is there a duplicate" but "which one did I mean to
+keep"); 29 production call sites across 16 files; and a guard test
+that no production module calls `yaml.safe_load` directly. That guard
+should walk the FILESYSTEM rather than use `git grep` - git grep sees
+only tracked files, and a brand-new module is untracked exactly while
+it is being written, which is when the guard is most worth having.
+
+**Alternative not evaluated properly**: `ruamel.yaml` raises on
+duplicate keys by default and needs no custom loader, at the cost of a
+new dependency and a different API across those 29 sites. It is not
+installed here, so its merge-override behaviour is UNVERIFIED - worth
+testing before anyone treats it as the easy option.
+
+24. **[in-progress, 2026-09-27]** **[Testing & dev tooling]** The e2e module was 85% of the gate and a third of it was deliberate sleeping - two of the three ranked fixes are now applied, 250s -> 185s.
+
+    **Measured 2026-09-26** (Keith's own question: "anything we can
+    do to speed up the e2e tests? is running them via pytest the
+    best?"), and the whole point of the entry is that the numbers are
+    real rather than estimated - this session had been asserting "about
+    ten minutes" for the full gate all afternoon without ever timing it.
+
+    **The full `mothman check` is ~295s.** `tests/test_dashboard_e2e.py`
+    alone is 148 tests in **249.66s**, and `--dist loadfile` pins that
+    one file to a single worker, so it IS the critical path while three
+    cores idle. `npm test` is ~24s, the nine validators ~20s combined.
+    `mothman check --no-pytest` is ~42s.
+
+    **Where the 250s goes:**
+
+    - **≥63s of unconditional sleeping.** `_goto()` ends with
+      `page.wait_for_timeout(500)` and has 126 call sites - more
+      executions than that, since several are parametrised. A further
+      41 explicit `wait_for_timeout` calls add 15s.
+    - **~42s rebuilding the dashboard per test.**
+      `dashboard_html_with_ticket`,
+      `dashboard_html_with_amber_decisions` and
+      `dashboard_html_with_divergent_arrivals` are FUNCTION-scoped, so
+      each rebuilds a second HTML for every test that asks - the ~4.2s
+      setup appearing ten times in the profile.
+    - **15.86s in one test, and it is correct.** The masthead test
+      waits fifteen seconds to prove the clock does NOT tick
+      (`REQ-DASH-071`). Leave it.
+    - **9.45s** for the session build fixture, paid once.
+
+    **Three fixes, ranked by value against risk. None applied** -
+    Keith parked this 2026-09-26 to scope delivery sprint 11 first.
+
+    1. **Replace `_goto`'s fixed sleep with a real wait condition.**
+       Playwright's own docs: it "performs a range of actionability
+       checks on the elements before making actions… auto-waits for
+       all the relevant checks to pass", and web-first assertions
+       retry. A fixed sleep is simultaneously too slow locally and too
+       short on a loaded runner, which is also how time-dependent
+       flakes are born. Biggest win, lowest risk, and it makes the
+       suite more reliable rather than less.
+    2. **Widen those three fixtures to class scope.** ~42s -> ~13s.
+       Needs `tmp_path_factory` and a `pytest.MonkeyPatch.context()`,
+       since `tmp_path`/`monkeypatch` are function-scoped.
+    3. **Let the module parallelise.** Playwright's Pytest plugin
+       reference recommends xdist directly - "you can speed up the
+       overall execution time of your test suite by using
+       pytest-xdist… `pytest --numprocesses auto`". The blocker is not
+       the browser: each test already gets its own context and page.
+       It is our own session build fixture racing workers
+       (item #10 above). Biggest gain, ~150s -> ~50s on four cores,
+       and the highest risk - the fixture has to be made worker-safe
+       first.
+
+    1+2 together are ~250s -> ~160s, taking the whole gate from ~5min
+    to ~3.5. 3 could roughly halve it again.
+
+    **APPLIED 2026-09-27: fixes 1 and 2. Measured 249.66s -> 184.84s,
+    148 tests passing both before and after** - 26% off this module and
+    the estimate above was about right ABOUT THE MODULE.
+
+    **The SUITE gained less, and the gap is the interesting part:
+    325s -> 294s, so 31 of the 65 seconds showed up.** The rest was
+    never on the critical path. `--dist loadfile` pins this file to one
+    worker while everything else runs beside it, so the module only
+    costs the suite what it costs BEYOND the slowest of the others -
+    and now that it is 185s it is no longer clearly the longest pole.
+    Worth stating because the module figure is the flattering one and
+    the suite figure is the one anybody actually waits for.
+
+    Fix 1 needed one line in the TEMPLATE to be worth doing properly.
+    `render()` now bumps a `data-render-count` attribute, and `_goto()`
+    waits on it instead of sleeping. Without that there is no real
+    signal that a render finished, and every alternative is a different
+    guess. The fiddly part is that a goto to a new path RELOADS (the
+    counter resets, so wait for "rendered at all") while a goto changing
+    only the fragment does NOT (the counter persists, so wait for
+    "rendered AGAIN") - waiting for the wrong one either returns
+    instantly on a stale render or hangs. `window.__e2eMark` tells them
+    apart: set before navigating, it survives a hash change and not a
+    reload.
+
+    Fix 2 was mechanical once the scope changed - `tmp_path_factory` and
+    `pytest.MonkeyPatch.context()` in place of the function-scoped
+    `tmp_path`/`monkeypatch`, which a class-scoped fixture cannot
+    request. The profile after fix 1 showed exactly where it was going:
+    ten setups at ~6.5s each, which is three now.
+
+    **Fix 3 (let the module parallelise) is still open** and is still
+    the biggest remaining win, ~150s -> ~50s on four cores. The blocker
+    is unchanged: the session build fixture has to be made worker-safe
+    first (item #10). Worth knowing before picking it up: the profile
+    now has a 15.5s single test that is CORRECT (the masthead proving
+    it does not tick) and a 12.9s session build paid once - parallelism
+    helps neither, so the realistic ceiling is lower than the arithmetic
+    suggests.
+
+    **On the runner itself: keep pytest.** Playwright's Python docs
+    document the pytest plugin as the supported path and recommend
+    xdist for parallelism, so this project is already on the sanctioned
+    route. Switching to Playwright's JS runner would split the Python
+    suite in two and lose the fixtures that build real data from
+    committed history. The cost here is sleeps and worker pinning, both
+    fixable in place.
+
+    **Worth knowing for whoever picks this up:** `playwright.dev` was
+    blocked by this session's egress proxy and Keith allow-listed it
+    the same afternoon, so the primary source is reachable now. Note
+    `/python/docs/best-practices` 404s into the Node docs - the pages
+    that answered this were `/python/docs/test-runners` and
+    `/python/docs/actionability`. And `WebFetch` kept reporting
+    `EGRESS_BLOCKED` for it long after `curl` returned 200, exactly as
+    `CLAUDE.md`'s own standing lesson describes; the text above was
+    read with `curl`.
+
+26. **[done, 2026-09-27]** **[Testing & dev tooling]** The suite was FLAKY under the parallel default - different tests failed on each full run, and a green result was therefore weaker than it looked. **Root cause found and fixed: Soda Core reloads this repo's `.env` over the process environment, which silently repointed the warehouse.**
+
+    Found while profiling for item 24, and it matters more than the
+    thing I was looking for: **two consecutive full runs of the same
+    tree failed DIFFERENT tests.**
+
+    - Run A: 8 failed / 2037 passed - `test_tables_read`,
+      `test_cross_table_scope`, `test_cli_cp`, `test_cli_bdm`,
+      `test_run_dbt_bdm`, `test_orchestrate_single_run`,
+      `test_run_soda_cp`, `test_build_warehouses_rebuild`.
+    - Run B: 4 failed / 2041 passed - a DIFFERENT set, overlapping only
+      partly.
+
+    Run serially (`-n0`) the same modules pass. So this is contention,
+    not an ordering dependency and not a code fault in the modules
+    that fail.
+
+    **The symptom is `relation "stg_birth_registrations" does not
+    exist`** and its CP equivalents - a staged table or a dbt model
+    that was there a moment earlier. Two candidate causes, and they are
+    not exclusive:
+
+    1. **The shared filesystem.** `data/raw/`, the delivery tree and
+       `reports/` are real paths shared by every worker, and several
+       modules regenerate or restage from them. This is the same class
+       `plans/tooling.md` #10 already fixed twice (the embed tests
+       reading `reports/` mid-rewrite, the e2e build fixture running
+       per worker) - so the pattern has form here.
+    2. **dbt's one shared schema.** `dbt_common.run_dbt()` sets
+       `DBT_PG_SCHEMA = supply_db.DBT_SCHEMA` - a single `dbt` schema
+       per database. Under the retired engine each run got its own
+       scratch FILE, so models were per-run by construction;
+       `REQ-PIPE-087`'s note that the schema "is what the ATTACH
+       arrangement was imitating" is not quite true, because the ATTACH
+       gave each run its own. Any two dbt invocations against one
+       database now drop and recreate the same models. Per-worker
+       databases mean this cannot bite ACROSS workers, but it can
+       within one whenever anything fans out.
+
+    **NEITHER OF THOSE WAS IT, and recording that matters as much as
+    recording the answer.** Both candidates were real defects and both
+    are now fixed - dbt's schema is per-run, and the rebuild tests no
+    longer stage the real delivery tree - but neither explained the
+    flakiness. The suite kept failing, differently, after each.
+
+    **THE ACTUAL CAUSE: Soda Core rewrites the process environment
+    from `.env`.** Its `EnvHelper` is a singleton built during scan
+    CONSTRUCTION, and its constructor calls
+    `dotenv.load_dotenv(override=True)` - which walks up from its own
+    file in site-packages, finds this repo's `.env`, and writes every
+    name in it over what the process already had. `MOTHMAN_SUPPLY_DSN`
+    is one of those names.
+
+    So the first real Soda scan on an xdist worker moved that worker
+    off its own isolated database and onto the developer's real
+    `supply` one, for every test that followed it. Which tests failed
+    depended entirely on how `--dist loadfile` had distributed the
+    modules that run scans, which is why the set changed every run and
+    why every one of them passed in isolation. The symptom - "a staged
+    table that was there a moment earlier" - was accurate: the table
+    was there, in the database the test had stopped looking at.
+
+    **It left real evidence, which is how sure we can be**: fourteen
+    pytest-fixture staged tables and five `qa_adhoc_pytest_*` schemas
+    were found sitting in the real `supply` database, at arrival
+    instants (2026-01-01, 2026-04-01) that no real receipt in
+    `data/receipts/` has.
+
+    **Reproduced in five lines** before anything was changed, which is
+    what took this from a theory to a cause:
+
+    ```
+    MOTHMAN_SUPPLY_DSN=postgresql://.../mothman_test_master uv run python3 -c "
+    from qa_tools.common import supply_db; print(supply_db.supply_db_dsn())
+    from soda.scan import Scan; Scan().set_data_source_name('x')
+    print(supply_db.supply_db_dsn())"
+    # before: .../mothman_test_master
+    # after : .../supply
+    ```
+
+    **THE FIX IS IN PRODUCTION CODE, NOT IN A FIXTURE**, because this
+    is not a test-only bug: `MOTHMAN_SUPPLY_DSN=... mothman pipeline
+    run` is a legitimate thing for an operator to type, and the first
+    Soda scan of that run discarded it. A pipeline that quietly writes
+    to a different database than the one it was told to is the same
+    family as the CI rule about never reaching real data.
+    `qa_tools/common/soda_common.py` now builds the singleton once, on
+    our terms, and puts the environment back
+    (`_defuse_sodas_dotenv_reload()`), and `execute_scan()` restores it
+    again around every scan as a second line of defence.
+    `tests/test_soda_leaves_the_environment_alone.py` asserts the
+    OUTCOME rather than Soda's internals, so it still says whether the
+    invariant holds if a future release changes this.
+
+    **A confirming detail worth knowing, because it inverts the usual
+    rule.** CI was GREEN throughout - `.env` is gitignored, so on a
+    freshly-cloned runner Soda's reload finds no file and has nothing
+    to override, and `MOTHMAN_TEST_DSN` comes from the workflow. So
+    this is the mirror image of the trap CLAUDE.md already records
+    (a test that asserts a gitignored path exists passes locally and
+    fails in CI): here a gitignored file's ABSENCE made CI immune to a
+    real fault that only a developer's machine could show. A green CI
+    said nothing about it either way.
+
+    **The method lesson, which is the same one the lock hunt taught:**
+    two plausible causes were in hand, both were genuinely broken, and
+    fixing both changed nothing. What found it was instrumenting the
+    actual value at each test phase - a four-line pytest hook printing
+    `os.environ[MOTHMAN_SUPPLY_DSN]` at setup, call and teardown -
+    rather than reasoning about which shared resource looked riskiest.
+
+25. **[todo, 2026-09-26]** **[Testing & dev tooling]** `mothman` never deletes its own temp directories - 4,218 of them, 1.3GB, found while tidying `/tmp`.
+
+**Status:** todo · **Category:** Testing & dev tooling
+
+Found by accident rather than by looking: Keith asked for `/tmp` to be
+tidied, and the bulk of it turned out not to be hand-made scratch at all.
+`/tmp` held **4,218 `mothman-qa-*` and `mothman-s3-*`/`mothman-s3-ref-*`
+directories totalling 1.3GB**, accumulated across a week of real QA runs
+and test runs in this one container. That was 87% of everything under
+`/tmp`; clearing it took the tree from 2.3GB to 135MB and gave back 2GB
+of a disk allowance this environment enforces per session.
+
+**Where it comes from, located rather than guessed.** Five real calls,
+each `tempfile.mkdtemp()` with no matching removal:
+
+- `cli/common.py:194` - `new_tmp_results_dir()`, prefix `mothman-qa-`
+- `cli/cp.py:226` and `:227` - the S3 staging and reference-staging dirs
+- `cli/cp.py:301` and `cli/bdm.py:243` - the same pattern again
+
+`mkdtemp()` is documented as the caller's to clean up, unlike
+`TemporaryDirectory()`, and the only `shutil.rmtree` anywhere in `cli/`
+is `cli/pipeline.py:162`, which is about something else entirely. So
+nothing ever removes these - every real `mothman bdm qa`, `mothman cp qa`
+and `mothman pipeline run` leaves one or more behind permanently.
+
+**Why it is worth fixing rather than shrugging at.** Not the disk, which
+is cheap here and was never close to full. Two better reasons. This
+environment's writable disk is a fixed per-session allowance where
+`df` misleads, and "no space left on device" is a real failure mode that
+would present as an unrelated test failure - a leak that grows with every
+run is exactly how a session hits it without warning. And it is a leak in
+the tool this project tells everyone is the only programmatic access
+point, so an evaluator running the PoC on their own machine inherits it.
+
+**The shape of the fix, and one thing to decide.** Mechanically it is
+`TemporaryDirectory()` as a context manager, or a `try/finally` with
+`shutil.rmtree`. What needs deciding first is whether a FAILED run should
+keep its directory - a staging dir holding the file a load choked on is
+genuinely useful for debugging, which is presumably why nobody removed
+these in the first place. Options: always clean; clean on success and
+keep on failure, saying where it is; or always clean and add a
+`--keep-staging` flag. The middle one matches how the rest of this tool
+behaves.
+
+**This is a bug, so it gets a failing test first** (`CLAUDE.md`'s
+standing rule). A real test can assert the directory a run created is
+gone afterwards, which fails against today's code by construction.
+Worth covering all five call sites rather than the one that produced the
+most litter.
+
+27. **[todo, 2026-09-29]** **[Testing & dev tooling]** **CI takes
+    nineteen and a half minutes, and half of it is a bootstrap that
+    could be cached.** Keith's own ask this morning, to be picked up in
+    the next couple of days.
+
+    **Where the time goes, measured on run `36503758018` rather than
+    estimated** - and note the CI figure is not the local one, which is
+    6m42s for the same tree:
+
+    | Step | Time |
+    |---|---|
+    | setup (checkout, `uv sync`, `dbt deps`, playwright, yamllint) | 1m 04s |
+    | `mothman pipeline bootstrap` | **8m 55s** |
+    | dashboard build | 8s |
+    | `pytest`, 2890 tests, with coverage | **9m 18s** |
+    | **total** | **19m 31s** |
+
+    The `js-tests` job is 41s and runs in parallel, so it is never the
+    critical path. The bootstrap exists because `REQ-PIPE-089` made the
+    suite's source a database and a runner's starts empty; it takes nine
+    minutes rather than four because `REQ-PIPE-075` made arrivals run one
+    at a time, each filing to the oldest slot the one before it did not
+    promote.
+
+    **Five options, put to Keith 2026-09-29, roughly best-value first.**
+
+    1. **CACHE THE BOOTSTRAPPED DATABASE.** It is a pure function of
+       committed configuration plus a fixed seed, so `pg_dump` it and
+       key the cache on a hash of `contract/`, `generator/`,
+       `qa_tools/` and `dbt_project/`. Restore is seconds, and most
+       pushes - plans, requirements, the dashboard template, tests -
+       would not invalidate it. **The risk to settle FIRST, because it
+       is the whole difficulty**: recorded results carry real
+       timestamps, and this project has twice been bitten by tests that
+       depend on the asset clock (a daily dataset's current cycle going
+       correctly quiet the moment the Perth date rolls, and an e2e
+       assertion computing "today" off `date.today()`). A cache three
+       days old could fail a test for a reason that is not a
+       regression. Half a day of care, not a one-liner.
+    2. **SPLIT THE JOB SO THE BOOTSTRAP IS OFF THE CRITICAL PATH.** Nine
+       test modules read `reports/` - `test_dashboard_e2e.py` is 178
+       tests of them - and the other ~2,700 use per-worker databases and
+       need no bootstrap at all. Two jobs in parallel: a fast one that
+       starts immediately, a slow one that bootstraps and runs the nine.
+       Wall clock becomes `max(...)` rather than `sum(...)`, so roughly
+       19m -> 10m, with the common failure back in about three minutes.
+       Lower risk than 1 and independent of it; they compose.
+    3. **PARALLELISE INSIDE A RUN.** `CLAUDE.md` already flags this: a
+       run's four tools are independent reads evaluated one after
+       another. Arrivals must stay serial, the tools inside one need
+       not. The only option here that is not CI-specific - it helps a
+       local bootstrap and a real pipeline run too. Touches both
+       orchestrators.
+    4. **PATH FILTERS.** A commit touching only `plans/` or
+       `requirements.yaml` needs neither the bootstrap nor the browser
+       tests, and several of the overnight commits were exactly that.
+       Cheap - and precisely the "it only failed on CI" class this
+       project has been burned by, so the filter would have to be narrow
+       and fail OPEN.
+    5. **A BIGGER RUNNER.** One line, costs money. Arrivals being
+       serial, it helps `pytest` under xdist more than the bootstrap, so
+       perhaps two to three minutes off the second half only.
+
+    Unmeasured and probably minor: coverage runs over the whole suite.
+    Worth timing before assuming it is free.
+
+    **Recommendation given: 2 then 1.** 2 is safe and halves the wait; 1
+    is the larger win but the clock question wants answering first.
+    Keith: "go and fix CI."
+
+    ### Option 2 is BUILT (2026-09-29), and my estimate for it was wrong
+
+    **I told Keith the split would take CI from 19m30 to about 10
+    minutes. Measured, it takes it to about 17.** Recorded rather than
+    quietly corrected, because the reasoning error is the reusable part:
+    I assumed the two halves were comparable in cost, so that splitting
+    them would halve the wall clock. They are not. The 270 deployment
+    tests are the EXPENSIVE ones - 178 of them drive a real browser - and
+    they are also the half that carries the nine-minute bootstrap. So the
+    slow job gets both costs and the fast job gets neither.
+
+    Measured locally, each half with coverage on:
+
+    | Half | Tests | Time |
+    |---|---|---|
+    | `-m "not needs_deployment"` | 2,628 | 5m 06s (3m 32s without coverage) |
+    | `-m needs_deployment` | 270 | 5m 47s |
+
+    Projected in CI: the fast job is ~1m setup + ~5m = **~6m**, the slow
+    job ~1m + 8m55 bootstrap + ~6m = **~16m**, and the combine ~1m after
+    both. So ~17m against 19m30 - a real saving of about two and a half
+    minutes, and nothing like the one I promised.
+
+    **WHAT IT IS ACTUALLY WORTH, which is not the wall clock.** A red
+    fast half now reports in about six minutes rather than nineteen, and
+    that is where most failures are - 2,628 of 2,898 tests. And it
+    isolates the bootstrap into one job, which makes caching it a clean
+    single change rather than one tangled with everything else.
+
+    **COVERAGE IS NOT THE MINOR COST this entry guessed it was.** The
+    fast half runs 3m32 without it and 5m06 with - roughly 45% on that
+    half. Worth its own look, since the gate it feeds has exactly one
+    point of headroom (93% measured against a floor of 92).
+
+    **THREE JOBS, NOT TWO, and the third is the cost of splitting.** Each
+    half measures only the lines its own tests reach, so neither can meet
+    `fail_under` alone. `coverage` downloads both, combines and enforces.
+    Rehearsed locally end to end: combined TOTAL 93%, exit 0.
+
+    **THE SPLIT IS DERIVED RATHER THAN LISTED**, which matters more than
+    it looks. A path list in the workflow goes stale the moment somebody
+    adds a module, and going stale means a test running in the job that
+    cannot satisfy it - where it SKIPS rather than fails, which is the
+    silent-green this workflow has already been bitten by once.
+    `tests/conftest.py` marks anything requesting the
+    `deployment_history` fixture; five modules reading `reports/` carry
+    the mark themselves; and `tests/test_publish.py` asserts no module
+    reading those files is missing it.
+
+    **That guard earned its place immediately**: it found
+    `test_scenario_injection.py`, which my own hand enumeration had
+    missed because it spells the path `root / "reports" / name` rather
+    than as a literal my grep matched. It skips when the file is absent,
+    so under the split it would have gone quiet in the fast half.
+
+    **And the split surfaced a real pre-existing test defect**, the same
+    shape as one found the same morning: `test_inheritance.py` asserted
+    on the NEWEST decision-log entry for a dataset, which is routinely
+    the RULE's automatic inheritance rather than the person's. It passed
+    only because of which module happened to share its xdist worker, and
+    removing 270 tests from the run changed that. Fixed to select the
+    entry for the period under test.
+
+    ### Measured in CI, 2026-09-29 (run 36573107713) - all four jobs green
+
+    | Job | Wall clock |
+    |---|---|
+    | `test` (2,622 tests, no deployment) | **6m 40s** |
+    | `test-deployment` (bootstrap 8m32 + 277 tests 4m49) | **14m 34s** |
+    | `js-tests` | 43s |
+    | `coverage` (combine + `fail_under`) | 19s |
+    | **run total** | **15m 03s** |
+
+    So **19m31 -> 15m03**, and a red in the common case reports in about
+    seven minutes rather than nineteen. Better than the ~17m this entry
+    revised to, and still not the ~10m first claimed. The `coverage` job
+    genuinely ran and enforced, which was the piece most likely to be
+    wrong.
+
+    **STILL TO DO: option 1, the cache**, which is where the remaining
+    time actually is - it would take the slow job from ~16m to ~7m. The
+    clock risk is real and now has a cheap answer: key the cache on the
+    config hash AND the asset-clock date, so it is never more than a day
+    stale, which is the same staleness a same-day bootstrap has anyway.
+    The generator produces arrivals relative to when it runs, which is
+    why an unbounded cache would break the daily dataset's current
+    cycle.

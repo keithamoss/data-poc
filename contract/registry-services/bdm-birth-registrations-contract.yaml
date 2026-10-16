@@ -1,0 +1,859 @@
+# Open Data Contract Standard (ODCS) contract for the BDM birth-registrations feed.
+#
+# Illustrative / worked example, written to accompany the data-contract-engines
+# landscape report. Structured against the documented ODCS v3 schema
+# (bitol-io/open-data-contract-standard). NOT run through `datacontract-cli lint`
+# in this environment (pip install isn't reachable here - see the repo README's
+# network-constraints note) - lint it yourself once datacontract-cli is set up,
+# before treating this as final:
+#
+#   pip install datacontract-cli
+#   datacontract lint bdm-birth-registrations-contract.yaml
+#   datacontract test bdm-birth-registrations-contract.yaml
+#
+# Describes the CURRENT state (CSV dumped to S3). The planned move to Parquet,
+# and eventually pulling directly from source (Postgres/MySQL/SQL
+# Server/Snowflake-shaped systems), is exactly the kind of change this contract
+# is meant to make explicit and versioned rather than a silent, hopeful swap -
+# see "Planned changes" in customProperties below, and the worked-example
+# section of the report for how that transition would actually play out.
+
+# datacontract-cli 1.2.0 lints every contract against its own bundled
+# odcs-3.2.0.schema.json regardless of the apiVersion declared here (see
+# datacontract.lint.resolve's `resolve_data_contract` - the schema_location
+# is hardcoded to "odcs-3.2.0.schema.json" unless one is passed explicitly)
+# - found by tracing why a 3.0.2-shaped `team:` kept failing lint even
+# though it matched the real odcs-3.0.2.schema.json's own `team` definition
+# exactly. Declaring v3.2.0 here matches what is actually enforced.
+#
+# Every quality rule below carries a `customProperties:` block with
+# check-lifecycle metadata (check_id/introduced_date/changelog) -
+# plans/publishing-and-history.md Thread D, Phase 1.
+#
+# Writing the reader-facing prose (description/failure_indicates/
+# technical_note): docs/check-authoring-rules.md is the standing
+# authoring standard - read it before adding or editing any of the
+# three. The lifecycle gate only checks that failure_indicates is
+# present; nothing enforces the wording rules.
+
+apiVersion: v3.2.0
+kind: DataContract
+# `id`, `name` and `domain` are held to the hierarchy in
+# contract/data-asset.yaml (REQ-QAC-039, gated by
+# `mothman dashboard validate-hierarchy`): `id` names what this
+# contract describes, `domain` names the agency that owns it, and
+# `name` is that thing's display name. Corrected 2026-09-23 - all
+# three previously disagreed with the ids every check_id,
+# qa_results/ path and dashboard URL already used, and nothing read
+# them, so they had drifted unnoticed.
+id: birth-registrations
+status: draft
+version: 1.0.0
+
+name: Birth Registrations
+domain: registry-services
+# ODCS v3's `description` is an object (usage/purpose/limitations), not a
+# bare string - the original draft had a plain string here, which
+# `datacontract lint` rejects outright ("data.description must be object").
+# Found by actually linting this file for the first time, per this file's
+# own header comment asking for exactly that.
+description:
+  purpose: >
+    Daily extract of birth registrations from the Registry of Births, Deaths
+    and Marriages (BDM), supplied to the central multi-agency data asset for
+    identity and eligibility matching by consuming agencies.
+
+# v3.2.0's `team` is a single object with a `members:` list (v3.0.2's was
+# itself the list) - see the apiVersion comment above for why 3.2.0 is what
+# actually gets validated here. Each TeamMember also requires `username`
+# (found by lint) - these are placeholders, same as the real-contact TODOs
+# already in this file.
+team:
+  members:
+    - role: dataOwner
+      name: Registry of Births, Deaths and Marriages
+      username: bdm-data-owner@example.gov.au  # placeholder - update before use
+    - role: dataSteward
+      username: bdm-data-steward@example.gov.au  # placeholder - update before use
+      description: BDM data governance contact - update with a real name/email before use
+    - role: consumer
+      name: Central multi-agency data asset
+      username: multi-agency-data-asset@example.gov.au  # placeholder - update before use
+
+# ODCS v3's `support` is itself the array of channels - not wrapped in a
+# `channels:` key as originally written (data.support must be array, per
+# real lint).
+support:
+  - channel: email
+    tool: email
+    description: BDM data supply team - replace with a real contact before use
+
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/bdm/birth-registrations/
+    format: csv
+    delimiter: comma
+    description: >
+      Current delivery mechanism: a full or incremental CSV dump, dropped
+      into this bucket on a daily schedule. No direct source connection yet.
+
+# `nullValues` (a project convention on top of ODCS, not a real ODCS
+# property - like `classification` elsewhere in this file, ODCS's own
+# Pydantic models accept arbitrary extra keys via extra="allow", so this
+# doesn't break `datacontract lint`) - an optional per-property list of
+# EXTRA literal strings this feed's source system uses to mean null,
+# beyond a genuinely empty field. Read by qa_tools/common/csv_io.py,
+# which every real CSV read in this pipeline goes through: no property
+# here sets one today, so every column's null vocabulary is "a literal
+# empty field, nothing else" - pandas'/DuckDB's own default null-
+# sniffing (which independently guesses at things like "N/A"/"NULL"/
+# "NaN") is turned off entirely, everywhere, on purpose. See
+# plans/qa-pipeline.md #17 for the real bug this fixes at the root
+# (an injected "N/A" silently became an actual NULL on CSV round-trip).
+schema:
+  - name: birth_registrations
+    physicalType: table
+    description: One row per birth registration record, as extracted by BDM.
+    properties:
+      - name: registration_number
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: BDM's unique registration identifier. Primary key of the feed.
+        # `rule: nullCheck`/`regexPattern`/etc (below and throughout this
+        # file) were never real ODCS v3 vocabulary - the DataQuality model
+        # datacontract-cli actually validates against has no `rule` field
+        # (deprecated in favour of `metric`) and no `mustBeRegex` at all.
+        # The real metric names/shapes (nullValues, invalidValues with a
+        # `pattern`/`validValues` argument, duplicateValues, rowCount, and
+        # `type: sql` for anything else) were found by reading
+        # datacontract-cli's own check-building code after `datacontract
+        # lint`/`test` rejected the original invented names outright - see
+        # README.md's known-disagreements section for the full account.
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registration_number:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            description: >
+              This value must never be empty.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registration_number:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^BDM-[0-9]{9}$"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be in the expected format.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registration_number:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be unique.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: child_given_names
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        # Real ODCS property - identifies this as personal data, so any
+        # sample-capture mechanism that respects it (datacontract-cli's own
+        # include_failed_samples, and this project's own aggregate-invalid-
+        # values feature - see plans/qa-pipeline.md #15) drops this
+        # column's actual values rather than surfacing them, even in an
+        # aggregate/anonymised-seeming form. Vocabulary matches
+        # datacontract-cli's own _SENSITIVE_CLASSIFICATIONS set exactly -
+        # not a project-invented convention.
+        classification: pii
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_given_names:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 1
+            severity: error
+            description: >
+              This value must never be empty.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.child_given_names.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_given_names:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be in the expected format.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.child_given_names.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: child_family_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: true
+        classification: pii
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_family_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 1
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.child_family_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:child_family_name:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be in the expected format.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.child_family_name.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: date_of_birth
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:range_check_datacontract
+            type: sql
+            dimension: conformity
+            # mustBeBetween is numeric-only in the real ODCS model (no date
+            # strings) - a date-range rule needs a custom SQL check instead.
+            query: "SELECT COUNT(*) FROM {model} WHERE {field} < DATE '1900-01-01' OR {field} > CURRENT_DATE"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be a plausible real date, neither in the future nor absurdly old.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.range_check_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.date_of_birth"]
+              - property: name
+                value: Date of birth in a plausible range
+              - property: introduced_date
+                value: "2026-09-13"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:freshness_datacontract
+            type: sql
+            # "timeliness" (not "conformity"/"consistency" like this
+            # column's other 2 rules) - the real ODCS dimension enum's word
+            # for "is the data current enough to be useful", not used
+            # anywhere else in this contract yet.
+            dimension: timeliness
+            # Every existing check in this project counts VIOLATING rows
+            # (mustBe 0) - this rule is the opposite shape ("must have at
+            # least one recent row"), so the query itself flips it back to
+            # that same "0 = healthy" convention (1 if the inner COUNT is
+            # zero, else 0) rather than needing new comparator support
+            # (mustBeGreaterThan) in real_tools/run_datacontract_real.py or
+            # the dashboard's threshold handling - both only ever expect
+            # mustBe: 0 today.
+            query: >
+              SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
+              FROM {model}
+              WHERE {field} >= date_registered - INTERVAL 7 DAY
+            mustBe: 0
+            severity: error
+            description: >
+              Each supply must contain recent records rather than only old ones.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.date_of_birth.freshness_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
+              - property: name
+                value: Recent births present
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: '[{"date": "2026-09-17T00:00:00Z", "description": "Anchored to this run''s own date_registered instead of real wall-clock CURRENT_DATE, which is why this check was permanently red. Paired with a new inject_stale_delivery generator defect so the check has something genuine to catch.", "author": "Keith Moss", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:sex:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["M", "F", "X"]
+            mustBe: 0
+            severity: error
+            description: >
+              A single unrecognised value fails.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.sex.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+
+      - name: place_of_birth_suburb
+        logicalType: string
+        physicalType: varchar(100)
+        required: true
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_suburb:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 2
+            severity: warning
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_suburb.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: description
+                value: >
+                  A few empty values are tolerated; a sustained rise fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_suburb:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              # Was a character-set regex (same as child_given_names) until
+              # generator/names_au.py's SUBURBS pool was noticed to already
+              # be a real closed, enumerable list (51 real WA suburb names -
+              # public geography, no person-level data) - a genuine closed
+              # value set is a stronger, more realistic check than "looks
+              # like a name-shaped string" for a field whose real-world
+              # values genuinely ARE bounded. See plans/qa-pipeline.md #15's
+              # aggregate-invalid-values follow-up for why this conversion
+              # mattered beyond just being a better check on its own.
+              validValues: ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington", "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton", "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance", "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook", "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill", "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine", "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
+            mustBe: 0
+            severity: error
+            description: >
+              A single unrecognised value fails.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_suburb.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+
+      - name: place_of_birth_facility
+        logicalType: string
+        physicalType: varchar(200)
+        required: false
+        description: Nullable - not every birth occurs in a registered facility (e.g. home births).
+        quality:
+          # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
+          # triplication pass): both Soda (missing_percent) and dbt
+          # (not_null with warn_if/error_if) already implement a null-rate
+          # threshold on this column - the contract was the one place it
+          # was missing, despite being the source of truth. 35% mirrors
+          # Soda's own fail band (warn>15%/fail>35%) - the single severity
+          # here is error rather than two-tier since ODCS quality rules
+          # don't have a native warn/error split within one metric the way
+          # SodaCL does; the warning-equivalent behaviour still lives in
+          # Soda/dbt's own two-tier checks.
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_facility:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 35
+            severity: error
+            description: >
+              This value is often empty for good reason; the check only fails if that becomes much more common.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.place_of_birth_facility.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: date_registered
+        logicalType: date
+        physicalType: date
+        required: true
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_registered:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_registered:date_ordering_datacontract
+            type: sql
+            # a cross-field logical rule, not a format/pattern match -
+            # ODCS's "consistency" dimension (not "conformity") fits a
+            # relationship holding true across a record's own fields. No
+            # mustBeGreaterThanOrEqualTo-against-another-field shape exists
+            # in the real model (its mustBeGreaterOrEqualTo/etc compare
+            # against a fixed number, not another column) - a cross-field
+            # comparison needs a custom SQL check instead.
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} WHERE date_registered < date_of_birth"
+            mustBe: 0
+            severity: error
+            description: >
+              A registration must not be dated earlier than the birth it records.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.date_registered.date_ordering_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.date_of_birth", "birth_registrations.date_registered"]
+              - property: name
+                value: Registered on or after birth
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The record is corrupt, or two different registrations have been joined together into one.
+
+      - name: registering_parent_1_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: false
+        classification: pii
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_1_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 15
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_1_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: >
+                  This value is often empty for good reason; the check only fails if that becomes much more common.
+              - property: changelog
+                value: '[{"date": "2026-09-18T00:00:00Z", "description": "Bumped severity warning->error with a real mustBeLessThan:15 (was mustBeLessThan:5, warning) - item 74 (plans/qa-pipeline.md): a warning/info-severity rule always has warn_threshold=None (ODCS is single-tier) AND, before this, fail_threshold=None too, which the dashboard silently defaulted to 0 - making this check read red on almost every run despite datacontract-cli itself correctly reporting pass. Matches place_of_birth_facility''s own established pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s own Soda copy, already fixed the same way.", "author": "Keith Moss", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_1_name:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be in the expected format.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_1_name.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: registering_parent_2_name
+        logicalType: string
+        physicalType: varchar(200)
+        required: false
+        classification: pii
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_2_name:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            unit: percent
+            mustBeLessThan: 50
+            severity: error
+            description: >
+              This value is often empty for good reason; the check only fails if that becomes much more common.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_2_name.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: '[{"date": "2026-09-18T00:00:00Z", "description": "Bumped severity info->error with a real mustBeLessThan:50 (was mustBeLessThan:30, info) - item 74 (plans/qa-pipeline.md): an info-severity rule always has warn_threshold=None (ODCS is single-tier) AND, before this, fail_threshold=None too, which the dashboard silently defaulted to 0 - making this check read red on almost every run despite datacontract-cli itself correctly reporting pass. Matches place_of_birth_facility''s own established pattern (severity:error + a real non-zero mustBeLessThan) and this same real-world check''s own Soda copy, already fixed the same way.", "author": "Keith Moss", "breaking": true}]'
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:registering_parent_2_name:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^[A-Za-z][A-Za-z. -]*$"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be in the expected format.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.registering_parent_2_name.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-09-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: is_multiple_birth
+        logicalType: boolean
+        physicalType: boolean
+        required: true
+        description: >
+          A boolean's only two non-null states are both valid values by
+          definition - the nullValues rule below is already the complete
+          "strict values" check this column needs; there's no separate
+          "invalid code" state a boolean column can land in the way a
+          string column like sex can.
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:is_multiple_birth:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:is_multiple_birth:sibling_match_datacontract
+            type: sql
+            dimension: consistency
+            # A self-join within one model - datacontract-cli's {model}
+            # template resolves to the same view both times it's used, so
+            # this genuinely joins the table to itself. Every row this
+            # flags is an is_multiple_birth record with no matching sibling
+            # row (same birth event: date_of_birth, facility, parent 1) -
+            # see daily_batch.py's generator fix (plans/qa-pipeline.md):
+            # previously this flag had no sibling logic behind it at all,
+            # so this check would have failed on every flagged row, every
+            # run, by construction. 0 on every clean run now; dirty.py's
+            # break_multiple_birth_siblings (amber/red only) drops one
+            # twin from a fraction of real pairs to demonstrate a real
+            # violation.
+            # IS NOT DISTINCT FROM (not plain =) on place_of_birth_facility
+            # and registering_parent_1_name: both can legitimately be null
+            # (home births; the ~2% parent1-name null rate), and plain =
+            # against NULL is never true in SQL even when both sides are
+            # the same NULL - found as a real, live false-positive (4
+            # flagged rows on a clean run where every sibling pair
+            # genuinely matched) before switching to null-safe equality.
+            query: >
+              SELECT COUNT(*) FROM {model} a
+              WHERE a.is_multiple_birth = true
+                AND NOT EXISTS (
+                  SELECT 1 FROM {model} b
+                  WHERE b.is_multiple_birth = true
+                    AND b.registration_number != a.registration_number
+                    AND b.date_of_birth = a.date_of_birth
+                    AND b.place_of_birth_facility IS NOT DISTINCT FROM a.place_of_birth_facility
+                    AND b.registering_parent_1_name IS NOT DISTINCT FROM a.registering_parent_1_name
+                )
+            mustBe: 0
+            severity: error
+            description: >
+              Every record flagged as a multiple birth must have a matching sibling in the same supply.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.is_multiple_birth.sibling_match_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.registration_number", "birth_registrations.is_multiple_birth", "birth_registrations.date_of_birth", "birth_registrations.place_of_birth_facility", "birth_registrations.registering_parent_1_name"]
+              - property: name
+                value: Multiple-birth sibling match
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: source_system_record_id
+        logicalType: string
+        physicalType: varchar(50)
+        required: true
+        description: BDM's internal record ID. Kept alongside registration_number to help trace re-extractions.
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:source_system_record_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be unique.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.source_system_record_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:source_system_record_id:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              pattern: "^SRC-[0-9]{9}$"
+            mustBe: 0
+            severity: error
+            description: >
+              This value must be in the expected format.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.source_system_record_id.invalidValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+      - name: extract_timestamp
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: When this record was extracted from BDM's source system, not when the file landed in S3.
+        quality:
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:extract_timestamp:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.nullValues_datacontract
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:registry-services:civil-registration:birth-registrations:extract_timestamp:timestamp_ordering_datacontract
+            type: sql
+            dimension: consistency
+            query: "SELECT COUNT(*) FROM {model} WHERE extract_timestamp < date_registered OR extract_timestamp > date_registered + INTERVAL 1 DAY"
+            mustBe: 0
+            severity: error
+            description: >
+              A record must be timestamped on or after the registration it describes, and delivered inside the agreed window.
+            customProperties:
+              - property: check_id
+                value: data-asset-1.registry-services.civil-registration.birth-registrations.extract_timestamp.timestamp_ordering_datacontract
+              - property: reads_columns
+                value: ["birth_registrations.extract_timestamp", "birth_registrations.date_registered"]
+              - property: name
+                value: Supply timestamp ordering
+              - property: introduced_date
+                value: "2026-01-15"
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+
+    quality:
+      # the duplicateCheck rule that used to live here moved to
+      # registration_number's own quality list above: real ODCS's
+      # duplicateValues metric works at field level directly (no need for
+      # the arguments.properties list a table-level composite-key check
+      # would need for a single column).
+      - id: data-asset-1:registry-services:civil-registration:birth-registrations:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [500, 20000]
+        severity: warning
+        description: >
+          The number of rows in the supply must fall inside the expected band.
+        customProperties:
+          - property: check_id
+            value: data-asset-1.registry-services.civil-registration.birth-registrations.rowCount_datacontract
+          - property: introduced_date
+            value: "2026-01-15"
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              self-evident
+
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: plannedDeliveryFormat
+    value: parquet
+  - property: futureSourceCandidates
+    value: "PostgreSQL, MySQL, SQL Server, Snowflake, or a direct CDC/API feed - once BDM can support a source connection rather than a file drop"
+  - property: piiClassification
+    value: "Contains personal information. Confirm and record the correct security/handling classification for your agency before this leaves draft status."
+  # mothman CLI Phase 3 (plans/tooling.md #1) - S3 QA source mode config.
+  # s3Source/localSource verified 2026-09-19 against real datacontract-cli
+  # parsing (qa_tools/tools/run_datacontract.py) before landing here.
+  # arrivalPattern was previously a design-doc-only proposal
+  # (docs/aws-event-driven-mvp-design.md's own flagged "confirm in the
+  # morning" item) - Keith's own explicit go-ahead, 2026-09-19, to wire
+  # it into the real contract now that it's been verified this way.
+  - property: s3Source
+    value: "bdm/"
+    # Real prefix within the raw-data landing bucket
+    # (aws/cdk/data_pipeline_stack.py's RawDataBucket) - matches the
+    # exact prefix its own S3 event-notification wiring already filters
+    # on. The bucket's own name is env-provided (MOTHMAN_RAW_BUCKET_NAME),
+    # never hardcoded here, since CDK auto-generates a globally-unique
+    # name at deploy time.
+  - property: localSource
+    value: data/raw
+    # Default local root `mothman bdm qa`'s Local files source mode
+    # browses from - the same real RAW_DIR
+    # qa_tools/tools/stage.py already uses.
+  - property: arrivalPattern
+    value:
+      - type: single_file
+        keyPattern: "bdm/birth_registrations_{date}.csv"
+        dataset_id: birth-registrations
+    # qa_tools/common/file_arrival.py's real, tested pattern-matching
+    # shape - one file per real delivery, so a single "single_file"
+    # pattern is enough (see that module's own docstring for
+    # nested_folder/zip_archive, used by Child Protection instead).

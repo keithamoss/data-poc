@@ -14,6 +14,12 @@ import textwrap
 from qa_tools.common import validate_check_lifecycle as vcl
 
 
+def _use_sources(monkeypatch, yaml_sources, evidently):
+    """Fix the gate's source lists at every ref, in place of the ones it
+    derives from each ref's hierarchy."""
+    monkeypatch.setattr(vcl, "_sources", lambda ref: (list(yaml_sources), list(evidently)))
+
+
 def _git(repo, *args):
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 
@@ -26,6 +32,12 @@ def _init_repo(tmp_path):
     return repo
 
 
+# Fixture check_ids are real-shaped (REQ-QAC-023). They used to read
+# "a.b.c.not_null", which is shorter but does not match the grammar every
+# one of the repo's 258 real check_ids satisfies - and once the grammar
+# became a CI gate, a fixture that could never exist in the real repo
+# started failing it. Made realistic rather than exempted: a gate that
+# the tests exercising it are excused from is not really a gate.
 def _dbt_schema(check_id: str, extra_config: str = "") -> str:
     return textwrap.dedent(f"""\
         models:
@@ -71,18 +83,18 @@ def test_old_file_content_returns_the_content_at_that_ref(tmp_path, monkeypatch)
 def test_collect_checks_reads_old_and_new_from_real_git_history(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
     old_checks = vcl.collect_checks("HEAD")
     new_checks = vcl.collect_checks(None)
 
-    assert [c.check_id for c in old_checks] == ["a.b.c.not_null"]
-    assert [c.check_id for c in new_checks] == ["a.b.c.not_null"]
+    assert [c.check_id for c in old_checks] == ["data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
+    assert [c.check_id for c in new_checks] == ["data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
 
 
 def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks(tmp_path, monkeypatch):
@@ -92,34 +104,34 @@ def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks
     first check ever gets retired (see collect_checks()'s own docstring)."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [
+    _use_sources(monkeypatch, [
         ("schema.yml", vcl.cl.parse_dbt_check_metadata),
         ("schema-retired.yml", vcl.cl.parse_dbt_check_metadata),  # deliberately never created
-    ])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [
-        "evidently_check_lifecycle_retired.py",  # deliberately never created
+    ],
+                 [
+        "evidently-checks-retired.yml",  # deliberately never created
     ])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
 
     checks = vcl.collect_checks(None)
 
-    assert [c.check_id for c in checks] == ["a.b.c.not_null"]
+    assert [c.check_id for c in checks] == ["data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"]
 
 
 def test_main_fails_on_an_undocumented_config_change(tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
     # change a real config value (error_if) with no new changelog entry,
     # committed - the exact scenario the CI gate exists to catch
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null", extra_config="error_if: \">95\""))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt", extra_config="error_if: \">95\""))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "tighten the threshold, forgot the changelog")
 
@@ -138,13 +150,13 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     history, not just the unit-level function in isolation."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [
+    _use_sources(monkeypatch, [
         ("schema.yml", vcl.cl.parse_dbt_check_metadata),
         ("schema-retired.yml", vcl.cl.parse_dbt_check_metadata),
-    ])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    ],
+                 [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
@@ -158,7 +170,7 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     assert exit_code == 1
     stderr = capsys.readouterr().err
     assert "disappeared" in stderr
-    assert "a.b.c.not_null" in stderr
+    assert "data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt" in stderr
 
 
 def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, capsys):
@@ -168,13 +180,13 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
     disappearance - main() must pass clean."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [
+    _use_sources(monkeypatch, [
         ("schema.yml", vcl.cl.parse_dbt_check_metadata),
         ("schema-retired.yml", vcl.cl.parse_dbt_check_metadata),
-    ])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    ],
+                 [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     (repo / "schema-retired.yml").write_text("models: []\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
@@ -189,7 +201,7 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
                 tests:
                   - not_null:
                       meta:
-                        check_id: a.b.c.not_null
+                        check_id: data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt
                         category: completeness
                         changelog: []
                         retired_as_of: "2026-09-16"
@@ -210,10 +222,10 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
 def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
 
-    (repo / "schema.yml").write_text(_dbt_schema("a.b.c.not_null"))
+    (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "introduce the check")
 
@@ -221,13 +233,546 @@ def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
     assert "zero errors" in capsys.readouterr().out
 
 
-def test_evidently_dict_from_source_evals_the_module_source():
-    source = textwrap.dedent("""\
-        CHECK_LIFECYCLE = {
-            "a.b.c.drift_psi": {"introduced_date": "2026-01-01", "changelog": []},
-        }
+# ---------------------------------------------------------------------
+# REQ-QAC-024: the failure_indicates gate.
+#
+# Built before the authoring pass that makes it satisfiable, so it ships
+# OFF - a count rather than a gate. That is the part worth testing
+# carefully: a gate nobody can turn on yet is easy to write wrong and
+# discover months later, when turning it on is urgent.
+# ---------------------------------------------------------------------
+
+DEFAULT_DESC = "This value must never be empty."
+
+
+def _dbt_schema_with_prose(check_id: str, failure_indicates: str | None,
+                           description: str | None = DEFAULT_DESC) -> str:
+    fi = "" if failure_indicates is None else f"\n                        failure_indicates: {failure_indicates}"
+    desc = "" if description is None else f"\n                        description: {description}"
+    return textwrap.dedent(f"""\
+        models:
+          - name: m
+            columns:
+              - name: c
+                tests:
+                  - not_null:
+                      meta:
+                        check_id: {check_id}
+                        category: completeness
+                        changelog: []{desc}{fi}
+                      config:
+                        warn_if: ">90"
         """)
 
-    result = vcl._evidently_dict_from_source(source, "fake_evidently_check_lifecycle.py")
 
-    assert result == {"a.b.c.drift_psi": {"introduced_date": "2026-01-01", "changelog": []}}
+def _one_check(tmp_path, monkeypatch, failure_indicates, description=DEFAULT_DESC):
+    """A repo holding exactly one check with the given prose."""
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
+    (repo / "schema.yml").write_text(
+        _dbt_schema_with_prose("data-asset-1.registry-services.civil-registration.birth-registrations.c.not_null_dbt",
+                               failure_indicates, description))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "one")
+    return vcl.collect_checks(None)
+
+
+def test_an_active_check_with_no_failure_indicates_is_an_error(tmp_path, monkeypatch):
+    errors = vcl._explanation_errors(_one_check(tmp_path, monkeypatch, None))
+    assert len(errors) == 1
+    # The message has to be actionable on its own: whoever trips this is
+    # looking at a check definition, not at this requirement.
+    assert "no failure_indicates" in errors[0]
+    assert "self-evident" in errors[0]
+    assert "docs/check-authoring-rules.md" in errors[0]
+
+
+def test_the_self_evident_sentinel_satisfies_the_gate(tmp_path, monkeypatch):
+    # The sentinel's whole purpose: an explicit decision that reads as
+    # authored, not as a field nobody filled in.
+    assert vcl._explanation_errors(_one_check(tmp_path, monkeypatch, "self-evident")) == []
+
+
+def test_a_folded_scalar_sentinel_still_satisfies_the_gate(tmp_path, monkeypatch):
+    # docs/check-authoring-rules.md tells authors to use `>` block
+    # scalars, and a folded scalar clips a trailing newline on. The gate
+    # itself would accept that for a trivial reason - any non-empty
+    # value passes - so what this really guards is that the trailing
+    # newline does not make it read as a sentinel NEAR-MISS and get
+    # rejected by the rule below.
+    assert vcl._explanation_errors(
+        _one_check(tmp_path, monkeypatch, ">\n                          self-evident")) == []
+
+
+def test_a_near_miss_spelling_of_the_sentinel_is_rejected(tmp_path, monkeypatch):
+    # The hole this closes: the gate accepts ANY non-empty value, so
+    # "self evident" satisfies it and then renders verbatim under a
+    # heading on a public page - the same leak the template's own
+    # normalisation prevents for the correct spelling. The gate is the
+    # only layer that can tell a typo from prose someone meant.
+    for typo in ['"self evident"', '"Self_Evident"', '"selfevident"', '"Self-evident."']:
+        errors = vcl._explanation_errors(_one_check(tmp_path, monkeypatch, typo))
+        assert len(errors) == 1, typo
+        assert "reads as the sentinel but is not it" in errors[0]
+
+
+def test_real_prose_is_never_mistaken_for_a_near_miss(tmp_path, monkeypatch):
+    # The rule above must not fire on an authored sentence that happens
+    # to use the words - otherwise it blocks legitimate prose.
+    assert vcl._explanation_errors(_one_check(
+        tmp_path, monkeypatch,
+        '"The cause is self-evident once you see which column failed."')) == []
+
+
+def test_real_authored_prose_satisfies_the_gate(tmp_path, monkeypatch):
+    assert vcl._explanation_errors(
+        _one_check(tmp_path, monkeypatch, "The upstream extract ran before the day closed.")) == []
+
+
+def test_a_whitespace_only_value_is_not_authored(tmp_path, monkeypatch):
+    # Same reasoning requirements.yaml applies to its own blank fields:
+    # absent and empty look identical once stripped, but a blank value
+    # is someone who started and stopped.
+    assert len(vcl._explanation_errors(_one_check(tmp_path, monkeypatch, '"   "'))) == 1
+
+
+def test_a_retired_check_is_held_to_the_same_terms(tmp_path, monkeypatch):
+    """REQ-QAC-025 says so in as many words, and an earlier version of
+    this gate got it backwards - it exempted retired checks, reasoning
+    they were history nobody reads. They are not: a retired check still
+    renders behind the dashboard's retired-checks toggle, so a reader
+    can still meet its prose."""
+    checks = _one_check(tmp_path, monkeypatch, None)
+    checks[0].retired_as_of = "2026-01-01"
+    assert len(vcl._explanation_errors(checks)) == 1
+
+    second = tmp_path / "b"
+    second.mkdir()
+    authored = _one_check(second, monkeypatch, "self-evident")
+    authored[0].retired_as_of = "2026-01-01"
+    assert vcl._explanation_errors(authored) == []
+
+
+def test_a_check_with_no_description_is_an_error(tmp_path, monkeypatch):
+    """The other half of REQ-QAC-025, and the half the first version of
+    this gate missed entirely: it only ever looked at
+    failure_indicates."""
+    errors = vcl._explanation_errors(
+        _one_check(tmp_path, monkeypatch, "self-evident", description=None))
+    assert len(errors) == 1
+    assert "no description" in errors[0]
+    assert "docs/check-authoring-rules.md" in errors[0]
+
+
+def test_both_halves_are_reported_in_one_run(tmp_path, monkeypatch):
+    """REQ-QAC-025: report every offending check in one run rather than
+    stopping at the first - which applies within a check too."""
+    errors = vcl._explanation_errors(
+        _one_check(tmp_path, monkeypatch, None, description=None))
+    assert len(errors) == 2
+
+
+def test_the_gate_is_off_by_default_and_fatal_only_when_asked(tmp_path, monkeypatch, capsys):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
+    (repo / "schema.yml").write_text(
+        _dbt_schema_with_prose("data-asset-1.registry-services.civil-registration.birth-registrations.c.not_null_dbt", None))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "one")
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "two")
+
+    assert vcl.main() == 0
+    assert "plain-English explanation(s) missing" in capsys.readouterr().err
+
+    assert vcl.main(require_explanations=True) == 1
+    assert "no failure_indicates" in capsys.readouterr().err
+
+
+def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path, monkeypatch, capsys):
+    """A defect, 2026-10-12: REQ-PIPE-190 made an ODCS `id` mandatory on
+    every quality rule, and the gate held the PREVIOUS commit's contract to
+    that rule too - so the push that added the ids was refused for the
+    commit before it, and so would any comparison reaching back past it.
+    The rule is about what is committed now; the old side is read as it was."""
+    import re
+    from pathlib import Path
+
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    _use_sources(monkeypatch, [("contract.yaml", vcl.cl.parse_contract_check_metadata)],
+                 [])
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD")
+
+    today = (Path(__file__).resolve().parent.parent / "contract" / "child-protection-family-support"
+             / "child-protection-contract.yaml").read_text()
+    before = re.sub(r"(?m)^(\s*)- id: \S+\n\1  ", r"\1- ", today)
+    assert before != today and "- id:" not in before
+    (repo / "contract.yaml").write_text(before)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "before the ids")
+    (repo / "contract.yaml").write_text(today)
+
+    assert vcl.main() == 0, capsys.readouterr().out
+
+
+# ---- REQ-QAC-223: the gate sees what a check actually does ------------
+#
+# A check's definition hash used to cover only its YAML configuration, so a
+# change to the macro behind a dbt test, a singular test's SQL, a Soda
+# check's own expression or an Evidently threshold passed the changelog gate
+# unseen - matches_regex.sql backs 11 real checks and editing it tripped
+# nothing.
+
+_BDM = "data-asset-1.registry-services.civil-registration.birth-registrations"
+
+_MATCHES_REGEX = """{% test matches_regex(model, column_name, regex) %}
+select * from {{ model }} where not regexp_like({{ column_name }}, '{{ regex }}')
+{% endtest %}
+"""
+
+
+def _regex_schema(changelog_on_a: str = "[]", changelog_on_rule: str = "[]") -> str:
+    return textwrap.dedent(f"""\
+        models:
+          - name: m
+            columns:
+              - name: a
+                tests:
+                  - matches_regex:
+                      regex: "^[0-9]+$"
+                      meta:
+                        check_id: {_BDM}.a.matches_regex_dbt
+                        category: conformity
+                        changelog: {changelog_on_a}
+              - name: b
+                tests:
+                  - matches_regex:
+                      regex: "^[A-Z]+$"
+                      meta:
+                        check_id: {_BDM}.b.matches_regex_dbt
+                        category: conformity
+                        changelog: []
+                  - not_null:
+                      meta:
+                        check_id: {_BDM}.b.not_null_dbt
+                        category: completeness
+                        changelog: []
+        tests:
+          - name: sibling_rule
+            config:
+              meta:
+                check_id: {_BDM}.b.sibling_rule_dbt
+                category: consistency
+                changelog: {changelog_on_rule}
+                reads_columns: [birth_registrations.date_of_birth]
+        """)
+
+
+def _dbt_repo(tmp_path, monkeypatch):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
+    (repo / "dbt_project" / "macros").mkdir(parents=True)
+    (repo / "dbt_project" / "tests").mkdir(parents=True)
+    (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(_MATCHES_REGEX)
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where false\n")
+    (repo / "schema.yml").write_text(_regex_schema())
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "introduce the checks")
+    return repo
+
+
+def _only_changelog_errors(err: str) -> None:
+    """A test about the changelog gate must fail on THAT, not on a fixture
+    some other gate (the check-id grammar, reads_columns) refuses."""
+    lines = [ln for ln in err.splitlines() if ln.startswith("  - ")]
+    assert lines, err
+    assert all("changelog" in ln for ln in lines), err
+
+
+def _commit(repo, message):
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", message)
+
+
+def test_an_unexplained_macro_edit_fails_naming_the_file_once_and_every_check_it_backs(
+        tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(
+        _MATCHES_REGEX.replace("regexp_like", "not regexp_like"))
+    _commit(repo, "change the macro, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert err.count("dbt_project/macros/matches_regex.sql") == 1
+    assert f"{_BDM}.a.matches_regex_dbt" in err and f"{_BDM}.b.matches_regex_dbt" in err
+    assert "not_null_dbt" not in err and "sibling_rule_dbt" not in err
+
+
+def test_an_unexplained_singular_sql_edit_fails_naming_that_check_alone(tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
+    _commit(repo, "change the singular test, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert f"{_BDM}.b.sibling_rule_dbt" in err
+    assert "matches_regex_dbt" not in err and "not_null_dbt" not in err
+
+
+def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "macros" / "helper.sql").write_text(
+        "{% macro clean_name(c) %} trim({{ c }}) {% endmacro %}\n")
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text(
+        "select {{ clean_name('x') }} where false\n")
+    _commit(repo, "the singular test starts using a project macro (new check text, so a changelog)")
+    # Re-baseline: the commit above changed the singular test, which the gate
+    # would rightly flag - this test is about the edit AFTER it.
+    (repo / "dbt_project" / "macros" / "helper.sql").write_text(
+        "{% macro clean_name(c) %} lower(trim({{ c }})) {% endmacro %}\n")
+    _commit(repo, "change the helper macro, no changelog")
+
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert f"{_BDM}.b.sibling_rule_dbt" in err
+
+
+def test_a_singular_sql_edit_passes_once_its_check_has_a_changelog_entry(tmp_path, monkeypatch, capsys):
+    """REQ-QAC-223 criterion 9's other half for singular SQL (#182)."""
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").write_text("select 1 where true\n")
+    (repo / "schema.yml").write_text(_regex_schema(
+        changelog_on_rule='[{"date": "2026-10-14", "change": "Rule now flags every row."}]'))
+    _commit(repo, "change the singular test and say why")
+    assert vcl.main() == 0, capsys.readouterr().err
+
+
+def test_a_macro_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
+    """dbt reads macros from every folder under macro-paths, so the gate must
+    too (#182: it listed only the top level, so this edit passed)."""
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    sub = repo / "dbt_project" / "macros" / "regex"
+    sub.mkdir()
+    (repo / "dbt_project" / "macros" / "matches_regex.sql").rename(sub / "matches_regex.sql")
+    _commit(repo, "move the macro into a subfolder (no behaviour change)")
+    (sub / "matches_regex.sql").write_text(_MATCHES_REGEX.replace("regexp_like", "not regexp_like"))
+    _commit(repo, "change the macro, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert "dbt_project/macros/regex/matches_regex.sql" in err
+    assert f"{_BDM}.a.matches_regex_dbt" in err
+
+
+def test_a_singular_test_in_a_subfolder_is_still_covered(tmp_path, monkeypatch, capsys):
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    sub = repo / "dbt_project" / "tests" / "rules"
+    sub.mkdir()
+    (repo / "dbt_project" / "tests" / "sibling_rule.sql").rename(sub / "sibling_rule.sql")
+    _commit(repo, "move the singular test into a subfolder")
+    (sub / "sibling_rule.sql").write_text("select 1 where true\n")
+    _commit(repo, "change the singular test, no changelog")
+
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert f"{_BDM}.b.sibling_rule_dbt" in err
+
+
+def test_a_soda_expression_change_fails_without_a_changelog_entry_and_passes_with_one(
+        tmp_path, monkeypatch, capsys):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    _use_sources(monkeypatch, [("soda.yml", vcl.cl.parse_soda_check_metadata)],
+                 [])
+    cid = f"{_BDM}.row_count_soda"
+
+    def soda(expr, changelog="[]"):
+        return textwrap.dedent(f"""\
+            checks for m:
+              - {expr}:
+                  attributes:
+                    check_id: {cid}
+                    category: completeness
+                    changelog: {changelog}
+            """)
+    (repo / "soda.yml").write_text(soda("row_count > 0"))
+    _commit(repo, "introduce")
+    (repo / "soda.yml").write_text(soda("row_count > 10"))
+    _commit(repo, "tighten the expression, no changelog")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert cid in err
+
+    (repo / "soda.yml").write_text(soda(
+        "row_count > 10", changelog='[{"date": "2026-10-14", "change": "Tightened to 10."}]'))
+    _commit(repo, "add the changelog entry")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~2")
+    assert vcl.main() == 0
+
+
+def test_an_evidently_threshold_change_fails_naming_that_check_alone(tmp_path, monkeypatch, capsys):
+    repo = _init_repo(tmp_path)
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    _use_sources(monkeypatch, [],
+                 ["ev.yml"])
+    a, b = f"{_BDM}.sex.drift_psi_evidently", f"{_BDM}.row_count_growth_evidently"
+
+    def ev(fail):
+        return textwrap.dedent(f"""\
+            checks:
+              - {{check_id: {a}, category: consistency, changelog: [], column: sex,
+                 method: psi, warn_threshold: 0.10, fail_threshold: {fail}}}
+              - {{check_id: {b}, category: timeliness, changelog: [], column: null,
+                 method: row_drop, warn_threshold: 0.10, fail_threshold: 0.25}}
+            """)
+    (repo / "ev.yml").write_text(ev(0.25))
+    _commit(repo, "introduce")
+    (repo / "ev.yml").write_text(ev(0.30))
+    _commit(repo, "loosen one band, no changelog")
+    assert vcl.main() == 1
+    err = capsys.readouterr().err
+    _only_changelog_errors(err)
+    assert a in err and b not in err
+
+
+def test_every_real_evidently_check_carries_its_whole_definition():
+    """REQ-QAC-223 criterion 3: an Evidently check's column, method and
+    warn/fail bands are literals in its own entry in its collection's check
+    file - where the definition hash sees them - not shared constants."""
+    from qa_tools import collections
+    from qa_tools.common import evidently_common as ec
+    entries = {}
+    for c in collections.all_collections():
+        entries.update(ec.collection_checks(c.id).checks)
+    assert len(entries) >= 9, "precondition: the real registries are not empty"
+    for check_id, meta in entries.items():
+        assert meta.get("method") in ("psi", "row_drop"), check_id
+        assert "column" in meta, check_id
+        assert 0 < meta["warn_threshold"] < meta["fail_threshold"], check_id
+
+
+def test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry():
+    """...and the runners read them from there by check_id, so the band the
+    hash covers is the band a verdict is judged by."""
+    from qa_tools.common import evidently_common as ec
+    entry = {"method": "psi", "column": "sex", "warn_threshold": 0.2, "fail_threshold": 0.4}
+    assert ec.status_for(0.3, entry) == "warn"
+    assert ec.status_for(0.5, entry) == "fail"
+    assert ec.status_for(0.1, entry) == "pass"
+
+
+# ---------------------------------------------------------------------
+# REQ-QAC-241: check files found by convention, at every ref.
+# ---------------------------------------------------------------------
+
+def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
+        tmp_path, monkeypatch, capsys):
+    """The build question REQ-QAC-241 left open: a singular test's definition
+    hash covers its SQL, and named the file by its path, so filing the test
+    under tests/<collection-id>/ read as an undocumented change."""
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "tests" / "civil-registration").mkdir()
+    _git(repo, "mv", "dbt_project/tests/sibling_rule.sql",
+         "dbt_project/tests/civil-registration/sibling_rule.sql")
+    _commit(repo, "file the test under its collection")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
+    assert vcl.main() == 0, capsys.readouterr().err
+
+
+def _flat_layout(real_root, repo):
+    """The tree as it stood before REQ-QAC-241: every collection's check
+    files flat in contract/, and Evidently's checks a Python dict under
+    qa_tools/<short>/. Built from today's files, so its checks are today's."""
+    import shutil
+
+    import yaml
+
+    from qa_tools import collections
+    from qa_tools.common import check_lifecycle as cl
+
+    (repo / "contract").mkdir()
+    for asset_wide in (real_root / "contract").glob("*.y*ml"):
+        shutil.copy(asset_wide, repo / "contract" / asset_wide.name)
+    doc = yaml.safe_load((real_root / "contract" / "data-asset.yaml").read_text())
+    for agency in doc["hierarchy"]["agencies"]:
+        for coll in agency["collections"]:
+            coll["contract"] = coll["contract"].rsplit("/", 1)[-1]
+    (repo / "contract" / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    for c in collections.all_collections():
+        for kind in ("contract", "soda"):
+            for retired in (False, True):
+                src = real_root / c.check_file(kind, retired=retired)
+                if src.exists():
+                    shutil.copy(src, repo / "contract" / src.name)
+        package = repo / "qa_tools" / c.short
+        package.mkdir(parents=True)
+        for retired, suffix in ((False, ""), (True, "_retired")):
+            checks = cl.load_evidently_checks(real_root / c.check_file("evidently", retired=retired))
+            (package / f"evidently_check_lifecycle{suffix}.py").write_text(
+                f"CHECK_LIFECYCLE = {checks!r}\n")
+
+
+def test_a_base_ref_from_before_the_move_reads_as_no_change(tmp_path, monkeypatch, capsys):
+    """Criteria 6 and 7: each side's sources come from its own ref's
+    hierarchy, and a ref predating the move is read through the legacy
+    reader - so moving every file reports no check added, removed or
+    changed."""
+    import shutil
+
+    from qa_tools.common import hierarchy
+
+    real_root = vcl.ROOT
+    repo = _init_repo(tmp_path)
+    _flat_layout(real_root, repo)
+    _commit(repo, "before the move")
+    shutil.rmtree(repo / "contract")
+    shutil.rmtree(repo / "qa_tools")
+    shutil.copytree(real_root / "contract", repo / "contract")
+    _commit(repo, "the move")
+
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", repo / "contract" / "data-asset.yaml")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
+    old, new = vcl.collect_checks("HEAD~1"), vcl.collect_checks(None)
+    evidently = [c for c in old if c.tool == "evidently"]
+    assert evidently and all(c.source_file.endswith(".py") for c in evidently), \
+        "precondition: the base side was read through the legacy reader"
+    assert len(old) == len(new) > 0
+    assert vcl.cl.validate(old, new) == []
+    assert ({c.check_id: c.config_hash for c in old}
+            == {c.check_id: c.config_hash for c in new})
+
+
+def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path, monkeypatch):
+    """Criterion 11: REQ-PIPE-192's cache is keyed on this, so an edit to an
+    Evidently file or a collection's dbt folder must be seen."""
+    import shutil
+
+    from qa_tools.common import hierarchy
+
+    for top in ("contract", "dbt_project/models", "dbt_project/tests", "dbt_project/macros"):
+        shutil.copytree(vcl.ROOT / top, tmp_path / top)
+    monkeypatch.setattr(vcl, "ROOT", tmp_path)
+    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "contract" / "data-asset.yaml")
+    edits = ["contract/registry-services/bdm-birth-registrations-evidently-checks.yml",
+             "dbt_project/models/child-protection/stg_cp_clients.sql",
+             "dbt_project/tests/civil-registration/recency.sql"]
+    for rel in edits:
+        before = vcl.sources_fingerprint()
+        path = tmp_path / rel
+        assert path.is_file(), f"precondition: {rel} exists"
+        path.write_text(path.read_text() + "\n")
+        assert vcl.sources_fingerprint() != before, rel

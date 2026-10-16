@@ -25,7 +25,7 @@ are actually authored in (verified against real file content before
 writing this, not assumed): dbt/soda's `check_id: <value>` on one line,
 the ODCS contract's `value: <value>` on the line under a
 `- property: check_id` customProperty entry, and Evidently's
-`SOME_CHECK_ID = "<value>"` constant assignment.
+`- check_id: <value>` entry in its check file.
 
 CI-safe per CLAUDE.md's hard rule: reads only committed check-definition
 files (the same ones check_lifecycle validation itself walks, via
@@ -38,31 +38,27 @@ import os
 import subprocess
 from pathlib import Path
 
+from qa_tools.common import hierarchy
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_REPO = "keithamoss/data-poc"
 
-# Real, currently-1:1 agency/dataset -> qa_tools/ folder mapping - a
-# plain dict, not derived from anything dynamic, same "just add the new
-# entry" convention validate_check_lifecycle.py's own _YAML_SOURCES
-# already uses for a brand-new dataset. Revisit if an agency ever gains
-# a second dataset/collection of its own (today registry-services has
-# exactly one - birth-registrations - and child-protection-family-
-# support has exactly one collection, child-protection, with 6 tables).
+# agency -> the qa_tools/ source folder its real tool scripts live in.
+# Genuinely NOT part of the hierarchy - it maps an agency onto this
+# repo's own code layout, which contract/data-asset.yaml has no business
+# knowing about - so it stays a literal. Add an entry when an agency
+# arrives.
 AGENCY_QA_FOLDER = {
     "registry-services": "bdm",
     "child-protection-family-support": "cp",
 }
-DATASET_QA_FOLDER = {
-    "birth-registrations": "bdm",
-    "cp-clients": "cp",
-    "cp-notifications": "cp",
-    "cp-investigations": "cp",
-    "cp-placements": "cp",
-    "cp-carers": "cp",
-    "cp-case-workers": "cp",
-}
+
+# The per-dataset view of the same thing. Derived from the hierarchy
+# (REQ-QAC-039) rather than enumerating every dataset a second time -
+# which is what it used to do, and what made this one of the four copies
+# of the tree that requirement removed.
+DATASET_QA_FOLDER = {d.dataset_id: AGENCY_QA_FOLDER[d.agency_id] for d in hierarchy.all_datasets()}
 
 
 def current_commit_sha(root: Path | str = ROOT) -> str:

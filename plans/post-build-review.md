@@ -1,0 +1,10077 @@
+# Post-build review
+
+What the post-build critic agents found when turned at work that is
+already BUILT AND SHIPPED, and what was decided about each finding.
+
+Deliberately a separate file, at Keith's own ask, 2026-09-24. The
+neighbouring files hold work not yet done - designs, sprints,
+requirements, sightings. This one holds judgements about code that is
+already in the repo and already running, which is a different thing to
+read and a different thing to act on.
+
+## The standing rule: Keith signs off every finding before anything changes
+
+His own words, 2026-09-24: "a finding about code that we've already
+shipped does deserve my eye before we change anything... I'd like to
+sign off on all of their findings."
+
+So the sequence is fixed, and it is not the same as the pre-build one:
+
+1. A critic reports. Its report is model output, not a verdict.
+2. This session VERIFIES anything load-bearing against the real code -
+   a critic's finding is a claim until it has been checked, and several
+   of this project's agent findings have arrived with a wrong citation
+   or a wrong premise attached to a correct conclusion.
+3. The finding is written up HERE, with its evidence, what it would
+   cost to fix, and a recommendation.
+4. **Keith decides.** Nothing in shipped code changes before that -
+   not a "trivially safe" fix, not a one-liner.
+5. A finding he accepts becomes real work: a requirement if it is a
+   behaviour change, a bug fix with a failing test first if it is a
+   defect (`CLAUDE.md`'s standing rule), or a recorded decision to
+   leave it alone.
+
+### AMENDED 2026-09-25 - the gate now applies to what is significant, not to everything
+
+Keith's own words, after the first thirteen findings had been walked
+through one at a time: "I don't actually care about reviewing all of
+them. I just want to know the ones that are significant or really
+require my decision as a product owner. I'm happy for you to fix minor
+bugs or do bits and pieces of polish."
+
+So step 4 above is narrowed, and steps 1-3 and 5 are unchanged.
+
+**Still needs his sign-off:**
+- A **significant defect** - one whose consequence is a wrong answer,
+  lost work, silently broken behaviour, or a false green. Flagged
+  before it is fixed, even when the fix itself is obvious, because he
+  is entitled to know the system did that.
+- Anything that is a **product decision**: what the dashboard should
+  say, what a state should mean, what is worth building.
+- Anything that **changes agreed behaviour or design**, including a
+  palette or layout change visible across the page, and anything that
+  reopens a decision already recorded.
+- Anything touching `requirements.yaml`'s own claims, since the
+  register is the permanent artefact.
+
+**Does not need it any more:** minor defects with one obvious right
+answer, wording, spacing, test coverage, and polish.
+
+**Two things that do NOT relax**, because they are what makes the
+narrower gate safe:
+1. **Everything still gets written up here**, fixed or not, with its
+   evidence. Delegating the decision is not delegating the record - he
+   must be able to find out afterwards what was changed and why.
+2. **A defect fix still gets a failing test first.** That is
+   `CLAUDE.md`'s rule and it never depended on who signed the finding
+   off.
+
+**And the judgement call is deliberately mine to make wrong in one
+direction only.** Where it is unclear whether something is minor, it
+gets flagged. Over-reporting costs him a sentence; under-reporting
+means shipped code changed on a judgement he never saw, which is the
+thing the original rule existed to prevent.
+
+**Why the gate is stricter here than for a new requirement.** A
+pre-build finding costs a conversation to act on. A post-build finding
+costs a change to something people are already relying on, and the
+repository's own history is the argument: a fix written to prevent a
+false green introduced one (`plans/qa-pipeline.md` item 74). Acting
+fast on shipped code is how the second bug gets written.
+
+Same conventions as every other numbered-item plans file: a closed
+status (`todo` / `investigate` / `in-progress` / `parked` / `done` /
+`superseded`), one or more component tags, and a date. A finding that
+is verified and rejected stays here as `done` with the reasoning, so
+the same finding arriving again from a later pass is recognisable
+rather than re-litigated.
+
+## 2026-09-24 - the first pass, over twelve requirements built in sprints 1-6
+
+`plans/running-thoughts.md` #34's own subject: twelve requirements were
+built across 2026-09-21..23 and **not one went through any post-build
+critic**. The sprints ran build, gate, commit, next, and the post-build
+half of the pipeline documented in `docs/agent-orchestration.md` was
+simply never invoked while they were moving. Nothing was skipped
+deliberately.
+
+The twelve: `REQ-QAC-039`, `REQ-GEN-040`, `REQ-GEN-042`, `REQ-GEN-043`,
+`REQ-QAC-047`, `REQ-PIPE-048`, `REQ-PIPE-049`, `REQ-PIPE-050`,
+`REQ-PIPE-051`, `REQ-PIPE-052`, `REQ-PIPE-053`, `REQ-DASH-055`.
+
+Four critics, one pass each over the whole set rather than twelve
+passes - Keith's own call, 2026-09-23 ("happy to do one pass with that,
+that's fine, rather than twelve"): `delivery-critic` on all twelve,
+`delivery-cli-ux-critic` on the `mothman schedule` surfaces,
+`delivery-dashboard-ux-critic` then `delivery-dashboard-visual-critic`
+on the dashboard ones - in that order and never in parallel, per the
+orchestration doc's own hard-won constraint.
+
+Run against a real built dashboard: 3.8MB, real embedded data, 6,545
+check results across 60 runs, both datasets.
+
+**Findings follow as each critic lands.**
+
+---
+
+## Queued for Keith - the visual critic's four questions
+
+**First thing when you are back, 2026-09-24 evening, your own ask.**
+These are the four from `delivery-dashboard-visual-critic`. They are
+here rather than in its own section below so you can answer them
+without reading 58 findings first - each is self-contained, and the
+finding number beside it has the measurements if you want them.
+
+They are the four where a critic could see the defect but not the right
+answer, and each would change what gets built. Every one of them is
+about something already shipped, so nothing moves until you say.
+
+Six more questions are behind these - four from the CLI critic (#17,
+#19, #21, #31) and two from the functional one (#1, #37). Say the word
+and they go in the same queue.
+
+### Q1. The executive tier is half empty, and that is a design call
+
+**What is there.** `.grid` uses `auto-fill`, so at 1180px it lays out
+four 284.5px tracks and fills two. The two real agency cards span 583px
+of a 1180px grid - **exactly half the front page is empty** - and the
+phantom tracks are held open rather than collapsed. This is the direct
+visual consequence of `REQ-DASH-055` removing three invented agencies
+from a grid that had been tuned for five. (#54)
+
+**Three ways, and the critic was explicit that this is a judgment call
+rather than a defect:**
+- **Collapse the tracks** (`auto-fit`) - the two cards stretch to
+  ~583px each and fill the row. No dead space, but two very wide cards
+  for a small amount of content, and it looks different again the day a
+  third agency appears.
+- **Cap the grid to its content** - a narrower container so two cards
+  sit in a deliberate-looking block rather than a half-empty four-track
+  row. Keeps the card proportions; adds a width rule tuned to today's
+  count.
+- **Leave it** - only visible at two agencies, and it self-corrects as
+  the asset grows toward thirty datasets.
+
+**ANSWERED 2026-09-24 evening - Keith asked whether capping hardcodes
+the agency count, "bearing in mind we'll have probably eight or so
+agencies in reality." That fact changes the answer, so the lean above
+is withdrawn rather than defended.**
+
+**At eight agencies the problem does not exist.** The grid lays out
+four 284.5px tracks at 1180px, so eight cards fill two complete rows
+with no dead tracks at all. Five, six or seven give one partial row,
+which is what every card grid on the internet looks like. The half-empty
+row is purely an artefact of being at two.
+
+**And yes, capping means pinning something.** The no-hardcode version
+would be `width: fit-content` with `margin-inline: auto` on the
+container - but `auto-fill` needs a definite width to compute its track
+count, and under intrinsic sizing that resolution is exactly the thing
+that goes strange. In practice you end up pinning a width, which is
+tuning for a state the asset is about to leave.
+
+**So: leave the grid alone.** Revised lean, on Keith's own fact.
+
+**What IS worth fixing regardless of agency count is the other half of
+#54**, and it gets worse at eight rather than better: `.card` is plain
+block flow with `.card-meta` unpinned, so a one-line title and a
+three-line title put the sparkline and the meta row 50px apart. At two
+agencies that is two ragged cards; at eight it is two ragged ROWS, and
+at thirty datasets' worth of collections below it, more. The fix is
+`.card{display:flex; flex-direction:column}` plus
+`.card-meta{margin-top:auto}` - no count anywhere, and it is correct at
+any number of agencies.
+
+**SIGNED OFF AND FIXED, 2026-09-24 evening** ("make sure you fix how the
+cards align internally"). One line, `margin-top:auto` on `.card-meta`.
+
+**One correction to the critic, found while fixing it.** Its finding
+said "`.card` is plain block flow" - it is not, and never was. `.card`
+has been `display:flex; flex-direction:column` since it was written.
+The cards are equal height because the grid stretches them, and the
+slack fell below the meta row because nothing pushed it down. Right
+conclusion, wrong premise - the fourth of these, and the reason the
+standing rule says a critic's finding is a claim until it has been
+checked.
+
+**Failing test first**, per that rule:
+`tests/test_dashboard_e2e.py::TestQuietStatesAreVisiblyBuilt::
+test_every_agency_card_pins_its_meta_row_to_the_same_place` measures,
+in a real browser, how far each card's meta row sits above its own
+bottom edge. Before: `[69, 19]`, matching the critic's own numbers.
+After: equal on every card. The whole module passes, 60 tests.
+
+### Q2. The exhausted count markers duplicate the pill beside them
+
+**What is there.** `exhaustedMarker()` adds a count pill at each tier.
+At today's scale that count is 1, so it restates the pill next to it -
+the critic measured **three identical `.pill.exhausted` within 40px
+vertically** on the Tier-2 page, the last two literally adjacent. (#57)
+
+**This is the one finding in the whole pass that gets BETTER at scale.**
+"17 schedules ended" at an agency is genuinely useful; "1 schedule
+ended" beside a pill already saying "Schedule ended" is not.
+
+- **Keep as built** - redundant now, correct, and becomes the useful
+  form at thirty datasets with no second change.
+- **Suppress the marker when the count is 1** - removes the duplicate
+  today, shows the marker only when it is actually aggregating.
+- **Merge them** - one pill per tier reading "Schedule ended" at count
+  1 and "N schedules ended" above. Fewest pills, but it turns the
+  marker into a status pill and blurs two roles.
+
+**My lean: suppress at 1.** A small conditional, no behaviour change at
+scale, and it keeps the marker's role clean - it aggregates, and when
+there is nothing to aggregate it says nothing.
+
+**SIGNED OFF AND FIXED, 2026-09-24 evening** - and **the approved
+proposal had to be narrowed while building it**, which is worth
+recording because the naive version was actively wrong.
+
+**Suppressing by COUNT ALONE would have hidden real information.** The
+marker exists because `REQ-PIPE-053` says an exhausted schedule must
+never be absorbed by the rollup - "one exhausted among five red still
+reads Red plus a count marker". A RED agency containing one exhausted
+dataset has no other signal on its card: its own pill says Red. Drop
+the marker at count 1 and that dataset disappears from the tier
+entirely - the exact absorption the requirement forbids, reintroduced
+by a fix meant to tidy it up. Same shape as `plans/qa-pipeline.md` item
+74, where a fix written to prevent a false green introduced one.
+
+**So the test is REDUNDANCY, not count.** `exhaustedMarker(count,
+status)` now returns nothing only when `count === 1` **and** the
+group's own pill already says `Schedule ended`. Both call sites pass
+their own status. A single exhausted dataset under a red, amber, green
+or no-data pill still gets its marker.
+
+**Failing tests first**, in `tests-js/relative-time-and-markers.test.js`
+- including one that pins the narrowing itself
+(`STILL shows a count of one when the group's own pill says something
+else`), so a later tidy-up cannot quietly restore the wrong version.
+
+### Q3. Fixing the "No data" pill means making the quiet state louder
+
+**What is there,** recomputed here from the real tokens rather than
+taken from the report: the pill's text measures **2.81:1 in light and
+3.55:1 in dark** against 4.5:1 for 12.5px bold, so it fails WCAG AA in
+both themes. Its dashed border measures **1.51:1** - not visible at
+all, either theme. The exhausted pill beside it measures 13.22:1 and
+12.78:1, a **4.7x gap**. (#49)
+
+**Two things make this more than a contrast fix.** The code comment
+says the exhausted pill is distinguished by "a solid border and a
+square marker" - but the border difference is really *invisible versus
+visible*, and both 9px markers are squares (1px versus 2px radius is
+imperceptible). So all the work separating the two quiet states is
+being done by the text contrast, on the token that fails.
+
+- **Raise both tokens** - clears AA, but narrows the 4.7x gap that is
+  currently doing the actual distinguishing.
+- **Fix only the border** - makes dashed-versus-solid a real
+  distinction instead of a notional one; leaves the text failing.
+- **Out of scope for now, logged as a standing accessibility item**
+  across every muted token - the footer (#54) and `--ink-faint`
+  generally have the same problem, so fixing one pill leaves the
+  pattern.
+
+**My lean is a blend of the last two:** fix the border now, because it
+is cheap and it makes the design the code already claims real - then
+fold the text contrast into one accessibility pass with #8 (keyboard
+cannot reach a dataset), #9 (focusable controls inside `aria-hidden`
+drawers), #10 and #55 (seven of eleven focusable types have no designed
+focus ring). Those four are already one job waiting to happen, and the
+muted-token audit belongs with them rather than ahead of them.
+
+**SIGNED OFF AND FIXED, 2026-09-24 evening** ("yeah, fix that"), taken
+as approving that blend: the border now, the text contrast into the
+accessibility pass.
+
+**What changed:** `.pill.nodata`'s border token moves from
+`--line-strong` to `--ink-faint` - the same token as its own label. It
+measures 2.81:1 light / 3.55:1 dark instead of 1.51:1, so the dashed
+edge is as visible as the words inside it, while staying quieter than
+exhausted's 5.35:1.
+
+**Why the same token rather than a hand-picked colour:** when the
+accessibility pass raises `--ink-faint` to clear AA, this border is
+lifted with it. A bespoke value would have to be found again.
+
+**Failing test first**, in both themes:
+`test_the_nodata_pills_border_is_at_least_as_visible_as_its_own_label`
+asserts the border's measured contrast against its own fill is at least
+the label's. The bar is deliberately that, not WCAG's 3:1 for non-text
+contrast - the muted tokens do not meet 3:1 yet, and raising them is
+the wider decision this defers. Before: 1.51 against 2.81 and 3.55.
+After: equal in both.
+
+**It also largely settles #48.** With a visible border the pill still
+reads as a pill when its fill merges into a hovered row. The root - one
+token serving both the pill's fill and the row's hover - is untouched
+and remains #48's to decide.
+
+### Q4. Two render sites disagree about the clock, and one shows raw ISO strings
+
+**What is there.** `REQ-PIPE-048` made every stored instant carry its
+own offset. Two render sites never caught up. The SLA tile builds its
+value by character-slicing the wall clock out of the string and
+appending `" UTC"` unconditionally - right today only because every
+stored value happens to be `+00:00`, which is the thing that
+requirement changed. And the supply-history table renders the field
+raw: **43 values of the form `2026-09-16T05:17:30.280161+00:00`**,
+confirmed in the built data, landing in a user-facing TIMING column.
+(#51)
+
+**The tile is the more pointed one.** In one four-across strip the SLA
+tile reads `Daily, by 14:00 AWST` and the arrival tile reads
+`05:29 UTC`, and a reader adds eight in their head, across two tiles,
+to judge the "Early" verdict in the same cell. Against a requirement
+whose story is "so that a supply that arrived at 10pm in Perth is not
+read as having arrived the following afternoon."
+
+- **Render every user-facing instant in the asset timezone** - matches
+  the story exactly, one formatter; changes what several existing views
+  display, so it wants its own requirement rather than a tidy-up.
+- **Keep UTC but format it** - drop the microseconds, use tabular
+  numerals, label the zone consistently. Cheaper, leaves the reader
+  doing +8 between two adjacent tiles.
+- **Split it** - format the supply-history timestamps now as a plain
+  rendering defect, and scope the UTC-versus-AWST question separately.
+
+**DECIDED 2026-09-24 evening, and wider than the question asked.**
+Keith's own call, in his words: "let's make a call... that will
+standardise the display of all timestamps and dates across the entire
+code base."
+
+**The standard he set:**
+
+| Kind | Form | His example |
+|---|---|---|
+| Date and time | time, then weekday, then day and month | `2:15pm Friday 29 September` |
+| Date alone | weekday, then day and month | `Friday, 29 September` |
+| Relative | "X <unit> ago", scaling by unit | `X minutes ago`, `X hours ago`, `X days ago`, `X weeks ago`, `X months ago`, `X years ago` |
+
+**And one prohibition, stated flatly: no raw ISO timestamps anywhere a
+person can see.** That kills #51's supply-history column and #14's
+`.slice(11,16)+" UTC"` tile outright, rather than choosing between the
+three options that were on the table.
+
+**This is a DISPLAY standard, not a storage change** - recorded
+explicitly because the distinction is load-bearing and nothing in the
+dictated version says it. Every stored instant keeps its ISO form with
+its offset: `qa_results/` is a permanent history read by machines,
+`REQ-PIPE-048` exists precisely to make those offsets explicit, and
+changing what is written would break the lot. The standard governs what
+reaches a human eye - the dashboard, the CLI, anything printed.
+
+**It needs a requirement before anything is built** (`CLAUDE.md`'s
+sign-off gate), and it is genuinely cross-cutting rather than a tidy-up:
+it lands on the dashboard's `fmtDate`/`fmtDateShort`/`fmtArrival`/
+`updateAsOfButtonLabel`, the supply-history table, the SLA tile, the
+`mothman schedule` output (`2027-11-01`, `09:00 +0800`), and every
+other print site. Four existing findings collapse into it - #3, #14,
+#51 and road-testing item 5 - plus road-testing item 11's "make the
+dates readable, not bloody raw timestamps".
+
+**Five things the dictated standard does not settle, and each would
+change what gets built - for Keith, before drafting:**
+1. **The year.** Neither example carries one, and this dashboard shows
+   multi-year history: supply runs from 2026, as-of dates out to 2028,
+   a Plans tab full of dated entries. Always show it, or only when it
+   is not the current year?
+2. **The timezone.** The format carries no zone label - which, given
+   the question this answers, most naturally means *everything is the
+   asset's clock and therefore needs no label*. That is the whole
+   substance of Q4 and it should be said out loud rather than inferred
+   from a format string.
+3. **Where relative, where absolute.** "Live · updated 39s ago" already
+   exists; supply history, last-QA-run and arrival times are absolute
+   today. One rule, or absolute with a relative tooltip, or relative
+   under some threshold and absolute beyond it?
+4. **Punctuation.** The two dictated examples differ - `2:15pm Friday
+   29 September` has no comma, `Friday, 29 September` has one. Worth
+   pinning, since this will be applied mechanically across a lot of
+   sites.
+5. **The CLI's machine-ish output.** `mothman schedule show` prints
+   dates into a table somebody may well be eyeballing against
+   `data-asset.yaml`, where `2027-11-01` matches the file and
+   `Monday, 1 November` does not. Does the standard cover config-echoing
+   output, or only prose?
+
+**ANSWERED 2026-09-24 evening, three of the five:**
+
+1. **The year is shown.** Keith's own call ("that should actually
+   mention the year - good point"). Taken as always, not
+   only-when-not-this-year, which is the reading that needs no rule and
+   never surprises anybody. Reversible if he meant the narrower one.
+2. **The absence of a timezone means everything is in asset time** -
+   his own words, and this is the substantive answer to Q4. Every
+   user-facing instant is rendered on the asset's clock, and carries no
+   zone label because there is only one. `#3`, `#14` and `#51` all
+   resolve to this.
+3. **Relative versus absolute:** he asked for a pass now rather than an
+   item later. It follows.
+
+**BOTH OF THESE WERE SETTLED LATER THE SAME EVENING** - see the
+"Punctuation" and "The CLI matches" paragraphs at the end of the
+relative-time pass below. Punctuation became one date string with an
+optional time in front of it; config-echoing CLI output IS covered,
+Keith's own call, with the consequence recorded there.
+
+**This line said "Still open" until 2026-09-25 and cost something.**
+A session preparing the six open items read it, did not read the
+resolution two sections further down, and put the CLI question to
+Keith as though it were undecided - with a lean OPPOSITE to the
+decision he had already made. He agreed with the lean, so the record
+briefly held two contradictory answers.
+
+Left here rather than deleted, because it is the third time this
+project has watched a decision get missed by a reader who stopped one
+level above it (`plans/tooling.md` #17 is the other). A stale "still
+open" is worse than no note at all: it does not merely fail to inform,
+it actively asserts the wrong thing.
+
+### The relative-time pass (Keith's ask, 2026-09-24 evening)
+
+"If you want to just do a pass now and find some of the high value
+areas to add relatives, that'd be handy."
+
+**What already exists, and it is less than it looks.**
+`fmtRelativeTime()` (template:3679) does minutes, hours and days, then
+**gives up at 30 days and returns an absolute date** - so Keith's weeks,
+months and years are not built. It is called from **exactly one place**,
+the Recent activity panel. And the masthead's `Live · updated Ns ago`
+clock (:4359) does its own seconds-and-minutes arithmetic inline rather
+than calling it - a second implementation of the same idea, which is
+the shape this project has been bitten by four times (`plans/qa-
+pipeline.md` item 74, and #34 in this very file).
+
+**Where relative genuinely earns its place** - the test being whether
+the reader's real question is "how long has it been?" rather than "which
+day was it?":
+
+| Site | Today | Worth it? |
+|---|---|---|
+| **`Last QA run` column**, Tier 2 (:2643) | `Sep 22, 2026` | **Highest value on the page.** The question is "is this stale?", and a date makes you do the arithmetic yourself. "2 days ago" answers it outright. |
+| **`Latest arrival`**, Tier 2 and the SLA tile | absolute time | **Both.** The absolute is needed to judge against the SLA deadline; the relative answers "has anything landed lately?". Absolute primary, relative alongside. |
+| **Past snapshots panel** (:3617) | `Sep 20, 2026 · 14:32` | **High.** You are choosing among archives, and "3 weeks ago" is how people pick one. |
+| **Release notes and Plans dates** | absolute | **Medium.** "How current is this thinking?" is a real question about both. |
+| **Recent activity** | already relative | Extend past 30 days to weeks/months/years. |
+| **The `Live · updated` clock** | its own inline maths | Point it at the one helper. |
+| **Supply history TIMING column** | `1 day since previous` + a raw ISO string | The between-rows relative is already right and should stay. The raw string becomes an absolute formatted one (#51). A third "ago" per row would be noise on a historical table. |
+| **`Retired <date>`, `Definition changed <date>`** | absolute | **Leave absolute.** These are records of when something was decided, not elapsed time. Relative belongs in the tooltip if anywhere. |
+| **The as-of chip, trend-axis labels** | absolute | **Never relative.** The as-of is a date somebody chose; "3 days ago" for a deliberate selection would be actively wrong. |
+
+**Two traps the pass turned up, and the first is the important one:**
+
+1. **Relative to WHOSE now?** Every relative string on this page would
+   be computed from the browser's real clock - but the dashboard is
+   routinely read **as of a past or future date**. Viewing as of
+   2027-09-01, a `Last QA run` reading "2 days ago" against the real
+   2026 clock is not merely unhelpful, it is false. **Relative time on
+   this page must be relative to `CURRENT_AS_OF`, not to `new Date()`**,
+   everywhere except the masthead clock (which genuinely is about now).
+   That is a rule the standard has to carry, and nothing in the
+   dictated version implies it.
+2. **The standard has no future tense.** "X ago" covers the past.
+   `mothman schedule show` is a table of **future** dates - Due,
+   Claimable from - and the runway warning counts forward. Those want
+   "in 3 days" / "in 2 quarters". Worth settling with the same
+   conversation rather than discovering it mid-build.
+
+**Recommendation:** one requirement, covering the absolute format, the
+relative format in both directions, the as-of-relative rule, and a
+single helper that both the dashboard and the CLI resolve through - not
+two more implementations. It supersedes #3, #14, #51 and road-testing
+items 5 and 11.
+
+**The 30-day fallback is FIXED, 2026-09-24 evening** (Keith: "also fix
+the bug where it stops at 30 days"). `fmtRelativeTime()` now runs
+minutes, hours, days, weeks, months, years and never returns an
+absolute date. Handover points are expressed in days so there is one
+number per boundary - a week at 7, a month at 30 - with the year
+decided by the computed month count rather than a day threshold, which
+is what stops "12 months ago" ever being printed.
+
+**Everything else in this pass still needs the requirement.** Keith
+agreed the analysis of the high-value sites; none of them are wired up
+yet, and they should not be until the standard is signed off - the
+as-of-relative rule above is exactly the kind of thing that is cheap to
+build in and expensive to retrofit.
+
+**Q4 IS NOW CLOSED AS A DECISION, 2026-09-24 evening.** Everything it
+asked is settled; none of it is built beyond the two defect fixes
+recorded above, and it still needs drafting as a real requirement
+before any more is.
+
+**Punctuation - Keith's call was that it is mine.** Settled as ONE date
+string with an optional time in front of it, rather than two formats:
+
+| | |
+|---|---|
+| A date | `Friday, 29 September 2026` |
+| A date and time | `2:15pm Friday, 29 September 2026` |
+
+Time is lowercase `am`/`pm`, no full stops, no leading zero on the
+hour, and minutes always shown even on the hour (`2:00pm`), so a column
+of them lines up.
+
+**Why this shape.** His two dictated examples disagreed on the comma,
+and the cheapest way to settle that is not to pick a winner but to stop
+having two strings: the date form is his own example exactly, and the
+date-and-time form is that same string with the time prefixed. One
+thing to build, one thing to read, and no rule about when the comma
+appears because it always does, in the same place.
+
+**The CLI matches** - his own call, 2026-09-24, closing the fifth open
+point. Worth recording the consequence once, since it was the reason
+for asking: `mothman schedule show`'s date columns will read
+`Monday, 1 November 2027` rather than `2027-11-01`, so they no longer
+match the `data-asset.yaml` a reader may have open beside them.
+
+**SUPERSEDED 2026-09-25. Config-echoing output is EXEMPT.** Keith's
+own call, put to him a second time and answered the other way: prose
+and anything read AS A TIME follows the standard; a column that echoes
+a configured value keeps its ISO form, so a reader can diff the table
+against the file by eye.
+
+**The second asking was an accident and is recorded as one**, because
+the accident is the interesting part. A stale "Still open" line two
+sections above this one (now corrected, see it for the full note) sent
+a session to Keith with the question presented as undecided and a lean
+OPPOSITE to the decision he had already made. He agreed with the lean.
+The contradiction was caught by reading this paragraph while drafting
+the requirement, and put back to him rather than resolved by picking
+the newer answer or the better-informed one.
+
+**Which is current: the 2026-09-25 exemption.** The 2026-09-24
+paragraph above is left standing rather than rewritten, so the earlier
+reasoning survives - it is a real argument for one rule with no
+exemptions, and whoever revisits this should see it.
+
+**Future tense is in** - his own call. The standard runs in both
+directions: `in 3 days`, `in 2 weeks`, `in 2 quarters` as well as `X
+ago`. Which means the trap the pass turned up is now a requirement of
+the standard rather than a gap in it.
+
+**THE RELATIVE HALF IS PARKED** - his own word, 2026-09-24 evening:
+"let's park the whole relative date thing."
+
+Read as parking the WORK, not the decisions. What stops: wiring
+relative time into the high-value sites the pass identified - the
+`Last QA run` column, the snapshots picker, latest arrival, release
+notes and plans dates. None of that was built and none of it starts.
+
+What stands:
+- **The 30-day fix stays shipped.** He asked for it specifically,
+  earlier in the same conversation, and it is in `d5158a1` and green.
+  `fmtRelativeTime()` keeps running to years.
+- **The decisions above stay recorded**, future tense included, so
+  unparking is a matter of drafting rather than re-deciding.
+- **The as-of-relative rule stays on the record** as the thing that
+  must be built in rather than retrofitted, since it is the reason
+  parking is cheap now and expensive later.
+
+**So the absolute half is live and the relative half is parked.** #3,
+#14, #51 and road-testing items 5 and 11 all resolve against the
+absolute standard, and none of them needs the relative work.
+
+**Next step, not taken:** draft this as a requirement. It has not been
+drafted, and per `CLAUDE.md` nothing is built until Keith has signed
+one off.
+
+## Findings
+
+Numbered continuously across critics. Each carries the critic's own
+label in brackets so the original report is findable, what this session
+**verified against the real code** (separately from what the critic
+claimed), what a fix would cost, and a recommendation.
+
+**Every one of these is waiting on Keith.** Nothing below has been
+acted on.
+
+Three did not survive verification unchanged, and the corrections are
+recorded with them rather than quietly applied: #5's crash has a
+narrower and more exact trigger than reported, #18's flag collision is
+three-way rather than two-way, and #9's severity depends on a claim
+about `mothman check` that turned out to be true for a different reason
+than the one given.
+
+**Where to start, if you read one thing.** Four findings are false
+greens or broken renders in code that is live right now, and they are
+the four this session would put in front of you first:
+
+| # | What | Cost |
+|---|---|---|
+| **#5** | An uncaught `TypeError` on three of seven dataset pages, at the default as-of, dropping the Supply History panel - shipping past a gate whose whole job is to catch it | small fix, real gate work |
+| **#1** | The executive legend counts `exhausted` and `nodata` agencies as GREEN - "Green, 2 agencies" directly above "6 datasets cannot be processed" | one expression |
+| **#4** | Eleven "no automated quality rule defined" placeholders that read as passing checks everywhere above the fourth click | a design question |
+| **#34** | Month names case-insensitive in the runtime, case-SENSITIVE in the gate - valid config refused with an untrue message | one `.lower()` |
+
+Two more are missed criteria on requirements already marked `built`,
+which is a different kind of problem: **#2** (the low-runway warning
+never rendered in the dashboard, and it is due right now) and **#3**
+(every date rendered on the viewer's clock, not the asset's).
+
+**#33 and #47 are process questions, not code** - whether the register
+should be able to say "built except for these criteria", and whether a
+post-build critic should see a requirement's own `evidence:`.
+
+### From `delivery-dashboard-ux-critic` (2026-09-24)
+
+1. **[done, 2026-09-24]** **[Dashboard UI]** **[F1] The executive tier
+   counts every non-red, non-amber agency as GREEN - including
+   `exhausted` and `nodata`.** The single most prominent sentence on the
+   landing page can state that both agencies are healthy directly above
+   a notice saying six datasets cannot be processed.
+
+   **Verified.** `dashboard/qa-reporting-dashboard.template.html:2525`
+   computes the green count by subtraction:
+   `${DATA.agencies.length-redCount-amberCount} agencies`, where
+   `redCount`/`amberCount` filter on `status==="red"`/`"amber"` only.
+   Nothing else is subtracted, so `nodata` and `exhausted` land in the
+   green bucket by arithmetic.
+
+   The critic checked the rest and found it correct, and so did this
+   session's read: `rollup()`/`rollupStatuses()` genuinely exclude both
+   statuses, and one exhausted among five red still reads Red plus a
+   marker. **It is only the legend counter.**
+
+   Against `REQ-PIPE-053`'s "SHALL NOT allow an exhausted schedule to be
+   absorbed by the worst-of status rollup at any tier" this is arguably
+   met in letter - a legend counter is not `worstOf()` - and defeated in
+   purpose. It is also exactly the false-green shape `runway.py`'s own
+   docstring opens with.
+
+   **Cost:** small. One expression, plus a decision about what the
+   legend should say when the three buckets do not sum to the total.
+
+   **SIGNED OFF AND FIXED, 2026-09-25 - Keith chose option (b)**, giving
+   the quiet states their own counters rather than dropping them from
+   the totals. Every figure is now COUNTED (`agencyCount(status)`)
+   rather than derived by subtracting two of them from the total, and
+   `No data` / `Schedule ended` appear with their own swatch and count
+   whenever an agency is in that state - so the legend also stops
+   naming three statuses when `statusVocabulary()` has five (#56's exec
+   half).
+
+   They appear only when real: two permanent `(0)` counters would be
+   furniture on the ordinary page.
+
+   **Failing tests first**, `tests/test_dashboard_e2e.py::
+   TestTheExecutiveLegendCountsWhatIsActuallyThere`, in a real browser
+   against the real built page. Three of four failed before. The one
+   that matters most is not about any single number - it asserts **the
+   figures sum to the number of agencies**, at a normal as-of, at
+   `2028-01-01` and at `2022-01-01`. A subtraction cannot be checked
+   against anything; a count can, and that is the property that makes
+   this class of bug impossible rather than merely fixed.
+
+   **#6 is NOT covered by this and still needs its own sign-off** - the
+   view-sub sentence above the legend still says "worst-of, so nothing
+   silently hides behind a healthy average" while two statuses are
+   deliberately excluded from that rollup. It is less misleading now
+   that the quiet ones are visibly counted, and still not true.
+
+2. **[done, 2026-09-25]** **[Dashboard UI, Pipeline & publishing]**
+   **[F2] The low-runway warning is computed, tested, and never
+   rendered anywhere in the dashboard.** `REQ-PIPE-053`'s criterion says
+   "surface the low-runway warning both in the dashboard and as a
+   non-fatal warning in the repository's gates". The gate half works.
+   The dashboard half does not exist.
+
+   **Verified.** `scheduleRunwayAsOf()` fills `out.low`
+   (template:1694), `buildData()` stores it as `data.scheduleRunway`
+   (:1822), and the ONLY consumer is `exhaustedNotice()` (:2475), which
+   returns `""` unless `exhaustedCount` is non-zero. `grep` finds no
+   other read of `.low` in the file. Two further criteria are vacuous
+   as a consequence - "warn once for that calendar, naming it, its last
+   authored period and how many datasets name it", and "distinguish a
+   warning from a failure in text as well as colour" - because there is
+   no warning on the page to name anything or to distinguish.
+
+   This is live today: the quarterly calendar has 2 future slots against
+   a threshold of 4, so a warning is due right now and no reader of the
+   dashboard can see it.
+
+   **What makes it worth Keith's eye rather than just fixing:** the
+   requirement's own `decisions:` records `delivery-dashboard-ux`
+   catching this exact half as "lost in scoping", and Keith explicitly
+   choosing both surfaces. It was then lost again at build time, and the
+   requirement is marked `built`.
+
+   **Cost:** moderate. A real render path plus its placement, which is a
+   design question, not a patch.
+
+   **Recommendation:** treat as a missed criterion on a `built`
+   requirement, not a new feature - and see #21, which asks what the
+   register should have recorded.
+
+   **SIGNED OFF 2026-09-25** - "we should rectify that, yep, definitely
+   actually build that." To build, as the missed criterion it is rather
+   than as a new feature.
+
+   **DONE 2026-09-25.** `lowRunwayNotice()` renders on the landing
+   view, above the fold, and is verified against the REAL built page
+   rather than a fixture - the live config has 2 quarterly slots
+   against a threshold of 4, so the warning is due right now.
+
+   Three decisions the criteria needed and did not state:
+   - **It names the dataset the number belongs to**, carried on the
+     runway itself as `drivingDataset`/`drivingLastPeriod` - the same
+     correction #22 needed on the CLI side, for the same reason:
+     `remaining` is a minimum across datasets, so naming only the
+     calendar pairs a number and a date belonging to different objects.
+   - **It says in WORDS that nothing has failed**, which is the
+     criterion about distinguishing a warning from a failure. Colour
+     alone cannot do it on a page already using red and amber for data
+     verdicts.
+   - **It goes silent once a calendar is actually exhausted.** "Running
+     low" stops being the news the moment it has run out, and two
+     notices about one calendar is the repetition the once-per-calendar
+     rule exists to prevent.
+
+3. **[done, 2026-09-25]** **[Dashboard UI]** **[F3] Every date on the
+   page renders in the VIEWER's timezone, not the asset's.** For any
+   viewer west of UTC the displayed date is a day early, silently.
+
+   **BUILT by `REQ-DASH-071`, 2026-09-25**, together with #51 and #60 -
+   they are one subject arriving from four directions, and the
+   requirement's own `decisions:` is where the thinking now lives.
+
+   **Verified.** `fmtDate()` (template:764) and `fmtDateShort()` (:765)
+   are bare `toLocaleDateString("en-US", …)` with no `timeZone` option,
+   fed `new Date(DATE_STR + "T00:00:00Z")`. Midnight UTC is the previous
+   calendar day anywhere west of Greenwich.
+
+   The critic measured it in four real browser contexts. In
+   `America/New_York` the header chip read "As of: Sep 23, 2026" while
+   the data shown was as of the 24th, and all six CP datasets reported
+   arriving "Jul 31, 2026" when they arrived on 1 August.
+
+   `REQ-PIPE-048`'s criterion 2 - "SHALL derive every wall-clock
+   computation from that value, and SHALL NOT carry a hardcoded offset
+   anywhere" - was built correctly in the engine (the critic confirmed
+   the asset-clock default as-of holds even at UTC+14, which is the real
+   bug that requirement killed) and the display layer was left behind.
+
+   **Severity, honestly:** Perth is UTC+8, always ahead of UTC, so every
+   date on this page is correct by coincidence for its actual audience.
+   It breaks for a federal counterpart, a vendor, or Keith on a trip -
+   with no indication anything has been re-interpreted. The same
+   "right by coincidence" shape `REQ-PIPE-048`'s own decisions use.
+
+   **Cost:** small-to-moderate. A `timeZone` option threaded through
+   two formatters and the as-of label, and a decision about where the
+   zone comes from.
+
+   **Recommendation: fix**, and pair it with road-testing item 5
+   (Keith's own sighting that the dashboard should display Perth time,
+   not UTC) - they are the same subject arriving from two directions.
+
+4. **[done, 2026-09-25]** **[Dashboard UI, QA checks & contract]**
+   **[F4] The "No automated quality rule defined" placeholder reads as
+   a passing check at every level a reader actually looks.** Its honest
+   label is four clicks deep; everywhere above that, an unchecked
+   column reads as a healthy one.
+
+   **Verified, including the count.** `pipeline/build_dashboard_data.py`
+   (and the CP twin) synthesise a placeholder check with
+   `current_status: "green"`, a full green `history`, and an honest
+   `note`. The source comment says green "is the truthful answer"
+   *because* the gap is labelled in `note` - and `note` renders in
+   exactly one place, the check panel.
+
+   Counted directly out of the real built `reports/*.json`: **11
+   placeholders across the 7 real datasets** - all six CP datasets'
+   `extract_timestamp`, `cp-investigations.end_date`,
+   `cp-placements.placement_end`, and the `table` scope of
+   `cp-clients`, `cp-carers` and `cp-case-workers`. The critic's
+   browser pass found the column tile Green, the drawer reading
+   "Passing 1, Warning 0, Failing 0" over 18 solid green squares, and a
+   `table`-scope placeholder rolling a whole "Table-level checks"
+   section to Green on its own.
+
+   **One of the eleven is already about to go.**
+   `cp-investigations.end_date` gets a real rule the next time CP runs -
+   the date-ordering check added today. The other ten stay.
+
+   **Cost:** moderate, and it is a design question rather than a patch:
+   green is defensible, the problem is that "no rule" and "rule passed"
+   are indistinguishable until the fourth click.
+
+   **Recommendation:** worth a requirement of its own. At 30 datasets
+   this is the most likely of anything in this file to become a real
+   false-green incident.
+
+   **SIGNED OFF 2026-09-25, with a design direction from Keith**: "yes,
+   we should definitely flag clearly that the column has no checks. I
+   feel like maybe a grey, as in like a disabled kind of grey colour is
+   the one to go for there - kind of speaks to it's inactive."
+
+   So the answer is NOT amber or red. A column nobody checks is not
+   failing and not warning - it is **inactive**, and disabled-grey is a
+   vocabulary a reader already has for that. It also cannot be mistaken
+   for a verdict, which is exactly what green was being mistaken for.
+
+   **That makes it a sixth status rather than a colour swap**, and
+   `REQ-QAC-047` owns the status vocabulary - so it lands in
+   `statusVocabulary()`, `STATUS_LABEL`, the pill CSS, the legend
+   (which #56 already says names three of five) and the Python twin in
+   `dataset_status.py`, held to the same `status-cases.json` table.
+
+   **The question the build has to answer**, noted now rather than
+   discovered later: what a column whose only check is inactive ROLLS
+   UP to. It must not win a `worstOf()` against a real verdict, and it
+   must not silently vanish either - which is precisely the shape
+   already settled for `nodata`.
+
+   **DONE 2026-09-25, and here is the answer to that question.**
+
+   `inactive` is **outside the ordering**, with `exhausted`, rather
+   than given a number. Both available numbers are wrong: low and it
+   loses every rollup and vanishes; high and an unasked question
+   outranks a real failure. So `worstOf`/`worst_of` REFUSE it, and the
+   filtering rollup handles it explicitly - a status carrying no
+   verdict never competes with one that does, and never disappears
+   either. Quiet-state precedence is `exhausted` > `inactive` >
+   `nodata`, ordered by what a reader can act on: an ended schedule is
+   why nothing is happening at all; "nobody wrote a rule" is a standing
+   fact; "no run within tolerance as of this date" is temporal and may
+   resolve itself tomorrow.
+
+   **The Python twin had no filtering rollup at all** - `dataset_status()`
+   called `worst_of()` directly, so the first check carrying `inactive`
+   would have raised inside the GitHub Issues automation. It has
+   `rollup_statuses()` now, held to a new `dataset_rollup_cases`
+   section of the shared table, because that behaviour is genuinely
+   different from ordering and both sides need it.
+
+   **Three consumers, found the hard way and worth recording** - this
+   is `CLAUDE.md`'s own "enumerate every consumer mechanically" lesson
+   arriving again:
+   - `pipeline/dashboard_check_labels.py`'s `status_rank()` indexed
+     `STATUS_ORDER` directly and took the whole dashboard build down
+     with a `KeyError`. That was the RIGHT failure - loud, at build
+     time - and it now ranks an unorderable status below everything,
+     locally, for headline sorting only.
+   - Three `worstOf()` call sites in the template (`buildRealDataset`,
+     `rollup`, and the exec-tier dataset loop) could all now receive
+     one. All three roll rather than order.
+
+   **My first attempt at the shared table was wrong and the harness
+   caught it**: I wrote the filtering behaviour as `rollup_cases`,
+   which drive `worstOf` - the ordering function - so they asserted
+   that an unorderable status returns a value. The cases are split
+   correctly now.
+
+   **A reporting gap found alongside**, not fixed: Vitest's own
+   stack-trace reader hits an `EISDIR` and the remaining tests in that
+   file never report. It surfaced as "35 passed (42)" with one failure
+   and seven tests unaccounted for.
+
+   **CORRECTED 2026-09-25, having hit it again on #57 and diagnosed it
+   properly.** This said the trigger was a test FAILING. It is not:
+   the trigger is an EXCEPTION THROWN INSIDE THE JSDOM PAGE SCRIPT.
+   Vitest tries to source-map a stack frame whose "file" is the
+   directory the template was loaded from, gets `EISDIR`, and abandons
+   the rest of that file - with or without any test failing. On #57 it
+   hid five PASSING tests behind a fixture of mine that threw inside
+   `aggregateFailureSeries()`.
+
+   That makes it a useful diagnostic rather than only a nuisance: **a
+   jsdom test file that stops partway means something in the page
+   threw**, and the fastest way to find it is to re-run that file with
+   `--reporter=verbose` and look at the last test that reported.
+
+   **Verified against the real built page**, not a fixture: all eleven
+   placeholders now read `inactive`, both table-scope sections roll up
+   `inactive` rather than green, and the inactive columns provably do
+   not change their dataset's own status in either direction.
+
+   **What this does NOT fix, stated plainly:** a dataset whose columns
+   are ALL inactive still rolls up `inactive`, which is right - but the
+   sibling case `worst_of(["nodata"]) === "green"` remains the pinned
+   false green of #45, and sprint 17 still owns it. Adding a third
+   quiet state does not change that, and deliberately did not try to.
+
+5. **[done, 2026-09-24]** **[Dashboard UI]** **[F5] An uncaught
+   `TypeError` on three of seven datasets, at the DEFAULT as-of, on an
+   ordinary drill-down - and it ships past the zero-console-errors
+   gate.**
+
+   **Verified, and the trigger is narrower and more exact than
+   reported.** The critic said the crash hits `cp-clients`, `cp-carers`
+   and `cp-case-workers` and named the placeholder's missing `key` as
+   the cause. Both halves are right, but the correlation is exact and
+   worth recording: those three are **precisely the three datasets
+   carrying a `table`-scope placeholder** (counted in #4). The crash is
+   in the `.scope-check` re-lookup loop (template:2895-2898), which only
+   runs over scope sections - so `cp-investigations` and
+   `cp-placements`, which have column-scope placeholders, do not crash,
+   and `cp-notifications` and `birth-registrations` are clean. The
+   critic's clean/crashing list is correct; the rule behind it is "has a
+   table-scope placeholder", not "has a placeholder".
+
+   The mechanism: rows are built with `data-check="${ck.key}"`, the
+   placeholder has no `key` (confirmed absent in the real built JSON),
+   so the attribute renders as the literal string `"undefined"`; the
+   re-lookup `find(ck=> ck.key===btn.dataset.check)` compares
+   `undefined === "undefined"`, matches nothing, and `check.name`
+   throws. Everything `renderDataset()` renders after that loop is
+   silently dropped, and the reader is left with a blank row that is a
+   bare Green pill - and, in the accessibility tree, a `button "Green"`
+   with no name.
+
+   **IT IS WORSE THAN EITHER CRITIC FOUND, measured 2026-09-25 while
+   building the accessibility cluster.** `navigate()` calls `render()`
+   BEFORE `history.pushState`, so the throw aborts the navigation
+   itself: clicking a row for `cp-clients`, `cp-carers` or
+   `cp-case-workers` leaves **the URL completely unchanged**. Verified
+   in a real browser - clicked the row, `url changed: False`, the
+   address still reading `/agency/child-protection-family-support`
+   while the page shows a half-drawn dataset view.
+
+   So on three of seven datasets the address bar disagrees with the
+   screen, Back goes somewhere else than the reader expects, a copied
+   link returns to the agency, and a reload loses the drill-down. The
+   critics reported a missing Supply History panel; the navigation
+   being silently broken is the larger half, and neither saw it.
+
+   **Still awaiting sign-off.** It is named here rather than fixed
+   because it is not in the accessibility cluster Keith approved -
+   though it is now the strongest candidate for the next one.
+
+   **The part that matters beyond the bug:**
+   `dashboard/check_dashboard_renders.py` holds the built page to zero
+   console errors and this is shipping, so that gate is evidently not
+   exercising a Tier-3 drill-down. Same "verify at the LAST transform
+   before the user" lesson `CLAUDE.md` already records from
+   `plans/qa-pipeline.md` item 74, recurring.
+
+   **Cost:** the crash itself is small. The gate gap is the real work.
+
+   **SIGNED OFF AND FIXED, 2026-09-25, in two places.**
+
+   **The data.** The synthesised placeholder gets a real
+   `key: "no_rule_defined"` in both build modules - unique within its
+   column, which is the scope `/check/<key>` resolves in, and this
+   placeholder is by definition the only check on its column.
+
+   **The render.** The scope-check loop no longer dereferences whatever
+   `find()` returned. A key that does not resolve is a real data bug
+   and must not pass quietly, so it logs `console.error` - which fails
+   `check_dashboard_renders.py`, exactly the gate that should catch it
+   - removes the row, and lets the rest of the page render.
+
+   **"Fail loudly" needs a different shape in a browser**, and that is
+   the reasoning worth keeping. On a server it means a stack trace
+   somebody reads. Here it meant a silently half-drawn page and a lost
+   navigation, which is the opposite of loud. Loud to the GATE, not
+   fatal to the READER.
+
+   **Tests, at the render layer:** every one of the six CP datasets is
+   loaded in a real browser under the fixture that asserts no console
+   error and no uncaught exception; the three that threw are
+   additionally asserted to still render everything after the scope
+   sections; and a third test clicks the row and asserts **the URL
+   actually changes**, which is the half neither critic found. Seven
+   failed before the fix.
+
+6. **[done, 2026-09-25]** **[Dashboard UI]** **[F6] The executive
+   tier's own explanatory sentence is now false.** It reads "worst-of,
+   so nothing silently hides behind a healthy average" (template:2521)
+   directly above the legend counter that is doing precisely that (#1).
+   Two statuses are now deliberately excluded from the rollup, by design
+   and correctly, and the copy was never updated.
+
+   **Verified** by reading the line. **Cost:** one sentence.
+   **Recommendation: fix alongside #1** - they are the same paragraph.
+
+   **SIGNED OFF AND FIXED, 2026-09-25**, one commit after the Tier 1
+   rename rather than alongside #1 - Keith declined to fold it into the
+   rename and then approved it on its own, which is the right order for
+   a claim about behaviour rather than a label.
+
+   It now reads: "...worst-of, so a failure cannot hide behind a
+   healthy average. A dataset with no data, or whose schedule has
+   ended, sits outside that comparison rather than losing to it, and is
+   counted separately below."
+
+   **The distinction the new wording carries** is the one the old
+   sentence blurred: those two states are not losing to a healthy
+   average, they are **not in the comparison at all** - and now that #1
+   gives them their own counters, "counted separately below" points at
+   something the reader can actually see three lines down.
+
+   **No new test**, deliberately, and the reasoning is recorded rather
+   than assumed: the behaviour this sentence describes is already
+   pinned - `rollup()`/`rollupStatuses()` by `status-cases.json` on
+   both sides, and the legend's own arithmetic by #1's
+   figures-sum-to-the-agency-count test. A test asserting particular
+   prose would pin the wording rather than the property, and would fail
+   the next time somebody improved the sentence.
+
+7. **[investigate, 2026-09-24]** **[Dashboard UI]** **[F7] The
+   exhausted notice says how many datasets cannot be processed and
+   never says which, or what is waiting.** `REQ-PIPE-053` asks a
+   message to "state how many supplies are waiting and since when" -
+   which may be one of the filing-layer criteria its own `[BUILD]`
+   decision already defers to sprint 8. Flagged rather than judged:
+   the notice as written asserts "nothing can be filed" without saying
+   what is piling up, which is the reader's next question.
+
+   **Recommendation:** resolve as part of sprint 8 rather than now, but
+   see #20 - at 30 datasets the missing names are a hunt.
+
+8. **[done, 2026-09-24]** **[Dashboard UI]** **[U1] You cannot reach a
+   dataset from an agency page by keyboard at all.**
+
+   **Verified.** The Tier-2 dataset rows - the primary drill-down, the
+   thing this dashboard exists for - are bare `<tr data-nav='…'>`
+   (template:2599, 2607, 2619) with no `tabindex`, no `role` and no
+   `href`; `grep` finds no `tabindex` anywhere in the file. The critic
+   captured the real Tab sequence and not one of the six rows appears
+   in it.
+
+   Tier 1 agency cards and Tier 3 column tiles ARE real `<button>`s, so
+   keyboard navigation dead-ends at exactly one level above the data.
+
+   **SIGNED OFF AND FIXED, 2026-09-25**, as one pass with #9, #10 and
+   #55. Every `tr[data-nav]` now carries `tabindex="0"` and answers
+   Enter and Space.
+
+   **On the row rather than a control inside the first cell**,
+   deliberately: the whole row has been the target since it was
+   written, and moving the affordance into one cell would change what a
+   MOUSE user clicks in order to fix what a keyboard user cannot reach.
+
+   **Tests:** `TestTheKeyboardCanReachTheData` asserts every row is in
+   the tab order, and separately that a focused row actually navigates
+   on Enter - the attribute and the behaviour, because the attribute
+   alone is a tab stop that does nothing.
+
+9. **[done, 2026-09-24]** **[Dashboard UI]** **[U2] Nine focusable
+   controls live inside closed, `aria-hidden="true"` drawers.** After
+   the last on-screen control, focus disappears into invisible widgets
+   with no focus indicator anywhere. A WCAG 4.1.2 violation, and
+   practically it reads as "Tab stopped working".
+
+   **VERIFIED and SIGNED OFF AND FIXED, 2026-09-25.** Confirmed in a
+   real browser rather than taken from the critic's trace: focusing
+   each control inside a closed drawer and checking whether
+   `document.activeElement` actually became it.
+
+   Every drawer now carries `inert` as well as `aria-hidden`, set
+   through one helper (`setDrawerHidden`) rather than at each of the
+   eight call sites - **the two attributes drifting apart is exactly
+   the bug being fixed**, so one place sets both. `inert` is the
+   purpose-built answer: it removes the subtree from the tab order AND
+   the accessibility tree, where the previous `transform:translateX`
+   removed it only from the eye. Support confirmed in the pinned
+   Chromium before it was relied on.
+
+   **Tests:** one asserts nothing inside a closed drawer can take
+   focus; its sibling asserts an OPEN drawer's controls still can,
+   because the cheapest wrong fix here hides everything.
+
+   **A test bug worth recording, since it is this file's own subject.**
+   The open-drawer test first clicked `.snapshots-btn`, which is the
+   class on every masthead chip - `.first` is "Dark mode", which opens
+   no drawer at all. It passed without ever opening one. Now it opens
+   the panel by its label and asserts a drawer is open before testing
+   anything, which is the same "check the precondition actually held"
+   discipline the rest of this pass has needed.
+
+10. **[done, 2026-09-25]** **[Dashboard UI]** **[U3] `plans/dashboard.md`
+    #15 confirmed still present, both halves**, checked across four
+    distinct views: `document.title` never updates, focus never moves on
+    route change, no ARIA live region announces one, and there are **2
+    real anchors in the entire rendered page** - so middle-click,
+    Ctrl-click and "copy link address" do nothing on breadcrumbs,
+    agency cards, dataset rows or column tiles. A confirmation of an
+    existing entry rather than a new finding; belongs with #8/#9.
+
+    **THREE OF THE FOUR HALVES FIXED, 2026-09-25.**
+
+    - **`document.title`** now names the view: `Registry Services ·
+      Data Asset QA Register`. Read off the view's own `<h2>` rather
+      than switched on `STATE.tier` - the heading is already the
+      answer, a per-tier lookup would be a second thing to keep in
+      step, and a tier added later gets this for free. Status pills are
+      stripped, since "Real pipeline data — 42 computed runs" is a
+      badge, not the view's name.
+    - **A live region** (`#route-announcer`, `aria-live="polite"`)
+      announces the same string, so a route change is spoken rather
+      than silent.
+    - **Focus moves** to the new view's heading - but only on a real
+      `navigate()`, NOT on every `render()`. `render()` also runs when
+      the as-of date changes, and stealing focus out of the date picker
+      mid-adjustment would be its own bug.
+
+    **THE FOURTH HALF IS STILL OPEN AND NEEDS A DECISION: real
+    anchors.** Breadcrumbs, agency cards, dataset rows and column tiles
+    are `<button>`/`<tr>` with `data-nav`, so middle-click, Ctrl-click
+    and "copy link address" still do nothing. Fixing it means every
+    navigable thing becomes an `<a href>` carrying the hash route it
+    already knows how to build - real work across five render
+    functions, and a change to what a click does at every tier, rather
+    than a patch. Worth its own conversation.
+
+    **SIGNED OFF 2026-09-25, and stated as a principle rather than a
+    fix.** Keith's own words: "yes, there should be links everywhere.
+    Everything should be an actual link. Nothing should be a magic
+    JavaScript link or magic JavaScript button."
+
+    That is wider than this finding, so it is recorded as the rule it
+    is: **anything that navigates is an `<a href>` carrying the route
+    it goes to.** Breadcrumbs, agency cards, dataset rows, column
+    tiles, check rows. A `<button>` stays a button only where it
+    performs an ACTION rather than a navigation - opening a panel,
+    toggling the theme, picking a date.
+
+    **What it buys beyond the middle-click:** the browser gets to do
+    its own job. Ctrl-click, open-in-new-tab, copy-link-address,
+    hover-to-see-the-target, and a real link for anything that scrapes
+    or archives the page. It also removes the keyboard question - a
+    link is focusable and Enter-able with no `tabindex` and no keydown
+    handler, so #8's row fix becomes a simpler thing rather than a
+    cleverer one.
+
+    **The thing to get right in the build:** a real `<a href>` is still
+    intercepted for the SPA route, and the interception must let the
+    browser win when the user asks it to - never `preventDefault` on a
+    middle click or a Ctrl/Cmd/Shift click. Intercepting
+    unconditionally is how a link becomes a magic JavaScript button
+    wearing an `<a>`, which is the thing this decision is against.
+
+    **DONE 2026-09-25, the fourth half.** Breadcrumbs and agency cards
+    are `<a href>` carrying the route they go to; dataset rows carry a
+    real link on the dataset NAME. One shared `wireNavLinks()` does the
+    interception and bails on any modifier, and on any button but the
+    primary - so Ctrl-click, middle-click, Cmd-click and Shift-click
+    all reach the browser untouched, which is asserted four ways rather
+    than assumed.
+
+    **A `<tr>` cannot be an `<a>`**, which is the one place the
+    principle needed a judgement rather than a substitution. The link
+    sits on the dataset name - what a reader aims at anyway, and what
+    "copy link address" should be offered on - and the row stays
+    clickable as a convenience. The row handler now bails when the
+    click came from inside an anchor, without which a Ctrl-click on the
+    name would open a new tab AND navigate this one, which is worse
+    than the magic button it replaced.
+
+    **Buttons that ACT are still buttons**, asserted explicitly in both
+    suites: the theme toggle, the as-of picker and the panel controls
+    are not navigations and did not become links.
+
+    Verified in a real browser as well as jsdom, because the jsdom half
+    cannot show that an ordinary click still routes instead of
+    reloading the page - which is the way this change could have
+    silently cost the SPA.
+
+11. **[done, 2026-09-25]** **[Dashboard UI]** **[U4] A stale column or
+    check deep link fails silently** - lands on the dataset page with no
+    message, `STATE.columnName` still set to the bad value, and the
+    broken segment still in the URL, so re-sharing propagates it.
+    `REQ-DASH-055`'s evidence records a not-found state added for agency
+    and dataset after exactly this class of bug; it was not extended to
+    column or check. At 30 datasets with evolving schemas, stale column
+    bookmarks are the common case, not the edge.
+
+    **DONE 2026-09-25.** A dead column or check segment now repairs the
+    URL (`replaceState`, so Back still goes where the reader came from
+    rather than through the broken link they just arrived on), clears
+    it out of `STATE`, and says what happened.
+
+    **NOT a full-page not-found, deliberately**, which is where it
+    differs from the agency/dataset case it is modelled on: everything
+    the reader asked for except the column resolved, and is worth
+    showing. So the dataset page renders and the notice sits above it.
+
+    **A test-harness bug found while writing the tests, and worth its
+    own line** because it is the same shape as #43: `_state_to_path()`
+    in `tests/test_dashboard_e2e.py` emitted no `/column/` or `/check/`
+    segment at all. Any test passing a `columnName` was silently
+    driving a plain dataset URL, so the assertion measured the dataset
+    page and said nothing whatever about the column. Fixed alongside.
+
+    The must-not-change half - a real column link still opens its
+    drawer - is in the Playwright suite rather than the jsdom one, and
+    deliberately: that harness carries only a hierarchy, so every
+    dataset in it has zero columns and every column name is stale.
+
+12. **[done, 2026-09-24]** **[Dashboard UI]** **[U5] The placeholder
+    check is not deep-linkable and Back cannot close its panel.** A real
+    keyed check behaves perfectly (URL gains `/check/<key>`, Back closes
+    the panel and restores the drawer, Escape does the same and syncs
+    the URL - the critic verified all of it). The keyless placeholder
+    from #4/#5 opens a panel with no URL change: not shareable, and Back
+    skips past it. **Same root cause as #5** - fix the key and this goes
+    with it.
+
+    **FIXED as a consequence, 2026-09-25**, exactly as predicted. The
+    placeholder now carries a key, so its panel deep-links and Back
+    closes it like any other check. A test asserts no check anywhere in
+    the embedded data is missing a key, rather than asserting this one
+    placeholder has one - the property is "every check is addressable",
+    not "we remembered this case".
+
+13. **[done, 2026-09-25]** **[Dashboard UI]** **[U6] The
+    exhausted dataset page is a dead end that hides real history.** It
+    replaces the ENTIRE dataset page - columns, checks, arrival history,
+    trends - with the exhausted message. `cp-case-workers` has 18 real
+    committed runs behind that message and no affordance to reach them.
+    Also: the two quiet states share one background
+    (`rgb(238,234,221)`), differing only in dashed-vs-solid border and
+    text colour, so "Schedule ended" and "No data" read the same at a
+    glance. The visual critic is looking at that half in both colour
+    schemes.
+
+    **DECIDED 2026-09-25**: keep the message prominent, **and show the
+    last known results below it**. Keith agreed the lean.
+
+    The reasoning to build against: **"nothing is expected" and
+    "nothing ever happened" are different statements**, and replacing
+    the whole page conflates them. `cp-case-workers` has 18 real
+    committed runs behind that message; a reader who drilled in to see
+    the last known state currently gets nothing and no way to ask for
+    it. The message stays first and stays loud - this is not a demotion
+    of it, it is putting history back underneath it.
+
+    **DONE 2026-09-25.** The early `return` is gone: the message is
+    built as a banner and the ORDINARY renderer runs, so the page
+    carries its columns, checks, arrival history and trends underneath
+    it. The heading keeps the `exhausted` pill, so the page does not
+    read as ordinary at a glance, and the banner ends by saying in
+    words that what follows is the last known state rather than a
+    current reading.
+
+    **A side benefit worth naming:** this path now exercises the same
+    renderer as every other dataset instead of being a second, quietly
+    diverging one. It had never run `renderDataset()`'s real body at
+    all, which is its own latent risk - the first test written here
+    asserts it renders with no console error for exactly that reason.
+
+14. **[done, 2026-09-25]** **[Dashboard UI]** **[U7] The asset's own
+    timezone is configured, and the page still shows two zones side by
+    side.**
+
+    **BUILT by `REQ-DASH-071`, 2026-09-25.** Both halves: the arrival is
+    now a real instant on the asset's clock, and the hardcoded `" AWST"`
+    is gone from `cadenceLabel()` - it was the last thing on the page
+    naming a clock. `expected_time` keeps its written `14:00` form,
+    because it is a deadline echoed out of `contract/*.yaml` rather than
+    an instant (criterion 8).
+ A dataset page reads `SLA: … by 09:00 AWST` next to
+    `Latest arrival: 01:00 UTC`, leaving the reader to convert in their
+    head to answer "did it meet the deadline". Both strings are
+    hardcoded: `cadenceLabel()` writes `"AWST"` literally, and
+    `arrivedAt` is `…slice(11,16) + " UTC"`, which takes the wall-clock
+    characters and labels them UTC **regardless of the stored offset**.
+    Correct today only because every stored value is `+00:00` - and
+    making other offsets storable was `REQ-PIPE-048`'s entire point.
+    **Same family as #3**; worth fixing together.
+
+15. **[done, 2026-09-25]** **[Dashboard UI]** **[U8] A broken sentence
+    in the footer, on every page.**
+
+    **Verified** at template:554: "…not just single-column rules Every
+    dataset on this page is real, computed the same way…" - no sentence
+    terminator where the mock-data sentence was removed by
+    `REQ-DASH-055`, and "computed the same way" now appears three times
+    in one paragraph.
+
+    **Cost:** trivial. **Recommendation: fix** - it is visible on every
+    page of the dashboard and it is one edit.
+
+    **DONE 2026-09-25.** The missing terminator, and the third
+    "computed the same way" went with it - it was the stranded half of
+    the removed mock-data sentence, not a clause the paragraph needed.
+
+16. **[done, 2026-09-25]** **[Dashboard UI]** **[U9] The agency page
+    overflows horizontally on a phone.** `scrollWidth` 537 against a
+    390px viewport, driven by `TABLE.dataset-table` at 539px: "Rows,
+    latest run" is clipped mid-word and "Last QA run" / "Trend" are
+    entirely off-screen. Before the first dataset row a reader scrolls
+    past roughly two screenfuls of chrome. The exec page and the
+    exhausted notice both render cleanly at that width.
+
+    **Recorded as reported** - the visual critic has this one in scope
+    and may add measurements.
+
+    **CLOSED 2026-09-25 as an ACCEPTED LIMITATION, not a fix.** The
+    phone is not a target (Keith's standing decision below), so the
+    Tier-2 table's own responsive strategy is deliberately not
+    attempted. The cheap half of his instruction IS done: the three
+    badge rows and the collection title now carry `flex-wrap`, so a
+    status marker wraps instead of being clipped. Desktop width is
+    untouched - they wrap only when they would otherwise overflow.
+
+### A standing decision that closes several findings at once
+
+**THE PHONE IS NOT A TARGET. Decided 2026-09-25, Keith's own words:**
+"no, it's not critical that it works on the phone. Shave off some of
+the rough edges, but I'm happy to accept a substandard experience
+there. Everyone will be using it on desktop screens or on laptop
+screens."
+
+**What that settles**, so the mobile findings stop being re-raised as
+though nobody had looked at them:
+
+- **#16** (the agency page overflowing at 390px), **#52** (the badge
+  row as the real widest element, and the collection count marker
+  clipped by 10px) and the tap-target half of **#57** are all accepted
+  as known, deliberate limitations rather than defects to fix.
+- **"Shave off some of the rough edges" is still a real instruction**,
+  not a dismissal. The cheap ones that cost nothing at desktop width -
+  a `flex-wrap` on the badge row, a `white-space` fix on the
+  breadcrumb, not clipping a status marker - are worth doing because
+  they are one line each and make the phone view untidy rather than
+  broken. What is NOT worth doing is a responsive strategy for the
+  Tier-2 table, which is the expensive half.
+- **It does not license regressions at desktop width**, and it does not
+  touch accessibility: keyboard, focus and screen-reader work
+  (#8/#9/#10/#55) was about operability on the machines people
+  actually use.
+
+### From `delivery-cli-ux-critic` (2026-09-24)
+
+All of these were verified by this session running the real commands
+just now, not by reading the critic's transcript.
+
+17. **[done, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A1] The gate's success line asserts the exact
+    opposite of the warning three lines below it.**
+
+    **Verified** at `qa_tools/common/validate_schedule.py:740` - the OK
+    line is a fixed string, `"… {n} dataset(s), every one of them
+    expecting something."` `_expects_nothing_errors` asks whether a
+    dataset derives zero periods **ever**; the OK line generalises that
+    into a claim about **now**, and the two part company the moment a
+    calendar runs out. With the asset clock past the quarterly
+    calendar's last date, the gate prints "every one of them expecting
+    something" immediately above a warning that six of the seven cannot
+    be processed.
+
+    **Cost:** small - one conditional, or dropping the clause.
+
+    **SIGNED OFF AND FIXED, 2026-09-24 - Keith chose option (b)**: keep
+    the headline as a statement about configuration validity and drop
+    the clause. It now reads `schedule validation OK - 2 calendar(s),
+    7 dataset(s), no configuration errors.`
+
+    **Rejected: making the headline runway-aware**, the other option on
+    the table. Config validity and remaining runway are deliberately
+    separate concerns in this gate - one fails the build and the other
+    must never do - and a headline speaking for both is exactly where
+    they would get confused.
+
+    **Failing test first**, `tests/test_validate_schedule.py::
+    TestTheSuccessLineDoesNotContradictTheWarningBelowIt`. It drives the
+    real gate against the REAL committed config with the asset clock
+    moved past the quarterly calendar's last authored period, so the
+    genuine exhausted warning fires, and asserts the headline makes no
+    claim the warning contradicts. Two sibling tests guard the
+    preconditions: that the gate still passes and the warning still
+    fires - without which there is nothing to contradict - and that
+    dropping the clause did not leave a bare "OK", since the counts are
+    what tell a reader the gate read the whole file rather than falling
+    out early.
+
+18. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A2] The
+    header's dataset count is not the number of datasets affected.**
+
+    **Verified** at `validate_schedule.py:709` - the count comes from
+    `{e.scope for e in errors if e.scope and e.scope.startswith("dataset ")}`,
+    so a calendar-scoped error contributes **zero** to it no matter how
+    many datasets that calendar serves. The critic reproduced a run
+    reporting "affecting 1 dataset(s)" where seven of seven were
+    affected.
+
+    Criterion 22 is met in form. The number it produces is what a reader
+    uses to judge urgency, and it is wrong in the safe-looking
+    direction.
+
+    **Cost:** small, but it needs a decision about what "affected"
+    means, since it now has to fan a calendar error out to its datasets.
+
+    **DONE 2026-09-25.** `ConfigError` grew an `affects` tuple - the
+    datasets an error actually breaks - filled in by one resolver,
+    `_attribute()`, rather than parsed at the point of use. A
+    calendar-scoped error fans out to every dataset naming that
+    calendar; a dataset-scoped one is itself; an error about the
+    asset's own top-level configuration stays empty and keeps its
+    existing "the asset's own configuration" wording, which is truer
+    than fanning a missing key out to all thirty.
+
+    **What "affected" means, settled:** a dataset is affected when an
+    error names it, or when an error names a calendar it uses. The
+    renamed-calendar case the critic reproduced now reads "6 error(s)
+    affecting 6 dataset(s)" where it read "affecting 1 dataset(s)".
+
+    One place reads a scope string back, deliberately - `scope` is a
+    display string this module builds in two shapes, and a single
+    resolver owning both readings beats threading a dataset list
+    through twenty construction sites where the missed one would
+    silently under-count.
+
+19. **[done, 2026-09-24]** **[Testing & dev tooling]** **[A3] Every
+    error names a correction; the one it names is the wrong one, and
+    the options offered include the typo.**
+
+    **Verified** at `validate_schedule.py:329` - the fix line is built
+    from the calendar names present in the file. Rename `quarterly` to
+    `quarterley` (one character) and six datasets each get "names
+    calendar 'quarterly', which this asset does not define. Use one of:
+    daily, quarterley, or add that calendar."
+
+    Two real consequences: the true fix - one character, one line above
+    those six datasets - **is never named**; and following the text
+    literally points six datasets at the misspelling, turns the gate
+    **green**, and commits a typo'd calendar name.
+
+    **This is not a re-litigation of Keith's individual-reporting rule.**
+    That rule is faithfully implemented and the critic says so
+    explicitly: nothing is hidden and the header count is true (#18
+    aside). A cause line printed ABOVE all six hides nothing and changes
+    no count.
+
+    **Cost:** small for the second half (stop offering a just-invented
+    name among valid options); moderate for the first (a cause line
+    needs to know which errors share a cause).
+
+    **Keith's call**, and the critic's Q2 offers exactly that split:
+    (a) add the cause line, (b) stop listing the typo, (c) both.
+
+    **STILL OPEN.** Keith asked on 2026-09-25 whether a pre-commit hook
+    would solve this instead. **It does not, and the reason is the
+    finding itself:** the harmful path ends in a VALID configuration.
+    Point the six datasets at `quarterley` as the text instructs and
+    the gate goes GREEN - so running the same validator sooner, or on
+    every commit, is still green. A hook changes WHEN you see the
+    message, not what it says, and arguably makes the bad instruction
+    more likely to be followed, since you are mid-commit and want to
+    move on.
+
+    **The hook was worth adding on its own merits and has been**, as a
+    separate thing (`mothman-check-schedule` in
+    `.pre-commit-config.yaml`, 2026-09-25): the gate is config-only and
+    runs in ~1.2s, and finding a calendar mistake at commit rather than
+    after a push is a real improvement to the loop. It is deliberately
+    documented in that file as NOT covering this item, so a later
+    reader does not take it for more than it is.
+
+    **SIGNED OFF AND FIXED, 2026-09-25 - Keith chose option (c)**, both
+    halves. The real output now reads:
+
+    ```
+    schedule validation FAILED - 6 error(s) affecting 6 dataset(s):
+
+      6 datasets name calendar 'quarterly', which this asset does not
+      define. The calendar 'quarterley' is defined and no dataset names
+      it - if that is the typo, one edit there fixes them all.
+
+      data-asset.yaml
+        dataset 'cp-carers'
+          - names calendar 'quarterly', which this asset does not define.
+            Use one of: daily, or add that calendar. ...
+    ```
+
+    **The cause line** is emitted only when at least two errors share a
+    root - a single error is not a shared cause, and a line restating it
+    would be noise. `ConfigError` grew a `cause` key and a `cause_hint`,
+    so the grouping is structural rather than string-matched on the
+    message text.
+
+    **Nothing is suppressed, and Keith's 2026-09-23 rule is intact**:
+    all six datasets are still printed individually and the header count
+    is unchanged. This adds a line above the detail; it removes none.
+    There is a test asserting exactly that, because "add a cause line"
+    is one refactor away from becoming the cause suppression he
+    rejected.
+
+    **The suggestions now list only calendars a dataset already uses**,
+    which is what stops `quarterley` being offered. A calendar nothing
+    references is either brand new or a typo, and neither is safe to
+    steer a broken dataset at. It falls back to listing everything when
+    nothing is referenced at all - a first dataset on a fresh asset -
+    since there is then no usage signal and an empty list helps nobody.
+
+    **The typo guess is claimed only when it is safe to claim**: exactly
+    one defined calendar unreferenced. Two or more and there is nothing
+    to point at, so nothing is said - covered by its own test, which
+    points a dataset at a name nobody ever defined and asserts no guess
+    appears.
+
+20. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A4/A5] One
+    mistake produces two errors in two idioms, and the generated half of
+    the fix lines names nothing.**
+
+    **Verified** at `validate_schedule.py:148-159`. The three generated
+    fixes are `"Remove it, or correct the spelling …"`, **`"Add it."`**
+    and **`"Correct the value."`** The last two name no shape, no
+    example and nowhere to look - against an NFR reading "every error
+    here must be one a human can act on immediately". The hand-written
+    fixes in the same report are genuinely excellent by contrast
+    ("Write a duration with its unit, like 14d or 4h. This is never
+    guessed at - a bare number could mean either."), and the generated
+    ones are what a mistyped or missing key produces, which is the most
+    common real mistake.
+
+    Separately, the schema and semantic layers both fire for one
+    mistake: `claim_window: 14` yields
+    `calendars -> 0 -> versions -> 0 -> claim_window: Input should be a
+    valid string. Correct the value.` AND `version 1's claim_window is
+    14, which is not a duration with a unit.` - the same version,
+    0-indexed and 1-indexed, two lines apart. The build decision "so one
+    mistake is one error" was applied within `_expects_nothing_errors`
+    and not across this seam, which also inflates #18's count.
+
+    **Cost:** small for the wording. Moderate for the double-fire, which
+    is a real seam between two validators.
+
+    **DONE 2026-09-25, both halves.**
+
+    The wording: a `_SHAPES` map gives every key in this schema an
+    expected form, and the generated fixes now read "Add it: a list of
+    lines saying what changed, like ['2027-01-01: authored 2027
+    dates']." rather than "Add it." Where a key is not in the map the
+    fallback points at the neighbouring entries rather than saying
+    nothing.
+
+    The double-fire: `ConfigError` grew a `field` path and a `layer`
+    tag, and one report about one value survives - the SEMANTIC one,
+    because it names the unit, gives two examples and says why it is
+    never guessed at, where the schema layer's generic message named
+    nothing. Tagged explicitly rather than inferred from the message
+    text, same reasoning as `cause` in #19.
+
+    Measured on the real config with `claim_window: 14` and a removed
+    `changelog`: three errors before, two after, and the header count
+    is no longer inflated by the duplicate (which was #18's other
+    half).
+
+21. **[done, 2026-09-24]** **[Testing & dev tooling, Pipeline & publishing]** **[A6] The exhausted schedule wears the warning's
+    label, in the one place a maintainer would act.**
+
+    **Verified** in `qa_tools/common/runway.py`. `warning_lines()`
+    prefixes BOTH states with `"WARNING (not failing the build)"`, and
+    `summary()` says `"calendar 'quarterly' is low on runway"` for a
+    calendar with **no** runway at all - then appends "The gate itself
+    PASSED." Exit 0.
+
+    The module's own docstring opens by calling these "TWO STATES,
+    DELIBERATELY DIFFERENT IN KIND" and says an exhausted schedule is "a
+    HARD FAILURE". Today they are textually the same state, and the
+    severe one reads as the mild one. `REQ-PIPE-053` criterion 14 asks
+    for a warning to be distinguished from a failure "in text as well as
+    colour".
+
+    **Defensible on the letter** - at the gate, nothing IS failing the
+    build, and the hard failure lands at filing in sprint 8.
+
+    **SIGNED OFF AND FIXED, 2026-09-25 - Keith chose option (a)**,
+    changing the words now rather than waiting for the filing layer.
+
+    The exhausted line now opens `EXHAUSTED (not failing the build,
+    yet):` instead of `WARNING (not failing the build):`, and
+    `summary()` no longer describes a calendar with no future dates at
+    all as "low on runway" - it says that calendar is `EXHAUSTED`, and
+    counts any merely-low ones after it, so the worse fact is never the
+    parenthetical. **The promise that nothing is failing the build
+    stays**, in both states: a non-fatal warning that starts failing
+    builds is one somebody turns off, and then it is not there for the
+    one that mattered.
+
+    **Failing tests first**, `tests/test_runway.py::
+    TestExhaustedDoesNotWearTheMildStatesWords`, including one that
+    pins the unchanged half - today's real config is low, not
+    exhausted, and must keep reading exactly as it did.
+
+    **It turned up a fixture that had been quietly wrong.**
+    `test_the_summary_counts_calendars_when_more_than_one_is_low` builds
+    a second calendar its own comment calls "also nearly out" and gave
+    it a single 2023 date - which is EXHAUSTED at that test's own as-of,
+    not nearly out. Nothing noticed while both states shared one
+    sentence. Extended to 2028 so the fixture matches its comment and
+    the assertion is about counting LOW calendars, which is what its
+    name says.
+
+22. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A7] The
+    runway number and the last period in one sentence belong to
+    different objects, and the number cannot be checked against the
+    file.**
+
+    **Verified with real numbers**, run just now against the real
+    committed config at `as_of` 2026-09-24:
+
+    | | |
+    |---|---|
+    | quarterly calendar, future periods | **5** |
+    | cp-clients and four siblings, future slots | **5** each |
+    | cp-case-workers, future slots | **2**, its own last being 2027-Q3 |
+    | what the warning prints | "calendar 'quarterly' has only **2** future supply slot(s) left - its last authored period is **2027-Q4**" |
+
+    `remaining` is correctly the min across datasets - `runway.py`'s own
+    docstring explains why - but the sentence attributes that dataset
+    fact to the calendar, pairs it with the CALENDAR's last period, and
+    names neither the driving dataset nor that a min was taken. Somebody
+    opens `data-asset.yaml`, counts five future dates, and the tool's
+    number is unreproducible.
+
+    **This is the same confusion `REQ-PIPE-053`'s own `[BUILD]` decision
+    already fixed on the dashboard side** - "a dataset's message names
+    its OWN last period, not its calendar's" - surviving intact on the
+    CLI side. At 30 datasets with mixed participation it is the normal
+    case.
+
+    **Cost:** small. **Recommendation: fix**, and it is the same edit
+    the dashboard already had.
+
+    **DONE 2026-09-25.** `CalendarRunway` now carries
+    `driving_dataset`, `driving_last_period` and `driving_last_date` -
+    as fields, not only inside the sentence, because the dashboard
+    renders its own message and should not parse one back out. The
+    warning reads:
+
+    ```
+    WARNING (not failing the build): calendar 'quarterly' runs out
+    first for 'cp-case-workers', which has only 2 future supply slot(s)
+    left - its own last is 2027-Q3 on 2027-08-01. 6 datasets name this
+    calendar. The calendar itself runs to 2027-Q4 on 2027-11-01.
+    ```
+
+    Every number in it can now be checked against the file. The
+    calendar's own horizon is kept as a separate clause, and only when
+    it differs from the driving dataset's.
+
+    **One existing rule was refined rather than broken**, and it is
+    worth being precise: `test_the_line_says_how_many_datasets_without_
+    listing_them` asserted that NO dataset is named. The thing that
+    rule exists to prevent is one fact repeated thirty times, not
+    naming a dataset - so it is now "name the one the number belongs
+    to, and none of the others", asserted exactly that way. The
+    minimum is taken with the dataset id as a tie-break, so the same
+    configuration always names the same dataset.
+
+23. **[done, 2026-09-25]** **[Testing & dev tooling]** **[A8] The
+    low-runway warning is printed and not surfaced.**
+
+    **Verified** at `cli/check.py:126-130` - the summary table has
+    exactly three outcomes, `passed` / `not installed` / `FAILED`, all
+    derived from a return code. The schedule gate returns 0, so the row
+    is green `passed`, the closing line is "Every gate passed.", and the
+    word WARNING appears nowhere in the summary.
+
+    **One correction to the critic's framing.** It attributed the miss
+    to the warning being "eight gates and two and a half minutes above
+    the table". That is true and is the smaller half. The structural
+    half is that `cli/check.py` has **no warning state to render at
+    all** - a gate cannot report one even if it wanted to, so no amount
+    of scrolling would change the summary.
+
+    `REQ-PIPE-053` criterion 12 asks for the warning "as a non-fatal
+    warning in the repository's gates". It is non-fatal and it is in a
+    gate. It does not reach the surface anybody reads.
+
+    **Cost:** moderate - a fourth outcome in `mothman check`, which is a
+    change to every gate's contract with it, not just this one.
+
+    **DECIDED 2026-09-25: yes, `mothman check` should be able to report
+    a warning.** Keith's own call.
+
+    The argument recorded for the build: **a gate that can only shout
+    or stay silent gets ignored for shouting.** Today the low-runway
+    warning prints, the row reads green `passed`, and the closing line
+    says "Every gate passed" - so the only way to make it visible is to
+    make it fail, which is precisely what `REQ-PIPE-053` forbids
+    ("a non-fatal warning that fails a build gets disabled, and then it
+    is not there for the one that mattered").
+
+    **What the build has to settle:** a warning must not change the
+    exit code - the fourth outcome is a REPORTING state, not a new
+    failure - and every gate needs a way to say "passed, with
+    something to know", which today they cannot express through a
+    return code alone.
+
+    **DONE 2026-09-25.** `mothman check` has a fourth outcome, "passed,
+    with a warning", and the closing line no longer says "Every gate
+    passed" over the top of one.
+
+    **How a gate says it, and why not the obvious way.** Reading the
+    gate's output for a marker was rejected: `_run` streams rather than
+    captures on purpose, and capturing means piping, and a gate whose
+    stdout is a pipe stops colouring it. So the channel is an exit
+    code - but a gate cannot simply start returning non-zero, because
+    CI runs these same commands as their own workflow steps where any
+    non-zero exit is a failed step. The runner therefore OPTS THE GATE
+    IN through `MOTHMAN_GATE_WARNING_EXIT`, and CI simply does not set
+    it. `mothman schedule validate` exits 0 for CI and 78 for
+    `mothman check`, from the same code path.
+
+    **The sentinel is interpreted per gate, not globally** - a fourth
+    field on `_GATES`. A real failure that happened to exit 78 would
+    otherwise be re-read as a warning, turning red into yellow, which
+    is the false-green direction.
+
+    **A bug found by driving it rather than reading it:** the first
+    build worked at the gate and still rendered red, because
+    `cli/schedule.py`'s wrapper turned every non-zero return into the
+    same `ClickException`. The warning arrived as a plain exit 1. It
+    has its own test now - a wrapper that flattens exit codes reads as
+    correct and nothing else in the chain would notice.
+
+    Verified end to end on the real config: `mothman check --only
+    schedule` exits 0 and shows the yellow row; `mothman schedule
+    validate` exits 0.
+
+24. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B1/B2/B3]
+    Ordinary wrong input produces Python tracebacks.**
+
+    **Verified by running all four just now**, real `uv run mothman`,
+    all exit 1, all ending in a 30-40 line traceback:
+
+    | command | ends in |
+    |---|---|
+    | `schedule show --dataset birth-registrations` | `ScheduleConfigError: … pass \`until\` to say where to stop.` |
+    | `schedule show --dataset nope` | `UnknownDatasetError: "'nope' is not a dataset…"` |
+    | `schedule show --dataset cp-case-workers --until notadate` | `ValueError: Invalid isoformat string: 'notadate'` |
+    | `schedule candidate-dates --calendar nope --year 2028` | `UnknownCalendarError: 'nope' is not a calendar…` |
+
+    Four things wrong at once in the first: **the most obvious
+    invocation for this repo's flagship dataset crashes**; it
+    half-renders the dataset header and then dies; the message itself is
+    genuinely good and is buried under 34 frames; and it names
+    `` `until` ``, the Python parameter, rather than `--until
+    YYYY-MM-DD`, the flag.
+
+    The `--until` pair is the worst: a bare `ValueError` from
+    `date.fromisoformat`, naming neither the flag, the format nor the
+    command - because `cli/schedule.py:34` declares `--until` as free
+    text rather than `click.DateTime`. Click's own convention
+    (`Invalid value for '--until': …`) was one parameter away, and is
+    what every other mothman command does. Meanwhile
+    `candidate-dates`' Click-level errors are model behaviour: clean
+    boxes, exit 2, usage line, `--help` pointer. **Same command group,
+    two languages.**
+
+    **Cost:** small and mechanical - `click.DateTime` for `--until`, and
+    a `ClickException` wrap around the three known config errors.
+
+    **Recommendation: fix, and decide it once for `mothman supply`
+    too** - whatever `schedule` ends up doing here, `supply` should do
+    the same way.
+
+    **DONE 2026-09-25.** `--until` is a real `click.DateTime`, so a bad
+    date now gets Click's own convention - "Invalid value for
+    '--until': 'notadate' does not match the format '%Y-%m-%d'" - like
+    every other flag in the tool. `--dataset` and `--calendar` are a
+    lazily-resolved choice type, so `--help` lists the real values and
+    a wrong one names them all. The two known config errors
+    (`UnknownDatasetError`, `ScheduleConfigError`) are wrapped in a
+    `ClickException` with the error's own message intact - unwrapped
+    from `KeyError`'s repr, which would otherwise print the message
+    inside escaped quotes and show the traceback through the thing
+    meant to replace it.
+
+    The fourth case, a daily calendar with no `--until`, is gone
+    entirely rather than caught: #29's window means the command no
+    longer needs the reader to supply a horizon.
+
+    **The choice type resolves LAZILY**, which is the one decision
+    worth keeping: the values come from `contract/data-asset.yaml`, and
+    reading it at import would make every `mothman --help` depend on
+    that file parsing. A gate exists to say whether it does; the help
+    should not be the thing that breaks first.
+
+    **`mothman supply` does not exist yet** - when it does, this is the
+    shape to copy.
+
+25. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B4] On a
+    failing gate, the only coloured thing on screen carries no
+    information.** The four real errors print uncoloured - visually
+    identical to the OK output - and the ending is a red, full-width,
+    boxed panel that repeats line 1 and adds "see output above",
+    pointing back past what could be sixty lines.
+
+    **Verified structurally**: `cli/schedule.py`'s `validate_command()`
+    raises `click.ClickException("schedule validation failed - see
+    output above.")`, and `_report()` prints every error with plain
+    `print(..., file=sys.stderr)` - no Rich markup anywhere in it.
+
+    **Cost:** small.
+
+    **DONE 2026-09-25.** The report colours its headline, the shared
+    cause, each filename, each scope and each error's bullet - with raw
+    ANSI and only when `sys.stderr.isatty()`, honouring `NO_COLOR`.
+    Rich was deliberately not used: this module also runs bare as a CI
+    step, where colour is stripped anyway, and importing a rendering
+    library to print eight lines buys a dependency for the case that
+    does not need it.
+
+    The closing panel's "see output above" is answered from the other
+    end: when there are more than three errors the headline is
+    repeated at the FOOT, where the eye already is. Thirty datasets is
+    sixty lines, and pointing a reader back past all of them to a line
+    they have already scrolled off is the thing that made the panel
+    useless.
+
+26. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B5] The
+    stdout/stderr split reverses the printed order, defeating the
+    code's own stated intent.**
+
+    **Verified, reproduced just now.** `validate_schedule.py`'s comment
+    says the warning is "printed AFTER the OK line rather than instead
+    of it, so it reads as an additional thing to know rather than as the
+    gate's verdict". The OK line goes to **stdout** (:740), the warning
+    to **stderr** (:766-771). With `PYTHONUNBUFFERED` unset - i.e. CI,
+    and a plain shell:
+
+    ```
+    $ env -u PYTHONUNBUFFERED uv run mothman schedule validate 2>&1 | head -6
+
+      WARNING (not failing the build): calendar 'quarterly' has only 2 future supply slot(s) left …
+
+      calendar 'quarterly' is low on runway. The gate itself PASSED.
+    schedule validation OK - 2 calendar(s), 7 dataset(s), every one of them expecting something.
+    ```
+
+    The warning arrives **first**, with no verdict above it, and the OK
+    line lands last. In a GitHub Actions log the first thing under this
+    gate is an unqualified WARNING - exactly the reading the comment
+    says the arrangement was chosen to avoid. This sandbox has
+    `PYTHONUNBUFFERED=1`, which is why it has never been seen here.
+
+    **Cost:** trivial - one stream, or one flush.
+    **Recommendation: fix.**
+
+    **DONE 2026-09-25** - the flush, keeping the stream split. One
+    `sys.stdout.flush()` before the first write to stderr, with a test
+    that asserts the ORDER of the two rather than their content, since
+    the bug is invisible in this sandbox (which sets
+    `PYTHONUNBUFFERED`) and would come straight back otherwise.
+
+27. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B6] The claim
+    window renders as a raw `timedelta`.** `cli/schedule.py:71` prints
+    `schedule.claim_window(dataset)` directly, giving `14 days, 0:00:00`
+    and `4:00:00`. The config is authored `14d` and `4h`, and
+    `REQ-PIPE-050` rejects any other form on purpose - "four ways to
+    write one duration is four ways for thirty datasets' config to read
+    differently". The one surface that displays it invents a fifth.
+    `4:00:00` reads as a time of day, in a table whose neighbouring
+    columns are literally times (`09:00 +0800`).
+
+    **DONE 2026-09-25.** A new `schedule.format_duration()`, the
+    inverse of `parse_duration`, used at both display sites - the
+    per-dataset view and the calendar list. It RAISES rather than
+    falling back to the timedelta's repr for a duration with no
+    authored form, because showing something nobody could type back in
+    is the whole problem.
+
+28. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B8/B9]
+    `candidate-dates` tells you to copy something it does not give you,
+    and will propose any year you ask for.**
+
+    **Verified by running it.** `--year 2027` proposes four periods that
+    are **already authored** - paste them and `validate` rejects them as
+    duplicates. `--year 2020` proposes six years into the past,
+    cheerfully. `--year 2030` leaves 2028 and 2029 unauthored, which is
+    the zero-slots hole `REQ-PIPE-050` exists to catch, produced by the
+    command the runway warning points you at as the remedy. The command
+    knows the calendar's last authored period - the warning prints it
+    one screen earlier - and does not use it.
+
+    Separately its own help says "Copy what you want into
+    contract/data-asset.yaml", and what it prints is a Rich table, not
+    YAML. There is no `--json`/`--yaml` on any of the three commands.
+
+    **Cost:** small for the year guard. Small for a `--yaml` output.
+
+    **DONE 2026-09-25.** The command proposes only the year actually
+    next in line, and refuses the other three cases by name: a year
+    already authored (naming the duplicate problem and the right year),
+    a year in the past, and a year that would skip one - which names
+    every year it would leave unauthored, since that is the silent
+    hole. It reads the last authored period from the calendar, which it
+    could always have done: the runway warning prints it one screen
+    earlier.
+
+    `--yaml` emits the version block its own help tells you to copy -
+    `effective_from`, a `changelog` line and the dates - printed bare
+    so it can be piped, with any weekend notes as a trailing comment
+    rather than inside the YAML.
+
+    Two existing tests used years the guard now refuses (2029 skips
+    2028; 2026 is authored). Both were rewritten to ask the calendar
+    which year is next rather than hard-coding one, so they do not go
+    stale the day somebody authors 2028. The weekend RULE stays covered
+    where it lives, in `tests/test_schedule.py`, against a year that
+    actually has one.
+
+29. **[done, 2026-09-25]** **[Testing & dev tooling]** **[B10] At daily
+    cadence there is no way to ask "what's next?"**
+    `schedule show --dataset birth-registrations --until 2026-09-24`
+    prints **1370 lines** (counted just now), no pager, no `--from`, no
+    `--limit`, no marker for today or the next due slot - and for a
+    daily calendar `Period` and `Date` are the same string in all 1363
+    data rows. The data team leader's actual question - *is my next
+    supply due today, and am I past it?* - has no answer short of
+    dumping three years. `slots.is_overdue()` and
+    `next_unfilled_claimable()` exist in the model with no CLI surface.
+
+    **DECIDED 2026-09-25**: default to a **window** - the last few and
+    the next few - with `--all` for the full dump. Keith agreed the
+    lean.
+
+    So `--until` stops being required for a daily calendar, which also
+    removes the traceback in #24 that a missing `--until` produces. The
+    reader's actual question - *is my next supply due, and am I past
+    it?* - becomes the default answer rather than something to be
+    extracted from 1370 lines.
+
+    **DONE 2026-09-25.** A single dataset shows three periods before
+    today and five after, with `->` against the next one actually
+    owed, and a footer saying how many were left out and how to see
+    them. `--all` is a real escape hatch - there is a test asserting it
+    genuinely prints everything, because a default that quietly becomes
+    a cap is a worse problem than the one this fixes. `--until` implies
+    the full list up to that date.
+
+    For a cadence rule the window also supplies the horizon the
+    calendar cannot, which is what removes #24's traceback: the bound
+    no longer has to come from the reader.
+
+30. **[done, 2026-09-25]** **[Testing & dev tooling, Docs & process]**
+    **[B11/B12] Help text and footers explain things the reader never
+    sees, and enumerate nothing they do.**
+    `mothman schedule --help` shows **`validate  Gate: a config error
+    can never silently produce zero slots (REQ-PIPE-050).`** - a
+    requirement ID in a Tier 1, human-facing listing (one other exists,
+    `dashboard validate-hierarchy`; none of the other seven groups do
+    it). `validate --help`'s body is a siting rationale written for a
+    developer. There are **no examples anywhere in the group**, which
+    `clig.dev` puts first. `--dataset TEXT` / `--calendar TEXT`
+    enumerate nothing although the values are finite and known - and the
+    penalty for guessing is #24's traceback. `--until` is described as
+    "For a daily calendar, the last date to list" when it is **required**
+    for one. And the per-dataset footer explains a period/slot
+    distinction that no shipped config exercises, while the thing a
+    reader would actually wonder about - why `cp-case-workers` shows 10
+    rows against 20 calendar dates - is answered only by inference.
+
+    **DONE 2026-09-25.** The requirement id and the siting rationale
+    are comments now, which is who they were written for; the help text
+    says what the command does. Every command in the group carries
+    examples. `--dataset` and `--calendar` enumerate their real values
+    in `--help`. `--until` no longer claims to be needed for a daily
+    calendar, because it is not any more (#29).
+
+    The footer answers the question a reader actually has: "10
+    period(s), 10 slot(s). The calendar has 20; this dataset takes
+    delivery in February, August only." The period/slot distinction is
+    still shown when a config genuinely exercises it, rather than
+    explained when it does not.
+
+31. **[done, 2026-09-24]** **[Testing & dev tooling]** **[B13]
+    `--dataset` means two different things - and it is actually three.**
+
+    **Verified, and the critic understated it.** `grep` across `cli/`:
+
+    | site | type |
+    |---|---|
+    | `cli/pipeline.py:59` | `click.Choice(["bdm","cp","all"])` |
+    | `cli/debug.py` ×5 | `click.Choice(["bdm","cp"])` |
+    | **`cli/debug.py:150`** (`debug changelog`) | **free text, "e.g. birth-registrations"** |
+    | `cli/schedule.py:33` | free text, a dataset_id |
+
+    So the fork **predates `schedule`** - `mothman debug changelog` has
+    taken a real dataset id under this flag name all along. That does
+    not make it better, but it does mean this is an existing
+    inconsistency being inherited rather than one `schedule` introduced.
+
+    `schedule`'s vocabulary is arguably the correct one (`bdm`/`cp` are
+    collections, not datasets). The finding is that a fork exists and
+    **`mothman supply` will have to pick a side**, and whichever it
+    picks, one group reads wrong.
+
+    **SIGNED OFF AND DONE, 2026-09-25 - Keith chose option (c)**: one
+    corrective rename, now, while there are six command groups and one
+    user. His own "renames are how a CLI surface rots" is about
+    REPEATED renames; this is the one that stops them.
+
+    **Checked before renaming, and it settled the noun.** Both
+    shorthands map one-to-one onto a real collection -
+    `bdm` -> `civil-registration`, `cp` -> `child-protection` - verified
+    against `hierarchy.all_datasets()` rather than assumed. `bdm` is not
+    a dataset shorthand; its collection simply holds one dataset today.
+    So the OLDER sites had the wrong noun and `schedule`'s was right all
+    along.
+
+    `--collection bdm|cp|all` on `mothman pipeline run` and the five
+    `mothman debug run-*`/`build-warehouses` commands. `--dataset` stays
+    exactly where it already meant a dataset id: `schedule show` and
+    `debug changelog`. **No deprecated alias** - keeping both spellings
+    is the fork, not the fix, and `mothman` is this repo's only
+    programmatic access point, so every caller is in the tree and was
+    updated in the same change (README, `CLAUDE.md`, the CLI tests).
+    The short VALUES stay as they are; the noun was the question, and
+    each flag's help now names the collection it stands for.
+
+    **Failing tests first**, and deliberately not a list of known call
+    sites: `tests/test_cli_app.py::TestOneNounPerThing` walks the whole
+    Click tree and asserts no command takes a collection shorthand under
+    a flag named `--dataset`, that the shorthands live under exactly one
+    flag name, and that `--dataset` still exists where it really means a
+    dataset. A future command cannot reintroduce the fork somewhere
+    nobody thought to look.
+
+### What both critics found genuinely working
+
+Recorded deliberately - a post-build pass that only lists faults gives
+a false picture of the state of the code, and several of these are
+things the critics tried to break and could not.
+
+- **Back/Forward on the dashboard is exactly right.** Four navigations
+  deep then four real back steps: each unwinds exactly one level, the
+  drawer closes on the right entry, no skipped entries, Forward
+  re-applies cleanly, Escape on a check panel closes it AND syncs the
+  URL.
+- **Deep links reconstruct real state cold**, and the query-string /
+  path-segment split matches `docs/spa-best-practices.md` section A
+  exactly.
+- **`REQ-PIPE-048`'s headline fix holds** in all four viewer timezones
+  tested, including UTC+14 where the viewer's own calendar had already
+  rolled over. The bug it was written to kill is dead. (#3 is a
+  different layer.)
+- **`REQ-QAC-047`'s loud-failure behaviour works in the real page** -
+  `checkStatus()` and `worstOf()` throw on an unknown value naming the
+  value, where it came from and the valid set, and explain
+  `exhausted` as "recognised but deliberately unorderable". The
+  level-scoped vocabulary is called out as genuinely good design. One
+  caveat worth carrying forward: in a browser "fail loudly" means an
+  uncaught throw mid-render, which the VIEWER experiences as a silently
+  half-drawn page - #5 is exactly that shape.
+- **The dataset-level exhausted message is the best error copy on the
+  dashboard** - names the dataset's OWN last period (the `[BUILD]`
+  decision landed), says plainly "Nothing is wrong with the data", names
+  the file to edit and the command that proposes the dates. Textbook
+  attribution-theory error handling.
+- **Exhausted is surfaced at every tier and correctly excluded from the
+  rollup**, and is evaluated against the selected as-of rather than
+  baked at build time. The notice cannot be dismissed.
+- **`REQ-DASH-055` is met**: only real datasets, a "No data" tile rather
+  than a vanishing dataset, and the raw unembedded template renders "No
+  data embedded" with zero console errors.
+- **Performance is comfortably inside the Doherty threshold**: 273ms
+  cold load of a 3.7MB page, 14ms tier navigation, 11ms full as-of
+  rebuild.
+- **The YAML parse-failure path is exactly right** - one error, file
+  named, line and column, "nothing below it can be checked until then",
+  and no cascade. Criterion 23 clean, and the hardest one to get right.
+- **The hand-written `fix` lines set a real bar** (see #20 for the
+  contrast with the generated ones).
+- **The runway warning names the file to edit and the command to run**,
+  and warns **once per calendar** with a dataset count and no
+  enumeration - the aggregation criterion is genuinely built and is the
+  right shape for 30.
+- **`mothman check` running every gate rather than stopping at the
+  first** is the correct call and visibly pays off.
+- **The Tier 1 siting decision for `mothman schedule` was right** -
+  `delivery-cli-ux` won that one on the merits and nothing the critic
+  drove contradicts it.
+
+### What works at 2 datasets and will not at ~30
+
+32. **[investigate, 2026-09-24]** **[Dashboard UI, Testing & dev tooling]** **Scale findings, collected.** Each belongs to a finding
+    above; they are listed together because the shared cause is breadth,
+    not any one of them.
+
+    - One asset-level typo produces ~30 near-identical stanzas with the
+      one-character fix named in none of them (#19).
+    - The header's denominator gets wronger as calendar-level errors fan
+      out (#18).
+    - Runway's min-across-datasets attribution is guaranteed to be the
+      normal case with mixed participation (#22).
+    - `mothman schedule show` with no arguments will print a `used by:`
+      line wrapping 30 dataset ids, with no summary and - in the one
+      place somebody editing calendars actually is - no mention of
+      runway at all.
+    - No machine-readable output on any `schedule` command, across two
+      separately-deployed assets somebody will want to script (#28).
+    - The exhausted notice names a count and never a dataset (#7). Keith
+      chose the notice over a badge and the decision names the risk
+      ("a notice that sits there for weeks becomes wallpaper") - so this
+      is a watch-item against a decision already taken, not a
+      disagreement with it.
+    - The false-green legend gets worse, not milder: at 30 datasets a
+      handful of exhausted or never-supplied ones is routine (#1).
+    - Eleven "no rule defined" placeholders across 7 datasets, honest
+      label four clicks deep (#4).
+    - The Tier-2 table repeats the same two-line provider string on
+      every row and already overflows at 390px; at 30 rows that is 60
+      lines of identical text (#16).
+    - `worstOf([])` returns green, so a table whose checks are all
+      retired rolls up green by vacuum. `REQ-QAC-047` **pins this as
+      parity-not-bug** and names sprint 16's zero-active-checks gate as
+      the fix - listed only so the pin stays visible.
+
+### A process question, not a code one
+
+33. **[done, 2026-09-25]** **[Docs & process]** **`REQ-PIPE-053` is
+    marked `built` and its dashboard half is not built** (#2). The
+    requirement's own `[BUILD]` decision already records that `built`
+    overclaims for the filing-layer criteria, and says so plainly - so
+    the register is not silent about the gap in general. #2 is a
+    different thing: a dashboard criterion, on a sprint whose dashboard
+    work WAS in scope, which `delivery-dashboard-ux` had already rescued
+    once from being lost in scoping.
+
+    The question is whether the register's binary `built`/`not_started`
+    model should be able to record "built except for these criteria",
+    and if so how. The critic flagged it rather than deciding it, which
+    is right - it is a call about how this project keeps its own
+    records, and it belongs with Keith.
+
+    **Keith, 2026-09-25: "I'm open to that. Give me a proposal."** The
+    proposal is summarised here so it does not live only in a chat log:
+    add an optional `unmet_criteria:` list to a requirement - each
+    entry naming the criterion, why it is unmet and who owns it next -
+    rather than adding a third status.
+
+    **SIGNED OFF AND BUILT 2026-09-25** ("ship it").
+
+    **Why a field and not a third status**, recorded because it is the
+    part a future session would otherwise re-litigate: `status` is what
+    the register is indexed and filtered by, so a third value would
+    make every consumer of it decide what "partly built" means - and
+    the honest answer for the requirement that prompted this is that it
+    IS built and has a hole in it. A hole is a property of the record,
+    not a different kind of record.
+
+    **All three sub-fields are required**, which is the point rather
+    than strictness: "some criteria are unmet" is exactly what the
+    prose already said, and a record that cannot name WHICH, WHY and
+    WHO NEXT is the same sentence in a different place. `owner` is free
+    text because the next owner is as often a sprint or a finding as a
+    person.
+
+    **It cannot appear on a `not_started` requirement** - nothing is
+    built, so nothing is unmet, and allowing it would make the field
+    mean two different things.
+
+    **Applied to `REQ-PIPE-053`**, which now carries its six
+    filing-layer criteria as structured records rather than as a
+    `decisions:` note: the four dashboard criteria (#2) are genuinely
+    met as of today, so what remains is the staging work that honestly
+    belongs to batch 3, sprint 8. Criterion 9 is #7, which resolves the
+    same way.
+
+    **And it reaches a reader**, which was the actual complaint - the
+    requirements panel renders the block above `decisions:` and the
+    evidence, because "this is not all there" changes how everything
+    below it should be read.
+
+### From `delivery-critic` (functional, 2026-09-24)
+
+Four of its findings are the same defects the dashboard UX critic
+reached independently, by a different route, and are recorded above
+rather than twice: its **A1** is #2 (runway never rendered), **A2** is
+#1 (the exec green counter), **D1** is #5 (the `TypeError`), **D4** is
+#15 (the footer). Two things that arriving twice does tell us, and both
+are worth having:
+
+- **#5 predates these twelve.** The functional critic traced it to
+  commit `6dba466` (REQ-DASH-033, 2026-09-20), and found that
+  `REQ-DASH-055`'s own evidence describes finding and fixing the **same
+  class of bug in the same function** - `renderDataset()` dereferencing
+  whatever `find()` returned - without covering this call site.
+- **Its own consequence is worse than the UX critic saw.** The
+  `forEach` aborts, so everything after that block in `renderDataset()`
+  never runs, and what is lost is the **Supply History panel**. Verified
+  in its own browser pass: present on the four clean datasets, gone on
+  the three that throw.
+
+It also read the requirements' own `evidence:` and `decisions:` blocks
+(which sit in the same file as the criteria) and **disclosed that it
+did**, flagging the isolation risk itself. It mitigated by checking
+every load-bearing claim independently - and that turned out to matter,
+because **three evidence claims are overstated** (#35, #39, #43). Worth
+deciding whether a future critic gets criteria-only extracts; recorded
+here as its own question, not acted on.
+
+34. **[done, 2026-09-25]** **[Pipeline & publishing]** **[A3] Month
+    names are case-insensitive in the runtime and case-SENSITIVE in the
+    gate, so valid config is rejected with an untrue message.**
+
+    **Verified by running both implementations just now:**
+
+    ```
+    schedule.parse_month_name("february")  -> 2
+    validate_schedule._month_number("february") -> None
+    validate_schedule._month_number("February") -> 2
+    ```
+
+    `REQ-PIPE-049` criterion 6 says "SHALL accept full month names only,
+    **case-insensitively**"; `REQ-PIPE-050` criterion 4 says the gate
+    "SHALL reject a month name that is not a real, full month name".
+    `schedule.py`'s `parse_month_name()` lowercases;
+    `validate_schedule.py`'s `_month_number()` does `_MONTHS.index()`
+    against title case. The pydantic schema imposes nothing.
+
+    The critic reproduced the end-to-end consequence on a copy of the
+    real config: `delivery_months: [february, august]` produces **three**
+    errors - two saying "names delivery month 'february', which is not a
+    month" (untrue), and a third, "expects no supply in any period at
+    all", which is a cascade of the first two and therefore inflates the
+    header count that criterion 21 calls "the true count" (see #18).
+
+    **Direction is a false RED, not a false green** - config the runtime
+    honours perfectly is refused at the gate. But it is the same
+    two-implementations-of-one-rule shape `REQ-QAC-047` exists to stamp
+    out, one requirement earlier in the same batch.
+
+    **Cost:** trivial - one `.lower()`. **Recommendation: fix, with a
+    failing test first,** and the test should be the parity kind: the
+    two functions should be held to each other, not each to its own
+    expectation.
+
+    **DONE 2026-09-25, and not with a `.lower()`.** The gate's
+    `_month_number()` now DELEGATES to `schedule.parse_month_name()`
+    rather than mirroring its reading, so there is one implementation
+    of the rule instead of two that agree until they do not. A gate's
+    job is to refuse what the runtime cannot read, which is only true
+    if it asks the runtime.
+
+    The parity test the finding asked for, holding the two to each
+    other across twelve spellings rather than each to its own
+    expectation, plus the end-to-end case (`february` is month 2, not
+    "not a month") and the must-not-change half (`Febuary` and `Feb`
+    are still refused - case-insensitive is not lenient). Confirmed
+    failing first.
+
+35. **[done, 2026-09-25]** **[Pipeline & publishing]** **[A4] Two
+    wall-clock computations are not on the asset clock.**
+    `REQ-PIPE-048` criterion 2 - "SHALL derive every wall-clock
+    computation from that value, and SHALL NOT carry a hardcoded offset
+    anywhere". The hardcoded `AWST_OFFSET` is genuinely gone and
+    `asset_time.py` is well built; two residues remain, neither covered
+    by the requirement's own recorded exceptions.
+
+    **Verified both.**
+
+    - `qa_tools/common/validate_schedule.py:622` - `today = today or
+      date.today()`. This is the boundary the retrospective-edit guard
+      uses to decide "already in the past", and it is the RUNNER's naive
+      local date. On GitHub Actions that is UTC, eight hours behind
+      Perth, so for roughly a third of each Perth day a date is
+      classified on the wrong side of "today" - precisely the class of
+      bug this requirement is named for.
+    - `dashboard/qa-reporting-dashboard.template.html:1739-1741` -
+      `assetTodayDateStr()` falls back **silently** to
+      `toDateStr(new Date())` (UTC) both when `ASSET_TIMEZONE` is null
+      and when the zone name does not resolve. The raw-template case is
+      legitimate and the comment says so ("never blank the page over
+      it"); a built file whose embed produced a null, or an IANA name a
+      given browser does not know, reverts to exactly the fixed bug with
+      no signal. Against this requirement's own "no silent
+      interpretation" stance, a visible degradation would be more
+      consistent.
+
+    **Cost:** small for the first. The second is a judgement about how
+    loudly a browser should fail, which is the same question #5 raises
+    from the other side.
+
+    **First residue FIXED 2026-09-25**, as part of #44's cheap
+    hardening - Keith folded the two together ("happy for you to put it
+    in item 44 and then address it there"), same guard, one fix. The
+    boundary now reads `asset_time.local_date(asset_time.now())`, with
+    a regression test that can only pass on the asset's clock. The
+    SECOND residue - `assetTodayDateStr()`'s silent UTC fallback in the
+    browser - is still open and still Keith's, for the reason recorded
+    above: it is the "how loudly should a browser fail" question, not a
+    one-line fix.
+
+    **SPLIT 2026-09-25, at Keith's direction.** The guard's
+    `date.today()` half moves to **#44**, which is the same guard and
+    the same conversation - "sure, happy for you to put it in 44 and
+    then address it there".
+
+    **THE DASHBOARD HALF IS BUILT, 2026-09-25**, as `REQ-DASH-071`
+    criterion 14 - Keith's own answer to the "how loudly should a
+    browser fail" question below was "I think I should just probably
+    fail quite loudly. No need for a graceful fallback." Absent or
+    unresolvable now throws, naming the zone, and both ends are
+    asserted. That closes this entry.
+
+    **What stayed here was the dashboard half**: `assetTodayDateStr()`
+    falling back silently to UTC when `ASSET_TIMEZONE` is null or the
+    zone name does not resolve. Still open, still mine, and still the
+    smaller of the two.
+
+36. **[in-progress, 2026-09-25]** **[QA checks & contract, Pipeline & publishing]** **[A5] Hierarchy identifiers are still restated inline
+    across many modules, and the requirement's own evidence says the
+    count is zero.**
+
+    `REQ-QAC-039` criterion 1: "SHALL define each dataset's place in the
+    hierarchy in exactly one place, and SHALL resolve every consumer's
+    need for those identifiers through it." Its evidence reads *"the
+    count is now zero, and the two that remain
+    (`cp_common.COLLECTION_ID`, `bdm_common.DATASET_ID`)…"*.
+
+    **The direction is confirmed and the evidence is wrong.** The critic
+    counted **17 inline literals across 10 modules**, none of them the
+    two named constants, and listed every site. This session's own
+    broader grep finds 26 occurrences across 15 files - a looser count
+    that also catches the two constants' own definitions and some
+    comments, so the critic's narrower number is the more careful one
+    and this session did not re-derive it line by line. Either way,
+    "zero" is not the state of the code.
+
+    It also names two structural neighbours:
+    `qa_tools/bdm/evidently_check_lifecycle.py:25-27` spells the whole
+    tree out as a literal check_id string, and
+    `qa_tools/common/validate_hierarchy.py:66-69` keeps a hand-maintained
+    contract-filename map that restates a relation `hierarchy.
+    contract_path()` already holds - two places to edit when a third
+    collection arrives.
+
+    **What makes this more than tidiness is #41.**
+
+    **Recommendation:** the evidence line needs correcting regardless of
+    whether the literals do - an overstated `evidence:` is the thing a
+    future session trusts instead of re-checking, which is the same
+    failure `CLAUDE.md` records about a fabricated test count.
+
+    **ONE OF THE TWO STRUCTURAL NEIGHBOURS IS DONE, 2026-09-25.**
+    `validate_hierarchy.py`'s hand-maintained `CONTRACTS` tuple is now a
+    derived `contracts()`: every dataset already declares its own
+    `contract:`, and which one a file describes falls out of how many
+    datasets name it - shared by several means their collection, named
+    by exactly one means that dataset.
+
+    **The failure mode it removes was silent**, which is what made it
+    worth doing rather than tidy: a third collection meant editing two
+    places, and forgetting the second one meant the new contract simply
+    never got checked - by the gate whose whole job is noticing that a
+    contract and the tree disagree.
+
+    **The comment it replaces is not overruled.** That said the list was
+    written out rather than "inferred from the filename, because a
+    filename is not a declaration". True, and unchanged: nothing reads a
+    filename to decide anything. It reads the hierarchy's own
+    declarations, which is the opposite of assuming.
+
+    **It also gained coverage the hand-written list never had**: a
+    contract file no dataset names is now reported. Deriving could have
+    lost that case - except it was never checked before either, because
+    nobody had added such a file to the tuple.
+
+    **THE EVIDENCE LINE IS CORRECTED, 2026-09-25, Keith's own yes.** It
+    claimed "the count is now zero"; the assertion is gone, and a
+    second entry records WHY it was wrong rather than quietly amending
+    it - an overstated evidence line is exactly what a future session
+    trusts instead of re-checking, which is the same failure
+    `CLAUDE.md` records about a fabricated test count.
+
+    **`REQ-QAC-039` now carries criterion 1 in `unmet_criteria:`** (the
+    field built for this, #33), owned by this finding. The register no
+    longer says the criterion is met.
+
+    **STILL OPEN:** the 17 literals themselves, and
+    `qa_tools/bdm/evidently_check_lifecycle.py`'s literal check_id
+    string - left alone because the literals are the substance of the
+    criterion and moving one of them is not the fix.
+
+    **SURVEY, 2026-10-06 (Keith's queue, "survey first").** The count
+    has grown, not shrunk: **~70 inline literals across 23 files**
+    (`grep` for every collection, agency and dataset id in `qa_tools/`,
+    `pipeline/`, `cli/`, `generator/`, `dashboard/`, `aws/`, excluding
+    `hierarchy.py` and comments). They fall into five kinds, and only
+    two of them are the defect the criterion names:
+
+    1. **A COLLECTION REGISTRY, STATED FOUR TIMES - the real defect.**
+       `processing_pass.COLLECTIONS`, `recheck._ORCHESTRATORS`, and
+       `cli/supply.py`'s `_SHORT_COLLECTION` and its `known` map each
+       say, per collection: its orchestrator module, its warehouse
+       builder, its run-id prefix (`run_`/`cp_run_`) and its short CLI
+       name (`bdm`/`cp`). `github_links.AGENCY_QA_FOLDER` says the
+       short name a fifth time, keyed by agency. A third collection
+       means editing five places, and forgetting one is silent in the
+       same way the old `CONTRACTS` tuple was. None of this is in the
+       hierarchy, and arguably should not be - a module path is code
+       layout, which is `AGENCY_QA_FOLDER`'s own stated reason.
+    2. **Per-collection code re-spelling its OWN collection** - ~35 of
+       the ~70. `qa_tools/bdm/*`, `cli/bdm.py`, `cli/cp.py`, the
+       `arrivals_for("civil-registration", "run_")` calls, and
+       `pipeline/build_dashboard_data.py`'s 14 `"birth-registrations"`.
+       Each module is about one collection by construction; the fault
+       is that it spells it rather than importing the one constant its
+       package already has (`bdm_common`/`cp_common`), and
+       `build_per_run_warehouses.DATASET_ID` and
+       `generate_runs.DATASET_ID` are second and third copies of
+       `bdm_common.DATASET_ID`.
+    3. **The Evidently check ids** - the whole tree spelled into two
+       constants. Derivable from the hierarchy plus a suffix.
+    4. **Scenario definitions** - `generator/scenario_injection.py`'s
+       six `dataset_id=` values. These are scenario CONFIGURATION, the
+       same kind of thing REQ-GEN-045's map is, and naming a dataset is
+       what a scenario is for. Not a defect if validated against the
+       hierarchy.
+    5. **Comments** that use an id as an example. Not code.
+
+    **The forks, for Keith before building** (asked 2026-10-06): where
+    the one collection registry (kind 1) lives, and whether kind 2 is
+    satisfied by "one constant per collection package, imported
+    everywhere" or needs every per-collection module to resolve through
+    `hierarchy.py` at runtime.
+
+    **KEITH'S ANSWERS SO FAR, 2026-10-06 - HELD, "talk it through
+    first".**
+    - **Registry: SPLIT, config plus code.** Each collection's short name
+      (`bdm`/`cp`) and run-id prefix become collection attributes in
+      `contract/data-asset.yaml`. Module paths go in ONE Python registry,
+      checked against the config.
+    - **Own-id: his question back was "why can't they read that from the
+      data?"** The answer given: mostly they can. Records carry their
+      collection and dataset, and a builder can iterate
+      `hierarchy.datasets_in_collection()` rather than naming its
+      dataset. The one fact a module cannot read from data is which
+      collection IT is, because `mothman bdm qa` runs before any record
+      exists. Proposed anchor: the package's own folder name
+      (`qa_tools/bdm` -> `bdm`) looked up against the config's `short:`,
+      so no id is spelled in code at all. A gate fails if a folder and the
+      config disagree in either direction, and a test refuses a new
+      inline id.
+    - The alternative put to him and not chosen yet: fold the
+      per-collection packages into one generic orchestrator, so there is
+      no `bdm`/`cp` folder to anchor. That is
+      `plans/publishing-and-history.md` item 6's code-architecture
+      question and a much bigger piece, to be scoped separately if
+      wanted.
+
+    Nothing is built until he has talked it through.
+
+    **KEITH, 2026-10-06 13:47, deferring it deliberately:** "why can't they
+    read that information in the data asset YAML file?" - and the thing he
+    wants to talk through is the larger aim behind it: **everything in
+    configuration and no custom code per dataset, if we can.** Parked to be
+    discussed alongside the calendar group (plans/wider.md #11, item 9), not
+    before. `plans/running-thoughts.md` #68 carries the aim itself.
+
+37. **[done, 2026-09-24]** **[Data generation]** **[A6/B3] Three
+    `REQ-GEN-040` criteria describe capabilities no operator can reach.**
+
+    **Verified by grep.** `partial_resupply=True` appears in the whole
+    repository exactly three times, **all in `tests/`**
+    (`test_generate_cp_runs.py:406`, `test_resupply.py:372/419/438`).
+    Neither `generate_cp_runs.py` nor `generate_runs.py` ever passes it,
+    and no `mothman` command exposes a flag, so `run_slot_chain()`'s
+    default `partial_resupply=False` is the only behaviour a person can
+    produce. `first_arrival_offset_days` is the same story - non-zero
+    only in tests.
+
+    Criterion 2 is phrased as an obligation on **output** ("SHALL
+    generate at least one delivery in which some of a collection's
+    tables are resupplied and the rest are not"), and as shipped the
+    system does not. Criteria 1, 4 and 5 (single-dataset supply, early
+    arrival, arbitrary lateness) are the same shape.
+
+    Keith's own `[BUILD]` decision sanctions the sequencing, so this is
+    not a surprise - but "the capability ships" is true of the library
+    and not of the product.
+
+    **SIGNED OFF AND DONE, 2026-09-25 - Keith chose option (b)**: keep
+    the capability library-only until the staging overlay lands, and
+    fix the register rather than the code. A `mothman` flag would create
+    a way to write a partial CP delivery into `data/deliveries/` that
+    today's warehouse builder crashes on, which is exactly what the
+    off-by-default guards against.
+
+    **A correction to the critic, found while doing it.** It reported
+    criteria 1, 4 and 5 as sharing the defect. **Only 1 and 2 did.**
+    Criteria 3, 4 and 5 already say "SHALL be able to" and are met by
+    the library capability. The reachability finding is real for all of
+    them; the PHRASING finding applied to two criteria, not four - the
+    fifth such correction in this pass.
+
+    So criteria 1 and 2 were reworded from "SHALL generate" to "SHALL be
+    able to generate", **matching the shape criteria 3, 4 and 5 already
+    used** - which makes the requirement internally consistent rather
+    than inventing an escape hatch for it.
+
+    **The original wording is quoted verbatim in `REQ-GEN-040`'s own
+    `decisions:`, on purpose.** Rewording a signed criterion is exactly
+    how a gap gets made to disappear, and this one has not: the
+    capability is still unreachable by any operator, that is still
+    recorded, and Keith still chose to defer it. What changed is the
+    register's CLAIM, not the scope - and a reader who suspects
+    otherwise can see both versions without going to git.
+
+38. **[investigate, 2026-09-24]** **[Pipeline & publishing, Dashboard UI]** **[A7] The dashboard is two slots away from asserting a stop
+    that does not happen.**
+
+    `REQ-PIPE-053` criteria 4, 5, 6, 7, 9 and 22 are self-admittedly
+    unbuilt, and the critic confirmed it independently rather than
+    taking it on trust: `grep -rn "exhausted" cli qa_tools pipeline`
+    outside `runway.py` / `dataset_status.py` / `validate_schedule.py`
+    returns **nothing**. No orchestrator, CLI command or filing path
+    knows an exhausted schedule exists.
+
+    **The consequence it names is the finding.** The quarterly calendar
+    has two slots left (#22). On the day it runs out, the dashboard will
+    render "N datasets cannot be processed - the delivery schedule has
+    ended" while `mothman pipeline run` processes them exactly as before
+    and publishes their results. The page will assert a stop that is not
+    happening, and today there is nothing to stop it.
+
+    **Recommendation:** this is sprint 8's work and it is already
+    scoped - the finding is the DATE. It stops being theoretical when
+    the calendar runs out, which is a known, computable day.
+
+    **RE-SCOPED 2026-10-06 (delivery-scoper) AND ANSWERED (Keith).** The stop
+    this entry warned about was settled differently: REQ-PIPE-131 c16 holds a
+    post-schedule supply rather than failing the dataset. Scoper also found
+    the hold's reason claims a next period opened (an exhausted calendar has
+    none), and `runway.exhausted_datasets` fires about a period before the
+    last slot closes. Keith's answers: (1) the hold IS the hard failure -
+    staged, checked, held, labelled schedule-ended with an honest reason and
+    the fix; (2) once dates are added, held supplies are RE-FILED
+    AUTOMATICALLY by the next pass in receipt order; (3) the dashboard says
+    exhausted when the last slot CLOSES, agreeing with the pipeline. Retention
+    of held supplies was not asked. Drafts (REQ-PIPE-154, REQ-DASH-155, and
+    053 c4-6 restated) are to be revised for (2) and (3) and brought for
+    sign-off.
+
+    **A WRONG PREMISE WENT TO KEITH, AND WAS CAUGHT BUILDING, 2026-10-06.**
+    The scoper reported that a held supply "is still staged and checked,
+    because arrival_lifecycle.process always runs the checks", and Keith
+    signed REQ-PIPE-154 criterion 5 on that. It is false: a held supply's
+    view is withheld (REQ-PIPE-078 criterion 9), so it gets its file checks
+    and no data checks - all 9 holds in the sandbox read 6 and 0. Caught
+    when the criterion was about to be marked met against
+    `tests/test_held_not_checked.py`, which says the opposite. Told him; he
+    kept today's behaviour and c5 is amended. The lesson is CLAUDE.md's own:
+    a critic's or scoper's claim about the code is a claim to verify against
+    the code BEFORE it goes to Keith, not after he has signed it.
+
+39. **[done, 2026-09-25]** **[Pipeline & publishing]** **[B1/B2] Three
+    model functions built in this batch have zero production callers.**
+
+    **Verified by grep across `cli/ qa_tools/ pipeline/ generator/
+    dashboard/`: no callers at all** for `schema_name`, `is_overdue`,
+    `is_claimable` or `next_unfilled_claimable` outside their own
+    definitions and tests.
+
+    - `REQ-PIPE-051` criterion 6, "SHALL name a warehouse schema after a
+      period": no warehouse schema in this repo is named after a period.
+      It is a correct, tested pure function that nothing uses.
+    - `REQ-PIPE-052` criterion 7, "SHALL determine whether a slot is
+      overdue": nothing currently determines that anything is overdue,
+      and no overdue slot appears anywhere a user can see.
+      `next_unfilled_claimable`'s own docstring says "DO NOT USE THIS AS
+      THE ASSIGNMENT RULE… nothing calls this yet, which is why it is a
+      trap rather than a bug" - an honest warning and the right call.
+
+    **Defensible for an early sprint**, and the critic says so. Its
+    actual point is the record: `status: built` plus assertive
+    `evidence:` prose reads, to anyone who does not open the code, as
+    though these are live. Same subject as #33.
+
+40. **[done, 2026-09-25]** **[Data generation, Pipeline & publishing]**
+    **[B4] Two signed criteria in this batch contradict each other.**
+
+    `REQ-GEN-040` criterion 6: "SHALL NOT decide, record or emit which
+    slot a generated supply fills."
+    `REQ-GEN-043` criterion 6: "SHALL keep the generator's own
+    bookkeeping - which scenario a delivery came from, **which slot it
+    was built to fill** - in an artefact outside every delivery."
+
+    The built system does the latter: `data/generator_bookkeeping.json`
+    records `slot_id` and `period` per arrival. 043 is later and more
+    specific so it plainly wins, and `tests/test_arrivals.py`'s static
+    firewall is a strong guard on the pipeline side - but **040/6 as
+    written is not met**, and the only thing between "recorded outside
+    the delivery" and "read while filing" is that test.
+
+    **Cost:** a wording change. **Recommendation:** reconcile the two
+    rather than leave two signed criteria disagreeing - a future session
+    reading 040 alone would conclude the bookkeeping file is a defect.
+
+    **RECONCILED 2026-09-25, Keith's own yes**, by narrowing 040 rather
+    than loosening 043. Criterion 6 was "SHALL NOT decide, record or
+    emit which slot a generated supply fills"; it now forbids EMITTING
+    one inside any delivery, and forbids the pipeline reading one from
+    the generator's bookkeeping, while leaving the generator free to
+    record what it knows.
+
+    **That is the rule the firewall actually enforces**, and stating it
+    that way is what makes `tests/test_arrivals.py`'s static check the
+    guard for a written criterion rather than for an unwritten
+    convention: the concern was never that the generator knows which
+    slot it built for - it must, to build a realistic supply - but that
+    a filing decision could be made from a declaration rather than
+    from arrival plus slot state.
+
+41. **[done, 2026-09-25]** **[Pipeline & publishing]** **[D2]
+    `arrivals_for()` answers an unknown collection with silence.**
+
+    **Verified** at `qa_tools/common/arrivals.py:141-142` - `if found !=
+    collection_id: continue`, returning `[]`. The critic confirmed the
+    behaviour live: `arrivals_for('civil-registration-RENAMED','run_')`
+    → `[]` against `42` for the real id.
+
+    Combined with #36's inline literals, **renaming a collection in
+    `contract/data-asset.yaml` gives every BDM/CP entry point zero
+    arrivals rather than an error** - a pipeline that processes nothing
+    and reports nothing wrong. The check-lifecycle hierarchy-agreement
+    gate would eventually fail on the same rename, so it is caught - by
+    a different gate, for a different reason, and only because check ids
+    happen to carry the collection segment.
+
+    Everywhere else in these twelve an unknown id raises
+    (`hierarchy.dataset`, `schedule.calendar`). This one is the
+    exception, and it is the false-green direction.
+
+    **Cost:** small. **Recommendation: fix** - it is the same
+    "no permissive fallback" stance `CLAUDE.md` takes elsewhere.
+
+    **SIGNED OFF 2026-09-25** - "yep, we should definitely raise on
+    unknown collection id."
+
+    **DONE 2026-09-25.** `arrivals_for()` now calls
+    `hierarchy.datasets_in_collection(collection_id)` first, which
+    already raised the right error naming the real collections - the
+    function simply never asked it. Three tests, the first two
+    confirmed failing first: a renamed collection raises, the error
+    names what does exist, and the must-not-change half - a real
+    collection with nothing delivered yet still answers `[]`, because
+    empty is an ordinary state and only an undefined id is not.
+
+42. **[done, 2026-09-25]** **[Pipeline & publishing]** **[B6] The claim
+    window is not effective-dated, so a new calendar version moves
+    history.**
+
+    **Verified** at `qa_tools/common/schedule.py:611` -
+    `return calendar_for_dataset(dataset_id).current.claim_window`.
+    `claim_window` is a per-VERSION field, and `slots_for_dataset`
+    applies the CURRENT version's value to every slot it derives,
+    including slots for periods years in the past. Author a new version
+    changing `14d` to `7d` and every historical slot's
+    `claim_opens_at` moves.
+
+    That is the retroactivity `REQ-PIPE-051` built `_effect_windows()`
+    to prevent for dates, arriving by a different door:
+    `periods_for_calendar()` got this right and `claim_window()` did
+    not.
+
+    **Cost:** moderate - it needs the same effect-window resolution the
+    dates already have. **Recommendation: fix**, and it is a real
+    correctness bug rather than a polish item, so a failing test first.
+
+    **ANSWERED 2026-09-25 - Keith asked whether `REQ-PIPE-051` fixes
+    this once built, or whether Thread E already has a solution.**
+
+    **051 is already built, and it does not fix this - deliberately.**
+    Its criterion 5 says the system "SHALL NOT attach a due instant, a
+    grace allowance or a CLAIM WINDOW to a period". Scoping the claim
+    window out of periods is correct: it belongs to the slot, not the
+    period. So this is not an oversight in 051, it is a boundary 051
+    drew on purpose.
+
+    **But 051 states the principle this needs, in its own criterion 9**
+    - "SHALL evaluate each period against the version of its own
+    calendar in force on that period's own date" - and BUILT the
+    mechanism, `_effect_windows()`. `periods_for_calendar()`'s own
+    docstring describes an identical bug it already fixed for dates:
+    reading `calendar.current` for the whole sequence, so adding a 2027
+    version did not move the earlier periods, it REPLACED them, and
+    four years of history ceased to exist.
+
+    **`claim_window()` is that same bug in the layer 051 handed to
+    052.** `REQ-PIPE-052` criterion 10 says a slot takes its claim
+    window "from its dataset's own contract where one is declared and
+    from its calendar's default otherwise" - and is silent on WHICH
+    VERSION. Today's code satisfies it by reading `.current`, so the
+    criterion is not broken, it is underspecified.
+
+    **Thread E does not solve it either - it RAISES THE STAKES.** Its
+    settled assignment rule is "assign to the oldest slot whose CLAIM
+    WINDOW is open and which is unfilled", so the claim window is not a
+    display detail, it is the input to slot assignment. A claim window
+    that moves retroactively means re-deriving a past assignment can
+    give a different answer than the one history was filed under - the
+    cascading misassignment Thread E exists to prevent, arriving
+    through configuration rather than through the rule.
+
+    **So: no existing requirement fixes it, the mechanism is already
+    built, and the fix is to apply `_effect_windows()` to the claim
+    window as well as to the dates** - plus tightening 052's criterion
+    10 to name the version, which touches `requirements.yaml`'s own
+    claims and so is Keith's.
+
+    **CRITERION 10 AMENDED 2026-09-25, Keith's own yes.** It read
+    "from its calendar's default otherwise" and now reads "from the
+    version of its calendar in force on that period's own date
+    otherwise". The code already did this; the criterion was
+    underspecified rather than wrong, which is the worse shape - it
+    was satisfied by the buggy reading and by the correct one alike.
+
+    **DONE 2026-09-25** (the code half; the criterion-10 wording is
+    still Keith's and is listed with the other register items).
+    `schedule.claim_window()` takes an optional `on:` date and resolves
+    the default through a new `_version_in_force()`, built on
+    `_effect_windows()` - the same mechanism the dates already use.
+    `slots_for_dataset()` now asks per period, on that period's own
+    date, instead of hoisting one value out of the loop.
+
+    Two decisions worth keeping. **The contract override stays
+    unversioned**: it is declared in the dataset's own ODCS contract,
+    which has no `effective_from` and no version sequence, so there is
+    no date at which one of its values was in force rather than
+    another - only the calendar default can move under history.
+    **A date before the first version's `effective_from` takes that
+    first version** rather than raising, which is what
+    `periods_for_calendar` already does implicitly by never generating
+    such a period; raising would turn "this calendar was authored later
+    than its own earliest data" into an error nobody can act on.
+
+    Three tests, the first confirmed failing first against a real
+    two-version calendar whose versions differ in claim window rather
+    than in dates: the 2024 slot opened seven days before its due
+    instant instead of fourteen, taking the 2027 version's value. The
+    other two are the halves that must not change - a current slot
+    still takes the current version, and a contract override still wins
+    at every date.
+
+43. **[done, 2026-09-24]** **[Testing & dev tooling]** **[C1/C3/C4] Two
+    gates claimed to catch "a throw reaching a viewer" do not, and the
+    gate's own three reporting criteria have no test at all.**
+
+    **Verified, with one correction to the critic.**
+
+    - **The e2e exhausted test misses uncaught exceptions.**
+      `tests/test_dashboard_e2e.py:1329` registers only a `console`
+      handler. The suite's own `clean_page` fixture (lines 58-68)
+      registers **both** `console` and `pageerror` and asserts in
+      teardown - this test uses plain `page` instead. So
+      `TestAnExhaustedScheduleIsLoud` passes while the very dataset page
+      it navigates to throws (#5).
+    - **`dashboard/check_dashboard_renders.py` only ever loads the
+      landing page.** `_check_render()` does one `page.goto()` per file
+      and asserts `#view` is non-empty; it never navigates to a Tier-2
+      or Tier-3 route. **The critic's wording implies this gate lacks a
+      pageerror handler - it does not** (line 108 registers one). The
+      gap is navigation coverage, not the handler, and that distinction
+      matters for the fix: adding a handler would change nothing.
+    - **`REQ-PIPE-050`'s criteria 19, 21 and the second half of 22 live
+      entirely in `_report()`, and `_report()` has no test.** The only
+      gate-level assertion in the suite is
+      `tests/test_validate_schedule.py:372`, `assert
+      validate_schedule.main() == 0` - the happy path. **Criterion 1**
+      ("SHALL exit non-zero on any error") is never exercised: the tests
+      assert `validate()` returns a non-empty list, not that the gate
+      exits 1. Four smaller branches are uncovered too (missing asset
+      file, a collection with no `contract:` key, a non-numeric
+      `latency`, an unparseable previous-commit version).
+
+    `REQ-QAC-047`'s own evidence says the render check "holds the built
+    page to zero console errors and so is what would catch a throw
+    reaching a viewer". #5 is a throw reaching a viewer on three of
+    seven dataset pages, and the gate is green.
+
+    **SIGNED OFF AND FIXED, 2026-09-25, all three halves.**
+
+    **The e2e fixture.** `TestAnExhaustedScheduleIsLoud::
+    test_the_page_still_has_zero_console_errors` now takes `clean_page`
+    instead of `page`. One word, and it is the one that would have
+    caught #5 months earlier.
+
+    **The render gate.** `check_dashboard_renders.py` now visits every
+    agency and dataset route, enumerated from the page's own `DATA` and
+    built with the page's own `stateToHash()` - so a dataset added
+    later is covered without anybody remembering, and the gate can
+    never visit a route the app would not build.
+
+    **PROVEN BLIND FIRST, AND PROVEN SIGHTED AFTER.** The bug was
+    reintroduced into a built copy (11 keys stripped) and the old gate
+    still reported "zero console errors"; with the extension it names
+    the three affected datasets and fails. Both directions checked,
+    because a gate that passes everything and a gate that works look
+    identical from one run.
+
+    **Two no-ops were found doing it, and they are the point.** The
+    first version assigned `window.location.hash` - the app listens for
+    `popstate`, which a programmatic hash assignment does not fire, so
+    it "visited" nine routes without re-rendering once. The second
+    tested `window.DATA` - a top-level `const` creates a global
+    BINDING but not a window property, so it enumerated zero routes.
+    **Both reported success.** Neither would have been caught by
+    anything except re-proving against the reintroduced bug, which is
+    the same a-check-that-never-runs-looks-like-success shape the gate
+    was being extended to close, hit twice in twenty minutes while
+    closing it.
+
+    **Criterion 1's own test.** `TestTheGateActuallyFailsTheBuild`
+    asserts `main()` returns 1 on a broken configuration and 0 on the
+    real one. Not a defect - it always did - but every other test in
+    that module asserts `validate()` returns a non-empty list, which is
+    a different claim from the gate failing. A validator whose exit
+    code nobody checks is one CI can stop honouring with no test
+    noticing.
+
+    **`_report()` itself is now covered** by #19's own tests, which
+    drive `main()` and read its real stderr - criteria 19, 21 and 22
+    went from untested to asserted as a side effect of that work.
+
+    **Recommendation: fix all three**, and take the cheap one first -
+    switching that one e2e test to `clean_page` is a one-word change
+    that would have caught #5.
+
+44. **[done, 2026-09-25]** **[Pipeline & publishing]** **[D3] The
+    retrospective-edit guard is narrower than its prose reads.**
+
+    **Verified.** `validate_schedule.py:597` defaults to
+    `ref="HEAD~1"`, and both workflows check out at `fetch-depth: 2`. A
+    push containing two or more commits is therefore only ever checked
+    against its last one - move a past date in commit A, land commit B
+    on top, and it passes. Separately, lines 655-656 clear the finding
+    if the version's changelog differs from the previous commit's **in
+    any way**, so an unrelated changelog line added to the same version
+    in the same commit silently licenses a past-date move.
+
+    Both are reasonable simplifications for a "say what you did" gate.
+    Neither is written down, and the requirement's decision prose reads
+    as though the guard is complete.
+
+    **Keith, 2026-09-25: "that's a pretty weak guard there, we can't
+    really rely on that. What are the options?"** Three, in the reply
+    of the same date and summarised here:
+
+    - **(a) Widen the diff.** Check the whole push range rather than
+      `HEAD~1`, and stop letting any changelog edit clear the finding.
+      Cheapest; still depends on how CI happens to be checked out.
+    - **(b) Compare against the base branch** so the unit is the whole
+      change rather than one commit. Catches a date moved and
+      "un-moved" across commits.
+    - **(c) Seal elapsed versions.** Commit a fingerprint of each
+      calendar version's authored dates once its window has elapsed;
+      the gate compares the file against the seal and never reads git
+      history at all. Works at any fetch depth, in any push shape, on
+      any checkout.
+
+    **#35 IS FOLDED IN HERE**, at Keith's own direction the same day -
+    the guard's `date.today()` reads the RUNNER's clock, so for about a
+    third of each Perth day it classifies a date on the wrong side of
+    "today". Same guard, same conversation, one fix.
+
+    **ANSWERED 2026-09-25, and the answer escalates this.** Keith asked
+    the right question - "don't we have a solid way for people to not
+    be able to retroactively change CHECKS? Why don't we just apply
+    that?" - and the honest answer is **no, we do not. It is the same
+    mechanism with the same hole.**
+
+    `qa_tools/common/validate_check_lifecycle.py` compares the working
+    tree against `collect_checks("HEAD~1")`. One job in
+    `deploy-pages.yml` runs both gates at `fetch-depth: 2`, and that
+    workflow's own comment says so: "Needs HEAD~1 for its past-date
+    guard - the same fetch-depth: 2 this job already sets for the
+    check-lifecycle diff below". So a push of two or more commits is
+    only ever checked on its last one, **for the 257 hand-authored
+    checks as much as for the calendars.** Change a check's threshold
+    in commit A, land commit B on top, and the gate protecting Thread
+    D never sees it.
+
+    **So this is not a schedule finding. It is a finding about the one
+    mechanism both gates share**, and it is worse where it was not
+    being looked at: the check gate is what stands between a quietly
+    edited threshold and a QA history that no longer means what it
+    said.
+
+    **The RULES should stay different, though, and that is worth being
+    precise about** - applying the check gate's contract wholesale to
+    calendars would be weaker than what calendars need:
+
+    - **A check's config changing is LEGITIMATE.** The rule is "say
+      what you did", so a changelog entry is the right escape hatch and
+      the gate is a documentation gate.
+    - **A past calendar date moving is NOT legitimate**, at any level
+      of documentation. It changes what already-filed history was
+      judged against - a supply that was late becomes on time. A
+      changelog entry does not make that acceptable, so the escape
+      hatch that clears the finding on ANY changelog difference is
+      wrong twice over: too loose, and conceptually the wrong shape.
+
+    **Which points at option (c) for both.** Sealing - a committed
+    fingerprint of what has already elapsed - fixes the shared hole
+    without depending on fetch depth, push shape or checkout, and it
+    lets each gate keep its own rule about what a seal MEANS: for
+    checks, "changed, and here is the changelog entry"; for past dates,
+    "cannot change".
+
+    **Still Keith's call**, since it is now a bigger change than the
+    schedule guard alone. Recorded here because the discovery belongs
+    with the finding that prompted it.
+
+    **AND THE SEAL FOR CHECKS ALREADY EXISTS** - found 2026-09-25 while
+    working out what option (c) would actually look like, and it
+    changes the shape of the answer.
+
+    Every committed `qa_results/*/verified[]` record already carries
+    `check_id`, `warn_threshold`, `fail_threshold`, `on_fail_action`,
+    `dimension` and `label` - what each check WAS at the moment it was
+    used to judge real data. Measured: **257 check_ids across 60
+    committed runs, and not one has ever had more than one threshold
+    pair.** So the baseline exists, is committed, is years-deep, and
+    agrees with today's configuration everywhere.
+
+    That means the checks half of option (c) is not a new artefact at
+    all - it is changing the baseline from `HEAD~1` to committed QA
+    history. It also asks a strictly better question: not "did this
+    change since the previous commit" but **"did this change since it
+    was last used to judge data"**, which is the thing that actually
+    must not move quietly.
+
+    **CORRECTION, 2026-09-25, found while building it: the seal in
+    committed history is NOT the thing this gate compares.**
+
+    `find_undocumented_changes()` compares `config_hash` - a SHA-256 of
+    a check's WHOLE config dict from its definition file. The committed
+    `verified` records carry the RESOLVED thresholds and nothing else;
+    `config_hash` appears nowhere in `qa_results/` (grepped, zero
+    hits).
+
+    **The gap is not cosmetic, and one example settles it.** Changing a
+    dbt `accepted_values` list from `[M, F, X]` to `[M, F, X, U]`
+    changes the config hash and changes NO threshold. Comparing on the
+    projection history carries would miss exactly the class of change
+    that matters most - what a check actually tests - while catching
+    only the thresholds. So "compare on what history already has" is
+    not a weaker version of the gate, it is a different and worse one.
+
+    **What I told Keith was right about thresholds and wrong about the
+    comparison**, and the difference is load-bearing, so it is recorded
+    here rather than quietly worked around.
+
+    **The obvious repair is the wrong shape, and its own numbers say
+    so.** Writing `config_hash` into each verified record costs ~35
+    bytes x 257 checks = **8.8 KB per run**, 2.9% of a measured 300 KB
+    run - which is **63 MB a year, 313 MB over five**, at the 20
+    datasets-daily figure Keith gave the same day. That is a lot of
+    repetition for a value that changes perhaps once a year per check,
+    and it walks directly INTO the problem
+    `plans/running-thoughts.md` #44 was opened to walk out of.
+
+    **An append-only record of check-config changes is the same
+    artefact as the seal, and costs ~30 KB a YEAR in total.** It is
+    what the gate wants to read, it is what makes the history
+    immutable, and it is what #44 already names as a thread to pull.
+    Building a per-run hash now would be building the throwaway version
+    of it.
+
+    **So the recommendation changed while building**, and it is Keith's
+    to take or leave:
+    - **Now:** the cheap hardening only - widen `HEAD~1` to the whole
+      push range, drop the changelog escape hatch, fix the runner clock
+      (#35). Closes the multi-commit hole in both gates, adds no bytes.
+    - **Then:** the real seal arrives as part of #44's redesign, where
+      it is a few KB rather than a few hundred MB.
+
+    **The calendars half has no such record, and building one now may
+    be throwaway.** Nothing committed carries a period's date, a due
+    instant or a claim window - `dataset_stats.json`'s arrival record
+    is `run_id`/`run_index`/`received_at`/`delivery` and nothing more,
+    deliberately (`REQ-GEN-043` criterion 7). Once sprint 8/9 files
+    supplies against slots, the filing record will carry the due
+    instant and claim window each was judged under, and the calendar
+    seal becomes the same shape as the check one for free.
+
+    **Cost:** small to document, larger to close. **Recommendation:**
+    decide which, and write down whichever is chosen - an
+    under-documented guard is one a future session will trust further
+    than it goes.
+
+    **DONE 2026-09-25 - the cheap hardening, on Keith's own call ("yep,
+    do the cheap hardening now and leave the seal for 44").** Three
+    changes, no new bytes in `qa_results/`:
+
+    - **`qa_tools/common/diff_base.py`**, new: one function answering
+      "which commit do the immutability gates compare against". CI sets
+      `MOTHMAN_DIFF_BASE` to `github.event.before` - the commit the
+      PUSH started from - and `deploy-pages.yml` now checks out at
+      `fetch-depth: 0` rather than 2. Every commit in a push is read,
+      for the calendars and for every hand-authored check alike. It
+      falls back to `HEAD~1` when the ref is unset or unreachable,
+      because a branch's first push reports an all-zeros before-SHA and
+      a shallow checkout cannot reach past its depth - neither is a
+      finding, and neither should take a gate down. Its own module
+      because BOTH gates need it and neither should own it; they had
+      already drifted into two spellings of one decision.
+    - **The changelog escape now needs a LONGER changelog**, not a
+      different one. Rewording an existing entry - or deleting one -
+      used to license moving a past date. Same rule the sibling check
+      gate's `find_undocumented_changes()` has always had.
+    - **The past/future boundary reads the ASSET's clock** (#35's first
+      residue, folded in here as agreed). It was `date.today()`, the
+      runner's, and the two are different calendar dates for about a
+      third of every day - on a function whose whole job is deciding
+      whether a date is in the past.
+
+    **Tests, all confirmed failing against the real pre-fix code
+    first** - `TestTheGuardIsNotAsNarrowAsItLooked` (the changelog
+    escape, the asset clock, plus the must-not-change half: a
+    genuinely new entry still clears the finding) and `TestTheDiffBase`
+    (the fallbacks, plus two that assert the WIRING - the defect was
+    that each gate named its own ref, so a test of `diff_base()` alone
+    would not have caught it). The clock test is built so it can only
+    pass on an asset-clock reading: it moves a date that is past in
+    Perth and future anywhere UTC-ish.
+
+    **One of those tests would itself have gone red in CI**, caught
+    before pushing and recorded because it is the same shape CLAUDE.md
+    already names: it set the configured ref to `HEAD~2`, which
+    resolves in a full local clone and not under `actions/checkout@v4`,
+    whose default fetch-depth is 1. Reproduced with a real `git clone
+    --depth 1` rather than reasoned about, fixed by asserting on `HEAD`
+    - which resolves at any depth and proves the same thing - and the
+    whole file re-run inside that shallow clone to confirm it.
+
+    **What is deliberately NOT closed:** the seal itself. Sealing what
+    has elapsed needs no git history at all and is the right answer,
+    but the obvious build of it costs ~63 MB a year in repeated hashes
+    and the elegant build is the same artefact `plans/running-thoughts.md`
+    #44 exists to design. This closes the multi-commit hole today; that
+    item owns the rest.
+
+45. **[investigate, 2026-09-24]** **[QA checks & contract]** **[B5] One
+    pinned false green, flagged only so the pin stays visible.**
+    `status-cases.json`'s case
+    `nodata-alone-is-green-and-that-is-a-known-false-green` has
+    `worst_of(["nodata"]) === "green"` in both implementations, by
+    agreement, as a parity case rather than a parity bug, with sprint
+    17 named as the structural fix. The critic flags it because it is
+    the one place in this batch where the shared table's authority is
+    used to bless a false green, and because
+    `ds.status = worstOf(ds.columns.map(c=>c.status))` (template:1841)
+    would carry it straight to the dataset tile. **Unreachable today**
+    (per-check `nodata` does not exist yet) - which is precisely the
+    condition sprint 17 changes. No action; the pin is correct.
+
+46. **[investigate, 2026-09-24]** **[Docs & process]** **What the
+    functional critic deliberately did NOT verify**, recorded so
+    nothing here reads as a clean bill:
+
+    - Generator determinism and byte-identity (`REQ-GEN-040` criteria 7
+      and 8, `REQ-GEN-042` criteria 6-8). It did not re-run the
+      generator; it confirmed `anchor_date.py` is pinned and no
+      `date.today()`/`datetime.now()` exists in the generator, which
+      makes the claims plausible but unmeasured.
+    - `REQ-GEN-043` criteria 8-10 (emitting a split extract, a
+      non-matching file, an unparseable one) - read, not driven.
+    - `REQ-QAC-047` criterion 1 at full breadth - it did not re-run the
+      ~30k-status browser comparison.
+    - `REQ-PIPE-049` criteria 12, 15 and 16 - read, not driven.
+    - The per-element `expectedTime`/`latency` fix - parser read, the
+      150-arrival verdict pin not re-run.
+    - Branch coverage: not measured in this project at all
+      (`[tool.coverage.run]` does not set `branch = true`) - a known,
+      parked gap. Every coverage number in these findings is line
+      coverage.
+
+47. **[todo, 2026-09-24]** **[Docs & process]** **A critic reading a
+    requirement's `evidence:` and `decisions:` is reading the builder's
+    own account of the work, in the same file as the criteria.** The
+    functional critic disclosed this itself, unprompted, and mitigated
+    by checking every load-bearing claim independently - which is the
+    only reason #35, #36 and #39's overstatements surfaced rather than
+    being confirmed back.
+
+    Its own question, and a fair one: should a future post-build critic
+    get **criteria-only extracts** rather than the whole register entry?
+    Against that - `decisions:` is exactly where a rejected alternative
+    lives, and a critic that cannot see one will re-propose it.
+
+    **Keith's call.** Recorded here rather than decided.
+
+### From `delivery-dashboard-visual-critic` (2026-09-24)
+
+**This critic's measurements reproduce exactly.** Every contrast ratio
+it reported was recomputed here from the real token values in the
+template, and all eight came back to the second decimal place - 2.81,
+1.51, 3.55, 1.51, 13.22, 5.35, 12.78, 6.54. Every CSS rule it cited is
+at the line it named. Nothing in its report needed correcting, which is
+not true of the other three.
+
+Its **V1** is #1 (the exec green counter, reached by a third
+independent route and measured in three separate as-of states) and its
+**V15**'s terminator half is #15; both are recorded above rather than
+twice. It deliberately did not re-find the `TypeError`.
+
+48. **[done, 2026-09-25]** **[Dashboard UI]** **[V2] Hovering a dataset
+    row makes the "No data" pill's fill vanish into the row.**
+
+    **Verified - the two rules are the same token.**
+    `.dataset-table tbody tr:hover{background:var(--surface-alt);}`
+    (template:243) and `.pill.nodata{background:var(--surface-alt); …}`
+    (:152). The critic measured the hovered result: pill background and
+    row background both `rgb(238,234,221)`, a contrast of **1.00:1**.
+    Unhovered it is already only 1.20:1.
+
+    What is left under the cursor is the 1px dashed border, which is
+    itself invisible (#49). So at any past or future as-of - where
+    "No data" is the most common row state - the status token
+    disappears when a reader points at it. `.pill.exhausted` loses its
+    fill the same way but survives on its dark border and dark text.
+
+    **Only findable by hovering.** Neither rule is wrong on its own.
+
+    **Cost:** trivial. **Recommendation: fix.**
+
+    **DONE 2026-09-25**, scoped to hover and to `--surface` rather than
+    a new darker token. That restores the pill to exactly the contrast
+    it has UNHOVERED (1.20:1) rather than making the quiet state
+    louder, which is what Keith declined in #49 - and it RAISES the
+    label's own contrast as a side effect (2.81 -> 3.39 light, 4.62 ->
+    5.05 dark) without touching `--ink-faint`, the token he declined to
+    change.
+
+    **A darker fill was tried first and backed out**, because measuring
+    it showed it dropped the label to 2.76 - making worse the very
+    number he agreed to take a hit on, which is not the same as taking
+    the hit.
+
+    **The first test passed for the wrong reason** and is worth
+    recording: it hovered a real row and compared the row's background
+    with its own pill's, and at the as-of it chose that pill was GREEN.
+    It measured a state that was never in question. It now hovers a row
+    for the real hovered colour and compares it against what
+    `.pill.nodata` and `.pill.inactive` actually paint, so it measures
+    the RULES rather than whichever pill a row happens to show.
+
+49. **[done, 2026-09-25]** **[Dashboard UI]** **[V3/V5] The `nodata`
+    pill fails WCAG AA in both themes, and its dashed border is not
+    visible at all.**
+
+    **Recomputed here from the real tokens:**
+
+    | | text on own fill | border on own fill |
+    |---|---|---|
+    | `nodata`, light | **2.81:1** | **1.51:1** |
+    | `nodata`, dark | **3.55:1** | **1.51:1** |
+    | `exhausted`, light | 13.22:1 | 5.35:1 |
+    | `exhausted`, dark | 12.78:1 | 6.54:1 |
+
+    At 12.5px/700 the WCAG bar is 4.5:1, not the large-text 3:1 - so
+    both `nodata` readings fail. A **4.7× gap** separates two states
+    that sit side by side.
+
+    **The border number is the more interesting one.** `REQ-PIPE-053`'s
+    own CSS comment says the exhausted pill is "deliberately unlike the
+    other four: a solid border and a square marker". In practice the
+    distinction is not dashed-versus-solid - it is *no visible border*
+    versus *a visible one*. It happens to work, but not for the reason
+    the code gives.
+
+    **And the marker does nothing.** `.pill.nodata .ico` is
+    `border-radius:2px`, `.pill.exhausted .ico` is `1px` (:153, :159).
+    At 9px those are both squares - the critic checked at device scale
+    and they are indistinguishable. So of the three devices meant to
+    separate the two quiet states, the background is identical, the
+    marker is imperceptible, and **all the work is done by text
+    contrast** - which is the token that fails AA.
+
+    **Keith's call, and the critic's Q3 frames the real tension:**
+    fixing the contrast means making the quiet state louder, which is
+    the opposite of what "quiet" was for. Its three options: raise both
+    tokens (clears AA, narrows the 4.7× gap doing the actual work); fix
+    only the border (makes dashed-vs-solid real, leaves the text
+    failing); or log it as a standing accessibility item across every
+    muted token, since the footer (#54) and `--ink-faint` generally
+    have the same problem and fixing one pill leaves the pattern.
+
+    **DECIDED 2026-09-25: NOT FIXING the text contrast.** Keith's own
+    words: "let's not fix that, I'm happy to take the hit to
+    accessibility." The border half was fixed on 2026-09-24 and stays
+    fixed, so what is declined is specifically raising `--ink-faint` -
+    the `nodata` label at 2.81:1 light / 3.55:1 dark, and the footer at
+    3.03:1 / 4.16:1 (#54), against a 4.5:1 bar.
+
+    **One factual point was put to him once and is recorded rather than
+    re-argued**, because it is a fact about the destination rather than
+    an opinion about the design: Australian government digital services
+    are generally held to WCAG 2.1 AA, so if this PoC becomes something
+    an agency publishes, this stops being a taste question and becomes
+    a compliance one. He has that and it is his call.
+
+    **Recorded as deliberate debt, not as an open finding**, so nobody
+    re-raises it as though it were new. What it does NOT touch: the
+    keyboard and focus work (#8/#9/#10/#55) was operability rather than
+    contrast, and is unaffected.
+
+50. **[done, 2026-09-25]** **[Dashboard UI]** **[V4] `1.5px` borders
+    render as `1px`, so the intended weight difference does not exist.**
+
+    **Verified in source** - `.pill.exhausted` (:158) and
+    `.notice-exhausted` (:160) both declare `border:1.5px solid`. The
+    critic measured computed `borderTopWidth` in a real browser at
+    DPR 1: **`1px`**, both. Chrome floors 1.5 device-independent px to
+    1 device px at 1×.
+
+    So the exhausted pill's border is the same weight as the nodata
+    pill's; only style and colour differ. It renders at 1.5px on a 2×
+    display and 1px on the 1× displays most government desktops use, so
+    it is also **inconsistent between machines**.
+
+    Exactly the case where reading the source gives the wrong answer -
+    worth keeping as an example, not just as a fix.
+
+    **DONE 2026-09-25** - 2px, which is a width every display actually
+    has. The test measures computed `borderTopWidth` on probe elements
+    rather than reading the declaration, for the reason this finding
+    exists.
+
+51. **[done, 2026-09-25]** **[Dashboard UI]** **[V8/V9] `REQ-PIPE-048`'s
+    stored offsets reach two render sites, and neither handles them.**
+
+    **BUILT by `REQ-DASH-071`, 2026-09-25.** Keith took the first of the
+    three options below - one formatter, every user-facing instant on the
+    asset's clock, its own requirement. Both sites now call it, the stale
+    comment is rewritten, and a real-browser test walks all seven dataset
+    pages looking for exactly the raw shape this entry counted 43 of.
+
+    **Verified in the real built data and the real template, and this
+    resolves a puzzle the two dashboard critics each saw half of.** One
+    field, `arrivedAt`, formatted at one site and not the other:
+
+    - **The SLA tile** (template:1239) builds it as
+      `d.lastArrival.arrivedAt.slice(11,16)+" UTC (earliest extract,
+      latest run)"` - character-slicing the wall clock out of the string
+      and labelling it UTC unconditionally. Correct today only because
+      every stored value is `+00:00`, which is the thing `REQ-PIPE-048`
+      changed. (This is #14 from the other direction.)
+    - **The supply-history table** (:2690) renders `e.arrivedAt`
+      **raw**. Confirmed in `reports/birth_registrations_dashboard.json`:
+      **43 values, every one of the form
+      `2026-09-16T05:17:30.280161+00:00`** - ISO-8601 with microseconds
+      and an explicit offset, straight into a user-facing TIMING column.
+
+    The critic's screenshot shows the column going, in three consecutive
+    rows, from `1 day since previous` to `0 days since previous` to an
+    amber pill plus that raw string.
+
+    **A stale comment sits right above it.** Template:767-769 says
+    "`lastArrival.arrivedAt` on its own is only ever a time
+    (`05:07 local`, `14:32 UTC …`)". The data no longer has that shape;
+    :1239 manufactures it, and `fmtArrival()` interpolates whatever it
+    is given.
+
+    **The tile is also the timezone problem made concrete.** In one
+    four-across strip the SLA tile reads `Daily, by 14:00 AWST` and the
+    arrival tile reads `05:29 UTC`, and a reader must add eight in their
+    head, across two tiles, to judge the "Early" verdict sitting in the
+    same cell. The one place the asset clock is visible is in the wrong
+    clock - against a requirement whose story is "so that a supply that
+    arrived at 10pm in Perth is not read as having arrived the following
+    afternoon".
+
+    **Keith's call, the critic's Q4:** render every user-facing instant
+    in the asset timezone (matches the story, one formatter, changes
+    several existing views so it wants its own requirement); keep UTC
+    but format it properly; or split - format the supply-history
+    timestamps now as a plain rendering defect, and scope the
+    UTC-vs-AWST question separately. **This is the same subject as #3,
+    #14 and road-testing item 5**, arriving from a fourth direction.
+
+52. **[done, 2026-09-25]** **[Dashboard UI]** **[V6/V7] The mobile
+    overflow's widest driver is the badge row, not the table - a
+    different fix from the one #16 implies.**
+
+    The dashboard UX critic measured `scrollWidth` 537 against 390 and
+    attributed it to `TABLE.dataset-table` at 539px. On the agency page
+    at `?asof=2027-09-01` the visual critic measures `scrollWidth`
+    **613**, and the widest overflowing element is the **badge row**
+    (`display:flex; flex-wrap:nowrap`) at **597px** - its
+    `Owned by Brian (qa), Reg (peer_review), Arthur (manager)` pill
+    alone is **336px**, `white-space:nowrap` inherited from `.pill`
+    (:138). The table's right edge is 561, second.
+
+    Different fix - `flex-wrap:wrap` on the badge row - so worth
+    separating from #16 rather than folding in.
+
+    **Separately, `REQ-PIPE-053`'s own collection-level count marker is
+    clipped at 390px.** `.collection-title` (:233) is a flex row with no
+    `flex-wrap`: container `clientWidth` 358 against `scrollWidth` 368,
+    and the `1 schedule ended` pill's right edge sits 10px past the
+    container's. The new marker is the thing cut off.
+
+    **CLOSED 2026-09-25, the cheap half only.** `flex-wrap:wrap` is on
+    `.collection-title` and on the three badge rows this entry measured,
+    which is one line each and is what stops the marker being clipped.
+    The badge row's own 336px owner pill still wraps rather than
+    shrinking, and that is accepted - the phone is not a target, and
+    "untidy" was the bar Keith set for it.
+
+53. **[parked, 2026-09-25]** **[Dashboard UI]** **[V11/V12/V13] The two
+    new quiet-state branches were written with a different markup shape
+    from the branch beside them.**
+
+    Three separate consequences, all measured:
+
+    - **Four column headers hang over nothing.** At `?asof=2027-09-01`
+      all six Tier-2 rows use a `colspan="4"` message cell, so
+      `LATEST ARRIVAL`, `ROWS`, `LAST QA RUN` and `TREND` have zero
+      content in every row - **579 of 1179px (49%) of the table** at
+      1440, and 37% at 390 where they are what pushes it past the
+      viewport. Worse, the message starts *under* `LATEST ARRIVAL`, so
+      "No QA run within tolerance as of the selected date" reads as a
+      value in that column.
+    - **The status pill moves 630px.** On a normal dataset page the
+      pill sits at x=922 in its own right-hand cluster; on the
+      exhausted and no-data branches it is **inline inside the `<h2>`**
+      at x≈295 and x≈360, sized and shaped like the "View on GitHub"
+      and "Owned by …" utility chips. A reader who has learned
+      "status is top-right" finds it top-left.
+    - **The same condition is a bordered box at Tier 1 and unstyled
+      body text at Tier 3.** The exec notice has a border, a fill, a
+      radius and `<code>` chips; the dataset-level message measures
+      `background: rgba(0,0,0,0)`, `border: 0px none` - bare text on
+      `--paper` on a page where everything else is a card. **Verified
+      in source:** `.notice-exhausted code` (:163) is scoped to the
+      notice, so the same two strings get a chip at Tier 1 and nothing
+      at Tier 3. Two smaller ones in the same pair: `max-width` is
+      `60ch` on one body and `56ch` on the other - two measures for two
+      sibling states written the same day - and both `<code>`s fall
+      back to the browser's `monospace` while every other code-ish
+      string on the page uses `.mono`/IBM Plex Mono with tabular
+      numerals.
+
+    **MOSTLY DONE 2026-09-25**, and two of the three fell out of #13's
+    fix rather than needing their own:
+
+    - **The status pill is back where readers expect it.** The
+      exhausted branch now runs the ordinary renderer (#13), which puts
+      the pill in the right-hand cluster every other dataset page uses.
+      The first draft of that fix ADDED a second pill inline in the
+      `<h2>` - exactly the shape this finding complains about - caught
+      by counting pills on the real page. The no-data branch got the
+      same treatment by hand.
+    - **Both quiet states are bordered notices now**, sharing one
+      shape, one measure and one set of `<code>` chips. That chip rule
+      was scoped to `.notice-exhausted` alone, so the SAME two strings
+      got a chip at Tier 1 and the browser's default `monospace` at
+      Tier 3. It now covers every notice and uses the page's own IBM
+      Plex Mono with tabular numerals.
+
+    **PARKED 2026-09-25, Keith's own call ("park it").** The
+    `colspan="4"` headers stay as they are: at a quiet as-of, four
+    Tier-2 column headers hang over nothing - 49% of the table at 1440
+    - and the message starts under `LATEST ARRIVAL`, so it reads as a
+    value in that column. Collapsing the header set when every row in a
+    collection is quiet is a real conditional-table change rather than
+    a CSS fix, and it was not worth the work today. Recorded as
+    deliberate debt rather than left as an open finding, so nobody
+    re-raises it as though it were new.
+
+54. **[in-progress, 2026-09-24]** **[Dashboard UI]** **[V10/V14/V15] Layout
+    measure: the notice is 2.4× the page's own, the footer fails AA, and
+    the exec grid is half empty.**
+
+    - **The exec notice is 1180px wide over 583px of cards**, and its
+      body measures **146 characters per line** at 13px - against
+      `.view-sub`'s declared `max-width:62ch` sitting 20px above it.
+      Nothing else on the page is that wide except the footer.
+    - **The footer measures 162 characters per line, `max-width: none`,
+      at 12px, with contrast 3.03:1 light / 4.16:1 dark** - both under
+      4.5:1. `REQ-DASH-055` appended a sentence to it that reads as a
+      changelog entry become permanent page furniture, and pushed the
+      block to four lines. (#15 is the missing terminator in the same
+      sentence.)
+    - **`.grid` uses `auto-fill`** (:217, **verified in source**), so at
+      1180px it computes four 284.5px tracks and fills two: **exactly
+      half the executive tier is empty**, held open by phantom tracks
+      `auto-fit` would collapse. The direct visual consequence of
+      `REQ-DASH-055` removing three invented agencies from a grid tuned
+      for five. The two real cards also **do not align internally** -
+      `.card` is plain block flow with `.card-meta` unpinned, so a
+      1-line title and a 3-line title put the sparkline and the meta row
+      50px apart, leaving 69px of dead space under one card and 19px
+      under the other (155px at the 2027 as-of).
+
+    **THE TWO MEASURES ARE DONE 2026-09-25** - the exec notice is capped
+    at 80ch and the footer at 90ch, against the 146 and 162 characters
+    per line the critic measured. MEASURE ONLY: the footer's contrast
+    is the `--ink-faint` question Keith declined in #49, and neither
+    change touches it.
+
+    **The grid one is explicitly a judgment call, not a defect** - the
+    critic says so - because `auto-fit` would stretch two cards to 583px
+    each, which may read worse. **Keith's call, its Q1:** collapse the
+    tracks, cap the grid to its content, or leave it on the grounds that
+    it self-corrects as the asset grows.
+
+55. **[done, 2026-09-24]** **[Dashboard UI]** **[V17] Seven of eleven
+    focusable element types fall back to Chrome's default focus ring.**
+
+    **Verified in source:** `grep` finds `:focus-visible` rules at
+    template lines 106, 224, 346, 347, 353, 354 **and nowhere else** -
+    four elements (`.wordmark`, `.card`, `.scope-check`, `.check-card`)
+    got a deliberate `2px solid var(--accent)` ring with
+    per-element offsets, and everything else did not.
+
+    What did not: **`.col-tile`** (the primary interactive surface of
+    the dataset page), all nine masthead chips including **the As-of
+    chip** - which is `REQ-PIPE-048`'s own control and the thing *both*
+    quiet-state messages instruct the reader to go and use - plus
+    `.crumb`, `.pill.tag.sm`, `.link-btn`, `.drawer-close` and `INPUT`.
+
+    **The problem is coverage, not craft** - the four that exist are
+    properly designed.
+
+    **SIGNED OFF AND FIXED, 2026-09-25.** One rule naming the
+    CATEGORY rather than a fifth, sixth and seventh naming elements:
+    `:where(a, button, input, select, textarea, summary,
+    [tabindex]):focus-visible`. `:where()` keeps its specificity at
+    zero so the four bespoke rules, which come after it, keep their own
+    deliberate offsets.
+
+    **A rule per element is how the gap happened**, and a rule that
+    names the category cannot miss the next element somebody adds.
+
+    **Tests:** four representative types (`.crumb`, `.col-tile`,
+    `.snapshots-btn`, `.drawer-close`) are focused in a real browser
+    and asserted to have a solid, non-zero outline rather than the
+    browser's default. One real gotcha is recorded in the test itself:
+    Chrome decides `:focus-visible` from how the LAST interaction
+    arrived, so a programmatic `.focus()` after a mouse click gets no
+    ring however the CSS is written - the test presses Tab first to put
+    the browser back in the mode the test is actually about.
+
+56. **[in-progress, 2026-09-25]** **[Dashboard UI, QA checks & contract]**
+    **[V16/V18/V23] The page's own statement of its colour language is
+    out of date, and the language is reused for something else.**
+
+    - **The legend names three statuses; the vocabulary has five.**
+      `.legend-key` hardcodes Green / Amber / Red at both the exec
+      (:2524) and dataset (:2838) tiers, while `REQ-QAC-047`'s
+      `statusVocabulary()` carries `nodata` and `exhausted` too with
+      `STATUS_LABEL` supplying their names. At `?asof=2027-09-01` the
+      page renders a legend naming three statuses directly above two
+      cards carrying the two it omits.
+    - **The MoSCoW pills reuse the status palette.** **Verified in
+      source:** `MOSCOW_CLASS = {must:"red", should:"amber",
+      could:"green", wont:"nodata"}` (:3818) and
+      `REQ_STATUS_CLASS = {built:"green", …}` (:3822) - so a
+      requirement renders `● Must` in exactly the pill a failing
+      dataset uses, and the critic captured one viewport with `● Red`
+      agency pills on the left and `● Must` requirement pills on the
+      right. Outside these four requirements' build scope, but squarely
+      inside the status vocabulary `REQ-QAC-047` owns.
+
+      **DONE 2026-09-25.** MoSCoW has its own ramp - one hue at four
+      weights, reading as a scale rather than a verdict - so nothing
+      borrows the status palette any more. The legend half is done too:
+      it names every quiet state actually present, `inactive` included
+      (#4), rather than three of five.
+    - **Three visually identical check cards** in one column drawer,
+      same title, same description, same Red pill - distinguishable
+      only by 12px grey monospace (`dbt:multiple_birth_sibling` /
+      `soda:sibling_match` / `datacontract:sibling_match`). They read as
+      a rendering bug at a glance, and the threshold line carries
+      **two formats for the same fact** - `REQ-QAC-047`'s
+      no-threshold-fallback rule surfacing as the prose "no
+      single-sided threshold — status is this tool's own verdict",
+      which wraps mid-sentence and reads as debug output.
+
+57. **[done, 2026-09-25]** **[Dashboard UI]** **[V19/V20/V21/
+    V22/V24] Five smaller visual findings, recorded together.**
+
+    - **`exhaustedMarker()` produces duplicate-looking pill pairs at
+      today's scale** - three `.pill.exhausted` within 40px vertically
+      on the Tier-2 page, the last two adjacent and identically styled.
+      **This is the one finding that gets BETTER at 30 datasets** ("17
+      schedules ended" is genuinely useful), which is why it is a
+      judgment call. **Keith's call, its Q2:** keep as built, suppress
+      the marker at count 1, or merge the pair into one pill.
+    - **`box-decoration-break: slice` splits the command chip on
+      mobile** - `<code>mothman schedule candidate-dates</code>`
+      returns 2 client rects at 390px, rendering as two separate
+      rounded boxes and reading as two commands.
+    - **All nine masthead chips are 28px tall** at 390px, below both
+      the iOS (44) and Android (48) tap minimums - including the As-of
+      chip, which both quiet-state messages tell the reader to use.
+    - **"No data" is two visual states, and one contradicts itself.**
+      At `?asof=2022-01-01` (no history at all) the card has no
+      sparkline - honest. At `?asof=2027-09-01` (history exists, none
+      current) the card shows the **full 19-cycle sparkline ending in a
+      red endpoint dot** under a "No data" pill - the only red pixel in
+      that viewport, 130px under a pill saying there is no data.
+    - **`.crumb` breaks mid-token at 390px** - "TIER 2" wraps to
+      "TIER" / "2" on every mobile view. One `white-space:nowrap`.
+
+    **FOUR OF THE FIVE DONE 2026-09-25**, the first having been settled
+    as Q2 the day before: the command chip gets `box-decoration-break:
+    clone`; the masthead chips and breadcrumbs get `min-height:44px`
+    below 480px - the minimum that makes them pressable, not a
+    responsive redesign, per Keith's own call on mobile ("shave off
+    some of the rough edges... everyone will be using it on desktop
+    screens"); and `.crumb .tier` gets `white-space:nowrap`.
+
+    **THE RED ENDPOINT IS FIXED, 2026-09-25** (Keith: "yep, fix it").
+    Where history exists but none is current, the card painted the full
+    series ending in a red dot - the only red pixel in that viewport,
+    under a pill saying there is no data.
+
+    **The LINE is untouched and deliberately so.** Keith's own words on
+    the quiet states generally: "no red amber and greens... but I
+    should still be able to see the historical graphs and comparison
+    stuff." Only the ENDPOINT asserts "and this is where it stands
+    now", which is the one thing a quiet state means nobody can say -
+    so only the endpoint goes quiet. A test asserts the two paths are
+    identical with and without a quiet status.
+
+    **A SECOND BUG IN THE SAME FUNCTION, found writing the tests, and
+    the more dangerous one.** `statusColorVar()` was a two-branch
+    ternary falling through to `var(--good)`, so EVERY status it did
+    not recognise - `nodata`, `exhausted`, `inactive`, and anything
+    added later - painted green. A colour function whose default is
+    "healthy" is the same false-green shape this project keeps finding.
+    It names the three verdicts explicitly now and everything else is
+    quiet, and `quietOf()` derives the quiet set from the vocabulary
+    rather than listing it again, so a sixth status added later is
+    quiet by default instead of silently green.
+
+    Verified on the real built page at `?asof=2027-09-01`: both exec
+    cards read `var(--ink-faint)` where one had been red.
+
+### What the visual critic found genuinely working
+
+- **`.pill.exhausted` survives dark mode properly** - 12.78:1 text,
+  6.54:1 border, unambiguously the most prominent thing in its card.
+  `REQ-PIPE-053`'s "never distinguished by colour alone" holds: the
+  label says "Schedule ended" in words and the state is legible with
+  colour removed. The other quiet state does not clear that bar (#49).
+- **The exec notice earns its place in the squint test** - blurred, the
+  page still resolves to "a bordered announcement at the top, two quiet
+  cards below".
+- **Tier-2 row messages are differentiated by weight, not just
+  wording** - the exhausted row's message renders in `--ink`, the
+  no-data rows' in muted. A real distinction doing real work.
+- **The exhausted dataset page at 390px is the best-laid-out view in
+  the whole pass** - pills wrap cleanly onto their own lines, measure
+  lands around 42 characters, hierarchy holds.
+- **No horizontal overflow at the exec tier at 390px** in either quiet
+  state.
+- **The drawer scrim is real** - checked because it looked absent.
+- **Card and check-card focus rings are properly designed** (#55 is
+  coverage, not craft).
+- **`REQ-DASH-055`'s removal is visually clean where it matters** - no
+  orphaned "illustrative mock data" chrome anywhere, in any state or
+  theme.
+
+### What the visual critic says breaks at ~30 datasets
+
+58. **[investigate, 2026-09-24]** **[Dashboard UI]** **Visual scale
+    findings, collected.** Each belongs to a finding above.
+
+    - The legend arithmetic gets wronger: at 30 datasets some dataset
+      is nearly always quiet, so the green number is nearly always
+      inflated (#1).
+    - The legend is nearly always incomplete - three named statuses out
+      of five is survivable while quiet states are rare (#56).
+    - Card misalignment goes from two ragged cards to eight ragged
+      rows, with the last row always partly empty (#54).
+    - The four dead columns multiply: 30 rows eating 49% of desktop
+      width and forcing a 545px table into a 390px viewport (#53).
+    - **The exec notice's scale risk is its calendar list, not its
+      dataset count.** The heading aggregates correctly ("N datasets");
+      the body inlines every unique calendar name in bold via
+      `${which}`. Six calendars in a 146-character line is already at
+      the limit - the heading scales, the body does not.
+    - **The drawer's run-history squares do not scale at all** - 31
+      runs already renders as 24 + 7, ragged, with no time axis and no
+      grouping. A year of daily runs is ~365 16px squares, roughly 15
+      ragged rows of full-saturation colour, sitting *above* the check
+      list it is meant to introduce.
+    - The duplicate check cards compound: four tools × one logical
+      check is already three or four identical cards, and tool identity
+      is the smallest, lowest-contrast text on each (#56).
+
+### Found by this session, not by a critic
+
+60. **[done, 2026-09-25]** **[Dashboard UI]** **The masthead's
+    "Live" clock measures nothing at all, and says the data was updated
+    when it was not.**
+
+    **BUILT by `REQ-DASH-071` criterion 13, 2026-09-25.** The masthead
+    now reads `Built <instant>` from a `BUILT_AT` const the embed step
+    writes, the `setInterval` is gone, and the dot no longer pulses -
+    a pulse says a feed is arriving, and nothing arrives after a static
+    file is opened. A real-browser test reads the stamp, waits fifteen
+    seconds - long enough to have caught the old clock twice - and
+    asserts it has not moved.
+
+    **Found by Keith, 2026-09-25**, reading the requirement draft's
+    first open question: "I'm not sure that masthead is working... it
+    should kind of be baked in when the dashboard gets rebuilt, right?
+    Because otherwise it doesn't have any updated information in it."
+
+    **Verified, and the code says so itself.** The section header is
+    literally `Boot + fake "live" clock`:
+
+    ```js
+    let secondsAgo = 4;
+    setInterval(()=>{ secondsAgo += 7; ... }, 7000);
+    ```
+
+    It is a counter starting at 4 that adds 7 every 7 seconds. It reads
+    no build time, no page-load time and no data timestamp. It counts
+    up from whenever the tab was opened, for as long as the tab stays
+    open, beside a pulsing green "live" dot - on a page that is a
+    STATIC FILE built by CI, possibly days earlier. Leave it open an
+    hour and it reads "Live - updated 51m ago", which is a statement
+    about the reader's browser session presented as a statement about
+    data freshness.
+
+    **This is the same family as the false greens, not a cosmetic
+    one.** On a dashboard whose whole job is saying whether data is
+    stale, a freshness indicator that asserts currency it cannot know
+    is the dangerous direction - and it is the ONE element on the page
+    a reader would trust for that question without drilling in.
+
+    **The honest fact exists and is not embedded.** Nothing carries a
+    build time today (grepped: no `generated_at`, `BUILT_AT` or
+    `build_time` in the template or `embed_dashboard_data.py`), but
+    `reports/results_bdm.json`/`results_cp.json` each carry a real
+    `generated_at`, and CI rebuilds the whole dashboard from committed
+    history on every relevant push - so "when this page was built" is a
+    real, knowable fact.
+
+    **Keith's own direction**, same message: bake it in at rebuild
+    time. That also removes the `setInterval` entirely, which is the
+    second-implementation problem `REQ-DASH-071` forbids - the masthead
+    does its own inline arithmetic rather than calling
+    `fmtRelativeTime()`.
+
+    **Scoped into `REQ-DASH-071` rather than fixed loose**, since it is
+    the same subject as that requirement and the requirement is not
+    signed off yet. Recorded here because the finding is about shipped
+    code and stands whatever happens to the requirement.
+
+59. **[done, 2026-09-25]** **[Testing & dev tooling, Pipeline & publishing]** **A test computed "today" on the container's clock
+    while the page computed it on the asset's, and failed for eight
+    hours out of every twenty-four.**
+
+    Found by a real full-suite run at 06:12 Perth / 22:12 UTC on
+    2026-09-25 - the window where the two calendars disagree - while
+    gating the work above. **Not caused by any of it**: the same run
+    passed the evening before, at 22:5x Perth, when both clocks read
+    the same day.
+
+    `tests/test_dashboard_e2e.py::TestSupplyHistoryDrillDown` picked a
+    supply-history row whose date was not `date.today()`, clicked it,
+    and asserted the URL gained `asof=<that date>`. `date.today()` is
+    the CONTAINER's date; `DEFAULT_AS_OF` is the asset's
+    (`Australia/Perth`, REQ-PIPE-048). Between 16:00 and 24:00 UTC the
+    page's default is already tomorrow, so the test picked a row dated
+    on that default, `setAsOfInUrl()` correctly dropped the parameter -
+    "a plain shared link never implies someone deliberately chose a
+    date", its own comment - and the assertion failed against a
+    completely healthy page.
+
+    **Fixed by reading the page's own `DEFAULT_AS_OF`** rather than any
+    clock of the test's own. The authoritative value is the one the code
+    under test uses, so this cannot drift again; picking a better
+    hardcoded date, or the asset clock in Python, would both have left a
+    second implementation to keep in step.
+
+    **Worth keeping visible for two reasons.** It is exactly the class
+    of bug `REQ-PIPE-048` exists to prevent, living in the test suite
+    rather than the code - the third place this session found it, after
+    #3 (every date rendered on the viewer's clock) and #51 (the sliced
+    "UTC" label). And it is a real instance of `CLAUDE.md`'s own rule
+    about tests that assert against ambient state: it was green locally
+    and in CI for days, and would have gone red in CI on any push made
+    in that eight-hour window, looking exactly like a regression in
+    whatever that push happened to touch.
+
+61. **[done, 2026-09-26]** **[Dashboard UI]** **A scope section whose
+    only check is the "no rule defined" placeholder claimed GREEN - the
+    exact false green #4 closed, in a second renderer that never picked
+    the fix up.**
+
+    **Found by this session, 2026-09-26**, while building
+    `REQ-QAC-037`. Moving cp-placements' two table-level business rules
+    into the new cross-table section left its Table-level section
+    holding nothing but the synthesized placeholder - and the page drew
+    a green pill over the words "No automated quality rule defined".
+
+    **Verified, and the code had already written the finding down.**
+    `rollupStatuses()` carries this comment, added by #4's own fix:
+
+    ```js
+    // post-build-review #4. Without this line a section whose only
+    // check is a placeholder rolls up GREEN - which is precisely the
+    // false green that finding is about ...
+    if(statuses.includes("inactive")) return "inactive";
+    ```
+
+    The section renderer did not call it. It kept its own reduce:
+
+    ```js
+    const worst = checks.reduce((acc, ck)=>
+      STATUS_ORDER[checkStatus(ck)] > STATUS_ORDER[acc] ? checkStatus(ck) : acc, "green");
+    ```
+
+    `STATUS_ORDER` has no entry for `inactive` - deliberately, it is
+    one of the `UNORDERED_STATUSES` - so `undefined > 0` is false and
+    the seed `"green"` survives untouched. A status the ordering
+    excludes on purpose reads, to a reduce seeded with green, exactly
+    like a status that lost.
+
+    **This was already live for five of the six CP datasets**, which is
+    the part worth keeping visible: `REQ-QAC-037` did not introduce it,
+    it moved it onto the one dataset the tests happened to drive. The
+    finding sat behind a page nobody had opened rather than behind a
+    condition nobody had hit.
+
+    **Fixed** by calling `rollupStatuses()` in both section renderers -
+    the dataset page's and the collection page's. The collection one
+    cannot hold a placeholder today, and was changed anyway: a seeded
+    reduce over `STATUS_ORDER` is now a known-bad shape in this
+    codebase, not a stylistic choice. A real-browser test asserts the
+    pill reads "No rule defined", and asserts first that the section
+    really does hold only the placeholder, so it fails loudly rather
+    than passing vacuously if a real table-level check is ever added
+    to cp-placements.
+
+    **The standing lesson is `CLAUDE.md`'s own, arriving from a new
+    direction.** That rule says to enumerate every consumer when a
+    VALUE's shape changes. Here the value did not change - the
+    VOCABULARY did, when `inactive` was added to a status set two
+    functions already reduced over. `grep`ping for `STATUS_ORDER[`
+    after the fact found six call sites, of which two were sections.
+    A new member of a closed set is a shape change, and the same
+    enumeration applies.
+
+62. **[done, 2026-09-26]** **[Testing & dev tooling]** **Ten tests
+    were silently skipping in CI, including the whole data-layer
+    coverage for cross-table checks - shipped that same morning.**
+
+    **Found while waiting on a subagent**, from Keith's own question
+    "anything small we can do while we wait", by auditing what the
+    suite asserts against real trees rather than fixtures. The audit
+    was prompted by `CLAUDE.md`'s own standing warning about tests
+    that pass locally and fail on a fresh clone; this turned out to
+    be the OTHER half of that warning, which that bullet does not
+    cover: a test that neither passes nor fails, and reports green.
+
+    **The shape.** `reports/*.json` is gitignored build output. Ten
+    tests across three files guard on it and call `pytest.skip` when
+    it is absent:
+
+    - `tests/test_cross_table_scope.py` - 6 (four tests, one
+      parametrised ×3). This is `REQ-QAC-037`'s entire data-layer
+      coverage.
+    - `tests/test_asset_time_semantics.py` - 3, through a fixture.
+    - `tests/test_history_rekey.py` - 1, `REQ-PIPE-038`'s
+      duplicate-key guard.
+
+    `.github/workflows/test.yml` had no build step, so a freshly
+    cloned runner has no `reports/` and every one of them skipped.
+
+    **Why it was invisible, and why it is worse than a red test.**
+    Locally they run, because a developer has built. In CI they
+    reported green while proving nothing, and a skip does not fail a
+    build or show up in a summary anybody reads. Nondeterministically,
+    too: `tests/test_dashboard_e2e.py`'s session fixture DOES build
+    `reports/`, so whether these tests execute depended on whether
+    that module's worker happened to get there first - and under
+    `--dist loadfile` it is a different worker.
+
+    **Verified by reproducing the runner's condition** rather than
+    reasoned about: move `reports/` aside, run the three files, watch
+    ten skip. Then with the fix in place, from the same reports-less
+    tree, all 59 pass and nothing skips.
+
+    **Fixed** by running the same CI-safe chain `deploy-pages.yml`
+    already runs - `mothman dashboard rebuild-results` then `mothman
+    dashboard build-data` - as a step in the test job before pytest.
+    Both read committed `qa_results/` history only and never open
+    `data/` or a warehouse, so the standing rule holds. Chosen over a
+    shared session fixture in `conftest.py`, which would have to
+    survive several workers racing to write the same real files - the
+    race `plans/tooling.md` #10 already recorded and `--dist loadfile`
+    only avoids because each file's tests stay on one worker. A CI
+    step has no such problem.
+
+    **Two smaller findings from the same audit, neither fixed:**
+
+    - `tests/test_run_id_guard.py:111` skips when no deliveries are on
+      disk. CI must never build data, so that test gives ZERO CI
+      coverage by design. Defensible, but it should be known rather
+      than assumed - noted here rather than changed.
+    - `tests/test_history_rekey.py:310,328` guard on `qa_results/`,
+      which is committed and therefore always present. The skip can
+      never fire. Harmless, but it reads as a real precondition and is
+      not one.
+
+    **The standing lesson**, and it is a genuine addition to the fresh-
+    clone rule `CLAUDE.md` already carries: when a test guards on a
+    build artifact, ask what it does on a runner that has never built
+    one. "Fails" is the answer that rule anticipates and is the SAFE
+    one - somebody sees it. "Skips" is the dangerous one, because the
+    suite stays green and the coverage quietly leaves.
+
+63. **[done, 2026-09-28]** **[Pipeline & publishing, Dashboard UI]**
+    **Three defects that had been unreachable, all reached on the same
+    night by the same change.** Not found by a critic - found by
+    promotion starting to work, which turned on a code path nothing had
+    ever executed.
+
+    `outstanding._from_closed_slots()` reports REQ-PIPE-063's slot
+    closed by monotonic filling. It returns early for a dataset with no
+    FILLED slots, and only a promotion fills one, so while promotion did
+    not exist the rest of the function was dead. Its own docstring said
+    so - "structurally empty today". Behind that guard sat two real
+    faults:
+
+    - it asked `slots_for_dataset(dataset_id)` with no `until`, which a
+      DAILY calendar refuses because it generates periods without end.
+      This is what actually broke: 153 errors in
+      `tests/test_dashboard_e2e.py`, every one of them a fixture error
+      naming a subprocess rather than a calendar.
+    - `closed_by_monotonic_filling()` returns a set of slot NAMES and
+      the loop read `slot.name` off each. That one would not have shown
+      as a crash in the survey - it needed a slot to actually be closed,
+      which is one step further in again.
+
+    **The third was visible rather than fatal, and is the one worth
+    remembering.** With the function working, the Birth Registrations
+    dataset page rendered **seventeen raw ISO dates** - "Birth
+    Registrations has no supply for 2026-08-27" - which is exactly what
+    REQ-DASH-071's display standard exists to prevent. Nothing was wrong
+    with that requirement's work: a period NAME is an identifier, a
+    DAILY calendar names its periods by the day, and no period name had
+    ever reached a reader as prose before. Fixed with
+    `display_time.format_period()` and `format_periods_in()`, the second
+    because a filing's `ambiguity` sentence is composed once and STORED,
+    so formatting at composition time would leave every earlier filing
+    showing raw dates forever.
+
+    Verified in a real browser against the rebuilt dashboard: 37 raw
+    dates before, zero after. All three carry failing-first tests
+    (`tests/test_outstanding.py`'s own
+    `TestADatasetOnAnEndlessCalendarDoesNotTakeTheSurveyDown`, and four
+    in `tests/test_display_time.py`), confirmed failing against the
+    unfixed module by reverting just that file.
+
+    **The standing lesson, and it is not "test more".** A guard that
+    makes a code path unreachable also makes it untested, and the path
+    runs for the first time on the day the guard stops holding - which
+    is the day somebody is shipping the feature that removes the guard,
+    with the least attention to spare. Worth asking, of any "this is
+    structurally empty today" comment: what runs the first time it is
+    not?
+
+64. **[done, 2026-09-29]** **[Pipeline & publishing, Testing & dev tooling]**
+    **A test that conflated two identifiers hid a defect that would have
+    broken the first real substitution anybody made.**
+    Found hours after the code shipped, by writing a DIFFERENT test
+    that happened not to conflate them.
+
+    A supply has two names. `cp-carers@202605010100000000` is how a
+    filing and a decision name it; `cp_carers__202605010100000000` is
+    what the warehouse can call a table, because dbt and Soda write the
+    name into their own SQL unquoted and PostgreSQL folds an unquoted
+    identifier to lower case. `promote()` takes both - the id for the
+    log, the tables to move.
+
+    `substitution.substitute()` took one `supply` argument and used it
+    for BOTH: it judged the decision against the log, where the value is
+    an id, and then built the view with it as a table name. The two
+    cannot both be right.
+
+    **WHY NOTHING CAUGHT IT, and this is the part worth keeping.**
+    `tests/test_substitution.py`'s own helper promoted with
+    `supply=physical, physical_tables=[physical]` - one string playing
+    both parts. Twenty-six tests passed, including ones that read real
+    rows through the substituted view, because within the test the two
+    names genuinely were the same. The fixture was not lazy; it was
+    UNDER-SPECIFIED, and an under-specified fixture makes a whole class
+    of confusion invisible rather than merely untested.
+
+    Fixed in `substitution.py` by resolving the physical table from the
+    period schema (`period_schema.promoted_in`), which is where the
+    warehouse actually keeps the answer, and refusing loudly where the
+    period holds no such table or several. Three test helpers were
+    rewritten to mint the two names differently, and one of them -
+    `tests/test_drift_reference.py`'s - turned up the same latent
+    conflation in a module written the same night.
+
+    **The standing lesson is about fixtures rather than about
+    identifiers.** Where a system carries two values that are usually
+    derived from each other, a test that makes them EQUAL proves
+    nothing about the code that tells them apart. Mint them differently
+    in the fixture, even when it costs a line - the cost is one line
+    and the saving is the first real user finding it.
+
+65. **[done, 2026-09-29]** **[Dashboard UI]** **Repairing a stale link
+    broke it, whenever an as-of date was set.**
+    Found while building REQ-DASH-085's drill-through, by reading every
+    place this page writes a URL rather than by a critic.
+
+    `forgetStaleSegment()` is the repair for a URL naming a column or a
+    check the dataset no longer has (#11): it renders the dataset page,
+    drops the dead segment from STATE, rewrites the address and puts a
+    notice above the page. It built the new address as
+    `stateToHash(STATE) + location.search`.
+
+    That concatenation puts the query string INSIDE the hash. With an
+    as-of date set, the repaired URL reads
+    `#/.../dataset/birth-registrations?asof=2026-05-01`, so on the next
+    load `pathToState()` takes the dataset id to be
+    `birth-registrations?asof=2026-05-01`, finds nothing, and renders
+    not-found. The repair whose whole purpose was to stop a broken
+    segment being re-shared produced a URL that was broken outright.
+
+    **WHY NOTHING CAUGHT IT.** `location.search` is empty in every
+    existing test of this path, and empty concatenates harmlessly. The
+    bug needed one more thing to be true at the same time - a filter
+    the tests had no reason to set - which is the shape of most things
+    that survive a suite.
+
+    Fixed by building the address with `URL` rather than by
+    concatenation, in the same `navUrl()` the drill-through needed
+    anyway. A repair of the page the reader is already on keeps the
+    arrival framing, because they have not gone anywhere.
+    Reproduced first, in `tests-js/navigation.test.js`.
+
+66. **[done, 2026-09-29]** **[Pipeline & publishing, Testing & dev tooling]**
+    **The same supply-id-as-table-name conflation as #64, in the module
+    written the same night, found the same way.**
+    Found by a test in a DIFFERENT module that happened to mint the two
+    names differently.
+
+    `inheritance.inherit_into()` - the RULE's own pass, which runs at
+    every period's birth in the real pipeline - took the supply id
+    straight out of the decision log and built
+    `CREATE VIEW ... AS SELECT * FROM "<period>"."<supply id>"`. A
+    supply has two names: `cp-carers@202605010100000000` is how a filing
+    and a decision name it, and `cp_carers__202605010100000000` is what
+    the warehouse can call a table. The first is not an identifier
+    PostgreSQL will take unquoted, which is why supply_db refuses it.
+
+    **WHY #64's FIX DID NOT REACH IT.** #64 was fixed on 2026-09-29 by
+    adding `substitution._physical_in()`, which resolves the physical
+    table from the period schema, and the write-up said the same
+    conflation had turned up in a third module the same night. It did
+    not say to go and look at the fourth. Substitution and inheritance
+    are deliberately kept apart - they mean opposite things - and that
+    separation is exactly what let one be fixed while the other was
+    not.
+
+    **WHY NOTHING CAUGHT IT, and it is #64's lesson word for word.**
+    `tests/test_inheritance.py`'s own `_promote_into()` promoted with
+    `supply=physical, physical_tables=[physical]` - one string playing
+    both parts - so every one of the module's thirty-five tests passed
+    and the real system, where the two differ, would have failed at the
+    first period birth after a real promotion.
+
+    Fixed with an `inheritance._physical_in()` of its own, and the rule's
+    pass now records a missing table as a REFUSAL rather than raising,
+    on criterion 10's own terms: one dataset's problem must not stop the
+    rest of the period being born. Three tests pin it at the path that
+    actually runs.
+
+    **The standing lesson is about the SWEEP, not the identifiers.**
+    When a fixture-shaped defect is found, the fix is not done until
+    every module that could hold the same one has been looked at. #64
+    named a third module and stopped; the fourth cost a second night's
+    finding. `grep` for the shape - here, a period schema and a name
+    from the decision log in one f-string - not for the module.
+
+67. **[done, 2026-09-29]** **[Pipeline & publishing]**
+    **A route was built whose entry point does not exist, and only an
+    audit for callers found it.**
+    Found by grepping for callers of the two modules shipped in the
+    preceding two commits, not by anything failing.
+
+    `qa_tools/common/filing_from_github.py` reads a filing decision out
+    of a ticket comment and raises it. Nothing reads ticket comments.
+    The workflow that would - `.github/workflows/ticket-sync.yml` - is
+    disabled and cannot run at all: it needs the recorded QA results,
+    those are rows in a PostgreSQL database since REQ-PIPE-089, and a
+    GitHub runner has no route to one. Its replacement inverts the
+    integration's direction, which is `plans/running-thoughts.md` #53
+    and is not scoped.
+
+    So REQ-GHUB-082's criterion 1 - "accept ... filing decisions raised
+    on the GitHub ticket" - is met as far as an entry point allows, and
+    that is now what the requirement says. It said "criterion 1" flatly
+    for about twenty minutes, which is the part worth correcting: a
+    criterion is not met because the code that would satisfy it exists
+    somewhere unreachable.
+
+    `filing_decisions.py`, shipped the commit before, has the same
+    property and it is fine: its caller is the TUI adapter, which is
+    the one phase of that requirement deliberately left for a session
+    with Keith awake. The difference is that its caller is SCOPED and
+    the GitHub one is not.
+
+    **The standing lesson is a question, and it costs one grep.** After
+    building a module, ask what calls it - in production, not in its
+    tests. This project has now paid three times for code that had
+    never executed outside a test: #63's guard that made a path
+    unreachable, #64/#66's fixture that made two names one string, and
+    this. The first two were found by accident weeks later; this one
+    was found the same hour, by asking.
+
+    Nothing was changed in the code. What changed is that the
+    requirement and this file now say where the gap is, so whoever
+    scopes #53 knows the adapter is already there and needs only a
+    caller.
+
+68. **[done, 2026-09-29]** **[GitHub workflow & people]**
+    **The commoner way the ticket service is absent got the thinner
+    message, and CI had been red on it for a run of commits nobody
+    checked.**
+
+    `ticket_github._gh()` raises `TicketServiceUnavailable` two ways. A
+    MISSING BINARY got the sentence criterion 17 is actually for - "The
+    change stands on its durable record and the next pass will bring
+    the ticket up to date." A binary that RAN AND EXITED NON-ZERO got
+    `` `gh issue list` failed: <stderr>`` and nothing else.
+
+    The second is the commoner case in the environments this is really
+    for: an unauthenticated CLI, an expired token, a network that
+    cannot reach github.com. It is also the case where a person reading
+    a pipeline run is most likely to conclude the promotion did not
+    happen. The behaviour was always right - the reconciler records a
+    failure per slot and carries on either way - but the message is the
+    only part of criterion 17 a human ever meets.
+
+    **This container cannot see it, and that is why it survived.** `gh`
+    is not installed here, so every test of an absent service takes the
+    first branch. A GitHub Actions runner HAS `gh` and no `GH_TOKEN`,
+    so it takes the second. Both branches are now driven explicitly
+    with a monkeypatched `subprocess.run`, because a test that passes
+    for a reason about the machine is a test that stops covering the
+    other reason.
+
+    **The worse half of this is the process failure, not the message.**
+    `tests/test_ticket_github.py::TestAnAbsentServiceRefusesCleanly::
+    test_it_says_the_change_still_stands` had been failing in CI since
+    that module landed, across a long run of commits - several of whose
+    own messages reported a green local `mothman check` and said
+    nothing about CI. CLAUDE.md has a standing rule for exactly this
+    ("a passing local `uv run pytest` is NOT evidence CI is green"),
+    amended to "don't block on it, but check at the next natural
+    pause". The pauses happened; the check did not.
+
+    **The standing lesson, and it is narrower than "check CI".** The
+    amendment that says not to block is the one that made this easy to
+    drop, because "the next natural pause" has no edge. An overnight
+    run has no pauses a person would notice. So: check the real run
+    BEFORE starting the next requirement, not at a pause - that is a
+    boundary something actually happens at. One `actions_list` call
+    against the branch answers it, and a red one found at the next
+    commit costs a commit rather than nine.
+
+    A second, cheaper lesson while reading those logs: the MCP tool's
+    `get_job_logs` returns a TAIL, and a job with a PostgreSQL service
+    container ends with hundreds of lines of "there is no transaction
+    in progress" from the container's own log. A short tail shows none
+    of pytest's output and reads as though the log is empty. Ask for
+    thousands of lines and grep for `short test summary`. That is
+    already in CLAUDE.md's blocked-host note; it is repeated here
+    because it cost time again.
+
+69. **[done, 2026-09-29]** **[Testing & dev tooling]** **CI was red all
+    day, I told Keith it was green, and the cause was one defect shape
+    that four different tests carried.** He had to say "it's been firing
+    red all day" before anybody looked again.
+
+    **THE DEFECT, which is the smaller half.**
+    `decisions_for(conn, dataset_id)[-1]` reads as "the decision I just
+    recorded" and means "the newest decision ANYBODY recorded for this
+    dataset". These tests act on a REAL dataset id - `cp-carers`,
+    because the fixtures need a real table and agency - while minting
+    periods of their own, so several modules write cp-carers entries
+    into one worker's log. Which module shares a worker depends on how
+    pytest-xdist distributed the files, so the same code went green once
+    and red twice.
+
+    Three failed on the runner and a fourth had already been fixed that
+    morning:
+    - `test_filing_decisions.py` x3 - `assert 'promote' == 'reject'`, and
+      an assertion that read another test's reason verbatim
+      (`'read them'`, typed in `test_cli_filing_tui.py`)
+    - `test_inheritance.py` - `assert 'inheritance rule' == 'Keith'`,
+      where a promotion's own `inherit-refused` entries landed after the
+      person's inheritance
+    - `test_cli_filing_tui.py` - the same, found and fixed the same
+      morning without recognising it as a class
+
+    **Two of the three were caused by tests written that morning**, whose
+    cp-carers decisions pushed the existing ones off the end.
+
+    **THE FIX IS STRUCTURAL, so ordering stops mattering**: select by the
+    period under test, which each of these mints uniquely.
+    `tests/test_filing_decisions.py::_entry_for()` is the one place that
+    says why. And a guard in `test_decision_log.py` walks every test
+    module with `ast` and refuses the spelling outright - verified by
+    reintroducing it and watching it fire. It reads the AST rather than
+    the text because the first version matched its own docstring and the
+    helper written to replace it, both of which quote the bad spelling
+    in order to warn about it. A guard that fires on its own explanation
+    is one somebody deletes.
+
+    **THE REPORTING FAILURE IS THE BIGGER HALF, and it is mine.** At
+    00:55 I checked run `3b2b53c`, found it green, and said "CI is
+    green". I then pushed twice more and never looked again. Both went
+    red. Keith found out by watching the Actions tab, which is exactly
+    how the 2026-09-18 incident this project already has a rule for was
+    found.
+
+    **The rule existed and I had just written a sharper version of it**
+    (#68, the same morning: "check the real run BEFORE starting the next
+    requirement"). I followed it once and stopped. So the lesson is not
+    another rule, it is what the existing one actually means:
+
+    **A GREEN RUN IS A FACT ABOUT ONE COMMIT, NOT A STATE.** "CI is
+    green" is a claim about a SHA. The moment anything is pushed on top
+    of it, the claim is about a tree nobody has tested - which is the
+    same reasoning `CLAUDE.md` already applies to a gate run that
+    predates its last edit, arriving one layer out. So the honest
+    sentence is "CI was green on `<sha>`", and if a later push has gone
+    out, that sentence has no bearing on now.
+
+    **And a flaky green is worse than a red**, which is the part that
+    made this expensive rather than merely wrong: `3b2b53c` passed with
+    the defect present. Reporting it as green was true of that run and
+    false about the code. Where a failure is ordering-dependent, one
+    green proves nothing - the fix has to make the ordering irrelevant,
+    which is what selecting by period does and what `[-1]` never could.
+
+
+70. **[done, 2026-09-29]** **[Testing & dev tooling]** **Splitting CI
+    exposed three more tests that only ever passed because something
+    else had run first - and the fast half was silently skipping three
+    more on top.** Found by reproducing the runner's exact condition
+    locally rather than by reading the failures twice.
+
+    **THE REPRODUCTION IS THE REUSABLE PART.** CI's fast half has an
+    EMPTY deployment database, no `data/` and no `reports/`. Recreating
+    all three locally - a scratch database, both trees moved aside -
+    reproduced all ten failures exactly, in 2m44 rather than a
+    nineteen-minute round trip. `CLAUDE.md` already recommends this for
+    the `data/` half; the database half is new and matters more now
+    that the suite's source is one.
+
+    **WHAT IT FOUND, in three groups.**
+
+    - **`test_outstanding.py`, nine tests.** It asserts on a GLOBAL
+      queue total, in a database shared with whatever else
+      `--dist loadfile` put on its worker. Its own docstring already
+      recorded the previous version of this - the deployment's 84
+      promotions arriving mid-test - and the fix then was a database
+      per WORKER, which isolates it from the deployment and from other
+      workers but not from its worker-mates. Removing 270 tests
+      redistributed the rest and nine tests began reporting 28
+      `closed-unfilled-slot` items where they expected none. Now on a
+      database per TEST (`private_supply_dsn`), which nothing else can
+      write into. Per test rather than per module because the decision
+      log is append-only by a database trigger, so a module cannot
+      clean up between its own tests either.
+    - **`test_scenario_map.py`, one test.** It rebuilds `SCENARIOS.md`
+      from `read_placements()`, which reads the GENERATED
+      `data/scenario_placements.json`. It passed in CI only because the
+      single job bootstrapped before running anything. Marked
+      `needs_deployment`.
+    - **Three tests that SKIPPED rather than failed** - `test_run_id_guard.py`
+      and `test_scenario_injection.py`, both on "no deliveries on
+      disk". Green, and proving nothing. This is the exact silent-green
+      the workflow's own bootstrap comment records having hit in 2026-09-18,
+      arriving again by a new route. Both marked; the skips stay as the
+      guard for a developer's own fresh checkout, where they are
+      correct.
+
+    **THE FAST HALF NOW REPORTS 2,622 PASSED AND ZERO SKIPPED** under
+    the runner's real condition, which is the number worth checking
+    rather than the pass count: a skip there is coverage that has gone
+    quiet.
+
+    **AND THE GUARD WAS TOO NARROW**, which is worth admitting rather
+    than just widening. `tests/test_publish.py` checked for modules
+    reading `reports/` and nothing else, so it missed
+    `scenario_placements.json`. It now checks a LIST OF KNOWN
+    ARTEFACTS, and says in its own docstring that it is not a general
+    proof - nothing static can tell whether a path is read from the
+    real tree or a redirected one. CI running the fast half against an
+    empty deployment is the real check; the guard is the cheap one that
+    catches the known shapes before a push.
+
+    **The standing lesson, which is not "test in CI conditions".** It
+    is that every one of these had been passing for a reason unrelated
+    to what it asserts - a bootstrap that ran first, a worker-mate that
+    wrote nothing, a tree that happened to be there. None of that is
+    visible from reading the test. What made them findable in one
+    afternoon rather than one at a time was reproducing the condition
+    that removes all three supports at once.
+
+
+71. **[done, 2026-09-29]** **[Testing & dev tooling]** **A generator
+    test had been rewriting the real `data/scenario_placements.json` on
+    every run, and the bootstrap was hiding it by overwriting the damage
+    each time.**
+
+    `tests/generator_isolation.py` redirects a generator's outputs to a
+    tmp tree, and its own docstring promises "one obvious place" for the
+    next output somebody adds. A fourth output was added and not added
+    there: both generators call
+    `scenario_injection.write_placements()` at the end of a run, which
+    defaults to the REAL file. So `test_generate_runs.py` rewrote it
+    with Birth Registrations' scenarios alone - while asserting, two
+    lines further down, that the real tree was untouched.
+
+    **IT WAS INVISIBLE BECAUSE SOMETHING ALWAYS REPAIRED IT.** The
+    single CI job bootstrapped before every run, overwriting the partial
+    file with a complete one. Splitting CI removed that, and the fast
+    half started reading whatever a test had last written:
+    `KeyError: 'TS-4'` - a Child Protection scenario missing from a file
+    a Birth Registrations test had truncated.
+
+    **WHY IT HANGS OFF A DIFFERENT MODULE**, which is the reusable part:
+    the other three redirected paths are attributes of the generator
+    being redirected, and this one belongs to `scenario_injection`. A
+    helper that loops over `hasattr(module, name)` cannot see it, so it
+    was skipped silently rather than failing. The redirect now sets it
+    explicitly, and `test_generating_never_touches_the_real_delivery_tree`
+    - the test that should have caught this - now fingerprints the
+    placements file alongside the other three.
+
+    **AND THE GUARD FROM #70 FALSELY ACCUSED THE FIX.** Teaching
+    `test_generate_runs.py` to redirect the path made it mention the
+    path, which is what that guard looks for - so it demanded a
+    `needs_deployment` mark on a module that needs the opposite. The
+    wrong fix was available and tempting: add the mark, quiet the
+    check, and push a fast test into the slow half for no reason. The
+    right one was to teach the guard that REDIRECTING an artefact is a
+    stronger form of covered than any mark.
+
+    Worth keeping as a caution about this kind of guard generally: a
+    static check on "does this module mention X" will accuse the code
+    written to handle X properly, and each false positive is pressure to
+    satisfy the checker rather than the requirement.
+
+72. **[in-progress, 2026-09-30]** **[Pipeline & publishing]** **A held
+    supply would have taken the whole collection's run down, which is
+    the exact opposite of what three separate places promise. Found by
+    running the path for the first time, while building REQ-PIPE-078
+    criteria 9 and 10.**
+
+    **THE PROMISE.** REQ-PIPE-059 criterion 7, `holds.py`'s own
+    docstring and `supply_holds.py`'s "every other dataset in the
+    delivery is processed normally" all say the same thing: one dataset
+    nobody could place must not cost the others their QA. It is this
+    area's standing blast-radius rule, stated in the requirement and
+    twice in the code.
+
+    **WHAT ACTUALLY HAPPENS.** A held supply gets no view in the run's
+    schema - that is how "a held supply is not checked" has been
+    enforced by construction rather than by remembering, and it is
+    correct as far as it goes. But every tool is then pointed at a
+    FIXED set of things to check. dbt is asked to build six named
+    models, so the model over the missing view does not fail, it
+    ERRORS - and an errored node is not a test result, it raises
+    through the orchestrator's `_run_step` and abandons the run.
+    Measured against a real Child Protection arrival with `cp-clients`
+    held, on a scratch database:
+
+        dbt could not run 1 node(s): model.birth_registrations.stg_cp_clients
+          relation "qa_trial_...z.cp_clients" does not exist
+
+    Five healthy datasets lost their QA for one held supply.
+
+    **WHY IT WAS NEVER SEEN.** The corpus holds ZERO holds of either
+    kind - no filing with `branch='held'`, no delivery with a `held`
+    entry - so the path had never run. `tests/test_holds.py`'s own
+    `TestBothFilesAreStagedAndNeitherIsReadable` covers the VIEW layer
+    and stops there, which is exactly the shape CLAUDE.md's own
+    shape-change lesson warns about: a green data layer says nothing
+    about the layer that consumes it.
+
+    **IT IS NOT SPECIFIC TO THE NEW KIND OF HOLD.** Verified rather
+    than assumed: building the run views with an ambiguous candidate
+    set - REQ-PIPE-059's own delivery-level hold - leaves the run
+    schema byte-identically empty. The same crash, by the same route,
+    in code shipped weeks ago.
+
+    **FIXED FOR dbt, both collections**, with the failing test first
+    (`tests/test_run_dbt_cp.py::TestAnUnreadableTableDoesNotTakeTheRunDown`,
+    confirmed red against the pre-fix code). `--exclude stg_<table>+`,
+    and the `+` is the whole fix: dropping the model from `--select`
+    left FOUR nodes still erroring, because `dbt build` runs every test
+    DEPENDING on a selected node - three relationships tests declared
+    on readable models that reference the unreadable one, plus a
+    cross-table singular test. Only the downstream selector takes the
+    dependents with it, and dbt is the only thing that knows what they
+    are. This is the one place `run_dbt` uses a graph selector rather
+    than an explicit node list, and its docstring says why.
+
+    **THE OTHER THREE TOOLS ARE THE SAME BUG AND ARE NOT FIXED.** The
+    same probe, re-run with dbt fixed, dies one tool later:
+
+        Soda Core failed - UndefinedTable: relation "cp_clients" does not exist
+
+    datacontract-cli and Evidently are unexamined and have no reason to
+    differ. Each is pointed at its own fixed set - Soda at a whole
+    checks YAML - so each needs its own way of being told what not to
+    read, across two collections.
+
+    **WITH KEITH, 2026-09-30**: whether to finish all four tools inside
+    REQ-PIPE-078, or to scope the tool-blindness as its own requirement
+    - the recommendation - since the defect is cross-cutting, predates
+    078, and is bigger than the criterion that found it. Nothing is
+    worse in the meantime: the same hold crashed at dbt before this
+    change and crashes at Soda after it, and the corpus has no holds.
+    **CLOSED 2026-10-06**: the other three tools were fixed by REQ-PIPE-079
+    and REQ-PIPE-115 (each leaves an unreadable table's checks out and says
+    so); REQ-PIPE-078 is built, with an end-to-end test through all four
+    tools over a held sibling (`TestAHeldSiblingDoesNotTakeAnyToolDown`).
+
+73. **[done, 2026-10-02]** **[Pipeline & publishing]** `EARLY`
+    may be unreachable through the real assignment path, because the
+    slot list is capped at the arrival date.
+
+    **Found while building `REQ-PIPE-080`**, by writing a test against
+    a REAL dataset rather than a hand-built slot map - the fictional
+    fixture the sibling test file uses would have hidden it entirely.
+
+    **The mechanism.** `filing.file_arrivals()` builds its
+    candidate slots with `slots_mod.slots_for_dataset(dataset_id,
+    until=arrival.received_at.date())`, and `until` stops at the
+    period CONTAINING that date. So a slot whose CLAIM WINDOW has
+    already opened, but whose period has not yet begun, is not in the
+    list the rule chooses from. Measured directly:
+
+        cp-clients, arrival 2023-07-25 09:00 Perth
+        2023-Q3 claim opens 2023-07-18, due 2023-08-01
+        slots_for_dataset(until=2023-07-25) -> ['2023-Q1', '2023-Q2']
+        current_slot(...)                   -> 2023-Q2
+
+    A supply arriving a week inside Q3's claim window is therefore
+    filed to Q2 - already filled, so branch 3 records a resupply of
+    the CURRENT slot - and classified against Q2, which reads LATE.
+    The honest answer is EARLY for Q3. `arrival_classification` would
+    give that answer correctly; it never gets the chance, because the
+    slot it needs was removed before the rule saw it.
+
+    **Which makes the claim window do nothing.** Its whole purpose is
+    to let a supply arrive before its due date and still be recognised
+    as that period's. Capping the slot list at the arrival date
+    defeats it by construction.
+
+    **NOT EXERCISED TODAY, checked rather than assumed**: zero of the
+    150 supplies in the real corpus arrived inside a claim window that
+    the cap excluded. So this is latent, and the measured
+    0 early / 240 on time / 112 late is still explained by the
+    generator sending nothing early (`plans/running-thoughts.md` #27)
+    rather than by this. **But the two causes are indistinguishable
+    from the outside, and that is the part worth flagging**: teaching
+    the generator to send an early supply (`REQ-GEN-044`) would not
+    produce an `early` reading, it would produce a wrong `late` one,
+    and the obvious conclusion would be that the classifier is broken.
+
+    **FIXED 2026-10-02, with Keith's sign-off** ("we should definitely
+    fix that") - sought because changing which slot a supply is filed
+    to is a change to agreed behaviour, which this file's standing rule
+    reserves for him.
+
+    **The fix is the bound, not the rule.** `slots.claimable_until()`
+    returns the arrival date plus the dataset's claim window - the
+    window's REACH rather than today - and both call sites now use it.
+    Widening the list does not widen what may be CLAIMED:
+    `current_slot()` and `is_claimable()` still filter on
+    `claim_opens_at`, so a slot whose window is shut is offered and not
+    chosen, exactly as the daily feed has always done for the current
+    day. A test asserts that invariant in both directions so a careless
+    later fix cannot let a supply claim forward.
+
+    **IT IS TWO CALL SITES, NOT ONE, and the second was found by
+    enumerating consumers rather than by a failing page** - CLAUDE.md's
+    own shape-change rule earning its place. Once a supply can be FILED
+    to a slot whose period has not begun, it can be PROMOTED into it;
+    and `slot_state.states_for()` listed slots only up to `now`, so
+    that filled slot would have been absent from the dashboard. The
+    early supply would have been accepted, promoted, and then
+    invisible - a worse failure than the one being fixed, and
+    introduced BY fixing it. Both call sites now take the same
+    lookahead, and a structural test fails if either stops.
+
+    **NOTHING ALREADY RECORDED MOVES, measured rather than argued**: 0
+    of the real corpus's 150 supplies file to a different current slot
+    under the new bound, which is the same zero that made this latent
+    in the first place. Filings are write-once in any case, so only new
+    arrivals could differ.
+
+    Covered by `tests/test_claim_window_lookahead.py` (8 tests, 5
+    confirmed failing against the pre-fix code; the 3 that passed
+    before and after are the negative cases, there precisely to catch
+    an over-broad fix). One of them was wrong when first written - it
+    asserted that `slots_for_dataset()` never returns a slot before its
+    window opens, which the design has never promised and the daily
+    feed breaks every morning. Corrected to assert the real invariant,
+    about what `current_slot()` CHOOSES, rather than changing the code
+    to match a rule it never had.
+
+    `REQ-PIPE-080`'s own resolver already avoided the same cap
+    (`filing._slot_named()`), because a supply re-filed FORWARD by a
+    person would otherwise lose its verdict.
+
+74. **[done, 2026-10-02]** **[Pipeline & publishing]** `REQ-PIPE-098`:
+    **a dataset subsetting its calendar by `delivery_months` never
+    inherited, and an inherited view was invisible to the overlay.**
+
+    Found by Keith, not by a critic, asking why Case Workers had no
+    inherited entry for the quarters it does not deliver in - after
+    REQ-PIPE-105's new "could not be evaluated" records showed 19 reds
+    naming `cp_case_workers` as a missing table in Q2 and Q4. Two
+    defects, both against criteria already marked built:
+
+    - **Criterion 5** (non-participation "from the schedule alone"):
+      `inheritance._does_not_participate()` read only explicit
+      `not_expected` entries. A schedule also says it through
+      `delivery_months` - Case Workers is February and August only -
+      which the slot builder honoured and inheritance ignored. So Q2 and
+      Q4 opened with no Case Workers at all; the decision log held not
+      one `inherit` for it across the whole corpus.
+    - **Criterion 16** (the inherited view visible "by the table's
+      logical name"): it was visible to a query, but the period overlay
+      chose among a period's versions with `period_schema.newest()`,
+      which rightly refuses to order a name with no arrival key - and an
+      inherited view is named just `cp_case_workers`. The overlay found
+      it and read nothing.
+
+    Neither showed until now because nothing read a sibling table from a
+    period before today's overlay, and the false reds it produced were
+    about the model rather than the data - the class Keith keeps
+    flagging as how people learn to ignore red. They also refused
+    promotion to cp-notifications and cp-investigations, whose checks
+    read Case Workers.
+
+    Fixed in both places, each with a test confirmed failing on the old
+    code first: `tests/test_inheritance.py`'s
+    `TestDeliveryMonthsAreNonParticipationToo` (the reason recorded is
+    the schedule's own: "delivered in February and August only") and
+    `tests/test_period_overlay.py`'s `TestAnInheritedTableIsRead`.
+    Classed as a bug against agreed behaviour rather than a change to
+    it, so fixed without separate sign-off under the 2026-09-25 rule.
+
+    **And the first fix was itself wrong, caught by the regenerate that
+    measured it.** It asked "is this period one of my slots?" of EVERY
+    period in the asset, so each Birth Registrations daily period
+    (`2026-08-24` and sixteen more) read as Case Workers declining it,
+    and was recorded as a refused inheritance. Restricted to periods of
+    the dataset's own calendar, with
+    `test_another_calendars_period_is_not_its_business` confirmed failing
+    first.
+
+75. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **A
+    `promotion-withheld` note makes a filled slot read as empty.** Found
+    by `delivery-architect`'s pre-build review of the option A batch, and
+    PROVEN, not just read: `tests/test_withheld_does_not_empty_a_slot.py`
+    (written first on Keith's instruction) fails on the current code -
+    `decision_log.promoted_into()` returns `None` and
+    `promotion.filled_slots()` is empty after a withheld note lands on a
+    slot holding a promoted supply.
+
+    Cause: every "what does this slot hold" reader takes the LATEST
+    decision naming the slot, and `promotion.after_run()` writes the
+    withheld note whenever an arrival is off-cycle - even when the gate's
+    real refusal was that the slot was already filled. Real case:
+    cp-case-workers' Q3 promoted; a resend arriving in Q4 (which it
+    skips) files to Q3, is withheld, and Q3 then reads unfilled, so the
+    next Q3 arrival would auto-promote over the accepted supply.
+
+    NOT YET SEEN IN DATA: the sandbox database held no withheld entries
+    when checked. A significant defect against agreed behaviour (a filled
+    slot must block automatic promotion), so the fix waits on Keith. The
+    fix is the resolving/annotating split now written into REQ-PIPE-132,
+    and REQ-PIPE-077 itself is retired by REQ-PIPE-131.
+
+    **Decided, 2026-10-04 (Keith):** fixed by construction, not patched -
+    "what does this slot hold" becomes ONE metadata-schema view built only
+    from slot-changing decisions (REQ-PIPE-130), built straight after
+    REQ-DOCS-143 and ahead of the rest of the batch, with this entry's
+    test going in alongside it, failing first.
+
+    **CLOSED 2026-10-04 overnight (sprint 2).** The test went in
+    (`tests/test_withheld_does_not_empty_a_slot.py`). It no longer failed
+    by the time it landed - #84's fix had already made `promoted_into`
+    skip refusals - and the fix by construction is in: `qa.slot_holds`
+    (REQ-PIPE-130 criterion 8) reads no refusal at all.
+
+76. **[blocked, 2026-10-04]** **[Dashboard UI]** **The arrival history labels
+    an arrival with its DELIVERY's receipt time, not the file's own.**
+    Spotted by `delivery-architect` reviewing REQ-PIPE-144:
+    `arrival_history._arrivals_in` takes the delivery's instant, while a
+    filing (and the dashboard's own `arrivedAt`) uses the file's. They
+    differ whenever a delivery's files land at different times, which the
+    synthetic generator already does for ~20% of multi-file deliveries
+    (`generator/receipt_instants.py`, up to ten minutes apart). Keith,
+    2026-10-04: fix it. A minor bug against agreed behaviour (REQ-PIPE-105:
+    every file is its own arrival with its own receipt), so it gets a
+    failing test first and needs no further sign-off.
+
+    **WORSE THAN A LABEL, AND FOLDED INTO REQ-PIPE-144 (Keith,
+    2026-10-04).** It is `mothman supply history` (and the delivery
+    companions beside it), and the same code builds each arrival's SUPPLY
+    ID from the delivery's time - so for a spread delivery the id matches
+    no filing. The database holds no per-file receipt until 144 adds one,
+    so 144 carries the fix as a criterion (the arrival history reads the
+    one receipt view) rather than a stopgap now.
+
+77. **[done, 2026-10-05]** **[Pipeline & publishing]** **An
+    unreadable table no longer takes a run down - but its reds do not
+    all exist, and none of them reach the dashboard.** Found by a
+    verification probe Keith approved (REQ-PIPE-078 criteria 9-10 and
+    the unsigned REQ-PIPE-115), run against real tools on scratch
+    databases; probe and per-case output in the session scratchpad,
+    nothing committed. Key claims re-checked at source by the main
+    session.
+
+    WORKS: in Child Protection, with a sibling table ABSENT, every run
+    completes, all four tools run, each tool leaves out exactly the
+    checks over the absent table, and each of those reappears as an
+    `unrunnable` red naming the table ("did not fail - it could not be
+    evaluated"). No pass for an unevaluated check anywhere.
+
+    FOUR GAPS, the first being the most serious:
+    1. **The reds never reach the dashboard.** `qa_results_reader`
+       (TOOL_ORDER, ~line 67/87) and `cp/build_results_from_history.py`
+       read only dbt/soda/datacontract/evidently, so `unrunnable` and
+       `held` records are stored and dropped on rebuild; the template has
+       no treatment for them. REQ-PIPE-105 criterion 13 ("make plain the
+       check is red for want of a promoted table") is therefore met in
+       the database and NOT at the layer a person sees - a claim
+       `requirements.yaml` makes that the display does not bear out.
+    2. **A HELD supply's own checks are evaluated in batch order** -
+       views are built before filing raises the hold, so its run records
+       ordinary verdicts against a supply with no period (37 in the
+       probe). REQ-PIPE-078 criterion 9 is not met. Even when withheld,
+       the held reds are written under the period-less held run, and the
+       sibling runs report the same checks as "no filled slot" rather
+       than "held" - two reds, two reasons, never one saying "held".
+    3. **A CONTESTED run's own checks vanish** (40 of 43 in the probe) -
+       by design under REQ-PIPE-079 criterion 13, but it is the "silently
+       omitted" REQ-PIPE-115 exists to stop.
+    4. **Birth Registrations emits nothing** when its one table is
+       unreadable - every tool is replaced by `lambda: []`
+       (`orchestrate_bdm.py` ~163-168), reason only in `tables_read`.
+    Also: nothing reconciles what was withheld against what was reddened
+    (115 criterion 7), and the not-yet-due / overdue / awaiting-decision
+    reason branches were not exercised by the probe's fixture.
+
+    Gap 1 is a defect against signed, built behaviour and goes to Keith
+    for sign-off before any fix, failing test first. Gaps 2-4 are what is
+    genuinely left of REQ-PIPE-078 and REQ-PIPE-115.
+
+    **GAP 1 FIXED, 2026-10-04 (Keith signed the fix).** Failing tests
+    first, each confirmed red against the old code: the reader
+    (`tests/test_qa_results_reader.py`'s
+    `TestACheckThatCouldNotRunIsReadBack`), the builder
+    (`tests/test_build_cp_dashboard_data.py`'s
+    `TestACheckThatCouldNotRunStaysOnItsOwnCard`) and the page
+    (`tests-js/not-evaluated.test.js`). The reader and the CP rebuild now
+    walk `RESULT_TOOLS` (the four tools plus `unrunnable` and `held`),
+    kept apart from `TOOL_ORDER` because a pseudo-tool is owed by no run.
+    THE BUILDER WAS WORSE THAN BLIND: a not-evaluated record (value None)
+    CRASHED it in the column stats - hidden only because the reader never
+    passed one through; the live path, which hands the builder in-memory
+    results including these records, could hit it. Each such record now
+    joins the real check's card (by check_id, not by its own check_name,
+    which would open a second card) as that run's red, carrying
+    `not_evaluated` with the reason. The page shows "not evaluated in the
+    latest run" on the card, the reason in the check panel (no invented
+    difference against an earlier run), "Not evaluated" in the chart's
+    table and tooltip, and a GAP in the trend line - it used to plot the
+    run at ZERO, the "nothing wrong" end of the axis.
+    NOT COVERED by this fix, and left to the rewritten REQ-PIPE-115:
+    gaps 2-4. **REQ-PIPE-115 REDRAFTED by delivery-scoper and SIGNED 2026-10-04**:
+    one dataset-level red (held reuses REQ-DASH-070's held-supply item; a
+    contested dataset gets a new 'Two files, choose one' item) that rolls
+    up; sibling checks reading the table say held/contested in their own
+    run; 078 criterion 9 narrowed to tool verdicts; the narrow
+    reconciliation stops the batch. Its CI sibling, REQ-QAC-145, is
+    registered PARKED until the tool set is settled. Birth Registrations' builder needs no change yet because it
+    emits no such record (gap 4). No real-browser test exercises one,
+    because the bootstrapped history contains none until a scenario
+    plants one - REQ-GEN-136's planted shapes are the natural place.
+
+    **GAPS 2-4 BUILT 2026-10-05 overnight (REQ-PIPE-115, sprint 6).** Gap
+    2's cause was the period overlay returning early for a supply with no
+    period, leaving staging's view of a HELD table readable; it now drops
+    that view and records the table held, and both orchestrators run no
+    tool when their own table is held, contested or refused at load (any
+    other reason raises). Tests `tests/test_unreadable_own_table.py`,
+    each confirmed failing first. Gap 3 (siblings saying absent for a
+    held table) and gap 4 (Birth Registrations' contested case) are its
+    criteria 14-16 and 23. The dataset-level red, the reconciliation of
+    what each tool left out, and the dashboard's as-of rule are the rest
+    of that requirement.
+
+78. **[investigate, 2026-10-04]** **[GitHub workflow & people]** **CI's
+    bootstrap would write real GitHub tickets if it ever had a token.**
+    Spotted by the agent prototyping REQ-TEST-116's equivalence test and
+    confirmed at source: `ticket_reconciler.service_from_env()` treats
+    `GITHUB_REPOSITORY` being set as "ticketing is configured", and
+    GitHub Actions sets that variable on EVERY run - so the deployment
+    half's `mothman pipeline bootstrap` reaches the reconciler with a
+    real `GitHubTickets(keithamoss, data-poc)`. Checked 2026-10-04: no
+    issue on the repository has been created or touched since
+    2026-09-28, so in practice nothing has been written - most likely
+    because the job holds no token that can write issues. LATENT, not
+    live: the gate is an incidental variable, not a decision. Natural
+    home: the environment-safety group (REQ-PIPE-093 refresh, in
+    scoping) - ticketing switched on by the environment's own declared
+    configuration. Not fixed; needs Keith.
+
+    **DECIDED 2026-10-04 (Keith):** carried by REQ-PIPE-093, signed -
+    ticketing is switched on only by the environment's declared
+    configuration, and the `ci` environment declares it off.
+
+79. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An older
+    checkout can silently DOWNGRADE a database's schema marker.** Found
+    by the delivery-scoper refreshing REQ-PIPE-107, not yet reproduced
+    here: `qa_store.ensure_schema` only asks whether the database's
+    SCHEMA_VERSION EQUALS the code's, so a checkout on an older commit
+    pointed at a newer database re-runs its own older DDL and writes its
+    LOWER version over the newer one. REQ-PIPE-144 refuses an older
+    schema; nothing refuses a NEWER one. Is a defect claim, so a failing
+    test comes before any fix and Keith signs it off; it is also the
+    refresh's open question Q4 (fold the refusal into 107, or its own
+    requirement).
+
+    **DECIDED 2026-10-04 (Keith):** folded into REQ-PIPE-107, signed - a
+    newer schema is refused, and the downgrade is fixed failing-test-first.
+
+80. **[done, 2026-10-05]** **[Pipeline & publishing]** **"Reject
+    the supply" is offered for a failed load, and may not work on one.**
+    Raised by the delivery-scoper refreshing REQ-DASH-148, not yet
+    reproduced here. The `failed-load` outstanding item
+    (`qa_tools/common/outstanding.py`, `_from_loads`) offers "reject the
+    supply" as a response, but `rejection.reject` works by MOVING the
+    supply's physical tables to the rejected schema - and a failed load
+    has no table. Two things unverified: whether rejecting a failed-load
+    supply succeeds at all, and whether it clears the item, since
+    `load_log.failures()` reads only load records and a rejection writes
+    a decision-log entry. Matters more now: from REQ-QAC-096 (signed
+    2026-10-04) every file refused by a file check takes this same path.
+    A defect claim, so a failing test comes first; whether the fix is a
+    sign-off item depends on what the probe shows.
+
+    **REPRODUCED 2026-10-04**, failing test kept in the session scratchpad
+    (`test_reject_failed_load.py`, a class for
+    `tests/test_filing_decisions.py`): a FAILED load record for a real
+    dataset, then `filing_decisions.apply(REJECT)` naming a period. The
+    rejection IS ACCEPTED - `changed=True`, a decision-log entry, no table
+    moved because there is none - and the failed load is STILL in
+    `load_log.failures()`, so the item stays open and the person is
+    offered the same decision again. `failures()` reads only load records
+    and never consults the decision log. TWO THINGS STILL OPEN, which is
+    why this is Keith's rather than a minor fix: which period a rejection
+    of a never-filed supply names (the log refuses a decision with no
+    slot), and whether the terminal's queue even reaches a failed load -
+    `filing_queue.awaiting` is built from slot states, and a supply that
+    never loaded may never have been filed. Both belong next to
+    REQ-DASH-148, which now owns how a failed load is shown.
+
+    **DECIDED 2026-10-04 (Keith):** amend REQ-DASH-148 to own how a
+    failed load is rejected and cleared - the period, the route, and
+    what clears the item. Drafting via delivery-scoper; Keith signs the
+    wording.
+
+    **SIGNED 2026-10-04:** split out as REQ-PIPE-153 (15 criteria), with
+    REQ-DASH-148 criterion 3, NFR 5 and decision 8 amended to match, an
+    unmet entry on REQ-PIPE-060 criterion 18, and a sentence added to
+    REQ-GHUB-082 criterion 16. Not built. Two more defects found while
+    drafting it are covered there: promoting a failed load records a
+    promotion of nothing (153 criterion 6), and #84 below, fixed first.
+
+    **BUILT 2026-10-05 overnight (REQ-PIPE-153, sprint 6).** The kept
+    reproduction is `tests/test_filing_decisions.py::TestRejectingASupplyThatNeverLoaded`,
+    confirmed failing against the pre-fix `load_log.failures()` before the
+    fix: `failures()` now leaves out a failed load a PERSON has rejected,
+    derived from the decision log at read time and writing nothing to the
+    load record. A failed load filed to a period is listed in the
+    terminal's standing queue offering reject only; one filed to no period
+    is left to the held route; promoting one is refused on every route.
+
+81. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
+    automatic promotion records the git identity that ran the pipeline as
+    its actor, not the rule.** Found by delivery-scoper refreshing
+    REQ-PIPE-086, verified here: both orchestrators' `promote_after()`
+    pass `actor=run_by` with `actor_kind=rule`
+    (`qa_tools/bdm/orchestrate_bdm.py` `promote_after`,
+    `qa_tools/cp/orchestrate_cp.py` likewise), and the bootstrapped
+    database holds 69 `promote` and 9 `promotion-withheld` entries whose
+    actor is `noreply@anthropic.com`. REQ-PIPE-074's decision is that a
+    rule's actor id is THE RULE'S NAME, and inheritance gets it right
+    (`"inheritance rule"`). The KIND is correct, so the stickiness rule
+    (automation defers to a person) still works; what is wrong is who a
+    reader is told decided. Touches a built requirement's claim, so it is
+    Keith's to sign off; a failing test comes first.
+
+    **FIXED 2026-10-04 (Keith: fix now).** `promotion.RULE_ACTOR =
+    "promotion rule"`, passed by both orchestrators' `promote_after()`
+    in place of the operator's identity. `tests/test_promotion_actor.py`,
+    confirmed failing first, linked to REQ-PIPE-074. Rows already in a
+    database keep the old actor until the next bootstrap regenerates
+    them - synthetic history, so nothing to migrate.
+
+82. **[investigate, 2026-10-04]** **[GitHub workflow & people]**
+    **REQ-GHUB-082 criterion 17 is only half wired.** Found by
+    delivery-scoper refreshing REQ-PIPE-086, verified here: the offer to
+    decide on a supply a run left waiting (`filing_tui.offer_after_run`)
+    is called only on the synthetic route (`cli/bdm.py`, `cli/cp.py`,
+    after `report_recorded`). The real hand-filed routes end in
+    `_finish_supply` and never offer it. Touches a built requirement's
+    claim, so it is Keith's; a failing test comes first.
+
+    **FIXED 2026-10-04 (Keith: fix now).** Both `_finish_supply`
+    functions now call `filing_tui.offer_after_run` for a KEPT run, never
+    a trial. `tests/test_offer_after_hand_filed_run.py`, confirmed failing
+    first for the kept case, linked to REQ-GHUB-082.
+
+83. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **The
+    Birth Registrations Lambda handler would crash on its first file.**
+    Found by delivery-scoper refreshing REQ-PIPE-086, verified here by
+    reading: `aws/lambda_handlers/bdm_ingest_handler.py` calls
+    `orchestrate_bdm.run_single(..., reference_csv=REFERENCE_CSV)`, and
+    `run_single` no longer takes `reference_csv` (REQ-QAC-108 moved the
+    drift reference), so it raises `TypeError`. The CP handler does not
+    pass it. Nothing runs these handlers today, which is how it went
+    unnoticed. Owned by the Lambda requirement split out of REQ-PIPE-086
+    (REQ-PIPE-152, drafting), whose criteria move both handlers onto the
+    shared lifecycle; a failing test comes first.
+
+    **DECIDED 2026-10-04 (Keith):** left to REQ-PIPE-152 (its last
+    criterion), which rewrites the handler anyway - a one-argument patch
+    now would be thrown away.
+
+84. **[investigate, 2026-10-04]** **[Pipeline & publishing]**
+    **Rejecting a supply filed as a resupply of a filled period empties
+    that period.** Found by delivery-scoper drafting the failed-load
+    rejection (#80), confirmed here by reading the code but not yet
+    reproduced: `decision_log.promoted_into` takes the LAST decision naming
+    a slot (`to_slot` or `from_slot`), and a reject names its supply's
+    filed slot as `from_slot`, so it returns None whichever supply it
+    names. Rejecting an unpromoted resupply of a promoted period would
+    therefore make the period read as unfilled while the promoted
+    supply's tables still sit in the period schema; `slot_state` shows
+    it REJECTED too. It touches a built requirement's claim (REQ-PIPE-074
+    criterion 9, REQ-PIPE-076).
+
+    **DECIDED 2026-10-04 (Keith):** fix FIRST, failing test first, ahead
+    of the failed-load rejection requirement that depends on it.
+
+    **FIXED 2026-10-04 (Keith: "start now"), failing tests first.**
+    Reproduced as read, and it was WIDER: a `promotion-withheld` entry
+    (an off-cycle resupply automation stood back from) names the period
+    as `to_slot`, so it emptied a filled period the same way. Fixed in two
+    places, because the rule had two copies:
+    - `decision_log.promoted_into` walks the slot's entries oldest first;
+      a reject, demote or re-file empties the slot only where it names the
+      supply filling it, and `RECORDS_A_REFUSAL` (`promotion-withheld`,
+      `inherit-refused`) never changes what fills it.
+    - `slot_state.state_of` read the LAST entry too, so the queue and
+      tickets showed REJECTED. Where the latest entry is about another
+      supply, the slot reads as its filler's, with the filler's own
+      decider and reason.
+    Tests: `tests/test_decision_log.py::TestRejectingAnotherSupplyLeavesTheSlotFilled`
+    (3) and `tests/test_slot_state.py::TestRejectingAnotherSupplyLeavesTheSlotPromoted`,
+    each confirmed failing first. `latest_for_slot` itself is unchanged:
+    it answers "what was the last decision", which substitution's refusal
+    wording needs. REQ-PIPE-130's slot view (signed, build step 2) will
+    replace both readers with one.
+
+85. **[investigate, 2026-10-04]** **[QA checks & contract]** **The drift
+    reference skips a promoted period when a later entry is about another
+    supply - a third copy of #84's rule.** Found by delivery-architect's
+    pre-build review of the file-check group, confirmed here by reading
+    the code, not yet reproduced: `drift_reference.reference_for()` walks
+    back through periods and accepts one only if
+    `decision_log.latest_for_slot()`'s LAST entry is a promote or re-file.
+    #84's fix went into `promoted_into` and `slot_state`, not here. So a
+    reject or demote of a different supply, a `promotion-withheld`, an
+    `inherit-refused`, and (once REQ-PIPE-151 lands) every
+    `promotion-refused` make it skip a period that holds a promoted
+    supply. The result today is a reference further back than it should
+    be. Under REQ-QAC-108's 2026-10-04 amendment it becomes a false red
+    ("no accepted earlier supply"). The architect also names `_standing_on`,
+    `substitution.py` and `inheritance.py` as `latest_for_slot` readers to
+    check. A defect against built code, so a failing test comes first;
+    the obvious fix is to ask `promoted_into`, which #84 corrected.
+
+    **DECIDED 2026-10-04 (Keith): wait for REQ-PIPE-130's slot view**
+    (build step 2), which replaces every reader of "what a slot holds"
+    with one. It must cover this reader, and the REQ-QAC-108 amendment
+    must not be built before it - otherwise its false red ships. Not
+    fixed.
+
+    **FIXED 2026-10-04 overnight (sprint 2), by the slot view as Keith
+    chose.** `latest_for_slot` now returns the last decision that
+    CHANGED the slot, from `qa.slot_holds`, so the drift walk reads it
+    and stops skipping. `tests/test_drift_reference.py::TestAnEntryAboutAnotherSupplyDoesNotHideTheReference`
+    - a reject of another supply and a withheld note - both confirmed
+    failing against the pre-view code first. Every other
+    `latest_for_slot` reader (substitution, inheritance, promotion_state,
+    `_standing_on`, filing_decisions, slot_state) reads the same answer.
+
+86. **[investigate, 2026-10-04]** **[Pipeline & publishing]**
+    **`supply_db._redact` misses a keyword-form DSN.** Found by
+    delivery-architect's review of REQ-PIPE-093, confirmed by reading: the
+    redaction is one regex over the URL form (`://user:pw@`), so a DSN
+    written as `host=... password=secret` passes through unredacted, and
+    psycopg's own parse errors can echo DSN fragments. The docstring says
+    why it matters - errors reach CI logs on a public repository. Latent:
+    every DSN this project sets is URL-form. Minor fix, failing test first
+    (a keyword-form DSN and a malformed one); REQ-PIPE-093 criterion 3
+    leans on it.
+
+    **FIXED 2026-10-04 (Keith: "redact both forms").** `_redact` now asks
+    libpq's own parser (`psycopg.conninfo.conninfo_to_dict`) which part is
+    the password, so no form can be missed, and shows nothing of a string
+    it cannot parse. `tests/test_redact_dsn.py` - URL, keyword, quoted,
+    spaced, query-string, malformed, and end to end through `connect()` -
+    6 of 8 confirmed failing first. The message now reads
+    `host=... port=... dbname=... user=... password=***` rather than a URL.
+
+87. **[investigate, 2026-10-04]** **[Testing & dev tooling]**
+    **The dev-container/CI PostgreSQL pin test checks only the first CI
+    service.** Found by the same review, confirmed by reading:
+    `tests/test_devcontainer.py::_ci_postgres_image` returns the first job
+    with a postgres service, and `.github/workflows/test.yml` has two
+    (both `postgres:16` today), so the second could drift unchecked.
+    Minor; REQ-PIPE-146 criterion 5 replaces this comparison with "every
+    image tag equals the declaration", so fold it in there.
+
+    **FIXED 2026-10-04 (Keith: "fix now").** `_ci_postgres_images` returns
+    every job's image and the pin test compares each one;
+    `test_every_ci_job_is_compared_not_only_the_first` pins it against a
+    workflow where only the second job drifted, which the old first-match
+    lookup was shown to miss. REQ-PIPE-146 still replaces the comparison
+    with "equals the declared major".
+
+88. **[done, 2026-10-04]** **[Dashboard UI]** **Two different cross-table
+    checks sharing a name were drawn as one card.** Found overnight by the
+    full suite (`tests/test_cross_table_scope.py::TestPooledChecksKeepSeparateIdentities`
+    failing), and partly MY regression: this morning's gap-1 fix
+    (post-build-review #77) let a can't-run record for cp-placements'
+    `cp_client_id.relationships_dbt` open a card of its own under the
+    same URL key as cp-investigations' check, so the section had a
+    duplicate key. Underneath it was an older defect: the CP builder
+    keyed a section's cards by (engine, check_name), so cp-placements'
+    REAL verdicts for that check had always been merged into
+    cp-investigations' card on cp-clients' cross-table section - silent
+    wrong information. FIXED (minor bug and Keith's overnight permission):
+    cards are keyed by check_id, and where two pooled cards share a URL
+    key each is prefixed with its declaring dataset - only colliding keys
+    change, so no other URL moves. `tests/test_build_cp_dashboard_data.py::TestTwoChecksThatShareANameStayTwoCards`,
+    confirmed failing first.
+
+89. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **A withheld
+    supply used to read as RETURNED in a slot's state; it now reads as
+    awaiting a decision.** Noted overnight (sprint 2), not a defect report
+    so much as a behaviour change worth a look: `slot_state` mapped any
+    unrecognised latest action - `promotion-withheld` included - to
+    RETURNED ("a person returned it"). With refusals no longer read as a
+    slot's decision (REQ-PIPE-130), a withheld supply's slot falls through
+    to its filing and reads AWAITING_DECISION, which is what REQ-PIPE-077
+    meant ("a person decides whether it fills this period"). No test
+    pinned the old reading. Flagged rather than assumed right.
+    **MOOT since sprint 3b (REQ-PIPE-131, 2026-10-04)**: the off-cycle
+    gate that wrote `promotion-withheld` is retired, so nothing produces
+    a withheld supply any more - an arrival with no open period is held
+    before it is filed. Left for Keith only as a record.
+
+90. **[done, 2026-10-04]** **[Docs & process]** **The validator demanded
+    that a RETIRED requirement's code still exist.** Found retiring
+    REQ-PIPE-063 and REQ-PIPE-077 (overnight sprint 3b): the requirements
+    gate failed on their `implemented_by`/`linked_tests`, because the
+    whole point of those retirements was to REMOVE that code - and
+    REQ-DOCS-143's own decision says a retired requirement "keeps whatever
+    it carried as history". Satisfying the gate would have meant deleting
+    the history. A minor gap in REQ-DOCS-143's build, not a design change:
+    FIXED - a retired requirement's links are no longer resolved; a live
+    one's still are (the control). `tests/test_validate_requirements.py::
+    TestARetiredRequirement::test_its_record_of_code_since_removed_is_kept_as_history`,
+    confirmed failing first.
+
+91. **[done, 2026-10-04]** **[Pipeline & publishing]** **A check could
+    get two results in one run - a `held` record and an `unrunnable`
+    one.** Latent until REQ-PIPE-131 produced the first real holds: Case
+    Workers' supply was held and Notifications' own table was staged
+    awaiting a decision, so the notifications->case-workers check was
+    explained by `held_blast_radius` AND by `unrunnable`. Caught by
+    `tests/test_history_rekey.py`'s one-result-per-check invariant
+    against a fresh bootstrap. FIXED: `unrunnable.results_for` leaves a
+    check that reads any held table to `held_blast_radius`, and records
+    one result per check where several of its tables are unreadable.
+    `tests/test_unrunnable.py::TestOneRecordPerCheck`, confirmed failing
+    first.
+
+92. **[done, 2026-10-04]** **[Dashboard UI]** **A hold's reason showed a
+    raw ISO instant in the queue.** My own sprint 3b text: the reason a
+    held supply's closed slot was unavailable named "the next period's
+    claim window opened at 2023-04-17T09:00:00+08:00", and the reason is
+    stored and rendered verbatim. Caught by the display-standard e2e test
+    (REQ-DASH-071). FIXED: the reason carries no instant.
+    `tests/test_assignment.py::TestAHoldsReasonIsWrittenForAPerson`,
+    confirmed failing first.
+
+93. **[investigate, 2026-10-04]** **[Pipeline & publishing]** **An
+    authored calendar's LAST period never closes, so a file arriving after
+    the calendar runs out is filed backward into it without limit.**
+    delivery-critic on REQ-PIPE-131, reproduced against the real config:
+    a 2030 cp-clients file is filed `open-slot-unfilled` to 2027-Q4.
+    `Slot.closes_at` is None where the calendar has no next period, and
+    `is_open` reads None as open for ever. Criterion 1 is silent on it and
+    no decision records the choice. **NEEDS KEITH**: keep it (the runway
+    warning already says when dates run out), or hold such an arrival for
+    a person (criterion 10's shape) - a product decision, so not changed
+    overnight.
+
+94. **[done, 2026-10-04]** **[Pipeline & publishing]** **REQ-PIPE-131
+    delivery-critic, the findings fixed overnight** (each with a failing
+    test first where it was a defect):
+    - `file_arrivals` built each dataset's slots once per call, for the
+      FIRST arrival's horizon; under REQ-PIPE-131 a later arrival in the
+      same call fell past the list's last (now closing) slot and was HELD.
+      Latent - every production caller passes one receipt instant. Keyed
+      on each arrival's horizon now. `tests/test_file_arrivals_slot_horizon.py`.
+    - The bisection test grepped for the word "bisect" in a docstring and
+      a linear walk passed it; the code itself rebuilt an O(n) key list
+      per arrival. Now `bisect(..., key=)`, and the test COUNTS slot reads
+      (<= 40 of 4,096). `test_assignment.py::...reads_only_log_n_slots`.
+    - An authored period just before a switch to a cadence rule had no
+      closing instant when generated with `until` before the switch.
+      `_calendar_periods` now reaches the next version's start.
+      `tests/test_slot_closes_across_versions.py` (which also pins the
+      window-version change and a dataset's own dates).
+    - Wording that still stated the retired rule: TS-3a-d and TS-9 in the
+      scenario register (TS-9's config was also self-contradictory - 21
+      days early inside a 14-day window; corrected to 25 July, 9 days
+      early); Thread H and sprint 9 in plans/supply-model.md; CLAUDE.md's
+      `--sequential` note; REQ-PIPE-062 NFRs 1 and 4, REQ-PIPE-123 c10
+      (routine amendments) and REQ-PIPE-151 c3 (PROVISIONAL - it kept
+      `promotion-withheld` for off-cycle arrivals).
+    - LEFT: **TS-4a**, which REQ-PIPE-131 criterion 15 names, does not
+      exist anywhere - the criterion may mean TS-3a. Keith's or the
+      scoper's.
+
+95. **[done, 2026-10-04]** **[Pipeline & publishing]** **REQ-PIPE-144
+    delivery-critic - storage change confirmed (all 150 filings, holds,
+    delivery records and file identities identical between the two
+    empty-database bootstraps); findings fixed overnight**, each with a
+    failing test first where it was a defect:
+    - SECURITY-ADJACENT: `reset-synthetic` matched schemas by NAME PREFIX
+      (it reused the publisher's deny-list), so `staging_someone_elses`,
+      `sample_reports` and the like were dropped too, and its CASCADE took
+      views in OTHER schemas the prompt never listed. Now the fixed names
+      match exactly, the per-period/run/dbt/trial schemas come from the
+      modules that name them, and the reset REFUSES, naming them, if
+      anything outside its drop set depends on what it would drop. It also
+      resets exactly the list it showed. `tests/test_reset_synthetic.py::
+      TestItTouchesOnlyWhatIsOurs`.
+    - The hand-filing closing panel pointed at `mothman pipeline run
+      --publish`, which now always refuses at that moment - it names
+      `mothman dashboard publish`. CLAUDE.md's "regenerate via `pipeline
+      run`" line updated.
+    - An old-schema database gave a raw `SchemaVersionError` traceback from
+      any command; the CLI root now turns it into the clean refusal it is.
+    - A reset silently drops a publisher role's grants with the schema; it
+      now says to re-run `mothman supply grant-publisher`.
+    - Criterion 33 gaps closed: the two no-delivery refusals, a hand-filed
+      filing's delivery link, and a trial writing no filing
+      (`tests/test_filing_delivery_link.py`).
+    - REQ-PIPE-038 criteria 4-5 and REQ-QAC-039 still named
+      `regenerate-history` as current: re-worded, 038 c5's PROVISIONAL
+      (its explicit stray-scope assertion went with the command; a rebuild
+      from empty cannot carry one forward - a change to a built claim, for
+      Keith).
+    - LEFT FOR KEITH: criterion 16 says the ARRIVAL CLASSIFICATION reads
+      the one receipt view, while filing.record() classifies from the
+      arrival's in-memory instant, which arrivals.py derives with its own
+      copy of the contested-pair earlier-file rule. The two agree today
+      (verified for a contested pair at one instant and at two); they are
+      two definitions. Also, until REQ-PIPE-151, no batch command
+      processes new arrivals in a populated database (consequence of
+      criteria 38-39). And the criterion 30 proof's CLI capture was 80
+      columns wide, and the synthetic corpus has no contested delivery, so
+      the contested view is covered by tests rather than by the proof.
+
+96. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-103 criteria 9-20 and REQ-PIPE-147 (commit e01c1fd).** Core
+    sound: criterion 11 holds - the stated arrival is display-only, verified
+    by reading every reader and by a live run. Findings, each verified
+    before being written here:
+    - FIXED - **prompts were drawn under the live progress bar**
+      (`cli/common.py`): "Keep this check?" appeared only once answered, the
+      file-names-become-public warning was never visible, and a typed
+      original-arrival time was not echoed. The bar now stops while a
+      person is asked anything (`paused_progress()`). Not unit-testable
+      without a pty; the critic's own `tui_drive.py` reproduction is the
+      check, and the next CLI critic pass re-drives it.
+    - FIXED - **a bare date was recorded as a midnight nobody stated**,
+      against the decision "date and time, not a bare date": `2026-09-20`,
+      `20260920` and `2026-W38-1` were all accepted. Refused now, pointing
+      at `not known`. `tests/test_stated_original_arrival.py::
+      TestResolvingTheAnswer::test_a_date_with_no_time_is_refused_not_recorded_as_midnight`,
+      confirmed failing first.
+    - FIXED - **receipts that disagreed about who filed a delivery were read
+      as whichever came last** (REQ-PIPE-147's NFR says refuse). Refused
+      now. `...::TestWhatAKeptSupplyRecords::test_receipts_that_disagree_about_who_filed_are_refused`,
+      confirmed failing first.
+    - FIXED - the NFR asking for proof that nothing decides on a typed date
+      had no test: `...::TestNothingDecidesOnATypedDate` files one file with
+      two statements and compares delivery and run id.
+    - FIXED - the receipt instant was taken BEFORE the person answered the
+      prompt, so thinking time sat between receipt and filing. Taken after.
+    - FIXED (wording) - the keep-default notice said `--keep`; the flag is
+      `--commit`.
+    - FIXED (process) - `plans/running-thoughts.md` #52 was not deleted in
+      the commit that built both its requirements; its two decisions no
+      requirement carried (records regenerated rather than backfilled; why
+      positional run ids keep the statement beside the receipt) moved into
+      REQ-PIPE-147's and REQ-PIPE-103's `decisions:` first.
+    - FOR KEITH - **a service identity hand-filing is recorded as a
+      person**: with `GITHUB_ACTIONS=true` the row reads `person` /
+      `github-actions:...`. Refuse hand-filing under a service identity, or
+      read "person" as "the hand route"? (Recommendation: refuse - a
+      record saying a person filed it should be true.)
+    - FOR KEITH - **the stated time has no instant column beside its text**,
+      which an NFR asks for; nothing queries it as an instant. Add one, or
+      amend the NFR? (Recommendation: amend - a display-only note needs no
+      index.)
+    - FOR KEITH - **schema version 19 was an in-place additive migration**
+      (`ALTER TABLE ... ADD COLUMN ... DEFAULT 'automated'`), not "regenerate,
+      never migrate". Moot today (no hand-filed rows existed), but it is a
+      departure from the NFR's wording.
+    - NOT FIXED, minor and logged: the statement prints straight after
+      filing rather than in the closing message (criterion 19's wording);
+      `--originally-received` is silently ignored with `--trial`; S3
+      LastModified is keyed by basename; `file_or_trial` resolves identity a
+      second time rather than taking the command's `run_by`;
+      `people.display_name` re-parses people.yaml per call; the S3 routes'
+      forwarding of `originally`/`storage_times` is verified by reading only.
+
+97. **[done, 2026-10-05]** **[Pipeline & publishing]** **dbt left out
+    checks over a contested table that was perfectly readable, and nobody
+    recorded them.** Found by REQ-PIPE-115 criterion 17's reconciliation on
+    its first full bootstrap - the run `cp_placements__202605270100000000`
+    was refused, as designed, and the batch stopped. `cp_carers` had two
+    versions staged for 2026-Q2 and FELL THROUGH to the period's promoted
+    version (REQ-PIPE-079 criterion 12), so it was both `resolved` and
+    `ambiguous`. Soda asks the catalogue, saw the view and ran its carers
+    checks; dbt asked `Resolution.unreadable`, which counted every ambiguous
+    name, and excluded `stg_cp_carers+` - taking two cp-placements checks
+    with it. The unrunnable rule correctly saw the table readable, so it
+    recorded nothing: two checks silently absent, reading as a pass. Exactly
+    the coincidence the reconciliation was signed to catch, on day one.
+    FIXED at the source: `Resolution.unreadable` no longer counts a name
+    that resolved (a run's OWN contested table is still withheld, by
+    `own_table`, which asks `ambiguous` directly).
+    `tests/test_unreadable_own_table.py::TestAContestedTableThatFellThroughIsReadable`,
+    confirmed failing first.
+
+98. **[in-progress, 2026-10-05]** **[Dashboard UI]** **delivery-dashboard-ux-critic
+    on the "dataset that cannot be checked" treatment and "Compared with"
+    (commit 578d193).** The reason rows, the could-not-be-loaded banner and
+    the as-of behaviour of the red itself hold up in a real browser (Green
+    the day before receipt, red from it; a rejected failed load red between
+    failure and rejection only). Findings, verified against the template:
+    - FIXED - the queue's lede said none of its items changes a dataset's
+      status, one line below a held dataset's red banner (REQ-DASH-070's own
+      decision said that copy would become false once 115 and 148 landed).
+      It now says which kinds turn a dataset red.
+    - FIXED - a dataset with nine held supplies named only the oldest. The
+      reason row and banner now count them and give the oldest and newest
+      receipts.
+    - FIXED - the blocked dataset's tile read "Latest arrival" while showing
+      the held supply's receipt, which is not the latest arrival. Now
+      "Waiting since".
+    - FIXED - a supply-history block whose rows were all resolved was still
+      headed "Waiting for a person"; it reads "Needed a person" then.
+    - FIXED (wording) - "Held — its supply is held, waiting for a person to
+      place it" now reads "Held — no open period to file its supply to;
+      waiting for a person"; the gap note in "Compared with" ends with what
+      clears it.
+    - NOT FIXED, logged: REQ-DASH-070 criterion 14 (the queue judged at the
+      same instant as the red) is not met for queue ITEMS - at an as-of date
+      before a hold, the queue still lists it, stamped with the bootstrap's
+      wall clock rather than the receipt. A gap against a built claim, so
+      it needs its own failing test and is queued for the next pass.
+    - NOT FIXED, logged: the supply-history CYCLE table shows a held
+      arrival as Green "not filed ... waiting 1253d" (counted from today,
+      not the as-of date) beside the Red waiting row for the same supply;
+      the reason row's text runs off screen at 390px; the queue stacks nine
+      near-identical held cards rather than grouping by dataset; the held
+      reason itself is machine text (supply keys, "claim window"); check
+      panels leave the document title and focus where they were.
+    - FOR KEITH: (a) should an old open hold blank out a later period's
+      real, checked results (criteria 10-11 as built say yes - Case Workers'
+      green 2026-Q3 supply reads No data because of holds from 2023)? (b)
+      should a gap-rule red be shown distinctly from a measured red (153 of
+      181 drift and volume results in the bootstrap are gap reds)? Both in
+      the morning report.
+
+99. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-115, REQ-QAC-108's amendment, REQ-DASH-148 and REQ-PIPE-153
+    (commit 578d193).** Verified against supply6 and a clean export.
+    - FIXED, CRITICAL - **one held supply stopped every later supply of its
+      dataset being checked.** `supply_holds.held_tables()` returned every
+      dataset with ANY open hold, and both the staging builders and the
+      period overlay withheld that table from every run of the dataset;
+      REQ-PIPE-115's own-table guard then ran no tool for them. On supply6,
+      17 of 18 Case Workers runs had no results, eight of them on-time
+      supplies filed to real slots with no hold of their own - and supply
+      history showed them GREEN. A false green, the failure the requirement
+      exists to prevent, produced by the requirement's own guard meeting a
+      pre-existing over-broad helper. held_tables() now takes the arrival
+      key and returns only tables whose supply IN THAT ARRIVAL is held.
+      `tests/test_unreadable_own_table.py::TestAnUnrelatedHoldDoesNotStopAFiledSupplyBeingChecked`
+      (2), both confirmed failing first. Re-bootstrapped (supply7).
+    - FIXED - a blocked dataset's check panel still showed the last run's
+      value and row counts as "current"; it now says "Not run for this
+      period" and drops the current-run row detail (the column drawer row
+      too). e2e `TestAHeldOrContestedDatasetReadsRed::test_its_check_panel_does_not_show_an_earlier_run_as_current`.
+    - FIXED - the "Latest arrival" tile and the reason row named the oldest
+      of nine holds as if latest (also UX #98): "Waiting since", with the
+      count and oldest/newest receipts.
+    - FIXED - a contested pair's refused file was also listed by the
+      terminal queue as its own failed load; filing_queue.could_not_load
+      now excludes it as the outstanding items already did.
+    - RECORDED, NOT FIXED - criterion 2 (one not-evaluated record per
+      unreadable table) is not met as signed; REQ-PIPE-115 now carries it
+      as an unmet criterion rather than overclaiming, with the question for
+      Keith. Criterion 17's reconciliation skips runs with no period
+      (trials, unfiled-and-unheld supplies) because unrunnable records
+      nothing for them; recorded as a PROVISIONAL decision and a question.
+      load_log.own_words never names the column (criterion 13 lists it) -
+      the library's message is the only source of a column name and is
+      exactly what may not be recorded; logged. The e2e tests inject
+      blockers rather than driving a real hold through the pipeline -
+      which is how the critical one got past them.
+
+100. **[done, 2026-10-05]** **[Pipeline & publishing]** **A mark that a
+    period was not supplied took the outstanding queue down.** Found by the
+    sprint-7 gate run, not a critic. REQ-PIPE-132's mark is about a PERIOD,
+    so it records no supply, and `dataset_blockers._decided_keys` took the
+    arrival key of every decision's supply - a `TypeError` on the NULL,
+    raised from `outstanding.survey()`, so one mark anywhere emptied the
+    whole queue. Fixed (a supply-less decision decides nothing about an
+    arrival's files); failing test first:
+    `tests/test_not_supplied.py::TestAMarkCarriesNoSupply`. The other
+    readers that walk `qa.decision` by supply were checked: rejections are
+    REJECT-only and always carry one, `load_log._settled_by_rejection` the
+    same, and `slot_holds` excludes marks by construction.
+
+101. **[done, 2026-10-05]** **[Dashboard UI]** **A period whose only supply
+    was rejected never read as unfilled.** Found re-testing REQ-PIPE-153
+    criterion 9's deferral once REQ-DASH-133 shipped. The first cut of
+    `pipeline/closed_slots.py` counted ANY filing to a period as "something
+    arrived", so a supply filed then rejected left the period looking
+    filed for good: no red, no "no supply", and nothing saying what had
+    happened. Fixed before it was ever committed: from the rejection on,
+    the filing no longer counts, the period is its own item naming who
+    rejected it, when and why, and "could not be loaded" where the load
+    log says so. Tests: `TestARejectedSupplyLeavesItsPeriodEmpty` and the
+    JS pair in `tests-js/closed-no-supply.test.js`. SAID PLAINLY: this
+    test was written alongside the fix rather than before it, because the
+    defect was in code written the same hour and never shipped.
+
+102. **[done, 2026-10-05]** **[Testing & dev tooling]** **A new test
+    promoted into the shared CP fixture's period.** The sprint-7 drift test
+    for a marked period promoted cp-case-workers into 2026-Q1 - exactly
+    where `tests/conftest.py`'s module-scoped CP fixture promotes its
+    reference delivery on the same worker's append-only log - so every CP
+    module after it on that worker errored with "superseding ... needs a
+    reason" (16 errors). Its own docstring said 2027-Q1; moved to 2025,
+    with the reason in the docstring. The general hazard is the one the
+    fixture's own docstring already names: shared periods on an
+    append-only log are shared state.
+
+103. **[done, 2026-10-05]** **[Pipeline & publishing]** **A daily feed's
+    missed day reached the dashboard as "1 period with no supply,
+    2026-09-23".** Found by the real-browser display-standard test
+    (`TestTheDisplayStandardHoldsInARealBrowser`) the first time a daily
+    gap reached the outstanding queue: `filing_queue.Gap.describe()` wrote
+    the ISO period name and called a day a period, and the queue carries
+    that headline verbatim onto the page. Fixed - a daily run reads "2 days
+    with no supply, Tuesday, 22 September 2026 to Wednesday, 23 September
+    2026", the page's own form - failing test first
+    (`TestGrouping::test_a_daily_run_says_days_in_the_pages_own_date_form`).
+    The same gate run caught three TEST defects of this sprint's own,
+    fixed rather than waived: the supply-history drill-down test read
+    `data-run-date` from rows that now include gap rows without one; the
+    nodata-pill contrast test needed a page where something is still
+    nodata (every corpus dataset has an unmarked gap by 2027); and a
+    sprint-6 check-panel test compared against `innerText`, which carries
+    the heading's CSS upper-casing.
+
+104. **[in-progress, 2026-10-05]** **[Dashboard UI]** **delivery-dashboard-ux-critic
+    on REQ-DASH-133 (commit 0f96148).** Driven in a real browser against the
+    built page plus an injected-gaps variant. Verified against the code
+    before acting.
+    FIXED (2026-10-05, tests in `tests-js/closed-no-supply.test.js` and
+    `TestClosedWithNoSupply`):
+    - HIGH: the queue was judged as at the BUILD, so at a past date it
+      listed periods that had not closed yet beside a banner that
+      correctly did not (criterion 9). Closed periods now come from the
+      page's own as-of reading, and any other item observed after the date
+      on show is left out (`asOfQueueItems`). What was open then and
+      resolved since still cannot be shown - REQ-DASH-070 criterion 14.
+    - HIGH: the queue's lede said everything but holds, contests and
+      failed loads "change no status", directly under a red caused by a
+      missing-supply item (REQ-DASH-070 criterion 1). Reworded; such an
+      item is now pilled "Makes its dataset red" and counted separately
+      rather than as "needing review".
+    - HIGH: a daily feed's row flipped to the reason row whenever the day
+      on show had no file yet, hiding the period actually late and open
+      and the arrivals before it. The reason row is now only for a dataset
+      with nothing ever arrived; otherwise the row keeps its columns with
+      the gap beneath its pill.
+    - LOW: the queue called the kind "Missing supply" where everything
+      else says "no supply" - renamed.
+    - HIGH (partly): "no supply", held, contested and unloadable banners
+      now draw in the red tokens rather than the all-clear grey.
+    - MEDIUM: the banner's command omitted the required `--reason` and
+      did not say how a day is named; the accepted row's pill read "No
+      data" (now "Accepted"); the accepted line's contrast (now the muted
+      ink rather than faint); "The period has closed" for several groups.
+    FOR KEITH (forks, not taken): which route the banner should name -
+    mark-not-supplied alone, all three, the wizard, or "chase the
+    supplier" first; and whether a daily feed's late-open period should be
+    named on the row beside an old gap.
+    LOGGED, NOT FIXED: at 390px the agency table scrolls and the gap note
+    wraps to eight lines in the status column; the Birth Registrations page
+    can show a red dataset, green supply-level checks and grey column
+    cards at once (may predate this); the accepted line does not name
+    which datasets; ordering (banner oldest first, history newest
+    first), a tight " - " in queue text, and dark-mode red-pill contrast
+    (shared pill styles).
+
+105. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-132 and REQ-DASH-133 (commit 0f96148).** Reviewed against a
+    `git archive` of the commit, with reproductions on a scratch database.
+    Verified against the code before acting.
+    FIXED, failing tests first (`tests/test_not_supplied.py`
+    `TestAnEmptiedPeriodIsAGapAgain`, `TestASupplyWaitingInAClosedPeriodIsNotAGap`,
+    and the JS pair in `tests-js/closed-no-supply.test.js`):
+    - HIGH, a false green: `pipeline/closed_slots.py` recorded only a
+      slot's FIRST fill and first mark, and skipped any slot filled before
+      it closed - so a closed period substituted then de-substituted, or
+      promoted then demoted, read as filled on the page for ever while the
+      queue said it needed a person. The build now embeds every change to
+      what the slot holds, from `qa.slot_holds` via `slot_timeline` (the
+      one statement of which decisions fill and which empty - the first
+      cut had re-stated it, which is the root cause), and every mark; the
+      page reads the slot's last change by the date on show, and a mark
+      stands only until the slot next changes.
+    - MEDIUM-HIGH: after a rejection, a resupply filed to the same closed
+      period still read REJECTED and closed - listed as "no supply" and
+      markable as not supplied (REQ-PIPE-132 criteria 3 and 6). A supply
+      filed and not rejected now outranks the decision that emptied the
+      slot, and the mark refuses it.
+    - MEDIUM: the queue panels ignored the as-of date and said gaps change
+      no status - fixed with #104's `asOfQueueItems`.
+    - LOW: the awaiting-supply refusal's `--operation promote|reject` was
+      not pasteable (now two commands, each with `--reason`); the banner's
+      command lacked `--reason` (#104); marking a substituted or inherited
+      period named `demote` of the supply it stands on as the undo (now
+      de-substitute / un-inherit, `TestTheRefusalNamesTheRightUndo`).
+    LOGGED, NOT FIXED: an accepted gap on a dataset with no runs as at the
+    date shows neither its note nor its history (the no-runs branch); a
+    future real period is refused as "not a
+    period it owes" (bounded by claimable_until); CLOSED is not shown in
+    `mothman supply slots` or the TUI period label; `slot_state._accepted`
+    and `mark()` read marks and holds without `as_at`; OVERDUE's responses
+    still offer marking a period that is open; a grouped accepted note
+    shows only the last mark's reason; the card mixes units (datasets for
+    gaps, items for the rest). The critic also noted my REQ-PIPE-122 work
+    in progress had upgraded `supply7` to schema 21 mid-review.
+
+106. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **delivery-critic
+    on REQ-PIPE-122 (commit 1798c63).** Reproduced against a `git archive`
+    of the commit and a scratch database; verified against the code before
+    acting. Core sound: hold leaves an amber supply unpromoted on the real
+    `after_run` path, acknowledge has parity on the GitHub route, and the
+    past is read from what was recorded.
+    FIXED (failing test first where a defect):
+    - F1, MEDIUM: an amber supply waiting under hold read
+      `awaiting-decision` - the red supply's state - where an earlier
+      decision had emptied its slot (criterion 17). The emptied-slot branch
+      of `state_of` now asks for the hold too
+      (`TestAmberWaitingAfterAnEmptiedSlot`).
+    - F4 and F5: an asset level whose every version starts in the future,
+      and two versions of one level sharing a date, are refused by the
+      schedule gate (`amber_setting.standing_problems`,
+      `TestTheConfigurationAsItStands`).
+    - F6: "a acknowledge needs a reason".
+    - F7: the old per-dataset ticket still told people to comment
+      `/accept` (now gone, test inverted); docs/components.md and two embed
+      comments still named the retired mechanism.
+    LOGGED, NOT FIXED:
+    - F2 (latent until REQ-PIPE-121): `amber-waiting` sticks if a supply's
+      verdict later changes, because it asks whether a hold note ever
+      existed rather than reading the newest outcome.
+    - F3, MEDIUM, FOR KEITH: criterion 7's "not dated before the day it is
+      added" is measured against the day the gate RUNS, so a commit made
+      late on day D and pushed after midnight, or a CI job re-run the next
+      day, goes red on a legitimate change. The fix is to take the day from
+      the commit that added the version; it is a design call because a
+      commit's date is author-supplied.
+    - A bare `/acknowledge` with no `supply:` line is refused with "a
+      decision needs the supply it acts on", without saying how to name it.
+    - NFR "visible, not set-and-forget" is NOT BUILT and nothing records a
+      deferral: no view shows the resolved amber value and level per
+      dataset, which was the stated answer to REQ-PIPE-075's quiet-failure
+      objection. For Keith.
+    - No test drives `after_run`'s hold path end to end, the
+      `_amber_setting_errors` wiring through `diff_base`, the GitHub
+      `/acknowledge` route, or `pipeline/acknowledgements.for_dataset`.
+
+107. **[in-progress, 2026-10-05]** **[Testing & dev tooling]** **delivery-cli-ux-critic
+    on REQ-PIPE-122 (commit 1798c63).** Driven against a `git archive` of
+    the commit and a scratch database, under a real terminal capture. Both
+    routes agree, acknowledge is offered first on a promotion owing one, no
+    state or refusal says "held", and the frozen-past errors are the
+    clearest of the config errors.
+    HIGH, FOR KEITH (predates 122, made likelier by it): one indentation
+    slip in `contract/data-asset.yaml` crashes EVERY mothman command -
+    `mothman schedule validate` included - with a ~60-line traceback,
+    because `hierarchy` is loaded when `cli.app` is imported, before the
+    validator's own "could not be parsed at line X" message can run. 122 is
+    the first requirement that asks a lead to hand-edit nested levels of
+    that file. Fixing it touches how every CLI module loads the hierarchy,
+    so it is not a polish-sized change.
+    HIGH, FOR KEITH: the same NFR #106 names - the resolved amber setting,
+    its level and version are not visible anywhere in the terminal:
+    `schedule show` says nothing about amber, `supply decisions` shows the
+    rule's promotion without the setting it acted under (the row holds it),
+    and the hold note names the value but not the level.
+    FIXED 2026-10-05: the hold case's refusal now names `--operation
+    promote` (`TestRefusalsNameTheNextCommand`); "already acknowledged"
+    says by whom and when and names `supply decisions`; "not the promoted
+    supply" names `supply slots`; the TUI picker shows states in words; the
+    prompts say "acknowledgement" as a noun.
+    MEDIUM, STILL OPEN: an empty slot is refused in lower
+    case without naming `--supply`. `supply slots` truncates the automatic
+    reason to "every check ... passed..." on exactly the amber rows. The TUI
+    asks for an acknowledgement's reason without pointing at which checks
+    warned. Config errors: an unknown value's fix text talks about versions;
+    the missing asset level does not name the three values or say there is
+    no default; a past-dated new version is told to "add a NEW version".
+    LOW: `supply decide --help` reads as requirement ids and
+    `supply decisions --help` still lists four operations; `schedule
+    validate` does not say amber was checked; all three waiting states are
+    yellow (met by words); at scale the closed-gaps table pushes
+    acknowledgement rows below the fold; a stale schema version crashes
+    `supply decide` with a raw read-only-transaction traceback.
+    CAUTION RECORDED: the critic closed every `/tmp/mothman-tui-*.sock` at
+    clean-up, not only its own.
+
+108. **[done, 2026-10-05]** **[Testing & dev tooling]** **CI's bootstrap
+    died on a DDL race between the two collections.** Found checking CI at
+    the end of the night, as Keith asked: the deployment half of "Run test
+    suite" failed on 1798c63 inside `mothman pipeline bootstrap` with
+    `UniqueViolation ... pg_type_typname_nsp_index`. The bootstrap runs Birth
+    Registrations and Child Protection in parallel processes, and both ran
+    `CREATE TABLE IF NOT EXISTS staging._resolutions` on their first run -
+    PostgreSQL's IF NOT EXISTS is not safe against a concurrent creator.
+    Intermittent (0f96148's bootstrap passed), so it read as noise until it
+    happened. Reproduced first with eight threads at a barrier, on the first
+    attempt, with the exact CI error (`tests/test_concurrent_ddl.py`).
+    Fixed: `supply_db.create_if_absent()` serialises every shared
+    `CREATE ... IF NOT EXISTS` on an advisory lock - held to COMMIT when
+    called inside a transaction, because a lock released after the
+    statement lets a second creator pass the check against the first's
+    uncommitted row - at the staging, period, superseded, rejected and
+    sample schema sites and the resolutions table. The same pattern
+    `qa_store.ensure_schema` already used for its own DDL.
+
+109. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery critic on
+    REQ-PIPE-118/120: a person's supersession was invisible, and five readers
+    did not know about superseded supplies.** Every finding was reproduced in
+    `tests/test_supersession_critic.py` before it was fixed, and each failed
+    against 99abafd.
+    - **F1, critical:** `is_superseded()` read the `superseded_by` column,
+      which a person's supersession leaves empty. So every one was unseen:
+      not listed, still promotable while its tables sat in the superseded
+      schema, and impossible to bring back. It now reads the action.
+    - **F2, critical:** the relaxed shape constraint shipped without a
+      schema-version bump, so a database already at 22 refused a person's
+      supersede with a CheckViolation. Bumped to 23.
+    - **F3/F4:** the slot read the LATEST filing. After an un-supersede it
+      showed the rejected newer supply, and a superseded latest filing read
+      "awaiting a decision". Fixed with `slot_state.filings_by_period()`.
+    - **F5:** all 28 superseded supplies in supply8 read "waiting Nd" on the
+      dashboard; `awaiting` and `waited` are now empty for a set-aside supply.
+    - **F6:** a promoted supply displaced by a person's promotion was
+      "superseded" with nothing moved. A supply accepted into the period is
+      now left alone unless it was demoted.
+    - **F7:** a superseded supply could be rejected and then brought back
+      still rejected. Both are now refused.
+    - **F10:** a person could supersede a supply not filed to the period.
+      Now refused.
+    - **F11:** the "why not promoted" text claimed only one of the three
+      causes. Now covers all three.
+    - **F12, pre-existing:** reset-synthetic added period names, not schema
+      names. Now drops period and superseded schemas by name.
+    - **F14:** a repeated supersede was refused. Now done-already.
+    - **F15:** REQ-PIPE-120's evidence claimed one invocation listed all 28;
+      re-measured as 16 + 12 across two.
+    - **Not fixed:** F8 is a product question **for Keith**: demoting into a
+      period with a newer waiting version leaves two waiting versions —
+      supersede the demoted one, or refuse? F9 (closed_slots judges
+      supersession by current state, not as-of) is latent; the supply8
+      corpus has no instance. F13 (a period whose name normalises to end in
+      `_superseded`) is an edge case. All three are recorded on the
+      requirements' decisions. The critic also found two REQ-PIPE-120 NFRs
+      riding on REQ-PIPE-151 that were not listed as unmet; they are now.
+
+110. **[in-progress, 2026-10-05]** **[Dashboard UI]** **The dashboard UX critic
+    on 8a942e7 (Keith's morning answers): the new verdict line was wrong for
+    five of six Child Protection datasets, and past dates showed today's
+    check colours.**
+    - **H1, FIXED** (failing test first; Keith signed the fix off):
+      `drift_reference.run_for()` took the earliest run that read a
+      supply's table. Every Child Protection run reads its siblings' tables
+      at one instant, so the alphabetical tie-break named cp_carers' run for
+      every dataset's supply. The page said "Nothing is in place" on
+      datasets whose supplies were promoted, and a drift reference could
+      come from the wrong run. The run named for the table now wins; all
+      107 run keys across the seven datasets map to their own dataset on
+      the real database. `tests/test_drift_reference.py::
+      TestASupplysRunIsItsOwnDatasetsRun`.
+    - **H2, FIXED** (pre-existing; failing test first; Keith signed the fix
+      off): `clipDatasetToAsOf()` overrode each check's value but kept its
+      NEWEST `current_status`, which `checkStatus()` reads first. So a past
+      date rendered today's colours - 96 of 227 checks as of 2 May 2026, a
+      check red on that day's run reading green. The clipped check now takes
+      the shown run's own status. `tests/test_dashboard_e2e.py::
+      TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too`
+      compares every check on every run date against the run it shows, and
+      failed against the unfixed template. This also resolves M5, where a
+      gap-red note sat beside a green pill.
+    - **FIXED, minor:**
+      - H3: the verdict line no longer appears on a page whose checks are
+        blanked.
+      - M1: the held and unloadable banner is now red, like the contested
+        one.
+      - M6: the queue's closed-period advice now leads with "chase the
+        supplier first".
+      - The held reason's "its supply" wording.
+      - The mixed dashes in the held banner.
+      - The gap-red note now names the filing wizard.
+      - "Amber supplies:" is now "Amber setting:", on the page and in the
+        terminal.
+    - **KEITH'S ANSWERS, 2026-10-05:**
+      - M2: judge "late, still open" against the build instant for today.
+        BUILT: on the build's own day the page compares instants with
+        BUILT_AT; past dates still compare days.
+      - M3: LEAVE IT. The bold "Awaiting a decision" on nearly every Birth
+        Registrations date comes from the bootstrap's invented promotion
+        lag (one hour to three days, Keith's own choice of 2026-10-02).
+        In production the rule promotes minutes after QA, so this is a
+        demo-corpus artefact, not worth a second wording.
+    - **LOGGED, pre-existing, not fixed:** M4. The "what is in the
+      warehouse is not the latest file" banner and the supply history are
+      not clipped to the date on show, so a past date shows supplies from
+      later months. A real as-of gap, older than this commit.
+    - Not a defect: the lowercase "unloadable" label came from the critic's
+      own injected variant page. Real blockers are kind `refused`,
+      labelled "Could not be loaded".
+
+111. **[in-progress, 2026-10-05]** **[Pipeline & publishing]** **The delivery
+    critic on 8a942e7: the same wrong-run defect as #110's H1, a trial
+    crash, and a too-permissive commit date.** Each finding was verified
+    against the code before it was written here.
+    - **H1**: the same root cause as #110's H1, fixed there.
+    - **H2, FIXED** (failing test first): reconciling trials (REQ-PIPE-115
+      criterion 17 as amended) while a trial wrote no not-evaluated
+      records crashed an ordinary trial on LeftOutMismatch when a sibling
+      file would not load. Before the amendment those checks were silently
+      absent (157 of 184). `unrunnable.results_for_trial()` now records
+      them, explained by an unreadable table; a left-out check nothing
+      explains still trips the reconciliation. The critic's exact
+      reproduction now exits 0 with 27 not evaluated and 184 total.
+    - **M1, FIXED** (failing test first): REQ-PIPE-122 criterion 7 dated a
+      change by the earliest commit in the push that touched the file, so
+      an unrelated edit let a back-dated version pass.
+      `_version_added_on()` dates each version by the commit that
+      introduced it.
+    - **M2, FIXED**: REQ-PIPE-115's `unmet_criteria` still carried
+      criterion 2 after Keith had answered it. While closing it,
+      `held_blast_radius` was found recording one result per (check, held
+      table) - two results for one check in one run. Now one, naming
+      every held table (failing test first).
+    - **M3, BUILT on Keith's answer (2026-10-05):** on a day a daily feed
+      has no file at all, its row took the "no QA run within tolerance"
+      branch and skipped the late-but-open note. That row now shows it
+      too.
+    - **FIXED, minor:**
+      - The demote refusal now says "another version", not "a newer
+        version".
+      - `unrunnable.describe()` names every table.
+      - REQ-PIPE-081 now lists its tests and implementing functions.
+      - REQ-PIPE-115 now lists `blockerWithoutARunOfItsOwn`.
+      - REQ-DASH-133's decision now names the wizard the way the banner
+        does.
+    - **LOGGED:**
+      - `lateOpenAsOf` and `runStateAsOf` are date-granular, not
+        instant-granular. Part of #110's M2 question.
+      - REQ-PIPE-144 criterion 29's text still describes the
+        reshape-only refusal; the stricter rule lives in its decisions.
+      - The wiring of `_version_added_on` inside `_amber_setting_errors`
+        has no test of its own.
+
+112. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery and CLI
+    UX critics on REQ-PIPE-128 (commit c66cf3c): three ways a period could
+    still hold two versions, undo text that did not undo, and a terminal
+    that asked before refusing.** Each finding was verified against the
+    code before it was written here. Keith answered the four that needed
+    him the same morning (2026-10-05).
+    - **H1, FIXED** (failing test first): `promote()` read what the slot
+      held before taking its lock, so two promotions at once each saw the
+      slot as it was. Two tables ended up in one period, or one supply was
+      superseded twice. The slot is now locked first and judged under the
+      lock (`decision_log.lock_slot`). Under the lock, a RULE meeting a
+      promoted holder is refused rather than displacing it, so a person
+      promoting at the same moment wins.
+    - **H2, FIXED** (failing test first): rejecting a PROMOTED supply
+      looked for its table only in staging, so the table stayed in the
+      period and the next promotion made two. REJECT now takes the
+      period's table when the supply is promoted.
+    - **H3, FIXED** (failing test first): a promotion with no tables (a
+      rejected supply, a mistyped id) superseded the holder in the log and
+      left its table in the period. It is now refused before anything is
+      written. `supersede_promoted` also fails loudly if the holder's table
+      is not there (criterion 12).
+    - **M1, FIXED on Keith's answer ("Honest two-step wording"):** the
+      undo text now says what each undo really takes. A displaced supply
+      is un-superseded (back to waiting) and then promoted again. A
+      removed substitution needs a demote and then a substitute. Each
+      command is on its own line.
+    - **CLI #3, FIXED on Keith's answer ("Refuse before asking"):**
+      `consequences()` runs the slot's refusals first: an inherited slot,
+      and a displaced supply that a later period stands on. A promotion
+      that cannot happen is now refused before the prompt, never after the
+      yes.
+    - **CLI product question A, BUILT on Keith's answer ("Yes, add it
+      now"):** a version waiting in a period that already holds a
+      promoted supply now appears in the queue and the period door, as
+      "another version waiting". It offers promote, which leads to the
+      displacement warning; before this it was reachable only through
+      `supply decide`.
+    - **FIXED, minor:**
+      - A mistyped `--acknowledge` key is no longer blamed on a change
+        that never happened. It says mistyped or changed, and gives the
+        current key.
+      - When the warning changes mid-decision, the terminal now says
+        somebody else's decision changed it and shows what is new. Being
+        changed twice now prints a message rather than exiting silently.
+      - Commands print below the panel, one per line and unwrapped, so a
+        copy picks up neither the border nor a line break.
+      - The refusal after a `--yes` with a shown warning no longer
+        repeats the warning.
+      - The success message says what else was done ("X moved to
+        superseded").
+      - `--yes` help and the non-interactive hint mention `--acknowledge`.
+      - The refusal on a rule into a substituted slot, and on an
+        unconfirmed person, now gives a command to paste.
+      - The stale `newest_promoted` docstring is fixed. The dead
+        `len(found) > 1` branches in substitution and inheritance are
+        gone.
+      - `scripts/dev/tui_drive.py` answers a cursor-position query with
+        the real cursor, not a fixed 1;1. The fixed answer made
+        prompt_toolkit redraw from the top and wipe anything printed
+        above a prompt, so a critic using the tool would wrongly report
+        "no panel".
+    - **LOGGED, not changed:**
+      - The success panel still reads "promote recorded for ..." in
+        lowercase.
+      - Supplies in the panel are still named by id rather than by arrival
+        date.
+      - Refusal output still goes to stdout.
+      - L3's window between the key check and the lock remains. It is
+        harmless now that the slot is judged again under the lock.
+
+113. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery critic on
+    REQ-PIPE-129 and the 081 census, and the CLI UX critic re-checking
+    #112.** Each finding was verified against the code before it was written
+    here. Keith answered the four that needed him the same morning
+    ("Fix all three now"; "Narrow to move/rename").
+    - **H1, FIXED** (failing test first): `mothman env reset-synthetic` failed
+      on any database holding an inherited or substituted view. The new
+      drop guard refuses a cascaded drop of a period view unless its own
+      schema goes in the same statement, and the reset dropped schemas one
+      at a time. It now drops them all in one statement.
+    - **H2, FIXED** (failing test first): a demote naming a supply the period
+      does not hold took the period's real table out under that supply's
+      name. The decision log now refuses a demote of anything but the
+      period's holder. A demote or reject whose table is missing is now
+      loud and rolled back, as `supersede_promoted` already was.
+    - **H3, FIXED** (failing test first, shown to fail on the old code): a
+      substitution or inheritance was judged before taking its lock and
+      never again, so a promotion in the gap left a view reading the
+      newcomer under the old supply's name. Both are now judged again
+      under the lock: the person's substitute and inherit, and the rule's
+      inheritance at a period's birth. The rule's inheritance now records
+      its view and its entry in one transaction.
+    - **M1, FIXED on Keith's answer ("Narrow to move/rename"):** the event
+      trigger refused every `ALTER TABLE` on a stood-on table, including an
+      added column. That would have broken REQ-PIPE-130's schema bump once
+      its `_manifest` views exist. It now refuses only `SET SCHEMA` and
+      `RENAME TO`, read from the statement text, since the trigger cannot
+      see the sub-command.
+    - **M2, FIXED:** criterion 16's build warning printed only from the
+      builders' `__main__`, which no `mothman` path runs.
+      `census.build_warnings()` is now called by `mothman dashboard
+      build-data`, by `rebuild` and by `pipeline run`.
+    - **M3, FIXED** (failing test first): the census read the log and the
+      catalogue as two statements, so a promotion committing between them
+      was recorded as a stray. Both are now read in one REPEATABLE READ
+      transaction.
+    - **CLI re-check HIGH, FIXED** (failing test first): the substitution
+      undo printed by #112 had no `--supply`. Pasted, it took the
+      just-demoted supply and crashed with a traceback. It now names the
+      supply stood on. `SubstitutionRefused` and `InheritanceRefused` are
+      now shown as refusals, not tracebacks.
+    - **CLI re-check MEDIUM, FIXED** (failing test first): a supply
+      un-superseded after being displaced never showed as waiting, though
+      the undo text says it returns to waiting. `_accepted_into` now counts
+      a displacement's SUPERSEDE as leaving the period.
+    - **CLI re-check MEDIUM, FIXED:** in the "another version waiting"
+      state, "reject" and "supersede" now say the period keeps its promoted
+      supply. Every supply-scoped confirmation names the supply by its
+      arrival.
+    - **FIXED, minor:**
+      - The census banner compares dates on the asset's calendar, not UTC's.
+      - The guard gate no longer calls an empty database "installed", and
+        its column reads as a question, not a result.
+      - A missing guard now names a remedy, the new `mothman supply
+        install-guard`.
+      - The session-start hook checks the guard wherever a qa schema exists.
+      - A refusal that is certain now comes before the reason prompt.
+      - The non-interactive hint at the confirmation names `--acknowledge
+        KEY`.
+      - "Recording - this waits up to 15s ..." is said before a decision
+        that may wait on a lock.
+      - An unknown person's refusal uses the same panel as every other
+        refusal.
+      - The inherited refusal starts with a capital.
+    - **LOGGED, not changed:**
+      - Views are still created and dropped with no census of their own (L4
+        - criterion 13 says "wherever a table is moved").
+      - `promote` takes its slot lock outside `_lock`'s sorted discipline.
+        No deadlock pair was found (L5).
+      - The NFR 6 source test's argument heuristic stays weak; the run-time
+        refusal in `move_table` is the real guard.
+      - `mothman supply queue --collection cp` ends in a traceback rather
+        than accepting the shorthand.
+      - The queue takes about 3 seconds to render.
+      - "2 later period(s)" and "supply/supplies" pluralisation.
+
+114. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery critic on
+    sprint 9 - REQ-PIPE-140 (a decision's own QA run), REQ-PIPE-141
+    (re-file) and REQ-GHUB-142 (its warning).** Each finding was checked
+    against the code before it was written here. None needed Keith: all are
+    defects in the built behaviour against signed criteria, not changes to
+    what was agreed. Fixed before sprint 9 was first committed.
+    - **D1 (HIGH), FIXED** (failing test first): re-filing a SUPERSEDED
+      supply moved its tables to staging but left it superseded. Every
+      route then refused to promote it, and the re-file had still
+      superseded the versions waiting in the target, so that period could
+      end with nothing promotable. A re-file now ends a supersession:
+      `supersession._latest` reads REFILE alongside supersede and
+      un-supersede.
+    - **D2, FIXED** (failing test first): a re-run's id was minted past
+      `qa.run` only. An attempt that broke before its run opened held its id
+      on `qa.owed_run` alone, so the next owed re-check took the same
+      `__r1`, and its results would have replaced the first's. Ids are now
+      minted past both, under an advisory lock.
+    - **D3, FIXED** (failing test first): the warning said the target
+      "reads the re-filed one from this decision on". A promoted version
+      there stays until the re-filed one is checked and promoted (criterion
+      9), and even an empty target only has it waiting. It now says which.
+    - **D4, FIXED** (failing test first): the re-file was planned before
+      the slot lock and never re-judged, so a version filed into the target
+      in between was neither superseded nor named. The plan is now worked
+      out again under both slots' locks, and a re-file whose consequences
+      changed is refused, with nothing done.
+    - **D5, FIXED** (failing test first): on the GitHub route a rejected,
+      contested or inherited re-file was asked to confirm before being
+      refused. Its refusals now come first, as on the terminal.
+    - **D6, FIXED** (failing test first): a decision-triggered run's
+      results named the run's own `__r1` key as the ARRIVAL that caused
+      them. Every result of such a run now carries
+      `reevaluated_after_decision`, and none carries the arrival key.
+    - **FIXED, minor:**
+      - An overlay that broke half-built left the re-run's view schema
+        behind.
+      - A held supply asked to be re-filed got an empty warning, then a
+        refusal about two slots. It is now told to place it instead
+        (failing test first).
+    - **RECORDED AS UNMET, not fixed:** criterion 5's terminal half on
+      REQ-PIPE-140. No terminal command shows a supply's verdict at all, so
+      there is no reader to point at the newest run.
+    - **LOGGED, not changed:**
+      - Owed re-checks can pile up when a supply is re-filed back and
+        forth: one per decision, each run against the current filing.
+        Harmless, since each completes as its own run. REQ-PIPE-151's pass
+        is where they are drained.
+      - NFR 2 (time one run on the largest Child Protection table) is not
+        yet measured.
+      - The Birth Registrations re-run path is exercised only through the
+        shared executor. The BDM fixture files nothing, so there is no
+        end-to-end test of it.
+    - **FOUND BY THE GATE, NOT THE CRITIC, FIXED** (failing test first):
+      `sprint_state` read an `**Owns:**` paragraph one line deep, so a
+      sprint whose list wrapped owned only its first line's requirements.
+      Two delivery-sprint tags in `plans/supply-model.md` were wrong
+      because of it. Sprint 11 was counted on four requirements of eleven.
+      Sprint 26 had read `done` since 2026-09-27, when its own register
+      says 96 of 112 criteria are met. Both now read `in-progress`, as
+      counted. Worth knowing: a "done" sprint tag before today was checked
+      against a short list.
+
+115. **[done, 2026-10-05]** **[Pipeline & publishing]** **The CLI UX
+    critic on the re-file (11eb18e), driving it for real** against a copy of
+    the deployment database. Each defect below was checked against the code
+    and, where it could be, reproduced in a failing test before it was fixed.
+    None changes agreed behaviour, so none needed Keith.
+    - **D1, FIXED** (failing test first): the target period was never
+      checked. `2026-Q9` was accepted, recorded and re-checked. A re-file into
+      a period the dataset's calendar does not have is now refused and names
+      `mothman supply slots`. Tests mint `2099-` periods, which a conftest
+      fixture counts as on the calendar; every real name is still judged by
+      the real calendar.
+    - **D2 and D3, FIXED** (failing tests first). This was the serious one.
+      A period emptied by re-filing a WAITING supply out read "returned by a
+      person", naming the supply that had left. The queue offered actions on
+      it, and a reject there was recorded against the supply's OLD period
+      while it waited in the new one. Three fixes:
+      - The slot view now reads a slot emptied by a re-file whose supply is
+        filed elsewhere as though nothing was decided there.
+      - The decision log refuses a reject or demote naming a supply filed to
+        another period, and names that period.
+      - A supply re-filed into a period past the claim horizon was listed
+        nowhere. Its period is now listed.
+    - **D5, FIXED:** the re-check panel was green whenever the run completed,
+      red verdict or not, and said only two run ids. It now says what the
+      supply came out as against which period, and whether the gate promoted
+      it, coloured by the verdict.
+    - **D4, NOT REPRODUCED, OPEN:** re-filing a PROMOTED supply left a
+      re-check that could not read its own table (`UnreadableOwnTable`). A
+      real-tools test of exactly that path, into an empty period, passes
+      (`TestAPromotedSupplyRefiledIsCheckedInItsNewPeriod`). The critic's
+      case had a target that already held a promoted version, and its tree
+      was an archive run without dbt on PATH. RETRIED AND CLOSED, 2026-10-05:
+      on a copy of the schema-27 deployment, re-filing the promoted
+      cp-carers supply of 2026-Q2 into 2026-Q1, which already held one, ran
+      its owed re-check to completion (green, left waiting because the slot
+      is filled - the correct outcome under `never`). Not reproducible on
+      the real tree; taken as the critic's environment.
+    - **FIXED, wording:**
+      - The held-supply refusal now points at `mothman supply holds` (W1).
+      - The supersede undo says what "out of the way" means (W3).
+      - "Recorded" names the target period (W6).
+      - The warning names what an already-filled target keeps reading (W7).
+      - "re-file", never "refile", in what a person reads (W8, partly).
+    - **LOGGED, not changed:**
+      - The non-interactive hint for a re-file leaves out `--to-period` (W2).
+      - The `--acknowledge` key wraps inside its panel (W4).
+      - "Recording ..." prints before a refusal that needs no lock (W5).
+      - The actor shows as an email rather than a name (W8).
+      - "or point them elsewhere:" is unexplained (W9).
+      - Library warnings leak into re-check output (P1).
+      - `--collection cp` crashes, which predates this (P2).
+      - The queue shows no supply ids (P3).
+      - The Ctrl-C reason wording (P4).
+      - The queue's silent pause (P5).
+      - The re-file prompt offers no list of periods.
+
+116. **[done, 2026-10-05]** **[Pipeline & publishing]** **The delivery
+    critic on sprint 10 (8040a69)**, which drove the dashboard built from a
+    copy of the schema-27 deployment in a real browser. Every finding was
+    checked against the code before it was written here.
+    - **D1 (HIGH), FIXED** (failing test first): "newest cause wins" ordered
+      a supply's runs by a mix of time scales. A decision's run was ordered
+      by the decision's historic effective time; an arrival's run by the
+      batch's WALL CLOCK, which a replay stamps years later. So in any
+      replay a re-evaluation could never outrank the arrival it
+      re-evaluated (REQ-PIPE-121 criteria 3 and 10). It showed a false "Red
+      promoted ... turned red 5 October 2026" on cp-investigations 2024-Q3.
+      An arrival's run is now ordered, and dated, by its supply's receipt
+      instant. The same fault stamped a re-check's gate decision with the
+      wall clock; it now takes effect when its cause did (failing test
+      first).
+    - **D3, FIXED** (failing test first): a supply promoted while already
+      red got no label, because every point before the promotion was
+      skipped. It now reads "Red promoted - promoted while red".
+    - **D4, FIXED** (failing test first): a legacy `?asof=` link was
+      honoured but stayed in the address bar until the date was changed.
+      It is now rewritten on arrival.
+    - **D5 (security), FIXED:** `manifest_for` is SECURITY DEFINER with
+      `search_path = pg_catalog` alone, so pg_temp was searched first and a
+      caller's temporary `pg_class` could spoof the listing (verified by the
+      critic). It is now `pg_catalog, pg_temp`. Schema 28.
+    - **D6, FIXED:** the knock-on read an INHERITED table as holding
+      nothing, so every reader of it looked stale and ran its tools again.
+    - **D2, FOR KEITH:** the status pill on a supply-history row and the
+      red-promoted label answer different questions, and they can
+      disagree on screen. The pill is the supply's arrival verdict; the
+      label is the newest result per check. One was a Green pill with
+      "Red promoted", and that one was D1's false red. Others were a Red
+      pill with no label, where later re-evaluations went green.
+      REQ-DASH-126 criterion 4 asks for the promoted-on verdict beside the
+      current one, but does not say which of the two the PILL is. Which
+      should it be, for a promoted supply?
+      **ANSWERED 2026-10-06 (Keith): the newest result.** Built the same
+      day - `supplyRowStatus`, with "Arrived <status>" beside the pill when
+      the two differ; recorded on REQ-DASH-126.
+    - **D7, LOGGED:** REQ-DASH-127's NFR, which collapses superseded
+      versions under the version that superseded them, is not built. They
+      are flat rows. Recorded on the requirement.
+    - **D8, FOR KEITH (wording):** REQ-PIPE-123 criterion 3 says "as one
+      decision in one transaction". The build writes TWO entries, supersede
+      and promote, in one transaction, as REQ-PIPE-128's displacing
+      promotion does. Amend the criterion, or record the replacement as
+      one entry?
+    - **LOGGED, latent:** a move queued by a nested decision whose
+      savepoint later rolls back would still be owed. No caller today
+      catches inside an outer decision transaction.
+    - Coverage gaps the critic named and that are still open: no
+      real-browser test of red promoted (REQ-DASH-126 NFRs 1 and 3); no
+      cascade test; no test of an amber replacement owing an
+      acknowledgement.
+
+117. **[in-progress, 2026-10-05]** **[Data generation]** **The delivery
+    critic on sprint 11 (8fb2229)**, which reviewed an exact archive of the
+    commit against a copy of the rebuilt deployment and drove the built page
+    in a real browser. Each finding below was checked against the code
+    before it was written here.
+    - **D1 (MEDIUM), FIXED** (failing test first): the dataset page printed
+      a decision's actor as recorded - an email - so a scripted decision
+      read `scripted-history@synthetic.invalid` (REQ-GEN-135 criterion 12).
+      Every person's mark, rejection and acknowledgement is now shown by
+      NAME from contract/people.yaml, as REQ-PIPE-147 criterion 7 already
+      does for who filed a delivery. tests/test_not_supplied.py asserted
+      the raw email and was updated on purpose.
+    - **D2 (MEDIUM), FIXED** (failing test first): an old `?panel=scenarios`
+      link stayed in the address bar and took over every later reload and
+      copied link. It is now dropped once it has opened the tab.
+    - **D3 (MEDIUM, security, latent), FIXED** (failing test first): the
+      "playback only" lock lived in the person lookup, so a caller holding
+      the synthetic record could reach `filing_decisions.apply()` directly
+      and be accepted. The decision path now refuses it on its own (NFR 2).
+    - **D4 (LOW), FIXED** (failing test first): a decision timed exactly at
+      an arrival's receipt played after it; criterion 3 says "at or after".
+    - **D5 (LOW, FOR KEITH)**: the replay applies scripts in PROCESSING
+      order, while rule promotions are stamped receipt + an invented lag of
+      one hour to three days (`promotion.effective_at_for`). Seven
+      decisions have an effective instant earlier than the row recorded
+      before them, and on TS-47's own day the late file's promotion takes
+      effect two days after the on-time file arrived, so 09-08 shows two
+      waiting versions for two days on the asset timeline. Harmless for the
+      one script planted; a hazard for parked TS-45/TS-53 shapes. Whether
+      the replay should order by asset time (and what the lag is for) is a
+      design question.
+    - **D6 (LOW-MEDIUM, FOR KEITH)**: two definitions of a supply's
+      "current" run disagree - `supply_status.runs_about` (asset time, the
+      #116 D1 fix) puts the stalest re-evaluation of cp-investigations
+      2024-Q3 last, `qa.supply_current_run` (run instant) the freshest. No
+      visible effect today (all pass). A load-caused re-check would also
+      sort at receipt, below every sibling re-evaluation (latent - nothing
+      owes one yet).
+    - **D7 (FOR KEITH)**: `recheck._cause_instant` stamps a gate promotion
+      at its cause decision's instant with no `min(now, ...)`, so in a live
+      deployment a re-check run hours later is recorded as in place before
+      the checks justifying it ran. Right for a replay, questionable live.
+    - **D8 (LOW), OPEN**: `redPromotedBadge` says "promoted while red" for a
+      supply promoted red, turned green, then red again, losing the
+      "turned red <date>" wording. No red promotion exists in the data;
+      read from code only.
+    - **RECORDS CORRECTED**: REQ-GEN-136 criterion 14's second clause (the
+      register names the settings in force where a planted scenario lands)
+      is now met for TS-41 and TS-47. Its TS-48/49/51 unmet entries named
+      the wrong blocker - the arrival shape already exists in 2024-Q3; what
+      is missing is a red outcome, the #63 blocker. REQ-DASH-139 now records
+      criterion 3's gap (31 of 66 entries name no requirement - the older
+      register entries cite none) and gained NFR 2's click-through test.
+    - **ALSO NOTED**: the history already holds two naturally occurring
+      "promoted, awaiting acknowledgement" BDM supplies (09-12, 09-13) -
+      TS-44's shape, unplanted. `load()` defaults a script's `supply` and
+      `after_hours` silently and `validate` crashes on a non-number (minor,
+      open). Determinism across two replays (criterion 7) was not verified.
+
+118. **[in-progress, 2026-10-05]** **[QA checks & contract]** **The delivery
+    critic on sprint 12 (4305585, f8f209e)** - file checks (REQ-QAC-096),
+    their page section (REQ-DASH-097), TS-12/TS-56, and #117's D1-D4. It
+    reviewed an exact archive against a copy of the rebuilt deployment and
+    drove the built page in a real browser. Each finding was checked
+    against the code before it was written here; every fix had a failing
+    test first, confirmed failing.
+    - **D-A (MEDIUM), FIXED**: the date page chose the newest file by
+      comparing receipt times AS TEXT, and receipts carry different UTC
+      offsets (injected supplies +08:00, the rest +00:00) - so on BDM
+      2026-09-08 it showed 11:00 Perth's file over 14:04's. Now compared as
+      instants (tests-js/file-checks.test.js), and the panel dates a receipt
+      on the asset's calendar rather than by slicing the stored string
+      (tests/test_file_check_panel.py, which is also the panel's first
+      Python test).
+    - **D-B (MEDIUM), FIXED**: on TS-12's own date the page said "could not
+      be loaded ... until a person resolves it" and directly below "Nothing
+      is waiting for a person here". The blocker opened at the supply's
+      receipt (REQ-DASH-148 criterion 3) but the outstanding ITEM was
+      stamped with the load record's wall clock - the night of the rebuild -
+      so the page dropped it as not yet observed. Both now take the instant
+      from one function, `dataset_blockers.refused_opened_at`. Not
+      re-routed to Keith: criterion 3 already says receipt, so this is the
+      item catching up with a signed criterion rather than a new decision.
+    - **D-C (LOW-MEDIUM), FIXED**: staging a trial or reference run screened
+      its file and registered a `qa.run` that nothing completed, so
+      `incomplete_runs()` listed it as crashed for ever. `trial.discard` now
+      removes the file-check rows it added and the run row when that is all
+      it holds; a trial whose own checks were recorded keeps them.
+    - **D-D (LOW, accessibility), FIXED**: each file-check row's aria-label
+      replaced its accessible name, so a screen reader heard neither the
+      status nor the finding. The hint is now sr-only text inside the
+      button. The DATA-check rows use the same aria-label pattern (template
+      ~5500) and were NOT changed tonight - same defect, older code; open.
+    - **D-E (LOW, privacy edge), HALF FIXED, HALF FOR KEITH**: (a) FIXED - a
+      repeated header name the contract does not list may be a row value,
+      so it is now counted ("1 column name the contract does not list"),
+      never quoted (criterion 14). (b) FOR KEITH - the header-row check
+      passes when the first line names ANY contract column, so a headerless
+      file whose first row holds a value equal to a column name passes, and
+      the loader takes that row for the names: a false green. A "more than
+      half" rule was tried and REVERTED the same night: it refused a file
+      for MISSING columns, which is a data check's question (REQ-QAC-096
+      criterion 2), and broke every test fixture whose header is a subset.
+      What makes a first line "a header" is a design question.
+    - **D-F (LOW), FIXED**: Python's csv field limit (128 KiB) refused a
+      file the loader would read, reported as "could not be split". The
+      limit is lifted; that branch now has a test.
+    - **D-G (LOW, wording), FIXED**: a refusal names the check as the page
+      does ("Fields per row", not `fields_per_row`) and ends its sentence,
+      so the item no longer reads "...were expected Nothing can read"; a
+      refused file's section no longer claims its checks "never change the
+      status of the checks below" beside a red dataset. FOLLOW-ON, caught by
+      the gate the same night: ending the reason's sentence made the
+      blocker, which adds its own full stop, read "were expected.. Nothing" -
+      fixed with a failing test first (tests/test_dataset_blockers.py).
+    - **D-H (LOW), FIXED**: `missing_tools` counted file-check rows, so a
+      refused file's dataset was reported missing every data tool.
+    - **#117 D1 CAVEAT, FOR KEITH (privacy)**: `people.display_name` falls
+      back to the RECORDED identity for anyone not in contract/people.yaml,
+      so an unlisted person's email would be published on the page. Not
+      changed: whether to show "someone not on the list", refuse, or keep
+      the identity is a privacy call.
+    - **NOT VERIFIED BY THE CRITIC**: a refused BIRTH REGISTRATIONS file end
+      to end (none exists in the history); the authoring-rules compliance
+      of the six checks' prose; D3/D4 at runtime.
+
+119. **[in-progress, 2026-10-06]** **[Pipeline & publishing]** **The delivery
+    critic on sprint 13 (91fbd85)** - REQ-PIPE-093, 107, 146 and REQ-TEST-114,
+    #118's fixes and the TS-56 move. Reviewed from an exact archive against a
+    copy of the deployment database, the TUI driven in a real pty. Checked
+    against the code before it was written here; each fix had a failing test
+    first, confirmed failing.
+    - **D1 (MEDIUM-HIGH), FIXED - a defect against a signed criterion, so not
+      routed as a choice**: `mothman env mark --confirm <id> --replacing ...`
+      re-marked a database with no terminal at all, production included, in
+      both directions - REQ-PIPE-093 criterion 6 says no flag skips the typed id
+      for a re-marking. `--confirm` now stands in for typing ONLY on an unmarked
+      database (the setup scripts' whole need); replacing an identity needs a
+      person at a terminal typing out what is being replaced, and `--replacing`
+      is gone. The refusal no longer prints the exact text to copy back
+      (criterion 3).
+    - **D2 (MEDIUM), HALF FIXED, HALF FOR KEITH**: `supply tidy`, `supply
+      discard-sample`, `env reset-synthetic` and the "originally received"
+      prompt now name the environment in the prompt (REQ-TEST-114 criterion 4).
+      WHETHER tidy and discard-sample should also need production's typed id,
+      with `--yes` unable to skip it, is outside REQ-PIPE-093 criterion 4's
+      list - a question for Keith (morning report).
+    - **D3 (MEDIUM, test gap), FIXED**: the production confirmation was tested
+      only on `confirm_change` alone - swapping the flows' calls back to a plain
+      yes/no passed every test. Two flow-level tests now fail under exactly
+      those mutations (tests/test_cli_filing_tui.py).
+    - **D4 (LOW-MEDIUM), FIXED**: the image-tag gate passed an untagged,
+      digest-pinned, templated or `postgresql`-named image, and never looked at
+      a job's own `container`. Now every PostgreSQL image is found and one whose
+      major cannot be read is an error.
+    - **D5 (LOW), FIXED**: the version refusal appended a redacted DSN; it now
+      carries none, as the identity refusal already did.
+    - **D6 (LOW), PARTLY FIXED**: the press-any-key prompt carries the toolbar;
+      the "originally received" `click.prompt` names the environment in its
+      text instead (a click prompt has no toolbar). Progress printed with no
+      prompt showing still names nothing - open, minor.
+    - **D7 (LOW), FIXED**: four tests that could pass vacuously now assert what
+      they claim (the id was asked for; the command succeeded; at least two CI
+      jobs were checked, found by image; the PROBE statement itself).
+    - **D8 (LOW), FIXED**: the percent-encoded form of a password is scrubbed
+      too.
+    - **D9 (LOW), FIXED**: a ticket repository with no owner is refused before
+      connecting, as the ticket service would refuse it mid-run.
+    - **D10 (FOR KEITH)**: production hand-filing asks "keep this?" (y/N) and
+      then the typed id. A recorded decision accepts that; whether the typed id
+      should replace the y/N is a choice (morning report).
+    - **NOT VERIFIED by the critic**: nothing in a browser, CI for 91fbd85, and
+      REQ-TEST-114 criterion 9 (the cast).
+
+120. **[in-progress, 2026-10-06]** **[Pipeline & publishing]** **The delivery
+    critic on sprint 14 (827636e)** - REQ-PIPE-151, REQ-PIPE-086, REQ-TEST-150,
+    REQ-PIPE-093 criterion 15 and #119's fixes. Reviewed from an exact archive,
+    with every write against copies of the deployment database (sandbox-,
+    production-marked and empty); the TUI was driven in a real pty. Each
+    finding was checked against the code before being written here, and each
+    fix had a failing test first, confirmed failing.
+    - **D1 (MEDIUM-HIGH), FIXED - against signed criteria (151 c6, 086 c8)**:
+      a terminal keep took no arrival lock, so a keep and a processing pass
+      could process one arrival at once. Reproduced by the critic: each run
+      dropped the other's run schemas, and both failed. Now every hand-filed
+      route (`run_arrivals`, both collections) processes each arrival under
+      its advisory lock. An arrival another process holds is refused BEFORE
+      filing, naming why. Once the lock is held the record is read again: an
+      arrival a pass finished while the person was answering prompts is
+      refused rather than recorded twice. Refused rather than waited for,
+      because the other process may be a whole pass long - PROVISIONAL.
+    - **D2 (MEDIUM), FIXED - against signed criteria (151 c14, c20)**: a
+      failure outside the per-arrival `try` was an uncaught traceback, which
+      exits 1 (criterion 20's "red"). The stages affected were setup, the
+      delivery record, owed work and tickets. A staging failure also aborted
+      the whole pass. Now: a setup failure ends the pass with exit 2. A staging
+      failure is that arrival's failure, holding back only its own collection.
+      Owed-work and ticket failures are recorded as failures (exit 2), and the
+      rest of the pass still completes. `run_pass` had no automated test; it
+      now has eight, covering order, both kinds of collection hold-back, a
+      locked arrival, every pass-level stage failing, and owed work.
+    - **D3 (MEDIUM), FOR KEITH**: tickets that could not be reconciled (as
+      opposed to the reconciler raising, now covered by D2) change neither the
+      exit status nor the summary. Criterion 20 reads "any stage failed", but
+      the slot state is durable and the next pass retries, so either reading
+      is defensible (morning report Q1).
+    - **D4 (MEDIUM), FIXED - REQ-TEST-150 c1/c2/c5 on a route 086 c9 makes
+      kept**: a kept synthetic arrival printed the check table and "Recorded
+      N results", but nothing the lifecycle decided. Both collections now end
+      on the lifecycle summary, interactive or not.
+    - **D5 (MEDIUM), FIXED - 086 c14**: in the TUI, a kept file that filing
+      refused, turned into a trial, stopped at once saying "pass
+      --reference-file". That is a trial offered and then not runnable, with a
+      flag named to a person in a menu. At a terminal the reference is now asked
+      for; with no answer, nothing is run and the message says so. Without a
+      terminal the flag is still the remedy. Covers both BDM files and CP folders.
+    - **D6 (MEDIUM-LOW), FOR KEITH**: a kept folder silently leaves behind files
+      no dataset recognises. A renamed extract is "a supply on the floor", which
+      the batch warns about and the terminal does not (morning report Q4).
+    - **D7 (LOW-MEDIUM), FIXED - 151 c3**: a refusal was skipped if the supply
+      had EVER been promoted or withheld. So a supply that was promoted,
+      demoted by a person, and refused on re-check left no entry, and the
+      kept-run report kept saying "promoted". It now looks at the LATEST gate
+      outcome or move for the supply: skip after a promote or a withheld, or
+      after the same refusal; record after a move (demote, re-file, reject,
+      supersede) or a different refusal. A refusal can therefore be recorded
+      again after an intervening different one. No rebuild was done for this
+      change; the deployment database's history was written under the old rule.
+    - **D8 (LOW), FIXED - 150 c1**: the aggregated report rewrote each dataset
+      as "its dataset", and "Kept." named only the first arrival. Shared lines
+      now list the datasets beside the count (eight named, then "and N more").
+      A multi-arrival keep names every arrival.
+    - **D9 (LOW), FOR KEITH**: an arrival whose run never completed is re-run
+      under its own run id, replacing its partial results. This is crash
+      recovery, but it reads against 086 c8's "SHALL NOT replace any result
+      already recorded" (morning report Q2).
+    - **D10 (LOW, security), FIXED**: #119 D8 scrubbed only the decoded password
+      and one canonical encoding of it. A partly-encoded or lowercase-hex
+      spelling went through. The scrub is now one pattern matching every
+      character either literally or percent-encoded in either case.
+    - **D11 (LOW), FIXED**: `--table` still said the other five tables
+      "auto-pull" from the last promoted run, which is now true only for a
+      trial. `--reference-run-id` still described a default that REQ-QAC-108
+      removed (that one predates this sprint).
+    - **D12 (LOW), FOR KEITH**: a locked arrival does not hold back later
+      arrivals of its collection, as a failure does. This is now reachable
+      through D1's fix: a person keeping one arrival while a pass runs (morning
+      report Q3).
+    - **D13 (LOW), FIXED, except one part**:
+      - Each arrival's `--- run ---` header printed twice; fixed.
+      - A synthetic keep of a run id recognition does not know raised a bare
+        `StopIteration`; it is now refused with the run named.
+      - NOT CHANGED: `backlog.unprocessed` has no caller. Criterion 18 required
+        amending it, and it now reads `processing_pass.recorded()`, so there is
+        one definition rather than two. Deleting a module owned by REQ-PIPE-061
+        is a separate call (morning report).
+      - NOT CHANGED: the pass's own output is not REQ-TEST-150's aggregated
+        report (151's observability NFR) - open, minor.
+    - **D14 (NFR note)**: every pass recognises the whole delivery tree and
+      records every delivery. That costs in proportion to history on disk
+      (about 5 seconds at 66 deliveries), not to what is unprocessed. Recorded
+      here, not changed.
+    - **OUTSIDE THIS SPRINT, FOR KEITH**: a trial leaves a completed `qa.run`
+      and its `check_result` rows behind (`run_by` `trial:not-recorded`, which
+      `check_result_visible` shows), while it prints "nothing was recorded".
+      `trial.discard` says so on purpose. That contradicts REQ-PIPE-103
+      criterion 6. It predates 827636e, and which one is right is a question
+      about a signed requirement (morning report).
+    - **WEAK TESTS NOTED, partly addressed**: the critic called out two tests:
+      `TestTheCommandGeneratesNothing` (a source grep) and the help-codes
+      substring match. Both stand. D1's and D2's new tests cover what the lock
+      tests never reached.
+    - **NOT VERIFIED by the critic**: the S3 routes live; a real held or
+      contested keep; an owed re-check (as opposed to a re-evaluation); a
+      configured ticket reconciliation succeeding; `--all-checks`; the
+      dashboard's display of `promotion-refused`; CI for 827636e.
+    - **KEITH'S ANSWERS, 2026-10-06**: D3 -> exit 2 (a ticket failure is a
+      failed stage); D9 -> same run id, with c8 amended to except an
+      incomplete run; D12 -> a locked arrival holds back its collection;
+      D6 -> keep the recognised files and name each one left behind; D13's
+      backlog.unprocessed -> deleted; the trial finding -> REQ-PIPE-103 c6
+      stands, so a trial's run and results are discarded.
+
+121. **[in-progress, 2026-10-06]** **[Dashboard UI]** **The dashboard visual
+    critic on a17d6e8** - the first visual pass since 2026-09-24, over the
+    supply history (REQ-DASH-126/127/133), the file-check section
+    (REQ-DASH-097), the Scenarios tab (REQ-GEN-135) and the cross-table rows.
+    Real Chromium, 1440 and 390 wide, light and dark, measured with
+    getComputedStyle. D1 and D6 checked against the template before being
+    written here.
+    - **D1, FIX AS POLISH**: the "Red promoted" badge uses `var(--red)`,
+      which is not a token (`--bad` is), so it renders ink-on-blue with no
+      red at all.
+    - **D2, FOR KEITH (Q2)**: the badge is one nowrap pill carrying a whole
+      sentence - 598px wide, wrapping Arrived to three lines, scrolling the
+      table 3.2x on mobile.
+    - **D3, FOR KEITH (Q1)**: supply-history cycle tables misalign (measured:
+      Outcome's left edge swings 499px between cycles) - road-testing #11
+      confirmed. The blocker table's Arrived also uses a different font.
+    - **D4, FIX AS POLISH**: blocker and gap rows show a pointer and hover
+      fill but do nothing; a dead Rows column and an empty unlabelled one.
+    - **D5, FOR KEITH (Q3)**: dark-mode status pills fail contrast - Red
+      2.61:1, Green 4.43:1, against 4.5:1. A different token from #49's
+      declined debt.
+    - **D6, FIX AS POLISH**: `.scope-check .label .ds` is an inline span, so
+      its margin does nothing and the tool id runs into the description
+      ("soda:row_countThe number of rows..."); 7px past the viewport on one
+      mobile page.
+    - **D7, FOR KEITH (Q4)**: the collection page's cross-table rows show only
+      the check name - nine "Client reference" rows, nothing to tell which
+      table pair or tool (road-testing #14 confirmed).
+    - **D8, FIX AS POLISH**: Scenarios link chips carry an inline
+      `font:inherit` that overrides `.pill.sm` - 15px, clipped up to 58px at
+      390 wide, 29px tap target.
+    - **D9, FIX AS POLISH**: an "In the data" pill on all 31 scenarios,
+      including the 23 with no data, drawn in the dashed "No data" style.
+    - **POLISH JUDGEMENTS**: a 2,708px queue notice above the agency cards;
+      spaced hyphens reading as hyphenated words; unbounded line lengths;
+      mixed table header styles; a held supply reading Red in one table and
+      Green/Waiting in the next.
+
+122. **[in-progress, 2026-10-06]** **[Pipeline & publishing]** **The delivery
+    critic on 96813c1 and a17d6e8** (the #120 answers and the twelve standing
+    answers, qa schema 31). 413 tests across 15 modules passed in its own
+    archive; every finding reproduced against copies of the deployment.
+    - **D1, FOR KEITH (Q5)**: during `env reset-synthetic`, another
+      connection's probe can read the newly created `qa.identity` under an
+      older snapshot and is refused "this database carries no recorded
+      identity - mark it" - fails closed and brief, but sends a person to
+      re-mark a marked database. Recommended: drop every qa table except
+      `identity` rather than the schema.
+    - **D2**: the reset rewrites `marked_at`. Fixed by D1's recommendation.
+    - **D3, FOR KEITH (Q6)**: `decision_log.follows()` can return an instant
+      after now (clock skew, or a future-dated decision). Recommended:
+      `min(now, ...)`, as effective_at_for already does. Latent.
+    - **D4, FOR KEITH (Q7)**: REQ-PIPE-081's decision says the lag cap changes
+      nothing live - wrong when a live pass catches up a backlog, since the
+      pass records every delivery first. Recommended: keep the behaviour,
+      correct the decision text.
+    - **D5**: a role that lost its grants after a reset is refused with an
+      identity message rather than a grants one. Wording; fails closed.
+    - **D6, FOR KEITH (Q8)**: supply_current_run's tie-break sorts run keys as
+      text (`__r10` before `__r9`). Latent - nothing makes load-caused
+      re-runs yet.
+    - **COVERAGE AND TRACEABILITY**: several new functions are missing from
+      their requirements' `implemented_by` (follows, next_receipt,
+      confirm_drop, decide_keep, reset, inherit_into); no test fails if the
+      `before=next_receipt(...)` argument is removed from the orchestrators;
+      two of this morning's tests assert a flag or source text only. FIX.
+    - **CODE QUALITY**: db_identity's docstring says qa_store's DDL creates
+      the table (it does not); `_KEEP_TYPED` is module state passed between
+      two functions. FIX.
+    - Verified sound: the reset keeps the identity under a failure inside its
+      transaction; no code still reads the old database settings; the header
+      rule refuses no real header in the 152 delivered files; the lag cap
+      never moves a promotion before its own receipt.
+
+123. **[in-progress, 2026-10-06]** **[Dashboard UI]** **The dashboard UX
+    critic on a17d6e8** - everything since #110. Real Chromium, desktop and
+    mobile, cross-checked against the record with `mothman supply`.
+    - **A1 (HIGH), against REQ-DASH-126 c1/c3**: on a date when the one red
+      promoted supply is in place but a newer one awaits a decision, the
+      dataset reads Green and "Red promoted" appears only in collapsed
+      history; the agency card never names the kind. FOR KEITH (Q9) on where
+      it surfaces.
+    - **A2 (HIGH), against REQ-DASH-133 c6/c9**: on any past date, held
+      supplies drop out of the queue and the agency count while the dataset
+      row still says Held - a hold's observed instant is the replay's wall
+      clock. Same family as #116 D1. A DEFECT.
+    - **A3 (MEDIUM-HIGH), against REQ-DASH-127 c1**: "Superseded by the
+      supply received <day>" cannot identify which, on a day with several
+      supplies. A DEFECT.
+    - **A4 (MEDIUM), against REQ-DASH-097 c4**: the as-of view leaks today -
+      a file's history lists later files; "waiting Nd" counts to today.
+    - **A5 (MEDIUM)**: "results below are the newest supply" sits above tiles
+      that all read No data - #110 H3's fix applied to one of its two causes.
+    - **B1 (HIGH), FOR KEITH (Q10)**: supply history still groups by the old
+      red-then-green resupply chain, now contradicting the slot model on the
+      same page.
+    - **B2 (HIGH), FOR KEITH (Q11)**: the dashboard's "waiting for a person"
+      leaves out the red supplies awaiting a decision that the terminal's
+      queue lists - about 20 in Child Protection.
+    - **B3, FOR KEITH (Q12)**: the headline count and the card counts use
+      different units.
+    - **B4, FOR KEITH (Q13)**: a scenario jump silently moves the whole
+      dashboard to a past date, and Back does not undo it.
+    - **B5-B9, POLISH**: queue items are dead ends; the Scenarios prose
+      disagrees with the data and shows reviewer notes; the Outcome column
+      clips on mobile; repetition and REQ ids in reader text; "Show all
+      history" not kept in the URL.
+    - **CLI SIDE-FIND**: `mothman supply queue --collection cp` dies with a
+      raw UnknownDatasetError traceback.
+    - Verified sound: SPA basics (titles, focus, real links, Back, cold
+      deep links); REQ-DASH-097's file-check section; REQ-DASH-133's gap
+      grouping; promotion-refused correctly kept off the page.
+
+124. **[in-progress, 2026-10-06]** **[Testing & dev tooling]** **The CLI UX
+    critic on sprints 13-14 and a17d6e8**, driving the real TUI in a pty
+    against sandbox-, production- and unmarked copies of the deployment.
+    - **D1 (HIGH), A DEFECT OF THIS MORNING'S #119 D10 FIX, confirmed in the
+      code**: production asks for the typed id TWICE on every keep.
+      decide_keep() is called again inside filing with keep=True, and resets
+      the "already typed" flag before filing reads it. The test written for
+      it asserted the flag alone and never drove the flow - the weak,
+      defensive kind of test plans/running-thoughts.md #67 is about.
+    - **D2 (HIGH), A DEFECT, FOR KEITH AND ANSWERED**: a file REFUSED at load
+      still had all four tools run - against the period's existing promoted
+      table - recording 78 passes under its run, and the unloadable file
+      SUPERSEDED a real waiting supply.
+    - **D3 (MEDIUM)**: the kept-run report says "promoted - every check passed
+      or warned" under a table showing two reference-gap reds.
+    - **D4-D8 (MEDIUM to LOW)**: the non-interactive fallback names a
+      `--keep` flag that does not exist; an empty fallback-trial reference
+      ends the whole TUI session; the production no-terminal refusal reads
+      "use the flag-based form... cannot be confirmed by a flag"; the
+      multi-arrival progress bar counts past its total (7/5); a repr in
+      discard-sample's error.
+    - **UX JUDGEMENTS**: the Check column shows only the shared
+      "data-asset-1.registry-services.civil-..." prefix at normal widths;
+      raw Python UserWarnings with source paths on every pass; a ticket
+      outage prints 590 lines; a kept folder names its left-behind files only
+      after the keep and into the spinner; an unplaceable file is refused only
+      after "originally received" is answered; the keep prompt still calls
+      the delivery log "this repository's"; an identity mismatch in the TUI is
+      titled "Unreachable"; the no-environment first screen gives no example;
+      `pipeline process` does not say what is red; times in UTC in one
+      refusal; REQ ids and design history in errors and help; a stale
+      ENGINE_TAG (dbt-duckdb); the publish offer only on the synthetic route.
+    - Works well: process discoverable and its exit codes stated; the
+      toolbar on every prompt; production confirmations for process and tidy;
+      env mark's refusals; keep before reference; recorded arrivals refused
+      naming --trial; the lifecycle report's wording.
+
+    **KEITH'S ANSWERS TO #121-#124, 2026-10-06** (13 + 4 questions):
+    supply history keeps resupply chains but NEVER ACROSS A PERIOD, with
+    aligned columns (over grouping per period); the dashboard's "waiting for a
+    person" INCLUDES red supplies awaiting a decision, grouped per dataset;
+    Red promoted surfaces in the dataset header and as a kind on the agency
+    card, a short pill with its sentence beneath; dark-mode red and green
+    lightened to clear 4.5:1; the cards count what the queue counts; a
+    scenario jump shows a "viewing <date> for <scenario> - back to today" bar
+    and Back undoes it; cross-table rows name their source table and tool;
+    the reset drops every qa table except identity; follows() never returns
+    a future instant; the live-backlog lag cap stays and REQ-PIPE-081's
+    decision is corrected; the current-run tie-break orders by run instant
+    before key, now; a REFUSED FILE records its file-check verdicts only, runs
+    no tool and supersedes nothing; a promotion past gap-reds names them;
+    terminal tables show `column.check`; a mistyped production id gets one
+    retry before becoming a trial. Defects and polish are fixed without
+    further sign-off; each defect with a failing test first.
+
+    **CHUNK A, THE DEFECTS - FIXED 2026-10-06**, each with a failing test
+    first:
+    - #124 D1: `decide_keep()` now returns a `Keep` decision carrying whether
+      the id was typed, and returns one passed back in unchanged, so the
+      filing step reads how the first decision was made instead of a module
+      flag the second call reset. The new tests drive the real filing step.
+      Keith's one-retry answer went in at the same time.
+    - #124 D2: `own_table.why_unreadable()` now answers REFUSED before asking
+      whether a view exists, as CONTESTED already did, so a refused table
+      that fell through to the period's promoted one no longer runs the
+      tools. `supersession.supersede_earlier()` returns nothing for a newer
+      supply refused at load. TS-12's deployment record still shows the old
+      behaviour until the next rebuild.
+    - #123 A2: a held supply's queue item is observed at its receipt, as
+      `dataset_blockers` already did, not at the pass's wall clock.
+    - #123 A3: "superseded by the supply received" names the receipt instant.
+    - #123 A4: on a past date a file check's history stops at that date, and
+      a wait counts to it (`waitedInPlaceOn()`); the default date keeps the
+      built figure.
+    - #123 A5: the verdict line is withheld where the date on show blanks
+      the tiles (`noDataInPlaceOn`), the cause #110 H3 missed.
+    - #123 CLI side-find: every `supply` command's `--collection` is
+      validated, naming the known collections, and takes bdm/cp as `pipeline
+      run` does.
+
+    **CHUNK B, KEITH'S ANSWERS - BUILT 2026-10-06**, each recorded as a
+    decision on the requirement it belongs to:
+    - #122 D1/D2 (REQ-PIPE-107): the reset empties the qa schema of
+      everything but `identity` and never drops that table, so marked_at
+      stays and no probe meets a table newer than its snapshot.
+    - #122 D3 (REQ-PIPE-140): `follows()` is capped at now.
+    - #122 D4 (REQ-PIPE-081): the decision text that said the lag cap changes
+      nothing live is corrected; the behaviour stays.
+    - #122 D6 (REQ-PIPE-140): `supply_current_run` breaks a tie by
+      run_instant before run_key. **qa schema 32.** The sandbox `supply`
+      database had the view hand-applied (the code never migrates in place);
+      its next rebuild makes that moot.
+    - #124 D3 (REQ-QAC-108): a promotion past gap reds names them in its
+      reason; `gap_reds()` shares the gate's own contributing-check rule.
+    - #124: terminal report tables show `column.check` (`check_label()`).
+    - #123 A1 / #121 D1, D2 (REQ-DASH-126): a short Red promoted pill with its
+      sentence beneath, in the dataset header, and a kind on the agency and
+      collection cards. D1's `var(--red)` went with it.
+    - #123 B2, B3 (REQ-DASH-133): supplies awaiting a decision are queue
+      items, one per dataset, from `filing_queue.awaiting()`; the cards count
+      queue items (`gapItemCount()`). A needs-action item makes its card read
+      as needing action whether or not it blocks.
+    - #123 B1 / #121 D3 (REQ-DASH-127): a chain never crosses the period its
+      supplies are filed to (`recorded_arrival` now carries the slot), and
+      every cycle table shares fixed column widths.
+    - #123 B4 (REQ-DASH-139): a scenario jump pushes an entry carrying the
+      date it left, shows a "Viewing <date> for <scenario>" bar with Back to
+      today, and popstate restores the date.
+    - #121 D5: dark-mode `--good`/`--bad` lightened to #14B47A/#EF5A6F
+      (5.64:1 and 5.25:1 on their pills), held there by
+      `tests-js/status-contrast.test.js` in both themes.
+    - #121 D7 (REQ-QAC-037): cross-table rows name their table, column and
+      tool. #121 D6 (`.ds` display:block) went in alongside, being the same
+      span.
+
+    **CHUNK C, POLISH AND TRACEABILITY - 2026-10-06.** Fixed:
+    - #124 D4: the non-interactive fallback names `--commit`/`--trial`, not
+      a `--keep` that does not exist.
+    - #124 D5: a ClickException inside any main-menu flow is shown and the
+      menu carries on, rather than ending the session - fixes the empty
+      fallback-trial reference and every other refusal of its kind.
+    - #124 D6: production with no terminal raises `NeedsATerminal`, which
+      says to run it from a terminal and no longer points at a flag form.
+    - #124 D7: the progress bar counts each arrival's own steps
+      (`StepCounter`) and names the arrival, so it never reads 7/5.
+    - #124 D8: `UnknownDatasetError` prints its message, not its repr.
+    - #124 judgements: the keep prompt calls the log "this asset's recorded
+      delivery log"; the dbt ENGINE_TAG names dbt-postgres (old tag still
+      mapped); an unreadable log is titled "Decision log not available".
+    - #121 D4: blocker and gap tables are static (no pointer, no hover) and
+      lost the dead Rows and unlabelled columns. #121 D8: scenario chips keep
+      `.pill.sm`'s size and wrap. #121 D9: an unplaced injected scenario
+      says "Planned for the data", in the tag style.
+    - #123 B5: each queue item naming a dataset links to it. B7 (Outcome
+      clipping on mobile) is answered by the fixed-layout tables, which
+      scroll at phone width rather than clip.
+    - #122 traceability: `implemented_by` and `linked_tests` added for every
+      new or named function; `tests/test_promotion_waits_for_next_receipt.py`
+      drives both orchestrators' `promote_after()` and was shown to fail with
+      `before=` removed; db_identity's docstrings no longer say qa_store
+      creates the table or the reset re-marks it.
+
+    **LEFT AS THEY ARE, and why** - none is a defect, each is a judgement
+    better made with the next road-test than guessed now:
+    - #122 D5 (a role without grants after a reset is told about identity,
+      not grants): fails closed; the right message needs the grants model
+      REQ-PIPE-092 is still settling.
+    - #123 B6 (Scenarios prose disagrees with the data, shows reviewer
+      notes), B8 (repetition and REQ ids in reader text), B9 ("Show all
+      history" not in the URL): each is a sweep across many strings or a
+      routing change, not a fix - candidates for road-testing.md.
+    - #121's judgements (the 2,708px queue notice, spaced hyphens, line
+      lengths, mixed header styles, held-supply Red/Green) and #124's
+      remaining ones (UserWarnings on every pass, the 590-line ticket outage,
+      left-behind files named after the keep, unplaceable refused after
+      "originally received", the no-environment first screen, `pipeline
+      process` not naming what is red, one UTC refusal, REQ ids in help, the
+      publish offer only on the synthetic route): recorded, not changed.
+
+125. **[todo, 2026-10-06]** **[Pipeline & publishing]** **REQ-PIPE-057
+    criterion 19's guard has done nothing since REQ-PIPE-089, and its tests
+    stay green.** Found by the delivery-scoper while re-scoping REQ-PIPE-057
+    criterion 18; confirmed against the code the same hour.
+
+    `qa_tools/common/run_id_guard.py::committed_deliveries` reads
+    `QA_RESULTS_DIR = ROOT / "qa_results"` - the committed tree
+    REQ-PIPE-089 deleted. A missing directory returns `{}`, so `check()`
+    returns early on every run, and both orchestrators still call it.
+    `tests/test_run_id_guard.py` builds its JSON fixtures in `tmp_path`, so
+    it is green against a guard that guards nothing in production - the
+    "a passing test proving nothing" shape again.
+
+    **Why it still matters**: run ids no longer come from position
+    (REQ-PIPE-105 made them `<table>__<receipt key>`), so the original
+    fragility is gone, but a run id can still change under recorded history
+    through a table rename or a changed receipt instant. The guard should
+    read `qa.run` - or be retired with the criterion amended, if Keith
+    judges the receipt-keyed id makes it moot. **A defect against a built
+    criterion, so his call before the fix.**
+
+    **A neighbouring gap the same pass raised, unverified**: two separate
+    deliveries of the SAME dataset with the same receipt instant (plausible
+    off S3, whose LastModified is to the second) would get the same run id,
+    and `qa.run.run_key` is a primary key. Not yet checked what happens.
+
+    **KEITH, 2026-10-06: RETIRE IT.** Run ids are receipt-keyed since
+    REQ-PIPE-105, so the positional renumbering the guard existed for is
+    gone; criterion 19 is amended as moot and the guard and its tests are
+    deleted rather than repointed at `qa.run`. The same-instant collision
+    above is NOT covered by that answer and stays open.
+
+126. **[todo, 2026-10-06]** **[Docs & process]** **REQ-PIPE-068's NFR 2
+    still says a build "may never open or query any database, including
+    this one"** - the wording REQ-DOCS-101's sweep replaced everywhere else
+    with "a build may read recorded QA results, never actual data, and never
+    anything else". Found by the delivery-scoper 2026-10-06. Wording only,
+    but it states the opposite of the built design, so it is a claim in
+    requirements.yaml and is written up here rather than quietly fixed.
+
+127. **[done, 2026-10-06]** **[Pipeline & publishing]** **REQ-PIPE-154 labelled
+    holds schedule-ended while the calendar ran on for four more years.**
+    Shipped in 91226ea; caught the same afternoon by REQ-PIPE-156's
+    whole-history comparison, which found `qa.hold.reason` differing: two
+    2023 Case Workers holds read "it is the last period this dataset's
+    schedule has" with `last_period` 2023-Q1, under a calendar that runs to
+    2027.
+
+    THE CAUSE was an assumption made explicitly and wrongly while building:
+    that the last slot in the list handed to `assign()` is the calendar's
+    last. Filing passes the slots up to the arrival's claim horizon, and for
+    a dataset that skips quarters that list stops at the slot before the
+    arrival - which had closed - so a gap read as an end.
+
+    FIXED by telling `assign()` the dataset's real final period
+    (`filing.final_period_for`, from the whole calendar; None for a cadence
+    rule, which never ends); only that slot closing ends a schedule. Failing
+    test first: `TestATruncatedSlotListIsNotAnEndedSchedule`, against the real
+    Case Workers configuration. No supply was mis-filed - the hold kind and
+    the filing were right; the reason and the structured flag were wrong.
+    Worth carrying: the whole-history comparison built for the replay clock
+    caught a bug in a different change, which is what it is for.
+
+128. **[done, 2026-10-06]** **[Testing & dev tooling]** **The on-demand
+    bootstrap-equivalence test (REQ-TEST-116 criterion 4) had been failing
+    on every run, and nothing noticed because nothing runs it by default.**
+    Found building REQ-TEST-159, whose criterion 5 rests on the same
+    harness. Two causes, both of the "it moved on and the test did not"
+    kind. The scripted decisions (REQ-GEN-135) refuse a cut-down corpus for
+    missing their supplies - `run_into_fresh_database` had been patched for
+    that, but the spawned-collection path the equivalence test uses had not,
+    so it now rides `apply_redirects` and reaches a spawned child. And the
+    comparison's exclusions predated the census, the identity row, owed
+    runs, `check_result.load_attempt` and `filing.refiled_by`, so it
+    reported every stamp and surrogate id in them as a difference.
+
+    FIXED in `tests/equiv_support.py`: those clock columns dropped, surrogate
+    ids dropped, and every id that points at another table compared as what
+    it names (a load outcome, a decision, a filing), with a knock-on's
+    running number (`knock-on/6`, `__r2`) masked. Confirmed failing on the
+    commit before (6 errors), passing after (6 passed).
+
+    THE PART WORTH SAYING TO KEITH: REQ-PIPE-158's evidence said its
+    whole-bootstrap comparison found "every difference one the comparison
+    already excludes". It did not exclude them - they were the same columns,
+    explained by hand with a scratch script, as REQ-PIPE-156's evidence
+    describes correctly. The comparison now does what that sentence claimed,
+    and the evidence is reworded. The finding itself stands: no difference
+    outside stamps, surrogate ids and the generator's receipt counter.
+
+    DECIDED, Keith 2026-10-06 ("option one sounds good"): an `on-demand`
+    job in `.github/workflows/test.yml` runs every test marked `on_demand` on
+    every push, beside the other jobs (~5 minutes, under the 15-minute
+    deployment job, so no added wait). The marker stays - it keeps a local
+    `uv run pytest` quick. Rejected: a nightly run (the failure lands on
+    nobody's push), path filters (a guess about what can break the history,
+    which is what these tests exist to catch), and remembering to pass
+    `--run-on-demand` locally (what had just failed). Pinned by
+    `tests/test_ci_on_demand.py`.
+
+129. **[done, 2026-10-06]** **[QA checks]** **A check's recorded failing-row
+    sample was whichever rows a query happened to return first.** Found by
+    the whole-bootstrap comparison for REQ-TEST-159: 20 cross-table results
+    whose `failing_sample_keys` held the same five keys in a different
+    order, once staging per arrival changed the tables' physical row order.
+    The dbt helpers read `SELECT pk ... LIMIT 5` with no ORDER BY, the Soda
+    sampler kept Soda's first five rows, and datacontract-cli's samples were
+    kept in its order. Past five failing rows, WHICH rows were sampled could
+    differ between two runs of the same data, not just their order - and a
+    sample is what a person reads to see what went wrong.
+
+    FIXED: the dbt queries order by the key, the Soda sampler keeps
+    everything Soda returned (bounded by Soda's own sample limit) and
+    `failing_sample_keys` sorts before keeping five, and datacontract-cli's
+    samples are sorted.
+    Failing test first: `tests/test_sample_keys_deterministic.py`, three
+    tests, all red before. MEASURED over a whole bootstrap against the
+    previous one: 1,002 results' samples changed and nothing else in them -
+    676 the same keys reordered, 326 DIFFERENT keys chosen for the same
+    data - and every sample recorded now is in key order. ONE EDGE REMAINS,
+    inside Soda: a check whose `samples limit` is 5 and where more than five
+    rows fail lets Soda choose WHICH five it returns before our sort sees
+    them (one such result differed between two bootstraps, 2026-10-06 -
+    8 rows failing). Fixing it means raising `samples limit` in the
+    checks configuration so our sort chooses; NOT done without Keith, since
+    it is a configuration change. Minor - no verdict, count or status changes - so
+    fixed under the standing rule rather than held for Keith.
+
+    THE SODA EDGE, CLOSED (Keith, 2026-10-07: "go ahead", and "note that in
+    the fine print on the dashboard"). The 71 checks at `samples limit: 5`
+    now ask for 100 - Soda's own default - so the five recorded are the
+    lowest keys of all the failing rows up to 100; past 100, the lowest of
+    the 100 Soda returned. The nine "failed rows" checks keep their
+    deliberate 100000 (sodadata/soda-core#1985). Failing test first, against
+    REAL Soda: eight failing rows stored so the first five are not the
+    lowest five, red at 5 and green at 100. The limit is no longer part of a
+    Soda check's `config_hash` (how many example rows come back is not what
+    a check checks), so raising it asked for no changelog entries -
+    `validate-check-lifecycle` reports zero changes. Takes effect on the next
+    bootstrap; results already recorded keep the samples they had.
+
+    A CORRECTION TO THE FIX ABOVE: "datacontract-cli's count was never
+    capped" was wrong. The tool caps itself - `_FAILED_SAMPLE_LIMIT = 5` in
+    `datacontract/engines/ibis/ibis_check_execute.py`, a `LIMIT 5` with no
+    ORDER BY - so past five failing rows datacontract-cli chooses which five,
+    exactly as Soda did, and there is no setting to raise. Patching the
+    tool's private constant was not done (it is the pinning-shaped change
+    Keith does not want). The dashboard says so instead: the new fine print
+    under the example rows names, per tool, whether the keys are the lowest
+    of all the failing rows or the tool's own choice, and
+    `tests/test_sample_keys_deterministic.py` pins the page's two numbers to
+    Soda's configured limit and datacontract-cli's constant.
+
+130. **[done, 2026-10-06]** **[Pipeline & publishing]** **Recording each
+    delivery at its first arrival (REQ-TEST-159) silently switched off
+    Keith's #117 D5 cap**, which keeps a replayed promotion's invented lag
+    before the same dataset's next receipt. `promotion.next_receipt` read
+    the next receipt from the recorded deliveries, and its docstring said
+    why that worked: the batch recorded every delivery before processing
+    the first. Once it recorded each at its first arrival, the next one was
+    not there yet, and 29 promotions' `effective_at` moved past the next
+    receipt - two versions shown waiting at once, the very thing #117 D5
+    fixed. Caught by the whole-bootstrap comparison before anything was
+    committed, which is what it is for.
+
+    FIXED: `next_receipt` also reads the arrivals in the delivery tree being
+    replayed - exactly the set the batch used to record up front, so a
+    replay answers as it did - and the live processing pass, which has no
+    tree, still answers from what it recorded. Failing test first:
+    `TestTheNextReceiptIsKnownInAReplay`. THE LESSON is the existing test's:
+    it replaced `next_receipt` with a stub, so it proved the call site and
+    never what the function would see.
+
+131. **[done, 2026-10-07]** **[Pipeline & publishing]** **The delivery
+    critic on five builds of 2026-10-06** - REQ-PIPE-157 (the dbt worker),
+    REQ-TEST-159/160 (checkpoint and resume), REQ-PIPE-152 (the S3 handlers),
+    REQ-PIPE-154/REQ-DASH-155 (held after the schedule ends) and 15edf01 (a
+    Soda check that cannot run is red). Scope chosen by Keith, 2026-10-07:
+    everything else built that day was left out on purpose (pure-speed work
+    proven by the whole-bootstrap comparison, single-criterion amendments,
+    the CI cache). Findings 1, 2 and 6 were re-checked against the code by
+    the main session before being written here; the rest are as the critic
+    reported them, marked "read" where it did not run anything.
+    - **D1 (HIGH), CONFIRMED - a defect against REQ-TEST-160's fail-safe NFR
+      and REQ-TEST-159 criterion 3.** `replay_inputs.deliveries_print` has
+      one entry PER FILE, and `first_affected` returns that index as an
+      ARRIVAL number. An arrival can hold several files for one dataset (the
+      contested case, `arrivals.py:316`), so every arrival after one is
+      reported later than it is, and a resume can then start too late and
+      keep a stale verdict - the one direction the NFR forbids. The reason
+      text is wrong too: a changed file reads "removed". Latent today (no
+      multi-file arrival in either collection), and live the first time a
+      contested pair arrives.
+    - **D2 (MEDIUM-HIGH), CONFIRMED - REQ-PIPE-152's reliability NFR.**
+      `s3_arrival.handle_event` passes the event's key to `head_object`
+      raw, and S3 event notifications URL-encode keys - so any file name
+      with a space or bracket fails on every retry. And one object that
+      raises stops the rest of the event, so its siblings are never
+      recorded either.
+    - **D3 (MEDIUM), read - REQ-PIPE-152 criteria 12 and 13.** Criterion 13
+      leans on "the scheduled pass remains the backstop", and `aws/` has no
+      schedule, retry configuration or dead-letter queue. Several CP files
+      landing together start parallel invocations that mostly meet
+      `PassLockHeld`; their default retries can run out while one pass
+      holds the lock. The time budget is checked inside the staging and
+      arrival loops only - `materialise`, `refile_covered` and the owed
+      re-checks run outside it. FOR KEITH: whether the scheduled backstop
+      is in scope now.
+    - **D4 (MEDIUM), read - REQ-PIPE-157 criterion 2.** The worker's schemas
+      are named by PID alone, and PIDs repeat across containers; two such
+      processes on one database can empty each other's schemas mid-build.
+      Also two leaks in `dbt_worker.py`: a worker that died idle is replaced
+      without `stop()`, and `_start` catches only `OSError`.
+    - **D5 (MEDIUM-LOW), read - REQ-TEST-159 criterion 7 and the clutter
+      NFR.** Resume databases are never listed or pruned; `delete()` drops a
+      resume database with no confirmation even when it is the one a person
+      was told to point `MOTHMAN_SUPPLY_DSN` at; a resume that fails after
+      the copy leaves its database behind unnamed.
+    - **D6 (LOW, a false-green path), CONFIRMED and latent.**
+      `run_soda_cp.py:178` drops an unreported check whose `checks for` key
+      is not a bare table name, which excludes Soda's partition syntax
+      (`checks for t [recent]`, used by BDM today, not yet by CP); and
+      `unreported_checks` skips a check with no `check_id`, which nothing
+      at config time refuses.
+    - **D7 (LOW), read - REQ-PIPE-154 criterion 7.** `refile_covered` runs
+      after the arrival loop, so a newer supply in the same pass is filed
+      before an older held one.
+    - **D8 (LOW), read - REQ-DASH-155's performance NFR.** One query per
+      dataset where the NFR asks for one aggregate in `tally()`'s shape.
+    - **D9 (LOW), read.** `require_synthetic` tests truthiness where its
+      siblings require `is True`; and the pass lock's pause around a
+      checkpoint copy lets another pass start in the window.
+    - **D10 (polish), wording.** The schedule-ended notice says "cannot be
+      processed", while REQ-PIPE-154 criterion 5 says those supplies are
+      still staged and file-checked.
+    Found sound, and worth keeping on record: dbt re-reads the environment
+    on every invoke (so swapping it per request carries nothing across);
+    the partial-parse file never holds the password; checkpoint `delete()`
+    and `prune()` cannot reach a non-checkpoint or another source's
+    database; a resume writes only to its own copy; a retried S3 event
+    records nothing twice; a not-evaluated Soda result is red and escaped.
+    NOT VERIFIED by the critic: REQ-PIPE-157's equivalence and ten-minute
+    target (both measured at build time), and anything against real AWS.
+    TO FIX in one batch once the two UX critics running alongside it have
+    KEITH, 2026-10-07, on D3: WAIT for a real AWS deployment, and collect
+    this and the other AWS items in their own file - `plans/aws.md`.
+    OUTCOME, 2026-10-07, each defect with a failing test first: D1 FIXED -
+    the print is counted in distinct arrivals, and a changed file reads
+    "changed" (`TestAnArrivalHoldingSeveralFiles`). D2 FIXED - keys
+    URL-decoded, and an object that cannot be recorded no longer stops the
+    rest; the pass still runs and the invocation then fails for retry
+    (`TestEveryObjectInAnEventIsTried`). D3 to plans/aws.md (Keith). D4 FIXED
+    - worker schemas carry a per-process random token beside the PID, a
+    worker that died idle is stopped before another starts, and a failed
+    start removes its process and directory (`TestNamesAndLeaks`). D5 FIXED
+    - resume databases are listed (never pruned, Keith), deletes confirm
+    and refuse an unknown name, and a resume that fails names the database
+    it left. D6 FIXED - the partition is stripped from the table, the column
+    is read wherever the call sits, and an unattributable check raises
+    instead of vanishing; an id-less check was already refused at config
+    time by the check-lifecycle gate's `MissingCheckIdError`, so no second
+    guard was added. D7 FIXED - held supplies are re-filed before the pass's
+    new arrivals. D8 KEPT AS BUILT - one query per dataset is how every
+    per-dataset builder on the page reads, about thirty small indexed
+    queries at full scale; an aggregate here alone would be the odd one out.
+    D9 FIXED for `require_synthetic` (`is True`); the lock pause around a
+    copy is unchanged - the copy refuses rather than proceeds if anything
+    connects, which `_copy` already names. D10 FIXED with #132 A4.
+    reported, failing test first for each defect.
+
+132. **[done, 2026-10-07]** **[Dashboard UI]** **The dashboard UX
+    critic on four small changes** - REQ-DASH-155's schedule-ended notice,
+    REQ-PIPE-140 criterion 5's newest-result pill, REQ-PIPE-081 criterion 6's
+    "decisions made since then" note, and #129's fine print. Scope chosen by
+    Keith, 2026-10-07. Python Playwright over the built page (the MCP
+    browser would not connect), 1440 and 390 wide, light and dark, no
+    console errors. Finding A1 was re-checked against the code by the main
+    session before being written here.
+    - **A1 (HIGH, a false green), CONFIRMED - against REQ-DASH-126
+      criterion 5.** A promoted supply's history row takes its pill from
+      `promotedHealth.timeline`, which `promotion.status_of` fills with the
+      GATE's reading of each result - and `_gating_status` deliberately
+      reads a reference-gap red as its measured status (REQ-QAC-108
+      criterion 15: a gap warns, it does not block). "Arrived X" comes from
+      the page's own status. So on Client Register as at 2023-08-05 the
+      header and the supply-level checks read Red while the same supply's
+      row reads **Green, "Arrived Red"** - two status implementations on one
+      row, the item-74 pattern, failing in the green direction. 22 of the 23
+      "Arrived X" rows in the real data are this artefact (newest timeline
+      point at the arrival instant); one, cp-investigations 2024-08-01, is
+      the genuine turned-red case the change was built for. Right for the
+      gate, wrong for a display: the fix is to show the displayed status,
+      and change the pill only for a reading AFTER the arrival.
+    - **A2 (MEDIUM) - the fine print claims more than this database holds.**
+      The deployment was bootstrapped before 4a24a4d, so its Soda samples
+      were taken at `samples limit: 5`, and the page states today's limit
+      (`SODA_SAMPLES_ASKED`) as if it applied to them. Record the limit with
+      each result and word the line from that. Also: "the 100 failing rows
+      Soda returned" under "5 of 512" reads as if 100 rows failed - reword.
+    - **A3 (MEDIUM), injected - a schedule-ended hold reads as the generic
+      "held, waiting for a person".** Headline and footer say a person must
+      resolve it while the body says the next pass files it; the hold queue
+      offers file-it-yourself or reject, both the wrong fix (the fix is
+      adding dates); raw ids and "cp-clients's" rather than the dataset's
+      name; the command shows literal backticks through `escHtml`.
+    - **A4 (LOW-MEDIUM) - the exhausted-schedule notice.** It blames the
+      calendar ("quarterly has no delivery dates after...") when it is one
+      dataset's own `endsOn` that ran out (cp-case-workers, 2027-10-18,
+      while quarterly has 2027-11-01); it never names the dataset; "them"
+      beside "1 dataset".
+    - **A5 (LOW), injected - "decisions made since then".** Lists every
+      dataset's decisions on a single-dataset page (`decisionsChangingDate`
+      walks `rawRealDatasets()`); "and 1 more" is a dead end; it reads
+      `run.arrivedAt`, which `raw.runs` does not carry, so a same-day
+      resupply cannot be told apart.
+    - **A6 (polish).** The fine print is 10.5px at 3.39:1 / 3.88:1 contrast,
+      under 4.5:1 though matching its label; `dbt:unique` lists a repeated
+      key, which "lowest keys among the failing rows" does not explain.
+    Works well: the exhausted notice's backlog line counts as at the date
+    shown and reflows cleanly; the fine print hides when every row shows;
+    the genuine turned-red row reads exactly as intended.
+    Out of scope, a sighting only: Client Register at 2023-08-05 shows
+    "What is in the warehouse is not the latest file - 2026-Q2 / 2026-Q3".
+    TO FIX in the same batch as #131, failing test first for A1-A5.
+    KEITH, 2026-10-07: A1 - the pill shows the PAGE's own status, and
+    changes from the arrival colour only for a reading AFTER the arrival,
+    naming its cause; the gate keeps its own reading for promotion. A2 -
+    RE-BOOTSTRAP ONLY: no per-result record of the sample limit and no
+    "since" wording, accepting that a future limit change has the same
+    window until the next rebuild. A3 - a schedule-ended hold offers
+    ADD-DATES ONLY: "file it yourself" and "reject" are removed for this
+    kind of hold, not kept as secondary options.
+    OUTCOME, 2026-10-07: A1 FIXED at both ends - `promotion.status_of`
+    takes `for_gate=False` for display and `pipeline/red_promoted.py` builds
+    the timeline with it, and the page moves the pill only for a reading
+    after the arrival, naming when and what changed it (Python and JS tests
+    first). A2 - the deployment is rebuilt with the new limit (Keith's
+    choice). A3 FIXED - a schedule-ended hold offers only adding dates, in
+    the terminal and on the page ("Held: schedule ended"), names the
+    dataset, says "until its next delivery dates are added" rather than
+    "until a person resolves it", and shows a recorded command as code. A4
+    FIXED - the notice names each dataset and its own last period, says
+    "cannot be filed" (#131 D10: supplies are still received and checked),
+    and agrees "it"/"them" with the count. A5 FIXED - the note lists only
+    the datasets in view, all of them, with the receipt instant the runs
+    carry. A6 - the fine print is reworded ("Soda returns up to 100 of the
+    failing rows and chooses which; these are the lowest 5 keys of those")
+    and moved from the faint to the muted ink; `dbt:unique` repeating a key
+    is correct - each duplicate row is a failing row - and is left.
+
+133. **[done, 2026-10-07]** **[Testing & dev tooling]** **The CLI UX
+    critic on checkpoint and resume** (REQ-TEST-159/160), driven for real
+    against its own scratch database - a ~10-minute bootstrap with a
+    checkpoint, template copies with doctored descriptions for the failure
+    states, every database it made deleted afterwards. Scope chosen by
+    Keith, 2026-10-07. B2 was re-checked against the code by the main
+    session. ITS SIDE EFFECTS, checked and put right the same morning: the
+    runs regenerated `data/deliveries` (by design - the arrivals still match
+    the `supply` database, 42 and 108, the three extra rows being one
+    supply's knock-on re-runs) and rewrote `reports/results_cp.json` from
+    the scratch database, which was rebuilt from `supply`.
+    - **B1 (HIGH, gap) - where a resume lands cannot be pasted.** It ends
+      "Point MOTHMAN_SUPPLY_DSN at user=user dbname=mothman_resume_... host=
+      ... password=***", in libpq keyword form, wrapped across three lines,
+      password masked - at the end of a multi-minute run, which undercuts the
+      signed "a person points MOTHMAN_SUPPLY_DSN at it". Print one unwrapped
+      `export MOTHMAN_SUPPLY_DSN=postgresql://user:<password>@.../<db>` line
+      and how to go back.
+    - **B2 (HIGH, defect), CONFIRMED.** `bootstrap --checkpoint-before` with
+      an impossible N (1, 0, negative, past the end) prints a ~70-line
+      traceback ending in a good `CheckpointRefused` sentence - only
+      `resume_command` catches it. And an unreadable checkpoint (described
+      as "before arrival 0") is not refused by `first.arrival < cp.before`,
+      so `resume` crashes with StopIteration at `bootstrap.py:310`, while
+      `checkpoint list` promises it would replay from the first arrival.
+    - **B3 (HIGH, gap) - a refusal after `data/` was already rewritten.**
+      Every bad-N refusal came after the synthetic data was regenerated.
+      Validate N first.
+    - **B4 (HIGH, gap) - N is a number nobody can see.** Nothing prints
+      which delivery is arrival 55; the range is learned only from the
+      refusal. A listing of arrivals, and the delivery's name beside every
+      arrival number in messages.
+    - **B5 (MEDIUM) - asking for a checkpoint on a populated database says
+      "nothing to do" and exits 0.** Refuse, non-zero, with the three real
+      steps (an empty database, `env mark`, bootstrap).
+    - **B6 (MEDIUM) - the checkpoint's name is buried** at line 644 of 1,209;
+      the run's last line does not mention it. Repeat it, and the resume
+      command, in the closing summary.
+    - **B7 (MEDIUM, defect against criterion 7) - deleting a name that does
+      not exist reports "Deleted"** (`DROP ... IF EXISTS`), with no
+      confirmation and `WITH (FORCE)`. Refuse unknown names; confirm.
+    - **B8 (MEDIUM) - resume databases are not listed** (also #131 D5).
+    - **B9 (MEDIUM) - a resume does not say up front** what changed, which
+      arrivals it will replay, into which database, or roughly how long.
+    - **B10-B14 (polish).** "removed" for a changed file (#131 D1); help
+      text cites requirement ids, says "receipt instant" where the code
+      snaps per delivery, does not say NAME comes from `checkpoint list`;
+      two confusing result-count lines at the end of a resume, the second
+      saying "from committed history"; checkpoint times in UTC rather than
+      the asset's clock; a trailing "..." on statements. Not in the TUI,
+      rightly - a developer tool.
+    Works well: every refusal sentence that is caught says what happened,
+    names the arrival and delivery, says nothing was copied, and gives a
+    next step; nothing-changed answers in 5 seconds; snapping explains
+    itself; `delete supply` is refused.
+    TO FIX in the same batch as #131 and #132.
+    OUTCOME, 2026-10-07: B1 FIXED - one unwrapped `export
+    MOTHMAN_SUPPLY_DSN=postgresql://user:<password>@host:port/db` line, and
+    how to go back. B2 FIXED - an impossible N and an unreadable checkpoint
+    are refused in a sentence (`TestARefusalChangesNothing`). B3 FIXED - N
+    is checked against a regeneration somewhere of its own before data/ is
+    touched. B4 FIXED - `mothman pipeline checkpoint arrivals --collection
+    cp` lists every arrival number with its delivery and receipt, and
+    messages name the delivery beside an arrival number. B5 FIXED - a
+    populated database refuses a checkpoint, non-zero, with the three
+    steps. B6 FIXED - the closing line repeats the checkpoint and the
+    resume command. B7 and B8 as #131 D5. B9 FIXED - a resume says what
+    changed, which arrivals and into what, before copying (no time estimate
+    - a number not measured would be invented). B10 with #131 D1. B11 help
+    text no longer cites requirement ids and says where NAME comes from and
+    where a resume lands. B12 FIXED - the rebuild's count line is quiet and
+    says "recorded history". B13 FIXED - times on the asset clock; a
+    statement keeps its full stop instead of a trailing "...".
+
+134. **[todo, 2026-10-07]** **[Pipeline & publishing]** **The built settings
+    guard dates a change by the commit's author date, which can be
+    backdated.** Found by delivery-scoper while folding the architect's
+    review of the calendar batch into REQ-PIPE-111 (the architect's S6),
+    and checked against the code by the main session:
+    `validate_schedule._version_added_on` reads `git log --format=%H %aI`
+    (validate_schedule.py:757), and REQ-PIPE-122's amber/replacement guard
+    uses it to decide whether a version was added after the date it took
+    effect. `GIT_AUTHOR_DATE` sets that freely, so a backdated commit
+    would pass as not past-dated. Low impact as built - a settings
+    version's past is recorded on every decision it governed, so a
+    backdated one re-judges nothing - but the same clock is about to
+    govern calendar freezes, where it would matter.
+    KEITH, 2026-10-07: fix it IN THE SAME CHANGE as REQ-PIPE-111, which
+    moves both freeze rules to the committer instant floored at the base
+    commit. REQ-PIPE-122 carries a pending-amendment decision saying so.
+    Failing test first when it is built.
+
+135. **[done, 2026-10-10]** **[Dashboard]** **A collection whose every dataset
+    is left out of the rollup reads GREEN - a latent false green.** Found by
+    delivery-dashboard-ux reviewing REQ-PIPE-110's turn-off design, and
+    checked against the code by the main session: `rollup()` in
+    `dashboard/qa-reporting-dashboard.template.html` (~line 2626) filters
+    out `inNoRollup` datasets, and when nothing is left it returns
+    `counted.length ? "nodata" : "green"` - so an empty `counted` is green.
+    `inNoRollup` today is only `scheduleNotAgreed` ("No delivery schedule
+    agreed yet"), so a collection made up only of such datasets would read
+    green with nothing checked. Neither real collection is in that state
+    today, so nothing on the published page is wrong yet; a turned-off
+    dataset (the coming split of REQ-PIPE-110) would join `inNoRollup` and
+    make the case reachable for a collection whose datasets are all off.
+    Same review, related: `unagreedMarker` is rendered only in the dataset
+    header, never on the collection row, so an unagreed red dataset sits
+    inside a green collection with nothing saying why.
+    ANSWERED BY KEITH, 2026-10-10 (REQ-PIPE-110's Q-J decisions): a group
+    whose datasets are all turned off reads a new 'Turned off' status; a group
+    where nothing is counted for any other reason, or a mix, reads a quiet
+    'Not counted' status with a line saying why. Never green. To be built with
+    the turn-off DASH requirement; the not-agreed half can be fixed sooner.
+    WHAT IT SHOULD SHOW INSTEAD was a status-semantics question for Keith,
+    asked with the REQ-PIPE-110 review batch (a quiet "No data" pill with an
+    "N datasets not counted" line, no pill at all with a line in words, or a
+    new group-level status). Failing test first when it is fixed.
+    **Answered, and to be fixed tonight (Keith, 2026-10-10 night):** his
+    answer is REQ-DASH-180's - 'Turned off' where every dataset is turned off,
+    'Not counted' with a line saying why otherwise, never green. Only the
+    'Not counted' half is reachable today (no dataset can be turned off until
+    REQ-PIPE-179 is built), and that half is fixed in the overnight run,
+    failing test first (plans/morning-reports.md #3).
+    **FIXED 2026-10-11 (overnight #3).** `rollup()` and its Python mirror
+    `rollup_datasets()` return `notcounted` where every dataset is left out
+    (an empty group alone stays green); `rollupStatuses()`/`rollup_statuses()`
+    treat it as the last quiet state, so an agency of not-counted
+    collections reads `notcounted` too and one beside a real verdict loses to
+    it. A solid-outlined, hollow-marker pill labelled 'Not counted' (not
+    inactive's struck one), a legend key, and a line on the collection and
+    agency card saying why, by reason. FAILING TEST FIRST: the two tests that
+    pinned the green - tests/test_no_calendar.py and
+    tests-js/status-rollups.test.js - were turned to expect `notcounted` and
+    failed against the old code; status-cases.json gained the vocabulary entry
+    and three rollup cases both sides now pass. Recorded as a decision on
+    REQ-PIPE-106, whose exclusion this was.
+
+136. **[done, 2026-10-10]** **[Pipeline & publishing]** **Two runners can run
+    the same owed re-check at once.** Found by delivery-architect reviewing
+    the REQ-PIPE-164 split, and the shape confirmed by the main session
+    reading `qa_tools/common/recheck.py::run` (lines 214-245): it reads the
+    owed item and whether it is cleared, then mints a run id passing the
+    item's own `run_key` as `taken`, with no lock or claim. So the terminal's
+    immediate run after a re-file (`filing_tui._run_owed`) and a processing
+    pass that reaches the same owed item can both execute it under one run
+    key, and one's schema tidy-up can drop the other's views mid-run. NOT
+    REPRODUCED - an analysis of the code, not a failure seen. Proposed fix
+    (architect): a session advisory try-lock keyed by owed id in
+    `recheck.run`, skipping rather than waiting, as `arrival_lock` does in
+    processing_pass.py. Carried into REQ-PIPE-164/177's open questions; a
+    failing test (two concurrent runs of one owed id) comes first when fixed.
+    **Update 2026-10-10:** now a criterion rather than an open question -
+    REQ-PIPE-164 criterion 19 (a claim released if its holder ends; a runner
+    finding one claimed skips it) and REQ-PIPE-177 criterion 16. Both are
+    unsigned. The fix is a defect in BUILT code (re-file already reaches
+    this path), so it does not have to wait for them.
+    **Keith, 2026-10-10 (night): fix it tonight**, failing test first, as part of
+    the overnight run (plans/morning-reports.md #3).
+    **FIXED 2026-10-11 (overnight #3).** `recheck.run` now claims the owed item
+    first - a session advisory lock (`OWED_CLAIM_SPACE`, beside the processing
+    pass's two) on a connection held for the whole run, so it is released when
+    the run ends or its process dies - and the old body is `_run_claimed`,
+    which reads the item only after the claim. A runner that finds the item
+    claimed returns 'this is already being run elsewhere - it will finish
+    there, and it stays owed until it does', records no failure, and leaves it
+    owed; `run_all_owed` and the terminal both go through `run`, so every
+    runner claims. FAILING TEST FIRST: tests/test_recheck.py
+    `TestTwoRunnersNeverRunOneOwedItem` - a second connection holds the claim
+    and `run` must not execute; it failed against the old code with 'a claimed
+    owed item was executed by a second runner', and passes now, beside a test
+    that the claim is released when a run ends.
+
+137. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-110 as built (9bc389e)** - run in the overnight
+    (plans/morning-reports.md #3), against a `git archive` of that commit
+    rather than the working tree, because REQ-PIPE-113 was in progress
+    beside it. Report saved in the session's reviews/2026-10-11-critic-110.md.
+    Every finding was checked against the code before anything was fixed:
+    ten failing tests written first (tests/test_agreement.py
+    `TestCriticFindingsOn110`), ten failed, then the fixes. All are defects or
+    gaps against criteria Keith had signed, so none needed a fresh decision.
+    - **H1, FIXED: a dataset, collection or not_expected period listed twice
+      passed, and the last entry won.** Now refused by the gate (naming the
+      entry and "twice") and by the loader.
+    - **H2, FIXED: criterion 7 was checked against the newest participation
+      version only.** Months are now checked per participation version,
+      against every calendar version it overlaps, at the gate and at runtime
+      (`schedule.periods_for_dataset` refuses rather than dropping a cadence
+      period - its test confirmed failing without the fix).
+    - **H3, FIXED: a hierarchy dataset with no calendar.yaml entry, on a
+      calendar through its collection, passed criterion 3.** The gate now
+      walks the hierarchy, not calendar.yaml's own list, and says the dataset
+      is on the calendar through its collection and has no entry.
+    - **M4, FIXED: three mistakes raised tracebacks instead of gate errors.**
+      An older version's month typo is now a per-version gate error;
+      `expected_time` must be a real 24-hour time (`25:99` refused by the
+      schema); the missing entry is H3.
+    - **M5, FIXED: criterion 29's message** now names the periods left
+      uncovered by name and date and where it looked, and lost its "no a".
+    - **M6, FIXED in part:** the shape hint for a changelog now shows the
+      structured entry; `participates`, `expected_time`, `days_before` and
+      `grace` gained hints. The critic's main claim - that a plain-string
+      changelog is told to write a plain string - did not reproduce on the
+      gate's path (its fix line already named the author); the stale hint is
+      fixed anyway.
+    - **L7, FIXED: criterion 18's "naming both files"** - the no-calendar
+      message now names data-asset.yaml's hierarchy and calendar.yaml, and the
+      test asserts both (it asserted one while its name claimed two).
+    - **L8, FIXED in part:** `supply_holds.SCHEDULE_FILE` is now derived from
+      `agreement.CALENDAR_YAML` rather than a second literal; the template's
+      "no data embedded" panel no longer points at data-asset.yaml alone and
+      the retired qa_results/. KEPT: the template's literal fallback file
+      name, used only when the page is opened without its embedded data.
+    - **L9, FIXED in part:** `agreement.cadence()` raises a named error for a
+      dataset with no participation. LEFT for REQ-DASH-182 (unsigned), which
+      owns the delivery-time label: a calendar that is not
+      exactly four months a year labels as 'authored', which the page renders
+      blank, and a calendar on mixed days of the month gives `day_of_month`
+      None. Neither shape exists in this asset today.
+    - Untested criteria the critic listed now have tests: criterion 11 (a
+      dataset's own calendar beats its collection's) and criterion 37 (the
+      terminal's owed-nothing kind and reason, tests/test_cli_schedule.py).
+
+138. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-113 as built (70bdbe2)** - overnight #3, against a
+    `git archive` of that commit. Report saved in the session's
+    reviews/2026-10-11-critic-113.md. Four real defects, each with a failing
+    test first (tests/test_slot_instants.py `TestCriticFindingsOn113`, four
+    failed before the fixes), none needing a decision from Keith:
+    - **#1, FIXED: the claim reach used the CURRENT claim window**, so after
+      a window was narrowed, a supply inside an older period's genuine
+      (wider) window found no slot and was held - post-build-review #73 by
+      another door. `slots.claim_window` is now the widest window any
+      calendar or participation version has had - a generation bound, which
+      is all it is used for.
+    - **#3, FIXED: a sub-day window crossing midnight fell off the reach** -
+      a date plus four hours is the same date. The reach is now the last
+      period whose window can open by the end of the arrival's day:
+      floor(window - earliest expected time + a day, less an instant) whole
+      days. A first, blunter fix - round the window up to whole days - broke
+      tests/test_claim_window_lookahead.py's pin that the daily feed (4h at
+      14:00) never gains tomorrow as a candidate; the full run caught it.
+    - **#4, FIXED: a period before the first participation version mixed
+      its inputs** - the first version's expected time and grace, but the
+      calendar's claim window rather than the first version's override.
+      `schedule.claim_window(on=...)` now falls back to the first version
+      exactly as `slots._participation_for` does.
+    - **#2, FIXED: the daylight-saving gate checked owed periods only**,
+      while the slot path computes every calendar period (a non-owed
+      period's opening closes the slot before it), so `days_before` landing
+      a non-owed due day on a gap was a traceback in filing - swallowed
+      there, leaving the dataset with no slots - instead of a gate error. The
+      gate now walks the same sequence the slot path does.
+    - **#5, LEFT for REQ-DASH-182 (unsigned):** the dashboard's delivery-time
+      label ignores days_before - "by 22:00" for a supply due the evening
+      before. It is the label REQ-DASH-182 owns, along with which version's
+      label to show.
+
+139. **[done, 2026-10-11]** **[Pipeline & publishing]** **REQ-PIPE-122's
+    settings guard dated a version by the commit's AUTHOR date**, which a
+    person can set to anything - so a backdated commit could pass a new
+    amber-setting version off as added before its effective date. Found by
+    delivery-architect's pre-build review of REQ-PIPE-111 (2026-10-07, S6) and
+    decided by Keith the same day (REQ-PIPE-111 decision 28): fix it in the
+    change that builds REQ-PIPE-111, with REQ-PIPE-122 criterion 7 amended
+    alongside. **FIXED 2026-10-11 (overnight #3)**:
+    `validate_schedule._version_added_on` reads `%cI`, the committer
+    instant, floored at the base commit's own. FAILING TEST FIRST:
+    tests/test_agreement_freeze.py `TestTheSettingsGuardDatesByTheCommitter`
+    failed against the `%aI` code (a stamp a week before the base came back
+    as the added-on date) and passes now.
+
+140. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-111 as built (100fd0d)** - overnight #3; report saved
+    in the session's reviews/2026-10-11-critic-111.md. Every finding probed
+    by the critic itself, then re-verified here with a failing test
+    (tests/test_agreement_freeze.py `TestCriticFindingsOn111`, all but the
+    own-dates coverage test failing before the fixes):
+    - **H1, FIXED: a past-dated calendar version took later frozen dates out
+      of force with no correction** - items were keyed by the version that
+      LISTED a date, so nothing "changed". Dates are now frozen as they stand
+      IN FORCE, keyed by period (`calendar quarterly period 2024-Q1`), so a
+      date leaving force is a removal and a date restated unchanged in a new
+      version is no change. Same for a dataset's own dates.
+    - **H2, FIXED PROVISIONALLY - KEITH'S FORK: calendar membership was not
+      frozen.** REQ-PIPE-110 left it to REQ-PIPE-111 (plans/running-thoughts.md
+      #79) and 111 had not settled it. Taken the strict way overnight: each
+      dataset's RESOLVED calendar (`dataset cp-clients calendar`) freezes with
+      its first participation version, so moving a dataset - or its whole
+      collection, which is one change per dataset - to another calendar or to
+      none needs a declared correction. The alternatives - refuse outright, or
+      version membership - are his to choose.
+    - **M1, FIXED: the paste-ready block printed "(nothing)"** for an added or
+      removed item, which never matched once pasted. It prints `null`; a test
+      pastes the printed entry and the change passes.
+    - **M2, FIXED: criterion 14 with only one file new** - a calendar.yaml
+      with no previous state is no longer compared, even where data-asset.yaml
+      has one.
+    - **L2, FIXED:** an old state today's loader cannot read is still checked,
+      against freeze instants from the new state, instead of skipping the gate.
+    - **L3, FIXED:** a commit whose file did not parse dates nothing in the
+      walk.
+    - **L4, FIXED:** removing an owner that carries corrections is refused as
+      breaking append-only.
+    - **Dead code removed:** `_window_of`.
+    - **LEFT:** L1 (the freeze instant reads the dataset list from the
+      current hierarchy, not the old state's - only a dataset removed in the
+      same change is affected, and removing a dataset is itself refused); L5
+      (a duplicate declaration is harmless - both must match); L6 (a local run
+      over a dirty tree dates everything now - errs strict). The multi-commit
+      walk and the invalid-zone fallback still have no test of their own; the
+      critic exercised the walk end to end in a scratch clone.
+
+141. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-GHUB-171 as built (9ce807f)** - overnight #3; report saved
+    in the session's reviews/2026-10-11-critic-171.md. Failing tests first
+    (tests/test_roles.py `TestCriticFindingsOn171` plus
+    `test_an_assigned_role_must_be_one_the_person_holds`), then:
+    - **#1, FIXED PROVISIONALLY - two answers to "who is a manager".** A
+      correction's approver (REQ-PIPE-111) was read from each person's own
+      `roles:`, the asset manager from the assignments, and the gate never
+      made the two agree - so a real AGENCY manager could approve a
+      correction to the whole asset's agreement, and dropping `manager` from
+      the asset manager's roles left the gate green and nobody able to
+      approve. Now the approver must be the asset manager (assigned manager
+      at data-asset level for this asset), and the gate refuses an assignment
+      of a role the person's own `roles:` does not hold. This answers, the
+      strict way and provisionally, the question the morning report put to
+      Keith about who may approve.
+    - **#2, FIXED:** a `data_asset:` assignment naming another asset granted
+      the role at runtime; it now counts only for this asset's id.
+    - **#3, FIXED:** a decision requiring a role, raised by an actor that is
+      not an identified person, is refused rather than waved past.
+    - **#5, FIXED:** an empty `people:` list fails the gate (only a MISSING
+      file passes, as on a fresh clone).
+    - **#6, FIXED:** a role required at an impossible level, or at agency
+      level with no agency, is a refusal naming the definition as wrong,
+      never a traceback.
+    - **#4, LEFT (dormant):** the terminal asks for a reason and a
+      confirmation before apply() refuses on role. Nothing requires a role
+      yet; REQ-PIPE-170, which adds the first, should check it up front.
+
+142. **[done, 2026-10-11]** **[Dashboard UI]** **[Pipeline & publishing]**
+    **The delivery critic on REQ-PIPE-167 as built (7b2ca89)** - overnight
+    #3; report saved in the session's reviews/2026-10-11-critic-167.md.
+    Each claim checked against the code; each fix has a test written to fail
+    first:
+    - **#1, FIXED - the cycle heading named the wrong period.**
+      `buildSupplyHistory` headed each chain with the period its ARRIVAL
+      DATE fell in, while grouping it by the slot it was FILED to. A
+      following-period supply arrives on time, before its period's date, so
+      its heading was the previous period's - "Cycle due 2 June" for a
+      supply due 2 September. The heading is now the filed slot's own date
+      (`periodDateNamed`), falling back to the arrival date's period where
+      the sequence has no such slot. The test runs the real
+      `buildSupplyHistory`, not `cycleLabel` alone
+      (tests-js/slot-due-dates.test.js). Three supply-history fixtures that
+      filed every daily run to one day were made realistic: each fresh run
+      is filed to its own day.
+    - **#2, FIXED - the SLA tile named the period's date as the delivery
+      time.** `agreement.cadence` now carries `days_before` where it is not
+      zero, and `cadenceLabel` says "due 60 days before each date".
+    - **#3, FIXED - `mothman schedule show`'s next-due marker and window.**
+      Both now follow each slot's due date, not the period's date, so an
+      overdue following-period slot is no longer marked as next.
+    - **#4, LEFT (low):** the "no data" banner says "current expected cycle
+      (started <period date>)" for the period containing the viewed date.
+      It is not a due date, and no dataset has days_before today.
+    - **#5, LEFT (low):** the runway count counts slots by period date, so
+      a following-period slot already due still counts as left. Same
+      reason: dormant until a dataset declares days_before.
+    - Not a defect, test gap noted: the embed's unit test has no
+      day-boundary case and ends with an `assert slots` that checks
+      nothing.
+
+143. **[done, 2026-10-11]** **[Pipeline & publishing]** **[GitHub workflow &
+    people]** **The delivery critic on REQ-PIPE-168 and REQ-GHUB-174 as built
+    (51df202)** - overnight #3; report saved in the session's
+    reviews/2026-10-11-critic-168-174.md. Each finding was checked against the
+    code. Each fix has a test that failed first
+    (tests/test_verdict_record.py `TestCriticFindingsOn168`,
+    tests/test_codeowners.py `TestCriticFindingsOn174`):
+    - **H1, FIXED - a corrected DATE was never re-judged.** `verdict.rejudged`
+      resolved the OLD recorded period date and compared a fingerprint that
+      deliberately leaves dates out. So moving 2023-Q3 from 1 August to
+      25 July re-judged nothing, and that is the correction REQ-PIPE-111
+      exists for. Each slot is now found by NAME under the agreement given,
+      and both its date and its fingerprint are compared. This also covers a
+      dataset's own dates, whose versions carry nothing else.
+    - **M1, FIXED:** a correction that moved an input without changing the
+      answer was listed as a re-judgement. Only a changed verdict is listed
+      now.
+    - **M3, FIXED (schema 35):** the database now refuses each of these:
+      - an empty correction reference;
+      - a second verdict for a filing that names no correction;
+      - a verdict whose dataset or supply is not its filing's;
+      - superseding another filing's verdict;
+      - superseding one verdict twice.
+    - **M4, FIXED:** CODEOWNERS `*` crossed `/`, so `/*.yaml` owned
+      contract/calendar.yaml, which GitHub's matching does not. Matching now
+      follows GitHub's rules: `*` stays in one directory and `**` crosses.
+      A plain path owns what is under it; a glob owns only what it matches.
+      A bare `@` is no owner.
+    - **L1, FIXED:** "May approve:" listed every asset manager. It now lists
+      only those who are also code owners of the file, so it never names
+      someone the gate then refuses.
+    - **L3, PART FIXED:** the dead `_is_approver` was removed.
+      `filing.classification_of` is left in place: it is only reached from
+      tests/test_refiling.py and predates the recorded verdict.
+    - **M2, LEFT AS DECIDED:** TRUNCATE on qa.verdict is not refused. This
+      is the same rule as Keith's 2026-10-05 call for qa.filing ("UPDATE and
+      DELETE refused, TRUNCATE not"), which the test fixtures rely on.
+    - **L2, LEFT:** on a branch's first push the base falls back to HEAD~1,
+      so commit 1 could add an approver that commit 2 then uses. This is the
+      existing, documented diff_base fallback. Required review in a real
+      deployment closes it.
+    - **L4, NOTED:** for a daily feed, resolving per slot is resolving per
+      supply. It was measured at 15ms for Birth Registrations' whole
+      history.
+    - **L5, NOTED:** the critic listed uncovered paths. No committed test
+      checks a timezone correction against data-asset.yaml's owners; the
+      critic probed it by hand and it worked.
+    - **NFR 1, FOR KEITH:** qa.verdict records a re-judgement's reference and
+      changelog line but not its approver, who is named only in
+      calendar.yaml. REQ-PIPE-170's applied record is the natural place to
+      carry the approver.
+
+144. **[done, 2026-10-11]** **[Testing & dev tooling]** **A half-written
+    reports/ file read by another worker** - CI on d6dce26 went red in the
+    test-deployment half. tests/test_history_rekey.py read
+    reports/results_cp.json while another xdist worker's dashboard build was
+    rewriting it, and parsed half a file ("Expecting ',' delimiter: line
+    63142"). This is the same class as plans/tooling.md #10. Fixed at the
+    writer, not the reader: qa_tools/common/atomic_file.write_json writes a
+    temporary file beside the target and renames it into place, so a reader
+    only ever sees the old file or the new one. Both results writers and
+    both dashboard-data builders use it. tests/test_atomic_file.py failed
+    first: an interrupted write leaves the previous file whole, and both
+    results writers go through it.
+
+145. **[done, 2026-10-11]** **[Pipeline & publishing]** **[Dashboard UI]**
+    **The delivery critic on REQ-PIPE-161 and REQ-DASH-162 as built
+    (d6dce26)** - overnight #3; report saved in the session's
+    reviews/2026-10-11-critic-161-162.md. Each fix has a test that failed
+    first (tests/test_excuse.py `TestCriticFindingsOn161`;
+    tests-js/excuse.test.js "an excused resupply row"):
+    - **#1, FIXED - an excuse was invisible on a resupply row.** That
+      covers 15 of the 21 real late supplies, and the case the decision
+      exists for. A resupply row now carries the Late (excused) tag and the
+      excuse note beside "N days since previous".
+    - **#2, FIXED - a supply re-filed away and back got its old excuse
+      back,** because the lapse compared slot names. An excuse now lapses
+      at the first re-file after it, wherever that re-file went.
+    - **#3, FIXED PROVISIONALLY - a lapse by correction is permanent:** if
+      a later correction judges the supply late again, the old excuse does
+      not come back, and a person excuses afresh. This is a question for
+      Keith.
+    - **#4, FIXED - a range could be half-applied** when someone excused
+      one of its supplies between the plan and the write. All the range's
+      entries are now written in one transaction, so the range is refused
+      whole.
+    - **#9, FIXED (pre-existing, every decision type):** `mothman supply
+      decisions` read free text as Rich markup and crashed on a reason
+      containing `[/]`. The reason, actor and supply are now escaped.
+    - **#10, FIXED:** a range refuses `--supply`, `--to-period` and
+      `--stands-on` instead of silently ignoring them.
+    - **#11, FIXED:** as at a date before a lapse, the excuse is still in
+      force. Lapse instants are compared as instants.
+    - **#5, FOR KEITH:** a range excuses every late supply currently filed
+      in its periods, including superseded and rejected ones.
+    - **#6, LEFT:** an excuse never reaches the slot's ticket, and a
+      GitHub-raised one gets no reply. The ticket body is built from slot
+      state, which an excuse does not change, and the GitHub route is
+      disabled today. Revisit when that route is turned back on.
+    - **#7, LEFT:** after a re-file, the lapse note shows on the supply's
+      row under its NEW period, because history rows group by the current
+      filing. Moving it would need the history to show a supply under the
+      period it left.
+    - **#8, FOR KEITH:** the range is offered only on the flags route. The
+      GitHub route and the interactive terminal take the single form. Does
+      that break REQ-GHUB-082 c3's parity, if the range counts as an
+      operation?
+    - **#12, NOT VERIFIED BY THE CRITIC:** hold resolution by arrival key.
+      An excuse needs a filed supply, so it cannot resolve that supply's own
+      hold. Left as the critic's open note.
+    - **Found by the gate, not the critic:** the excuse tests' cp-clients
+      decisions pushed tests/test_cli_supply.py's fixture row out of the
+      newest-twenty listing on a shared worker. The decision log is
+      append-only and shared, so that test now lists with a limit covering
+      the whole log rather than assuming it is alone.
+
+146. **[done, 2026-10-11]** **[Pipeline & publishing]** **[Dashboard UI]**
+    **The delivery critic on REQ-PIPE-173 as built (534a398)** - overnight
+    #3; report saved in the session's reviews/2026-10-11-critic-173.md.
+    Each fix has a test that failed first (tests/test_agreement_drift.py
+    `TestCriticFindingsOn173`; tests/test_schedule_ended_hold.py
+    `test_a_refused_dataset_is_left_held`; tests-js/agreement-refusal.test.js
+    "the wording"):
+    - **#1 HIGH, FIXED PROVISIONALLY - an unrelated correction silenced
+      the backstop.** Any declared correction naming any of a slot's
+      shared items (a timezone version, the dataset's membership) with its
+      current value counted, and corrections are append-only, so one old
+      entry silenced the slot for good. An undeclared grace change went
+      through. A correction now counts only if its item is of a kind that
+      can move the input that differs, it carries the current value, and
+      it is dated on or after the verdict was recorded. The rule is
+      recorded on REQ-PIPE-173 and goes to Keith.
+    - **#2 HIGH, FIXED IN PART - a refused dataset was still processed.**
+      Schedule-ended re-files ran before the backstop and filed against
+      the changed terms. The backstop now runs first and those re-files
+      skip a refused dataset. FOR KEITH: should owed re-checks and the
+      gate also stop for a refused dataset? They re-run checks and apply
+      verdicts already recorded, so nothing is re-judged; today they
+      continue.
+    - **#3, LEFT FOR KEITH:** re-filing a cleared refusal hold goes
+      through the shared re-file loop, not assign(). It records no
+      resupply link, does no REQ-PIPE-118 supersession, and names the
+      branch as a person's re-file. The schedule-ended hold has always
+      drained the same way, so this is a question about both holds.
+    - **#4, FIXED - a supply the rule would hold anyway was labelled
+      refused,** and that hold would never clear into the right one. The
+      rule now runs first, and the refusal replaces a filing only.
+    - **#5, FIXED - test order dependency.** Verdicts that
+      tests/test_schedule_ended_hold.py left on a worker made
+      tests/test_processing_pass.py see a refusal. The pass tests now stub
+      the backstop, which tests/test_agreement_drift.py covers.
+    - **#6, LEFT FOR KEITH:** a retroactive not_expected on an already
+      judged period is not detected, because the fingerprint leaves it out.
+    - **#7, LEFT:** the message grows by about 91 characters per slot; a
+      timezone change over three years of a daily feed is around 100KB,
+      stored in each hold reason. Worth summarising by run of slots;
+      measured, not fixed.
+    - **#8, FOR KEITH:** the refusal is red on every as-of date, and it
+      replaces another blocker's banner rather than sitting beside it.
+    - **#9, FIXED - a dataset that cannot be evaluated was silently
+      skipped.** The pass now reports it as a failure. check-agreement
+      reports it and exits 2, and refuses an unknown `--dataset` by name;
+      before, it said "nothing refused" and exited 0.
+    - **#10, FIXED - wording.** A missing slot reads "2023-Q3: no longer
+      a period of its schedule (it was dated 2023-08-01)". A refusal-only
+      pass no longer says a recorded result is red, though its exit status
+      still does. The banner lost its stray comma. The notice names
+      `contract/data-asset.yaml` for the timezone.
+    - **#11, FOR KEITH:** a refusal exits 1, the same as red data.
+
+147. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-169 as built (before its first commit)** - overnight
+    #3; report saved in the session's reviews/2026-10-11-critic-169.md.
+    Fixed in the same commit as the build, each with a test that failed
+    first (tests/test_correction_trial.py `TestCriticFindingsOn169`):
+    - **F1 HIGH, FIXED - a moving supply's old verdict was dropped,** so
+      the summary said 0 verdicts changed while five On time supplies would
+      become late. A move now carries both; it is counted and reads
+      "2023-Q3 (On time) -> 2023-Q2, late".
+    - **F2, FIXED - "a person put it there" was guessed** from the base
+      agreement's answer, which called an agreement-refused hold a person's
+      and could propose moving a person's re-file. It is now read from the
+      record: refiled_by, and whether that decision was the rule's.
+    - **F3, FIXED - a rejected supply was not blocked, and a held one read
+      as an ordinary re-file;** refiling.plan refuses both. Rejected is
+      blocked naming the remedy; held reads "placed into".
+    - **F4, FIXED - a working copy part-way through an edit crashed the
+      Calendar entry and draft-correction said "nothing to declare".** Both
+      states are now read through the agreement loader and refused in words.
+    - **F5, FIXED IN PART - wording:** values print as YAML, not Python;
+      the summary says gained / lost; a multi-line blocked reason stays in
+      its bullet. LEFT: a superseded version is not marked as superseded,
+      and the report does not mention a target period already filled or a
+      period left empty by a move.
+    - **F8, FIXED - recorded facts that could not be read were a footnote.**
+      Only a schedule that cannot be built is footnoted now; a database
+      error refuses (criterion 9).
+    - **F9, FIXED IN PART:** before a dataset's agreement starts, it "owes
+      nothing yet"; the Calendar entry reads the working copy fresh. LEFT:
+      "applied" means a verdict names the correction, so a correction that
+      changes no verdict reads pending until REQ-PIPE-170 records one; a
+      blank or Ctrl-C date means today.
+    - **F10, FIXED IN PART:** draft-correction asks for a reference only
+      when something needs declaring. LEFT FOR KEITH: one entry per owner
+      (the gate prints one per item); may_approve uses calendar.yaml's
+      owners even for a timezone correction.
+    - **F6, FOR KEITH:** a change to a daily feed's due time lists every
+      slot to 400 days ahead - about 1,800 lines - and that horizon moves
+      with the day it is run.
+    - **F7, FOR KEITH:** a timezone correction shows both instants in one
+      zone; showing each in its own would say what changed.
+    - **Found by the gate, not the critic:** two test modules shared the
+      supply id `s` on cp-clients, and a delivery record is written once,
+      so whichever ran first fixed the other's receipt instant - three
+      failures in tests/test_recorded_arrival_classification.py. Both new
+      modules now use their own id (test_agreement_drift.py had the same
+      latent clash).
+    - **For REQ-PIPE-170, from the same review:** trial() takes a base and a
+      working state, so 170 must rebuild the pre-correction state from git;
+      nothing records which correction caused which change, which 170 c2's
+      "grouped by correction" needs; and _blocked should share refiling's
+      rules rather than mirror them.
+
+148. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery
+    critic on REQ-PIPE-170 as built (before its first commit)** - overnight
+    #3, into Saturday morning; report saved in the session's
+    reviews/2026-10-11-critic-170.md, with the critic's own probes kept
+    beside it. Fixed in the same commit as the build, each with a test
+    that failed first (tests/test_correction_apply.py
+    `TestCriticFindingsOn170`):
+    - **D1 CRITICAL, FIXED - a correction declared on several owners was
+      applied for the first owner only, then marked done.** The gate
+      makes each changed item be declared on its own owner, so one
+      reference can span a calendar and its datasets. Entries sharing a
+      reference are now one correction.
+    - **D2, FIXED - holding a promoted supply left its period reading as
+      promoted by it.** qa.slot_holds compared a re-file's slot with `=`,
+      which a re-file naming no target made NULL. Now IS NOT DISTINCT
+      FROM. Schema 36 is not yet pushed, so the sandbox had the DDL
+      re-applied rather than a version bump.
+    - **D3, FIXED - keeping a held supply named the wrong period and
+      cleared its hold.** A keep never resolves a hold; a held supply is
+      kept held, naming the period it was not placed into.
+    - **D4, FIXED - a supply held once before was not held again** (one
+      hold row per supply). supply_holds.raise_again reopens it.
+    - **D5, FIXED - a keep barred the supply from automatic promotion.**
+    - **D6, FIXED - a kept supply's re-judgement was neither shown nor
+      keyed.** Each move now shows its verdict if kept.
+    - **D8, FIXED - the applied summary said "Nothing was recorded".**
+    - **D9, FIXED - with two corrections pending, moves were judged with
+      the later one in force too.** The confirmation runs under this
+      correction's own agreement.
+    - **L1, L2, L3, FIXED:** a missing promoted table refuses; the
+      terminal says when corrections cannot be read; a clearer "already
+      applied" message.
+    - **D7, FIXED IN PART:** a correction-held supply's advice now says
+      promote, which works. FOR KEITH: a supply a confirmed correction
+      moved or held is recorded as a person's re-file, so a LATER
+      correction treats it as a person's and does not propose moving it
+      back. Should a correction's moves count as the rule's?
+    - **J1-J4, FOR KEITH:**
+      - J1: a held supply placed by a confirmation is recorded as the
+        rule's, naming the asset manager;
+      - J2: the list is the preview's report, not the filing menu's
+        warning panel;
+      - J3: a blocked move must be KEPT to confirm the rest, so its
+        correct move is then lost for good;
+      - J4: ties in "oldest first" go by file order (calendars, then
+        datasets, then the timezone).
+    - **Gate history:** none of these came from the gate. The first full
+      gate on this build was stopped part way when the critic's report
+      arrived, because the fixes would invalidate it.
+
+149. **[done, 2026-10-11]** **[Dashboard UI]** **The delivery critic on
+    REQ-DASH-172 as built (before its first commit)** - overnight #3,
+    Saturday morning; report saved in the session's
+    reviews/2026-10-11-critic-172.md, with the critic's probes beside it.
+    Fixed in the same commit as the build, each with a test that failed
+    first (tests/test_dashboard_corrections.py `TestCriticFindingsOn172`;
+    tests-js/corrections.test.js "delivery-critic on 172"):
+    - **#1, FIXED - ruff failed on the new test file** (F811 on fixtures
+      imported by name). The gate would have gone red; now bound by name.
+    - **#2, FIXED - a supply kept HELD was never shown** (no run, so no
+      row). Listed on its dataset now.
+    - **#3, FIXED - the asset-wide pending-correction item named datasets
+      as bare ids.** It carries them as links.
+    - **#4, FIXED - a keep's correction was parsed back out of its reason**,
+      and so misread for a reference with a colon or a space. Found
+      underneath it while fixing: one supply kept against two corrections
+      mapped both keeps to the newer one. The keep's own decision id now
+      travels in the applied record and is what the page maps by.
+    - **#5, #9, #10, FIXED - wording.** "1 supply' punctuality" fixed. The
+      row reads "re-judged <date> by correction <ref>" as criterion 7 has
+      it, because "re-judged on time Sunday" read as a time of day.
+      Several awaiting corrections now read in the plural.
+    - **#6, FIXED - an awaiting state that could not be worked out was an
+      empty all-clear.** Said on the page and in the build output now.
+    - **#7, FIXED - corrections sit outside the activity panel's 30-entry
+      cap**, so thirty publishes cannot push one out. The panel's intro
+      names them.
+    - **#8, FOR KEITH:** a supply a correction MOVED gets no "at the time"
+      note and is not counted in the past-date note, because its new
+      verdict comes from its new filing rather than a re-judgement naming
+      the correction. Does "re-judged" include moved?
+    - **Found by the tests, not the critic:** the activity feed now reads
+      applied corrections, so the confirmation tests' leftovers appeared in
+      test_embed_dashboard_data.py's feed when run on the same worker. The
+      confirmation tests now clear the table when they finish.
+    - **Found by CI on 0d3af2e (REQ-PIPE-170's push), not the critic:** the
+      same write-once delivery clash as #147, in a third module.
+      tests/test_verdict_record.py filed cp-clients supply `s` at 1 Aug 2023
+      12:00 Perth, and test_recorded_arrival_classification.py read that
+      receipt on the same worker - three failures in the no-deployment half.
+      Renamed to its own id. The pattern is now in three modules; the root
+      is filing_support's delivery name `pytest-<dataset>-<supply>`, written
+      once and never updated, which a test choosing its own receipt instant
+      cannot see.
+    - **Found by the full gate, not the critic:** test_excuse.py's
+      markup-reason test (#145's #9) went red once this sprint's tests
+      wrote later-dated cp-clients decisions on the same worker. `supply
+      decisions` lists the newest twenty by when they took effect, so the
+      excuse fell off the end; the test's loose `"see" in output` fallback
+      had been hiding that the table also wraps at eighty columns. The test
+      now asks for the whole log on a wide console and looks for the exact
+      reason. The command itself is right - a reader wants the newest.
+
+150. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery critic on
+     REQ-PIPE-181 (collection participation_defaults and inherit).** The
+     resolution held up - one function, value by value, and no consumer
+     still reading a raw dataset version. The holes were in the gate's
+     wording of what inherit would do. Each fix below has a test in
+     tests/test_collection_defaults.py `TestCriticFindingsOn181`, failing
+     first.
+    - **F1 (high):** a collection's `participates: inherit` silently widened a
+      dataset that named its collection's own calendar explicitly - the
+      affected list excluded any dataset with a `calendar:` key at all.
+      Now it excludes only a dataset on ANOTHER calendar.
+    - **F2 (Keith's call):** inherited months could not be written without
+      restating the old `reason:`, which was then ignored. Keith: the reason
+      belongs to the months, so it comes with them - exempt from the
+      restate rule beside `participates: inherit`, and refused if written
+      there. His question first ("aren't there other properties we'd want a
+      reason for?") is answered on the requirement: every version's
+      changelog line already says why it changed.
+    - **F3:** the restate refusal offered `participates: inherit` where the
+      widening rule would refuse it. Not offered there now.
+    - **F4:** the claim-window offer said "the calendar's" where the
+      collection states one for part of the window. It names both now.
+    - **F5:** the collection's widening error left out a dataset that stated
+      months once and inherited later. Named now.
+    - **F6 (Keith's call):** the once-only report fired with no collection
+      defaults at all, and for datasets on another calendar. Now only where
+      the collection's defaults could be the fix.
+    - **F7:** the calendar level showed no "since" date, and a later calendar
+      version's window was never shown as a change. Both are now.
+    - **F8:** the Calendar entry crashed on a dataset with no participation.
+    - **F9:** `Inherit` in the wrong case read as a broken duration; it is
+      named as a miscased keyword now. A collection correction no longer
+      lists datasets on another calendar as affected. The drift attribution
+      to a collection item is covered.
+    - **Found by the critic, not about 181:** tests/test_correction_apply.py's
+      `test_d2` went red at 09:00 Perth on 11 Oct - its promotion was written
+      at the database's `now()` and the correction confirmed at a fixed
+      09:00 that morning, so once the wall clock passed it the promotion read
+      as newer. A fixed instant now, which is the same lesson CLAUDE.md
+      records for daily datasets: never mix the real clock with a fixed one.
+    - **Found migrating Child Protection, not by the critic:** a drafted
+      correction's `old:` wrapped a long reason at eighty columns across
+      lines, at an indent that could not be pasted. One line now, however
+      long. And a dataset naming a calendar that does not exist got three
+      follow-on errors beside the one that mattered, once it took nothing
+      from its collection; it gets the one again.
+    - **The migration itself (Keith, (v)):** Child Protection's 09:00 and 8h
+      are stated once on the collection, by declared correction
+      REQ-PIPE-181 on each dataset, previewed first: no slot moved and no
+      verdict changed. It now reads as PENDING on the dashboard and in the
+      pass until the asset manager confirms it with `mothman supply
+      confirm-correction REQ-PIPE-181` - which is Keith's to do, not this
+      session's. Correction-mechanics tests now build their base with the
+      real file's own corrections removed, since a real pending one is not
+      their subject.
+    - **Found by CI on 94f1ea6 (REQ-DASH-172's push), not the critic:** four
+      unit tests of the changelog merge went red in the deployment half -
+      the feed now also reads applied corrections from the database, and a
+      fresh worker database has no qa schema. Green locally because an
+      earlier module on the same worker had created it; reproduced by running
+      the module alone. The tests stub that read now, and one more asserts an
+      applied correction is listed outside the thirty-entry cap.
+
+151. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery critic on
+     Keith's backstop answers (f)-(i) (commit 01a7a53, REQ-PIPE-173).** Run
+     after the push, as the new commit cadence has it; every fix below is
+     its own commit, each with a test that failed first.
+    - **1 (high):** beside another blocker a refusal left the last verdict
+      showing as current, and the refusal's OWN hold counted as "another
+      blocker" - two banners for one cause. Holds now carry
+      `agreementRefused` in the blocker export, the rollup ignores those
+      when looking for another blocker, and a refusal blanks the checks
+      either way.
+    - **2 and 3 (high, medium):** a re-evaluation is owed under its WRITER
+      but runs its READERS, and the freeze checked the writer. A refused
+      reader ran and its item was cleared, so nothing re-gated it later; a
+      refused writer froze readers that were not refused. Now each reader
+      is checked in knock_on.complete: refused readers wait, the rest run,
+      and the item stays owed while any waits.
+    - **4 (medium):** an arrival left ungated by the freeze made the pass
+      raise "its gate outcome was not recorded" - exit 2, and its whole
+      collection held back. It is now `left_frozen`, said in the summary,
+      and holds back nothing.
+    - **5:** check-agreement exited 3 when one dataset could not be checked
+      and another was refused; it is 2 now, as the pass ranks them.
+    - **6:** the pass summary counted waiting owed items as run; it says
+      what waits on a refused dataset now.
+    - **7 (Keith's call, 2026-10-11):** under a refusal alone, an exhausted
+      schedule and an unmarked no-supply gap disappeared. Both stay in view
+      beside it now.
+    - **8:** `from` used only the recorded date, so a period a change moved
+      EARLIER showed without its refusal for the dates between. It is the
+      earlier of the recorded and current dates.
+    - **9:** three older decisions on REQ-PIPE-173 and a pass comment still
+      described the old behaviour; marked superseded or settled.
+    - **Not done, noted:** the "not expected" wording is chosen by searching
+      a message's text (a structured flag would be safer); the backstop's
+      "an unevaluable check refuses nothing" fails open in three places, as
+      filing's documented choice does; each rule gate re-reads both YAML
+      files. Keith also confirmed two PROVISIONALS the same morning: a
+      person's own promotion of a refused dataset stands, and the exit
+      order is failure (2) > refused (3) > red (1).
+
+152. **[done, 2026-10-11]** **[Pipeline & publishing]** **The delivery critic on
+     the parked correction moves (1af4eff, REQ-PIPE-170 criteria 19, 25-29)
+     and the range excuse (7c511e5, REQ-PIPE-161 criteria 20-21).** Run after
+     the push; every claim was checked against the code, most by the critic's
+     own runs, and each fix below had a test that failed first (finding 9's
+     passed already and stays as a guard on the replacement).
+    - **1 (high):** one parked move that could not be carried out - its
+      confirmed period gone - raised out of the drain, failing every pass and
+      stranding every later parked move. Each is now tried on its own; a
+      refusal is said and leaves it parked.
+    - **2 (high):** a parked PLACEMENT never asked whether its confirmed
+      period still exists, and filed a held supply into 2023-Q9. The drain
+      now checks the period first, for every shape.
+    - **3 (medium):** a move carried out from parked got no "moved by
+      correction" note on its history row - the note read only the applied
+      record, written at confirmation. pipeline/corrections.py now reads the
+      resolved parked moves too, the verdicts either side from the filings
+      around the move's own decision; the activity feed counts parked moves.
+    - **4 (medium):** a supply a person moved while it was parked still read
+      "the next processing pass moves it" on the outstanding list, and a keep
+      recorded the period it was parked FROM. The item now says where it is
+      and offers only the keep; the keep records where it is now.
+    - **5 (medium):** `corrections --reference` on a confirmed correction
+      with parked moves refused as "already applied" when something else was
+      pending, and any reference - even an unknown one - listed every parked
+      move when nothing was. A confirmed reference now shows its own parked
+      moves, and an unknown one is refused either way.
+    - **6 (low-medium):** a keep made while parked was not in the applied
+      record, so its reference came back through the prose regex and a
+      reference with a space was lost. The resolution's decision id now maps
+      it, as a keep at confirmation is mapped.
+    - **7 (Keith's call, 2026-10-11): AS AT ITS CONFIRMATION.** The drain
+      reverts every later correction not yet confirmed, as confirm() does,
+      rather than using the agreement on disk.
+    - **8 (low):** the agreement backstop failing open let the drain go ahead
+      for a dataset nobody had checked. The drain now waits for a pass that
+      read the backstop, and skips a dataset it could not check.
+    - **9 (low):** the move's decision id came from max(id) for the supply.
+      It is now handed back by whatever wrote the decision.
+    - **10 (low):** keeping several parked supplies is one transaction, all
+      or nothing; --acknowledge/--output on that route are said to be
+      ignored. NOT FIXED, said here: a supply parked under two corrections
+      is moved by the first drain and the second then reads it as moved by a
+      person - left parked and said, which is safe.
+    - **On REQ-PIPE-161:** criteria 20 and 21 met, verified end to end by the
+      critic. Its decision's "excusing one by name is still open" read as
+      "not yet possible"; it is possible, and now says so, with a test.
+
+153. **[done, 2026-10-11]** **[QA checks & contract]** **[Data generation]** **The
+     delivery critic on the band catalogue and declared columns (3115cdd,
+     1e6e329, REQ-GEN-183) and the postcode tolerance (defc2ec, REQ-QAC-187).**
+     Run after the push; every claim was checked against the code before
+     acting, and each fix had a test that failed first. REQ-QAC-187 was met
+     in full. Its criteria 6 and 7 are only partly asserted: dbt's warning
+     and the other tools at 5% agree on a read but are not each tested.
+    - **1 (medium-high, Keith's call):** grouping by column merged rules
+      that only shared a column - escalation completeness with
+      notification_id's nulls, carer reference with approval compliance,
+      four file checks in one - and split one rule dbt states at table
+      level. Keith chose "same name, else column": checks sharing an
+      authored name are one rule. A name only one check holds is still its
+      own rule, which is what separates the file checks; recorded as a
+      decision. Soda's escalation check gained the name its siblings carry.
+    - **2 (medium):** the listing said "fails on any" for every single-tier
+      check, hiding the contract's 3% postcode tolerance among others. It
+      now prints each tool's bound, and "on any" only where that is true.
+    - **3 (medium, not yet triggered):** dbt's `unique` summing n_records
+      counts rows in duplicated groups; Soda and the contract count keys.
+      It is now a measure of its own.
+    - **4 (medium-low):** Soda compares a percentage rounded to two places;
+      the catalogue now does too. Simulated with Soda's formula, not a run.
+    - **5 (medium-low, not yet triggered):** dbt defaults warn_if to `!= 0`,
+      so a test with only error_if warns below it. Modelled; criterion 3
+      reworded to match (Keith approved the wording, 2026-10-11).
+    - **6 (low):** a size band nothing fails above had an invented upper
+      edge; it now reads "N and up".
+    - **7 (low):** two contract SQL checks declared a key their
+      `SELECT COUNT(*)` never reads; removed.
+    - **8 (low):** Soda reference checks were missing from the parent
+      column's single-tier readers; derived from the expression now.
+    - **9 (low):** the listing ran past 80 columns, wrapped to column 0,
+      cut ids to their last segment and printed four bare "file" rows. It
+      wraps itself, indents continuations, names another table's checks
+      with the table, and heads a named rule with its name.
+    - **10 (low):** the decision said a JSON-string reads_columns was read
+      like changelog's; the parser refused it. The parser now matches the
+      decision rather than the decision being rewritten.
+    - **11 (low):** four silent defaults now refuse, naming what. One was
+      live: the Evidently row-count checks are named row_count_growth and
+      reached their bands only through the default.
+    - **12 (low, not fixed):** the page prints "fail > 3.00%" for a rule
+      that fails at exactly 3%. Existing convention, older than this work,
+      and noted on REQ-QAC-187.
+    - **13 (low):** the old provisional grouping decision is marked
+      superseded; criterion 3 reworded (5 above).
+    - **14 (low):** the gate is `mothman dashboard validate-reads-columns`,
+      and `mothman check` calls that.
+    - **Checked, not a finding:** no band the generator aims at moved -
+      compared against HEAD's code - so the generated history is unchanged.
+
+154. **[done, 2026-10-11]** **[Data generation]** **The delivery critic on
+     REQ-GEN-184 part A, ordinary ambers built to read amber (1010828).** Run
+     after the push. Every claim was checked against the code before acting,
+     and each fix had a test that failed first (finding 1's on what the
+     generator WROTE: 3 ambers against 6 drawn).
+    - **1 (high):** the ambers moved out of the hold era were moved at
+      import, blind to the injected scenarios - onto TS-2's emptied day and
+      its own injected day, where the generator ignores the drawn severity.
+      Birth Registrations generated 3 ordinary ambers where 6 were drawn
+      (and 5 before this work). The plan now moves an amber off any period
+      that cannot carry one - held, injected or emptied - in `main()`, where
+      the injections are known, in both collections; the count generated
+      equals the count drawn, and an amber drawn onto an injected period is
+      moved rather than lost. The injected periods also got their own drawn
+      sizes back.
+    - **2 (high):** the measurement said "eight ordinary ambers" where six
+      are drawn. Re-measured after this fix and corrected on REQ-GEN-184.
+    - **3 (medium, Keith's call):** building every amber at 2,049 rows made
+      the CLEAN supply after it drop 12-16% and warn - ambers in the history
+      for a reason that is not the rule being shown. Keith chose the size of
+      the supply before it: asked for at that size and trimmed to it
+      exactly, single-birth rows only, so no twin loses its sibling.
+    - **4 (medium):** the module said it kept every column a single-tier
+      check reads passing; it protects twins, which today is the same thing.
+      Reworded to say exactly that, and that the general guard is part B's.
+    - **5 (low):** `outside_hold`'s falsy-setting guard was dead -
+      resolution raises rather than returning nothing. Removed.
+    - **6 (low):** the red-positions test now asserts positions; the two
+      untested refusals are tested; too few postcodes refuses as a target
+      error rather than numpy's; the hold era's comment in
+      contract/data-asset.yaml says no ordinary amber lands there now (a
+      comment beside the dated entries, which are left as written); the
+      rewritten page test's unused value is gone.
+    - **Noted, not a finding:** the critic's first runs used the default
+      test database name and may have dropped another session's scratch
+      database - test data only.
+
+155. **[done, 2026-10-11]** **[Data generation]** **The delivery critic on
+     REQ-GEN-184 part B, injected targets (796b537).** Run after the push;
+     every claim checked against the code before acting, and each fix had a
+     test that failed first.
+    - **1 (high):** a targeted resend is churned before it is targeted, and
+      churn voided a twin about four times in ten, so a green resend could
+      read red. Fixed at the source in 8070c58 (running-thoughts #82,
+      Keith: void singles only); the new test fails against the old churn.
+    - **2 (medium-high):** the twin flag was a lever - a red target that
+      picked it wrote NA into a boolean column and crashed mid-generation,
+      after the old history was cleared. It is never a lever now, refused
+      up front naming why.
+    - **3 (medium):** every same-column single-tier check was treated as
+      safe, including a uniqueness check a fill can break and a check that
+      also reads another column. Narrowed: own rule, a value check reading
+      that column alone, or the named sibling rule.
+    - **4 (Keith's call):** criterion 3's "an amber band in every tool"
+      admits no rule read literally. Reworded to the catalogue's meaning,
+      in wording Keith approved.
+    - **5 (low-medium):** the ordinary amber plan could still refuse after
+      the old history was cleared. Planned before the clear now.
+    - **6 (low):** green left no margin on a lever sitting exactly at its
+      bound. It leaves one on every lever.
+    - **7 (low):** the record's key was `verdict`; it is `built_to`. `was`
+      is the count before any change.
+    - **8 (context, not a defect):** a clean supply after a missing period
+      reads gap-red whatever its rows - REQ-GEN-185's lead-in is the answer.
+    - **Not fixed, noted:** several refusal branches stay untested by line
+      (the critic listed them); each raises a TargetError naming why.
+
+156. **[done, 2026-10-11]** **[Data generation]** **The delivery critic on
+     REQ-GEN-185, lead-ins (19735c6).** Run after the push; every claim
+     checked against the code or the database before acting. Five of eight
+     criteria met outright; the findings, and what happened to each:
+    - **1 (medium-high, Keith's ground):** TS-43's hold could not be seen.
+      The scripted promotion came five hours after receipt, the hold lasted
+      an hour, and in-place-on chooses by day - so SCENARIOS.md said to look
+      at 09-05 and the page showed it promoted. The promotion now comes at
+      10:00 the next morning, before that day's 14:30 supply; checked on the
+      real page, 09-05 shows TS-43 waiting for a decision and 09-06 shows it
+      promoted. The register's config line says so.
+    - **2 (medium):** a lead-in was not on time - its receipt came from the
+      rows' earliest extract, so 09-16 arrived 16:55 and was recorded late,
+      and three more were early or late. Every lead-in and following supply
+      now arrives halfway through its grace; the test that only compared
+      dates now checks the window, and failed first. The arrival golden
+      moved by exactly those four.
+    - **3 (medium):** a scripted decision was recorded at the next arrival's
+      receipt, not when it took effect (REQ-PIPE-081 criterion 28), so the
+      page said a person decided TS-43 the next afternoon. The replay clock
+      is now anchored at the decision's own instant.
+    - **4 (medium, Keith's call - "Spread 1h-4h"):** capping the old lag at
+      the claim window put 25 of 33 promotions at exactly four hours. The
+      lag now spreads across the window: 32 rule promotions at 31 different
+      lags. Built "in a replay only" first, as the option Keith picked said,
+      and taken back: the terminal and Lambda routes invent the same lag for
+      a past-dated receipt and REQ-PIPE-086 criterion 11 needs the three to
+      agree, which tests/test_kept_routes_agree.py caught. The critic's
+      live-path point - a late live pass stamps its decision before its gate
+      ran - predates the window and is with Keith (running-thoughts #83).
+    - **5 (requirement claims):** REQ-GEN-184 criterion 10 amended in
+      wording Keith approved (a red may move, the count kept); its stale
+      amber-landing decision superseded; REQ-GEN-185's decisions corrected
+      - reds are moved, not gone; eight ambers, seven in August and one on
+      09-19; TS-44's lead-in follows a promoted supply, not a green one.
+    - **6 (low):** three refusal paths had no test. Each has one now, and
+      the ordinary-red refusal names its period.
+    - **7 (low):** nothing tied TS-43 to TS-46 to their setting eras. A test
+      now does, and checks every scripted decision on a planted scenario
+      comes after the claim window.
+    - **8 (low):** Child Protection half-supported lead-ins. A targeted
+      Child Protection injection is now refused up front, naming why.
+    - **9 (low):** the calendar-move pin's allowance for earlier days is
+      scoped to Birth Registrations.
+    - **10 (low, not a defect):** "gap reds 28 became 21" and the critic's
+      26 count different things - 26 results carry a gap note, five of
+      which measured red anyway. The evidence now says both.
+    - **11 (low):** `targeting` imported once at module level; the
+      redundant green line's comment corrected.
+    - **Edge from criterion 5:** a scenario whose own suppressed day covered
+      its own lead-in was accepted and lost the lead-in silently. Refused.
+
+157. **[done, 2026-10-11]** **[Data generation]** **[Pipeline & publishing]**
+     **The delivery critic on REQ-GEN-186 (8e2bada).** Run after the push. The
+     comparison logic holds: the critic re-ran it read-only over the 26
+     targeted supplies and all agreed, and the gate's reading is what makes
+     2026-08-28's ordinary amber read amber rather than red. FIXED the same
+     evening, each with a test that failed first: 1, 2, 3, 6, 7 and the
+     coverage gap; 4 answered by Keith and recorded. Noted, not changed:
+     5, 8 and the code-quality points.
+    - **1 (medium-high, checked):** the TUI's bootstrap menu (`cli/app.py`
+      `_bootstrap_menu`) never reads `result.disagreements` and prints
+      "Ready" in green over a history where a supply read wrong. Only the
+      CLI command fails. FIXED: one message (`cli.pipeline.
+      disagreement_message`) both callers give; the TUI prints it in red
+      instead of "Ready".
+    - **2 (medium, Keith's call):** `mothman pipeline run` regenerates
+      (the trial runs) and replays both collections, but never compares
+      after the replay, and can publish. Keith: compare there too. FIXED:
+      it compares after the replay, still builds the local dashboard so the
+      disagreement can be looked at, and fails before any snapshot or
+      publish.
+    - **3 (medium, checked):** `resume` regenerates, and so runs the trial,
+      BEFORE it switches `MOTHMAN_SUPPLY_DSN` to the resume's own database.
+      A trial writes and then discards a run, schemas and load outcomes in
+      the database the user was pointed at, which resume promises never to
+      write to, and outside any pass lock. FIXED: resume generates with
+      `trial=False` - it compares after its own replay anyway.
+    - **4 (Keith's call):** REQ-GEN-043 criterion 7. A QA module
+      (`bootstrap.targets_agree`) now reaches the bookkeeping through
+      cli/ and generator/. The static guard checks names, not the call
+      graph. What c7 protects (filing from a declaration) is untouched -
+      the read only feeds an after-the-fact comparison - but it is a read.
+      Keith: acceptable, record why. Recorded on REQ-GEN-043, and
+      tests/test_arrivals.py now names the three modules allowed to reach
+      it and fails on any other.
+    - **5 (low-medium):** `after_replay` compares a supply's current run,
+      which excludes `readers` runs, while the knock-on re-gate reads
+      `supply_status.latest_results` across every run. No targeted supply
+      has more than one run today. A third way of answering "a supply's
+      results", which the requirement's own decisions warn against.
+    - **6 (low):** an ordinary amber that warned on nothing, or a quiet
+      verdict, gives a message naming no checks (observability NFR). FIXED:
+      a quiet verdict names its quiet checks, and a supply better than built
+      with no rule named says "no check warned".
+    - **7 (low):** on a trial failure, the scenario placements, the
+      rewritten SCENARIOS.md and a previous generation's Child Protection
+      deliveries stay; a `ValueError` from targets.py escapes as a
+      traceback, and after a replay only once the bootstrap has finished.
+      FIXED: the trial now runs before the scenario map is written, so a
+      refused history leaves SCENARIOS.md alone; a record that does not add
+      up is a disagreement in one line on both paths. The placements and a
+      previous generation's Child Protection deliveries still stay - the
+      generator rewrites both on its next run.
+    - **8 (low, note):** the trial skips the row-count-growth check, so it
+      cannot see a volume target. Consistent with "a verdict probe".
+    - **Coverage:** no test fed recorded results that DISAGREE to
+      `after_replay` - one does now. `targets_agree`'s body is stubbed in
+      every bootstrap test, and no test completes a resume through
+      `bootstrap.resume`; still true.
+    - **Code quality:** `target_agreement.py` uses private helpers of
+      promotion and qa_results_reader, and `responsible()` repeats
+      `status_of`'s per-record mapping.
+
+158. **[done, 2026-10-12]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **The delivery critic on REQ-PIPE-188 to 191 (26f1f8f).** Run after the
+     push. No defect changed a recorded verdict: the critic cross-checked every
+     declared check against what each tool can select (0 mismatches across both
+     collections and all three scoped tools) and read the real database
+     read-only (readers-only runs asked for 1-2 checks a tool). Three findings
+     were Keith's, the rest fixed without sign-off; each defect fix has a test
+     that failed first.
+    - **F1 (medium, Keith's call):** a missing check inside a knock-on
+      (readers-only) re-evaluation was caught by `knock_on.complete`'s
+      catch-all, left owed and retried while the batch carried on - against
+      criterion 6's "refuse the run and stop the batch". Keith: stop
+      everything. FIXED in `knock_on.complete` AND, found checking the
+      callers, in `recheck._run_claimed`'s full re-check, which had the same
+      catch-all: left owed, then `MissingCheck` re-raised. The processing
+      pass still catches per stage by design (REQ-PIPE-152, "reported, left
+      owed"), so there it fails the owed-work stage, as an arrival's own
+      refusal already did. Criterion 6's wording stands as signed.
+    - **F2 (low-medium, Keith's call):** a Child Protection run whose supply
+      has no period was asked for a scoped subset but never guarded. Latent:
+      all 9 such runs had an unreadable own table. Keith: guard them too.
+      FIXED: guarded wherever the tools ran; with no period there are no
+      not-evaluated rows, so a check reading an unreadable table, or one a
+      tool said it left out, is excused (`orchestrate_cp._excusing_unreadable`).
+    - **F3 (low, Keith's call):** an empty ask left no row in
+      `qa.asked_check`, so "no rows" could mean either "not invoked" or "asked
+      for nothing", against criterion 8. Keith: a marker row. FIXED:
+      `qa.asked_tool`, one row per run and tool invoked, with `asked_check`
+      hanging off it; schema 39, so every database rebuilds once more.
+    - **F4 (low):** Child Protection's `_check_id_for` claimed two Birth
+      Registrations singular tests, against `names_by_check_id`'s contract.
+      Harmless today (selection only looks up Child Protection ids). FIXED: a
+      node with no Child Protection table is not Child Protection's.
+    - **F5 (low, test quality):** a test asserting `SCHEMA_VERSION == 38`
+      (red the moment work succeeds, CLAUDE.md's rule 4) - removed with the
+      bump; two constant-only tests and one that could not fail on its own -
+      deleted; a leftover debug print loop - removed; the scoped path end to
+      end through the orchestrator - now asserted (the no-period test drives
+      a table-named run and checks each scoped tool was asked for a strict
+      part of the collection); Birth Registrations' three empty-ask branches
+      - now tested. NOT DONE: proving dbt's own builds reuse the partial
+      parse, which `--quiet` hides; the timing evidence stands for it.
+    - **Also fixed:** three stale comments (asked_for's SCOPED note,
+      run_datacontract_cp's "cannot be asked", `_scope_to_run`'s docstring).
+    - **Noted, not changed:** `contract_rule_models` re-parses the contract
+      each run (~23ms) - small against the saving; and the debug runners get
+      the asked-for record but no guard, since they are not runs.
+    - **Found by the gate on the fixes, both test isolation:** (a) the Child
+      Protection fixture promotes into 2026-Q1 once per module, and a module
+      that empties qa (test_qa_store) forgot the promotion but not the period
+      table, so the next module's promotion hit `cp_carers already exists` -
+      45 setup errors in this gate, and the 24 errors the baseline gate on
+      b8424c9 showed. Reproduced by running a fixture module, test_qa_store,
+      then another fixture module (6 errors); FIXED by the fixture emptying
+      its own two periods first. (b) test_not_supplied asked about cp-clients
+      2026-Q1, which that same fixture promotes into; reproduced failing after
+      a fixture module, FIXED by asking about 2025-Q1. Both pre-dated this
+      work and were made likelier by four new modules using the fixture.
+    - **And a real defect behind the one remaining gate failure**
+      (`test_later_runs_reuse_the_parse`, 4.12s / 1.59s / 4.42s: red only
+      in a full gate, never alone). dbt's own debug log
+      (`dbt_project/logs/dbt.log`, which `--quiet` does not touch) showed
+      the third run saying "Unable to do partial parsing because profile
+      has changed" with an identical environment. Cause: after every invoke
+      the worker copied the run target's `partial_parse.msgpack` over its
+      kept parse, but dbt writes none when it skips parsing, so a file an
+      EARLIER process had left in that run's target (another worker's
+      schema in its profile) was kept, and the next run parsed in full.
+      Reproduced deterministically by planting a stale file
+      (`test_a_stale_parse_left_in_a_runs_target_is_never_kept`, failing
+      first); FIXED by removing the target's file before each invoke. The
+      reuse test now observes the kept parse itself (unchanged across runs
+      that reuse it, rewritten by a forced full parse) rather than a
+      stopwatch, which also closes F5's "NOT DONE". Not measured: whether
+      the bootstrap was paying this in practice - its per-run targets are
+      removed after each run, so only a re-run over a leftover target would.
+    - **And CI was red on 26f1f8f, which this session did not check before
+      moving on** (CLAUDE.md's rule, broken: a push is not done until its
+      run is read). Two failures. (1) A REAL DEFECT of REQ-PIPE-190's: the
+      check-lifecycle gate parses the PREVIOUS commit's contract too, and
+      the new "every rule carries its ODCS id" rule refused it - so the
+      push that added the ids failed for the commit before it, and any
+      comparison reaching back past it (a merge to main) would again. The
+      old side is now read as it was (`past=True`); failing test first
+      (`test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side`),
+      and the real gate against b8424c9 fails without the fix and passes
+      with it. (2) `test_supersession`'s
+      `test_the_gate_refuses_naming_the_newer_one`, a KeyError on
+      `cp-carers` in the fast half - not reproduced; a leftover filing is
+      the likely cause, and 49a70df's isolation fixes may cover it, which
+      that push's own CI run is what settles. IT DID NOT: 5d43376's run
+      failed it again with five `test_replacement_setting` tests, all on one
+      worker, all because the agreement backstop had frozen `cp-carers`.
+      Not reproducible by running the fast half (timing decides which
+      modules share a worker), so every module was run ALONE in its own
+      database and probed for a refusal afterwards: one hit,
+      `test_schedule_ended_hold`, whose tests file `cp-carers` into slots of
+      a monkeypatched calendar and left the filings - read against the
+      committed calendar they are "no longer a period of its schedule".
+      Reproduced deterministically (that module first, then the two: 6
+      failed); FIXED by its `conn` fixture forgetting the filings each test
+      made. The sweep is the method worth keeping for this class: a leftover
+      row survives its module, so probing each module alone finds it without
+      needing CI's worker order.
+    - **The suite's size, settled (Keith, 2026-10-12: "Leave it").** Asked
+      why there are ~4,600 Python tests: 4,269 distinct test functions (800
+      parametrized cases) over 351 modules; ~69k lines of test code against
+      ~68k of product Python, about 1:1; ~2.3 tests per acceptance criterion
+      on the 167 built requirements (1,833 criteria). Offered a
+      criterion-by-criterion pruning pass, a numeric target, or a speed-only
+      pass; he parked it - "leave it in the pocket for later" - and is happy
+      for it to be proposed again. Parked as `plans/running-thoughts.md` #86.
+
+159. **[done, 2026-10-12]** **[Pipeline & publishing]** **delivery-critic on
+    REQ-PIPE-128 criterion 8 (fe59334) - the re-check warning.** Five
+    findings, each checked against the code before acting; all fixed the
+    same day, test-first where a test could show it.
+    - **M1 - pasted undo commands now refused.** Demote, substitute,
+      de-substitute and un-inherit commands carried `--yes`, but each can
+      now have consequences (the readers it owes), and `--yes` without the
+      key is refused (criterion 9). FIXED: `--yes` dropped from those five
+      commands (filing_decisions, promotion, refiling, decision_log's
+      unblock list); the pasted command now asks, showing the warning.
+      `un-supersede` keeps `--yes` - it never changes what a period holds.
+      tests/test_one_version_per_period.py's pinned command updated (failed
+      first).
+    - **M2 - a re-check promised for a decision about to be refused.**
+      INHERIT, SUBSTITUTE and their undoing were always treated as moving a
+      table, though inherit_one and substitute refuse several cases only
+      after the key check - so a person confirmed a re-check that never
+      happened. Reproduced (an INHERIT into a period the dataset
+      participates in named readers); FIXED by asking each operation's own
+      refusal: `inheritance.inherit_one_refusal()` (now the one place
+      inherit_one's three refusals live), substitution's
+      `_refuse_unless_substitutable`, and for the two undos whether the
+      period is held that way.
+    - **M3 - an assertion that could never fail.** It looked for the
+      supply id in a header that names the table. Rewritten: one test on
+      the real fixture asserts the moving decision names Placements in
+      plain terms with NO supply id, a demote of a non-holder names nothing,
+      and a refused inherit names nothing - each failed against the code
+      before its fix.
+    - **L4 - "each will be re-checked" can be untrue**: only stale readers
+      re-run, a backstop-frozen one waits. FIXED in wording: "owed a
+      re-check by this decision", which is exactly what knock_on records.
+    - **L5 - ids, not plain terms; one bullet per reader.** FIXED: datasets
+      by name and supplies by the day they arrived (REQ-GHUB-142 NFR 2's
+      rule), as ONE entry with its readers indented, and a matching line in
+      the success message. NOT CHANGED: a demote's panel saying how to undo
+      it - criterion 7's reach there is Keith's call, unchanged by c8.
+    - **Not measured**: the cost of `knock_on.readers()` per decision in
+      the TUI (two or three calls). Noted, not acted on.
+    - Also from the contested-pair scoping the same evening, **two possible
+      defects read but not yet run** (each needs a failing test before it is
+      called one): `dataset_blockers._decided_keys` may end a contest on any
+      non-refusal decision (an acknowledgement, an excuse); and
+      `filing_decisions._staged` may build the arrival key for a `#1`
+      supply with the `#1` kept, so rejecting a contested pair would move
+      nothing.
+      **The second was REAL, and is fixed**: rejecting `cp-carers@<key>#1`
+      left both files in staging (test_filing_decisions
+      test_rejecting_a_contested_pair_moves_both_files_out_of_staging failed
+      first, both tables still there); `_staged` now drops the `#n` suffix.
+      **The first is real in the code too** - `_decided_keys` counts any
+      person's decision naming the supply, an acknowledgement included - but
+      WHAT ends a contest is draft REQ-PIPE-194 criterion 5 (unsigned), so it
+      waits for Keith's sign-off rather than being decided here.
+
+
+160. **[done, 2026-10-13]** **[Pipeline & publishing]** **Two defects in
+    built contested-pair handling, found surveying the code for
+    REQ-PIPE-193 before it went back to the architect and UX reviewers.**
+    Not a critic's finding - a read-only survey of every contested-pair
+    path - but written up here because both are defects in shipped code,
+    each fixed with a failing test first. Minor under the 2026-09-25 rule:
+    each restores behaviour a signed requirement already states.
+    - **A person could promote a contested pair, putting two versions of
+      one table into a period.** Promote was offered on a pair's `#1`, and
+      the staged-table lookup returns BOTH files, so promotion moved both;
+      the second collided on the base name ("relation already exists").
+      REQ-PIPE-128 says a period holds exactly one version of each table.
+      Fixed: `filing_decisions._refuse_promoting_a_contested_pair` refuses
+      on any route while two versions are staged, naming what can be done
+      today (reject the pair; choosing one file is REQ-PIPE-193, not
+      built). Test: tests/test_filing_decisions.py
+      `test_promoting_a_contested_pair_is_refused_naming_choose_file`.
+      STILL OPEN, deliberately: the TUI still OFFERS promote on a contested
+      pair (filing_queue.operations_for) and the refusal then explains -
+      left for REQ-PIPE-193/194's UX review rather than patched now.
+    - **Any person decision closed a contest** - an excused lateness made a
+      dataset stop reading "Two files, choose one" though nothing about the
+      files had been settled (REQ-PIPE-194 criterion 7's suspicion,
+      confirmed). Fixed: `dataset_blockers._decided_keys` counts only a
+      rejection of the pair or its supersession; choosing a file joins them
+      when REQ-PIPE-193 is built. Test: tests/test_dataset_blockers.py
+      `test_a_decision_that_settles_nothing_leaves_the_contest_open`.
+    Also found, NOT fixed (each belongs to 193/194's scope, so it goes to
+    the reviewers with them): knock_on treats any `#` supply as contested
+    forever; scripted decisions resolve a contested pair to `ds@key`
+    rather than its filed `ds@key#1`; slot_state's HELD branch and its
+    "which file is the supply?" text are unreachable; the GitHub decision
+    handler has no caller outside tests.
+    **Since REQ-PIPE-193 (built 2026-10-13):** the promote refusal and its
+    test are replaced by `_refuse_on_an_open_pair`, which refuses every
+    supply decision on an open pair and names where to settle it
+    (tests/test_filing_decisions.py
+    `test_a_plain_decision_on_an_open_pair_is_refused_naming_where_it_is_settled`);
+    the queue now offers only "settle" on a two-file slot, so the STILL OPEN
+    item above is closed; choose-file closes a contest; knock_on and
+    slot_state read the resolver, and HELD is gone in favour of TWO_FILES.
+    The scripted-decision `ds@key` resolution is REQ-GEN-196 criterion 9.
+
+161. **[done, 2026-10-13]** **[Data generation]** **[Pipeline & publishing]**
+    **TS-67's scripted re-files left their QA re-checks owed - the bootstrap
+    never runs a scripted decision's re-check.** Found by delivery-architect
+    reviewing REQ-GEN-196, then CONFIRMED against the bootstrapped database
+    (2026-10-13): after REQ-GEN-195's bootstrap, `qa.owed_run` held exactly
+    five open items - all `recheck`, all TS-67's re-filed
+    `cp-*@202310121000000800` supplies, caused by the five scripted re-file
+    decisions - and every one of the 113 `reevaluate` items was cleared. So
+    the five 2023-Q4 supplies are filed there and judged early, but were
+    never QA'd against 2023-Q4 nor gated; a real processing pass would
+    have run them. Cause: scripted playback raises the decision through
+    filing_decisions.apply, which OWES the re-check (recheck.owe), but
+    nothing in the replay drains RECHECK - only processing_pass.run_all_owed
+    does, and the bootstrap's own follow-up handles REEVALUATE only.
+    REQ-GEN-195's evidence did not catch it: it checked filing and verdict,
+    not the QA run that should have followed.
+    **Keith, 2026-10-13: playback runs the owed re-checks at the decision's
+    own instant, for EVERY scripted decision** (over choose-file only, or
+    leaving them owed). This changes TS-67's history - the five supplies
+    get checked and gated - so the golden is re-captured. To be fixed
+    test-first; REQ-GEN-196 depends on it.
+    **FIXED 2026-10-13, test-first, and it exposed two more defects that any
+    real re-check would have hit** - none of them reachable before, because
+    no decision in the synthetic history had ever had its re-check RUN:
+    - **Playback discarded the re-check** (the finding above):
+      `scripted_decisions._apply` now runs the owed re-check at the
+      decision's own instant, and a re-check that does not complete stops
+      the replay as a refused decision does. Test:
+      tests/test_scripted_decisions.py `TestAScriptedDecisionsReCheckIsRun::
+      test_no_re_check_a_scripted_decision_owed_is_left_open` (failed first
+      on TS-67's five).
+    - **Every re-check of a Perth-time receipt found neither its table nor
+      its period.** `filing.received_at_of` returned the instant in UTC, so
+      the key derived from it (`...0200000000`) never matched the key the
+      supply was staged and filed under (`...1000000800`). Fixed at the
+      source: it returns the writer's own text from the receipt view, with
+      the instant as fallback. Test: tests/test_filing.py
+      `TestAReceiptKeepsItsOwnOffset` (failed first).
+    - **A re-check run crashed the Child Protection results build**
+      (KeyError: 'run_index'): `recheck.execute` recorded no run_index, and
+      the rebuild sorts every current run by it. It now carries its
+      arrival's own. Test: `test_every_run_records_its_place_in_the_history`
+      (failed first on twelve runs - TS-67's and older re-evaluations').
+    Re-bootstrapped from empty, 3m51s; the arrival golden moved five run
+    ids to `__r1` and nothing else.
+    **STILL OPEN - the third problem, its own fix next (Keith: commit, then
+    chase it):** a supply whose cross-table checks were UNRUNNABLE because
+    a sibling table was not in the period yet is not re-evaluated when that
+    table arrives. TS-67's scripted re-files land one dataset at a time, so
+    cp-clients' re-check ran before its siblings were in 2023-Q4, went red,
+    was refused promotion, and nothing re-checked it when investigations,
+    placements and carers were promoted into 2023-Q4 minutes later;
+    cp-notifications likewise ("still-failing"). Hypothesis, not yet
+    verified: an unrunnable read records no dependency, so REQ-PIPE-121's
+    knock-on never learns the supply reads those tables.
+    **FIXED THE SAME DAY, and the hypothesis was wrong.** The dependency was
+    recorded; the RULE for who re-evaluates was the fault, implemented
+    twice and narrower than the status rule both times.
+    promotion.status_of counts a cross-table check toward EVERY dataset
+    whose table it reads ("a referential check ... belongs to both"), but:
+    (a) reevaluation.plan selects checks by their DECLARED tables, and a
+    cross-table check declares only the OTHER tables it reads - its own,
+    the table of the dataset it is filed under, is implicit - so when
+    investigations arrived, the investigations-filed checks that had turned
+    clients and notifications red were never selected; (b) knock_on.readers
+    grouped the selected checks by the dataset they are FILED under; and
+    (c) the results writer's readers-only filter (`_readers_of`) kept only
+    checks filed under the reader's dataset, so a re-run notifications
+    supply had those very results thrown away. Fixed once:
+    reevaluation.reading_checks() (declared readers plus cross-table checks
+    filed under the table's own dataset) and counts_toward() (filed dataset
+    plus every declared table's dataset, minus the moving table's own),
+    used by both knock_on.readers and the writer. Tests, each failing
+    first: tests/test_knock_on.py `TestEveryDatasetACheckCountsTowardIsAReader`
+    (with the real plan() and the real shape of a declaration) and
+    tests/test_reevaluation.py
+    `TestACheckFiledUnderTheArrivingTableCountsTowardWhatItReads` (against
+    the project's real declarations). Re-bootstrapped from empty, 3m56s:
+    2023-Q4 now holds all five re-filed supplies promoted and cp-case-workers
+    inherited; the arrival golden is unchanged.
+
+162. **[done, 2026-10-13]** **[Testing & dev tooling]** **The premise gate
+    could fail on a directory it never scans.** Seen in the full gate for
+    #161: `TestTheRepositoryIsClean` failed with FileNotFoundError on
+    `data/dbt_scratch/.../dbt_target/<run>__r6`. validate_premise walked the
+    whole tree with rglob and skipped `data/` only afterwards, so another
+    test worker removing its dbt scratch mid-walk crashed the scan - a race
+    on a path the gate never reads. Fixed: the walk prunes every skipped
+    directory before entering it (os.walk). Test, failing first:
+    tests/test_validate_premise.py `TestTheWalkNeverEntersASkippedDirectory`.
+    Minor under the 2026-09-25 rule.
+
+163. **[done, 2026-10-13]** **[Dashboard UI]** **A re-filed older supply
+    became "the latest arrival".** REQ-DASH-197 criterion 3 asked for this
+    to be tested first, as the architect suspected it. It was real:
+    `promotion_state.state_for()` took the latest arrival from
+    `filing.filings_of()`, ordered by the CURRENT filing row's `recorded_at`,
+    and a re-file writes a newer row - so re-filing an older supply after a
+    newer one arrived made the older one the panel's "latest arrival".
+    Fixed by ordering on when each supply was FIRST filed
+    (`filing.filings_as_at`, a filing taking effect at its receipt). Test,
+    failing first against the old code: tests/test_promotion_as_at.py
+    `TestALaterReFileDoesNotMakeAnOlderSupplyTheLatestArrival`. A defect in
+    built code that a signed criterion already named, so fixed in REQ-DASH-197's
+    own build.
+
+164. **[todo, 2026-10-13]** **[Dashboard UI]** **A resupply awaiting a
+    decision is told it was "superseded".** Seen driving the built page for
+    REQ-DASH-197, and NOT caused by it - the rule is REQ-DASH-056's
+    `_why_not`, unchanged. Birth Registrations on 8 September 2026: a 2:57pm
+    resupply for that day's period is still awaiting a decision, while the
+    11:00 supply for the same period is promoted. The panel's reason is
+    SUPERSEDED - "a newer version had arrived for the same period, a person
+    had set it aside, or a later supply had been promoted into the period" -
+    which is not what happened: the promoted supply arrived EARLIER, and the
+    verdict line on the same page says "Awaiting a decision". The branch is
+    "its period holds another supply". For a resupply waiting to replace the
+    one in place, the honest reason is closer to "awaiting a decision -
+    it would replace the supply in place". Not fixed: it changes what a
+    reason MEANS, which is Keith's (a significant change to agreed
+    behaviour under the 2026-09-25 rule). Question for Keith: a new reason
+    for a resupply awaiting a decision, or reword SUPERSEDED to cover it?
+
+165. **[done, 2026-10-13]** **[Dashboard UI]** **Four defects in REQ-DASH-197
+    and REQ-DASH-198, from the post-build critics.** Each fixed with a test
+    that failed first:
+    - An impossible date in the URL (`from-on=2026-13-45`, `in-place-on=
+      2026-02-30`) matched the date SHAPE, so Back rendered "45 undefined
+      2026" and threw "not an instant". `isRealDateStr` round-trips through
+      Date. tests-js/standing-in-drill.test.js.
+    - The past-date notice named every decision of the change point's day
+      (a refusal about another supply printed as "changed what this date
+      shows"), and missed a late-recorded decision behind an EARLIER change
+      point. It now names decisions about the supplies the panel names, from
+      every point up to the date, plus the period's own stand-ins.
+      tests-js/promotion-as-at.test.js. No live exposure today (0 of 209
+      decisions recorded on a later day than they took effect).
+    - The drill's href copied the whole query, carrying an open side panel
+      into a middle-clicked tab. It now carries only in-place-on, from,
+      from-on and via.
+    - tests/test_dashboard_e2e.py's verdict/panel agreement test compared a
+      value with itself, so it could not fail. It now compares the rendered
+      verdict line against the run found by the panel's supply key.
+    Also: coverage for an open contest and a supersession in the change-point
+    walk (tests/test_promotion_timeline.py `TestTheWalkCoversEveryReason`).
+
+166. **[done, 2026-10-13]** **[Dashboard UI]** **REQ-DASH-197/198 critic
+    findings that were Keith's to decide, and the polish.** Keith's answers:
+    - cp-clients on 1 March 2024: the verdict line names the 2024-Q1 supply
+      (promoted into its own period) while the panel names 2023-Q4 (promoted
+      later). BOTH STAND; REQ-DASH-126's claim that the two can no longer
+      differ is corrected rather than the behaviour changed.
+    - That case gets its own heading - "The newest file is not the newest
+      promotion" / "On <date> the newest file was not the newest promotion" -
+      because criterion 8's heading said the opposite of the cell under it.
+    - A standing-in period with a newer supply awaiting: the qualifier now
+      says "<period> holds <earlier>'s supply; the results below are a newer
+      supply awaiting a decision." rather than contradicting the verdict
+      line.
+    - The drill adds a browser-history entry, so browser Back returns to the
+      date left.
+    - The date picker's help and the past-date notice reworded: "a decision
+      written down after that date still counts if it took effect by then,
+      and one that took effect after it does not."
+    Polish, minor under the 2026-09-25 rule: the drill scrolls to and focuses
+    the arrival banner (it left the reader mid-page with the banner three
+    screens up); the banner names the date left; the tooltip's who-sentence
+    is capitalised; the verdict line gives the in-place supply's receipt
+    time, not only its day. NOT DONE, recorded for later: a single
+    vocabulary for "no slot" across four blocks; the SLA tile ignoring a
+    dataset's own participation; the held card's present tense on a past
+    date; "superseded" naming its specific cause (with #164).
+
+167. **[done, 2026-10-13]** **[Testing & dev tooling]** **REQ-DASH-197's own
+    tests collided with an older module's on a shared worker.** Seen in the
+    full gate for REQ-GEN-200: `tests/test_promotion_as_at.py`'s
+    `test_a_later_rejection_reads_as_awaiting_before_it` failed with
+    `relation "carers__2" already exists in schema "rejected"`. Its
+    `_table_for` named a staged table from the supply's suffix alone, as
+    `tests/test_promotion_state.py` does, so both modules rejecting an `@2`
+    supply on one worker collided. Reproduced deterministically by running
+    the two modules together with the old helper (1 failed), and fixed by
+    naming the table from the test's own uuid dataset too (28 passed) - in
+    `tests/test_promotion_timeline.py` as well, which had the same helper.
+    A test defect, not a product one; minor under the 2026-09-25 rule.
+
+168. **[in-progress, 2026-10-13]** **[Data Generation]** **The delivery
+    critic on REQ-GEN-200 as built (c610afc).** No criterion fails on the
+    period-scoped path TS-76 and TS-77 use. Each finding below was checked
+    against the code before it was acted on. Fixed test-first, all minor
+    under the 2026-09-25 rule:
+    - MEDIUM. A substitution scoped to a SUPPLY passed validate, with or
+      without `stands_on`, and then lost `stands_on` at play time - the
+      replay asked for a substitution standing on nothing. Validate now
+      refuses any substitution that is not `scope: period`, which is
+      criterion 8 read without the qualifier the code had added.
+    - MEDIUM (tests). Every playback test pinned `_due_at`, so the instant
+      criterion 1 is about was never computed by a test. New tests hold
+      the real due instant (cp-placements 2024-Q3 is 2024-08-01 09:00
+      Perth), a real `_timed_by_period`, and `Player.before()` playing two
+      period-scoped scripts in file order once the replay reaches them.
+    - LOW. A script naming neither a supply nor a scope reached the
+      Player as a bare `TypeError` naming no scenario, because the replay
+      never calls validate. It now waits with a reason, and the end of the
+      replay refuses it by name.
+    - LOW (tests). The stood-on-nothing test would have passed on any
+      exception. It now asserts substitution's own refusal.
+    - LOW (polish). The refusal message had a double space and a double
+      full stop. Validate now also refuses a negative `after_hours`, and
+      `to_period`, `period_from` or `names_supply` on a period-scoped
+      script, which used to be silently ignored.
+
+    OPEN, not fixed, for a later decision:
+    - LOW. `schedule.date_of` looks only a year past the REAL today, so
+      `relative_period` and `_due_at` answer differently as the calendar
+      date moves. For example, `relative_period("cp-clients", "2027-Q4",
+      -1)` is None today and will be 2027-Q3 after 2026-11-01. No
+      committed script reaches that far. REQ-GEN-196's relative re-file
+      target uses the same resolver with POSITIVE offsets, so check it
+      when that requirement is built.
+    - OBSERVATION. `_timed_by_period` never compares the placement's
+      dataset with the script's. A period the script's dataset does not
+      take part in is reported as "no period N before ...", when the real
+      problem is "not this dataset's period".
+    - The refusals raised at play time do not name the script entry or say
+      what to change (NFR 8). Validate already names both for every
+      configuration problem.
+
+169. **[done, 2026-10-13]** **[Data Generation]** **The delivery critic on
+    REQ-GEN-201 as built (f16725a).** 9 of 10 criteria met. The critic
+    checked parity against the real history (read-only): all nine
+    committed scripts, each given a name, resolved through link_dates() to
+    exactly their recorded `effective_at`. Keith decided the two design
+    findings:
+    - MEDIUM, latent. A link's `arrival N` and a script's `supply N` are
+      different lists. A placement records only the supplies recognition
+      found, so one unrecognised arrival shifts every later index in the
+      replay but not in the link. Nothing hits this today. Keith chose to
+      REFUSE AT GENERATION: `check_every_index_has_its_supply()` runs once
+      run ids are read back, in both generators. He rejected keeping
+      supplies positional.
+    - LOW-MEDIUM. Names were unique per scenario, but a link looks names
+      up across the whole placement. Keith chose UNIQUE PER PLACEMENT;
+      validate now refuses one name on two siblings' decisions, and
+      criterion 3 was amended to say so.
+    Minor, fixed under the 2026-09-25 rule:
+    - every link refusal now says what to change;
+    - validate's banner names scenario links;
+    - a fractional `days` value or a bool event is refused;
+    - `generated_periods()` refuses a dataset no generator writes, where it
+      used to hand back Birth Registrations' periods.
+    New tests cover:
+    - the real periods routing;
+    - the ambiguity and cannot-be-timed branches;
+    - parity with the replay's period-scoped timing.
+
+170. **[done, 2026-10-13]** **[Pipeline & publishing]** **The
+    delivery critic and CLI UX critic on REQ-PIPE-193 as built
+    (cbccb0b).** Every claim below was checked against the code before it
+    was written here. Keith decided four (2026-10-13); the rest are minor
+    and fixed test-first.
+    - **Keith's calls.**
+      - Re-filing a settled file into a period that holds ANOTHER open
+        pair quietly superseded that pair, named only by supply id.
+        REFUSE IT, as the plain supersede of an open pair is refused
+        (criterion 25): the target prompt says why and asks again.
+      - The flag form needed `--acknowledge` for every settlement that
+        made a supply, because the line listing the QA runs counted as a
+        consequence. The runs are LISTED but carry no key; only a real
+        side effect (moved, held, superseded) needs one. The refusal's
+        "more than its own slot" and "ticket comment" wording, both wrong
+        for a terminal-only decision, go with it.
+      - A rejected file "can be promoted back" (criteria 3, 26; built
+        REQ-PIPE-075 criterion 9), but PROMOTE only looked in staging -
+        no route could reverse a rejection, a gap predating 193 that
+        refiling's own refusal also advised. FIX PROMOTE to bring a
+        rejected supply back from the rejected schema, on every route.
+      - Criterion 13 gaps, BOTH IN 193: `filing.period_of`,
+        `period_for_key`, `recorded_arrival_at` and the queue's Arrived
+        column read the arrival key, not a settled supply's own receipt
+        (the later file's runs built as "arrival unknown"; the queue
+        showed 13:30 for a 13:45 file); and holds were matched by arrival
+        key alone (latent - no BDM receipt is held today).
+    - **Defects, minor.** Displaced versions not caused by the choose-file
+      entry (criterion 8); a changed consequence refused without saying
+      what changed or asking again (18); a partial `--file-outcome` at a
+      terminal dropped the given answer (15); a refused load named by the
+      database's filename order, not Python's (file-order NFR); a spare
+      copy where the supply moves, or both files landing in one period,
+      refused only after the reason (4, 19); Back on the first file left
+      the slot, and a blank re-file target dropped the settlement (24);
+      filenames truncated in the summary table at 80-100 columns, the
+      `-resend` that tells them apart cut (3, 24).
+    - **Polish.** Unavailable options' reasons cut off; the run-owed panel
+      showing an exception class, ids and "its earlier verdict stands"
+      for a supply never judged; the pointer's "(listed first)" and
+      collection name not matching the menus; the missing-`--reason`
+      refusal using placeholders; dataset and supply ids on TUI screens;
+      grammar ("supply/supplies", "run(s)").
+    - **Fixed, each with a failing test first** (tests/test_choose_file.py
+      `TestCriticFindingsOn193`; tests/test_settle_tui.py
+      `TestCriticFindingsOn193`, `...Screens`, `TestTheTargetPrompt`,
+      `TestAChangedConsequenceIsShownAndAskedAgain`): all four of Keith's
+      calls and every minor defect above; the ruled-out options' reasons,
+      the run-owed panel, the missing-`--reason` refusal, ids on the
+      slot prompt and the not-an-open-pair refusal (which now says who
+      settled it and when). F7's file order is fixed by sorting in Python;
+      NO FAILING TEST - this sandbox's C collation agrees with byte order,
+      so the defect cannot be reproduced here.
+    - **The pointer (Keith, 2026-10-13):** the collection picker now lists
+      collections by NAME, as the pointer names them, and "(listed first)"
+      is dropped from the pointer and the criteria quoting it - it
+      described an order, not a label (tests/test_settle_tui.py
+      `TestThePointerMatchesTheMenus`, failing first).
+    - **Left, and why.** The shared decision messages' "supply/supplies" and the
+      queue's date format belong to every decision, not to 193. The bare
+      `--- <run id> ---` line before each run comes from the orchestrator,
+      which every re-check prints.
+    - **CI found two test defects after cbccb0b, both in the tests rather
+      than the product.** Three flag-form tests asserted on a Rich usage
+      panel's raw text, which CI colours (FORCE_COLOR) and wraps - green
+      locally, red on the runner; reproduced with `FORCE_COLOR=1` and fixed
+      by asserting on the unstyled, unwrapped text. And the re-file refusal
+      above made the random-day tests collide with open pairs earlier
+      tests leave in the worker's database (six repeated runs, three
+      failures); `pair_support.free_day` now picks a day whose period and
+      the next two hold none.
+
+
+171. **[done, 2026-10-13]** **[Pipeline & publishing, Dashboard UI]** **The
+    delivery critic and dashboard UX critic on REQ-PIPE-194 as built
+    (b5ca06d).** Each claim was checked against the code first.
+    - **Keith's call.** A re-filed file's link lands on its period's own
+      date, which can be before the settlement - the page there showed
+      the pair still open, under a banner saying the reader had followed a
+      re-filed file. KEEP THE DATE AND SAY SO: the banner adds "This file
+      was re-filed here on <day>; before then the pair was still waiting"
+      when the date on show is before the settlement. Rejected: opening on
+      the settlement's day (on a daily dataset that is another period).
+    - **Defects, each with a failing test first:**
+      - A. An open pair in a period that already held a promoted supply
+        read PROMOTED - the ticket said nothing was waiting, and the queue
+        offered promote, reject and supersede, each refused by the open
+        pair. The open pair now outranks every other slot state, and open
+        pairs are matched to slots by period through the resolver.
+      - B. Two files sharing one receipt instant (every multi-file delivery
+        in the bootstrap): the re-filed file's runs were found as the
+        other file's arrival, putting its row in the wrong period. The
+        build now takes the supply a run's own manifest entry states
+        (`recorded_arrival.stated_supply`).
+      - C. A settled supply's runs, dated by receipt, were in place on
+        dates before the settlement. Left out until its asset day.
+      - D. On a past date a pair open then and settled since was missing
+        from the waiting list and the cards' counts; it is put back from
+        the blocker record, which carries both ends and where to settle.
+      - E. The settler (and a rejecter) showed as a raw email on a public
+        page; now by name, through `people.display_name`.
+    - **Polish.** The blocker's own reason names each file's receipt and
+      where to settle it (the dataset page reads it on every date); the
+      label is no longer said twice; the cards count "1 table with two
+      files"; a settled supply line names its period.
+    - **Left, and why.** The settled row's Why column off-screen on a
+      phone, and Back landing at the top of the page, belong to the table
+      and REQ-DASH-198's Back for every row, not to this. Settled rows
+      accumulate above the current cycle as accepted gaps already do - a
+      30-dataset question for the supply history as a whole. "a spare copy
+      - kept, can be brought back" keeps its plain hyphen: it is the
+      wording criterion 10 quotes. A refused correction trial on the CLI
+      printing the settle form was not verified.
+
+172. **[done, 2026-10-13]** **[Data generation, Pipeline & publishing, Dashboard UI]**
+    **The delivery critic on REQ-GEN-196 as built (6c68fb8), and a defect
+    the scoper found on the same evening.** Each claim checked against the
+    code and the bootstrapped database first; 17 of 21 criteria met.
+    - **D1 - Keith's call: SPACE THE PAIRS OUT.** The seven pairs and their
+      green days made 4-18 August one solid quiet block, so three late-July
+      reds had their resends pushed past it 22 to 27 days late; one became
+      19 August's supply and TS-73's green following day read RED, sized
+      against the wrong supply. Nothing caught it: only placements with
+      TARGETS were compared after replay. Fixed three ways, each failing
+      first: every day built green is now compared (`generator/targets.py`,
+      `TestWhatWasBuilt::test_a_green_follow_with_no_target_is_still_compared`
+      - and on the unfixed history it found exactly TS-73's day); the pairs
+      sit 28 July to 25 August with ordinary days between them; and no
+      arrival may land more than ten days after its slot
+      (`TestNoResendIsPushedFarFromItsDay`). Spacing left the ordinary
+      reds no room to sit apart - seven in a row, two neighbours' resends on
+      one receipt instant, which the generator refuses - so the red mover
+      now prefers a slot with no red beside it, and the history grew to 85
+      days from 2026-06-30 (an earlier calendar version, never a moved one;
+      Keith's option allowed "more history").
+    - **D2 - the refused file was never marked "never loaded"** on the
+      settled row (criterion 16). Two causes, both fixed test-first: the
+      row never read `loadFailures`; and the blocker record took them from
+      the load QUEUE, which a rejection drains, so once settled the record
+      forgot the file had been refused (`dataset_blockers._contested` reads
+      every failed load now).
+    - **F - an open pair with one refused file was CHECKED.** The load gate
+      dropped the refused file from the run's candidates, so TS-72's
+      arrival run read the other file as a clean supply (80 checks recorded)
+      while the page said nothing is checked until a person decides. The
+      overlay now treats an open pair's staged names as its candidates, a
+      refused one included, so neither is read (`period_overlay.build`).
+    - **Scoper, 2026-10-13: a plain re-file into a period holding an open
+      pair went through**, superseding the pair and ending its contest with
+      nobody settling it. Refused now, through the same
+      `settlement.open_pair_in` a settlement's own re-file uses
+      (`TestARefileIntoAnOpenPair`, failing first).
+    - **Flaky test** (`TestASettledAwayFileIsNotTheLatestArrival`): another
+      test's SETTLED pair on the same day became the latest arrival -
+      `pair_support.free_day` avoided only open pairs; it avoids any now.
+    - **Polish:** the register and SCENARIOS.md said "on time" where the
+      pairs read early (criteria 14-16 were reworded); a "neither" pair read
+      "a supply arrived and was rejected" - now "2 files arrived and were
+      rejected", from a count in the closed-slot record.
+    - **Test quality:** the one-decision-per-pair test overwrote by filename
+      and could not see a second decision - it keeps every row now; the
+      unknown-shape refusal the NFR requires is tested; page-level tests
+      added for criteria 14, 16 and 17 (late 4:30pm, never loaded, 2 files
+      rejected).
+    - **Not changed, said so:** C9's test-first order is not verifiable
+      (test and fix in one commit); C16's en_US collation half is proven
+      only on CI; the July red cascade (resends filling neighbouring days)
+      predates this and remains Keith's call - the reds no longer touch.
+
+173. **[done, 2026-10-13]** **[Pipeline & publishing]** **A person's
+    PROMOTE checks nothing about the supply's filing or QA - a held, an
+    unfiled, or another period's supply goes into a period unchecked.**
+    SIGNIFICANT, Keith's to sign off. Found by the delivery-architect
+    reviewing REQ-PIPE-163, confirmed by a read-only audit Keith asked for
+    ("there should be no way to move things into a period and then skip
+    doing checks - check nothing else has the same loophole"). Code-read
+    and one existing test; NOT yet reproduced test-first.
+    - **The gap:** `filing_decisions._apply_one(PROMOTE)` ->
+      `promotion.promote` never reads `filing_current`, owed re-checks or
+      completed runs (nor whether the period is on the calendar). So a
+      HELD supply (no data checks at all), an UNFILED staged table, or a
+      supply FILED TO ANOTHER PERIOD can be promoted with no QA for that
+      period and no gate; the hold is quietly resolved and nothing is owed.
+      `tests/test_filing_decisions.py::test_promote_moves_the_tables_and_records_it`
+      already shows an unfiled table promoted into a period on no calendar.
+      The code even ADVISES it: `decision_log.py` ~389 ("places a held
+      supply by promoting it"), `supply_holds.py` ~210 (correction holds:
+      "promote it into the period it belongs to"),
+      `tests/test_correction_apply.py` ~272. It contradicts signed criteria
+      that were only ever enforced for the rule: REQ-PIPE-075 criteria 5, 8
+      and 17, REQ-PIPE-078 criterion 5, REQ-PIPE-064 criterion 3.
+    - **The same gap, other doors:** a GitHub `/promote` (workflow disabled,
+      code live), scripted playback, promote-back of a rejected supply into
+      a period not its filing's.
+    - **L2, the owed-re-check window:** with `decide` now leaving re-checks
+      owed (Keith, 2026-10-13), a person can promote a re-filed or settled
+      supply into its new period before its re-check runs, on old-period
+      verdicts; the re-check later finds the slot filled and does nothing.
+    - **L3, needs a test to know:** the knock-on re-gate reads the
+      period-blind `supply_status.latest_results` and does not skip a supply
+      with a RECHECK owed, so the RULE might promote a re-filed,
+      not-yet-re-checked supply through a re-evaluation.
+    - **Deliberate, not loopholes:** substitution and inheritance show an
+      earlier period's checked supply on a labelled view (REQ-PIPE-084,
+      REQ-PIPE-098); every rule route, re-file, settlement, correction move
+      and schedule-ended re-file files and owes a full re-check first.
+    - **No live harm:** the 8 holds are all outstanding; the one person
+      promotion (TS-43) went into its filed period.
+    - **Proposed fixes (Keith to decide):** (1) a person's promote refused
+      unless the supply's current filing names that period (held -> place
+      or reject; elsewhere -> re-file), in `decision_log._judge` so every
+      door gets it, plus the calendar check; and the three advising texts
+      corrected; (2) promote refused while a re-check is owed or no full run
+      completed since the latest filing; (3) L3 test-first, then knock-on
+      skips a supply with a RECHECK owed, or `latest_results` becomes
+      period-aware. Each failing first.
+    - **Keith, 2026-10-13 ~21:30: ALL THREE APPROVED.** Fix 1 now, ahead
+      of the calendar close-out (until REQ-PIPE-163 lands, a held supply
+      reaches a period only by reject or a calendar correction - accepted);
+      fix 2 yes; fix 3 test first, fix only if it reproduces. Rules for
+      manual promotion as they stand today were summarised to him from the
+      audit: identified person, reason always, supply named; refused for a
+      superseded supply, an inherited period, one file of an open pair, a
+      failed load; promote-over and removing a substitution after a
+      warning; red or amber deliberately allowed - and NO check that any QA
+      ran, which is this item.
+    - **Built, 2026-10-13, each failing first.** Fix 1 (63bd965):
+      `filing_decisions._refuse_promoting_where_it_is_not_filed`, in both
+      `consequences()` (before the reason is asked) and `apply()`; unfiled,
+      held and elsewhere each refused with what to do instead (reject or
+      correct the calendar; `--operation refile`). First tried in
+      `decision_log._judge` as proposed - it refused 147 fixtures that WRITE
+      a person's promote as history rather than make one, and the rule never
+      needed it, so it sits where only a person's route passes. The three
+      advising texts are corrected. One choose-file test had only ever
+      passed through the loophole (promoting into the delivery's own day,
+      not the day before it is filed to) and was rebuilt; `pair_support.Pair`
+      now takes its period from the real filing. Fix 2: the same place
+      refuses while a RECHECK is owed for the supply, or when its current
+      run (`supply_current_run`) completed before its latest filing - both
+      stamped on the replay clock. Fix 3: REPRODUCED -
+      `knock_on.readers()` handed a re-filed supply owed its re-check to the
+      re-gate on its old period's results. Fixed by skipping it as a supply
+      not yet run is skipped (its own re-check gates it); a REEVALUATE owed
+      is deliberately not a refusal, since it re-runs only reading checks
+      and the gate after it judges the supply's whole status. Decisions on
+      REQ-PIPE-075 and REQ-PIPE-121.
+
+174. **[todo, 2026-10-13]** **[Data generation]** **[Dashboard UI]**
+    **REQ-GEN-199's first bootstrapped build: six of its quoted texts open
+    below the fold, and TS-76's after-state is not the red the architect
+    predicted.** Found by the build itself, overnight #4, against the real
+    bootstrapped page at 1280x800 - not by a critic.
+    - **Below the fold (criterion 34 - a finding against the page, the
+      assertion not loosened).** Clicking a chip lands on the right page and
+      date, but the as-at panel opens at y=729-1771px (TS-75a, TS-75b, TS-77b,
+      TS-78a) and the substitution drill-down's "Since ..." line at y=974px
+      (TS-76, TS-77a), with TS-77b's drill-down sentences at y=790 onward. The
+      pills (TS-76, TS-77a, TS-79a, TS-79b) and TS-78b's verdict line are on
+      screen. tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips carries
+      each of the six as a STRICT expected failure naming this item, so the day
+      the page brings one into view it fails and its entry comes out. The
+      likely page fix is a scenario jump that scrolls to what its scenario is
+      about - a dashboard change, so not built tonight.
+    - **H1 did not reproduce.** REQ-GEN-199 criterion 9 says to record that
+      TS-76 leaves cp-clients and cp-carers "promoted and red, permanently".
+      On the real build neither is red: clients promoted AMBER (its quarter's
+      drawn amber, kept - see PROVISIONAL (a) in the morning report) and
+      carers GREEN, before, during and after the substitution. The cross-table
+      checks reading cp_placements are filed under cp-placements, so in a
+      quarter with no placements supply nothing runs them for clients or
+      carers. The register records what was observed; the criterion's wording
+      needs Keith (SIGNIFICANT: it changes a signed claim).
+    - **Keith to decide**: the page fix for the fold, and criterion 9's
+      wording.
+
+175. **[todo, 2026-10-13]** **[Data generation]** **Two supplies that are
+    neither TS-43's nor TS-78's wait under hold on 8 September 2026.** Found
+    by REQ-GEN-199 criterion 16's guard on its first run, overnight #4.
+    - **What**: TS-47's late file (the 7 September extract arriving at 11:00
+      on 8 September, by design - its drift and row-count checks flag it) and
+      8 September's own supply (an ordinary chain whose rows tripped a
+      not-null warning) both read amber inside the 1-9 September hold era, so
+      the rule held each, and the second superseded the first.
+    - **Not caused by the 30 August version** - 8 September has always been
+      in the era. Whether it predates tonight is unknown: the generator
+      change moved the row-count chain (TS-78's days), and checking needs a
+      second rebuild, which overnight #3's terms rule out.
+    - **The guard is kept exact** - a strict expected failure naming this
+      item, not an allowance - so the criterion is not loosened.
+    - **Options for Keith**: (1) TS-47 `green_follow` so 8 September's own
+      supply is built green, and accept TS-47's late file under hold by
+      amending criterion 16 to name it; (2) move TS-47 out of the hold era;
+      (3) build every ordinary day inside a hold era green. Recommended (1):
+      TS-47's late file being held is a true consequence of the era, and its
+      register entry can say so.
+
+176. **[done, 2026-10-14]** **[Data generation]** **[Dashboard UI]** **The
+    delivery-critic on REQ-GEN-199 as built (274e7a6)** - overnight #4. Every
+    criterion's claim checked against the real database and page (the critic
+    drove the built page at 1280x800); the strict-xfail findings #174 and #175
+    confirmed honest. Fixed the same night, defects failing first:
+    - **N1 (defect, fixed test-first)**: a substitution's drill-down read
+      "Decided by scripted-history@synthetic.invalid" - the raw actor email -
+      where the rest of the page shows the person's name, so a scripted
+      substitution was labelled scripted (REQ-GEN-199 NFR 5).
+      promotion_state.StandingIn.as_record now carries people.display_name();
+      tests/test_promotion_state.py::TestAStandInIsDecidedByAName failed first.
+      Not REQ-GEN-199's code - REQ-DASH-198's display, exposed by it.
+    - **G1 (latent, fixed test-first)**: the replay read `supply N` from a
+      placement's recorded supplies, which counted any arrival with a run id,
+      while links counted only arrivals carrying the dataset's file; the two
+      agreed today and would have diverged for a shaped delivery given its only
+      run by resolve_run_ids' fallback. The recorded supplies now come from
+      supply_arrivals().
+    - **G2 (latent, fixed test-first)**: a drawn RED on a quarter that keeps
+      its drawn severity would be planned and not written; now refused.
+    - **T1**: the chip test's whole-test expected failures hid content and
+      cold-reload regressions on the seven below-the-fold cases; now every
+      chip's text and reload is asserted and only the viewport check is
+      inverted for #174's cases. **T2**: the hold guard compared slots, and
+      as one strict xfail also hid a TS-78 regression; split, keyed by
+      supply - the planted ambers ARE held (passes), nothing else is (#175's
+      xfail). **T3**: the resupply-follows-red exemption narrowed to the one
+      scenario that needs it.
+    - **F4**: two register dates a day early (UTC read as Perth) - 11 and 7
+      February. **G6**: TS-79's config text names the quarter it really
+      inherits from. **O2**: TS-79's Expect now says what else its pages show.
+      **D1**: REQ-GEN-199's source line said "not signed off". Criterion 30's
+      fixture docstring corrected; TS-79's "too short" refusal says what to do.
+    - **Recorded, not changed**: G3 - the amber moved off TS-75's quarter went
+      to -13, the quarter TS-67 files into (harmless; TS-67 still meets a filled
+      slot). G4 - filed_early_into misses a same-day early arrival and always
+      claims the quarter before; neither occurs. G5 - covered-day bookkeeping
+      keeps the anchor's id_offset and seed (cosmetic). O1 - TS-77's decision
+      log has a rule refusal effective five days AFTER the person's promote of
+      the same supply though recorded first; replay timing, plausibly #90's
+      family - to investigate.
+    - **For Keith**: criterion 22 lists TS-79a/TS-79b as "sharing one
+      placement" while criterion 19 gives them different quarters - the two
+      cannot both hold; the build follows 19. Wording only.
+
+177. **[done, 2026-10-14]** **[Pipeline & publishing]** **[Data
+    generation]** **A replayed correction's confirmation is stamped with the
+    real clock, and the fix the architect proposed would stamp it before the
+    correction was merged.** Found by `delivery-architect` (finding B10)
+    reviewing the close-out batch, verified against the real database rather
+    than taken on trust. `bootstrap._confirm_corrections` opens a fresh
+    `replay_clock.replaying()`, whose anchor is None, so `confirm_due` stamps
+    `asset_time.now()`. The one row in `qa.correction_applied` (REQ-PIPE-181)
+    reads applied 2026-10-13 15:17 UTC - the moment that bootstrap ran -
+    while the replayed history ends at 2026-09-22 14:30 (the latest
+    `qa.supply_receipt`). So the stamp differs on every bootstrap, which
+    breaks "regenerating reproduces the same output", and sits three weeks
+    after the history it confirms.
+
+    **NOT FIXED, on purpose.** The architect's amendment - anchor at the later
+    of both collections' last replayed instants - is wrong for the only
+    correction that exists: REQ-PIPE-181 is dated 2026-10-11, AFTER the
+    history ends, so that anchor would confirm it on 2026-09-22, nineteen
+    days before it was merged. The recorded decision (REQ-PIPE-170's "stamped
+    at the end of the replay rather than on the merge date") assumed a
+    correction merged inside the history and does not say what happens to
+    one merged after it. That is a choice about agreed behaviour, so it is
+    Keith's. The candidates: (a) leave the real clock - honest that the
+    confirmation happened at bootstrap, not reproducible; (b) the later of
+    the replay's end and the correction's merge instant - reproducible,
+    never before the merge (recommended); (c) the replay's end only - wrong
+    whenever the merge is later, as now. No visible effect today: the
+    confirmation moved, placed and held nothing. Needs a failing test first
+    once chosen.
+
+    **KEITH'S ANSWER, 2026-10-14 morning (close-out question 28): option (b)**
+    - the later of the history's end and the correction's own date. FIXED
+    the same morning, test-first: `TestStampedWhereTheHistoryEnds` in
+    tests/test_correction_replay.py drove `bootstrap._confirm_corrections`
+    with the wall clock faked to 2031 and got 2031 back before the fix.
+    `correction_replay.history_end` reads the latest receipt or decision
+    taking effect, and `confirm_due(history_end=...)` stamps each correction
+    at the later of that and its own date; a real asset still stamps the
+    wall clock. Recorded on REQ-PIPE-170's decisions. The fixture now
+    rebuilds the qa schema per test, because the decision log is
+    append-only and an earlier test's decisions moved the history's end.
+    This sandbox's `supply` database still carries the old stamp until its
+    next bootstrap from empty. REQ-GEN-205's draft criterion 19 is now
+    built work and comes out of the draft at the next fold.
+
+178. **[done, 2026-10-14]** **[Dashboard UI]** **A supply that arrives
+    inside its claim window but before its period starts reads as "No data"
+    for the whole period, across the collection.** Found checking a claim in
+    REQ-DASH-182's own UX review (docs/drafts/calendar-close-out/
+    review-182-ux.md, finding 1), verified in a real browser against the
+    dashboard rebuilt from this morning's bootstrap. The template's
+    `clipDatasetToInPlaceOn` sets `staleInPlaceOn = effectiveRun.run_date <
+    periodStartDate(d.id, inPlaceOnDateStr)` (template line ~2645): it
+    compares the RUN DATE with the start of the period the date on show falls
+    in, rather than asking which period the supply was filed to. Child
+    Protection's 2025-Q3 delivery was received 2025-07-19, inside the claim
+    window for the 1 August period, filed to 2025-Q3 and promoted by the rule
+    on 2025-07-30 - yet at in-place-on 2025-08-05 and 2025-09-15 every one of
+    the six datasets (checked: cp-clients, cp-placements, cp-case-workers)
+    shows a "No data" pill and "nothing has landed yet in this dataset's
+    current expected cycle". The reviewer's own version of the finding - a
+    period a dataset OWES NOTHING in reading "No data" (cp-case-workers in
+    May) - did NOT reproduce: at 2025-06-15 and 2026-06-15 the page showed
+    neither. What the reviewer did get right, also confirmed: the SLA tile
+    reads "Quarterly (Feb/May/Aug/Nov, day 1), by 09:00" for a dataset owed
+    only in February and August.
+
+    Direction: a false alarm, not a false green - but a whole collection
+    reading "No data" for a quarter is exactly the noise that teaches a
+    reader to ignore "No data". Needs a failing test first (a real-browser
+    e2e on 2025-Q3's early delivery, which exists in the generated history
+    today). **FIXED the same morning, test-first, at Keith's call ("fix now,
+    test-first")**: staleness is now judged by the start of the period the
+    supply was FILED to (`arrivalByRun[run].slot` through
+    `periodDateNamed`), the run date standing in only where none is
+    recorded. tests-js/per-dataset-arrivals.test.js's new describe block
+    failed first on the early-arrival case and passes now, with two control
+    cases (filed to the previous period - still stale; no period recorded -
+    the old rule). Verified in a real browser on the rebuilt page:
+    cp-clients, cp-placements and cp-case-workers no longer read "No data"
+    at 2025-08-05 or 2025-09-15. A consequence, intended: a late supply filed
+    to the PREVIOUS period now reads stale in the current one. Recorded on
+    REQ-DASH-054. The "No data" still seen on cp-clients at 2025-06-15 is a
+    cross-table check that could not be judged (identical before and after
+    the fix) - running-thoughts #95's subject, not this one.
+
+179. **[todo, 2026-10-14]** **[Pipeline & publishing]** **A Lambda
+     processing pass stops taking arrivals at its 10-minute budget, but
+     then runs ALL owed work with no budget at all.** Found by
+     delivery-scoper while re-scoping REQ-PIPE-177 (2026-10-14), verified
+     by the main session against the code: `processing_pass.run_pass`
+     checks `deadline` only before taking a new arrival
+     (qa_tools/common/processing_pass.py:319-334), then calls
+     `recheck.run_all_owed(kinds=(REEVALUATE, RECHECK))` (line 520), which
+     takes no deadline and runs up to `limit=1000` items
+     (qa_tools/common/recheck.py:391). So an invocation that reaches its
+     budget still runs every owed re-evaluation and re-check after it,
+     and then tickets - against Lambda's hard 15-minute limit.
+     NOT A DEFECT AGAINST REQ-PIPE-152 AS WRITTEN: its criterion 12 only
+     says "take no new arrival once 10 minutes have passed", and is met.
+     It is a GAP in what that criterion covers, which matters once owed
+     work can be large (REQ-PIPE-177's bulk re-checks, ~400 supplies).
+     Nothing is lost if Lambda kills the invocation (owed work is cleared
+     only when it completes), but the tickets step at the end of the pass
+     would not run. REQ-PIPE-177's re-scoped draft keeps its criterion 24
+     (the deadline applies to owed work too) as unmet, with a decision
+     saying why. **Keith, 2026-10-14: leave it to REQ-PIPE-177** - it only
+     bites once bulk re-checks exist, and 177 criterion 24 carries the fix
+     (pass the pass's deadline into the owed work, test first). Stays todo
+     until 177 is built.
+
+180. **[done, 2026-10-14]** **[Dashboard UI]** **Closing a side panel the
+     page was opened with leaves the dashboard (or cannot close at all).**
+     Found by delivery-architect and delivery-dashboard-ux independently,
+     reviewing REQ-DASH-222 (2026-10-14), and REPRODUCED by the main session
+     in a real browser: cold-load the template with `?panel=requirements`,
+     press Escape, and the tab navigates to the previous page
+     (`about:blank`). `closePanel()` (template :7285) calls
+     `history.back()` whenever `STATE.panel` is set, and a cold load sets it
+     from the address, so Back steps over an entry the app never pushed. In
+     a genuinely fresh tab (history length 1) Back does nothing and the
+     panel cannot be closed at all. Affects all five SIDE_PANELS (activity,
+     changelog, requirements, snapshots, leaderboard). The side-panel twin
+     of road-testing #8, fixed for the check panel by `panelPushed` +
+     `stepUpInPlace()` in `closeCheckPanel()` (:7183) and by `drawerPushed`
+     in `closeDrawer()`. A defect in built behaviour; fix is test-first.
+     **FIXED the same afternoon (Keith: "fix now, all five panels").**
+     `openPanel()` marks the entry it pushes (`sidePanelPushed`), and
+     `closePanel()` steps back only over that; otherwise it closes in
+     place with replaceState, dropping `panel=`.
+     `tests/test_dashboard_e2e.py::TestClosingASidePanelReachedByItsUrl` -
+     each of the five panels cold-loaded and closed by its X, Escape on
+     one, all six seen failing first - plus the pushed case still stepping
+     back (Forward reopens it). REQ-DASH-222's draft relies on this guard
+     rather than re-specifying it.
+
+181. **[done, 2026-10-14]** **[Dashboard UI]** **The Trend line counted
+     checks nobody judged as failing.** Found by delivery-scoper while
+     scoping road-testing sprint 1, verified by the main session against the
+     template: `aggregateFailureSeries()` counted every status other than
+     green as a failure, so a check with no rule for the period (`inactive`)
+     or not run for it (`nodata`) pushed the line up. On the real data every
+     Child Protection dataset's latest point plotted a failing share with no
+     amber or red result at all (cp-notifications 2 of 45), and a line scaled
+     to its own maximum drew that near the top of its box under a green dot -
+     a false "failing" on the very surface road-testing #1 is about. A
+     defect, minor enough to fix without sign-off, and Keith said so anyway:
+     "fix now, test-first". **FIXED**: only amber and red count as not green,
+     over the checks that were judged that run; a run with nothing judged
+     reads 0. `tests-js/trend-counts-only-verdicts.test.js`, three tests, all
+     seen failing first. The one implementation (no Python mirror). Road-
+     testing sprint 1's REQ-DASH-224 builds on this rather than being it.
+
+182. **[done, 2026-10-14]** **[Dashboard UI]** **[QA checks &
+     contract]** **delivery-critic on REQ-DASH-222 and REQ-QAC-223.** Every
+     finding below was checked against the code before being written up.
+     Each REQ-QAC-223 edit scenario the critic ran for real (a macro, a Soda
+     expression, an Evidently band, a contract SQL rule, a singular test)
+     failed the gate, naming only the checks that edit backs, and every file
+     was restored afterwards.
+     - **FIXED - the Evidently runners did not read their column from the
+       entry** (REQ-QAC-223 criterion 3, "the runners read them from
+       there"). BDM selected and looked up `sex` by name; CP used a module
+       constant `_COLUMN`, which the requirement's own decision says was
+       deleted. Editing the entry's column alone would have read one column
+       and labelled the result as another. Both now use `_PSI["column"]` for
+       the run's own rows and for the recorded reference.
+       `tests/test_evidently_reads_its_entry.py` (4 tests) failed first.
+     - **FIXED - the dbt scan saw only the top level of each folder.**
+       `_files_in` listed `macros/` and `tests/` without recursing, and
+       singular tests were assumed to sit at `tests/<name>.sql`. dbt reads
+       every folder under macro-paths and test-paths, so a macro or test
+       filed in a subfolder could change with no changelog entry. None does
+       today, so this was latent. It now recurses (`git ls-tree -r`,
+       `rglob`) and finds a singular test by its file name in any subfolder
+       outside `tests/generic/`. `test_a_macro_in_a_subfolder_is_still_covered`
+       and `test_a_singular_test_in_a_subfolder_is_still_covered` both failed
+       first. On the real repo the gate still reads 307 checks, OK.
+     - **FIXED - coverage gap**: criterion 9's "and passes with an entry"
+       half for singular SQL had no test. Added
+       `test_a_singular_sql_edit_passes_once_its_check_has_a_changelog_entry`.
+     - **FIXED (polish) - an empty `req=` stayed in the address.**
+       `?panel=requirements&req=` is now dropped on load like a `req=` beside
+       another panel. `test_an_empty_req_is_dropped_and_the_panel_opens_at_the_top`
+       failed first.
+     - **FIXED (Keith, 2026-10-14: "Close always closes") - Close after
+       following a link inside the panel took two presses.** A link followed inside the Requirements panel pushes a
+       history entry (criterion 4: Back returns to the panel as it was), and
+       Close is Back whenever the panel was opened by a push (#180's
+       design). So after one in-panel link, X or Escape steps back to the
+       previous requirement and only a second press closes. Back behaves as
+       criterion 4 asks; Close does not read as closing. Options: (a) Close
+       always closes in place, leaving Back for stepping; (b) Close steps
+       back over all of the panel's own entries in one go; (c) leave it.
+       Built as (b) under the hood so that (a) is what a reader sees: STATE
+       counts the panel's own entries (`panelDepth`, replacing
+       `sidePanelPushed`), Close does `history.go(-depth)`, and where the
+       page underneath was itself a cold-loaded panel the popstate handler
+       finishes the close in place. Back still steps requirement by
+       requirement. `test_close_closes_after_following_links_inside_the_panel`
+       (X and Escape) and `test_close_closes_a_cold_loaded_panel_after_following_a_link`
+       all failed first.
+     - **KEPT (Keith, 2026-10-14: "keep it strict") - a comment-only edit
+       to a macro asks for changelog entries on every check the macro
+       backs** (6 for `matches_regex`), as the requirement chose.
+     - **CORRECTED (Keith, 2026-10-14) - `matches_regex` backs 6 checks,
+       not 11.** REQ-QAC-223's NFR and its carried decision now say 6. The
+       same 11 sits in held REQ-QAC-176's decisions and is left for when
+       that requirement is next opened.
+     - **NOTED, no change**: a retired check backed by a changed macro also
+       needs an entry (REQ-QAC-025's same-terms rule, deliberate); `method`
+       is read only by `check_bands.evidently_bounds`, since each runner
+       already holds one method per entry; macros reached only through
+       `adapter.dispatch` are not followed (none exist here); REQ-QAC-223's
+       evidence cites runs, while its commit was a checkpoint with no test
+       claims - the full `mothman check` ran before that push, but nothing
+       records whether an edit landed between, so the tie is not proven.
+
+183. **[done, 2026-10-14]** **[Dashboard UI]** **A check section's head
+     pill read green on a date nothing was checked.** Found by the main
+     session building REQ-DASH-225, whose browser test compares each dataset
+     row's count with the pills on that dataset's page. On a date with
+     nothing in a dataset's current period, Phase 5g rolls its column tiles
+     up to "No data", but the Supply-level, Table-level and Cross-table
+     section heads rolled up each check's last verdict, so Birth
+     Registrations on 14 October showed thirteen "No data" tiles beside a
+     green "Supply-level checks" - a claim about a period nobody had
+     checked. A minor display defect, fixed without sign-off under the
+     standing rule. **FIXED**: a section head goes quiet with the tiles; its
+     rows keep each check's own last verdict, as a column's panel does.
+     `TestAStaleDatasetsSectionsSayNoData` failed first.
+
+184. **[done, 2026-10-14]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-225 and REQ-DASH-227 (commit 8aad489).** Every finding checked
+     against the code before being written up; each fix's test seen failing
+     first.
+     - **FIXED - the amber line was --warn-fill, which REQ-DASH-225's signed
+       CONTRAST NFR names and rejects** (2.73:1 on white in light theme,
+       against a 3:1 floor; --warn is 5.07:1). The builder's decision had
+       read the criterion's "--warn" as naming a colour rather than a
+       variable, which the NFR's own text rules out - a misreading, not a
+       judgement call, so corrected without sign-off and the decision
+       rewritten. The tests that asserted "no amber" by the literal
+       --warn-fill now check both variables, so the change cannot hollow
+       them out.
+     - **FIXED - amber was drawn over red** where the two lines coincide;
+       the LEGIBILITY NFR asks for red on top. Amber is drawn first now.
+     - **FIXED - a stale row's accessible name contradicted its text**:
+       "latest 0 red and 0 amber of 14" under "No column has a verdict on
+       this date". The name now gives the history and says no column (or,
+       in a column's panel, no check) has a verdict on the date.
+     - **FIXED - the tile key showed above tiles that draw no lines** (a
+       stale dataset's "No data" tiles). It shows only where tiles can.
+     - **FIXED - dead code**: unitCounts' redNames/amberNames were read
+       only by a test; removed, and the test reads sectionNames, which the
+       row uses.
+     - **CONFIRMED BY KEITH, 2026-10-14 - the stale-row reading of
+       REQ-DASH-225 criterion 21** ("No column has a verdict on this date"
+       rather than "All 14 green" off the last run).
+     - **RESOLVED BY REQ-DASH-226 - the home-page agency cards** had briefly
+       drawn the new two-line column series across all of an agency's
+       datasets, with no key; 226 replaced that with datasets not green and
+       a weekly trend in the same push.
+     - **FIXED - CI went red on 8aad489** (found by checking the run, not by
+       a critic): the accessible names' short date used the browser's
+       toLocaleDateString, which REQ-DASH-071 criterion 9 forbids and
+       tests/test_display_time.py guards. It is now shortDay() beside fmtDay.
+       The miss was mine: the local runs covered the browser module and the
+       JS suite but not the six Python modules that read the template, which
+       run in seconds and now get run with any template change.
+     - **NOTED, no change**: section names come from the embedded column
+       name, which matches COLUMN_SCOPES' heading today; x positions are by
+       run index, not elapsed time (a question for the dashboard critics,
+       not a criterion); unitTrendBlock interpolates its own constant titles
+       unescaped. Untested by automation: REQ-DASH-227 criteria 7 and 10 and
+       REQ-DASH-225 criterion 16 - checked live by the critic.
+
+185. **[done, 2026-10-14]** **[Dashboard UI]** **[Docs & process]** **A
+     paragraph after a list was glued onto the list's last bullet.** Found by
+     the main session building REQ-DOCS-219: `dashboard/plans_md.py` treated
+     any line after a bullet as that bullet's wrapped continuation, even
+     across a blank line, so on the Plans tab a paragraph following a list
+     rendered inside its last bullet - and a feedback card's last line
+     swallowed the entry's prose after it. A minor display defect, fixed
+     without sign-off. **FIXED**: a continuation joins its bullet only when no
+     blank line comes between them.
+     `test_a_paragraph_after_a_list_is_not_glued_onto_its_last_bullet`
+     failed first.
+
+186. **[done, 2026-10-14]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-226 and REQ-DASH-224's dataset half (c51ccf0, 146a9d7).** The
+     two performance changes were confirmed pure caches: `buildData` hashed
+     identically before and after at 474 dates, and `datasetStatusesOn`
+     agreed with `buildData` at 692. Each fix's test seen failing first.
+     - **FIXED - a quiet weekly trend's accessible name claimed a count**
+       ("latest 0 red and 0 amber of 0"), the class #184 fixed for the
+       dataset row. It now says no dataset has a verdict on the date.
+     - **FIXED (Keith, 2026-10-14: "leave them out") - a week with no dataset
+       counted plotted as 0%**, reading as a green week nobody judged. Such
+       weeks are left out, as REQ-DASH-224 criterion 8 already does for column
+       lines. Never reached in today's data; reachable at 30 datasets.
+       REQ-DASH-226 criterion 9 amended with his approval.
+     - **FIXED (Keith, 2026-10-14) - "All 1 datasets green"**: singular for
+       one. Criterion 1 amended with his approval.
+     - **NOTED, no change**: the count line reads `DATA` (buildData, so the same
+       code) while only the trend calls `datasetStatusesOn()` - the letter of
+       criterion 2, not its substance; the trend fill is one task of about
+       0.6s at 31 datasets, not chunked; `_ASSET_PARTS` grows by one entry per
+       distinct `new Date()` instant per render, not continuously; the e2e
+       parity test skips where no trend drew, and checks M with the page's
+       own predicate - the red and amber split is the independent part.
+
+187. **[done, 2026-10-14]** **[Dashboard UI]** **[Docs & process]**
+     **delivery-critic on REQ-DOCS-219 and REQ-DASH-220 (42dc2a2).** Each
+     finding checked against the code; each fix's test seen failing first.
+     - **FIXED - card text was not escaped (REQ-DASH-220 criterion 12), and on
+       the public site that ran script.** `feedbackInline()` handed card text
+       to `renderPlansMarkdown()`, which escapes nothing because the rest of
+       the page trusts committed repo content; the critic fired a real
+       `alert()` from an `<img onerror>` in a card line, which the gate
+       accepted. It also rendered "1. " and "- " lines as lists. Card text is
+       now escaped first, then given bold and inline code only.
+       `tests-js/feedback-cards.test.js`.
+     - **FIXED - an embedded const could close its own `<script>`**:
+       `_replace_const` wrote `json.dumps` output as is, and a literal
+       `</script>` in any embedded string - plans prose included - ends the
+       element. "</" is now written "<\/", the same string to JavaScript.
+       Pre-existing, wider than this change.
+     - **FIXED - links the page would follow differently from a new tab**: a
+       query parameter other than `in-place-on` (`?panel=changelog`) passed the
+       gate but a plain click dropped it; `REQ=` slipped past the `req=` rule;
+       an impossible date (`2023-02-30`) and a repeated `in-place-on` passed;
+       malformed %-encoding threw in the page. All refused by the shared
+       parser now.
+     - **FIXED - the build silently derived 'Heard' for a card citing an
+       unknown requirement**; it now refuses, as for a bad href.
+     - **FIXED - #27 was dated 2026-10-04** (its blocked date); first raised
+       2026-10-02 (1c4f562). **#25's card** said configuration is checked
+       before a run; it is checked in CI.
+     - **FIXED - the 'built' predicate was restated, not shared**:
+       `sprint_state.requirement_met()` is the one predicate now and
+       `card_status` calls it. Status derivation, never unit-tested before,
+       has seven cases of its own.
+     - **AMENDED WITH KEITH'S APPROVAL, 2026-10-14**: the introduction's older
+       sentence now says an entry's prose comes out when it lands and its card
+       stays; the card paragraph says a card never names, describes or quotes
+       the reviewer; REQ-DASH-220 NFR 8 now says card text is escaped first,
+       its old premise (renderPlansMarkdown's own escaping) having been false.
+
+188. **[in-progress, 2026-10-14]** **[Pipeline & publishing]** **[Testing & dev
+     tooling]** **delivery-critic and delivery-cli-ux-critic on REQ-PIPE-163
+     (place a held supply), overnight #5.** Each finding checked against the
+     code before it is written here; each fix had a failing test first
+     (`tests/test_place_held_supply.py`'s critic classes).
+     - **FIXED - BLOCKER: choosing "place" crashed the terminal for every held
+       supply in the queue** (cli-ux). The chooser's default matched
+       `r.period == first` with `first=None`, and an owes-nothing row's period
+       is None too, so questionary was handed an unselectable separator as its
+       default and raised. All 8 holds in today's queue are cp-case-workers',
+       which owes February and August only, so every chooser page had such a
+       row. Shipped in 1e6fffb; the tests drove the chooser with a stubbed
+       select that accepted any default. The stub now refuses a default that
+       is not a selectable choice, as questionary does. The cursor also starts
+       on the nearest owed period now, never on "Earlier periods".
+     - **FIXED - `--wait` on un-supersede was refused, saying it owes no run**
+       (D1). It owes a re-check (REQ-PIPE-120); --wait now covers place, refile
+       and un-supersede.
+     - **FIXED - placing and rejecting one held supply were not serialised**
+       (D3): a placement locked only its target period and a period-less reject
+       locked nothing, so two placements into different periods could both find
+       the hold open. The decision log now also locks the held supply itself.
+       By reading; not reproduced as a race.
+     - **FIXED - `supply holds` dropped a correction hold's middle response**
+       (D4), and **`supply filings` said "by a person" for the rule's
+       placements** (D5).
+     - **FIXED - the place command was not on a line of its own everywhere**
+       (D6): the dashboard's held item put it inline in backticks (now a code
+       line of its own), and the re-file and decision-log refusals named
+       neither the command nor the screen.
+     - **FIXED - a pair placed through the flags gave no pointer to settling
+       it** (D7); the preview printed `on_time` (D8); an **agreement-refused
+       hold was offered place and reject** although it files itself and placing
+       it is refused (D9) - the door now offers nothing on it, as `supply holds`
+       already said.
+     - **FIXED - smaller**: the owes-nothing refusal ended in ".."; the chooser
+       crashed rather than emptied on a dataset with no calendar; "Name another"
+       after a refused target that is now chosen; `decide --help` still called
+       --to-period re-file only; an already-run check said the gate "did not
+       promote it"; Ctrl-C still asked "Decide on it now?".
+     - **FIXED - cli-ux**: an unlisted person was told only after walking
+       dataset, period, operation and target - the door now asks who is
+       deciding on the way in; a held supply's reason was off-screen when its
+       place/reject menu was shown - it is printed above the menu now; held rows
+       read "Held: Case Workers, received ..." beside slot rows reading
+       "cp-case-workers ... arrived" - now said the same way; the re-file
+       chooser offered the supply's own period - shown, not selectable, "it is
+       filed here now"; the chooser said "accepted" where the period list one
+       screen earlier says "promoted".
+     - **FIXED - CI went red on 1e6fffb, green locally**: two new tests matched
+       phrases in CLI output, and CI forces colour on, so ANSI codes broke the
+       phrases. Reproduced with `FORCE_COLOR=1`; the test helpers strip colour
+       codes now. A test reading rich output must strip them - worth knowing
+       before reading the next CI-only red of this shape as a regression.
+     - **NOT CHANGED, pre-existing - Back from a held supply's or a slot's menu
+       goes to the collection menu, not "Which one?"** (cli-ux L7). Same for slot
+       rows before this change; a separate piece of polish.
+     - **QUESTIONS FOR KEITH** (queued in morning report #5):
+       1. **D2: should the flags refuse rejecting a schedule-ended held
+          supply?** The door offers only adding dates (criterion 22); the flag
+          route records a reject. REQ-GHUB-165's parity test names it as a
+          deliberate exception until you decide.
+       2. **Should `decide --operation un-supersede` run its check in the
+          foreground?** REQ-PIPE-120's decision says "the terminal waits";
+          REQ-PIPE-163 criterion 32 says decide leaves a decision's checks owed
+          unless --wait is given, and that is what it does now (the door still
+          waits). --wait is accepted for it since D1's fix.
+
+189. **[done, 2026-10-15]** **[Pipeline & publishing]** **[Testing & dev
+     tooling]** **delivery-critic on REQ-GHUB-165 (the door offers what the
+     flags record), overnight #5.** Each finding checked against the code
+     first; each fix had a failing test (`tests/test_door_flag_parity.py`,
+     `TestCriticFindingsOn189` and the overlays).
+     - **FIXED - HIGH: the parity test could not see three operations** (F1).
+       Excuse-lateness, withdraw-excuse and un-supersede are offered from
+       recorded facts, not from a slot's state, and no example ever made the
+       flags accept them - so blanking `excuse_offers` and `supersede_offers`
+       passed every case. Three overlays now build a late supply, an excused
+       one and a promoted slot with a superseded version; each asserts its own
+       operation is accepted by the flags AND offered by the door, then runs
+       the full loop. Re-checked by the same mutation: all three fail.
+     - **FIXED - HIGH, NAMED: substitute over an open pair** (F2). The flags
+       record it; the door hides it, which REQ-PIPE-194 criterion 4 requires.
+       Named in HIDDEN with that reason; whether the flags should refuse it
+       too is a question for Keith (morning report 5, Q6).
+     - **FIXED - a HIDDEN reason that was false in general** (F3): it said the
+       period door offers re-file and supersede of a failed load, which holds
+       only when the failed load is alone in its slot. Reworded to say so.
+     - **NOT CHANGED - a waiting supply can be reachable from no door** (F4):
+       the period door shows one supply per slot, so a failed resupply hides a
+       waiting good one, or the reverse. Probed by the critic, not reproduced
+       here; older than REQ-GHUB-165 (slot_state). A question for Keith
+       (morning report 5, Q7).
+     - **FIXED - the hold-label examples never checked the label took** (F5),
+       and with REQ-PIPE-179's live labels the schedule-ended example had in
+       fact become a plain hold. The test now sets each label as configuration
+       would give it, asserts the row carries it, and covers turned off too.
+     - **FIXED - the state list came from the door's wording table** (F6): it
+       now also reads slot_state's own state constants.
+     - **FIXED - the offer after placing skipped the one combiner** (F7):
+       `_offer_next_decision` passed the slot's operations alone, so a late
+       placed supply was not offered its excuse.
+     - **FIXED - the held menu was hard-coded** (F8): it now offers exactly
+       what `held_operations` gives.
+     - **FIXED - a promote naming no supply** (F10): on an empty period it
+       said "None is already promoted"; once that check was corrected the
+       flag route would have recorded a promotion of nothing. It is refused
+       now, naming --supply, and nothing is recorded.
+     - **NOT CHANGED - the un-supersede count and version list filter
+       differently** (F9): not reproducible - rejecting a superseded supply is
+       refused - so left as the critic found it.
+
+190. **[done, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **delivery-critic on REQ-PIPE-179 (turn a dataset off), overnight #5.**
+     Each finding checked against the code first; each defect fixed with a
+     test that failed first (`TestCriticFindingsOn190` in
+     `tests/test_turn_off.py`, `tests/test_correction_apply.py` and
+     `tests/test_processing_pass.py`; the dashboard's in
+     `tests-js/blocked-dataset.test.js`).
+     - **FIXED - runway warned wrongly both ways** (D1). A turn-off for good
+       that had not started yet silenced the runway warning for a dataset
+       still owing, and a calendar whose every dataset was off still read as
+       exhausted. `runway.off_for_good` now asks the one helper on a date (so
+       only a STARTED turn-off counts), and `low_runway` skips a calendar
+       with no datasets left on it. Whether a turn-off that has not started
+       should count is PROVISIONAL - built as "it does not" (morning report
+       5, Q8).
+     - **FIXED - the dashboard counted quiet holds** (D2): the outstanding
+       marker and the blocker history both included supplies received while
+       turned off, which criterion 24 says never need a person.
+     - **FIXED - the schedule-ended line read the recorded flag** (D3):
+       `schedule_ended.for_dataset` filtered on the reason stored when the hold
+       was raised, so a turn-off added since still showed it as schedule
+       ended. It reads the label as it stands now, as every other reader does.
+     - **FIXED - a dataset back on inside its collection's gap was shown off
+       for good** (D4): `turned_off.timeline` worked out `until` on its own,
+       ignoring the dataset's own version. It now uses the same `_turn_off`
+       that `standing_on` does.
+     - **FIXED - keep offered where it would be refused** (D5): the confirm
+       menu, the parked-move menu, `mothman supply corrections` and the
+       outstanding item all offered keeping a supply in a period that no
+       longer owes one. One answer now, `correction_apply.keep_refusal`, and
+       the keep refusal itself has a test of its own.
+     - **FIXED - a parked move into a gap said the next pass moves it** (D6):
+       the pass leaves it parked (criterion 37). The item names the gap and
+       what ends it.
+     - **FIXED - the freeze named only the first flipped period** (D7): a
+       turn-off reaching back eighteen months named one quarter. It names
+       every flipped period whose claim window had opened by the time the
+       change was introduced.
+     - **FIXED - configuration text printed as Rich markup** (D8): a
+       `turned_off_reason` containing brackets crashed `mothman supply holds`
+       and the processing pass's output. Both print literally now.
+     - **FIXED - the participation view** (D9): it said "nothing - turned
+       off" and "(when last on)" while an owed slot was still open, and a
+       dataset back on inside its collection's gap did not say which gap. Both
+       are fixed.
+     - **FIXED - a `turns_off` that is not true** (D10): the refusal now names
+       its version and prints the entry to paste, as criterion 40's own does.
+     - **FIXED - a comment that described a held pair as two holds** (D11).
+     - **FIXED - the held-supply summary listed quiet datasets** (D12): the
+       dataset list named datasets whose only holds were quiet ones, and
+       `mothman supply holds` listed those rows. Both now show only what
+       needs a person; the quiet count stays in the summary.
+     - **NOT CHANGED, FOR KEITH:**
+       - **J2.** A supply a PERSON filed into a period that a correction then
+         turns off is skipped by the trial (NotProposed, as any person-filed
+         supply is), so it is never held as turned off. Morning report 5, Q9.
+       - **J5.** The view says "Changeable by an ordinary edit until ...". It
+         follows the signed criterion 28, so it is left as signed.
+         Morning report 5, Q10.
+       - **J1 and J6.** Already Q4 and Q5.
+     - **A WRONG NUMBER IN THE FIX COMMIT (c21b495).** Its message says the
+       tests ran over "59 test files"; the selection was 70. The pass and
+       fail counts in it are from that run and stand; the file count was
+       written without being looked at. Recorded here rather than by
+       rewriting a pushed commit.
+
+191. **[in-progress, 2026-10-15]** **[Testing & dev tooling]** **Three test-suite
+     problems found while building REQ-PIPE-164, overnight #5 - two of them CI
+     reds. None was in the code under test.**
+     - **FIXED - a test that failed for one minute a night.**
+       `tests/test_cli_supply.py::TestReadingTheDecisionLog::test_the_instant_is_rendered_on_the_assets_clock`
+       asserted that "1:30am" appears nowhere in cp-clients' decision log. The log
+       is shared by every module on the worker, so a cp-clients decision another
+       module records live at 01:30 Perth correctly reads 1:30am. It went red at
+       01:30 on 2026-10-15. It now asks for the log as at the fixture's own
+       instant (`--as-at`), so no decision that took effect later is in the
+       answer. Two narrower first attempts failed in the full gate, because the
+       table truncates and wraps its cells differently as the log grows.
+     - **FIXED - a new test that left a shared supply promoted.** REQ-PIPE-164's
+       first test of a promoted re-check promoted the session's CP fixture
+       supply and demoted it afterwards. The promotion superseded another
+       version and moved the table, which no demote undoes, and 48 setup errors
+       and two test_recheck failures followed in the full gate. That test now
+       drives recheck.run on a minted promoted supply with only the four tools
+       stubbed (TestThroughTheRealExecutor), so it touches nothing shared.
+     - **FIXED - order-dependent state between modules, and a CI red of my own
+       making.** Running `tests/test_door_flag_parity.py` before
+       `tests/test_replacement_setting.py` on one worker failed four or five of
+       the latter's TestTheGate tests: the gate found cp-carers frozen by the
+       agreement backstop. The parity module's filings into minted periods
+       outlived each test, and once the minted calendar was gone the backstop
+       read them as moved. The same failures reproduce on e184025 without
+       REQ-PIPE-164. A first draft of this entry said CI had not hit it. That
+       was wrong: CI's `test` job failed on exactly these on 778ccc7 and on
+       e184025, after #189's overlays (778ccc7) added more such filings. The
+       parity module now forgets its own cp-carers filings after each test
+       (`_forget_its_filings`, which tests/test_recheck_decision.py shares),
+       and the pair passes in that order (67 passed, -n0).
+     - **CHANGED ON A HYPOTHESIS, NOT REPRODUCED - TS-79a off-screen on CI.**
+       `TestTheAsAtScenarioChips` for TS-79a failed on CI three runs in a row
+       (7aa2c82, 778ccc7, e184025) with the element at -38..-14px, and passed
+       here every time, including at 8x CPU throttling. The scenarios page is
+       long, so the chip is scrolled to before it is clicked, and the jump
+       scrolls back to the top smoothly. The test measured at a fixed 700ms.
+       It now waits for `window.scrollY` to reach 0 (10s timeout) before
+       measuring. If CI is still red on TS-79a, the cause is elsewhere and
+       this is reopened.
+
+192. **[done, 2026-10-15]** **[Pipeline & publishing]** **delivery-critic on
+     REQ-PIPE-164 (re-check a supply), overnight #5.** Each finding was checked
+     against the code, and each defect fix had a test that failed first
+     (`TestCriticFindingsOn192` in `tests/test_recheck_decision.py`).
+     - **FIXED - the queue table never showed the verdicts** (F1). Criterion
+       15's heading, both verdicts and the re-check were on the picker label
+       only. `mothman supply queue` and the door's table printed "Promoted,
+       then re-checked worse". The table now prints the row's own reason.
+     - **FIXED - listed before its re-check had run** (F2). A supply made worse
+       some other way (a knock-on re-evaluation, say) and then re-checked
+       without --wait was listed straight away, as "the re-check ... came back
+       red" before that run happened, and owed an acknowledgement for it. It is
+       listed only once the owed re-check that decision caused has cleared.
+       The test fixture had hidden this by never running its re-check.
+     - **FIXED - the backstop refused after the reason and the confirmation**
+       (F4). Re-check's refusals now run in `consequences()`, before the reason
+       is asked, as every other decision's do.
+     - **FIXED - `decide` on a held supply gave "--period is required"** (F5).
+       A re-check names its supply, so --period is optional, as for a held
+       supply's reject. It now gives the hold's own responses.
+     - **FIXED - "promoted?" was decided before the run** (F7). A supply
+       demoted while its re-check ran skipped the gate. Promotion is now read
+       after the run.
+     - **FIXED - performance** (F6). Each queue render read the whole asset's
+       re-checked-worse list as well as each slot's own. It now asks only about
+       the slots awaiting acknowledgement. Measured by the critic on the real
+       database with no re-checks: no change in cost.
+     - **FIXED - tidy-ups** (F9): an unused property removed; `decide`'s
+       docstring names every operation --wait covers; acknowledge's refusal
+       names the re-checked case.
+     - **FOR KEITH:**
+       - **F3.** A re-check owes a run of the supply's own checks only.
+         Another dataset's checks that read its table are not re-run, though
+         the architect's NFR names `_readers_rechecked` as the way to find
+         them. Morning report 5, Q12.
+       - **F8.** After a re-checked-red supply is acknowledged, re-checking it
+         again with the same red verdict lists it again, because "worse" is
+         measured against the promoted-on verdict. Morning report 5, Q13.
+
+193. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **delivery-critic on REQ-PIPE-166 (withdraw an acknowledgement or a mark
+     as not supplied), overnight #5.** Each finding was checked against the
+     code, and each defect fix had a test that failed first
+     (`TestCriticFindingsOn193` in `tests/test_withdrawal.py`). The critic
+     drove the real built page with injected withdrawals and found criteria
+     13, 16 and 17 correct in a real browser.
+     - **FIXED - a mark's confirmation printed raw UTC** (F2). A mark carries
+       its instant as a string, which the formatter passed through untouched:
+       "recorded 2026-10-14T19:42:55+00:00". Both confirmations also printed
+       the recorded email; they now give the person's name and the asset
+       clock.
+     - **FIXED - a lapsed acknowledgement was said to need a person again**
+       (F3). Acknowledge, then demote, then withdraw: the confirmation said
+       the supply "awaits acknowledgement", though nothing was owed. The
+       withdrawal is still allowed (it corrects the record) and now says the
+       supply is no longer in its period and owes nothing.
+     - **FIXED - withdraw-acknowledgement with no supply** (F9) blamed a
+       blank supply's record; it now says the request names no supply.
+     - **FIXED - dead code** (F10): `withdrawal.withdrawal_of` was called by
+       nothing; removed, with its `implemented_by` line.
+     - **FIXED - wording** (F8): the reason prompt for withdrawing a mark said
+       "published beside the supply"; a mark has none, so it now says "in the
+       period's row". The requirement's own decision note said the terminal
+       shows what a withdrawal does BEFORE asking the reason; the code shows
+       it after, as for every decision. The note was wrong and is corrected.
+     - **FIXED - no real-browser test** (F6, an NFR):
+       `TestAcknowledgementBadge::test_a_withdrawn_one_reads_as_at_the_date_on_show`
+       in `tests/test_dashboard_e2e.py`.
+     - **NOTED, not changed** (F11): no synthetic scenario contains a
+       withdrawal, so the built dashboard has only rendered one from injected
+       data. Worth a scripted decision if Keith wants one on show.
+     - **FOR KEITH:**
+       - **F1 (defect against criterion 14's wording).** Under the default
+         `needs-action` ticket policy a mark (accepted) is never posted, so a
+         withdrawal returns the slot to exactly what the ticket last said.
+         The pass sees no change: a ticket a person closed stays closed, and
+         a GitHub-route withdrawal gets no reply - yet the confirmation says
+         "its ticket reopens". Reproduced by the critic with the real
+         reconciler. Either the pass reopens a closed ticket whose slot needs
+         action again, or the wording stops promising it. Morning report 5,
+         Q14.
+       - **F4 (criterion 15).** A withdrawn mark shows in the period's row of
+         "Periods with no supply", but the accepted-gaps list only lists
+         periods still accepted, so the withdrawal never appears there unless
+         the period is marked again. Q15.
+       - **F5 (an NFR not met).** "One history reader, not three" asked for
+         `excuse.history`/`pipeline/excuses.py` to be generalised; the build
+         added a second pairing reader (`closed_slots.withdrawals`) instead,
+         and no decision recorded the departure. Generalise, or record why
+         not. Q16.
+       - **F7 (criterion 12's scope).** `mothman supply decisions` prints
+         every action's raw name, withdrawals included, and does not show
+         which entry a withdrawal names. Does criterion 12 cover the
+         terminal list? Q17.
+
+194. **[in-progress, 2026-10-15]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-182 (periods owed nothing; the delivery time in force),
+     overnight #5.** Each finding was checked against the code. The critic
+     drove the real built page for cp-case-workers at nine dates and built
+     the not_expected, turned-off and markup cases in the browser.
+     - **FIXED - a current owed-nothing row vanished when a supply also fell
+       in its period** (F1, criterion 1). The history picked ONE current
+       block and dropped every current one from the older list, so
+       cp-case-workers' unfiled May supply hid the May "Not owed" row on most
+       May-quarter dates - the requirement's own showcase. Every current block
+       is now shown, the owed-nothing row first. Test-first in
+       `tests-js/owed-nothing.test.js` ("post-build-review #194"); the e2e
+       row test now asserts on the visible current row, where it used to take
+       the first match, which could be a hidden older one.
+     - **FIXED - no rows when nothing had been supplied yet** (F2, criterion
+       1). The never-supplied branch drew no supply history at all, so a
+       dataset whose first period is owed nothing read only "Nothing had been
+       supplied". It now draws the history section. Test-first in the real
+       browser (`TestOwedNothingPeriods::test_rows_show_before_anything_is_supplied`,
+       with the data made in the page; the real data has no such dataset).
+     - **FIXED - tests and tidy-ups**: a daily run's "(3 days)" and
+       "(3 days so far)" now tested (F4); parentheses on an expression that
+       read ambiguously (F8).
+     - **NOTED, not changed**: F7 (history mixes in supply cycles after the
+       date on show - existing behaviour, and the count is honest); F9 (one
+       embedded entry per owed-nothing period, collapsed in the browser - the
+       scale NFR is about rows on the page and is met; a daily dataset turned
+       off for a year embeds ~365 small entries); F10 (the not_expected
+       staleness test checks the flag; the critic checked the rendered text).
+     - **FOR KEITH:**
+       - **F1/F6.** A supply in a period the dataset owes nothing in (the
+         unfiled May files) now shows as two blocks for that period - the
+         owed-nothing row and the supply cycle. One block with the label as
+         its subheading instead? Morning report 5, Q18.
+       - **F3 (criterion 3).** Before the first participation version the
+         page has no SLA tile, so "Not owed yet" shows only as the notice's
+         heading - beside a "No data" pill. Add the tile there (and change
+         the pill), or amend the criterion? Q19.
+       - **F5.** The tile follows participation versions by date but not
+         calendar versions (none differ today). Follow both now, or wait for
+         a second calendar version? Q20.
+
+195. **[in-progress, 2026-10-15]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-180 (a turned-off dataset on the dashboard), overnight #5.**
+     Each finding was checked against the code; each defect fix had a test
+     that failed first ("post-build-review #195" in
+     `tests-js/turned-off.test.js`). The real configuration turns nothing
+     off, so the critic built turn-offs with the real Python over altered
+     calendar copies and injected them into the page.
+     - **FIXED - an owed red supply awaiting a decision let a turned-off
+       dataset leave the rollup** (D1, criteria 6 and 7). Only blockers and
+       closed unfilled periods kept it in; a filed supply awaiting promotion
+       did not - cp-notifications read out of the rollup with its 2023-Q4
+       supply red and waiting. `outByTurnOff()` now keeps it in.
+     - **FIXED - the weekly trend counted what the 'N of M' line left out**
+       (D2, criterion 29). The per-date statuses were built without the
+       turn-off marking. One `markTurnOffs()` now serves both.
+     - **FIXED - the dataset marker's icon was a 7x7 square** (D3, criteria 12
+       and 13): the small pills' size rule outranked the bar's. Checked by
+       computed style in the browser test (written after the fix).
+     - **FIXED - '(turned off)' and 'Turned off with ...' while it was only
+       announced** (D4, criterion 26; D5, criterion 2). Both now say
+       'Turning off' until the effective_to has passed.
+     - **FIXED - edges and polish**: no slot owed before the gap no longer
+       reads 'nothing more owed' on every earlier date (F11); the
+       received-while-off line gives a date, as criterion 14 words it; the
+       reasons read most first, as criterion 9's example does (F12); the
+       'no schedule agreed yet' marker now shows on collection rows, which
+       criterion 10 asks for now that the line counts them (F6); the
+       executive intro names turned-off and unagreed datasets among those
+       outside the comparison; amendment 1's test is linked (F9).
+     - **NOTED, not changed**: the runway's "N datasets name this calendar"
+       still counts a dataset off for good; `rollup_datasets` (the Python
+       mirror) has no production caller; 'Promoted, then re-checked' items
+       are not on the page, so D1 covers what the page can see.
+     - **FOR KEITH** (morning report 5, Q21-Q25): criterion 25's 'nothing
+       more owed' marker before the turn-off was authored (F10); an
+       asset-level not-counted line (F7); restyle 'Not counted' to the
+       marker's style as criterion 12 reads, or amend it (F8); suppress the
+       runway warning once a for-good turn-off is authored; criterion 19's
+       note in the Timing cell, there being no separate provenance cell.
+
+196. **[in-progress, 2026-10-15]** **[Dashboard UI]** **delivery-critic on
+     REQ-DASH-175 (a supply a person placed says so), built in 2c71710.** The
+     real database holds no placement, so the critic injected placements into
+     the built page and drove it with Python Playwright (the Playwright MCP
+     server did not connect this session). Each finding is still to be
+     checked against the code before it is fixed; defects get a failing test
+     first. FIXED 2026-10-15 except F3 (Keith's call, queued) - each defect
+     with a test that failed first: F1 and F4 in `tests-js/placed.test.js`
+     ("post-build-review #196"), F4's data in `tests/test_placements_page.py`
+     (`TestAPlacementLaterOvertaken`), F2 in `tests-js/turned-off.test.js`
+     ("criterion 14 as amended") and `tests/test_turn_off.py`
+     (`test_a_resolved_one_says_how_it_ended`). F5 and F6 were changed with
+     no test of their own (F5's date format is asserted by the existing tag
+     test, updated). F7: the promotion timeline's placedIn path now has a
+     test (`TestThePromotionTimelineSaysPlaced`). That test FAILED ONCE, in
+     the first run of the file that contained it, and has passed in eight
+     runs since; its error output was not captured, so the cause is unknown
+     and is recorded here rather than assumed away. Still untested: a
+     placement and an excuse on one row, the Outcome cell, and that the
+     builders embed `placements`.
+     - **F1, DEFECT (criteria 3, 10)**: `blockerHistoryRows` checks
+       `placedHoldNote()` before `rejected`/`supersededBy`, so a contested pair
+       placed whole and later superseded or rejected reads "placed in ..." and
+       hides how it actually ended. `placedHoldNote` is also called twice per
+       row.
+     - **F2, CHANGED SIGNED BEHAVIOUR (REQ-DASH-180 c14)**: to keep a placed
+       hold listed, the build made "Received while turned off" list and count
+       every turned-off hold however it was resolved, with no note for one
+       rejected, superseded or filed by the rule - while the build's own
+       decision said nothing signed changed. Put to Keith 2026-10-15: keep
+       everything, each resolved row with a note saying how it ended, and the
+       line saying how many are still held. Criterion 14 amended with his
+       exact wording (morning report 5).
+     - **F3, DEFECT (criterion 5)**: before the placement instant the row
+       already sits in the target period's cycle, judged against it, because
+       `arrivalByRun[run].slot` comes from the current filing with no as-of.
+       Criterion 5 says the supply shows as held on any earlier date. Found
+       by reading the code.
+     - **F4, DEFECT (criterion 1)**: a supply placed into Q3 and later re-filed
+       to Q4 by a person keeps saying "Placed in Q3" - nothing drops a
+       placement a later decision has overtaken. From reading the code.
+     - **F5, POLISH (REQ-DASH-071)**: the tag shows a date (`fmtDay`), the hold
+       note the same placement's instant (`fmtInstant`).
+     - **F6, POLISH**: `pipeline/placements.py` swallows every exception from
+       `slots.slot_named` into `slot=None`; narrow it to the unknown-period
+       case.
+     - **F7, TEST GAPS**: the `promotion_timeline.decisions_on` placedIn path;
+       `blockerHistoryRows`/`settledPairRow` with a placement (criterion 10,
+       which is why F1 was not caught); `changedSinceNote` carrying placedIn; a
+       placement and an excuse on one row (criterion 4); the Outcome cell
+       (criterion 6); and that the builders embed `placements` at all.
+     - Verified met: c1, c2, c6, c7, c8, c9; c3 for hold rows; the
+       thirty-dataset NFR.
+
+197. **[done, 2026-10-15]** **[Testing & dev tooling]** **A false gate claim
+     in a pushed commit (dc1d82e).** Its message says `mothman check
+     --no-pytest` passed. It did not: the `patterns` gate failed with
+     `SchemaVersionError`, because the commit bumps the qa schema to 44 and a
+     schema is never brought up to date in place, so the real `supply`
+     database (43) had to be rebuilt. The command was piped through `tail`,
+     whose exit code let the commit run, and the box the tail showed was the
+     error panel's bottom edge, not "Passed". Recorded here rather than by
+     rewriting a pushed commit. Fix in practice: the gate's exit code is read
+     on its own (`; echo exit=$?`), never through a pipe, before any commit.
+     The database was rebuilt with `mothman env reset-synthetic` then
+     `mothman pipeline bootstrap`, and the gate re-run on that tree.
+
+198. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on dc1d82e:
+     a test stub too narrow for the confirmed-agreement check (Q4).**
+     `tests/test_place_held_supply.py`'s stub of `schedule_ended._covering_slot`
+     took two arguments. On CI's empty database the real configuration's
+     REQ-PIPE-181 correction is still pending, so the re-filer's new check
+     (`_covering_slot(..., agreement=confirmed)`) ran and the stub raised
+     TypeError; locally that correction had been confirmed by the bootstrap,
+     so the check never ran. Reproduced on an empty scratch database (fails
+     with the old stub, passes with the new); the stub now takes
+     `agreement=None`. The touched modules (16) also ran on that empty
+     database: 562 passed, no skips reported.
+
+199. **[done, 2026-10-15]** **[Pipeline & publishing]** **[Dashboard UI]**
+     **delivery-critic on the morning report 5 answers (b900dac..f43c85d).**
+     Q6, Q10, Q14, Q16, Q17, Q19, Q21, Q22 and Q23 meet their wording; the
+     findings below are on Q4, Q9, Q11, Q17's test, Q18, Q19, Q24 and
+     REQ-DASH-180 c14. Each claim checked against the code before it was
+     written here.
+     - **F1, DEFECT (Q9, REQ-PIPE-179 c35 as amended), reproduced by the
+       critic**: `correction_trial.trial` skips a supply whose receipt the
+       rule answers the same way under both agreements BEFORE it asks whether
+       the period it is filed to is turned off. So a person's placement into a
+       newly turned-off period only becomes a turned-off hold when that period
+       is also its receipt's own slot - a supply received in Q2's window and
+       placed into Q3 stays where it is, in no list. The shipped test placed
+       a supply received on Q3's own date, the one shape that works. To fix,
+       test first.
+     - **F2, CRITERION GAP (Q4, c19 as amended)**: the confirmed-agreement
+       check reverts the calendar but reads the asset's timezone from disk,
+       so a hold only a pending TIMEZONE correction covers is filed ahead of
+       confirmation. To fix: run the check under
+       `correction_trial.configured(cal, asset)`.
+     - **F3, CRITERION GAP (Q4)**: the check asks whether the confirmed
+       agreement covers the receipt at all, not whether it gives the SAME
+       slot - so a hold the confirmed agreement puts in X and the pending
+       correction in Y is filed to Y. And `_covering_slot`'s on-calendar test
+       read the agreement on disk whatever it was given. To fix: the same slot,
+       read wholly under the confirmed agreement.
+     - **F4, TEST GAP and ROBUSTNESS (Q4)**: both tests stub
+       `_awaiting_confirmation`, so nothing exercises the real revert (the
+       critic drove it read-only and it works); and a working copy that
+       cannot be read, or a revert that fails, now aborts the drain inside
+       the processing pass. To fix: an unreadable correction leaves every
+       hold held this pass, and says so.
+     - **F5, KEITH'S CALL (Q18, REQ-DASH-182 c12)**: on the real build
+       cp-case-workers' period owed nothing shows three cycle blocks, one per
+       supply, each saying "Not owed". The amendment removed the separate
+       label-only block; the one-chain-per-supply grouping still repeats the
+       period. Queued for Keith in plans/morning-reports.md.
+     - **F6, POLISH (Q18)**: `ofCycle`'s `e.period === c.period` half is dead -
+       a cycle carries `cycleStart` and `entries`, never `period`. To remove.
+     - **F7, KEITH'S CALL (Q24, REQ-DASH-180 c17)**: a dataset with an
+       authored, not yet started, for-good turn-off has the fewest dates left
+       by construction, so it drives the runway minimum - and the amended
+       wording then drops the add-dates instruction while other datasets on
+       the calendar are also short. Queued for Keith.
+     - **F8, KEITH'S CALL (Q11, REQ-PIPE-130 c12)**: `_manifest` reads the
+       newest CLEARED re-check; `rechecking.worse_than_promoted` reads the
+       newest re-check DECISION and skips the supply while it is owed. While
+       a second re-check is owed the two disagree. Nothing disagrees in the
+       real database today (every cleared row predates schema 44, so
+       `found_worse` is NULL). Queued for Keith - which reading is right is a
+       product question.
+     - **F9, TEST GAP (Q17)**: `test_every_action_the_log_records_has_words`
+       builds its set from constants already in `DONE`, so it cannot fail.
+       To fix: assert `set(decision_log.ACTIONS) <= set(DONE)`.
+     - **F10, POLISH (Q19)**: in the agency table "Not owed yet" sits beside
+       "No QA run within tolerance on the selected date"; and the dataset
+       page's main branch (a dataset with columns) still calls
+       `pill(ds.status)`. To fix both.
+     - **F11, POLISH (REQ-DASH-180 c14 as amended)**: a hold superseded by the
+       rule reads "superseded, <at>" with no "by". To fix.
+     - **F12, NOTE (Q21)**: the terminal headline "Turning off after ... -
+       nothing more owed" has no authored-date condition; c25 is a dashboard
+       criterion. Queued for Keith with F5, F7 and F8.
+     - **FIXED, 2026-10-15**: F1 (`correction_trial.trial` asks whether the
+       filed period is turned off before the rule's answer; a rule move to an
+       owed slot is not labelled turned off; test
+       `test_received_in_an_owed_period_and_placed_into_the_gap`, failing
+       first). F2-F4 (`schedule_ended._confirmed_slot` reads the slot under
+       `correction_trial.configured`, calendar and timezone both, and must be
+       the same slot; unreadable corrections leave every hold held and say so;
+       five tests in `TestItWaitsForACorrectionsConfirmation`, all failing
+       against the old re-filer). F6 removed. F9 asserts against
+       `decision_log.ACTIONS`. F10 `noRunWords` and `statusPill` on the
+       dataset page's three branches. F11 "superseded by the rule". F5, F7,
+       F8 and F12 queued for Keith in plans/morning-reports.md.
+     - **KEITH'S ANSWERS BUILT, 2026-10-15** (all four the recommended
+       option): F5 one block per period owed nothing - cycles sharing an
+       owed-nothing period's date merge in `renderSupplyHistorySection`
+       (tests-js/owed-nothing.test.js, failing first). F7 an authored
+       for-good turn-off stops driving the runway minimum on the page and in
+       the gate, and drives only where every dataset counted is turning off
+       (tests-js/schedule-runway.test.js and tests/test_turn_off.py, failing
+       first; the older gate test now turns the whole collection off, the
+       one case its wording still covers). F8 the queue takes the newest
+       re-check that has RUN (tests/test_recheck_decision.py, failing first).
+       F12 the terminal headline waits for the authored date
+       (tests/test_turn_off.py, failing first). Decisions on REQ-DASH-182,
+       REQ-DASH-180 and REQ-PIPE-130.
+
+200. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on f43c85d:
+     a dashboard test still expecting Q19's old pill.**
+     `TestInPlaceOnDatePicking::test_a_date_before_any_real_history_shows_no_data`
+     asserted "No data" on Birth Registrations' page a thousand days before
+     any history. That date is also before the dataset's first participation
+     version (2026-06-30), and REQ-DASH-182 criterion 3 as amended for Q19
+     (37e4d1a) makes the pill read "Not owed yet" there - the page was right
+     and the test was out of date. 37e4d1a's own CI run was cancelled by the
+     next push, so f43c85d's was the first to show it. The test now asserts
+     "Not owed yet" and that no earned status (Green, Amber, Red) shows; it
+     passes on the rebuilt local dashboard. Lesson for this session: a
+     cancelled CI run is not a green one - the next run carries its result.
+
+201. **[done, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
+     **delivery-critic on REQ-GHUB-229 and REQ-DASH-230 (25116ce).**
+     REQ-DASH-230 checked in a real Chromium at 1280px and 390px on all seven
+     datasets, zero console errors; REQ-GHUB-229's main case works. Each
+     finding below checked against the code and turned into a test before
+     the fix.
+     - **F1, DEFECT (229 c9), reproduced**: an open pair over a promoted
+       period listed the promoted supply as "waiting on a decision" - the
+       in-place check read the slot's state, which is TWO_FILES there.
+     - **F2, DEFECT (229 c5, c7), reproduced**: a supply rejected and later
+       promoted was listed "rejected", offering promote and re-file, while it
+       was the period's promoted supply - the reject check came first.
+     - **F3, DEFECT (229 c14), reproduced**: supplies filed into a SUBSTITUTED
+       (or inherited) period were listed at the door and in no queue entry.
+     - **F4, KEITH'S CALL**: a failed load ALONE in its period goes straight
+       to the period's decisions "as today" (criterion 2), so the door still
+       offers it promote, re-file and the rest, while the queue offers reject
+       only - against the signed decision "reject only, in the door as in the
+       queue". Queued in plans/morning-reports.md.
+     - **F5, GAP (230 c6), reproduced**: a hand-filed RESUPPLY row showed the
+       filer's stated original arrival nowhere.
+     - **F6, POLISH (229 c5)**: "superseded by the supply that arrived
+       202605270100000000" - a raw arrival key.
+     - **F7, POLISH**: un-supersede on a chosen superseded version still said
+       "(N earlier versions)" for the whole period.
+     - Test gaps: the door's pair-only choice, "The period itself", and an
+       unreachable log at the list step had no test.
+     - **FIXED, 2026-10-15**: F1 and F2 (`supplies_in` reads the promoted
+       holder from `decision_log.held` and checks it before anything else
+       but an open pair), F3 (`waiting_behind` asks substituted and inherited
+       slots too), F5 (`statedNote` on the resupply branch), F6 (the newer
+       supply's receipt via `display_time.format_instant`), F7 (no count on a
+       chosen version); the door's three branches now have tests. All in
+       tests/test_every_filed_supply.py and tests-js/how-it-got-here.test.js,
+       F1-F3 and F6 seen failing first.
+     - Noted, not changed: `_rechecked_worse(conn, "", ...)` passes a dummy
+       collection id to a parameter it does not use; `supplies_in` calls
+       `open_contest` once per filed supply, heavier than the NFR's "one
+       verdict lookup per supply" (0.05-0.15s a period on the real database
+       today) - worth watching at thirty datasets.
+     - **F4 BUILT, 2026-10-15 (Keith: reject only at the door too)**:
+       `period_flow` reads `supplies_in` for a period with exactly one filing
+       and, where it could not be loaded, decides on it with reject alone.
+       Test `TestALoneFailedLoadAtTheDoor`, failing first (it offered promote
+       and seven more). Decision on REQ-GHUB-229.
+
+202. **[done, 2026-10-15]** **[Testing & dev tooling]** **[Dashboard UI]**
+     **delivery-critic on REQ-DASH-208 (63ba55d).** Every one of the 32
+     placed chips clicked and cold-reloaded in a real Chromium at 1280x800,
+     plus hand-edited URLs, every date-change route, drawers, panels, dark
+     mode and 390px. Each finding was checked against the code and turned into
+     a test before its fix.
+     - **F1, DEFECT (c1, c7), reproduced**: 8 of 32 chips (TS-67, TS-68 to
+       TS-74) said "nothing to show" with the row on the page. The placement
+       names the supply's run id; the row carries the run in place
+       (`<id>__1__r1`), and the match was exact. TS-73 (both files rejected,
+       no run at all) had no run row, only its "Two files for one table" row,
+       which carried no id.
+     - **F2, REGRESSION (c8 against #123 B4), reproduced**: change the date
+       after a jump, press Back, and the Scenarios tab showed the changed date
+       while its address carried none. Dropping the jump on a date change also
+       dropped the date Back undoes to.
+     - **F3, DEFECT, reproduced**: a reload with a drawer or panel open moved
+       focus to the subject BEHIND it; the column drawer also kept
+       `scenario=` in its address while its state had dropped the jump.
+     - **F4, DEFECT (c7, c9), reproduced**: the subject was found by element
+       kind alone, so `scenario=ts-75a` on Birth Registrations marked that
+       dataset's as-at panel as TS-75a's, and a wrong date marked that day's.
+     - **F5, DEFECT (c4), reproduced**: the standing-in pill (TS-79a/b) got
+       no accent rule - `.pill.standing-in.<kind>`, 0,3,0, outranked it.
+     - **F6, KEITH'S CALL**: on a reload, a shared link or keyboard Enter the
+       subject also draws the focus ring beside the rule - focus is c1's, the
+       ring is c4's "never the mark". Queued in plans/morning-reports.md.
+     - **F7, KEITH'S CALL**: every subject lands flush on the viewport's
+       bottom edge ("from the top, then nearest") - meets c1, least
+       comfortable place to land. Queued with F6.
+     - **F8, DEFECT, reasoned**: `history.scrollRestoration = "manual"` stayed
+       set for the page's life, and later entries copy it.
+     - **F9, POLISH**: a mixed-case parameter matched but was not rewritten.
+     - **F10, POLISH**: an unknown subject name read on the page as "nothing
+       to show" instead of failing the build.
+     - **FIXED, 2026-10-15**: F1 (`sameSupplyRun` matches a supply's own
+       runs; a blocker row carries `data-supply` and is found by the key its
+       supply and run id share), F2 (the dropped jump leaves `jumpedFrom`, which
+       popstate honours and `navigate()` strips), F3 (no focus while a panel
+       or drawer is open; the column drawer carries the jump as the panels'
+       spread already did), F4 (`onScenarioPage`: the scenario's own dataset
+       and date), F5 (the rule's selector outranks the pill's), F8 (manual
+       for that load only, handed back after `load`), F9 (written back
+       lowercase on load), F10 (`Placement.of` refuses a name outside
+       `SUBJECTS`). Tests: tests/test_dashboard_e2e.py's
+       TestEveryScenarioJumpLands (every chip, F2, F3, F8, F9),
+       tests-js/scenario-jump.test.js (F1, F3, F4), tests/
+       test_scenario_subjects.py (F10) - each seen failing first.
+     - **Open, for Keith with F6/F7**: whether opening a drawer or panel over
+       a jump's page is "navigating from the page" (c8). Built as NOT - the
+       jump stays with a drawer as it already did with a panel - because a
+       panel over the page leaves the page and its subject where they were.
+     - **KEITH'S ANSWERS, 2026-10-15**: F6 keep the focus ring - no change.
+       F7 land the subject centred - `landOnScenarioSubject` scrolls from the
+       top to block "center", or "start" for a subject taller than the
+       window; the 0.25px round-up for TS-77b went with "nearest". Test
+       `test_every_subject_lands_centred` over every placed chip, failing
+       first (TS-1 and the rest sat at 670-720px of 800). The drawer
+       question: built as asked - opening one is not leaving the page.
+       Decision on REQ-DASH-208.
+
+203. **[in-progress, 2026-10-15]** **[Pipeline & publishing]** **[Testing & dev tooling]**
+     **delivery-critic on REQ-PIPE-202 (2da963b).** All 13 criteria hold in
+     behaviour, criterion 4's last clause openly deferred; no Child Protection
+     load route still assumes `<table>.csv` and no path quietly picks one of
+     two cp_clients files. The weaknesses were in the tests.
+     - **F1, TEST GAPS, each reproduced by the critic as holding today**:
+       (a) the picker's mark was tested on a hand-built entry, never through
+       the real `load_manifest`; (b) "each reader" was asserted as "at least
+       one"; (c) "staging both and checking neither" had no test; (d)
+       criterion 5's WHERE - a partner the load refuses keeps the pair
+       contested - had none; (e) the queue item itself was not read, only the
+       blocker; (f) the trial's own entry point was not driven.
+     - **F2, KEITH'S CALL**: a pair in a TRIAL folder (or its reference) is
+       refused naming the Filing decisions queue as where it is settled - but
+       a trial files nothing, so it will never appear there. Met to the
+       letter. Queued in plans/morning-reports.md.
+     - **F3, NOTED**: the five sibling arrivals of a pair's delivery are
+       listed unmarked, and picking one is refused because its load reads the
+       whole folder - loud rather than a quiet choice, so criterion 13 is met;
+       it surprises, about a table the person did not pick. Folded into F2's
+       question.
+     - **F4, DEFECT (c13), reasoned**: picking a pair asked "keep or trial?"
+       and printed "Running the real ... chain" before refusing.
+     - **F5, STALE PROSE**: generator/scenario_injection.py and
+       tests/test_scenario_injection.py still said every Child Protection
+       pattern is exact - and that test would go red when REQ-GEN-203 plants
+       TS-42, because the work succeeded (CLAUDE.md test rule 4).
+     - **F6, NIT**: three files said "has two files".
+     - **FIXED, 2026-10-15**: F1 (tests/test_cp_pair.py - each of the three
+       readers, two staged tables and no tool results, the queue item, the
+       real picker, an unloadable partner; tests/test_cp_load_by_pattern.py -
+       the trial and reference folders through `run_check_local_folder`), F4
+       (`_refuse_a_contested_run` before `decide_record` on both routes), F5
+       (both rewritten; the test now covers the five exact patterns), F6 (the
+       count). F4 and F6 seen failing first; F1's tests passed at once, being
+       coverage of behaviour that already held. Also fixed a fixture flake
+       found on the way: a random free quarter could be the last one, or one
+       whose next period an earlier run had filled, and the re-file test files
+       into the next period.
+     - **CI RED ON 249926f, fixed 2026-10-15**: (1) a CI worker running the
+       whole suite ran out of free cp-clients quarters, because every pair
+       test built its own pair in a fresh one - the read-only checks now
+       share one module-scoped pair; (2) test_placements_page's placedIn test
+       read `points`, which holds only days the panel's answer changed, and
+       on a crowded worker database the placement's day was not one - it now
+       asks the day's decisions directly. Both test defects, not page ones.
+
+204. **[in-progress, 2026-10-15]** **[Dashboard UI]** **[Testing & dev tooling]**
+     **delivery-critic on REQ-DASH-209 (421e9f4).** The held kinds agree with
+     qa.slot_holds in all 70,212 dataset-period-days checked from 2023-02-01 to
+     2026-10-15, and with the dataset page's standing-in pill on 8,226
+     dataset-days - 0 mismatches. The rows holding nothing were weaker.
+     - **F1, DEFECT (c1), reproduced**: a period with a supply received but not
+       promoted, and no closed-slot record, read 'No supply' or 'Due' where its
+       supply history says 'Waiting' (Birth Registrations 2026-07-02, 07-05 and
+       five more days; Child Protection 2023-Q2 and 2024-Q1) - against the
+       build's own PROVISIONAL rule.
+     - **F2, DEFECT (c1), latent, reproduced with altered data**: 'Not owed
+       yet' was keyed on the date on show, so a past period before a late
+       joiner owed anything flipped between 'Not supplied' and 'Not owed' with
+       the date. No real dataset joins late today.
+     - **F3, WORDING**: 'Not owed — Not owed — outside its agreed months'.
+     - **F4, PRIVACY, latent**: people.display_name() returns the identity for
+       anyone not in contract/people.yaml, so a person removed from it would
+       reach the embedded slot timeline as an email address. Holds today.
+     - **F5, NOTED (reasoned)**: a collection whose datasets follow different
+       calendars would merge period names and mark a dataset without that
+       period 'Not supplied'. None does today.
+     - **F6, NOTED**: the previous/next links sit on their own line below the
+       sub-line rather than beside the h2; a 'Previous period' link is offered
+       where the period on show had not opened either (within c14's letter).
+     - **F7, NOTED**: page size drifts with build time (10,891,457 and
+       10,898,715 on later rebuilds), so the recorded before/after are two
+       builds made minutes apart, not one diff.
+     - **FIXED, 2026-10-15**: F1 (a supply received in the period and not
+       withdrawn by the date reads Waiting, from the same runs and runStates
+       the supply history reads), F2 (keyed on the period's own date against
+       owesFrom), F3 (the word once), F4 (slot_timeline._shown: 'a person'
+       where no name exists). Tests: tests-js/period-composition.test.js
+       (F1-F3) and tests/test_slot_timeline.py (F4), each seen failing first.
+
+205. **[done, 2026-10-15]** **[Testing & dev tooling]** **CI red on 674399a:
+     two test defects, neither in the product.**
+     - **`test_a_resupply_only_ever_follows_a_red_delivery`** - mine, from
+       421e9f4: TS-14's corrected Client Register rides TS-12 as a second
+       delivery after an UNREADABLE first one, not a red one. The test's
+       invariant is about the resupplies the drawn severity chooses; it
+       already exempted TS-77's scripted chain, and now also exempts a chain
+       whose later deliveries its scenario scripts after a file fault (TS-12;
+       TS-77a was already exempt). Reproduced locally first.
+     - **`test_cp_pair.py`, two shapes of one cause: a CI worker's database
+       carries other modules' Child Protection state.** (a) The queue-item
+       test read the FIRST contested Client Register item, which can be
+       another module's - reproduced locally by running the Child Protection
+       modules serially on one database; it now finds its own pair's item by
+       its receipt. (b) The unloadable-partner fixture's carers run read a
+       `cp_clients` sibling with no `postcode` column from its period - NOT
+       reproduced locally in three runs; `_free_quarter` now also refuses a
+       quarter any Child Protection dataset has filed to, or whose period
+       schema holds any table, which removes every way a foreign sibling
+       could be read there. If it recurs, the period's tables at that moment
+       are the thing to capture.
+
+206. **[done, 2026-10-15]** **[Dashboard UI]** **[Testing & dev tooling]**
+     **The executive legend's green counter read "(1 agencies)", and four
+     tests leant on the newest quarter being red.** Found in the first full
+     run after REQ-GEN-207 grew Child Protection back to 2013.
+     - **A real, minor defect.** The legend printed green as
+       `(${n} agencies)` and every other status as `(${n})`. No test had ever
+       seen a green agency there, so nothing caught it; at 2022-01-01 Child
+       Protection is now green and Birth Registrations has no data, and
+       `test_every_counter_sums_to_the_number_of_agencies` could not add the
+       green count up. Fixed test-first: the test gained a ONE_GREEN date
+       (2022-01-01) and failed on it; the legend now reads `(N)` like the
+       rest. NOTHING_YET moved to 2012-01-01, since 2022 is no longer before
+       any history.
+     - **Two test preconditions with a one-quarter shelf life.** The
+       "Columns not green" and dataset-trend tests required a not-green
+       unit AT THE BUILD'S OWN DATE. Since TS-56 moved to the newest quarter
+       (held, so nothing amber is in place), every dataset is all green
+       there - legitimately. The row-count test now requires a not-green
+       unit at its earlier date (2025-06-15) instead; the trend test runs at
+       that date. Same family as the daily-dataset shelf-life note in
+       CLAUDE.md's runtime log.
+     - **`test_calendar_move_pin`** pinned Child Protection's periods from
+       before the move; REQ-GEN-207 added 2013-2022 as earlier versions, so
+       the six Child Protection datasets join Birth Registrations in the
+       "earlier periods may be added, nothing pinned may change" set.
+     - **The configuration tests** (122 failures across 13 files) read "the
+       first version" meaning the 2023 one; they now read the calendar as it
+       stood before the growth (`tests/before_growth.py`), and the few that
+       run the real configuration take its new expectations.
+     - **A fixture-ordering error in the full gate (12 setup errors, one
+       worker).** On cea40d9's full `mothman check` (5,478 passed), the Child
+       Protection staging fixture's period clean-up dropped 2026-Q1/Q2 only,
+       and the guard refused because another module on the same worker had
+       left a `period_2026_q4.cp_case_workers` view resolving through them.
+       Not reproduced by pairing the obvious modules locally; the fixture now
+       drops every period schema from 2026-Q1 on, newest first. Test-only.
+
+207. **[in-progress, 2026-10-16]** **[Data generation]** **[Testing & dev tooling]**
+     **delivery-critic on REQ-GEN-207 (Child Protection grown ten years).**
+     Ran while a bootstrap rebuilt the database, so criteria 6 and 10's
+     counts went unchecked against the DB; the byte proof it re-ran itself
+     (206 of 222 original Child Protection files identical, 16 differing, all
+     in 2024-Q4 and 2026-Q3) agrees with the evidence.
+     - **D1 (fixed in text; question for Keith).** TS-54's register entry and
+       REQ-GEN-207's decision said cp-placements' 2024-Q4 supply was "promoted
+       amber". The amber moved there dirties only cp_carers and cp_clients, so
+       that supply is green, promoted - TS-54 still stands on a green one.
+       Both now say so; whether it should be amber is Keith's.
+     - **D2 (fixed).** TS-79b said "six years earlier" (ten); the SIX YEARS
+       decision is now marked superseded by TEN YEARS.
+     - **D3 (fixed, test-first).** `_grown_severities()` ignored injections: the
+       first scenario planted in a grown quarter (REQ-GEN-203/205/206 plan
+       to) would silently swallow a drawn amber, leave a lead-in unforced and
+       drop a red. It now refuses, naming the scenario, until it learns to
+       move them. `TestAScenarioInAGrownQuarterIsRefused` failed first.
+     - **E3 (fixed).** `tests/before_growth.py` now asserts it stripped
+       something, so a moved `GROWN_FROM` cannot turn the configuration tests
+       into edits of the wrong version.
+     - **Not fixed, recorded:** criterion 2's evidence is a hand count, not a
+       recorded dry run (superseded by the Emergency Department plan's
+       REQ-GEN-238, which re-runs it for the shrink); no ongoing byte pin for
+       the original fifteen (E1); `test_severity_counts_match_run_plan` is
+       circular for the grown quarters (E2 - checked by hand: the mix is from
+       seed 29000, oldest clean, 2 reds, 10 ambers).
+     - **Observations for Keith:** O1 the grown reds leave permanent
+       "Awaiting a decision" queue items (replacement `never`), visible on
+       today's pages and the TS-76/TS-77a jumps; O2 running-thoughts #98 seen
+       for real - checks shown on 2013 supplies with nothing saying they came
+       later; O3 grown extracts carry rows dated up to 13 years after the
+       extract (the base data is not date-filtered); O4 a knock-on headline
+       reads Red while its history row reads Green (pre-existing at
+       2024-03-15 too); O5 later supplies listed as "Waiting" at a past date
+       (pre-existing). Stale comments at scenario_injection.py TS-76/TS-77a.
+
+208. **[done, 2026-10-16]** **[Data generation]** **[QA checks & contract]**
+     **REQ-GEN-044's evening-before era was built and shelved.** Byte proof
+     clean (449 of 449 existing Birth Registrations deliveries identical, 12
+     new), but `mothman schedule validate` refuses the configuration: the
+     2026-06-30 participation version leaves out the new version's
+     `days_before: 1`, restating `days_before: 0` there is refused by the
+     agreement freeze, and every later version needs the same. Caught by the
+     configuration tests and the critic before any push. The whole change is
+     `docs/drafts/evening-before/evening-before.patch`, with the options for
+     Keith in that folder's README.
+     **RESOLVED the same morning.** Keith chose to widen REQ-PIPE-111
+     criterion 9's synthetic exemption to "RESTATING on a frozen version a
+     value it left out, at that value's default" (his approved wording,
+     ~06:30 Perth). Built test-first
+     (`TestRestatingAnOmittedValueAtItsDefault`, the free case failing
+     against the old code, four refusals passing on both), the patch
+     re-applied with `days_before: 0` restated on all four later Birth
+     Registrations versions, the byte proof re-run on that tree (449 of 449
+     identical, 12 new), and the draft folder deleted. A defect fix in the
+     sense of this file's rule? No - a built rule doing what it said, changed
+     by an approved amendment; the test-first order was kept anyway.
+
+
+209. **[done, 2026-10-16]** **[Supply model]** **The slot horizon took the
+     largest `days_before` ever stated, not the one in force.** Found by the
+     full gate after the evening-before era landed:
+     `test_claim_window_lookahead.py::test_the_daily_feed_is_unchanged`
+     failed because `slots.claimable_until()` added
+     `max_days_before()` - the largest of every version Birth Registrations
+     ever had - so twelve evening-before days in June widened every later
+     day's horizon by one, and a supply on 5 September was offered the 6th.
+     Harmless in effect (`assignment.open_slot()` still filters on the
+     window, so nothing could claim it), but the list the docstring
+     promises is "every claimable slot and no more" and it was not. Fixed:
+     only the versions whose span meets the horizon count. The failing test
+     was already there and failed first; 304 tests across every module
+     touching `days_before` pass. Minor, so fixed under Keith's polish rule.
+     The same gate's other four failures were re-pins the era made true on
+     purpose: Birth Registrations owes from 2026-06-18, TS-10 is TS-10a and
+     TS-10b, SLOT_DUE_DATES now holds exactly the twelve era days, and the
+     arrival golden was re-captured from the rebuilt history - 441 arrivals
+     in both, zero verdicts moved, the 12 era arrivals added.
+
+210. **[done, 2026-10-16]** **[Testing]** **A killed equivalence capture left
+     its worktree and work directory behind for good.** Seen for real while
+     REQ-TEST-239's self-check ran: the container restarted during capture
+     B's bootstrap, and a kill never reaches `capture()`'s `finally`, so
+     `git worktree list` still carried `/tmp/equiv-self-check-b-*/tree`, the
+     work directory stayed on disk and `equiv_self_check_b` stayed in
+     PostgreSQL. The database was already self-healing - the database stage
+     drops it by name before creating it - but nothing ever removed the
+     other two. Fixed: a capture first clears any earlier capture's
+     leftovers, with the test failing first. Minor, so fixed under Keith's
+     polish rule. Capture A had finished before the restart (about 25
+     minutes from empty, against the 31m52s measured 2026-10-15), so only B
+     was re-run. REVISED THE SAME DAY by #211: the first fix matched
+     leftovers by label, and the self-check then showed a per-label path
+     makes two captures' help texts differ. Every capture now uses one
+     fixed path under an exclusive lock, so the leftover is always at the
+     same place and a live capture's tree can never be cleared, because a
+     second capture is refused while the lock is held.
+
+211. **[done, 2026-10-16]** **[Testing]** **REQ-TEST-239's first self-check
+     failed, as it exists to, and every difference was the harness.** Two
+     captures of 653911d here, and the same again in CI's on-demand job on
+     7ac4b1d, differed on S1, S5 and S7 with S4 identical. Causes, all
+     measured from the two baselines: decision ids referenced raw from
+     seven places (the collections replay side by side, so ids
+     interleave), load-attempt ids in the dashboard JSON, clock stamps in
+     S5, rule-made decision times (29 of 544, by at most 0.69s), the
+     build's own wall clock (a 10:00 Perth slot closed between the two
+     builds), and the worktree path inside `mothman population --help`.
+     **One was a real defect in code already relied on:** `filing.refiled_by`
+     names the decision that re-filed a supply, and the rule inherited from
+     `tests/equiv_support.py` joined it to `qa.filing.id`, so every
+     equivalence comparison since REQ-PIPE-141 compared an unrelated filing.
+     A test reproducing it against a real database failed on the old rule
+     ("cp-carers|...|2099-S..." where the decision's reference belonged)
+     and passes on the fix. Keith decided two things: rule-made decision
+     times are left out by name, and the clock is pinned
+     (REQ-TEST-239 criteria 16 and 17, wording approved as written). The
+     rest are normaliser 2 and the fixed worktree path. Recorded on
+     REQ-TEST-239's decisions.
+
+212. **[done, 2026-10-16]** **[Testing]** **CI went red on both of the
+     morning's REQ-TEST-239 pushes, 9bab4da and 7ac4b1d, seven failures
+     each.** Three causes, none in the harness's logic: CI's terminal adds
+     colour codes, which broke assertions on the error panel's text
+     (reproduced here with `FORCE_COLOR=1`: the old test fails, the new one
+     passes); two tests need git history that the default depth-1 checkout
+     does not have (a commit from before `mothman env mark`, and a count of
+     commits between two baselines), so the `test` and `on-demand` jobs now
+     check out full history, about 17MB; and `equivalence.py` imported
+     `synthetic_reset`, which `test_reset_synthetic.py` reserves for
+     `mothman env` alone - it now asks the asset clock's own synthetic check.
+     The pushes went out because the local gate ran with
+     `--no-pytest` plus selected test files, as rule C allows, and none of
+     the three is visible from a local run. CLAUDE.md already records the
+     git-depth trap; this is a second instance of it.
+
+213. **[done, 2026-10-16]** **[Testing]** **A test's tidy-up could remove a
+     live capture's worktree.** Seen running `tests/test_equivalence.py`
+     while REQ-TEST-239's self-check was mid-bootstrap: since #211 every
+     capture uses one fixed worktree path, and the killed-capture test's
+     `finally` ran `git worktree remove --force` on that path whatever was
+     there. The live tree survived (checked: still registered, clean, its
+     `data/` intact), but by luck rather than design. Fixed in the tests:
+     the three that capture now require the harness to be free and FAIL
+     with a plain message when a capture is running - never skip, which
+     would be a green proving nothing - and the tidy-up holds the capture
+     lock while it removes anything. Seen failing in exactly that way with
+     the self-check running, and the tree was unaffected. Minor, so fixed
+     under Keith's polish rule.
+
+
+214. **[done, 2026-10-16]** **[Testing]** **The equivalence harness named the
+     generator's bookkeeping, which no QA-side module may.** CI's fast half
+     went red on a0f3e3d and 0e5bacf with one failure:
+     `tests/test_arrivals.py::TestTheGeneratorsBookkeepingIsWalledOff`
+     (REQ-GEN-043 criterion 7) found `data/generator_bookkeeping.json` written
+     out in `qa_tools/common/equivalence.py`'s S4 file list. The harness only
+     hashed the file, but the rule is about any QA module naming it at all,
+     and it was right to fire. Fixed by naming WHERE rather than WHAT: S4 now
+     hashes every file the bootstrap leaves under `data/` except dbt's own
+     per-run scratch - the identical 924 files, checked against the after-240
+     baseline, so no baseline needs recapturing. The architecture test failed
+     locally first and passes now. Missed locally because the gates before
+     those pushes ran selected test files rather than the whole suite (rule C);
+     the full suite in CI is what caught it.
+
+
+215. **[done, 2026-10-16]** **[QA checks & contract]** **Moving dbt's singular tests
+     into collection folders would have hidden them from the cross-table
+     gate.** Found while building REQ-QAC-241, before anything was pushed.
+     `tables_read._dbt_singular_cross_table_checks()` looked for each
+     singular test at `dbt_project/tests/<name>.sql` exactly; once the five
+     real ones moved to `tests/<collection-id>/`, it skipped every one
+     without a word, and `undeclared_cross_table()` would have stayed green
+     over six business rules that join a second table - the same shape of
+     miss that function's docstring already records once. Fixed test-first:
+     a singular test filed under `tests/child-protection/` failed to be read
+     against the old code, and now is, because the scan searches every
+     folder under `tests/` the way dbt does. The repo-wide "not passing
+     vacuously" test now strips declarations from every collection's schema
+     file rather than one fixed path. Minor and in a gate, so fixed under
+     Keith's polish rule.
+
+
+216. **[done, 2026-10-16]** **[Testing & dev tooling]** **CI's coverage combine
+     failed on the legacy Evidently reader.** Run 38879892217 on ca6747b: both
+     test halves green, then `coverage report` exited 1 on "No source for code:
+     qa_tools/bdm/evidently_check_lifecycle.py". REQ-QAC-241's legacy reader
+     `exec`s a pre-move module's source to read a base ref's checks, and
+     compiled it under that module's repo path, so coverage recorded code for
+     a file the tree no longer has. Reproduced locally the same way - one test
+     module under `--cov`, then `coverage report` exiting 1 on the four
+     deleted paths - and fixed by compiling under `<legacy <path>>`, a name
+     coverage never treats as a source file; the same report now raises
+     nothing. Missed locally because the full gate runs pytest without
+     coverage. Minor, so fixed under Keith's polish rule.
+
+
+217. **[done, 2026-10-16]** **[Testing & dev tooling]** **The tests' cache
+     helper never cleared the collection registry, so a swapped hierarchy
+     outlived its test.** Found while building REQ-QAC-242, before anything
+     was pushed. `tests/agreement_split.py::clear_caches()` predates
+     REQ-PIPE-240 and cleared the hierarchy's cache but not the registry's,
+     which is built from it. A test that swapped in a smaller asset left
+     the registry holding that asset for the rest of its worker. The first
+     shared stager read a collection's tables from the registry, so
+     `test_build_warehouses_rebuild.py`'s Child Protection test failed
+     whenever it ran after `test_sample_data.py` on the same worker: it
+     rebuilt views over `cp_referrals`, a table only the earlier test's
+     asset had. Two fixes. The stager asks the hierarchy on every call, as
+     the builder it replaced did, because a dataset graduating out of
+     sample data is a configuration change a running process must see. And
+     the helper now clears the registry too. That un-masked two fake
+     hierarchies in `test_sample_data.py` and `test_no_calendar.py` that
+     had never declared `short` or `run_prefix`: they had only ever been
+     read through the stale real registry. Both now declare them. The
+     failing ordering reproduced before the fix and passes after it.
+     Minor and test-side, so fixed under Keith's polish rule.
+
+
+218. **[done, 2026-10-16]** **[Testing & dev tooling]** **A local gate compared
+     against the previous commit, not against what the push would be judged
+     against.** CI's validate-config run on 81b4ce2 failed: the check-lifecycle
+     gate found `recency_dbt`'s definition changed with no changelog entry. My
+     REQ-QAC-242 docs sweep had edited a comment in
+     `dbt_project/tests/civil-registration/recency.sql`, and a singular test's
+     hash covers its whole SQL text, comments included. The full local gate
+     passed beforehand because `diff_base()` falls back to `HEAD~1` when CI's
+     `MOTHMAN_DIFF_BASE` is unset, and the work had been committed as several
+     local checkpoints (rule D), so `HEAD~1` already held the edit. That is the
+     multi-commit hole #44 closed for CI, reopened at the desk. Two fixes. The
+     comment edit is reverted rather than given a changelog entry, because it
+     changed nothing the check does. And `diff_base()` now compares, locally,
+     against the merge base with the branch's upstream, which is the commit CI
+     is handed as `github.event.before`, falling back to `HEAD~1` only where
+     there is no upstream. Each gate passes its own repository root, because
+     tests point the gates at temporary repositories. Test-first:
+     `tests/test_diff_base.py` failed against the old code (two local commits
+     ahead of an upstream came back as `HEAD~1`) and passes now. Reproduced the
+     CI failure locally with `MOTHMAN_DIFF_BASE=b5253dd` before the revert, and
+     the same command passes after it. Minor and in a gate, so fixed under
+     Keith's polish rule.

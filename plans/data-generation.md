@@ -131,7 +131,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    linkage work. Needs a scoping pass with Keith before building, same as
    this item's own original 2026-09-14 scoping rounds.
 
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
    explicit ask).**
 
 4. **[todo, 2026-09-18]** **[Data generation]** Document/explain how the
@@ -368,7 +368,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
    current mechanics first, then a scoping conversation with Keith
    before building, same as every other design-fork item in this file.
 
-   **Priority: work through today/tomorrow (2026-09-19, Keith's own
+   **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
    explicit ask).**
 
 10. **[todo, 2026-09-19]** **[Data generation]** A synthetic "education"
@@ -391,5 +391,135 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     `synthetic_data_generator/` or `generator/`. Needs a scoping
     conversation with Keith before building.
 
-    **Priority: work through today/tomorrow (2026-09-19, Keith's own
+    **Former priority, cleared by Keith 2026-10-04 - work through today/tomorrow (2026-09-19, Keith's own
     explicit ask).**
+
+11. **[todo, 2026-09-30]** **[Data generation]** The generator ignores
+    `delivery_months:`, so partial-participation datasets arrive in
+    quarters they are not due for.
+
+    **Found while measuring REQ-PIPE-077's mixed-period gate against
+    the real recorded corpus** (NFR 2 asks for a measured firing rate
+    rather than an assumed one). The gate fires on 9 of 60 deliveries,
+    and the dataset in the minority period is `cp-case-workers` **every
+    single time** - checked, not sampled.
+
+    **The cause is configured and deliberate**: `contract/data-asset.yaml`
+    gives `cp-case-workers` `delivery_months: [February, August]` and
+    calls it "the worked example of partial participation" - a staffing
+    register rather than casework, resupplied twice a year. It has 6
+    slots where `cp-clients` has 12, and no 2026-Q2 slot at all.
+
+    **Nothing in `generator/` reads `delivery_months`** (grepped), so
+    the synthetic supplier sends all six Child Protection tables in
+    every quarterly drop, including the two quarters case-workers is
+    not due for. The assignment rule then has nowhere to put it, falls
+    through to its third branch, and records it as
+    `resupply-of-most-recently-filled` - which reads as a resupply and
+    is nothing of the kind.
+
+    **Keith, 2026-09-30, on whether this shape is realistic**: it is
+    not - a partial-participation dataset would not turn up in the same
+    delivery as the quarterly ones. So the corpus is exercising a shape
+    the real world would not produce, and any rate measured against it
+    is measuring the generator rather than the model.
+
+    **But he also settled what SHOULD happen if it ever did**: an
+    off-cycle arrival of a partial-participation dataset is worth
+    flagging, and is a human decision rather than an auto-promotion.
+    Which means REQ-PIPE-077's gate did the RIGHT thing on all nine -
+    they were never false positives. What is wrong is only the
+    frequency, and the explanation it gives ("filed to more than one
+    period" rather than "this dataset is not due this quarter").
+
+    **So there are two separate pieces of work here**, and they should
+    not be conflated: teaching the generator to honour
+    `delivery_months` so the corpus is honest, and giving the gate a
+    clearer reason for the off-cycle case. The first is this item.
+
+    **The second is DONE, 2026-10-02** - and turned out to be the
+    condition rather than the wording. `REQ-PIPE-077` was amended and
+    retitled: the gate now fires on a supply ARRIVING in a period its
+    dataset does not participate in, says exactly that, and withholds
+    only that supply rather than its whole delivery. It still fires on
+    the same nine arrivals here, which is the right answer for as long
+    as this item is open - the corpus really does deliver case-workers
+    off-cycle. What changed is that the other 45 supplies in those
+    deliveries no longer wait with it.
+
+    Likely relevant to `REQ-GEN-044`, whose whole point is that the
+    generated history contains the shapes the model needs - a history
+    that contradicts its own configured participation is a history
+    nobody should measure against.
+
+12. **[todo, 2026-10-15]** **[Data generation]** **[QA checks & contract]**
+    **A cheap Emergency Department dataset so scenarios stop costing Child
+    Protection quarters.** Scoped with Keith 2026-10-15 evening
+    (`plans/running-thoughts.md` #99): Department of Health > Emergency
+    Department > ED Presentations, quarterly on the shared calendar, one
+    8-column CSV per supply, all four tools (~13 checks). Scenarios move
+    unless they need several files, a cross-table check or several datasets
+    in one collection; Child Protection then shrinks by the same dry run.
+    Drafted as REQ-QAC-231 to REQ-GEN-238 by delivery-scoper the same night,
+    in `docs/drafts/emergency-department/requirements-draft.yaml`, NOT
+    SIGNED. Open with Keith: code shape for a third collection, the shared
+    calendar under corrections, TS-61, how Child Protection shrinks, the
+    bootstrap budget, TS-63's dataset, the agreement freeze, Emergency
+    Department's ordinary severity mix.
+
+    **Keith's answers, 2026-10-15 ~23:20 Perth, after the delivery-architect
+    pass:**
+    - Q1 code shape: **generalise first** - resolve
+      `plans/publishing-and-history.md` #6 (one module per tool, not per
+      dataset) before Emergency Department, which becomes its first user.
+      (Not the architect's recommendation, which was a collection registry
+      plus copied runners; his call, made with the trade-off stated.)
+    - Q2 calendar: **one shared calendar**, a correction applies to both
+      collections.
+    - Q3 TS-61: **Emergency Department gets a participation gap** so it has
+      an inheritance of its own; TS-61 moves.
+    - Q6 TS-63: **stays on Child Protection** (the cross-table clause).
+    - Q4 shrink: **drop the oldest grown years** to what a fresh dry run
+      needs; the original fifteen stay byte-identical.
+    - Q5 budget: **a hard 12 minutes** from empty.
+    - Q7 freeze: **widen the synthetic exception** - which amends the built
+      REQ-PIPE-111 criterion 9 (exact wording still to go to him).
+    - Q8 ordinary quarters: **the same severity mix as Child Protection**,
+      from its own seed.
+
+    **What the architect found that the drafts must absorb** (full report
+    summarised here so it survives the session): adding the agency raises
+    KeyError at import in `qa_tools/common/github_links.py`
+    (`AGENCY_QA_FOLDER`), so it is not configuration-only; the check-source
+    lists are hardcoded tuples (`validate_check_lifecycle.py`,
+    `tables_read.py`, `soda_common.py`, `check_bands.py`,
+    `check_lifecycle.py`), so ED would have zero active checks and every
+    supply refused at promotion while the gate passed; `processing_pass.py`
+    iterates a fixed COLLECTIONS map, so it would silently never see an ED
+    arrival; ~20 dispatch sites in ~14 files either fall back to Child
+    Protection, omit ED, or refuse. A shared-calendar correction re-judges
+    every supply in its quarter in BOTH collections, so each corrected
+    quarter must be empty in the other collection (placement or
+    suppression), or the generator's own claim rule refuses it. Amber and
+    replacement settings have no correction route and no synthetic
+    exemption, so their 2013 versions stay. `tests/before_growth.py` keys on
+    the literal 2013-01-01 and must assert it removed something once the
+    versions move. Reuse `generator/names_au.py`'s WA postcode pool (not a
+    licensed Australia Post list). A new dataset's calendar membership is
+    itself a frozen item (traced, not run). The 12-minute budget is below
+    the architect's 15-17 minute estimate for ~30 Child Protection quarters,
+    so profiling the per-quarter cost rise (21s -> 33s) becomes part of it.
+
+    **Keith's follow-up answers, same night, with the architect's findings
+    put to him:** Q1 CONFIRMED - generalise first, knowing the Child
+    Protection shrink now waits on scoping `plans/publishing-and-history.md`
+    #6 (the architect's collection-registry middle path was offered and
+    declined). Q2: add the EMPTY-ELSEWHERE rule - each corrected quarter
+    holds no supply in the other collection, by placement or by suppressing
+    its routine supply. Q5 CONFIRMED - a hard 12 minutes, so profiling the
+    bootstrap is in scope, not optional. Q7: REQ-PIPE-111 criterion 9
+    amended in his approved wording (applied to the register, with the
+    amended half listed as unmet). Still to put to him: REQ-PIPE-170
+    criterion 31's "both collections" -> "every collection" (built, outside
+    the delegation), and whether ED checks on postcode/sex/age group/arrival
+    time record row-level failing values (architect A8). NEXT: scope #6.

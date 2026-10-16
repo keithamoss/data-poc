@@ -16,7 +16,7 @@ invented fresh."""
 from __future__ import annotations
 import os
 
-import yaml
+from qa_tools.common import config_yaml
 
 
 def dataset_s3_config(contract_path: str) -> dict:
@@ -32,7 +32,7 @@ def dataset_s3_config(contract_path: str) -> dict:
     error - a contract that genuinely has no S3 source configured yet is
     a real, valid state, not a config bug."""
     with open(contract_path) as f:
-        doc = yaml.safe_load(f)
+        doc = config_yaml.parse(f)
     props = {cp["property"]: cp["value"] for cp in doc.get("customProperties") or [] if "property" in cp}
     return {
         "prefix": props.get("s3Source"),
@@ -69,6 +69,20 @@ def list_delivery_prefixes(bucket: str, prefix: str, s3_client=None) -> list[str
     client = _client(s3_client)
     response = client.list_objects_v2(Bucket=bucket, Prefix=prefix, Delimiter="/")
     return sorted(cp["Prefix"] for cp in response.get("CommonPrefixes", []))
+
+
+def last_modified(bucket: str, keys, s3_client=None) -> dict:
+    """{basename: LastModified} for these keys - S3's own record of when
+    each object was written, offered as the default answer to "when was
+    this originally received" for a kept supply (REQ-PIPE-103 criterion
+    17). Recorded only; never a receipt (that decision is on the
+    requirement)."""
+    client = _client(s3_client)
+    out = {}
+    for key in keys:
+        head = client.head_object(Bucket=bucket, Key=key)
+        out[os.path.basename(key.rstrip("/"))] = head["LastModified"]
+    return out
 
 
 def download_key(bucket: str, key: str, dest_dir: str, s3_client=None) -> str:

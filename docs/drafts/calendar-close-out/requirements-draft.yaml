@@ -1,0 +1,603 @@
+requirements:
+- id: REQ-DASH-204
+  title: A dataset turned red by another table it reads says so at the top of its page, naming that table and what clears
+    it
+  date_written: '2026-10-14'
+  story: As a data team leader opening a Child Protection dataset that reads red, I want the top of its page to tell me when
+    the red comes from ANOTHER table - two files for one table, a file that could not be loaded, a supply held, overdue or
+    waiting on a decision - naming that table and what clears it, so that I go to the one decision or arrival that clears
+    it instead of hunting through this dataset's checks for a fault it does not have.
+  moscow: must
+  status: not_started
+  source: 'Keith, 2026-10-13 evening, answering the CLI and dashboard UX reviews of the calendar close-out batch (plans/running-thoughts.md
+    #92): ''a reader dataset turned red by ANOTHER table''s contest gets a NEW DASHBOARD REQUIREMENT NOW (a top-of-page line
+    naming the contested table), not a later sighting.'' Drafted by delivery-scoper overnight 2026-10-13 to 14 while Keith
+    was asleep, so every fork is an open question rather than a decision.'
+  acceptance_criteria:
+  - WHERE the run the dataset's status is computed from on the date on show includes a cross-table check recorded as not evaluated
+    because a table belonging to ANOTHER dataset was contested, could not be loaded, held with no period, past due or staged
+    and awaiting a decision (REQ-PIPE-115 criteria 14 to 16, held_blast_radius), THE SYSTEM SHALL show at the top of that
+    dataset's page ONE notice in the page's red notice style - after the waiting-blocker banner and before the exhausted-schedule
+    banner - holding one line per such table, each beginning in bold with criterion 15's wording for its cause, and naming
+    the period; and SHALL NOT show a line for a table that is merely not yet due.
+  - THE SYSTEM SHALL say in that line how many of this dataset's checks read that table and could not run, that those checks
+    did not fail on this dataset's own data, and what runs them again - criterion 15's next step for the cause.
+  - THE SYSTEM SHALL NOT word the line so that it says or implies this dataset has nothing else wrong, and SHALL NOT change
+    the dataset's status because of it - the line explains the red and never removes it.
+  - THE SYSTEM SHALL show one line per contested table however many of the dataset's checks read it, and SHALL NOT show a
+    line per check.
+  - THE SYSTEM SHALL make the contested dataset's name in the line a real link (<a href>) to that dataset's page at the same
+    date on show, built as affectsLinks() builds its links, so that middle-click and copying the link keep the date.
+  - THE SYSTEM SHALL judge the line as at the date on show - from the run the dataset's status is computed from on that date
+    and the contest's opening and resolving instants on the asset's clock (REQ-PIPE-194 criteria 9 and 14) - and SHALL NOT
+    judge it as at the build.
+  - WHILE a contest is resolved on the date on show but the run the dataset's status is computed from still carries checks
+    not evaluated because of it, THE SYSTEM SHALL say in the line that the pair was settled, or superseded, on <date on the
+    asset's clock>, that these checks have not run again since, and what runs them again - the re-check settling the pair
+    owes (REQ-PIPE-211), a later supply of <dataset> promoted into the period, or a person's re-check of this supply (REQ-PIPE-164,
+    once built) - and SHALL NOT say that the red is waiting on the pair.
+  - WHEN the dataset's checks have been re-evaluated (REQ-PIPE-121's knock-on) so that the run its status is computed from
+    carries no check not evaluated because of another table, THE SYSTEM SHALL show no line.
+  - THE SYSTEM SHALL NOT show the line on the page of the dataset whose table is the cause, which carries criterion 17's 'Affects'
+    instead.
+  - THE SYSTEM SHALL record, for every not-evaluated cross-table result, the reason's code for EACH table it names (unrunnable_codes_by_table,
+    beside today's single unrunnable_code), SHALL carry it and a held-supply record's held_tables into the dashboard data,
+    and SHALL identify the blocking table and its cause from those fields alone, never by parsing the reason's prose; records
+    written before this change SHALL be read by their single unrunnable_code.
+  - THE SYSTEM SHALL compute the line at build time from recorded QA results and recorded decisions only, and SHALL NOT read
+    supply rows.
+  - THE SYSTEM SHALL render every name in the line as text, never as markup.
+  - THE SYSTEM SHALL have real-browser tests, against a dashboard built from a fixture history, written first and seen to
+    fail, in which a reader dataset shows one line naming the contested table while the pair is open - though three of its
+    checks read that table - and no line once its checks have been re-evaluated after the settlement; and in which a reader
+    of a table that could not be loaded shows that cause's line.
+  - WHERE the synthetic history holds TS-42 or TS-80 (REQ-GEN-203), THE SYSTEM SHALL quote the line, as the page words it,
+    in each scenario's register entry for its three reader datasets on the pair's arrival day.
+  - 'THE SYSTEM SHALL word each cause''s line, and its next step, as follows, rendering <dataset> as criterion 5''s link:
+    contested - ''Red because <dataset> has two files for one table'', next step settling the pair (''say what each file is'',
+    REQ-PIPE-194 criterion 15) or a later file superseding it; could not be loaded - ''Red because <dataset>''s file for <period>
+    could not be loaded'', next step a corrected file or a person rejecting it (REQ-PIPE-153); held - ''Red because <dataset>''s
+    supply is held with no period'', next step placing or rejecting it (REQ-PIPE-163); past due - ''Red because <dataset>''s
+    supply for <period> is overdue'', next step the supply arriving or a person marking it not supplied (REQ-PIPE-132); staged
+    and awaiting a decision - ''Red because <dataset>''s supply for <period> is waiting on a decision'', next step a person
+    promoting or rejecting it. (NEW WORDING - for Keith''s approval.)'
+  - WHERE every red check on a reader's waiting supply is one not evaluated because of another table, THE SYSTEM SHALL word
+    the reader's verdict line and its outstanding item to say that nothing needs deciding on this supply, and that its checks
+    run again and the gate is applied again once <criterion 15's next step> (REQ-PIPE-121), and SHALL NOT offer promote or
+    reject as its next step.
+  - THE SYSTEM SHALL end the notice the causing dataset's own page shows for that cause - the 'Two files for one table' banner,
+    or the notice it shows for a file that could not be loaded, a held, an overdue or a waiting supply - with 'Affects <reader
+    links>', built by affectsLinks(), naming each dataset this criterion's line appears on at the date on show.
+  - THE SYSTEM SHALL show, in the collection table, a quiet note under each such reader's status pill naming the causing table,
+    in the noSupplyNote shape, and on the collection card ONE line per causing table, in the redPromotedMarker shape, naming
+    that table once with the number of readers it holds red, and SHALL NOT list each reader on the card.
+  non_functional_requirements:
+  - 'SCALE (CLAUDE.md''s ~30-datasets rule): one line per contested table, never per check - cp-investigations alone carries
+    several checks reading cp_clients (Soda and dbt referential checks, reads_tables [cp_clients]), and on a thirty-dataset
+    asset a widely read table could hold many readers red at once; each reader''s page says the cause once.'
+  - 'PERFORMANCE: computed once per dataset per build from the results already embedded; no per-render scan of history, so
+    page load does not grow with the number of past runs.'
+  - 'THE BUILD RULE: a build may read recorded QA results, never actual data, and never anything else (criterion 11).'
+  - 'PRIVACY: the line names the other dataset and the period, never the two filenames - those stay on the contested dataset''s
+    own banner (REQ-PIPE-194 criterion 1) - so a supplier''s file naming is shown in one place, not repeated on every reader.'
+  - 'ACCESSIBILITY AND CONSISTENCY: the same notice styling and role=''status'' the page''s other top-of-page banners use,
+    and the one label REQ-PIPE-194 criterion 15 fixes; no new asset, so the self-hosted, file:// and offline viewing paths
+    are unaffected.'
+  - 'TEST FIRST for criterion 3 above all: a line that read as ''this dataset is fine'' would be the false-green direction.'
+  dependencies:
+  - REQ-PIPE-115
+  - REQ-PIPE-194
+  - REQ-PIPE-121
+  - REQ-DASH-197
+  - REQ-PIPE-202
+  - REQ-GEN-203
+  - REQ-PIPE-164
+  - REQ-PIPE-211
+  - REQ-PIPE-163
+  - REQ-PIPE-132
+  - REQ-PIPE-153
+  decisions:
+  - 'A NEW REQUIREMENT NOW (Keith, 2026-10-13): a top-of-page line on the reader naming the contested table. REJECTED leaving
+    it for a later road-testing sighting.'
+  - 'WHY A READER GOES RED, VERIFIED IN CODE 2026-10-14 (delivery-scoper): qa_tools/common/unrunnable.py records each cross-table
+    check that reads a contested table as status fail with unrunnable_code ''contested'', in the reader''s OWN run (REQ-PIPE-115
+    criteria 14 to 16; period_schema.CONTESTED outranks every slot reason); promotion.status_of counts every contributing
+    check, so the reader''s status is red and the gate withholds it. Child Protection''s readers of cp_clients are cp-notifications,
+    cp-investigations and cp-placements (reads_tables [cp_clients] in contract/child-protection-soda-checks.yml and dbt_project/models/staging/schema.yml),
+    several checks each.'
+  - 'WHAT THE PAGE SAYS TODAY, VERIFIED IN THE TEMPLATE 2026-10-14: the reader''s pill is red; each affected check card carries
+    ''not evaluated in the latest run''; the reason appears only inside the check''s drawer, under ''Not evaluated in the
+    current run''. The top-of-page banners (blockedBanner, waitingBanner) are about the dataset''s OWN supply only, so nothing
+    at the top names the other table. pipeline/build_cp_dashboard_data.py carries only the reason''s prose to the page, not
+    its code or table - hence criterion 10.'
+  - 'THE SAME SHAPE IS ON THE REAL PAGE TODAY FOR AN UNLOADABLE TABLE: the bootstrapped database (queried 2026-10-14) holds
+    ''could-not-be-loaded'' records against cp_clients in all three readers'' runs, from TS-12''s quarter, and no ''contested''
+    ones - Child Protection cannot be contested until REQ-PIPE-202 widens the pattern. Whether the line covers that kind too
+    is open question 1.'
+  - 'THE LINE EXPLAINS THE RED, NEVER REMOVES IT (delivery-scoper, PROPOSED): a check that could not run counts as red until
+    it can - the template''s own drawer text says so, and REQ-PIPE-115 records it red. REJECTED showing such a reader amber
+    or with its status recomputed without those checks: that is the false-green direction, and the gate would disagree with
+    the page.'
+  - 'NAMES THE DATASET AND PERIOD, NOT THE FILES (delivery-scoper, PROPOSED): the contested dataset''s own banner names both
+    files; repeating them on every reader multiplies a supplier''s naming across pages for no gain in what to do.'
+  - 'ONE LINE PER CONTESTED TABLE (CLAUDE.md scale rule, the caller''s brief): REJECTED a line per affected check, which on
+    cp-investigations would repeat one cause several times.'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect D17 (criterion 10 - unrunnable.py writes
+    ONE unrunnable_code per record, the first table''s by name order, and keeps no per-table reason, while held tables are
+    recorded separately by held_blast_radius as tool ''held'' with held_tables; so the recorder gains a per-table code, which
+    makes this requirement touch the PIPE recorder, said here rather than hidden); architect D18 (''results in place'' was
+    undefined for a red reader - now ''the run the dataset''s status is computed from on the date on show''); dashboard UX
+    4 (criterion 1 - one notice in the red notice style, its place among the banners, a bold first sentence); dashboard UX
+    5 (criterion 5 - a real href built as affectsLinks() builds them, verified in the template); dashboard UX 8 (criterion
+    7 names what runs the checks again).'
+  - 'OPEN QUESTION 1''s FIRST PREMISE WAS WRONG, CORRECTED (dashboard UX 3, verified 2026-10-14): a held table''s readers
+    are recorded by held_blast_radius (tool ''held'', held_tables, held_reason), not under an unrunnable_code; and unrunnable
+    records also carry past-due and staged-awaiting-decision, so ''another table is overdue'' - the commonest such red at
+    thirty datasets - is a candidate too. The question is re-offered below with that option.'
+  - 'EVERY RED ROOTED IN ANOTHER TABLE GETS THE LINE (Keith, 2026-10-14, close-out Q17, option A, the dashboard UX recommendation):
+    contested, could not be loaded, held with no period, past due and staged awaiting a decision, each with its own wording
+    and next step (criteria 1 and 15), never a not-yet-due one. At thirty datasets ''another table is overdue'' is the commonest
+    such red. REJECTED contested and could-not-be-loaded only, and contested only (Keith''s original wording of the ask).
+    The per-cause wording in criterion 15 is new and the scoper''s, for Keith''s approval.'
+  - 'COLLECTION LEVEL: ROW NOTE, ''AFFECTS'', AND ONE CARD LINE (Keith, 2026-10-14, close-out Q18, option A as the summary
+    put it, the dashboard UX review''s recommended set): criteria 17 and 18. One cause reads once on the card however many
+    readers it holds red. REJECTED the row note and ''Affects'' only, and nothing at collection level.'
+  - 'THE READER''S OWN WAITING ITEM SAYS NOTHING NEEDS DECIDING THERE (Keith, 2026-10-14, close-out Q19, option A): criterion
+    16 is the page half; the terminal half is REQ-PIPE-210, drafted the same morning. Both surfaces today invite a decision
+    on the reader when the decision that clears it is the other table''s. REJECTED the page half only, and leaving both.'
+  - 'MUST (Keith, 2026-10-14, close-out Q20, option A): REQ-GEN-203 puts three red readers on the real page. REJECTED should.'
+  - 'AFTER ''REJECT BOTH'' THE READERS ARE RE-CHECKED (Keith, 2026-10-14, close-out Q21, option A): REQ-PIPE-211, drafted
+    the same morning, so settling a pair owes the readers a re-check whatever the outcome; criterion 7 names it as what runs
+    them again.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s close-out answers): title, story, criteria 1, 2, 7, 8, 9 and 13 generalised
+    from the contested case to every cause; criteria 15 to 18 added. Criterion 15''s wording is new.'
+  open_questions:
+  - 'CHECK AT BUILD (not a question for Keith): criterion 17 assumes the causing dataset''s page already shows a notice for
+    each cause to end with ''Affects''. The ''Two files for one table'' banner exists; for an unloadable, held, overdue or
+    waiting supply, confirm which notice or outstanding item carries it, and bring any cause with none back to Keith rather
+    than inventing a banner.'
+- id: REQ-GEN-206
+  title: The last planted scenarios of REQ-GEN-136 and REQ-GEN-137 - Case Workers' held gap arrival, a reader re-checked after
+    a replacement, Keith's un-supersede case, a substitution and a three-kind _manifest - a Child Protection pair with both
+    files rejected, and REQ-GEN-199's held-day finding
+  date_written: '2026-10-14'
+  story: As Keith showing someone the supply model, I want the last shapes REQ-GEN-136 and REQ-GEN-137 promised either in
+    the generated history or deliberately dropped with my reason, so that the scenario panel's 'no data behind it' list holds
+    only what we chose not to plant.
+  moscow: should
+  status: not_started
+  source: 'REQ-GEN-136 criteria 4, 5, 8, 9 and 11 and REQ-GEN-137 criteria 2, 5 and 6 (both signed 2026-10-04, built with
+    these unmet) - Keith''s calendar close-out, 2026-10-13 (plans/running-thoughts.md #92: ''REQ-GEN-136''s leftovers'').
+    Also plans/post-build-review.md #174 and #175, found by REQ-GEN-199''s first bootstrapped build overnight 2026-10-13.
+    REQ-GEN-136 criterion 3 (TS-42) is REQ-GEN-203''s and is not here. Drafted by delivery-scoper overnight 2026-10-13 to
+    14 while Keith was asleep, so every fork is an open question. TS-81 added by Keith, 2026-10-14, follow-up F8 (plant a
+    ''reject both'' Child Protection scenario).'
+  acceptance_criteria:
+  - THE SYSTEM SHALL register TS-52 as a placement written after generation, as TS-79's are (scenario_injection.inheritance_placements),
+    chosen from configuration and the generated deliveries alone - the newest cp-case-workers supply received when no period
+    it delivers in was open, and not one any declared correction moves, holds or places - with a scenario link (REQ-GEN-201)
+    on a date after its receipt and no arrival of its own, delivering REQ-GEN-136 criterion 11.
+  - IF the generated history holds no such held cp-case-workers supply, THEN generation SHALL refuse naming TS-52, and SHALL
+    NOT pick a supply held for another reason.
+  - THE SYSTEM SHALL record TS-54 as also demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted onto 2024-Q4
+    by a scripted person (REQ-GEN-200) - with its own link on a date while the substitution stands, delivering REQ-GEN-137
+    criterion 5, and SHALL replace TS-54's register text 'the script has no field for the period stood on', which REQ-GEN-200's
+    stands_on answered.
+  - THE SYSTEM SHALL plant TS-55 in a quarter cp-case-workers does not deliver in, whose delivery leaves one other table out
+    and whose period a scripted person substitutes onto the quarter before (REQ-GEN-200), never removed or replaced, so that
+    at the end of the history that quarter's _manifest lists promoted, inherited and substituted tables together (REQ-PIPE-130),
+    delivering REQ-GEN-137 criterion 6, in a quarter REQ-GEN-207 adds; and SHALL give TS-55 a scenario link on the history's
+    last day whose chip opens that quarter's period-composition view (REQ-DASH-209), its Expect quoting what that view shows.
+  - 'THE SYSTEM SHALL plant TS-53 on Birth Registrations, Keith''s worked un-supersede case, delivering REQ-GEN-137 criterion
+    2 as amended by criterion 14 here: a good file waiting behind a filled slot is superseded by a bad later one; a scripted
+    person rejects the bad one and then un-supersedes the good one, in that order (REQ-PIPE-120); the good one is re-checked,
+    left waiting by the gate, and then promoted by a scripted person (REQ-GEN-135) - the good file built green and the bad
+    one red by targeting (REQ-GEN-184). (NEW WORDING - for Keith''s approval.)'
+  - 'THE SYSTEM SHALL plant TS-50 in full: its replacement half - a cp_clients resupply, built green with the Child Protection
+    targeting REQ-GEN-203 builds, replacing its promoted supply under a short Child Protection replacement setting of green
+    in force at its receipt, in a quarter REQ-GEN-207 adds, its three readers re-checked by the one knock-on handler (REQ-PIPE-121)
+    - and SHALL record its supersession half as also demonstrated by REQ-GEN-203''s TS-42, delivering REQ-GEN-136 criterion
+    8.'
+  - THE SYSTEM SHALL express any setting era these scenarios need as an effective-dated version in contract/data-asset.yaml,
+    scoped no wider than the collection it serves, as REQ-GEN-136 criterion 14 requires, and SHALL state in each register
+    entry the setting version in force where it lands.
+  - 'THE SYSTEM SHALL record TS-48 as demonstrated by TS-75 (REQ-GEN-199) - its three readers red on cross-table checks reading
+    the red cp_clients, promoted green when the corrected cp_clients'' promotion re-evaluates them (REQ-PIPE-121) - leaving
+    REQ-GEN-136 criterion 4''s wording unchanged and clearing its unmet entry with evidence naming TS-75; and TS-49 and TS-51
+    as not to be planted, with Keith''s reason (2026-10-11, confirmed 2026-10-14: they need named red cross-table targets
+    and referential closure across six tables), in their register entries, clearing REQ-GEN-136''s unmet entries for criteria
+    5 and 9; and SHALL amend, in the same change, REQ-GEN-136 criteria 5 and 9 to say so.'
+  - THE SYSTEM SHALL generate only arrival shapes and scripted decisions, and SHALL NOT generate any verdict, filing, supersession,
+    promotion, inheritance or substitution the scenarios expect (REQ-GEN-044 criterion 6).
+  - IF a scenario here cannot be placed - no free quarter or day under REQ-GEN-044's collision rule, or a needed setting era
+    not in force where it lands - THEN generation SHALL refuse naming the scenario, and SHALL NOT shift it, relax the rule
+    or drop it.
+  - 'THE SYSTEM SHALL build 8 September 2026''s own Birth Registrations supply green by giving TS-47 a green following day
+    (REQ-GEN-185), and SHALL state in TS-47''s register entry that its late file is held because 8 September lies in the hold
+    era, so that only the supplies TS-43, TS-47 and TS-78 account for wait under hold that day (post-build-review #175, option
+    1); TS-47''s following day is claimed by TS-47, and IF another scenario claims it, THEN generation SHALL refuse naming
+    both rather than shift either.'
+  - 'THE SYSTEM SHALL remove, in the change that resolves each, every strict expected failure naming post-build-review #175,
+    so that REQ-GEN-199''s guard is exact again with no allowance.'
+  - THE SYSTEM SHALL update each scenario's register entry here with its configuration, an Expect quoting what the page says
+    as observed on the first bootstrapped build, and a Breaks as line, and SHALL clear each unmet entry it delivers on REQ-GEN-136
+    and REQ-GEN-137, naming this requirement.
+  - THE SYSTEM SHALL amend, in the same change, REQ-GEN-137 criterion 2 so that Keith's un-supersede case is promoted by a
+    person after the gate leaves it waiting, rather than by the gate.
+  - 'THE SYSTEM SHALL amend, in the same change, REQ-GEN-199 criterion 9 to record what the first bootstrapped build showed
+    for TS-76''s quarter - cp-clients promoted amber and cp-carers green, before, during and after the substitution - in place
+    of ''promoted and red, permanently'' (post-build-review #174).'
+  - THE SYSTEM SHALL generate, as registered scenario TS-81, through REQ-GEN-044's injection mechanism, one Child Protection
+    delivery in a quarter REQ-GEN-207 adds, carrying the six usual files plus a second Client Register file under REQ-PIPE-202's
+    widened pattern, the two Client Register files each with its own receipt instant (REQ-GEN-203 criterion 2), both before
+    the quarter's due time.
+  - THE SYSTEM SHALL have TS-81's pair settled by a scripted person (REQ-GEN-135) through REQ-PIPE-193's choose-file as 'neither'
+    - both files rejected - on the asset day after its arrival, and SHALL have the re-evaluation of its readers that the settlement
+    owes (REQ-PIPE-211) run in the replay at the settlement's instant through the playback hook (REQ-GEN-196 criterion 10),
+    as TS-80's runs are (REQ-GEN-203 criterion 11).
+  - 'THE SYSTEM SHALL give TS-81 two lettered-sibling scenario links (REQ-GEN-201): ''a'' on its arrival day, where cp-clients
+    reads ''Two files for one table'', its three readers'' cross-table checks read contested, and each reader''s page carries
+    REQ-DASH-204''s line for the contested table in that requirement''s criterion 15 wording; and ''b'' on the settlement''s
+    asset day, where the pair''s row reads settled with both files rejected and no reader''s cross-table result reads contested
+    (REQ-PIPE-211 criterion 7); each Expect quoting what the page shows as observed on the first bootstrapped build. What
+    status the readers read on either date, and the wording of REQ-DASH-204''s line, follow plans/running-thoughts.md #95''s
+    outcome, and SHALL NOT be stated here as red.'
+  non_functional_requirements:
+  - 'BOOTSTRAP COST: TS-52 and TS-54 add nothing generated; TS-55 one delivery; TS-53 one Birth Registrations resupply, one
+    resend, one re-check and three scripted decisions; TS-50 one Child Protection resupply with its lead-ins and three reader
+    re-checks; TS-81 one Child Protection delivery, one settlement and one re-evaluation of three readers; #175''s fix none.
+    Measure from empty before and after (7m00s on 2026-10-13) and log both in CLAUDE.md''s running log.'
+  - 'NOISE: inside a setting era the setting applies to every supply, not only the scenario''s (REQ-GEN-136''s own NFR) -
+    count what TS-50''s Child Protection replacement era and TS-53''s era boundary replace or hold, and record it. TS-52''s
+    held supply is one of the standing Case Workers holds (eight on 2026-10-13), each counted as needing a person - known,
+    not added. TS-81 leaves its quarter''s cp-clients slot with no supply once both files are rejected, so that slot closes
+    unfilled - record what that slot and its readers read at the end of the history - the readers'' status following plans/running-thoughts.md
+    #95''s outcome.'
+  - 'QUARTER BUDGET: TS-50, TS-55, TS-81 and their lead-ins and era take Child Protection quarters REQ-GEN-207 adds, sized
+    by its dry run (close-out Q1; TS-81 by follow-up F8); TS-53 takes Birth Registrations days (follow-up F12), on days before
+    TS-62''s new version takes effect, after 2026-09-08 (REQ-GEN-205 criterion 25).'
+  - 'CONFIGURATION ONLY: the injections, the scripts, the setting eras and the register; every effect lives in the database.
+    DETERMINISM and loud failure are REQ-GEN-044''s, inherited.'
+  - 'SECURITY: every decision plays back through REQ-GEN-135 as the synthetic person, only on an asset declaring itself synthetic;
+    nothing writes a decision-log entry by another route (REQ-GEN-137 criterion 7).'
+  dependencies:
+  - REQ-GEN-136
+  - REQ-GEN-137
+  - REQ-GEN-044
+  - REQ-GEN-135
+  - REQ-GEN-185
+  - REQ-GEN-199
+  - REQ-GEN-200
+  - REQ-GEN-201
+  - REQ-GEN-203
+  - REQ-GEN-205
+  - REQ-PIPE-120
+  - REQ-PIPE-121
+  - REQ-PIPE-123
+  - REQ-PIPE-130
+  - REQ-GEN-207
+  - REQ-DASH-208
+  - REQ-DASH-209
+  - REQ-GEN-184
+  - REQ-PIPE-211
+  - REQ-PIPE-193
+  - REQ-PIPE-202
+  - REQ-DASH-204
+  decisions:
+  - 'BUILT ON THE EXISTING MACHINERY (Keith, 2026-10-04, REQ-GEN-136): the register in plans/supply-model.md, REQ-GEN-044''s
+    injection table, REQ-GEN-045''s map and REQ-GEN-135''s scripts. EVERY SHAPE OF THE BATCH GETS A PLANTED SCENARIO (Keith,
+    2026-10-04) - so a shape is dropped only by Keith''s decision, never quietly.'
+  - TS-42 IS REQ-GEN-203's (Keith, 2026-10-13, widen one Child Protection pattern), and is not repeated here.
+  - 'KEITH LEFT TS-48, TS-49 AND TS-51 OUT OF REQ-GEN-183..186 (Keith, 2026-10-11, question 4, recorded on REQ-GEN-184: ''OUT
+    OF SCOPE: Child Protection''s cross-table outcomes TS-48, TS-49 and TS-51 ... They need named red targets and referential
+    closure across six tables''). Asked again in open question 1 rather than assumed either way.'
+  - 'TS-52 BY A POST-GENERATION PLACEMENT, NOT AN INJECTION: its register entry already says the ordinary history produces
+    it - Case Workers files arrive in every delivery and are held where cp-case-workers does not deliver (TS-33a, REQ-PIPE-131)
+    - and ''an injection would record a placement for what is already there''. REQ-GEN-199 built the writer for that (inheritance_placements,
+    delivery-architect B4) for TS-79.'
+  - 'REQ-GEN-137 CRITERION 5''s BLOCKER IS GONE: its unmet ''why'' says the script has no field for the period stood on; REQ-GEN-200
+    added stands_on, and TS-76 and TS-77a now substitute onto an earlier promoted supply (REQ-GEN-199). TS-76 is the proposed
+    carrier because its substitution stands for eleven weeks with a link already on 17 February 2025.'
+  - 'NO PERIOD HOLDS ALL THREE KINDS TODAY: TS-77''s substitution was replaced and TS-76''s removed, and both sit in quarters
+    cp-case-workers delivers in. TS-55 needs a substitution that still stands at the end of the history in a quarter cp-case-workers
+    inherits in (a May or November quarter). REQ-GEN-137''s NFR that ''no dataset declares'' a non-participating period is
+    stale: cp-case-workers'' participation provides the inheritance since REQ-PIPE-110.'
+  - 'THE UN-SUPERSEDE ORDER IS FIXED (REQ-GEN-137, Keith''s option A item 3): reject the bad newer file first, then un-supersede
+    the good one, because REQ-PIPE-120 refuses an un-supersede beside a waiting version.'
+  - 'TS-50''s SUPERSESSION HALF RIDES TS-42 (delivery-scoper, PROPOSED): REQ-GEN-203 criterion 3 already has a later green
+    cp_clients file supersede the pair and its promotion re-evaluate the readers; a second scenario for the same route would
+    claim another quarter for nothing. The replacement half has no carrier: Birth Registrations'' TS-46 is a replacement with
+    no reader, and Child Protection has never run under a replacement setting other than never.'
+  - '#175 IS GENERATOR WORK AND IS TAKEN HERE AS CRITERIA (Keith, 2026-10-14, close-out Q14, option A, post-build-review #175''s
+    own recommendation): option 1 - TS-47 green_follow, its late file''s hold stated as a true consequence of the era. REJECTED
+    (2) moving TS-47 out of the hold era, which moves a planted scenario for a side effect, and (3) building every ordinary
+    day of a hold era green, which hides the era''s real effect on ordinary supplies.'
+  - 'STILL REJECTED (REQ-GEN-044): a scenario label on injected runs or dataset pages.'
+  - '#174 IS NOT TAKEN HERE AS CRITERIA EXCEPT ITS WORDING HALF: its page fix is its own requirement, REQ-DASH-208 (dashboard
+    UX 14, option A), built before this requirement''s bootstrap; its second half, REQ-GEN-199 criterion 9''s wording, is
+    criterion 15 here (close-out Q15).'
+  - 'ROUND 3 REVIEWS FOLDED (round 3 fold, delivery-scoper, 2026-10-14): architect C14 (criterion 1 - TS-52 chosen from configuration
+    and deliveries alone, never a supply a correction touches); architect C16 (criterion 11 - TS-47''s following day claimed,
+    refused not shifted); architect A5 (REQ-GEN-207 the growth owner); dashboard UX 15 (no page shows _manifest, so TS-55''s
+    surface is open question 7); architect C15 folded into open question 3 (TS-50 needs Child Protection targeting - the same
+    fork as REQ-GEN-203''s).'
+  - 'TS-48 BY TS-75; TS-49 AND TS-51 NOT PLANTED (Keith, 2026-10-14, close-out Q10, option A): criterion 8. TS-75 already
+    shows readers rescued by their partner''s promotion. REQ-GEN-136 criteria 5 and 9 are amended to record the decision (signed;
+    wording in the batch''s sign-off document). REJECTED planting all three (Child Protection cross-table red targets) and
+    dropping all three.'
+  - 'TS-53 GETS A PERSON''S PROMOTE (Keith, 2026-10-14, close-out Q11, option B, against the recommendation): criteria 5 and
+    14. Under the rules as built the gate leaves the re-checked good file waiting behind the filled slot, so a scripted person
+    promotes it, and REQ-GEN-137 criterion 2''s ''promoted by the gate'' is amended to match. REJECTED (the recommendation)
+    planting it across a replacement-setting boundary so the gate promotes it, and dropping it.'
+  - 'TS-50 PLANTED IN FULL (Keith, 2026-10-14, close-out Q12, option A): criterion 6, under a short Child Protection green-replacement
+    era in a grown quarter - the one re-check route no page shows. REJECTED amending REQ-GEN-136 criterion 8 to the supersession
+    half only.'
+  - 'TS-54 RIDES TS-76 (Keith, 2026-10-14, close-out Q13, option A): criterion 3 - its substitution stands for eleven weeks.
+    REJECTED TS-77a and TS-55''s own substitution.'
+  - 'REQ-GEN-199 CRITERION 9 REWORDED TO WHAT WAS OBSERVED (Keith, 2026-10-14, close-out Q15, option A): criterion 15. The
+    register already records clients amber and carers green. REJECTED treating the missing red as a pipeline defect.'
+  - 'TS-55 GETS A PAGE (Keith, 2026-10-14, close-out Q16, option B, against the recommendation): a period-composition view,
+    REQ-DASH-209, drafted the same morning; TS-55''s chip opens it (criterion 4). REJECTED (the recommendation) an Expect
+    quoting the terminal or a query with a chip on the substituted dataset''s page.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s close-out answers): criteria 4, 5, 6 and 8 reworded; criteria 14 and 15
+    added; all seven open questions answered.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-GEN-137 criterion 2 (signed; criterion
+    14 here) to read: ''THE SYSTEM SHALL plant Keith''s worked un-supersede case: a good file superseded by a bad later one;
+    a person rejects the bad one and un-supersedes the good one, which is re-checked (REQ-PIPE-120), left waiting by the gate,
+    and then promoted by a person.'''
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-GEN-199 criterion 9 (signed; criterion
+    15 here) to read: ''THE SYSTEM SHALL record in TS-76''s register entry, as part of what TS-76 shows, the state cp-clients
+    and cp-carers are left in for TS-76''s quarter once the substitution is removed - cp-clients promoted amber and cp-carers
+    green, as the first bootstrapped build showed (post-build-review #174), the cross-table checks reading cp_placements being
+    filed under cp-placements and run for neither in a quarter with no placements supply - and what cp-clients'' and cp-carers''
+    pages read before the substitution, while it stands and after it ends.'''
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-GEN-136 criterion 5 (signed; criterion
+    8 here) to read: ''THE SYSTEM SHALL register, and SHALL NOT plant, TS-49 - a correction whose re-check after its partner''s
+    promotion still fails, producing the decision log''s large shout (REQ-PIPE-121) - which Keith left unplanted (2026-10-11,
+    confirmed 2026-10-14) because it needs named red cross-table targets and referential closure across six tables.'''
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-GEN-136 criterion 9 (signed; criterion
+    8 here) to read: ''THE SYSTEM SHALL register, and SHALL NOT plant, TS-51 - a promoted supply whose cross-table result
+    goes red when a sibling arrives later (REQ-DASH-126) - which Keith left unplanted (2026-10-11, confirmed 2026-10-14) because
+    it needs named red cross-table targets and referential closure across six tables.'''
+  - 'TS-81, A ''REJECT BOTH'' CHILD PROTECTION PAIR, IS PLANTED HERE (Keith, 2026-10-14, follow-up F8, option B, against the
+    recommendation of fixture tests only): criteria 16 to 18 - at the cost of another grown quarter, which REQ-GEN-207''s
+    dry run counts. Here rather than on REQ-PIPE-211, because planting is generator work and this requirement is built after
+    REQ-PIPE-211, so TS-81''s Expect is written against the fix; the full reasoning is on REQ-PIPE-211''s decisions. TS-81
+    is the next free scenario id (TS-80 is REQ-GEN-203''s). REQ-GEN-203''s own decision rejecting ''reject both'' as TS-80''s
+    outcome stands - TS-81 is a second pair, not TS-80 changed.'
+  - 'TS-81''s SHAPE (delivery-scoper, 2026-10-14, PROVISIONAL - say if you want it otherwise): one grown quarter only, reading
+    F8''s ''another grown quarter''; so no green targeting and no lead-in quarters, and the readers'' own results are whatever
+    the ordinary delivery gives them, recorded as observed. The settlement falls on the asset day after the arrival, as TS-80''s
+    does. REJECTED targeting the readers green, which would show REQ-DASH-204''s ''nothing needs deciding'' line cleanly but
+    needs lead-in quarters F8 did not budget for.'
+  - 'TS-53 IS ON BIRTH REGISTRATIONS (Keith, 2026-10-14, follow-up F12, option A, the recommendation): criterion 5 - no setting
+    era is needed now that a person promotes it, its targeting is built, and it claims no Child Protection quarter. REJECTED
+    Child Protection, which would add a grown quarter to REQ-GEN-207''s dry run.'
+  - 'REQ-GEN-136 CRITERION 4 KEEPS ITS WORDING (Keith, 2026-10-14, follow-up F13, option A, the recommendation): criterion
+    8 clears its unmet entry with evidence naming TS-75 (REQ-GEN-199). This is a planned change to the register''s unmet entries
+    made when this requirement is built, not an amendment: REQ-GEN-136 keeps ''Criteria 4 and 5'' as one unmet entry, which
+    clears whole - criterion 4 by TS-75, criterion 5 by its amended wording. REJECTED rewording criterion 4 to TS-75''s shape.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answers F8, F12 and F13): title, source and criteria 5 and 8 reworded;
+    criteria 16 to 18 added for TS-81; NFRs 1 to 3 updated; REQ-PIPE-211, REQ-PIPE-193 and REQ-PIPE-202 added as dependencies.
+    Open questions 1 and 2 answered; the build-time check on #175 is still open.'
+  - 'TS-81 STAYS HERE (round 4 architect M3 and question B, which agree with follow-up F8''s placement): planted by this requirement,
+    built last, after REQ-PIPE-211 (round 4 H5 order: 207, 202, 211, 203, 204, 210, 182, 163, 179, 180, 208, 209, 205, 206).
+    REJECTED REQ-GEN-203, which would need REQ-PIPE-211 and REQ-DASH-204 built first.'
+  - 'THE READERS'' STATUS FOLLOWS #95, AND IS NOT STATED AS RED (Keith, 2026-10-14, round 4 R5; plans/running-thoughts.md
+    #95): criterion 18 and NFR 2. A reader whose cross-table check cannot run against everything it reads is neither green
+    nor red, and #95 is scoping what it reads; REQ-PIPE-202 and REQ-GEN-203 were signed with the same deferral. TS-81''s ''a''
+    Expect quotes REQ-DASH-204 criterion 15''s line, and #95''s draft (docs/drafts/unjudged-cross-table/) proposes replacing
+    that criterion''s per-cause wording with one line, so the quoted text depends on #95 too. This requirement is built after
+    both, so the Expect is written against whatever is signed, as observed.'
+  - 'R2 IS NOT FOLDED HERE (Keith, 2026-10-14, round 4 R2, its follow-up and R5): whether ''reject both'' raises the still-failing
+    shout, and in what words, is #95''s question now (its draft REQ-PIPE-217). TS-81 shows whatever is decided there; nothing
+    here says whether a shout is raised.'
+  - 'R3 IS NOT HERE: TS-79b''s reword to ''the oldest of the original fifteen quarters'' is REQ-GEN-207 criterion 11, signed
+    2026-10-14.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, round 4 reviews and Keith''s round 4 answers): criterion 18 reworded; NFRs 2 and
+    3 updated; REQ-DASH-204 added as a dependency; no criterion changed by R1, R2 or R3.'
+  open_questions:
+  - 'CHECK AT BUILD (not a question for Keith): whether 8 September''s held supply predates REQ-GEN-199''s row-count chain
+    change is unknown and needs one rebuild to settle (post-build-review #175).'
+  - 'WAITS ON #95 (not a question for Keith now): TS-81''s ''a'' Expect quotes REQ-DASH-204 criterion 15, whose wording #95''s
+    draft proposes replacing with ''No promoted <dataset> for <period>''; and what the readers read on either date is #95''s
+    status. Both are settled when #95 is signed, before this requirement is built.'
+- id: REQ-PIPE-210
+  title: The terminal's queue says a waiting supply turned red only by another table needs nothing decided on it, and lists
+    it under that table's own item
+  date_written: '2026-10-14'
+  story: As the person working through supplies waiting on a decision in the terminal, I want a reader whose red comes only
+    from another table to say that nothing needs deciding on it and which table clears it, so that I deal with the one item
+    that clears it instead of rejecting or promoting a supply with nothing wrong in its own data.
+  moscow: should
+  status: not_started
+  source: 'Keith, 2026-10-14 morning, close-out Q19, option A: ''page and terminal; a small pipeline requirement drafted now
+    for the terminal queue'' - the terminal half of what REQ-DASH-204 criterion 16 does on the page (CLI UX round 3, question
+    B). Drafted by delivery-scoper the same morning; NOT REVIEWED by delivery-architect or by a UX reviewer.'
+  acceptance_criteria:
+  - WHERE every red check on a supply waiting on a decision is a cross-table check recorded as not evaluated because of another
+    dataset's table, for any cause REQ-DASH-204 criterion 1 names, THE SYSTEM SHALL show it in the terminal's queue ('mothman
+    > Filing decisions > {collection name} > Supplies waiting on a decision') with a line saying that nothing needs deciding
+    on this supply, naming the other dataset and the cause, and saying that its checks run again and the gate is applied again
+    once <REQ-DASH-204 criterion 15's next step> (REQ-PIPE-121).
+  - WHERE the causing table has an item of its own in that queue - an open contested pair, a held supply or a supply waiting
+    on a decision - THE SYSTEM SHALL list such readers beneath that item, each named once, and SHALL NOT list them again as
+    rows of their own.
+  - WHEN a person opens such a reader, THE SYSTEM SHALL say the same before offering any decision, SHALL offer going to the
+    causing table's item first, and SHALL keep the reader's own decisions available on the same terms as today.
+  - WHERE a reader also has a red check of its own, THE SYSTEM SHALL list it as today with a line naming the other table's
+    cause, and SHALL NOT say that nothing needs deciding on it.
+  - THE SYSTEM SHALL work out which waiting supplies this covers, and why, through one function that the dashboard build's
+    REQ-DASH-204 line also uses, reading the per-table codes and held tables REQ-DASH-204 criterion 10 records, and SHALL
+    NOT read supply rows or parse a reason's prose.
+  - THE SYSTEM SHALL have fixture tests, written first and seen to fail, that drive the real queue with a contested cp_clients
+    pair and its three readers, asserting that the readers are listed once beneath the pair with the nothing-to-decide line
+    and are not included in the queue's count, and that a reader with a failing check of its own is listed and counted as
+    today.
+  - THE SYSTEM SHALL count, wherever the terminal counts supplies waiting on a decision - the Filing decisions queue's own
+    count and `mothman supply queue` - a cause with readers listed beneath it once, and SHALL NOT count a reader listed beneath
+    its cause, so that the count is the number of things to decide; a reader with a red check of its own (criterion 4) SHALL
+    be counted as today.
+  non_functional_requirements:
+  - 'SCALE: at thirty datasets a widely read table can hold many readers red at once; grouping them beneath the one item that
+    clears them keeps the queue one row per cause, not one per reader.'
+  - 'NO FALSE QUIET: the line is only shown where every red check is another table''s (criterion 4); a reader with a fault
+    of its own is never told nothing needs deciding.'
+  - 'ONE ANSWER: the page (REQ-DASH-204) and the terminal decide which readers this covers through one function, so they cannot
+    disagree.'
+  - 'SECURITY: nothing is widened - the reader''s own decisions keep their allowlist, actor and reason.'
+  - TEST FIRST for criterion 4, the false-quiet guard.
+  dependencies:
+  - REQ-DASH-204
+  - REQ-PIPE-121
+  - REQ-PIPE-115
+  - REQ-PIPE-194
+  - REQ-GHUB-082
+  - REQ-PIPE-163
+  - REQ-PIPE-202
+  decisions:
+  - 'THE TERMINAL GETS ITS OWN REQUIREMENT, DRAFTED NOW (Keith, 2026-10-14, close-out Q19, option A): the queue, like the
+    page, invited a decision on the reader when the decision that clears it is another table''s. REJECTED the page half only,
+    and leaving both.'
+  - 'THE SAME CAUSES AS THE PAGE (delivery-scoper, derived from Keith, 2026-10-14, close-out Q17 and Q19, not asked separately):
+    Keith chose every cross-table cause for the page and ''both'' for page and terminal, so the terminal covers the same causes
+    rather than contested only.'
+  - 'THE READER''S OWN DECISIONS STAY (delivery-scoper, PROPOSED): a person may still have a reason to reject a reader, and
+    removing the choice is a bigger change than Keith asked for.'
+  - 'A READER LISTED BENEATH ITS CAUSE IS NOT COUNTED (Keith, 2026-10-14, follow-up F6, option A, the recommendation): criterion
+    7 - the count is the number of things to decide. REJECTED counting every waiting supply as today, with the grouping only
+    changing where it is shown.'
+  - 'SHOULD (Keith, 2026-10-14, follow-up F14, option B): REQ-PIPE-211 is must; this requirement and REQ-DASH-209 are should.'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answers F6 and F14): criterion 6 extended, criterion 7 added.
+    F6 left two cases open - a reader with no item to sit beneath, and the page''s own counts - now open questions 1 and 2.'
+  open_questions:
+  - '1. A READER WITH NOTHING TO SIT BENEATH (follows F6). Criterion 2 lists a reader beneath its cause only where the cause
+    has an item of its own in this queue. An overdue cp_clients supply has none, so its readers are rows of their own, each
+    saying nothing needs deciding on it. F6 covered readers listed beneath a cause. PROVISIONAL in criterion 7: these readers
+    are counted as today. Recommended (A): do not count them either - F6''s reason, ''the count is the number of things to
+    decide'', applies equally, and a line under the count says how many readers are waiting on another table. (B) count them,
+    as drafted - every row in the queue is counted, and nothing needs explaining.'
+  - '2. THE PAGE''S OWN COUNTS (follows F6; NFR 3 says the page and the terminal decide through one function). The dashboard
+    counts supplies waiting for a person in each agency and collection card''s breakdown. Recommended (A): the same rule there
+    - a reader whose red is wholly another table''s is not counted as waiting for a person, through the same one function,
+    the cause carrying it (REQ-DASH-204 criterion 18''s line). This would add a criterion to REQ-DASH-204. (B) the terminal
+    only, as F6 was asked - the page keeps counting every waiting supply.'
+- id: REQ-PIPE-211
+  title: Settling a contested pair, whatever the outcome, re-checks the datasets whose checks the contest stopped
+  date_written: '2026-10-14'
+  story: As the person who settles a contested pair, I want the datasets whose cross-table checks could not run because of
+    the pair to be re-checked once I have settled it - even when I reject both files - so that they do not stay red for good
+    on a contest that has ended.
+  moscow: must
+  status: not_started
+  source: 'Keith, 2026-10-14 morning, close-out Q21, option A: after ''reject both'' the readers are re-checked via a small
+    pipeline follow-up. Found by the round 3 architect review (D19): the knock-on re-evaluates only when a period''s holding
+    changes (decision_log.apply_decision), and rejecting both files changes nothing held. Drafted by delivery-scoper the same
+    morning; NOT REVIEWED by delivery-architect or by a UX reviewer.'
+  acceptance_criteria:
+  - WHEN the contest of a table in a period ends - by a person's settlement of the pair (REQ-PIPE-193), whatever the outcome,
+    'reject both' included, or by a later arrival superseding the pair (REQ-PIPE-118 criterion 13, REQ-PIPE-194 criterion
+    9), whether or not that arrival is promoted - THE SYSTEM SHALL record, in the same transaction as the settlement or the
+    supersession, that a re-evaluation is owed of every cross-table check in that period recorded as not evaluated because
+    that table was contested, through REQ-PIPE-121's one handler (knock_on), and SHALL NOT add a settlement-specific or supersession-specific
+    re-evaluation path.
+  - THE SYSTEM SHALL evaluate those checks against what the period holds for the table once the contest has ended, and WHERE
+    it holds nothing - both files rejected, or the later file that superseded the pair still waiting - SHALL record each as
+    not evaluated for the reason that now applies (REQ-PIPE-115), never as contested.
+  - THE SYSTEM SHALL apply the promotion gate to each waiting supply the re-evaluation touched, exactly as REQ-PIPE-121 criterion
+    3 does, and SHALL NOT demote, supersede or reject a promoted one (REQ-PIPE-121 criterion 6).
+  - WHERE the settlement or arrival that ends the contest also moves or promotes a file, THE SYSTEM SHALL run one re-evaluation
+    for it, covering both (REQ-PIPE-121 criterion 9), and SHALL NOT run two.
+  - IF the re-evaluation fails to run, THEN THE SYSTEM SHALL leave the settlement or the supersession standing and the re-evaluation
+    owed, and complete it on the next processing pass (REQ-PIPE-121 criteria 14 to 16).
+  - THE SYSTEM SHALL amend, in the same change, REQ-PIPE-193 criterion 23 so that a settlement owes the knock-on whatever
+    its outcome, and REQ-PIPE-121 criterion 1 so that the end of a contest - by a settlement or by a later arrival superseding
+    the pair - is among the knock-on's triggers.
+  - THE SYSTEM SHALL have fixture tests, written first and seen to fail, that end a Child Protection contest three ways -
+    a settlement rejecting both files, a settlement choosing a file that is left waiting red, and a later file superseding
+    the pair and left waiting - and assert in each that no result recorded as contested remains current for the readers in
+    that period; and one that settles a pair in the terminal and asserts that the readers are re-checked before the outcome
+    panel is shown.
+  - WHEN a pair is settled in the terminal - through the settle flow or the flag form (REQ-PIPE-193 criterion 15) - THE SYSTEM
+    SHALL run the owed re-evaluation while the person waits, after the settlement's own QA runs and gates (REQ-PIPE-193 criterion
+    21) and before its outcome panel; SHALL name it, with the readers it covers, among what follows in the settlement's warning
+    panel (REQ-PIPE-193 criterion 17); and SHALL show in the outcome panel each reader re-checked, with its status afterwards.
+  - WHEN a later arrival supersedes a contested pair, THE SYSTEM SHALL run the owed re-evaluation in the processing pass that
+    files that arrival.
+  non_functional_requirements:
+  - 'NO FALSE GREEN: the re-evaluation re-runs the readers'' cross-table checks against what is there; it never clears a red
+    by dropping a check.'
+  - 'COST: cross-table checks only, never a reader''s own table-level checks (REQ-PIPE-121 criterion 2); at thirty datasets
+    a widely read table may have many readers, all covered by the one re-evaluation per decision.'
+  - 'RELIABILITY: owed in the settlement''s transaction and finished by the processing pass if interrupted (criterion 5).'
+  - 'AUDITABILITY: every result it records names the settlement as its cause (REQ-PIPE-121 criterion 5).'
+  - 'TEST FIRST: criterion 7''s ''reject both'' case is today''s defect - the readers stay red for good.'
+  - 'PERFORMANCE: a person settling in the terminal now also waits for the readers'' cross-table re-check (criterion 8) -
+    one re-evaluation per settlement, cross-table checks only, named in the warning panel beforehand so the wait is expected.'
+  dependencies:
+  - REQ-PIPE-193
+  - REQ-PIPE-121
+  - REQ-PIPE-115
+  - REQ-PIPE-194
+  - REQ-PIPE-202
+  - REQ-PIPE-118
+  decisions:
+  - 'THE READERS ARE RE-CHECKED AFTER ''REJECT BOTH'' (Keith, 2026-10-14, close-out Q21, option A, the architect''s recommendation):
+    otherwise they stay red for good. REJECTED leaving them for the next supply or a person''s re-check (REQ-PIPE-164), with
+    REQ-DASH-204''s line saying so.'
+  - 'EVERY OUTCOME, NOT ONLY ''REJECT BOTH'' (delivery-scoper, following the architect''s wording of option A - ''settling
+    a pair, any outcome, re-evaluates the readers waiting in its period''): a file chosen as this period''s supply and left
+    waiting red changes nothing held either, so its readers would keep a stale ''contested'' result too.'
+  - 'SUPERSEDED IN PART 2026-10-14 by follow-up F5 below - REQ-PIPE-121 criterion 1 is now amended too. WAS: AMEND REQ-PIPE-193
+    CRITERION 23, NOT REQ-PIPE-121 (delivery-scoper, PROPOSED - for the architect to confirm): 193 criterion 23 is where a
+    settlement''s knock-on is stated, and REQ-PIPE-121 criterion 8 already forbids a second path.'
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14) - REQ-PIPE-193 criterion 23 (signed;
+    criterion 6 here) to read: ''WHEN a pair is settled, whatever its outcome (REQ-PIPE-211), WHEN a settlement moves a file
+    into or out of a period, and WHEN a settled supply is promoted, THE SYSTEM SHALL owe the knock-on through REQ-PIPE-121''s
+    one handler (knock_on), which selects the checks by reevaluation.reading_checks() and the datasets by reevaluation.counts_toward(),
+    and SHALL NOT add a settlement-specific path or restate either rule.'''
+  - 'PROPOSED AMENDMENT WORDING, for Keith''s approval (delivery-scoper, 2026-10-14, revised the same day for follow-up F5;
+    batch amendment 27) - REQ-PIPE-121 criterion 1 (signed 2026-10-04, built; criteria 1 and 6 here). OLD: "WHEN a table arrives
+    in or leaves a period schema - promoted by a rule or a person, re-filed in or out, superseded, demoted or rejected - THE
+    SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved table, whether
+    it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL NOT re-evaluate any check that does not
+    read a moved table." NEW: "WHEN a table arrives in or leaves a period schema - promoted by a rule or a person, re-filed
+    in or out, superseded, demoted or rejected - or the contest of a table in that period ends, by a person''s settlement
+    of the pair whatever its outcome or by a later arrival superseding the pair whether or not that arrival is promoted (REQ-PIPE-211),
+    THE SYSTEM SHALL re-evaluate, within that period only, every cross-table check that declares it reads the moved table
+    or the table whose contest ended, whether it belongs to a supply WAITING in that period or one PROMOTED there, and SHALL
+    NOT re-evaluate any check that reads neither. AMENDED <date built> by REQ-PIPE-211 criterion 1." WHY: neither a settlement
+    that leaves nothing promoted nor a later file superseding the pair and left waiting moves a table into or out of the period
+    schema - a contested pair''s files are staged, never in it - so as worded criterion 1 does not trigger, and its last clause
+    forbids re-evaluating a check that reads no moved table. BUILT BEHAVIOUR: BUILT CODE CHANGES with REQ-PIPE-193 criterion
+    23 (knock_on gains a trigger); built and tested by REQ-PIPE-211. NOTE: NO LONGER CONTINGENT in the scoper''s reading,
+    since F5: REQ-PIPE-193 criterion 23 can carry a settlement''s knock-on, but a later arrival''s supersession is not a settlement,
+    and REQ-PIPE-121 criterion 1 is the list of the one handler''s triggers. The architect''s review may still place the supersession
+    trigger elsewhere (REQ-PIPE-118).'
+  - 'A PAIR ENDED BY A LATER FILE ALSO RE-CHECKS THE READERS (Keith, 2026-10-14, follow-up F5, option A, the recommendation):
+    criteria 1, 2, 4, 5, 7 and 9. The contest ending by supersession owes the same re-evaluation; otherwise the readers keep
+    a ''contested'' result until the later file is promoted, which may be never. REJECTED settlements only, as Keith''s close-out
+    Q21 answer was worded. This is what makes the REQ-PIPE-121 criterion 1 amendment (batch amendment 27) needed rather than
+    contingent.'
+  - 'IN THE TERMINAL THE RE-CHECK RUNS WHILE YOU WAIT (Keith, 2026-10-14, follow-up F7, option A, the recommendation): criterion
+    8 - with the settlement''s own runs, so the outcome panel shows the readers re-checked. REJECTED leaving it owed for the
+    processing pass. No amendment to REQ-PIPE-193 criterion 17: it says the panel lists the QA runs that follow, and naming
+    the re-evaluation as well adds to that list without contradicting it.'
+  - 'A ''REJECT BOTH'' CHILD PROTECTION SCENARIO IS PLANTED, AS TS-81, BY REQ-GEN-206 (Keith, 2026-10-14, follow-up F8, option
+    B, against the recommendation of fixture tests only): it costs one more grown quarter, which REQ-GEN-207''s dry run counts.
+    OWNED BY REQ-GEN-206, NOT HERE (delivery-scoper, 2026-10-14, as the main session asked): planting a scenario is generator
+    work (docs/components.md - GEN owns generator/, the injections and the scripted decisions), while this requirement''s
+    outcome is pipeline behaviour, proved by criterion 7''s fixture tests; REQ-GEN-206 is built last, after this requirement,
+    so TS-81''s register Expect is written against the fix rather than today''s defect; and putting it here would tie a must
+    requirement''s build to REQ-GEN-207''s grown quarters and a full bootstrap. ALSO REJECTED REQ-GEN-203, which plants the
+    other Child Protection pairs: it is built third, before this requirement, so TS-81 would first be observed showing the
+    defect.'
+  - 'MUST (Keith, 2026-10-14, follow-up F14, option B): without this requirement a ''reject both'' leaves its readers red
+    for good on the real page. REJECTED should, with REQ-DASH-209 and REQ-PIPE-210 (which stay should).'
+  - 'FOLDED 2026-10-14 (delivery-scoper, Keith''s follow-up answers F5, F7, F8 and F14): moscow must; criteria 1, 2, 4, 5,
+    6 and 7 reworded; criteria 8 and 9 added; a performance NFR added; REQ-PIPE-118 added as a dependency; batch amendment
+    27 revised. All three questions to Keith answered.'
+  open_questions:
+  - 'CHECK AT BUILD (architect, not a question for Keith): REQ-PIPE-121 criteria 9 and 15 are worded for a decision and a
+    promotion. Confirm that a contest ended by an arrival''s supersession needs no amendment to either beyond batch amendment
+    27, or say where the supersession trigger belongs instead (REQ-PIPE-118).'

@@ -1,0 +1,268 @@
+"""A kept terminal run says what the lifecycle decided about each arrival,
+and on what grounds (REQ-TEST-150)."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from types import SimpleNamespace
+
+import pytest
+
+from cli import common, lifecycle_report as lr
+from qa_tools.common import arrival_lifecycle, supply_holds
+
+WHEN = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+
+
+def _arrival(dataset="cp-clients", table="cp_clients", files=("cp_clients.csv",)):
+    return SimpleNamespace(run_id=f"{table}__1", received_at=WHEN,
+                           files_by_dataset={dataset: tuple(files)})
+
+
+class _Conn:
+    """Answers each query from what the test says was recorded."""
+
+    def __init__(self, *, filing=None, gate=None, inherits=()):
+        self.filing, self.gate, self.inherits = filing, gate, list(inherits)
+        self.sql = []
+
+    def execute(self, sql, params=None):
+        self.sql.append(sql)
+        if "filing_current" in sql:
+            rows = [self.filing] if self.filing else []
+        elif "action IN" in sql:
+            rows = [self.gate] if self.gate else []
+        else:
+            rows = self.inherits
+        return SimpleNamespace(fetchall=lambda: rows)
+
+
+class TestEachOutcomeIsSaid:
+    """Criteria 1, 2, 3, 4, 5 and 6."""
+
+    def test_filed_with_its_classification(self):
+        o = lr.outcome_of(_Conn(filing=("2026-Q1", "late", ["2026-Q1"]),
+                                gate=("promote", "green", "auto-promotion")), _arrival())
+        assert o.filed == "recognised as cp-clients; filed to 2026-Q1, late"
+
+    def test_the_gate_names_the_rule_and_its_recorded_reason(self):
+        o = lr.outcome_of(_Conn(filing=("2026-Q1", "on_time", []),
+                                gate=("promotion-refused", "status is red", "auto-promotion")),
+                          _arrival())
+        assert o.gate == "left for a person by the rule (auto-promotion), not by you - status is red"
+
+    def test_no_gate_outcome_says_it_is_owed(self):
+        o = lr.outcome_of(_Conn(filing=("2026-Q1", "on_time", [])), _arrival())
+        assert "owed to the next processing pass" in o.gate
+
+    def test_a_held_arrival_names_each_slot_and_says_nothing_ran(self, monkeypatch):
+        monkeypatch.setattr(supply_holds, "hold_on", lambda conn, ds, s: SimpleNamespace(
+            reason={"unavailable": [["2026-Q1", "closed"], ["2026-Q2", "not yet open"]]}))
+        o = lr.outcome_of(_Conn(), _arrival())
+        assert o.filed.endswith("filed to no period")
+        assert o.extra[0] == ("held - 2026-Q1: closed; 2026-Q2: not yet open. "
+                              "No check ran over it.")
+
+    def test_a_contested_arrival_names_the_other_file(self):
+        o = lr.outcome_of(_Conn(filing=("2026-Q1", "on_time", [])),
+                          _arrival(files=("cp_clients.csv", "cp_clients_v2.csv")))
+        assert any("cp_clients_v2.csv" in line and "contested" in line for line in o.extra)
+
+    def test_an_inheritance_is_the_rules(self):
+        o = lr.outcome_of(_Conn(filing=("2026-Q2", "on_time", []),
+                                inherits=[("cp-carers", "2026-Q2", "2026-Q1")]),
+                          _arrival())
+        assert any("the rule inherited cp-carers's 2026-Q1 supply into 2026-Q2" in line
+                   for line in o.extra)
+
+    def test_inheritances_are_read_by_link_not_by_time(self):
+        """Keith, 2026-10-06 (criterion 6, over the time window): the
+        inheritances this arrival's promotion caused, named on the entry -
+        never whatever the rule happened to record after its receipt."""
+        conn = _Conn(filing=("2026-Q2", "on_time", []))
+        lr.outcome_of(conn, _arrival())
+        inherit_sql = [q for q in conn.sql if "caused_by_supply" in q]
+        assert inherit_sql and all("recorded_at" not in q for q in inherit_sql)
+
+    def test_it_reads_only_recorded_rows(self):
+        """Criterion 9: three reads of the record - the filing, the gate's
+        entry, the inheritances - and nothing worked out again."""
+        conn = _Conn(filing=("2026-Q1", "on_time", []), gate=("promote", "ok", "r"))
+        lr.outcome_of(conn, _arrival())
+        assert len(conn.sql) == 3
+
+
+class TestOneOutcomeSharedIsSaidOnce:
+    """Criterion 8."""
+
+    def test_six_arrivals_one_line(self):
+        outs = [lr.Outcome(f"t{i}__1", f"cp-{i}", f"recognised as cp-{i}; filed to 2026-Q1, on time",
+                           "promoted by the rule (r), not by you - ok") for i in range(6)]
+        lines = list(lr._grouped(outs))
+        # #120 D8: the line is shared, but each arrival's dataset is still
+        # named (criterion 1) - in the count, not lost to "its dataset".
+        assert ("recognised as its dataset; filed to 2026-Q1, on time",
+                "6 arrivals (cp-0, cp-1, cp-2, cp-3, cp-4, cp-5)") in lines
+        assert len(lines) == 2
+
+    def test_thirty_are_named_up_to_a_point(self):
+        outs = [lr.Outcome(f"t{i}__1", f"cp-{i:02d}", "filed", "promoted") for i in range(30)]
+        who = dict((line, w) for line, w in lr._grouped(outs))["filed"]
+        assert who.startswith("30 arrivals (cp-00, cp-01") and who.endswith("and 22 more)")
+
+    def test_the_kept_line_names_every_arrival(self, capsys):
+        common.say_what_it_did("cp_clients__1", "handfiled-x",
+                               arrivals=["cp_clients__1", "cp_carers__1"])
+        out = capsys.readouterr().out
+        assert "cp_carers__1" in out and "2 arrivals" in out
+
+    def test_one_that_differs_gets_its_own_line(self):
+        outs = [lr.Outcome(f"t{i}__1", f"cp-{i}", "filed", "promoted") for i in range(3)]
+        outs.append(lr.Outcome("t9__1", "cp-9", "filed", "left for a person"))
+        lines = list(lr._grouped(outs))
+        assert ("left for a person", "t9__1") in lines
+        assert ("promoted", "3 arrivals (cp-0, cp-1, cp-2)") in lines
+
+
+class TestAFailedStageIsNamed:
+    """Criterion 7."""
+
+    def test_the_arrival_the_stage_and_what_completed(self):
+        def boom(*a, **k):
+            raise ValueError("dbt fell over")
+        steps = arrival_lifecycle.Steps(
+            file_and_overlay=lambda arrival, among: None,
+            entry_for=lambda arrival: {}, run_one=boom,
+            promote_after=lambda *a: None)
+        with pytest.raises(arrival_lifecycle.StageFailed) as caught:
+            arrival_lifecycle.process(_arrival(), steps=steps, among=[], run_timestamp="t",
+                                      run_by="me")
+        exc = caught.value
+        assert (exc.run_id, exc.stage, exc.completed) == (
+            "cp_clients__1", arrival_lifecycle.CHECKING, (arrival_lifecycle.FILING,))
+
+    def test_the_terminal_never_says_kept(self, capsys):
+        lr.stage_failure(arrival_lifecycle.StageFailed(
+            "cp_clients__1", arrival_lifecycle.GATING, ("filing and overlay", "checks"),
+            RuntimeError("x")))
+        out = capsys.readouterr().out
+        assert "STOPPED" in out and "promotion gate" in out and "Kept." not in out
+
+
+class TestATrialSaysWhatRecognitionWouldDo:
+    """Criterion 10."""
+
+    def test_each_file_and_the_trial_goes_on(self, capsys):
+        filed = common._as_trial(["/x/cp_clients.csv", "/x/notes.pdf"])
+        out = capsys.readouterr().out
+        assert "cp_clients.csv: would be cp-clients" in out
+        assert "notes.pdf: would be claimed by no dataset" in out
+        assert filed.run_id and not filed.delivery_name
+
+
+class TestSeveralArrivalsAreReportedCompactly:
+    """Criterion 11."""
+
+    def _results(self):
+        return [{"dataset_id": "cp-clients", "status": "pass", "check_id": "a"},
+                {"dataset_id": "cp-clients", "status": "pass", "check_id": "b"},
+                {"dataset_id": "cp-carers", "status": "fail", "check_id": "c"}]
+
+    def test_failing_in_full_passing_counted(self, monkeypatch, capsys):
+        shown = []
+        monkeypatch.setattr(common.hand_filing, "arrivals_of",
+                            lambda filed, c, p: [_arrival(), _arrival("cp-carers", "cp_carers")])
+        monkeypatch.setattr(lr, "report", lambda found: shown.append("summary"))
+        filed = SimpleNamespace(run_id="cp_clients__1", delivery_name="d", received_at=WHEN)
+        common.finish_kept(self._results(), filed, collection_id="child-protection",
+                           run_id_prefix="cp_run_",
+                           table=lambda rows, run_id: shown.append([r["check_id"] for r in rows])
+                           or "")
+        out = capsys.readouterr().out
+        assert shown[0] == ["c"] and "cp-clients: 2 checks passed" in out
+        assert shown[-1] == "summary", "it ends on the lifecycle summary"
+
+    def test_all_checks_lists_every_one(self, monkeypatch):
+        shown = []
+        monkeypatch.setattr(common.hand_filing, "arrivals_of",
+                            lambda filed, c, p: [_arrival(), _arrival("cp-carers", "cp_carers")])
+        monkeypatch.setattr(lr, "report", lambda found: None)
+        filed = SimpleNamespace(run_id="cp_clients__1", delivery_name="d", received_at=WHEN)
+        common.finish_kept(self._results(), filed, collection_id="child-protection",
+                           run_id_prefix="cp_run_", all_checks=True,
+                           table=lambda rows, run_id: shown.append(len(rows)) or "")
+        assert shown == [3]
+
+
+class TestAKeptSyntheticArrivalIsReportedToo:
+    """REQ-TEST-150 criteria 1, 2 and 5 on the synthetic route, which
+    REQ-PIPE-086 criterion 9 makes a kept route (post-build-review #120 D4):
+    it printed the check table and "Recorded N results" and nothing the
+    lifecycle decided."""
+
+    @pytest.mark.parametrize("module, collection", [("bdm", "civil-registration"),
+                                                    ("cp", "child-protection")])
+    @pytest.mark.parametrize("interactive", [False, True])
+    def test_it_ends_on_the_lifecycle_summary(self, monkeypatch, module, collection,
+                                              interactive):
+        import importlib
+
+        from qa_tools.common import arrivals
+
+        mod = importlib.import_module(f"cli.{module}")
+        mine = _arrival()
+        monkeypatch.setattr(arrivals, "arrivals_for",
+                            lambda c, p: [mine] if c == collection else [])
+        shown = []
+        monkeypatch.setattr(lr, "report", lambda found: shown.append([a.run_id for a in found]))
+        monkeypatch.setattr(mod, "report_table", lambda results, run_id: "")
+        monkeypatch.setattr(mod.filing_tui, "offer_after_run", lambda *a: None)
+        monkeypatch.setattr(common, "offer_to_publish", lambda: None)
+        monkeypatch.setattr(common, "report_recorded", lambda *a: None)
+        mod._report_synthetic([], mine.run_id, True, interactive=interactive)
+        assert shown == [[mine.run_id]]
+
+    def test_a_trial_has_no_lifecycle_to_report(self, monkeypatch):
+        from cli import bdm
+
+        monkeypatch.setattr(lr, "report", lambda *a, **k: pytest.fail("a trial was reported"))
+        monkeypatch.setattr(bdm, "report_table", lambda results, run_id: "")
+        bdm._report_synthetic([], "trial_x", False, interactive=False)
+
+
+class TestAKeptRunIdNothingRecognisesIsRefusedPlainly:
+    """#120 D13: `next()` over the recognised arrivals raised a bare
+    StopIteration when the run id named none of them."""
+
+    def test_the_keep_branch_names_the_run(self, monkeypatch):
+        from qa_tools.common import arrivals
+
+        monkeypatch.setattr(arrivals, "arrivals_for", lambda c, p: [])
+        with pytest.raises(common.click.ClickException, match="run_404"):
+            common.kept_arrival("civil-registration", "run_", "run_404")
+
+
+class TestTheCheckColumnSaysWhichCheck:
+    """Keith, 2026-10-06 (post-build-review #124): at normal widths the
+    Check column showed only the shared "data-asset-1.registry-services.
+    civil-..." prefix. It shows `column.check` now; the tool has its own
+    column."""
+
+    def test_a_column_check(self):
+        from cli import common
+
+        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+                         "cp-placements.cp_client_id.relationships_dbt"}
+        assert common.check_label(r) == "cp_client_id.relationships"
+
+    def test_a_dataset_level_check_has_no_column(self):
+        from cli import common
+
+        r = {"check_id": "data-asset-1.child-protection-family-support.child-protection."
+                         "cp-placements.row_count_soda"}
+        assert common.check_label(r) == "row_count"
+
+    def test_anything_unparsable_is_shown_whole(self):
+        from cli import common
+
+        assert common.check_label({"check_id": "odd"}) == "odd"
+        assert common.check_label({"name": "n"}) == "n"
