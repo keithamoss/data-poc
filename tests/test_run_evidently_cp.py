@@ -14,7 +14,8 @@ from __future__ import annotations
 import pandas as pd
 
 from qa_tools.common import hierarchy
-from qa_tools.cp import cp_common, run_evidently_cp
+from qa_tools.cp import cp_common
+from qa_tools.tools import run_evidently
 
 
 def test_evaluate_evidently_cp_writes_under_the_collection_id_not_the_table_id(monkeypatch):
@@ -25,17 +26,17 @@ def test_evaluate_evidently_cp_writes_under_the_collection_id_not_the_table_id(m
     # current side now comes from the warehouse and the reference from
     # a recorded distribution, so the two private frame helpers are
     # what a unit test of the write path substitutes.
-    monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
-    monkeypatch.setattr(run_evidently_cp, "_reference_frame", lambda run_id: reference)
+    monkeypatch.setattr(run_evidently, "_current_frame", lambda *a: current)
+    monkeypatch.setattr(run_evidently, "_reference_frame", lambda *a: reference)
 
     captured = {}
 
     def fake_write_qa_result(agency, dataset, run_id, run_timestamp, tool, raw_output, verified=None, **kw):
         captured["dataset"] = dataset
 
-    monkeypatch.setattr(run_evidently_cp, "write_qa_result", fake_write_qa_result)
+    monkeypatch.setattr(run_evidently, "write_qa_result", fake_write_qa_result)
 
-    run_evidently_cp.evaluate_evidently_cp("cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
+    run_evidently.evaluate("child-protection", "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
 
     assert captured["dataset"] == cp_common.COLLECTION_ID
     assert captured["dataset"] != hierarchy.dataset_for_table("cp_notifications").dataset_id
@@ -52,11 +53,11 @@ def test_evaluate_evidently_cp_still_tags_its_own_result_with_the_table_dataset_
     # current side now comes from the warehouse and the reference from
     # a recorded distribution, so the two private frame helpers are
     # what a unit test of the write path substitutes.
-    monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
-    monkeypatch.setattr(run_evidently_cp, "_reference_frame", lambda run_id: reference)
-    monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **kw: None)
+    monkeypatch.setattr(run_evidently, "_current_frame", lambda *a: current)
+    monkeypatch.setattr(run_evidently, "_reference_frame", lambda *a: reference)
+    monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **kw: None)
 
-    results = run_evidently_cp.evaluate_evidently_cp("cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
+    results = run_evidently.evaluate("child-protection", "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
 
     assert results[0]["dataset_id"] == hierarchy.dataset_for_table("cp_notifications").dataset_id
 
@@ -73,16 +74,16 @@ class TestNoReferenceIsNotAPass:
 
     def _run(self, monkeypatch, *, reference_run_id):
         current = pd.DataFrame({"concern_type": ["neglect", "physical"]})
-        monkeypatch.setattr(run_evidently_cp, "_current_frame", lambda run_id: current)
-        monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **kw: None)
+        monkeypatch.setattr(run_evidently, "_current_frame", lambda *a: current)
+        monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **kw: None)
 
-        def _refuse(run_id):
+        def _refuse(*a):
             raise AssertionError(
                 "the reference frame was built although there is no reference")
 
-        monkeypatch.setattr(run_evidently_cp, "_reference_frame", _refuse)
-        return run_evidently_cp.evaluate_evidently_cp(
-            "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id=reference_run_id)
+        monkeypatch.setattr(run_evidently, "_reference_frame", _refuse)
+        return run_evidently.evaluate(
+            "child-protection",             "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id=reference_run_id)
 
     def test_it_reports_no_reference_rather_than_passing(self, monkeypatch):
         psi = self._run(monkeypatch, reference_run_id=None)[0]

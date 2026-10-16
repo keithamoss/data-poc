@@ -30,4 +30,13 @@ KNOWN: dict[str, str] = {
         "a custom-named check with a routed column records its own value as the "
         "invalid-row count, as Birth Registrations' copy did and Child Protection's "
         "never has."),
+    "evidently.reads_unreadable_tables": (
+        "the drift check is always evaluated, whether or not the run can read its "
+        "table, and nothing is noted as left out."),
+    "evidently.volume_from_drift_frame": (
+        "the one volume check is counted by Evidently's RowCount over the drift "
+        "frame, with that snapshot kept in the raw output as `row_count`; a reference "
+        "with no recorded count is counted from its rows; a reference of zero rows "
+        "reads as no drop; and the result sits on the check's own column rather than "
+        "the table - Birth Registrations' single-table copy."),
 }

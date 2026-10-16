@@ -9,9 +9,19 @@ import contextlib
 
 import pytest
 
-from qa_tools.bdm import run_evidently_bdm
+from qa_tools import collections
 from qa_tools.common import evidently_common, supply_db
-from qa_tools.cp import run_evidently_cp
+from qa_tools.tools import run_evidently
+
+COLLECTIONS = ["civil-registration", "child-protection"]
+
+
+def _entry(collection_id):
+    """The collection's drift check entry, its column changed - as an edit to
+    the check file would change it."""
+    checks = evidently_common.collection_checks(collection_id)
+    entry = dict(checks.checks[checks.psi], column="some_other_column")
+    return collections.by_id(collection_id), entry, checks.psi
 
 
 class _Conn:
@@ -39,24 +49,26 @@ def fake_db(monkeypatch):
     return seen
 
 
-@pytest.mark.parametrize("module", [run_evidently_bdm, run_evidently_cp])
-def test_the_runs_rows_are_read_from_the_entrys_column(module, fake_db, monkeypatch):
-    monkeypatch.setitem(module._PSI, "column", "some_other_column")
-    frame = module._current_frame("run_x")
+@pytest.mark.parametrize("collection_id", COLLECTIONS)
+def test_the_runs_rows_are_read_from_the_entrys_column(collection_id, fake_db, monkeypatch):
+    coll, entry, check_id = _entry(collection_id)
+    result = run_evidently._psi_result(coll, entry, check_id, run_evidently._table_of(check_id),
+                                       "run_x", "2026-01-01T00:00:00Z", None)
     assert any("SELECT some_other_column FROM" in sql for sql in fake_db)
-    assert list(frame.columns) == ["some_other_column"]
+    assert result["column_name"] == "some_other_column"
 
 
-@pytest.mark.parametrize("module", [run_evidently_bdm, run_evidently_cp])
-def test_the_reference_is_looked_up_by_the_entrys_column(module, monkeypatch):
+@pytest.mark.parametrize("collection_id", COLLECTIONS)
+def test_the_reference_is_looked_up_by_the_entrys_column(collection_id, fake_db, monkeypatch):
     asked = []
 
     def counts(agency, collection, run_id, column):
         asked.append(column)
         return [["a", 3], ["b", 1]]
 
-    monkeypatch.setattr(evidently_common, "reference_value_counts", counts)
-    monkeypatch.setitem(module._PSI, "column", "some_other_column")
-    frame = module._reference_frame("ref_run")
+    monkeypatch.setattr(run_evidently, "reference_value_counts", counts)
+    coll, entry, check_id = _entry(collection_id)
+    frame = run_evidently._reference_frame(coll, "ref_run", run_evidently._table_of(check_id),
+                                           entry["column"])
     assert asked == ["some_other_column"]
     assert list(frame.columns) == ["some_other_column"]

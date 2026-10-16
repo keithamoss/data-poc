@@ -120,16 +120,16 @@ def run_datacontract_command(collection: str, run_id: str) -> None:
 def run_evidently_command(collection: str, run_id: str, reference_run_id: str | None) -> None:
     """Run real Evidently AI in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
+    from qa_tools import collections
+    from qa_tools.tools import run_evidently
     if collection == "bdm":
-        from qa_tools.bdm.run_evidently_bdm import evaluate_evidently_bdm
         _bdm_manifest_entry(run_id)  # a guard, as above
         ref_entry = _bdm_manifest_entry(reference_run_id) if reference_run_id else _bdm_manifest_first_entry()
-        results = evaluate_evidently_bdm(run_id, run_timestamp,
-                                          reference_run_id=ref_entry["run_id"])
+        reference_run_id = ref_entry["run_id"]
     else:
-        from qa_tools.cp.run_evidently_cp import evaluate_evidently_cp
         reference_run_id = reference_run_id or _cp_manifest_first_run_id()
-        results = evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)
+    results = run_evidently.evaluate(collections.by_short(collection).id, run_id, run_timestamp,
+                                     reference_run_id=reference_run_id)
     _print_results(results, run_id)
 
 

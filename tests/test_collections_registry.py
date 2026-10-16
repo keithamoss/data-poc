@@ -564,6 +564,70 @@ class TestTheSharedToolModules:
                 pass  # nothing readable, so no row count for the stub's checks
         assert handed == [{FAKE_TABLE}, set()]
 
+    def _evidently(self, monkeypatch, legacy=frozenset(), readable=True):
+        """The shared Evidently runner for the third collection, the tool and
+        the warehouse stood in for: one drift check, one volume check."""
+        import dataclasses
+
+        import pandas as pd
+
+        from qa_tools.common.evidently_common import EvidentlyChecks
+        from qa_tools.tools import run_evidently as ev
+
+        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=legacy)
+        prefix = f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}"
+        band = {"warn_threshold": 0.1, "fail_threshold": 0.25}
+        checks = EvidentlyChecks(
+            {f"{prefix}.kind.drift_psi_evidently": {"column": "kind", "method": "psi", **band},
+             f"{prefix}.row_count_growth_evidently": {"column": "fake_id", "method": "row_drop", **band}},
+            f"{prefix}.kind.drift_psi_evidently", {FAKE_TABLE: f"{prefix}.row_count_growth_evidently"})
+        written, notes = [], []
+        monkeypatch.setattr(ev, "collection_checks", lambda collection_id: checks)
+        monkeypatch.setattr(ev.asked_for, "ask", lambda *a, **k: [])
+        monkeypatch.setattr(ev, "_psi_applies", lambda run_id, table: readable)
+        monkeypatch.setattr(ev, "_unreadable", lambda run_id, table: not readable)
+        monkeypatch.setattr(ev, "_current_frame", lambda *a: pd.DataFrame({"kind": ["a", "b", "a"]}))
+        monkeypatch.setattr(ev, "_current_row_counts", lambda run_id, tables: {FAKE_TABLE: 90})
+        monkeypatch.setattr(ev, "_row_count_of", lambda df: (len(df), {"rows": len(df)}))
+        monkeypatch.setattr(ev, "recorded_row_counts", lambda *a: {FAKE_TABLE: 100})
+        monkeypatch.setattr(ev, "recorded_row_count", lambda *a: 100)
+        monkeypatch.setattr(ev, "_reference_frame", lambda *a: pd.DataFrame({"kind": ["a", "b", "b"]}))
+        monkeypatch.setattr(ev, "compute_psi", lambda current, reference, column: (0.05, {"psi": 0.05}))
+        monkeypatch.setattr(ev.drift_reference, "judge", lambda results, assessment: None)
+        monkeypatch.setattr(ev.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
+        monkeypatch.setattr(ev, "write_qa_result", lambda *a, **k: written.append(a))
+        got = ev.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z", reference_run_id="r")
+        return {r["check_name"]: r for r in got}, written[0][5], notes
+
+    def test_evidently_reads_everything_it_needs_from_the_adapter(self, third_collection,
+                                                                  monkeypatch):
+        got, raw, notes = self._evidently(monkeypatch)
+        psi, volume = got["drift:PSI"], got["evidently:row_count_growth"]
+        assert {psi["collection_id"], volume["collection_id"]} == {FAKE_ID}
+        assert (psi["dataset_id"], psi["column_name"]) == (FAKE_DATASET, "kind")
+        assert (volume["column_name"], volume["metric_value"], volume["row_count_total"]) == \
+            ("(table)", 10.0, 90)
+        assert set(raw) == {"psi"} and notes == []
+
+    def test_evidently_volume_from_drift_frame_keeps_the_single_table_count(
+            self, third_collection, monkeypatch):
+        got, raw, _ = self._evidently(
+            monkeypatch, legacy=frozenset({"evidently.volume_from_drift_frame"}))
+        volume = got["evidently:row_count_growth"]
+        assert (volume["column_name"], volume["row_count_total"], volume["metric_value"]) == \
+            ("fake_id", 3, 97.0)
+        assert raw["row_count"] == {"rows": 3}
+
+    @pytest.mark.parametrize("legacy,evaluated,noted", [
+        (frozenset(), False, True),
+        (frozenset({"evidently.reads_unreadable_tables"}), True, False),
+    ])
+    def test_evidently_reads_unreadable_tables_always_runs_the_drift_check(
+            self, third_collection, monkeypatch, legacy, evaluated, noted):
+        got, _, notes = self._evidently(monkeypatch, legacy=legacy, readable=False)
+        assert ("drift:PSI" in got, bool(notes)) == (evaluated, noted)
+
     def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
         import dataclasses
 

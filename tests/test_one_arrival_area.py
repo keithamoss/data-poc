@@ -108,22 +108,18 @@ def test_a_warehouse_failure_fails_the_drift_check_rather_than_producing_a_numbe
     failure into a plausible-looking number, which is the shape this
     project argues against everywhere else. So when the warehouse read
     fails, the drift check raises; it does not return a result."""
-    from qa_tools.bdm import run_evidently_bdm
     from qa_tools.common import supply_db
-    from qa_tools.cp import run_evidently_cp
+    from qa_tools.tools import run_evidently
 
     monkeypatch.setattr(supply_db, "connect", lambda *a, **k: _UnreachableWarehouse())
     # Recording is stubbed so that the only database read left in the
     # path is the warehouse read under test - otherwise a fallback could
     # hide behind the writer's own failure to connect.
     recorded = []
-    monkeypatch.setattr(run_evidently_bdm, "write_qa_result",
+    monkeypatch.setattr(run_evidently, "write_qa_result",
                         lambda *a, **k: recorded.append(k))
     with pytest.raises(psycopg.OperationalError):
-        if compute == "bdm":
-            run_evidently_bdm.evaluate_evidently_bdm(
-                "drift_failure_run", "2026-01-02T00:00:00+08:00", reference_run_id=None)
-        else:
-            run_evidently_cp._psi_result(
-                "drift_failure_run", "2026-01-02T00:00:00+08:00", reference_run_id=None)
+        run_evidently.evaluate(
+            {"bdm": "civil-registration", "cp": "child-protection"}[compute],
+            "drift_failure_run", "2026-01-02T00:00:00+08:00", reference_run_id=None)
     assert recorded == [], "a drift result was recorded from a failed warehouse read"

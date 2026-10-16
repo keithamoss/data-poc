@@ -161,7 +161,7 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     # directory, so there is no longer one to point elsewhere.
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
     for module_name in ("bdm.run_dbt_bdm", "tools.run_soda", "tools.run_datacontract",
-                        "bdm.run_evidently_bdm"):
+                        "tools.run_evidently"):
         module = __import__(f"qa_tools.{module_name}", fromlist=[module_name])
         monkeypatch.setattr(module, "write_qa_result", lambda *a, **k: None)
 

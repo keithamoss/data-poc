@@ -56,7 +56,7 @@ from . import dataset_stats
 from . import run_dbt_cp
 from qa_tools.tools import run_soda
 from qa_tools.tools import run_datacontract
-from . import run_evidently_cp
+from qa_tools.tools import run_evidently
 from qa_tools.common import arrival_lifecycle
 from qa_tools.common import replay_clock
 from qa_tools.common import asset_time
@@ -178,7 +178,7 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
         # AND WHAT THE COMPARISON CROSSES (REQ-QAC-108 criteria 8 to 17) -
         # see orchestrate_bdm.py's identical block.
         assessment = drift_reference.assess_arrival(
-            owner[0] if owner else run_evidently_cp.DATASET_ID, entry["received_at"],
+            owner[0] if owner else run_evidently.drift_dataset(cp_common.COLLECTION_ID), entry["received_at"],
             period=(entry.get("purpose") or {}).get("period"))
         reference_run_id = assessment.run_id if assessment else None
     else:
@@ -219,8 +219,8 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
             lambda: run_datacontract.evaluate(cp_common.COLLECTION_ID, run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[3])
         got.extend(run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
-            lambda: run_evidently_cp.evaluate_evidently_cp(
-                run_id, run_timestamp, reference_run_id=reference_run_id,
+            lambda: run_evidently.evaluate(
+                cp_common.COLLECTION_ID, run_id, run_timestamp, reference_run_id=reference_run_id,
                 assessment=assessment)))
         return got
 

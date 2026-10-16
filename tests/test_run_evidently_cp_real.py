@@ -8,7 +8,10 @@ get written, not its output-parsing logic - see that file's own
 docstring)."""
 from __future__ import annotations
 
-import qa_tools.cp.run_evidently_cp as run_evidently_cp
+import qa_tools.tools.run_evidently as run_evidently
+from qa_tools.common.evidently_common import collection_checks
+
+_CHECKS = collection_checks("child-protection")
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 from fixture_ids import (CP_DIRTY_NOTIFICATIONS_RUN_ID as _DIRTY_NOTIFICATIONS,
@@ -18,8 +21,8 @@ from fixture_ids import (CP_DIRTY_NOTIFICATIONS_RUN_ID as _DIRTY_NOTIFICATIONS,
 def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp, reference_run_id=_REF_RUN_ID):
     # THE WAREHOUSE, not a directory of CSVs (REQ-PIPE-102) -
     # cp_duckdb_dir is what staged the fixture's two arrivals into it.
-    monkeypatch.setattr(run_evidently_cp, "write_qa_result", lambda *a, **k: None)
-    return run_evidently_cp.evaluate_evidently_cp(run_id, run_timestamp, reference_run_id=reference_run_id)
+    monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
+    return run_evidently.evaluate("child-protection", run_id, run_timestamp, reference_run_id=reference_run_id)
 
 
 #: Every CP table: the dirty run is its delivery's last-filed file, and
@@ -46,7 +49,7 @@ def test_a_run_measured_against_itself_has_no_psi_drift(monkeypatch, cp_duckdb_d
 
     psi = _psi(results)
     assert psi["status"] == "pass"
-    assert psi["engine"] == run_evidently_cp.ENGINE_TAG
+    assert psi["engine"] == run_evidently.ENGINE_TAG
     assert psi["reference_run_id"] == _REF_NOTIFICATIONS
 
 
@@ -59,7 +62,7 @@ def test_dirty_run_has_a_real_check_id_and_reference(monkeypatch, cp_duckdb_dir)
                    reference_run_id=_REF_NOTIFICATIONS)
 
     psi = _psi(results)
-    assert psi["check_id"] == run_evidently_cp.PSI_CHECK_ID
+    assert psi["check_id"] == _CHECKS.psi
     assert psi["metric_value"] is not None
     assert psi["reference_run_id"] == _REF_NOTIFICATIONS
 
@@ -101,7 +104,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
         """A warn band and a fail band, in the criterion's own words -
         read from each check's own CHECK_LIFECYCLE entry (REQ-QAC-223
         criterion 3), the same values Birth Registrations uses."""
-        from qa_tools.cp.run_evidently_cp import CHECK_LIFECYCLE
+        CHECK_LIFECYCLE = _CHECKS.checks
 
         for r in _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z")):
@@ -121,11 +124,11 @@ class TestARelativeVolumeCheckOnEveryDataset:
         reference run's OWN REAL STAGED TABLES, so both sides of the
         comparison are real; only the recording step is skipped.
         """
-        monkeypatch.setattr(run_evidently_cp, "recorded_row_counts",
+        monkeypatch.setattr(run_evidently, "recorded_row_counts",
                              lambda agency, collection, run_id: dict(counts))
 
     def test_it_measures_a_real_proportional_change(self, monkeypatch, cp_duckdb_dir):
-        reference = run_evidently_cp._current_row_counts(_REF_RUN_ID)
+        reference = run_evidently._current_row_counts(_REF_RUN_ID, _CHECKS.row_drop)
         assert reference, "the fixture staged no reference tables to count"
         self._against(monkeypatch, reference)
 
@@ -142,7 +145,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
         dirty run is a perturbed copy of the same population, so its
         tables are the same rough size - a volume check that reddens on
         that is a volume check people turn off."""
-        self._against(monkeypatch, run_evidently_cp._current_row_counts(_REF_RUN_ID))
+        self._against(monkeypatch, run_evidently._current_row_counts(_REF_RUN_ID, _CHECKS.row_drop))
         volume = _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z"))
         assert all(r["status"] == "pass" for r in volume), \
@@ -159,7 +162,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
         current count makes the test about the BANDS rather than about
         how much the fixture happens to have moved.
         """
-        current = run_evidently_cp._current_row_counts(_DIRTY_RUN_ID)
+        current = run_evidently._current_row_counts(_DIRTY_RUN_ID, _CHECKS.row_drop)
         assert current, "the fixture staged no tables to count"
         return {t: round(n / (1 - fraction)) for t, n in current.items()}
 

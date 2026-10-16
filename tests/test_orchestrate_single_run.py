@@ -17,7 +17,7 @@ import qa_tools.bdm.build_per_run_warehouses as build_per_run_warehouses
 import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
 import qa_tools.tools.run_datacontract as run_datacontract
 import qa_tools.bdm.run_dbt_bdm as run_dbt_bdm
-import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
+import qa_tools.tools.run_evidently as run_evidently
 import qa_tools.tools.run_soda as run_soda
 import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
@@ -45,7 +45,7 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_dbt_bdm, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(run_evidently_bdm, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
 
 
@@ -121,7 +121,7 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     completion tracker left to consult."""
     import qa_tools.tools.run_datacontract as run_datacontract
     import qa_tools.cp.run_dbt_cp as run_dbt_cp
-    import qa_tools.cp.run_evidently_cp as run_evidently_cp
+    import qa_tools.tools.run_evidently as run_evidently
     import qa_tools.tools.run_soda as run_soda
 
     # One supply database, named by the environment - the three
@@ -132,7 +132,7 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # NOTHING LEFT TO REDIRECT ON DISK (REQ-PIPE-102) - both of these
     # modules read the warehouse now, so the CP_RAW_DIR they used to
     # carry is gone rather than pointed somewhere else.
-    for mod in (run_dbt_cp, run_soda, run_datacontract, run_evidently_cp):
+    for mod in (run_dbt_cp, run_soda, run_datacontract, run_evidently):
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
 

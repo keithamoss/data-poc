@@ -66,7 +66,7 @@ from . import dataset_stats
 from . import run_dbt_bdm
 from qa_tools.tools import run_soda
 from qa_tools.tools import run_datacontract
-from . import run_evidently_bdm
+from qa_tools.tools import run_evidently
 from qa_tools.common import arrival_lifecycle
 from qa_tools.common import replay_clock
 from qa_tools.common import asset_time
@@ -227,8 +227,8 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
             lambda: run_datacontract.evaluate(COLLECTION_ID, run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[3])
         got.extend(run_step(COLLECTION_ID, "Evidently", run_id,
-            lambda: run_evidently_bdm.evaluate_evidently_bdm(
-                run_id, run_timestamp, reference_run_id=reference_run_id,
+            lambda: run_evidently.evaluate(
+                COLLECTION_ID, run_id, run_timestamp, reference_run_id=reference_run_id,
                 assessment=assessment)))
         return got
 

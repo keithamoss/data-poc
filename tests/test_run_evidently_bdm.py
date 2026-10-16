@@ -9,7 +9,10 @@ evidently.Report + DataDriftPreset/RowCount classes against a small,
 real, session-scoped BDM CSV fixture."""
 from __future__ import annotations
 
-import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
+import qa_tools.tools.run_evidently as run_evidently
+from qa_tools.common.evidently_common import collection_checks
+
+_CHECKS = collection_checks("civil-registration")
 
 from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _REF_RUN_ID
 
@@ -45,13 +48,13 @@ def _patch(monkeypatch, bdm_delivery_dirs):
     deliveries, receipts = bdm_delivery_dirs
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
-    monkeypatch.setattr(run_evidently_bdm, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
 
 
 def _run(monkeypatch, bdm_delivery_dirs, run_id, run_timestamp, **kw):
     _patch(monkeypatch, bdm_delivery_dirs)
-    return run_evidently_bdm.evaluate_evidently_bdm(
-        run_id, run_timestamp,
+    return run_evidently.evaluate(
+        "civil-registration", run_id, run_timestamp,
         reference_run_id=kw.get("reference_run_id", _REF_RUN_ID),
     )
 
@@ -85,7 +88,7 @@ class TestASupplyWithNothingToMeasureAgainst:
         assert psi["status"] == "nodata"
         assert psi["metric_value"] is None, "a PSI value implies a comparison happened"
         assert psi["reference_run_id"] is None
-        assert psi["engine"] == run_evidently_bdm.ENGINE_TAG
+        assert psi["engine"] == run_evidently.ENGINE_TAG
 
     def test_the_volume_check_says_the_same_thing(
             self, monkeypatch, bdm_delivery_dirs, bdm_duckdb_dir):
@@ -132,7 +135,7 @@ def test_dirty_run_produces_a_real_row_count_drop_failure(monkeypatch, bdm_deliv
     # metric_value is a POSITIVE percentage drop ((previous-current)/previous),
     # not a signed delta - a real >25% drop is what pushes past FAIL_ROW_DROP.
     assert growth["metric_value"] > 25.0, f"expected a real >25% drop, got {growth['metric_value']}%"
-    assert growth["check_id"] == run_evidently_bdm.ROW_COUNT_GROWTH_CHECK_ID
+    assert growth["check_id"] == _CHECKS.row_drop["birth_registrations"]
 
 
 def test_evaluate_evidently_bdm_forwards_the_given_reference_not_the_module_default(
@@ -146,8 +149,8 @@ def test_evaluate_evidently_bdm_forwards_the_given_reference_not_the_module_defa
     account of the bug this guards against)."""
     _patch(monkeypatch, bdm_delivery_dirs)
 
-    results = run_evidently_bdm.evaluate_evidently_bdm(
-        _DIRTY_RUN_ID, "2026-01-02T06:30:00Z", reference_run_id=_REF_RUN_ID,
+    results = run_evidently.evaluate(
+        "civil-registration", _DIRTY_RUN_ID, "2026-01-02T06:30:00Z", reference_run_id=_REF_RUN_ID,
     )
     psi = next(r for r in results if r["check_name"] == "drift:PSI")
     assert psi["reference_run_id"] == _REF_RUN_ID

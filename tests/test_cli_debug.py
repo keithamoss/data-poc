@@ -130,14 +130,14 @@ def test_run_datacontract_cp_does_not_need_a_csv_filename(monkeypatch):
 
 def test_run_evidently_bdm_defaults_reference_to_manifests_first_entry(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
-    import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
+    import qa_tools.tools.run_evidently as run_evidently
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+    def _fake_evaluate(collection_id, run_id, run_timestamp, reference_run_id):
         seen.update(run_id=run_id, reference_run_id=reference_run_id)
         return []
-    monkeypatch.setattr(run_evidently_bdm, "evaluate_evidently_bdm", _fake_evaluate)
+    monkeypatch.setattr(run_evidently, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-evidently", "--collection", "bdm", "--run-id", "run_002"])
 
@@ -149,14 +149,14 @@ def test_run_evidently_bdm_defaults_reference_to_manifests_first_entry(monkeypat
 
 def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
-    import qa_tools.bdm.run_evidently_bdm as run_evidently_bdm
+    import qa_tools.tools.run_evidently as run_evidently
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+    def _fake_evaluate(collection_id, run_id, run_timestamp, reference_run_id):
         seen.update(reference_run_id=reference_run_id)
         return []
-    monkeypatch.setattr(run_evidently_bdm, "evaluate_evidently_bdm", _fake_evaluate)
+    monkeypatch.setattr(run_evidently, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, [
         "run-evidently", "--collection", "bdm", "--run-id", "run_002", "--reference-run-id", "run_002",
@@ -169,14 +169,14 @@ def test_run_evidently_bdm_honours_an_explicit_reference_run_id(monkeypatch):
 
 def test_run_evidently_cp_defaults_reference_to_manifests_first_run_id(monkeypatch):
     _patch_cp_manifest(monkeypatch)
-    import qa_tools.cp.run_evidently_cp as run_evidently_cp
+    import qa_tools.tools.run_evidently as run_evidently
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp, reference_run_id):
+    def _fake_evaluate(collection_id, run_id, run_timestamp, reference_run_id):
         seen.update(run_id=run_id, reference_run_id=reference_run_id)
         return []
-    monkeypatch.setattr(run_evidently_cp, "evaluate_evidently_cp", _fake_evaluate)
+    monkeypatch.setattr(run_evidently, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-evidently", "--collection", "cp", "--run-id", "cp_run_02"])
 

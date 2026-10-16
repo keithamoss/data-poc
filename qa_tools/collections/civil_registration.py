@@ -69,5 +69,7 @@ ADAPTER = CollectionAdapter(
         "soda.reads_unreadable_tables",
         "soda.scope_suffix",
         "soda.named_check_value_is_invalid_count",
+        "evidently.reads_unreadable_tables",
+        "evidently.volume_from_drift_frame",
     }),
 )
