@@ -1,6 +1,26 @@
 """Civil Registration's adapter (REQ-PIPE-240). Every pointer below is
 temporary and names its remover in qa_tools/collections/base.py."""
-from qa_tools.collections.base import CollectionAdapter, DatacontractSpec, DbtSpec, SodaSpec
+from qa_tools.collections.base import (
+    CollectionAdapter, DatacontractSpec, DbtSpec, SodaSpec, StatsSpec,
+)
+
+#: The valid values the real checks enforce (dbt_project/models/
+#: civil-registration/schema.yml), so the statistics' notion of "invalid"
+#: cannot drift from what the checks flag (REQ-PIPE-243, moved from
+#: qa_tools/bdm/dataset_stats.py).
+_SEX_VALID = ["M", "F", "X"]
+_SUBURB_VALID = ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington",
+                 "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton",
+                 "Kalgoorlie", "Broome", "Karratha", "Port Hedland", "Busselton", "Northam", "Narrogin", "Esperance",
+                 "Collie", "Mount Lawley", "Leederville", "Wembley", "Innaloo", "Success", "Baldivis", "Ellenbrook",
+                 "Butler", "Balga", "Girrawheen", "Maddington", "Gosnells", "Kwinana", "Hamilton Hill",
+                 "Beaconsfield", "South Perth", "Bentley", "Willetton", "Riverton", "Karrinyup", "Currambine",
+                 "Clarkson", "Yanchep", "Byford", "Waroona", "Manjimup", "Margaret River"]
+
+
+def _sql_list(values: list[str]) -> str:
+    return ",".join("'" + v.replace("'", "''") + "'" for v in values)
+
 
 ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
@@ -83,6 +103,31 @@ ADAPTER = CollectionAdapter(
         },
         invalid_count_metrics=frozenset({"missing_count"}),
     ),
+    stats=StatsSpec(
+        aggregates={
+            ("birth_registrations", "sex"): {
+                "kind": "categorical",
+                "invalid_condition": f"sex NOT IN ({_sql_list(_SEX_VALID)}) OR sex IS NULL",
+                "classification": None,
+                "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
+            },
+            ("birth_registrations", "place_of_birth_suburb"): {
+                "kind": "categorical",
+                "invalid_condition": (f"place_of_birth_suburb NOT IN ({_sql_list(_SUBURB_VALID)}) "
+                                      f"OR place_of_birth_suburb IS NULL"),
+                "classification": None,
+                "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
+            },
+            ("birth_registrations", "date_of_birth"): {
+                "kind": "numeric_date",
+                "invalid_condition": "date_of_birth < DATE '1900-01-01'",
+                "classification": None,
+                "check_names": {"datacontract:custom_sql"},
+            },
+        },
+        value_counts={("birth_registrations", "sex"): _SEX_VALID},
+    ),
+    claim_window_dataset="birth-registrations",
     legacy=frozenset({
         "datacontract.reads_unreadable_tables",
         "soda.reads_unreadable_tables",
@@ -94,5 +139,9 @@ ADAPTER = CollectionAdapter(
         "dbt.audits_skipped_tests",
         "dbt.no_left_out_note",
         "stage.stamps_run_columns",
+        "stats.single_table_shape",
+        "stats.rows_by_run_id",
+        "stats.zero_counts_kept",
+        "stats.arrival_after_registration",
     }),
 )

@@ -68,6 +68,22 @@ class SodaSpec:
 
 
 @dataclass(frozen=True)
+class StatsSpec:
+    """What the shared dataset statistics read (REQ-PIPE-243 criterion 2).
+
+    Pure data, so an adapter stays importable without a QA tool library
+    (criterion 5): the SQL is a condition string, run by
+    qa_tools/tools/dataset_stats.py."""
+    #: Per (table, column): `kind` (categorical or numeric_date), the
+    #: `invalid_condition` the real checks flag, a `classification`, and the
+    #: `check_names` the dashboard attaches the aggregate to.
+    aggregates: dict = field(default_factory=dict)
+    #: Per (table, column): the known values of a value-count distribution,
+    #: in display order; anything else counts as "(invalid code)".
+    value_counts: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class CollectionAdapter:
     collection_id: str
     #: How the bootstrap names this collection's work when it reports it -
@@ -97,6 +113,11 @@ class CollectionAdapter:
     dbt: DbtSpec = field(default_factory=DbtSpec)
     datacontract: DatacontractSpec = field(default_factory=DatacontractSpec)
     soda: SodaSpec = field(default_factory=SodaSpec)
+    stats: StatsSpec = field(default_factory=StatsSpec)
+    #: The dataset whose claim window applies when an arrival names none of
+    #: its own (REQ-PIPE-243 criterion 2); None means no window, never a
+    #: borrowed one.
+    claim_window_dataset: str | None = None
     #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place
     #: this collection's recorded output differs from what the shared code
     #: would produce. Every name is in qa_tools/tools/legacy.py, which says
