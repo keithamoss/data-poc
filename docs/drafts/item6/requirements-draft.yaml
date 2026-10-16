@@ -117,7 +117,8 @@
   status: not_started
   source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md calls 5, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
   acceptance_criteria:
-    - "THE SYSTEM SHALL define each collection's Evidently checks in contract/<stem>-evidently-checks.yml, and its retired ones in contract/<stem>-evidently-checks-retired.yml, where <stem> is the collection's contract file name less '-contract.yaml'."
+    - "THE SYSTEM SHALL define each collection's Evidently checks in contract/<agency-id>/<stem>-evidently-checks.yml, and its retired ones in contract/<agency-id>/<stem>-evidently-checks-retired.yml, where <stem> is the collection's contract file name less '-contract.yaml'."
+    - "THE SYSTEM SHALL keep each agency's contract, Soda, Evidently and retired-check files under contract/<agency-id>/, and only the asset-wide files (data-asset.yaml, calendar.yaml, people.yaml, environments.yaml, file-checks.yaml, scripted_decisions.yaml) at the top of contract/; WHEN `mothman check` runs, IF a collection's file sits outside its agency's folder, THEN THE SYSTEM SHALL fail naming it."
     - "THE SYSTEM SHALL write every date in those files quoted, or coerce it to a string on reading, and SHALL carry every Evidently check's check_id, category, introduced_date, description, failure_indicates, technical_note, column, method, thresholds and changelog unchanged, with an unchanged config_hash for every one."
     - "THE SYSTEM SHALL keep each collection's dbt models, sources, schema files and singular tests under dbt_project/models/<collection_id>/ and dbt_project/tests/<collection_id>/, leaving shared macros and generic tests where they are."
     - "WHEN `mothman check` runs, IF a dbt model, source, schema file or singular test sits outside every collection's folder and is not a shared macro or generic test, or two collections declare a singular test of the same name, THEN THE SYSTEM SHALL fail naming each."
@@ -139,6 +140,7 @@
   dependencies:
     - REQ-PIPE-240
   decisions:
+    - "AGENCY FOLDERS (Keith, 2026-10-16, for REQ-DASH-244's agency pill): every collection's contract, Soda, Evidently and retired-check files move under contract/<agency-id>/ in this change, so every path moves once rather than twice; asset-wide files stay at the top of contract/. Cost: nearly every path naming a contract changes once (workflows, docs, tests, CLAUDE.md's layout table)."
     - "SIGNIFICANT, FOR KEITH TO SENSE-CHECK - EVIDENTLY CHECKS MOVE OUT OF PYTHON (main session, position.md call 5): every tool's checks found the same way. Ids and prose unchanged; the authoring standard untouched."
     - "PER-CHECK PRESENTATION METADATA STAYS IN THE ADAPTERS FOR NOW (position.md call 6); moving it into the check files is a logged follow-up."
     - "PER-COLLECTION dbt FOLDERS LIVE HERE (main session's round-4 call 28, placed here by delivery-scoper): it is a change to where a collection's checks are found, which is this requirement's subject; the runner scoping nodes by the adapter's table set is REQ-QAC-242's. It is a precondition of REQ-TEST-249, whose fake collection adds dbt files only inside its own folders."
@@ -226,13 +228,17 @@
 
 - id: REQ-DASH-244
   title: "The dashboard is built for every collection by one Python builder and rendered from one COLLECTION_DATA const, with a dataset's GitHub link opening its contract and the agency pill removed"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As a data team leader, I want every real collection on the register built and shown the same way, so that a newly added collection appears with its real results - or plainly as not yet supplied - rather than looking as though it has no data because nobody wired it in."
   moscow: must
   status: not_started
   source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sites 17 to 20; main session position.md calls 1 and 14 to 18 (after the dashboard UX review), 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
   acceptance_criteria:
-    - "THE SYSTEM SHALL build every collection's dashboard data through one shared pipeline/build_dashboard_data.py, taking presentation metadata from the adapter's .present, and SHALL delete pipeline/build_cp_dashboard_data.py in the same change."
+    - "THE SYSTEM SHALL build every collection's dashboard data through one shared pipeline/build_dashboard_data.py, taking each column's and table's type and description from the collection's ODCS contract, with no per-collection presentation code, and SHALL delete pipeline/build_cp_dashboard_data.py in the same change."
+    - "BEFORE the builder switches source, THE SYSTEM SHALL move each collection's richer column and table notes from today's builders into its contract's description fields, so that the page's text is unchanged."
     - "THE SYSTEM SHALL NOT have one collection's dashboard build import or mutate another's module state."
     - "THE SYSTEM SHALL embed every collection's dashboard data into one template const, COLLECTION_DATA, keyed by collection id in hierarchy order, each entry self-contained, and SHALL remove REAL_BIRTH_REG_DATA and REAL_CP_DATA."
     - "THE SYSTEM SHALL build every real collection's datasets in the page through one function, replacing buildBirthRegistrations and buildChildProtectionDatasets, resolving a dataset through one dataset-id index."
@@ -242,10 +248,10 @@
     - "THE SYSTEM SHALL derive embed_dashboard_data.py's targets, cli/dashboard.py's, snapshot_dashboard.py's and check_dashboard_renders.py's collection lists, and github_links, from the registry."
     - "THE SYSTEM SHALL move the template's AGENCY_BLURB into a presentation configuration file under contract/, separate from data-asset.yaml, read by the builder, rendering the same text."
     - "THE SYSTEM SHALL preserve Birth Registrations' dashboard JSON shape and its two display drifts (dropping empty pseudo-columns, the reference-reason fallback for not_evaluated) behind named legacy flags."
-    - "WHEN a reader opens a real dataset's 'View on GitHub', THE SYSTEM SHALL open its collection's ODCS contract anchored at that dataset's entry, with a tooltip naming the file."
-    - "THE SYSTEM SHALL NOT show an agency-level GitHub pill."
+    - "WHEN a reader opens a real dataset's 'View on GitHub', THE SYSTEM SHALL open its collection's ODCS contract, under its agency's folder, anchored at that dataset's entry, with a tooltip naming the file."
+    - "THE SYSTEM SHALL keep the agency-level GitHub pill, linking to that agency's folder, contract/<agency-id>/, on GitHub."
     - "THE SYSTEM SHALL carry one CHANGELOG.yaml entry for criteria 11 and 12 in the same push."
-    - "WHEN `mothman debug equivalence capture --rebuild-from` is run for the commit before this change and for this change, both over REQ-PIPE-243's kept 'after' database, THE SYSTEM SHALL report no difference on S5 and S7, and on S6 none outside the dataset links' target and tooltip and the agency pill's absence, each listed in this requirement's evidence."
+    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S4 and S7, and on S5 none outside the dataset and agency links' targets and tooltips, each listed in this requirement's evidence; the links themselves SHALL be proved in a real browser by tests/test_dashboard_e2e.py."
     - "WHEN the raw template is opened with its illustrative mock data, THE SYSTEM SHALL render with zero console errors, as tests-js/dashboard-loads.test.js holds it to today."
     - "THE SYSTEM SHALL remove from the migration allowlist every file whose dispatch sites this requirement rewires, each with a third-collection test."
   non_functional_requirements:
@@ -259,6 +265,7 @@
     - REQ-PIPE-243
     - REQ-GEN-246
   decisions:
+    - "KEITH, 2026-10-16: asked why each collection needed a Python builder; none does. .present dropped - types and descriptions come from each ODCS contract, the builders' richer notes moved into the contracts first ('Contract, enrich first'). The agency pill KEPT, linked to the agency's folder ('Make agency folders'), which REQ-QAC-241 now creates. REJECTED keeping .present, reading the contracts as they stand, linking the pill to the hierarchy entry or a code search."
     - "ONE COLLECTION_DATA CONST (position.md call 1), iterated in hierarchy order, with one dataset-id index and dataset ids unique across collections (main session's round-3 call 18)."
     - "A ZERO-RUN COLLECTION IS NOT A MISSING ONE (main session's round-3 call 14, after dashboard UX finding 1): it renders the existing never-supplied or not-owed-yet notice; only a declared collection with no entry fails, and `mothman check` catches an unwired collection before any build."
     - "SIGNIFICANT, FOR KEITH TO SENSE-CHECK - ONE MISSING COLLECTION FAILS THE WHOLE BUILD (main session's round-3 call 15, UX Q1 (a)): with call 14's gate an unwired collection never reaches a build, so a missing entry means a builder crashed, and publishing a page that silently lacks a collection is the false quiet item 6 exists to remove. REJECTED (b), a 'results not built' tile, for now; revisit when a real deployment has more than a handful of collections."
