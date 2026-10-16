@@ -199,11 +199,11 @@ class TestTheContractListIsDerivedNotMaintained:
         """Shared by several datasets, so it describes what they have in
         common - which is the collection, not any one of them."""
         by_file = dict(validate_hierarchy.contracts())
-        assert by_file["child-protection-contract.yaml"] == "child-protection"
+        assert by_file["child-protection-family-support/child-protection-contract.yaml"] == "child-protection"
 
     def test_a_dataset_scoped_contract_resolves_to_that_dataset(self):
         by_file = dict(validate_hierarchy.contracts())
-        assert by_file["bdm-birth-registrations-contract.yaml"] == "birth-registrations"
+        assert by_file["registry-services/bdm-birth-registrations-contract.yaml"] == "birth-registrations"
 
     def test_a_contract_file_nothing_names_is_reported(self, tmp_path, monkeypatch):
         """The one thing deriving could have LOST. An orphan contract was
@@ -211,6 +211,7 @@ class TestTheContractListIsDerivedNotMaintained:
         so this is coverage the hand-maintained list did not have."""
         (tmp_path / "orphan-contract.yaml").write_text("id: nobody\n")
         for name in {d.contract for d in hierarchy.all_datasets()}:
+            (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
             (tmp_path / name).write_text(
                 (validate_hierarchy.CONTRACT_DIR / name).read_text())
         monkeypatch.setattr(validate_hierarchy, "CONTRACT_DIR", tmp_path)

@@ -223,12 +223,12 @@ class TestTheGateRefusesTheNewShapeBroken:
 
     def test_a_contract_stating_sla_properties_is_refused(self, broken):
         """Criterion 16, and it is never read."""
-        path = broken.contract_dir / "child-protection-contract.yaml"
+        path = broken.contract_dir / "child-protection-family-support/child-protection-contract.yaml"
         doc = yaml.safe_load(path.read_text())
         doc["slaProperties"] = [{"property": "latency", "value": 30, "unit": "min"}]
         path.write_text(yaml.safe_dump(doc, sort_keys=False))
         errors = broken(lambda d: None)
-        assert any(e.file == "child-protection-contract.yaml" and "slaProperties" in e.problem
+        assert any(e.file == "child-protection-family-support/child-protection-contract.yaml" and "slaProperties" in e.problem
                    and "calendar.yaml" in e.fix for e in errors), _text(errors)
 
     def test_a_dataset_the_hierarchy_does_not_hold_is_refused(self, broken):
@@ -307,8 +307,8 @@ class TestTheContractsDetection:
     def test_a_contract_is_recognised_by_its_kind(self):
         """Criterion 32 - neither real contract states slaProperties any
         more, and both are still checked as contracts."""
-        for name in ("bdm-birth-registrations-contract.yaml",
-                     "child-protection-contract.yaml"):
+        for name in ("registry-services/bdm-birth-registrations-contract.yaml",
+                     "child-protection-family-support/child-protection-contract.yaml"):
             doc = yaml.safe_load((REAL_CONTRACT_DIR / name).read_text())
             assert doc["kind"] == "DataContract"
             assert "slaProperties" not in doc

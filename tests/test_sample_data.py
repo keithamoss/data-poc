@@ -56,7 +56,7 @@ def _asset_with(datasets: list[dict], tmp_path, monkeypatch):
     agency = doc["hierarchy"]["agencies"][0]
     agency["collections"] = [{
         "id": "civil-registration", "name": "Civil Registration",
-        "contract": "bdm-birth-registrations-contract.yaml",
+        "contract": "registry-services/bdm-birth-registrations-contract.yaml",
         "delivery_boundary": "directory",
         "datasets": datasets,
     }]

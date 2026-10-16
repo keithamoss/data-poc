@@ -279,7 +279,7 @@ class TestTheContractsOnTheOtherSide:
     def test_a_contract_no_collection_names_is_rejected(self, config):
         def mutate(doc):
             pass
-        shutil.copy(config.contract_dir / "child-protection-contract.yaml",
+        shutil.copy(config.contract_dir / "child-protection-family-support/child-protection-contract.yaml",
                      config.contract_dir / "orphan-contract.yaml")
         errors = config(mutate)
         assert any(e.file == "orphan-contract.yaml" for e in errors), _messages(errors)
