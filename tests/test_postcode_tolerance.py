@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 import qa_tools.tools.run_datacontract as run_datacontract
-import qa_tools.cp.run_soda_cp as run_soda_cp
+import qa_tools.tools.run_soda as run_soda
 from fixture_ids import CP_REF_RUN_ID
 from qa_tools.common import supply_db
 
@@ -29,7 +29,7 @@ def clients(cp_duckdb_dir, monkeypatch):
     from qa_tools.common import asked_for
     monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(run_soda_cp, "write_qa_result", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(run_soda, "write_qa_result", lambda *a, **k: None, raising=False)
     with supply_db.connect(label="test-postcode-tolerance") as conn:
         # THROUGH THE RUN'S OWN VIEW of the clients table, wherever it was
         # staged or promoted - the run reads exactly this.
@@ -58,7 +58,7 @@ def test_a_few_unrecognised_postcodes_pass_the_contract_and_warn_in_soda(clients
     conn, table, n = clients
     _spoil(conn, table, max(1, n // 100))
     assert _datacontract()["status"] == "pass"
-    soda = [r for r in run_soda_cp.evaluate_soda_cp(CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
+    soda = [r for r in run_soda.evaluate("child-protection", CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
             if r["check_id"] == SODA]
     assert [r["status"] for r in soda] == ["warn"]
 
@@ -93,6 +93,6 @@ def test_an_ordinary_child_protection_amber_reads_amber(clients):
         conn.execute(f"UPDATE {table} SET postcode = ? WHERE cp_client_id = ?",
                      [int(postcode), client_id])
     assert _datacontract()["status"] == "pass"
-    soda = [r for r in run_soda_cp.evaluate_soda_cp(CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
+    soda = [r for r in run_soda.evaluate("child-protection", CP_REF_RUN_ID, "2026-01-01T09:00:00Z")
             if r["check_id"] == SODA]
     assert [r["status"] for r in soda] == ["warn"]

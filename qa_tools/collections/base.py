@@ -32,8 +32,24 @@ def _attr(path: str):
 class DatacontractSpec:
     #: A SQL rule's cross-tool label, by the tail its check id ends with.
     labels_by_check_tail: dict = field(default_factory=dict)
-    #: Each table's key column, the only value a failing-row sample keeps.
-    sample_key: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SodaSpec:
+    #: The name the scan's data source goes by - it is in the raw output.
+    data_source: str = "collection"
+    #: A custom-named check's column, by its name: a `failed rows` check
+    #: has none of its own.
+    column_by_name: dict = field(default_factory=dict)
+    #: A custom-named check's cross-tool label, by its name.
+    label_by_name: dict = field(default_factory=dict)
+    #: A check's dimension: a custom-named one's by its name (with
+    #: `name_dimension_default` where it has none), any other by its metric.
+    dimension_by_name: dict = field(default_factory=dict)
+    name_dimension_default: str | None = ""
+    dimension_by_metric: dict = field(default_factory=dict)
+    #: The metrics whose own value is the count of invalid rows.
+    invalid_count_metrics: frozenset = frozenset()
 
 
 @dataclass(frozen=True)
@@ -64,8 +80,12 @@ class CollectionAdapter:
     #: the built dashboard file, and how its datasets are listed in it.
     dashboard_json: str
     dashboard_datasets: Callable[[dict], list[dict]] = field(compare=False)
+    #: Each table's key column, the only value a failing-row sample keeps -
+    #: never full row content (plans/qa-pipeline.md #15).
+    sample_key: dict = field(default_factory=dict)
     #: What each shared tool module reads (REQ-QAC-242 criterion 2).
     datacontract: DatacontractSpec = field(default_factory=DatacontractSpec)
+    soda: SodaSpec = field(default_factory=SodaSpec)
     #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place
     #: this collection's recorded output differs from what the shared code
     #: would produce. Every name is in qa_tools/tools/legacy.py, which says

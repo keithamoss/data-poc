@@ -19,4 +19,15 @@ KNOWN: dict[str, str] = {
         "datacontract-cli's rules are recorded even over a table the run has no view "
         "for, and nothing is noted as left out - Birth Registrations' copy never "
         "had REQ-PIPE-078's left-out handling."),
+    "soda.reads_unreadable_tables": (
+        "Soda is handed every check whatever the run can read, and nothing is noted "
+        "as left out - REQ-PIPE-078's handling, as for datacontract-cli above."),
+    "soda.scope_suffix": (
+        "a generically named Soda check is recorded as `<metric>[<filter or all>]` "
+        "rather than `<metric>` - the name Birth Registrations' checks have always "
+        "carried, which the dashboard keys a check on."),
+    "soda.named_check_value_is_invalid_count": (
+        "a custom-named check with a routed column records its own value as the "
+        "invalid-row count, as Birth Registrations' copy did and Child Protection's "
+        "never has."),
 }

@@ -1,6 +1,6 @@
 """Child Protection's adapter (REQ-PIPE-240). Every pointer below is
 temporary and names its remover in qa_tools/collections/base.py."""
-from qa_tools.collections.base import CollectionAdapter, DatacontractSpec
+from qa_tools.collections.base import CollectionAdapter, DatacontractSpec, SodaSpec
 
 #: Each table's primary key (all `unique: true` in the contract) - the only
 #: value a failing-row sample keeps, never full row content
@@ -33,6 +33,24 @@ ADAPTER = CollectionAdapter(
         # rule, so an FK check") once grouped a date-range rule with
         # referential integrity.
         labels_by_check_tail={"relationships_datacontract": "Referential integrity"},
-        sample_key=TABLE_PK,
+    ),
+    sample_key=TABLE_PK,
+    soda=SodaSpec(
+        data_source="cp_collection",
+        # The three cross-table business rules stay unrouted (the table's
+        # own pseudo-column): they are not about one column.
+        column_by_name={
+            "date_of_birth out of range": "date_of_birth",
+            "end_date is not earlier than start_date": "end_date",
+        },
+        # Matching each rule's own contract quality entry.
+        dimension_by_name={
+            "Escalation completeness": "completeness",
+            "Closed-case investigation hygiene": "consistency",
+            "Placement/carer approval compliance": "consistency",
+            "date_of_birth out of range": "conformity",
+        },
+        dimension_by_metric={"reference": "consistency", "row_count": "completeness"},
+        invalid_count_metrics=frozenset({"reference"}),
     ),
 )

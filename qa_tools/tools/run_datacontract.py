@@ -165,7 +165,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             "on_fail_action": "quarantine" if diag.get("severity") == "error" else "flag",
             "row_count_total": diag.get("row_count"),
             "row_count_invalid": row_count_invalid,
-            "failing_sample_keys": (failing_sample_keys(c, spec.sample_key[table])
+            "failing_sample_keys": (failing_sample_keys(c, adapter.sample_key[table])
                                     if metric in SAMPLEABLE_METRICS else []),
             "engine": ENGINE_TAG,
         })

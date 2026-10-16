@@ -482,6 +482,88 @@ class TestTheSharedToolModules:
 
         assert (len(got), len(notes)) == (recorded, noted)
 
+    def _soda(self, monkeypatch, tmp_path, legacy=frozenset(), soda=None, readable=(FAKE_TABLE,)):
+        """The shared Soda runner over a stub scan, for the third collection:
+        one generic check with a filter, one custom-named `failed rows`."""
+        import dataclasses
+
+        from qa_tools.collections.base import SodaSpec
+        from qa_tools.tools import run_soda
+
+        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter.ADAPTER = dataclasses.replace(
+            adapter.ADAPTER, legacy=legacy,
+            soda=soda or SodaSpec(data_source="fake_source",
+                                  column_by_name={"things pair up": "things"},
+                                  label_by_name={"things pair up": "Pairing"},
+                                  dimension_by_name={"things pair up": "consistency"},
+                                  dimension_by_metric={"missing_count": "completeness"}))
+        checks = tmp_path / "fake-soda.yml"
+        checks.write_text(f"checks for {FAKE_TABLE}:\n  - row_count > 0:\n"
+                          f"      attributes: {{check_id: x}}\n")
+        prefix = f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}"
+        scan_results = {"metrics": [{"identity": "m1", "metricName": "missing_count"}], "checks": [
+            {"table": FAKE_TABLE, "column": "things", "name": "missing_count(things) = 0 warn when > 0",
+             "filter": "recent", "metrics": ["m1"], "outcome": "fail",
+             "diagnostics": {"value": 3}, "resourceAttributes": [
+                 {"name": "check_id", "value": f"{prefix}.things.missing_count_soda"}]},
+            {"table": FAKE_TABLE, "column": None, "name": "things pair up", "filter": None,
+             "metrics": [], "outcome": "fail", "diagnostics": {"value": 2}, "resourceAttributes": [
+                 {"name": "check_id", "value": f"{prefix}.things.pair_soda"}]},
+        ]}
+        conn = SimpleNamespace(execute=lambda sql: SimpleNamespace(fetchone=lambda: (7,)),
+                               close=lambda: None)
+        written = []
+        monkeypatch.setattr(run_soda.asked_for, "ask", lambda *a, **k: [])
+        monkeypatch.setattr(run_soda.asked_for, "SCOPED", frozenset())
+        monkeypatch.setattr(run_soda, "checks_path", lambda collection_id: str(checks))
+        monkeypatch.setattr(run_soda.supply_db, "connect", lambda **k: conn)
+        monkeypatch.setattr(run_soda.supply_db, "readable_in", lambda c, run_id: set(readable))
+        monkeypatch.setattr(run_soda, "execute_scan", lambda scan: scan_results)
+        monkeypatch.setattr(run_soda, "unreported_checks", lambda *a: [])
+        monkeypatch.setattr(run_soda, "write_qa_result", lambda *a, **k: written.append(a))
+        got = run_soda.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
+        return {r["check_id"].rsplit(".", 1)[-1]: r for r in got}, written
+
+    def test_soda_reads_everything_it_needs_from_the_adapter(self, third_collection,
+                                                             monkeypatch, tmp_path):
+        got, written = self._soda(monkeypatch, tmp_path)
+        generic, named = got["missing_count_soda"], got["pair_soda"]
+        assert {r["collection_id"] for r in got.values()} == {FAKE_ID}
+        assert (generic["check_name"], generic["dimension"], generic["label"]) == \
+            ("missing_count", "completeness", "Null rate")
+        assert (named["column_name"], named["label"], named["dimension"]) == \
+            ("things", "Pairing", "consistency")
+        assert generic["row_count_total"] == 7 and written[0][:2] == ("fake-agency", FAKE_ID)
+
+    @pytest.mark.parametrize("flag,field,without,with_", [
+        ("soda.scope_suffix", ("missing_count_soda", "check_name"),
+         "missing_count", "missing_count[recent]"),
+        ("soda.named_check_value_is_invalid_count", ("pair_soda", "row_count_invalid"), None, 2),
+    ])
+    def test_each_soda_flag_changes_only_its_own_field(self, third_collection, monkeypatch,
+                                                      tmp_path, flag, field, without, with_):
+        check, key = field
+        plain, _ = self._soda(monkeypatch, tmp_path)
+        flagged, _ = self._soda(monkeypatch, tmp_path, legacy=frozenset({flag}))
+        assert (plain[check][key], flagged[check][key]) == (without, with_)
+        flagged[check][key] = plain[check][key]
+        assert flagged == plain
+
+    def test_soda_reads_unreadable_tables_hands_every_check(self, third_collection,
+                                                            monkeypatch, tmp_path):
+        from qa_tools.tools import run_soda
+
+        handed = []
+        monkeypatch.setattr(run_soda, "readable_checks_yaml",
+                            lambda path, unreadable, keep=None: handed.append(set(unreadable)) or "")
+        for legacy in (frozenset(), frozenset({"soda.reads_unreadable_tables"})):
+            try:
+                self._soda(monkeypatch, tmp_path, legacy=legacy, readable=())
+            except KeyError:
+                pass  # nothing readable, so no row count for the stub's checks
+        assert handed == [{FAKE_TABLE}, set()]
+
     def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
         import dataclasses
 

@@ -106,8 +106,7 @@ class TestEveryLongLivedConnectSiteIsGuarded:
     long body, which is where the leak has consequences."""
 
     MODULES = [
-        "qa_tools/bdm/run_soda_bdm.py",
-        "qa_tools/cp/run_soda_cp.py",
+        "qa_tools/tools/run_soda.py",
         "qa_tools/bdm/run_dbt_bdm.py",
         "qa_tools/cp/run_dbt_cp.py",
     ]

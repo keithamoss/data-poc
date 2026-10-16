@@ -2,7 +2,8 @@
 evaluate_soda_cp() - the CP counterpart to tests/test_run_soda_bdm.py."""
 from __future__ import annotations
 
-import qa_tools.cp.run_soda_cp as run_soda_cp
+import qa_tools.tools.run_soda as run_soda
+from qa_tools import collections
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
@@ -14,8 +15,8 @@ def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp):
     monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     # The environment already points at this worker's database
     # (conftest's supply_dsn); cp_duckdb_dir is what staged the data into it.
-    monkeypatch.setattr(run_soda_cp, "write_qa_result", lambda *a, **k: None)
-    return run_soda_cp.evaluate_soda_cp(run_id, run_timestamp)
+    monkeypatch.setattr(run_soda, "write_qa_result", lambda *a, **k: None)
+    return run_soda.evaluate("child-protection", run_id, run_timestamp)
 
 
 def test_clean_run_resolves_every_check_id_across_all_6_tables(monkeypatch, cp_duckdb_dir):
@@ -129,7 +130,7 @@ class TestSamplesAreNotLostToANameAnotherTableShares:
             schema = supply_db.run_schema(_DIRTY_RUN_ID)
             for r in sampled:
                 table = hierarchy.dataset(r["dataset_id"]).table
-                pk = run_soda_cp.cp_common.TABLE_PK[table]
+                pk = collections.adapter("child-protection").sample_key[table]
                 keys = {str(row[0]) for row in conn.execute(
                     f'SELECT {pk} FROM "{schema}".{table}').fetchall()}
                 assert set(r["failing_sample_keys"]) <= keys, \

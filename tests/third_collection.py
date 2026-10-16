@@ -86,8 +86,8 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
         results_rebuild=CODE, generator=f"{CODE}:generate", target_datasets=(FAKE_DATASET,),
         dashboard_json="fake_collection_dashboard.json",
         dashboard_datasets=lambda doc: list(doc["datasets"]),
-        datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"},
-                                      sample_key={FAKE_TABLE: "fake_id"}))
+        datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"}),
+        sample_key={FAKE_TABLE: "fake_id"})
     monkeypatch.setitem(sys.modules, "qa_tools.collections.fake_collection", adapter)
     return calls
 

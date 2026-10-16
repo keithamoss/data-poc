@@ -216,16 +216,17 @@ class TestThroughTheRealOrchestrator:
         shape a wrong selection takes - refuses the run before it is
         finished, naming the check, and the batch stops (nothing catches
         it)."""
-        from qa_tools.bdm import orchestrate_bdm, run_soda_bdm
+        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import run_soda
 
-        real = run_soda_bdm.evaluate_soda_bdm
+        real = run_soda.evaluate
         dropped = []
 
-        def loses_one(run_id, run_timestamp):
-            got = real(run_id, run_timestamp)
+        def loses_one(collection_id, run_id, run_timestamp):
+            got = real(collection_id, run_id, run_timestamp)
             dropped.append(got.pop()["check_id"])
             return got
-        monkeypatch.setattr(run_soda_bdm, "evaluate_soda_bdm", loses_one)
+        monkeypatch.setattr(run_soda, "evaluate", loses_one)
 
         run_id, entry = _bdm_run()
         with pytest.raises(asked_for.MissingCheck) as caught:
@@ -291,16 +292,17 @@ class TestARunWithNoPeriodIsGuardedToo:
         assert asked["evidently"] == asked_for.collection_checks(CP, "evidently")
 
     def test_a_dropped_check_refuses_it(self, cp_duckdb_dir, monkeypatch):
-        from qa_tools.cp import orchestrate_cp, run_soda_cp
+        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import run_soda
 
-        real = run_soda_cp.evaluate_soda_cp
+        real = run_soda.evaluate
         dropped = []
 
-        def loses_one(run_id, run_timestamp):
-            got = real(run_id, run_timestamp)
+        def loses_one(collection_id, run_id, run_timestamp):
+            got = real(collection_id, run_id, run_timestamp)
             dropped.append(got.pop()["check_id"])
             return got
-        monkeypatch.setattr(run_soda_cp, "evaluate_soda_cp", loses_one)
+        monkeypatch.setattr(run_soda, "evaluate", loses_one)
         run_id, entry = self._run()
         with pytest.raises(asked_for.MissingCheck) as caught:
             orchestrate_cp._run_one(entry, entry["received_at"], "t@example.com",
@@ -315,7 +317,7 @@ class TestBirthRegistrationsAskedForNothing:
 
     @pytest.mark.parametrize("module,evaluate,tool,invoker,lead", [
         ("qa_tools.bdm.run_dbt_bdm", "evaluate_dbt_bdm", "dbt", "run_dbt", ()),
-        ("qa_tools.bdm.run_soda_bdm", "evaluate_soda_bdm", "soda", "execute_scan", ()),
+        ("qa_tools.tools.run_soda", "evaluate", "soda", "execute_scan", ("civil-registration",)),
         ("qa_tools.tools.run_datacontract", "evaluate", "datacontract",
          "run_against_warehouse", ("civil-registration",)),
     ])
