@@ -482,6 +482,21 @@ def _timings(output: str) -> dict[str, float]:
             re.findall(r"([^,]+?) (\d+(?:\.\d+)?)s", m[-1])}
 
 
+def _clear_killed(label: str) -> None:
+    """A KILLED capture never reaches its `finally` (post-build-review #210),
+    so its worktree stays registered and its work directory on disk; the
+    next capture of the same label clears them. Its database needs nothing
+    here - the database stage drops it by name before creating it."""
+    # exactly mkdtemp's 8-character suffix, so label "self" never matches
+    # "self-check-b"'s directory
+    for left in Path(tempfile.gettempdir()).glob(f"equiv-{label}-" + "?" * 8):
+        if (left / "tree").exists():
+            subprocess.run(["git", "worktree", "remove", "--force", str(left / "tree")],
+                           cwd=ROOT, capture_output=True)
+        shutil.rmtree(left, ignore_errors=True)
+    subprocess.run(["git", "worktree", "prune"], cwd=ROOT, capture_output=True)
+
+
 def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
     """Capture `ref` as `label` (criteria 1, 4, 7-15). Returns the baseline path."""
     import psycopg
@@ -498,6 +513,7 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
     admin, scratch, dbname = _scratch_dsn(label)
     commit = _commit(ref)
     env_id = environments.current().id
+    _clear_killed(label)
     work = Path(tempfile.mkdtemp(prefix=f"equiv-{label}-"))
     tree = work / "tree"
     env = {**os.environ, "MOTHMAN_SUPPLY_DSN": scratch, "PYTHONPATH": str(tree),

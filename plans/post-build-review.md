@@ -9911,3 +9911,19 @@ twice. It deliberately did not re-find the `TypeError`.
      TS-10b, SLOT_DUE_DATES now holds exactly the twelve era days, and the
      arrival golden was re-captured from the rebuilt history - 441 arrivals
      in both, zero verdicts moved, the 12 era arrivals added.
+
+210. **[done, 2026-10-16]** **[Testing]** **A killed equivalence capture left
+     its worktree and work directory behind for good.** Seen for real while
+     REQ-TEST-239's self-check ran: the container restarted during capture
+     B's bootstrap, and a kill never reaches `capture()`'s `finally`, so
+     `git worktree list` still carried `/tmp/equiv-self-check-b-*/tree`, the
+     work directory stayed on disk and `equiv_self_check_b` stayed in
+     PostgreSQL. The database was already self-healing - the database stage
+     drops it by name before creating it - but nothing ever removed the
+     other two. Fixed: a capture first clears any earlier capture's
+     leftovers under the same label, matching exactly `mkdtemp`'s
+     eight-character suffix so that label `self` can never remove
+     `self-check-b`'s live directory. Two tests, the first failing before
+     the fix. Minor, so fixed under Keith's polish rule. Capture A had
+     finished before the restart (about 25 minutes from empty, against the
+     31m52s measured 2026-10-15), so only B was re-run.

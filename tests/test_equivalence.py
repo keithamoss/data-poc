@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
@@ -164,6 +165,40 @@ def test_a_failed_capture_names_its_stage_and_leaves_nothing(baselines, tmp_path
     with psycopg.connect(admin) as conn:
         assert not conn.execute("SELECT 1 FROM pg_database WHERE datname = %s",
                                 [name]).fetchall()
+
+
+def test_a_killed_captures_leftovers_go_with_the_next_capture_of_its_label(baselines):
+    """post-build-review #210: a capture that is KILLED - a container restart,
+    as on 2026-10-16 - never reaches its own cleanup, so its worktree stays
+    registered and its work directory stays on disk. The next capture under
+    the same label clears both before it starts."""
+    import tempfile
+
+    left = Path(tempfile.mkdtemp(prefix="equiv-pytest-killed-"))
+    subprocess.run(["git", "worktree", "add", "--detach", "-q", str(left / "tree"),
+                    BEFORE_ENV_MARK], cwd=eq.ROOT, check=True, capture_output=True)
+    try:
+        result = _runner.invoke(cli, ["debug", "equivalence", "capture", "--ref",
+                                      BEFORE_ENV_MARK, "--label", "pytest-killed"])
+        assert "stage 'mark'" in result.output
+        worktrees = subprocess.run(["git", "worktree", "list"], capture_output=True,
+                                   text=True, cwd=eq.ROOT).stdout
+        assert str(left) not in worktrees
+        assert not left.exists()
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", str(left / "tree")],
+                       cwd=eq.ROOT, capture_output=True)
+
+
+def test_clearing_a_label_never_touches_a_longer_label_it_prefixes(tmp_path):
+    import tempfile
+
+    other = Path(tempfile.mkdtemp(prefix="equiv-pytest-prefix-longer-"))
+    try:
+        eq._clear_killed("pytest-prefix")
+        assert other.exists()
+    finally:
+        other.rmdir()
 
 
 class TestTheSurfacesReadTheTree:
