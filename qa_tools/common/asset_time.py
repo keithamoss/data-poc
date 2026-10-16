@@ -38,6 +38,7 @@ five requirements' comparisons on.
 """
 from __future__ import annotations
 
+import os
 import re
 
 import functools
@@ -163,6 +164,22 @@ def zone_now() -> ZoneInfo:
     return zone_at(datetime.now(UTC))
 
 
+#: The one instant a synthetic asset's clock may be pinned to
+#: (REQ-TEST-239 criterion 16, Keith 2026-10-16).
+PINNED_NOW_VARIABLE = "MOTHMAN_PINNED_NOW"
+
+
+class PinnedClockRefused(RuntimeError):
+    """MOTHMAN_PINNED_NOW was set on an asset that is not synthetic."""
+
+
+def declared_synthetic() -> bool:
+    """Whether contract/data-asset.yaml declares the asset synthetic - read
+    here, as the replay clock reads it, rather than through the reset module."""
+    raw = config_yaml.parse(DATA_ASSET_YAML.read_text()) or {}
+    return raw.get("synthetic") is True
+
+
 def now() -> datetime:
     """The current instant, in the asset's own zone as in force now.
 
@@ -170,7 +187,21 @@ def now() -> datetime:
     without a timezone, and nothing should call it with `timezone.utc`
     either - a UTC instant is correct but reads as a foreign wall clock
     to whoever opens the file.
+
+    PINNED (REQ-TEST-239 criterion 16): where MOTHMAN_PINNED_NOW names an
+    instant, that instant IS now - so the equivalence harness can build two
+    captures hours apart and have them agree on which slots have closed.
+    Refused on an asset not declared synthetic: a real asset's "now" is
+    evidence, and is never invented.
     """
+    pinned = os.environ.get(PINNED_NOW_VARIABLE)
+    if pinned:
+        if not declared_synthetic():
+            raise PinnedClockRefused(
+                f"{PINNED_NOW_VARIABLE} is set, and this data asset does not declare "
+                f"`synthetic: true` - a real asset's clock is never pinned")
+        at = parse_instant(pinned, PINNED_NOW_VARIABLE)
+        return at.astimezone(zone_at(at))
     return datetime.now(UTC).astimezone(zone_now())
 
 

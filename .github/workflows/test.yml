@@ -200,6 +200,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        # FULL HISTORY: tests/test_equivalence.py captures a real commit from
+        # before `mothman env mark` existed and counts commits between two
+        # baselines - neither exists in the default depth-1 clone. ~17MB.
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -315,6 +320,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        # FULL HISTORY: tests/test_equivalence.py captures a real commit from
+        # before `mothman env mark` existed and counts commits between two
+        # baselines - neither exists in the default depth-1 clone. ~17MB.
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0

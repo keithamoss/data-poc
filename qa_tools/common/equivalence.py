@@ -50,9 +50,18 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 #: Bumped when what a capture records changes; `compare` refuses two
 #: baselines that disagree (criterion 2), because their differences would
 #: be the harness's rather than the code's.
-HARNESS_VERSION = 1
+HARNESS_VERSION = 2
 #: Bumped when a normalising rule below changes, for the same reason.
-NORMALISER_VERSION = 1
+#: 2 (2026-10-16): the rules the first self-check proved missing - decision
+#: references, rule-made decision times, S5's ids and clock instants.
+NORMALISER_VERSION = 2
+
+#: THE INSTANT EVERY CAPTURE'S BOOTSTRAP AND BUILD TAKE AS "NOW" (criterion
+#: 17, Keith 2026-10-16). A build works out from now which slots have closed
+#: and what is still awaiting; the first self-check's two builds, 54 minutes
+#: apart, straddled a 10:00 closing and disagreed. Changing this constant
+#: makes every earlier baseline incomparable - compare refuses the pair.
+PINNED_NOW = "2026-10-16T12:00:00+08:00"
 
 #: (code, name, what it holds) - the four surfaces of the lean harness.
 SURFACES = (
@@ -64,8 +73,11 @@ SURFACES = (
 _BY_NAME = {name: code for code, name, _ in SURFACES}
 _CODES = {code for code, _, _ in SURFACES}
 
-#: S5's one exclusion: a build stamps its own time.
-REPORT_KEYS_REMOVED = ("generated_at",)
+#: S5's KEYS LEFT OUT, each a clock stamp: the build's own time, a run's
+#: wall-clock timestamp (CLOCK_COLUMNS' run_timestamp), and a decision's
+#: recorded_at (CLOCK_COLUMNS' decision.recorded_at) - 5,280 run stamps and
+#: 235 recordedAt values differed between the first self-check's two builds.
+REPORT_KEYS_REMOVED = ("generated_at", "run_timestamp", "recordedAt")
 #: S7: the terminal every help text and menu screen is rendered at.
 COLUMNS, ROWS = 100, 40
 
@@ -154,16 +166,55 @@ ORDINAL_COLUMNS = {
 #: Columns recomputed as a natural value rather than compared raw.
 _LOAD = ("(SELECT lo.dataset_id || '|' || lo.physical || '|' || lo.outcome "
          "FROM qa.load_outcome lo WHERE lo.id = t.{col})")
-_DECISION = ("(SELECT d.dataset_id || '|' || d.action || '|' || coalesce(d.supply, '') "
-             "|| '|' || d.effective_at::text FROM qa.decision d WHERE d.id = t.{col})")
+#: A REFERENCE TO A DECISION is compared as WHICH decision: its collection
+#: and its place in that collection's log - the same ordinal the decision's
+#: own id becomes (ORDINAL_COLUMNS). Raw ids differ because the two
+#: collections replay side by side and interleave; the first self-check
+#: found 584 check results, 13 runs, 23 owed runs, 38 decisions and 14
+#: decision files differing on that alone. `snapshot` builds the lookup.
+_DECISION = "(SELECT r.ref FROM equiv_decision_ref r WHERE r.id = t.{col})"
+#: The lookup, as a CTE in the one SELECT that needs it - a snapshot only
+#: ever reads.
+_DECISION_REF_CTE = (
+    "WITH equiv_decision_ref AS (SELECT id, collection_id || '#' || row_number() OVER "
+    "(PARTITION BY collection_id ORDER BY id) AS ref FROM qa.decision) ")
 
 DERIVED_COLUMNS = {
     # A completion stamp is clock time, but WHETHER a run completed is not.
-    "run": {"completed_at": "completed_at IS NOT NULL"},
+    "run": {"completed_at": "completed_at IS NOT NULL",
+            "caused_by_decision": _DECISION.format(col="caused_by_decision"),
+            "caused_by_load": _LOAD.format(col="caused_by_load")},
     # Ids pointing at another table's surrogate: compared as what they name.
-    "check_result": {"load_attempt": _LOAD.format(col="load_attempt")},
-    "filing": {"refiled_by": "(SELECT f.dataset_id || '|' || f.supply_id || '|' || "
-                             "coalesce(f.slot, '') FROM qa.filing f WHERE f.id = t.refiled_by)"},
+    # extra carries one too - the decision a re-evaluation came after.
+    "check_result": {"load_attempt": _LOAD.format(col="load_attempt"),
+                     "extra": "CASE WHEN t.extra ? 'reevaluated_after_decision' THEN "
+                              "jsonb_set(t.extra, '{reevaluated_after_decision}', "
+                              "coalesce(to_jsonb((SELECT r.ref FROM equiv_decision_ref r "
+                              "WHERE r.id::text = t.extra->>'reevaluated_after_decision')), "
+                              "'null'::jsonb)) ELSE t.extra END"},
+    # refiled_by names the DECISION that re-filed - it was joined to
+    # qa.filing until 2026-10-16, comparing an unrelated filing that agreed
+    # only when the ids happened to interleave alike.
+    "filing": {"refiled_by": _DECISION.format(col="refiled_by")},
+    "decision": {"caused_by_decision": _DECISION.format(col="caused_by_decision"),
+                 # A RULE-MADE decision's effective time is the replay clock,
+                 # which runs on with real elapsed time after its anchor
+                 # (REQ-PIPE-081): 29 of 544 differed, by at most 0.69s, between
+                 # two bootstraps of one commit, while every person-made and
+                 # scripted one matched. Left out for rule decisions only
+                 # (Keith, 2026-10-16); their order is still compared, as the
+                 # decision log's ordinal.
+                 "effective_at": "CASE WHEN t.actor_kind = 'rule' THEN NULL "
+                                 "ELSE t.effective_at END"},
+    "decision_file": {"decision_id": _DECISION.format(col="decision_id")},
+    "census_discrepancy": {"census_id": "(SELECT c.trigger || '|' || coalesce(c.run_key, '') "
+                                        "FROM qa.census c WHERE c.id = t.census_id)"},
+    "correction_parked_resolved": {
+        "decision_id": _DECISION.format(col="decision_id"),
+        "parked_id": "(SELECT p.change_reference || '|' || p.dataset_id || '|' || "
+                     "p.supply_id || '|' || coalesce(p.from_period, '') || '|' || "
+                     "coalesce(p.to_period, '') FROM qa.correction_parked p "
+                     "WHERE p.id = t.parked_id)"},
     "owed_run": {"caused_by_decision": _DECISION.format(col="caused_by_decision"),
                  "caused_by_load": _LOAD.format(col="caused_by_load"),
                  "cleared_at": "cleared_at IS NOT NULL",
@@ -183,9 +234,7 @@ DERIVED_COLUMNS = {
     "hold": {"resolved_at": "resolved_at IS NOT NULL",
              # resolved_by is a decision's surrogate id; compare WHICH
              # decision resolved it instead.
-             "resolved_by": "(SELECT d.dataset_id || '|' || d.action || '|' || "
-                            "coalesce(d.supply, '') || '|' || d.effective_at::text "
-                            "FROM qa.decision d WHERE d.id = t.resolved_by)"},
+             "resolved_by": _DECISION.format(col="resolved_by")},
 }
 
 #: WHOLE COLUMNS LEFT OUT FOR A REASON OTHER THAN THE CLOCK - one, and its
@@ -229,7 +278,10 @@ def _qa_select(conn, table: str) -> tuple[list[str], str]:
             continue
         names.append(col)
         exprs.append(f't."{col}"')
-    return names, f'SELECT {", ".join(exprs)} FROM qa."{table}" t'
+    sql = f'SELECT {", ".join(exprs)} FROM qa."{table}" t'
+    if "equiv_decision_ref" in sql:
+        sql = _DECISION_REF_CTE + sql
+    return names, sql
 
 
 def _canon(value) -> str:
@@ -323,19 +375,98 @@ def generated_files(tree: Path) -> dict[str, str]:
     return out
 
 
-def _strip(value):
-    if isinstance(value, dict):
-        return {k: _strip(v) for k, v in value.items() if k not in REPORT_KEYS_REMOVED}
+#: S5 KEYS HOLDING A SURROGATE ID, compared as what the id names - the same
+#: rule S1 applies (normaliser 2). The first self-check found 1,800
+#: decision ids and 936 load-attempt ids differing on interleaving alone.
+DECISION_ID_KEYS = ("decision_id", "decisionId", "reevaluated_after_decision")
+LOAD_ID_KEYS = ("attempt",)
+_INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
+
+
+def report_context(dsn: str) -> dict:
+    """What S5 needs from the database the build read: each raw decision and
+    load-attempt id's comparable name, and every INSTANT that came from a
+    clock (CLOCK_COLUMNS) or from a rule-made decision's running replay
+    clock - each of which S5 shows as what it is, not as its value."""
+    import psycopg
+
+    ctx: dict = {"decisions": {}, "loads": {}, "instants": {}}
+    with psycopg.connect(dsn) as conn:
+        for raw, ref, rule, at in conn.execute(
+                "SELECT id, collection_id || '#' || row_number() OVER "
+                "(PARTITION BY collection_id ORDER BY id), actor_kind = 'rule', effective_at "
+                "FROM qa.decision"):
+            ctx["decisions"][str(raw)] = ref
+            if rule:
+                ctx["instants"][at] = "<rule-made decision's time>"
+        for raw, ref in conn.execute(
+                "SELECT id, dataset_id || '#' || row_number() OVER "
+                "(PARTITION BY dataset_id ORDER BY id) FROM qa.load_outcome"):
+            ctx["loads"][str(raw)] = ref
+        tables = {r[0] for r in conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'qa'")}
+        for table, cols in CLOCK_COLUMNS.items():
+            if table not in tables:
+                continue
+            for col in cols:
+                found = conn.execute(
+                    "SELECT 1 FROM information_schema.columns WHERE table_schema = 'qa' "
+                    "AND table_name = %s AND column_name = %s", [table, col]).fetchone()
+                if not found:
+                    continue
+                for (at,) in conn.execute(
+                        f'SELECT DISTINCT "{col}" FROM qa."{table}" WHERE "{col}" IS NOT NULL'):
+                    if isinstance(at, datetime):
+                        ctx["instants"].setdefault(at, "<clock>")
+    return ctx
+
+
+def _as_instant(value: str):
+    if not _INSTANT.match(value):
+        return None
+    try:
+        at = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return at if at.tzinfo is not None else None
+
+
+def _normalise_report(value, ctx: dict | None, parent: str | None = None):
     if isinstance(value, list):
-        return [_strip(v) for v in value]
-    return value
+        return [_normalise_report(v, ctx, parent) for v in value]
+    if isinstance(value, str) and ctx:
+        at = _as_instant(value)
+        if at is not None and at in ctx["instants"]:
+            return ctx["instants"][at]
+        return value
+    if not isinstance(value, dict):
+        return value
+    out = {}
+    for k, v in value.items():
+        if k in REPORT_KEYS_REMOVED:
+            continue
+        if ctx and v is not None and (k in DECISION_ID_KEYS or (k == "id" and parent == "decisions")):
+            out[k] = ctx["decisions"].get(str(v), v)
+        elif ctx and v is not None and k in LOAD_ID_KEYS:
+            out[k] = ctx["loads"].get(str(v), v)
+        else:
+            out[k] = _normalise_report(v, ctx, k)
+    # A wait measured to a rule-made decision's time is as noisy as that
+    # time: left out beside it, kept wherever the arrival still waits (the
+    # pinned clock makes that one exact).
+    if "waitedSeconds" in out and isinstance(out.get("filledAt"), str) \
+            and out["filledAt"].startswith("<"):
+        del out["waitedSeconds"]
+    return out
 
 
-def reports(tree: Path) -> dict:
-    """S5: every JSON the build wrote under `tree`'s reports/, parsed."""
+def reports(tree: Path, ctx: dict | None = None) -> dict:
+    """S5: every JSON the build wrote under `tree`'s reports/, parsed and
+    normalised (REPORT_KEYS_REMOVED always; ids and clock instants by
+    `report_context` when the database is to hand)."""
     out = {}
     for f in sorted((tree / "reports").glob("*.json")):
-        out[f.name] = _strip(json.loads(f.read_text()))
+        out[f.name] = _normalise_report(json.loads(f.read_text()), ctx)
     return out
 
 
@@ -482,18 +613,42 @@ def _timings(output: str) -> dict[str, float]:
             re.findall(r"([^,]+?) (\d+(?:\.\d+)?)s", m[-1])}
 
 
-def _clear_killed(label: str) -> None:
+def work_dir() -> Path:
+    """THE ONE place a capture's worktree lives, whatever its label. Fixed
+    rather than per label because the tree's path is printed - `mothman
+    population --help` shows a default under it, wrapped to the terminal -
+    so a path whose length followed the label made two captures' help
+    texts differ (the first self-check, 2026-10-16)."""
+    return Path(tempfile.gettempdir()) / "mothman-equivalence-work"
+
+
+def _one_capture_at_a_time():
+    """An exclusive lock for the capture's whole span: one fixed worktree
+    means one capture at a time, which also keeps a capture's bootstrap
+    timing its own. The operating system releases it if the process dies."""
+    import fcntl
+
+    lock = open(Path(tempfile.gettempdir()) / "mothman-equivalence.lock", "w")  # noqa: SIM115
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock.close()
+        raise Refused("another equivalence capture is running - one at a time, so "
+                      "wait for it to finish") from None
+    return lock
+
+
+def _clear_killed() -> None:
     """A KILLED capture never reaches its `finally` (post-build-review #210),
-    so its worktree stays registered and its work directory on disk; the
-    next capture of the same label clears them. Its database needs nothing
-    here - the database stage drops it by name before creating it."""
-    # exactly mkdtemp's 8-character suffix, so label "self" never matches
-    # "self-check-b"'s directory
-    for left in Path(tempfile.gettempdir()).glob(f"equiv-{label}-" + "?" * 8):
-        if (left / "tree").exists():
-            subprocess.run(["git", "worktree", "remove", "--force", str(left / "tree")],
-                           cwd=ROOT, capture_output=True)
-        shutil.rmtree(left, ignore_errors=True)
+    so its worktree stays registered and its directory on disk; the next
+    capture clears them, holding the lock, so never a live one. Its
+    database needs nothing here - the database stage drops it by name
+    before creating it."""
+    work = work_dir()
+    if (work / "tree").exists():
+        subprocess.run(["git", "worktree", "remove", "--force", str(work / "tree")],
+                       cwd=ROOT, capture_output=True)
+    shutil.rmtree(work, ignore_errors=True)
     subprocess.run(["git", "worktree", "prune"], cwd=ROOT, capture_output=True)
 
 
@@ -501,9 +656,9 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
     """Capture `ref` as `label` (criteria 1, 4, 7-15). Returns the baseline path."""
     import psycopg
 
-    from qa_tools.common import environments, synthetic_reset
+    from qa_tools.common import asset_time, environments
 
-    if not synthetic_reset.is_synthetic():
+    if not asset_time.declared_synthetic():
         raise Refused("this data asset is not declared synthetic - a capture bootstraps "
                       "a synthetic history and is refused on a real asset")
     path = baseline_path(label)
@@ -513,15 +668,16 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
     admin, scratch, dbname = _scratch_dsn(label)
     commit = _commit(ref)
     env_id = environments.current().id
-    _clear_killed(label)
-    work = Path(tempfile.mkdtemp(prefix=f"equiv-{label}-"))
+    work = work_dir()
     tree = work / "tree"
     env = {**os.environ, "MOTHMAN_SUPPLY_DSN": scratch, "PYTHONPATH": str(tree),
+           "MOTHMAN_PINNED_NOW": PINNED_NOW,
            "NO_COLOR": "1", "COLUMNS": str(COLUMNS), "TERM": "xterm"}
     env.pop("GITHUB_REPOSITORY", None)
     stage = "worktree"
     baseline: dict = {"harness": HARNESS_VERSION, "normaliser": NORMALISER_VERSION,
                       "label": label, "ref": ref, "commit": commit,
+                      "pinned_now": PINNED_NOW,
                       "captured_at": datetime.now(UTC).isoformat(timespec="seconds")}
 
     def run(stage_name: str, *args: str) -> str:
@@ -531,7 +687,10 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
             raise StageFailed(stage_name, (done.stdout + done.stderr)[-3000:])
         return done.stdout + done.stderr
 
+    lock = _one_capture_at_a_time()
     try:
+        _clear_killed()
+        work.mkdir(parents=True)
         subprocess.run(["git", "worktree", "add", "--detach", "-q", str(tree), commit],
                        cwd=ROOT, check=True, capture_output=True)
         packages = ROOT / "dbt_project" / "dbt_packages"
@@ -561,7 +720,7 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
         stage = "S4"
         baseline["surfaces"]["S4"] = generated_files(tree)
         stage = "S5"
-        baseline["surfaces"]["S5"] = reports(tree)
+        baseline["surfaces"]["S5"] = reports(tree, report_context(scratch))
         stage = "S7"
         baseline["surfaces"]["S7"] = help_and_menus(tree, env)
         stage = "write"
@@ -585,6 +744,7 @@ def capture(ref: str, label: str, *, yes: bool = False, say=print) -> Path:
         subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=ROOT,
                        capture_output=True)
         shutil.rmtree(work, ignore_errors=True)
+        lock.close()
 
 
 # ---- compare -----------------------------------------------------------
@@ -607,10 +767,37 @@ def _diff_mapping(a: dict, b: dict, limit: int) -> list[str]:
             out.append(f"  only in A: {key}")
         elif a[key] != b[key]:
             out.append(f"  differs: {key}")
+            if isinstance(a[key], (dict, list)):
+                out += [f"     {p}" for p in _json_differences(a[key], b[key], 10)]
         if len(out) >= limit:
             out.append("  ...")
             break
     return out
+
+
+def _json_differences(a, b, limit: int, path: str = "") -> list[str]:
+    """The first `limit` JSON paths where two parsed reports differ."""
+    out: list[str] = []
+
+    def walk(x, y, p):
+        if len(out) >= limit:
+            return
+        if isinstance(x, dict) and isinstance(y, dict):
+            for k in sorted(set(x) | set(y)):
+                if k not in x or k not in y:
+                    out.append(f"{p}.{k}: only in {'A' if k in x else 'B'}")
+                else:
+                    walk(x[k], y[k], f"{p}.{k}")
+        elif isinstance(x, list) and isinstance(y, list):
+            if len(x) != len(y):
+                out.append(f"{p}: {len(x)} items vs {len(y)}")
+            for i, (u, v) in enumerate(zip(x, y)):
+                walk(u, v, f"{p}[{i}]")
+        elif x != y:
+            out.append(f"{p}: {json.dumps(x, default=str)[:80]} vs "
+                       f"{json.dumps(y, default=str)[:80]}")
+    walk(a, b, path)
+    return out[:limit]
 
 
 def _diff_s1(a: dict, b: dict, limit: int) -> list[str]:
@@ -639,6 +826,10 @@ def _diff_s1(a: dict, b: dict, limit: int) -> list[str]:
 
 def compare(a: dict, b: dict, surfaces: list[str], *, limit: int = 5) -> dict[str, list[str]]:
     """Differences surface by surface; an empty list where equal (criterion 3)."""
+    if a.get("pinned_now") != b.get("pinned_now"):
+        raise Refused(f"the two baselines were built with the clock pinned to different "
+                      f"instants ({a.get('label')}: {a.get('pinned_now')}, {b.get('label')}: "
+                      f"{b.get('pinned_now')}) - recapture one so they compare like with like")
     for key in ("harness", "normaliser"):
         if a.get(key) != b.get(key):
             raise Refused(f"the two baselines were taken by different {key} versions "

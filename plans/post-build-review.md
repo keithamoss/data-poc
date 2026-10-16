@@ -9921,9 +9921,50 @@ twice. It deliberately did not re-find the `TypeError`.
      PostgreSQL. The database was already self-healing - the database stage
      drops it by name before creating it - but nothing ever removed the
      other two. Fixed: a capture first clears any earlier capture's
-     leftovers under the same label, matching exactly `mkdtemp`'s
-     eight-character suffix so that label `self` can never remove
-     `self-check-b`'s live directory. Two tests, the first failing before
-     the fix. Minor, so fixed under Keith's polish rule. Capture A had
-     finished before the restart (about 25 minutes from empty, against the
-     31m52s measured 2026-10-15), so only B was re-run.
+     leftovers, with the test failing first. Minor, so fixed under Keith's
+     polish rule. Capture A had finished before the restart (about 25
+     minutes from empty, against the 31m52s measured 2026-10-15), so only B
+     was re-run. REVISED THE SAME DAY by #211: the first fix matched
+     leftovers by label, and the self-check then showed a per-label path
+     makes two captures' help texts differ. Every capture now uses one
+     fixed path under an exclusive lock, so the leftover is always at the
+     same place and a live capture's tree can never be cleared, because a
+     second capture is refused while the lock is held.
+
+211. **[done, 2026-10-16]** **[Testing]** **REQ-TEST-239's first self-check
+     failed, as it exists to, and every difference was the harness.** Two
+     captures of 653911d here, and the same again in CI's on-demand job on
+     7ac4b1d, differed on S1, S5 and S7 with S4 identical. Causes, all
+     measured from the two baselines: decision ids referenced raw from
+     seven places (the collections replay side by side, so ids
+     interleave), load-attempt ids in the dashboard JSON, clock stamps in
+     S5, rule-made decision times (29 of 544, by at most 0.69s), the
+     build's own wall clock (a 10:00 Perth slot closed between the two
+     builds), and the worktree path inside `mothman population --help`.
+     **One was a real defect in code already relied on:** `filing.refiled_by`
+     names the decision that re-filed a supply, and the rule inherited from
+     `tests/equiv_support.py` joined it to `qa.filing.id`, so every
+     equivalence comparison since REQ-PIPE-141 compared an unrelated filing.
+     A test reproducing it against a real database failed on the old rule
+     ("cp-carers|...|2099-S..." where the decision's reference belonged)
+     and passes on the fix. Keith decided two things: rule-made decision
+     times are left out by name, and the clock is pinned
+     (REQ-TEST-239 criteria 16 and 17, wording approved as written). The
+     rest are normaliser 2 and the fixed worktree path. Recorded on
+     REQ-TEST-239's decisions.
+
+212. **[done, 2026-10-16]** **[Testing]** **CI went red on both of the
+     morning's REQ-TEST-239 pushes, 9bab4da and 7ac4b1d, seven failures
+     each.** Three causes, none in the harness's logic: CI's terminal adds
+     colour codes, which broke assertions on the error panel's text
+     (reproduced here with `FORCE_COLOR=1`: the old test fails, the new one
+     passes); two tests need git history that the default depth-1 checkout
+     does not have (a commit from before `mothman env mark`, and a count of
+     commits between two baselines), so the `test` and `on-demand` jobs now
+     check out full history, about 17MB; and `equivalence.py` imported
+     `synthetic_reset`, which `test_reset_synthetic.py` reserves for
+     `mothman env` alone - it now asks the asset clock's own synthetic check.
+     The pushes went out because the local gate ran with
+     `--no-pytest` plus selected test files, as rule C allows, and none of
+     the three is visible from a local run. CLAUDE.md already records the
+     git-depth trap; this is a second instance of it.
