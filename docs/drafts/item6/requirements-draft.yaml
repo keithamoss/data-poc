@@ -4,6 +4,9 @@
 # dashboard UX, CLI UX and delivery-architect reviews. PROPOSALS, none signed.
 
 - id: REQ-TEST-239
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   title: "A before-and-after equivalence harness captures a commit in its own git worktree and proves a refactor changed nothing a bootstrap records, generates, builds or offers"
   date_written: "2026-10-15"
   story: "As whoever generalises the per-collection code, I want one command that captures everything a from-empty bootstrap produces at a named commit, run by that commit's own code, and compares two such captures, so that every refactor step can show it changed no recorded result, generated file, built page or command, rather than assert it."
@@ -11,26 +14,21 @@
   status: not_started
   source: "Keith, plans/publishing-and-history.md item 6, reopened 2026-10-15 night ('small adapter per collection'); main session position.md calls 2, 20, 24 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
   acceptance_criteria:
-    - "THE SYSTEM SHALL offer `mothman debug equivalence capture --ref <commit> --label <name>`, which checks the commit out into a git worktree of its own, runs that commit's own `mothman pipeline bootstrap` from empty into a scratch database named for the label, and writes one baseline file describing surfaces S1 to S7, without patching any module of the code under capture."
+    - "THE SYSTEM SHALL offer `mothman debug equivalence capture --ref <commit> --label <name>`, which checks the commit out into a git worktree of its own, runs that commit's own `mothman pipeline bootstrap` from empty into a scratch database named for the label, and writes one baseline file describing surfaces S1, S4, S5 and S7, without patching any module of the code under capture."
     - "THE SYSTEM SHALL record in every baseline the commit captured, the harness version and the normaliser version, and `compare` SHALL refuse two baselines whose harness or normaliser versions differ, naming both."
-    - "THE SYSTEM SHALL offer `mothman debug equivalence compare <a> <b> [--surfaces ...]`, taking surfaces by name or by code, which reports every difference surface by surface, prints both baselines' commits and the number of commits between them, and exits non-zero IF any compared surface differs; its `--help` SHALL list all seven surfaces by name and code."
+    - "THE SYSTEM SHALL offer `mothman debug equivalence compare <a> <b> [--surfaces ...]`, taking surfaces by name or by code, which reports every difference surface by surface, prints both baselines' commits and the number of commits between them, and exits non-zero IF any compared surface differs; its `--help` SHALL list all four surfaces by name and code."
     - "THE SYSTEM SHALL capture as S1 every row of every base table in the qa schema, under the clock, surrogate, ordinal and derived-column rules tests/equiv_support.py applies today, so that a column added to the qa schema later is compared by default."
     - "THE SYSTEM SHALL capture as S2 every schema name and every supply table's name, row count and digest of its sorted rows."
-    - "THE SYSTEM SHALL capture as S3 every tool_output row's raw_output in a per-tool normalised form, whose every rule (a key removed, a path rewritten, a float rounded, a list sorted) is named in one place with the measured reason for it."
-    - "WHEN two full captures are taken of the same commit, THE SYSTEM SHALL compare them equal on all seven surfaces - the self-check that proves the normaliser quiet - and this self-check SHALL be run and recorded in this requirement's evidence before any other requirement in this set uses the harness, and kept as an on-demand test."
+    - "WHEN two full captures are taken of the same commit, THE SYSTEM SHALL compare them equal on all four surfaces - the self-check that proves the normaliser quiet - and this self-check SHALL be run and recorded in this requirement's evidence before any other requirement in this set uses the harness, and kept as an on-demand test."
     - "IF a value cannot be normalised to equality by the self-check, THEN THE SYSTEM SHALL leave it out by name with the measured reason, and SHALL keep every exclusion on every surface in one named list, comparing everything not on it."
     - "THE SYSTEM SHALL capture as S4 the path and sha256 of every file the generators wrote - every delivery, every receipt, the generator bookkeeping and the scenario placements."
     - "THE SYSTEM SHALL capture as S5 every results JSON and dashboard JSON the bootstrap wrote under the worktree's reports/, parsed and compared as JSON with only generated_at removed."
-    - "THE SYSTEM SHALL capture as S6, in a real browser with the page clock pinned to the newest recorded receipt instant, the visible text of the executive view and of every real dataset's page each cold-loaded from its own URL, plus the page's own buildDatasetsOn() output for each collection's first, middle and newest receipt dates, and SHALL record the embedded GitHub link values separately, reported but never failing a compare."
     - "THE SYSTEM SHALL capture as S7 the `--help` text of every mothman group and command, and the TUI's menu text, with COLUMNS fixed and NO_COLOR=1."
     - "IF the scratch database's DSN equals MOTHMAN_SUPPLY_DSN, THEN THE SYSTEM SHALL refuse before writing anything, naming both."
     - "IF the data asset is not declared synthetic, THEN THE SYSTEM SHALL refuse to capture."
-    - "THE SYSTEM SHALL write nothing under the main working tree's data/, reports/ or dashboard/, and SHALL remove its worktree and, unless `--keep-database` was given, drop its scratch database when a capture ends."
-    - "WHERE `--keep-database` is given, THE SYSTEM SHALL keep the capture's scratch database, record its name in the baseline, and `mothman debug equivalence drop <label>` SHALL drop it; IF a kept database no longer exists, THEN `--rebuild-from <label>` SHALL refuse naming it."
+    - "THE SYSTEM SHALL write nothing under the main working tree's data/, reports/ or dashboard/, and SHALL remove its worktree and drop its scratch database when a capture ends."
     - "IF a baseline with the given label exists, THEN capture SHALL refuse unless `--yes` is given; WHEN a capture succeeds, THE SYSTEM SHALL print the baseline's path."
     - "IF a capture fails at any stage, THEN THE SYSTEM SHALL drop its scratch database, leave no readable baseline, name the stage that failed and exit non-zero."
-    - "THE SYSTEM SHALL keep scripted decisions ON in a full capture; WHERE `--reduced` is given, THE SYSTEM SHALL capture over REQ-TEST-116's reduced corpus with scripted decisions off and mark the baseline reduced, and `compare` SHALL refuse a reduced baseline against a full one, naming both."
-    - "WHERE `--rebuild-from <label>` is given, THE SYSTEM SHALL capture only S5, S6 and S7, building the commit's results and dashboard from that label's kept database without bootstrapping and without writing to it, so that two commits that differ only in their build can be compared over one kept database."
     - "WHEN a capture finishes, THE SYSTEM SHALL record its bootstrap wall-clock time per collection in the baseline, and `compare` SHALL report both times and their difference."
   non_functional_requirements:
     - "BASELINES ARE STATE, NOT CONFIGURATION (CLAUDE.md, Keith 2026-09-27): a baseline file lives in a scratch directory outside the repository and is never committed."
@@ -51,7 +49,7 @@
     - "KEPT DATABASES (main session's round-5 call 30, P1, after the architect's verification pass): `--rebuild-from` needs a database that outlives its capture, so a capture can keep its scratch database, recorded in the baseline and dropped by `equivalence drop`. REJECTED re-bootstrapping for REQ-DASH-244's rebuild - it would spend a full capture to compare two builds of identical recorded results."
     - "SUPERSEDED - round 2's CI ceiling ('a CI cache-miss bootstrap no more than 5% slower across the series') is REPLACED by back-to-back sandbox timings with a threshold from the self-check's measured noise (main session's round-4 call 28): CI runner timings vary too much run to run for a 5% line to mean anything."
   open_questions:
-    - "KEITH, 2026-10-16, asked why this exists, then chose the LEAN VERSION: keep the worktree capture and compare, but only S1 (recorded results), S4 (generated files), S5 (results and dashboard JSON) and S7 (help and menus); drop S3 (raw tool output), S6 (the browser render) and the reduced, rebuild-from and keep-database options. To be re-drafted and re-presented; REQ-PIPE-240 criterion 12 and REQ-QAC-241 criterion 12 name surfaces and follow it."
+    - "LEAN, SIGNED (Keith, 2026-10-16: asked 'Why does it exist???', chose the lean version, then 'I'm happy to sign off on the lean harness now'): S1, S4, S5 and S7 only; S3 (raw tool output), S6 (the browser render) and the --reduced, --rebuild-from and --keep-database options dropped. Scripted decisions are always on. DEPENDENTS TO RE-DRAFT against it: REQ-PIPE-240 c12 and REQ-QAC-241 c12 (surface names), REQ-DASH-244 (--rebuild-from), REQ-GEN-246 (a kept capture), REQ-PIPE-248 (S6)."
 
 - id: REQ-PIPE-240
   title: "One collection registry, derived from the hierarchy, behind the dispatch sites whose code survives the series - with a gate, and an allowlist that hands every other site to the requirement that rewrites it"
@@ -75,7 +73,7 @@
     - "THE SYSTEM SHALL exempt from criterion 8 contract/, qa_tools/collections/, generator/collections/ and aws/, and in the scenario register only the INJECTIONS and INHERITING_DATASET values, each exemption listed in the gate with its reason."
     - "THE SYSTEM SHALL list on the migration allowlist every file still holding a dispatch site once this lands, each with the requirement in this set that rewires it, and IF the allowlist names a file that no longer holds such a literal, THEN `mothman check` SHALL fail, so that the allowlist only shrinks."
     - "WHEN `mothman pipeline bootstrap` or `mothman pipeline run` runs over every collection, THE SYSTEM SHALL run each registered collection in its own spawned process, as it does for two today."
-    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change (REQ-TEST-239), THE SYSTEM SHALL report no difference on S1 to S7, and the comparison SHALL be this requirement's evidence."
+    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change (REQ-TEST-239), THE SYSTEM SHALL report no difference on S1, S4, S5 and S7, and the comparison SHALL be this requirement's evidence."
     - "THE SYSTEM SHALL delete every constant this replaces - processing_pass.COLLECTIONS, recheck's map, checkpoints' collection lookup, bootstrap's per-collection names and branches - in the same change."
     - "THE SYSTEM SHALL amend REQ-PIPE-170 criterion 31 in this change to the wording in this requirement's decisions, ONLY IF Keith has approved that wording."
   non_functional_requirements:
@@ -130,7 +128,7 @@
     - "WHEN Evidently runs for a collection, THE SYSTEM SHALL read its checks from that collection's Evidently YAML, and no Evidently check_id SHALL remain as a Python constant."
     - "THE SYSTEM SHALL include the new Evidently files and the per-collection dbt folders in validate_check_lifecycle.sources_fingerprint(), so that REQ-PIPE-192's cache sees an edit to them."
     - "THE SYSTEM SHALL NOT change docs/check-authoring-rules.md, and SHALL keep Evidently's config-hash exclusion an explicit list of names, so that that document's 'one real trap' passage stays true; IF the design needs that passage changed, THEN the exact wording SHALL go to Keith before the edit."
-    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S2, S4, S5 and S7; S3's differences SHALL be confined to dbt's own file paths for the moved files and S6's to the reported GitHub link values, each listed in this requirement's evidence."
+    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S4, S5 and S7, any difference confined to dbt's own file paths for the moved files, each listed in this requirement's evidence."
     - "THE SYSTEM SHALL delete the four evidently_check_lifecycle*.py modules under qa_tools/bdm/ and qa_tools/cp/ in the same change, and SHALL remove from the migration allowlist every file whose dispatch sites this requirement rewires."
   non_functional_requirements:
     - "BYTE-IDENTICAL (REQ-TEST-239): criterion 12, and criterion 5 is the check-definition equivalent - zero lifecycle changes proves moving a definition did not change it."
@@ -153,6 +151,9 @@
 
 - id: REQ-QAC-242
   title: "One shared module per QA tool and one staging module serve every collection, with each collection's differences preserved behind named legacy flags on its own adapter"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As someone adding a collection, I want dbt-core, Soda Core, datacontract-cli and Evidently each run by one shared module, and supplies staged by one, reading what differs from the collection's adapter, so that a new collection gets all four tools without copying a runner."
   moscow: must
@@ -166,7 +167,7 @@
     - "IF an adapter declares a legacy flag the shared modules do not know, THEN `mothman check` SHALL fail naming it."
     - "THE SYSTEM SHALL NOT, in a shared module, compare a collection's id, short or run prefix to choose behaviour; a difference is an adapter value or a legacy flag."
     - "WHEN `mothman debug run-dbt`, `run-soda`, `run-datacontract` or `run-evidently` runs for any registered collection, THE SYSTEM SHALL record the same results as before this change."
-    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1 to S7, S3 included under its normaliser."
+    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S4, S5 and S7."
     - "THE SYSTEM SHALL delete the eight run_*_bdm.py and run_*_cp.py modules, build_per_run_warehouses.py and build_cp_warehouses.py in the same change, and SHALL remove from the migration allowlist every file whose dispatch sites this requirement rewires, each rewired site carrying a third-collection test."
     - "THE SYSTEM SHALL move every test that monkeypatches an attribute of a deleted module to the shared module in the same change, and SHALL NOT keep a test whose only assertion is that a deleted module is gone."
   non_functional_requirements:
@@ -190,6 +191,9 @@
 
 - id: REQ-PIPE-243
   title: "One shared orchestrator, dataset-stats computation and results-from-history rebuild serve every collection"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As someone adding a collection, I want the run orchestration, the dataset statistics and the rebuild of results from recorded history shared, so that a new collection's supplies are run, summarised and rebuilt without more copied modules."
   moscow: must
@@ -202,7 +206,7 @@
     - "THE SYSTEM SHALL remove qa_tools/cp/dataset_stats.py's import of qa_tools.bdm.dataset_stats and cli/common.py's import of RUN_STEPS from orchestrate_bdm."
     - "THE SYSTEM SHALL keep every adapter module importable without importing any QA tool library, so that the registry and the CLI can read an adapter's declarations cheaply."
     - "WHEN the processing pass, a recheck or a bootstrap runs a collection, THE SYSTEM SHALL reach the shared orchestrator through the registry, and the adapters SHALL lose the temporary orchestrator and warehouse-builder pointers REQ-PIPE-240 gave them."
-    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, taken with `--keep-database`, THE SYSTEM SHALL report no difference on S1 to S7, and that kept capture SHALL serve as REQ-GEN-246's 'before' and as REQ-DASH-244's rebuild database."
+    - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S4, S5 and S7, and that capture SHALL serve as REQ-GEN-246's 'before'."
     - "THE SYSTEM SHALL delete both orchestrators, both dataset_stats.py, both build_results_from_history.py, bdm_common.py and cp_common.py, and with them the qa_tools/bdm/ and qa_tools/cp/ packages, in the same change, and SHALL remove from the migration allowlist every file whose dispatch sites this requirement rewires, each with a third-collection test."
   non_functional_requirements:
     - "BYTE-IDENTICAL (REQ-TEST-239): criterion 7."
@@ -269,6 +273,9 @@
 
 - id: REQ-TEST-245
   title: "One factory builds each collection's mothman command group, labelled and listed from the registry, with help that imports no tool and a broken adapter that takes down only its own commands - a refactor that changes no help or menu text"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As someone adding a collection, I want `mothman <short>` and the TUI's menus to appear for it from the registry, labelled as people already know them, so that a new collection gets its generate and qa commands without a copied CLI module and without slowing or breaking anyone else's."
   moscow: must
@@ -284,7 +291,7 @@
     - "WHEN `mothman --help`, any `mothman <short> --help` or any `mothman <short> qa --help` runs, THE SYSTEM SHALL import none of pandas, numpy, duckdb, soda, dbt, datacontract or evidently, checked by a test that inspects sys.modules in a fresh interpreter, against a measurement of today's imports and time taken before the change and recorded in this requirement's evidence (2026-10-16 sandbox, informally: `mothman --help` imports pandas, numpy, duckdb and soda, cli.app import about 1.0s, the whole command about 1.45s under uv)."
     - "IF a collection's adapter cannot be loaded, THEN its own commands SHALL refuse naming the collection and the error, every other command SHALL work, and no traceback SHALL be shown."
     - "WHEN any existing collection command runs with the same arguments as before, THE SYSTEM SHALL exit with the same code and the same output."
-    - "WHEN `mothman debug equivalence compare` runs between captures of the commit before this change and of this change, THE SYSTEM SHALL report no difference on S7, the TUI menu text included, nor on any surface of a reduced capture."
+    - "WHEN `mothman debug equivalence compare` runs between captures of the commit before this change and of this change, THE SYSTEM SHALL report no difference on S7, the TUI menu text included, nor on S1, S4 or S5."
     - "THE SYSTEM SHALL remove from the migration allowlist cli/app.py, cli/pipeline.py, cli/debug.py and cli/supply.py, each rewired site with a third-collection test."
   non_functional_requirements:
     - "BYTE-IDENTICAL (REQ-TEST-239): S7 is the CLI's public surface; criterion 9 covers what help text cannot. Every help or menu change at ~30 collections is REQ-TEST-252's, never this requirement's."
@@ -308,6 +315,9 @@
 
 - id: REQ-TEST-252
   title: "The CLI and TUI stay usable at about thirty collections - help splits collections from tools, collection pickers group by agency and filter by typing above a stated size, and --collection hints point somewhere rather than listing everything - while two collections read as they do today"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-16"
   story: "As a data engineer running mothman on an asset with about thirty collections, I want `mothman --help`, the TUI's collection and dataset pickers and every --collection hint to stay as quick to read and choose from as they are with two, so that finding my collection is a recognition task rather than a scroll through thirty lines, and the tool commands are not lost among the collection groups."
   moscow: must
@@ -332,8 +342,8 @@
     - "WHEN `mothman --help` runs in that copy, THE SYSTEM SHALL show all 30 collection groups in the Collections panel and every tool group in the Tools panel, at COLUMNS=80 and COLUMNS=120 with NO_COLOR=1, with no line wrapped mid-word in the Collections panel."
     - "WHEN `mothman --help`, `mothman <short> --help` or `mothman <short> qa --help` runs in that copy, THE SYSTEM SHALL import none of pandas, numpy, duckdb, soda, dbt, datacontract or evidently, and SHALL take no more than 10% longer than the same command at today's two collections, both absolute times recorded in this requirement's evidence."
     - "WHEN the TUI runs in that copy under scripts/dev/tui_drive.py, THE SYSTEM SHALL show the Quality Assurance and Generate synthetic data 'Which dataset?' menus and the filing 'Which collection?' menu grouped by agency, SHALL narrow each to one collection by typing a fragment of its label, and SHALL reach that collection's own next prompt by Enter, using the keyboard only."
-    - "WHEN `mothman pipeline run --help`, `mothman debug run-dbt --help` and `mothman supply load --help` run in that copy, THE SYSTEM SHALL render the --collection option as criterion 11 states, and WHEN each is given an unknown collection, THE SYSTEM SHALL refuse as criterion 12 states."
-    - "WHEN `mothman debug equivalence compare` runs between captures of REQ-TEST-245's change and of this change, THE SYSTEM SHALL report no difference on any surface of a reduced capture except S7, and every S7 difference SHALL be one this requirement names, each listed in this requirement's evidence and reported to Keith rather than accepted silently."
+    - "WHEN `mothman pipeline run --help`, `mothman debug run-dbt --help` and `mothman supply load --help` run in that copy, THE SYSTEM SHALL render the --collection option as criterion 11 states, and WHEN each is given an unknown collection, THE SYSTEM SHALL refuse as criterion 13 states."
+    - "WHEN `mothman debug equivalence compare` runs between captures of REQ-TEST-245's change and of this change, THE SYSTEM SHALL report no difference on S1, S4 or S5 of a full capture, and every S7 difference SHALL be one this requirement names, each listed in this requirement's evidence and reported to Keith rather than accepted silently."
     - "WHEN the TUI runs at today's two collections, THE SYSTEM SHALL show every collection picker's text exactly as REQ-TEST-245's capture recorded it, so that dashboard/demos/qa_wizard.cast stays true."
     - "THE SYSTEM SHALL carry one CHANGELOG.yaml entry for the help panels and the uniform --collection option in the same push."
   non_functional_requirements:
@@ -367,6 +377,9 @@
 
 - id: REQ-GEN-246
   title: "One generator driver runs every collection's slot loop, with a provider module per collection, seeds inside each provider's declared range, and target trial refused where a collection lacks it"
+  signed_off:
+    by: Keith
+    date: "2026-10-16"
   date_written: "2026-10-15"
   story: "As Keith planting scenarios, I want the generator's slot loop, bookkeeping, delivery writing and injection placement shared, with only each collection's rows, seeds and period plan in its own provider, so that the Emergency Department generator is a provider from its first day rather than a third copy to unpick later."
   moscow: must
@@ -376,7 +389,7 @@
     - "THE SYSTEM SHALL generate every collection's synthetic history through one shared driver - the slot loop, bookkeeping, delivery and receipt writing, and injection placement - with each collection's rows, seed schedule and period plan in a provider module of its own at generator/collections/<id>.py, separate from the collection's QA adapter."
     - "THE SYSTEM SHALL make each provider's seed schedule a provider method, and IF any seed a provider derives falls outside the range it declares, THEN generation SHALL refuse naming the provider and the seed."
     - "WHEN `mothman check` runs, IF two providers' declared seed ranges overlap, THEN THE SYSTEM SHALL fail naming both."
-    - "WHEN `mothman debug equivalence compare` runs between REQ-PIPE-243's kept 'after' capture, as this change's 'before', and the full capture of this change, THE SYSTEM SHALL report no difference on S4 - every delivery, receipt, the bookkeeping and the scenario placements byte-identical - nor on S1 to S3 and S5 to S7."
+    - "WHEN `mothman debug equivalence compare` runs between REQ-PIPE-243's 'after' capture, as this change's 'before', and the full capture of this change, THE SYSTEM SHALL report no difference on S4 - every delivery, receipt, the bookkeeping and the scenario placements byte-identical - nor on S1, S5 and S7."
     - "THE SYSTEM SHALL declare the target-trial capability once, on the collection's generator provider, read there by the generator, the CLI (REQ-TEST-245) and bootstrap's _TARGET_DATASETS, and SHALL remove the adapter's temporary target-trial pointer from REQ-PIPE-240 in the same change."
     - "WHERE a collection's provider declares the target-trial capability, THE SYSTEM SHALL run its target trial; IF a target trial is asked of a collection without it, THEN THE SYSTEM SHALL refuse naming the collection, replacing the silent fallbacks in generator/targeting.py and generator/targets.py."
     - "THE SYSTEM SHALL keep every provider module importable without importing pandas or numpy at module level, so that reading its declarations costs no tool import."
