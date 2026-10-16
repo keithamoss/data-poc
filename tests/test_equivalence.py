@@ -251,6 +251,8 @@ class TestTheSurfacesReadTheTree:
         (tmp_path / "data" / "receipts").mkdir()
         (tmp_path / "data" / "receipts" / "r.json").write_text("{}")
         (tmp_path / "data" / "generator_bookkeeping.json").write_text("{}")
+        (tmp_path / "data" / "dbt_scratch" / "run").mkdir(parents=True)
+        (tmp_path / "data" / "dbt_scratch" / "run" / "manifest.json").write_text("{}")
         got = eq.generated_files(tmp_path)
         assert set(got) == {"data/deliveries/d1/a.csv", "data/receipts/r.json",
                             "data/generator_bookkeeping.json"}

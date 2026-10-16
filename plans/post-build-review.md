@@ -9983,3 +9983,18 @@ twice. It deliberately did not re-find the `TypeError`.
      the self-check running, and the tree was unaffected. Minor, so fixed
      under Keith's polish rule.
 
+
+214. **[done, 2026-10-16]** **[Testing]** **The equivalence harness named the
+     generator's bookkeeping, which no QA-side module may.** CI's fast half
+     went red on a0f3e3d and 0e5bacf with one failure:
+     `tests/test_arrivals.py::TestTheGeneratorsBookkeepingIsWalledOff`
+     (REQ-GEN-043 criterion 7) found `data/generator_bookkeeping.json` written
+     out in `qa_tools/common/equivalence.py`'s S4 file list. The harness only
+     hashed the file, but the rule is about any QA module naming it at all,
+     and it was right to fire. Fixed by naming WHERE rather than WHAT: S4 now
+     hashes every file the bootstrap leaves under `data/` except dbt's own
+     per-run scratch - the identical 924 files, checked against the after-240
+     baseline, so no baseline needs recapturing. The architecture test failed
+     locally first and passes now. Missed locally because the gates before
+     those pushes ran selected test files rather than the whole suite (rule C);
+     the full suite in CI is what caught it.

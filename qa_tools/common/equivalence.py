@@ -360,17 +360,24 @@ def summary(snap: dict) -> dict[str, int]:
 
 # ---- the other surfaces -----------------------------------------------
 
+#: Under data/, what is NOT generated: dbt's own per-run working
+#: directories (supply_db.dbt_target_path), which a run tidies away.
+NOT_GENERATED = ("dbt_scratch",)
+
+
 def generated_files(tree: Path) -> dict[str, str]:
-    """S4: every file the generators wrote under `tree`'s data/."""
+    """S4: every file the bootstrap left under `tree`'s data/ - every
+    delivery, every receipt, and the generators' own records - except
+    dbt's scratch. Named by WHERE it is rather than file by file, so this
+    module never names the generator's bookkeeping, which no QA module may
+    (REQ-GEN-043 criterion 7, tests/test_arrivals.py)."""
     data = tree / "data"
     out = {}
-    roots = [data / "deliveries", data / "receipts"]
-    files = [data / "generator_bookkeeping.json", data / "scenario_placements.json"]
-    for root in roots:
-        if root.is_dir():
-            files += [p for p in root.rglob("*") if p.is_file()]
-    for f in sorted(files):
-        if f.is_file():
+    if not data.is_dir():
+        return out
+    for f in sorted(data.rglob("*")):
+        rel = f.relative_to(data)
+        if f.is_file() and rel.parts[0] not in NOT_GENERATED:
             out[str(f.relative_to(tree))] = hashlib.sha256(f.read_bytes()).hexdigest()
     return out
 
