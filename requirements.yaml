@@ -354,9 +354,9 @@ requirements:
     - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
     - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
     - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
-    - dbt_project/models/staging/schema.yml
-    - contract/bdm-birth-registrations-contract.yaml
-    - contract/bdm-birth-registrations-soda-checks.yml
+    - dbt_project/models/civil-registration/schema.yml
+    - contract/registry-services/bdm-birth-registrations-contract.yaml
+    - contract/registry-services/bdm-birth-registrations-soda-checks.yml
     - qa_tools/common/soda_common.py::unreported_checks
     - qa_tools/common/validate_soda.py::problems
   - id: REQ-QAC-002
@@ -420,8 +420,8 @@ requirements:
     - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
     - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
     - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
-    - contract/child-protection-contract.yaml
-    - contract/child-protection-soda-checks.yml
+    - contract/child-protection-family-support/child-protection-contract.yaml
+    - contract/child-protection-family-support/child-protection-soda-checks.yml
     - qa_tools/common/soda_common.py::unreported_checks
     - qa_tools/common/validate_soda.py::problems
   - id: REQ-DASH-003
@@ -1952,8 +1952,8 @@ requirements:
       - qa_tools/common/validate_check_lifecycle.py::_check_id_errors
       - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
       - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
-      - contract/child-protection-contract.yaml
-      - contract/bdm-birth-registrations-contract.yaml
+      - contract/child-protection-family-support/child-protection-contract.yaml
+      - contract/registry-services/bdm-birth-registrations-contract.yaml
     evidence:
       - >
         2026-09-20: all 258 check config_hashes byte-identical before and
@@ -7548,7 +7548,7 @@ requirements:
       - cli/schedule.py::show_command
       - cli/schedule.py::candidate_dates_command
       - contract/data-asset.yaml
-      - contract/child-protection-contract.yaml
+      - contract/child-protection-family-support/child-protection-contract.yaml
     evidence:
       - >
         2026-09-23: two named calendars in contract/data-asset.yaml -
@@ -32774,7 +32774,7 @@ requirements:
     linked_tests:
     - tests/test_postcode_tolerance.py
     implemented_by:
-    - contract/child-protection-contract.yaml
+    - contract/child-protection-family-support/child-protection-contract.yaml
     evidence:
     - '2026-10-11: tests/test_postcode_tolerance.py 3 passed against the real datacontract-cli and Soda Core over this worker''s staged fixture delivery - with 1% of client postcodes unrecognised the contract''s rule passes and Soda''s warns (c6), at 5% the contract''s fails (c7), and the recorded fail threshold is 3, not 0 (c8). The first and third failed before the change. `mothman dashboard validate-check-lifecycle` OK over 307 checks with the breaking changelog entry (c3); check_id, validValues and dimension unchanged (c2); the Soda and dbt checks and the postcode null rule untouched (c5); the description rewritten to the tolerance form docs/check-authoring-rules.md asks for, the same words the Soda copy already uses (c4).'
   - id: REQ-PIPE-188
