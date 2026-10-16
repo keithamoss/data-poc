@@ -85,14 +85,15 @@ def test_run_dbt_cp_calls_evaluate_dbt_cp(monkeypatch):
 
 def test_run_datacontract_bdm_passes_only_the_run_id(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
-    import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
+    import qa_tools.tools.run_datacontract as run_datacontract
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp):
+    def _fake_evaluate(collection_id, run_id, run_timestamp):
         seen["run_id"] = run_id
+        assert collection_id == "civil-registration"
         return []
-    monkeypatch.setattr(run_datacontract_bdm, "evaluate_datacontract_bdm", _fake_evaluate)
+    monkeypatch.setattr(run_datacontract, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--collection", "bdm", "--run-id", "run_002"])
 
@@ -111,14 +112,15 @@ def test_run_datacontract_bdm_unknown_run_id_fails_clearly(monkeypatch):
 
 
 def test_run_datacontract_cp_does_not_need_a_csv_filename(monkeypatch):
-    import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
+    import qa_tools.tools.run_datacontract as run_datacontract
 
     seen = {}
 
-    def _fake_evaluate(run_id, run_timestamp):
+    def _fake_evaluate(collection_id, run_id, run_timestamp):
         seen["run_id"] = run_id
+        assert collection_id == "child-protection"
         return []
-    monkeypatch.setattr(run_datacontract_cp, "evaluate_datacontract_cp", _fake_evaluate)
+    monkeypatch.setattr(run_datacontract, "evaluate", _fake_evaluate)
 
     result = _runner.invoke(debug_cli.debug_group, ["run-datacontract", "--collection", "cp", "--run-id", "cp_run_02"])
 

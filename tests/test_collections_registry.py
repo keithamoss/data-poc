@@ -16,7 +16,7 @@ from qa_tools.common import hierarchy
 from qa_tools.common import validate_collections as gate
 # The fixtures `third_collection` and `without_adapter` come from
 # tests/third_collection.py, made available by tests/conftest.py.
-from third_collection import BARE_ID, CODE, FAKE_DATASET, FAKE_ID, FAKE_SHORT
+from third_collection import BARE_ID, CODE, FAKE_DATASET, FAKE_ID, FAKE_SHORT, FAKE_TABLE
 
 
 class TestTheRegistry:
@@ -404,3 +404,90 @@ class TestTheCheckFileGate:
             (folder / "same_rule.sql").write_text("select 1\n")
         [problem] = gate.check_file_problems()
         assert "singular test 'same_rule' is declared in both" in problem
+
+
+
+# ---- REQ-QAC-242: the shared tool modules ----------------------------------
+
+class TestTheSharedToolModules:
+    """Criterion 9: each rewired site run for a third collection, through its
+    own adapter - the tool itself stood in for, since the fixture has no
+    warehouse."""
+
+    def test_datacontract_reads_everything_it_needs_from_the_adapter(
+            self, third_collection, monkeypatch):
+        from qa_tools.tools import run_datacontract as dc
+
+        check = SimpleNamespace(
+            type="field_quality_sql", model=FAKE_TABLE, field="things", name="n",
+            qualityDefinition=f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}.things.pair_datacontract",
+            diagnostics={"metric": "custom_sql", "value": 2, "severity": "error"},
+            dimension="consistency", result=SimpleNamespace(value="failed"))
+        sampled, written = [], []
+        monkeypatch.setattr(dc.asked_for, "ask", lambda *a, **k: [])
+        monkeypatch.setattr(dc.asked_for, "SCOPED", frozenset())
+        monkeypatch.setattr(dc, "run_against_warehouse", lambda path, schema, **o: SimpleNamespace(
+            checks=[check], model_dump=lambda: {"path": path}))
+        monkeypatch.setattr(dc, "_unreadable_in", lambda run_id, tables: frozenset())
+        monkeypatch.setattr(dc, "_declared_reads_tables", lambda: {})
+        monkeypatch.setattr(dc, "_authored_names", lambda path: {check.qualityDefinition: "Pair"})
+        monkeypatch.setattr(dc, "check_id_from_quality_definition", lambda q: q)
+        monkeypatch.setattr(dc, "fail_threshold_from_quality_definition", lambda *a: 0)
+        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key: sampled.append(key) or [])
+        monkeypatch.setattr(dc, "write_qa_result", lambda *a, **k: written.append(a))
+
+        [r] = dc.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
+
+        assert (r["agency_id"], r["collection_id"], r["dataset_id"]) == \
+            ("fake-agency", FAKE_ID, FAKE_DATASET)
+        assert r["label"] == "Fake pair" and r["check_name"] == "datacontract:sql: Pair"
+        assert written[0][:2] == ("fake-agency", FAKE_ID)
+        assert written[0][5]["path"].endswith("contract/fake-agency/fake-things-contract.yaml")
+        assert sampled == []  # custom_sql is never sampled; the key is the adapter's when it is
+
+    @pytest.mark.parametrize("legacy,recorded,noted", [
+        (frozenset(), 0, 1),
+        (frozenset({"datacontract.reads_unreadable_tables"}), 1, 0),
+    ])
+    def test_reads_unreadable_tables_keeps_birth_registrations_behaviour(
+            self, third_collection, monkeypatch, legacy, recorded, noted):
+        """The flag's whole effect, shown on the one input it changes: a rule
+        over a table the run has no view for."""
+        import dataclasses
+
+        from qa_tools.tools import run_datacontract as dc
+
+        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=legacy)
+        check = SimpleNamespace(
+            type="field_null_values", model=FAKE_TABLE, field="things", name="n",
+            qualityDefinition=f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}.things.nullValues_datacontract",
+            diagnostics={"metric": "null_count", "value": 0}, dimension="completeness",
+            result=SimpleNamespace(value="failed"))
+        notes = []
+        monkeypatch.setattr(dc.asked_for, "ask", lambda *a, **k: [])
+        monkeypatch.setattr(dc.asked_for, "SCOPED", frozenset())
+        monkeypatch.setattr(dc, "run_against_warehouse", lambda *a, **o: SimpleNamespace(
+            checks=[check], model_dump=lambda: {}))
+        monkeypatch.setattr(dc, "_unreadable_in", lambda run_id, tables: frozenset({FAKE_TABLE}))
+        monkeypatch.setattr(dc, "_declared_reads_tables", lambda: {})
+        monkeypatch.setattr(dc, "_authored_names", lambda path: {})
+        monkeypatch.setattr(dc, "check_id_from_quality_definition", lambda q: q)
+        monkeypatch.setattr(dc, "fail_threshold_from_quality_definition", lambda *a: 0)
+        monkeypatch.setattr(dc, "failing_sample_keys", lambda c, key: [])
+        monkeypatch.setattr(dc, "write_qa_result", lambda *a, **k: None)
+        monkeypatch.setattr(dc.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
+
+        got = dc.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
+
+        assert (len(got), len(notes)) == (recorded, noted)
+
+    def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
+        import dataclasses
+
+        adapter = sys.modules["qa_tools.collections.fake_collection"]
+        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=frozenset({"no.such.flag"}))
+        got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
+                                            "fake_collection"))
+        assert got == ["qa_tools/collections/fake_collection.py declares legacy flag "
+                       "'no.such.flag', which no shared module knows (qa_tools/tools/legacy.py)"]

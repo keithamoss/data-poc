@@ -36,18 +36,8 @@ COLLECTION_NAME = _DATASETS[0].collection_name
 # real tool scripts have always iterated these tables in.
 TABLES = [d.table for d in _DATASETS]
 
-# each table's primary key column (all `unique: true` in
-# contract/child-protection-contract.yaml) - used to pull just the
-# identifier out of a failing-row sample, never full row content, per
-# plans/qa-pipeline.md #15's "flag it, not full row content" line.
-TABLE_PK = {
-    "cp_clients": "cp_client_id",
-    "cp_notifications": "notification_id",
-    "cp_investigations": "investigation_id",
-    "cp_placements": "placement_id",
-    "cp_carers": "carer_id",
-    "cp_case_workers": "worker_id",
-}
+# Each table's primary key, from the adapter (REQ-QAC-242).
+from qa_tools.collections.child_protection import TABLE_PK as TABLE_PK  # noqa: E402
 
 # where each of the 3 cross-table business-rule singular tests / SQL rules
 # "lives" for dashboard purposes - matches the table their quality: block

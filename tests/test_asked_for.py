@@ -313,13 +313,13 @@ class TestBirthRegistrationsAskedForNothing:
     """An empty ask invokes no tool and says so, on the Birth Registrations
     path too (critic F5: these three branches were untested)."""
 
-    @pytest.mark.parametrize("module,evaluate,tool,invoker", [
-        ("qa_tools.bdm.run_dbt_bdm", "evaluate_dbt_bdm", "dbt", "run_dbt"),
-        ("qa_tools.bdm.run_soda_bdm", "evaluate_soda_bdm", "soda", "execute_scan"),
-        ("qa_tools.bdm.run_datacontract_bdm", "evaluate_datacontract_bdm", "datacontract",
-         "run_against_warehouse"),
+    @pytest.mark.parametrize("module,evaluate,tool,invoker,lead", [
+        ("qa_tools.bdm.run_dbt_bdm", "evaluate_dbt_bdm", "dbt", "run_dbt", ()),
+        ("qa_tools.bdm.run_soda_bdm", "evaluate_soda_bdm", "soda", "execute_scan", ()),
+        ("qa_tools.tools.run_datacontract", "evaluate", "datacontract",
+         "run_against_warehouse", ("civil-registration",)),
     ])
-    def test_it(self, module, evaluate, tool, invoker, monkeypatch):
+    def test_it(self, module, evaluate, tool, invoker, lead, monkeypatch):
         import importlib
 
         mod = importlib.import_module(module)
@@ -329,5 +329,5 @@ class TestBirthRegistrationsAskedForNothing:
         monkeypatch.setattr(mod, invoker, lambda *a, **k: pytest.fail("the tool was invoked"))
         written = []
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: written.append((a[4], a[5])))
-        assert getattr(mod, evaluate)("birth_registrations__1", "2026-01-01T00:00:00Z") == []
+        assert getattr(mod, evaluate)(*lead, "birth_registrations__1", "2026-01-01T00:00:00Z") == []
         assert written == [(tool, {"asked": []})]

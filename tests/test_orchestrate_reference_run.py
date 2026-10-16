@@ -85,7 +85,7 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
 
     monkeypatch.setattr(orchestrate_bdm.run_dbt_bdm, "evaluate_dbt_bdm", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_soda_bdm, "evaluate_soda_bdm", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_bdm.run_datacontract_bdm, "evaluate_datacontract_bdm", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate_bdm.run_datacontract, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_bdm.run_evidently_bdm, "evaluate_evidently_bdm", fake_evaluate_evidently_bdm)
     monkeypatch.setattr(orchestrate_bdm.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
@@ -148,7 +148,7 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
 
     monkeypatch.setattr(orchestrate_cp.run_dbt_cp, "evaluate_dbt_cp", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_soda_cp, "evaluate_soda_cp", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_cp.run_datacontract_cp, "evaluate_datacontract_cp", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate_cp.run_datacontract, "evaluate", lambda *a, **k: [])
     monkeypatch.setattr(orchestrate_cp.run_evidently_cp, "evaluate_evidently_cp", fake_evaluate_evidently_cp)
     monkeypatch.setattr(orchestrate_cp.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
     monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")

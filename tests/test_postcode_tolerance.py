@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
+import qa_tools.tools.run_datacontract as run_datacontract
 import qa_tools.cp.run_soda_cp as run_soda_cp
 from fixture_ids import CP_REF_RUN_ID
 from qa_tools.common import supply_db
@@ -28,7 +28,7 @@ def clients(cp_duckdb_dir, monkeypatch):
     # and a fixture run is scoped to one table since REQ-PIPE-188 to 191.
     from qa_tools.common import asked_for
     monkeypatch.setattr(asked_for, "SCOPED", frozenset())
-    monkeypatch.setattr(run_datacontract_cp, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda_cp, "write_qa_result", lambda *a, **k: None, raising=False)
     with supply_db.connect(label="test-postcode-tolerance") as conn:
         # THROUGH THE RUN'S OWN VIEW of the clients table, wherever it was
@@ -47,7 +47,7 @@ def _spoil(conn, table, rows: int) -> None:
 
 
 def _datacontract():
-    results = run_datacontract_cp.evaluate_datacontract_cp(CP_REF_RUN_ID,
+    results = run_datacontract.evaluate("child-protection", CP_REF_RUN_ID,
                                                            "2026-01-01T09:00:00Z")
     [found] = [r for r in results if r["check_id"] == CHECK]
     return found

@@ -20,6 +20,22 @@ def _attr(path: str):
     return getattr(importlib.import_module(module), name)
 
 
+# ---- per-tool sub-objects (REQ-QAC-242 criterion 2) ------------------------
+#
+# Each shared module in qa_tools/tools/ reads only its own part of an
+# adapter. Everything a sub-object holds is a difference between collections
+# that is data, not code: a tool's behaviour that differs by collection is a
+# legacy flag (`legacy` below), never a comparison of ids.
+
+
+@dataclass(frozen=True)
+class DatacontractSpec:
+    #: A SQL rule's cross-tool label, by the tail its check id ends with.
+    labels_by_check_tail: dict = field(default_factory=dict)
+    #: Each table's key column, the only value a failing-row sample keeps.
+    sample_key: dict = field(default_factory=dict)
+
+
 @dataclass(frozen=True)
 class CollectionAdapter:
     collection_id: str
@@ -48,6 +64,13 @@ class CollectionAdapter:
     #: the built dashboard file, and how its datasets are listed in it.
     dashboard_json: str
     dashboard_datasets: Callable[[dict], list[dict]] = field(compare=False)
+    #: What each shared tool module reads (REQ-QAC-242 criterion 2).
+    datacontract: DatacontractSpec = field(default_factory=DatacontractSpec)
+    #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place
+    #: this collection's recorded output differs from what the shared code
+    #: would produce. Every name is in qa_tools/tools/legacy.py, which says
+    #: what it preserves; `mothman check` refuses one that is not.
+    legacy: frozenset = frozenset()
 
     def orchestrator_module(self):
         return importlib.import_module(self.orchestrator)

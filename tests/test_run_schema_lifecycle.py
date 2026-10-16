@@ -160,8 +160,9 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     # the file where it is rather than copying it into a raw
     # directory, so there is no longer one to point elsewhere.
     monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
-    for module_name in ("run_dbt_bdm", "run_soda_bdm", "run_datacontract_bdm", "run_evidently_bdm"):
-        module = __import__(f"qa_tools.bdm.{module_name}", fromlist=[module_name])
+    for module_name in ("bdm.run_dbt_bdm", "bdm.run_soda_bdm", "tools.run_datacontract",
+                        "bdm.run_evidently_bdm"):
+        module = __import__(f"qa_tools.{module_name}", fromlist=[module_name])
         monkeypatch.setattr(module, "write_qa_result", lambda *a, **k: None)
 
     # ANY of the fixture's flat CSVs, found rather than named. The

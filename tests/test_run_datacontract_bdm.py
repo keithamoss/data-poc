@@ -8,7 +8,7 @@ bdm-birth-registrations-contract.yaml and a small, real, session-scoped
 BDM CSV fixture."""
 from __future__ import annotations
 
-import qa_tools.bdm.run_datacontract_bdm as run_datacontract_bdm
+import qa_tools.tools.run_datacontract as run_datacontract
 
 # THE REAL STAGED RUN IDS, not invented ones (REQ-QAC-088). These used to
 # be arbitrary strings - "pytest_bdm_ref" - because a run id only ever
@@ -23,8 +23,8 @@ from fixture_ids import BDM_DIRTY_RUN_ID as _DIRTY_RUN_ID, BDM_REF_RUN_ID as _RE
 def _run(monkeypatch, bdm_duckdb_dir, run_id, run_timestamp):
     # NO FILENAME (REQ-PIPE-102): this reads the run's own view
     # schema, and bdm_duckdb_dir is what staged the data into it.
-    monkeypatch.setattr(run_datacontract_bdm, "write_qa_result", lambda *a, **k: None)
-    return run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)
+    monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
+    return run_datacontract.evaluate("civil-registration", run_id, run_timestamp)
 
 
 def test_clean_run_resolves_every_check_id_and_mostly_passes(monkeypatch, bdm_duckdb_dir):
@@ -34,7 +34,7 @@ def test_clean_run_resolves_every_check_id_and_mostly_passes(monkeypatch, bdm_du
     assert all(r["check_id"] for r in results), \
         "every result must resolve a real check_id (evaluate_datacontract_bdm raises if not)"
     assert all(r["run_id"] == _REF_RUN_ID for r in results)
-    assert all(r["engine"] == run_datacontract_bdm.ENGINE_TAG for r in results)
+    assert all(r["engine"] == run_datacontract.ENGINE_TAG for r in results)
     assert all(r["status"] in ("pass", "warn", "fail") for r in results)
     failing = [r for r in results if r["status"] == "fail"]
     assert not failing, f"clean reference run had real datacontract-cli failures: {failing}"

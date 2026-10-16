@@ -65,7 +65,7 @@ from . import build_per_run_warehouses
 from . import dataset_stats
 from . import run_dbt_bdm
 from . import run_soda_bdm
-from . import run_datacontract_bdm
+from qa_tools.tools import run_datacontract
 from . import run_evidently_bdm
 from qa_tools.common import arrival_lifecycle
 from qa_tools.common import replay_clock
@@ -224,7 +224,7 @@ def _run_one_inner(entry: dict, run_id: str, csv_filename: str, run_timestamp: s
             lambda: run_soda_bdm.evaluate_soda_bdm(run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[2])
         got.extend(run_step(COLLECTION_ID, "datacontract-cli", run_id,
-            lambda: run_datacontract_bdm.evaluate_datacontract_bdm(run_id, run_timestamp)))
+            lambda: run_datacontract.evaluate(COLLECTION_ID, run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[3])
         got.extend(run_step(COLLECTION_ID, "Evidently", run_id,
             lambda: run_evidently_bdm.evaluate_evidently_bdm(

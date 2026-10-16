@@ -5,7 +5,7 @@ CSV, this reads all 6 real tables from the warehouse -
 no explicit csv_filename argument needed."""
 from __future__ import annotations
 
-import qa_tools.cp.run_datacontract_cp as run_datacontract_cp
+import qa_tools.tools.run_datacontract as run_datacontract
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
@@ -17,8 +17,8 @@ def _run(monkeypatch, cp_duckdb_dir, run_id, run_timestamp):
     monkeypatch.setattr(asked_for, "SCOPED", frozenset())
     # NOTHING ON DISK TO REDIRECT (REQ-PIPE-102) - this reads the
     # warehouse, and cp_duckdb_dir is what staged the data into it.
-    monkeypatch.setattr(run_datacontract_cp, "write_qa_result", lambda *a, **k: None)
-    return run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)
+    monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
+    return run_datacontract.evaluate("child-protection", run_id, run_timestamp)
 
 
 def test_clean_run_resolves_every_check_id_across_all_6_tables(monkeypatch, cp_duckdb_dir):
@@ -113,12 +113,12 @@ class TestAnUnreadableTableIsNotReportedRed:
         from qa_tools.common import supply_db
         from qa_tools.common.qa_results_writer import _declared_reads_tables
 
-        monkeypatch.setattr(run_datacontract_cp, "write_qa_result", lambda *a, **k: None)
+        monkeypatch.setattr(run_datacontract, "write_qa_result", lambda *a, **k: None)
         mine = f"cp_held_{uuid.uuid4().hex[:8]}"
         with supply_db.connect(label="test-held-datacontract") as conn:
             clone_run_views(conn, _REF_RUN_ID, mine, held={"cp_clients"})
         try:
-            results = run_datacontract_cp.evaluate_datacontract_cp(mine, "2026-01-01T09:00:00Z")
+            results = run_datacontract.evaluate("child-protection", mine, "2026-01-01T09:00:00Z")
             assert {r["dataset_id"] for r in results} - {"cp-clients"}, \
                 "the readable tables must still be checked"
             assert not [r for r in results if r["dataset_id"] == "cp-clients"]

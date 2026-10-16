@@ -76,12 +76,10 @@ ALLOWLIST: dict[str, str] = {
     # One shared module per QA tool, and one staging module.
     "qa_tools/bdm/bdm_common.py": "REQ-QAC-242",
     "qa_tools/bdm/build_per_run_warehouses.py": "REQ-QAC-242",
-    "qa_tools/bdm/run_datacontract_bdm.py": "REQ-QAC-242",
     "qa_tools/bdm/run_evidently_bdm.py": "REQ-QAC-242",
     "qa_tools/bdm/run_soda_bdm.py": "REQ-QAC-242",
     "qa_tools/cp/build_cp_warehouses.py": "REQ-QAC-242",
     "qa_tools/cp/cp_common.py": "REQ-QAC-242",
-    "qa_tools/cp/run_datacontract_cp.py": "REQ-QAC-242",
     "qa_tools/cp/run_evidently_cp.py": "REQ-QAC-242",
     "qa_tools/cp/run_soda_cp.py": "REQ-QAC-242",
     # One shared orchestrator, dataset-stats computation and rebuild.
@@ -127,6 +125,13 @@ def config_problems(package: Path | None = None) -> list[str]:
             if adapter.collection_id != c.id:
                 problems.append(f"qa_tools/collections/{c.module_name}.py is the adapter of "
                                 f"{adapter.collection_id!r}, not {c.id!r}")
+    # REQ-QAC-242 criterion 5: a legacy flag only the shared modules know.
+    from qa_tools.tools import legacy
+    for c in declared:
+        if c.module_name in modules:
+            for flag in sorted(collections.adapter(c).legacy - set(legacy.KNOWN)):
+                problems.append(f"qa_tools/collections/{c.module_name}.py declares legacy flag "
+                                f"{flag!r}, which no shared module knows (qa_tools/tools/legacy.py)")
     for orphan in sorted(modules - set(wanted)):
         problems.append(f"qa_tools/collections/{orphan}.py names no declared collection")
 

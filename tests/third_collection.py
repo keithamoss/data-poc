@@ -16,7 +16,7 @@ import pytest
 import yaml
 
 from qa_tools import collections
-from qa_tools.collections.base import CollectionAdapter
+from qa_tools.collections.base import CollectionAdapter, DatacontractSpec
 from qa_tools.common import hierarchy
 
 FAKE_ID, FAKE_SHORT, FAKE_PREFIX = "fake-collection", "fk", "fk_run_"
@@ -85,7 +85,9 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
         run_pipeline_function="run_pipeline", warehouse_builder=CODE, warehouse_tables="TABLES",
         results_rebuild=CODE, generator=f"{CODE}:generate", target_datasets=(FAKE_DATASET,),
         dashboard_json="fake_collection_dashboard.json",
-        dashboard_datasets=lambda doc: list(doc["datasets"]))
+        dashboard_datasets=lambda doc: list(doc["datasets"]),
+        datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"},
+                                      sample_key={FAKE_TABLE: "fake_id"}))
     monkeypatch.setitem(sys.modules, "qa_tools.collections.fake_collection", adapter)
     return calls
 

@@ -98,8 +98,9 @@ def run_soda_command(collection: str, run_id: str) -> None:
 def run_datacontract_command(collection: str, run_id: str) -> None:
     """Run real datacontract-cli in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
+    from qa_tools import collections
+    from qa_tools.tools import run_datacontract
     if collection == "bdm":
-        from qa_tools.bdm.run_datacontract_bdm import evaluate_datacontract_bdm
         # LOOKED UP AS A GUARD, not for a path (REQ-PIPE-102). The
         # tool reads the run's own view schema and never a file, so
         # nothing here needs the arrival's csv_path - but an
@@ -109,10 +110,7 @@ def run_datacontract_command(collection: str, run_id: str) -> None:
         # call did exactly that, and left two `does_not_exist/`
         # directories in qa_results/ to prove it.
         _bdm_manifest_entry(run_id)
-        results = evaluate_datacontract_bdm(run_id, run_timestamp)
-    else:
-        from qa_tools.cp.run_datacontract_cp import evaluate_datacontract_cp
-        results = evaluate_datacontract_cp(run_id, run_timestamp)
+    results = run_datacontract.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
     _print_results(results, run_id)
 
 

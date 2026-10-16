@@ -55,7 +55,7 @@ from . import cp_common
 from . import dataset_stats
 from . import run_dbt_cp
 from . import run_soda_cp
-from . import run_datacontract_cp
+from qa_tools.tools import run_datacontract
 from . import run_evidently_cp
 from qa_tools.common import arrival_lifecycle
 from qa_tools.common import replay_clock
@@ -216,7 +216,7 @@ def _run_one_inner(entry: dict, run_id: str, run_timestamp: str, run_by: str,
             lambda: run_soda_cp.evaluate_soda_cp(run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[2])
         got.extend(run_step(cp_common.COLLECTION_ID, "datacontract-cli", run_id,
-            lambda: run_datacontract_cp.evaluate_datacontract_cp(run_id, run_timestamp)))
+            lambda: run_datacontract.evaluate(cp_common.COLLECTION_ID, run_id, run_timestamp)))
         _announce(on_step, RUN_STEPS[3])
         got.extend(run_step(cp_common.COLLECTION_ID, "Evidently", run_id,
             lambda: run_evidently_cp.evaluate_evidently_cp(
