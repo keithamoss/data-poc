@@ -36744,7 +36744,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As someone adding a collection, I want its checks for all four tools to sit in files found by convention from the registry, so that the lifecycle gate, the band and table-read gates and the runners pick up a new collection's checks without anyone editing a list in code."
     moscow: must
-    status: in_progress
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md calls 5, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL define each collection's Evidently checks in contract/<agency-id>/<stem>-evidently-checks.yml, and its retired ones in contract/<agency-id>/<stem>-evidently-checks-retired.yml, where <stem> is the collection's contract file name less '-contract.yaml'."
@@ -36784,6 +36784,36 @@ requirements:
       - "A NEW COLLECTION'S EVIDENTLY CHECKS ARE FOUND BY METHOD (criterion 10): one `psi` check, and a `row_drop` check per table whose dataset is the check id's fourth segment. A runner keeps module names for the ids, read from the file - no id is a literal."
       - "TESTS PATCH vcl._sources, NOT A PRODUCT-CODE OVERRIDE: an early draft kept _YAML_SOURCES/_EVIDENTLY_SOURCES as None-unless-a-test-sets-them, a test seam in product code that CLAUDE.md forbids; removed before commit."
       - "THE LEGACY READER KEEPS ITS FILE ON THE ALLOWLIST, under REQ-PIPE-248: validate_check_lifecycle.py's only collection literal is the legacy reader's package map for refs that predate REQ-PIPE-240's `short`, and that requirement deletes both."
+    linked_tests:
+      - tests/test_validate_check_lifecycle.py
+      - tests/test_collections_registry.py::TestTheCheckFileGate
+      - tests/test_tables_read.py
+      - tests/test_check_bands.py
+      - tests/test_github_links.py
+      - tests/test_declared_reads_once.py
+      - tests/test_history_rekey.py
+      - tests/test_run_evidently_cp_real.py
+    implemented_by:
+      - qa_tools/common/validate_check_lifecycle.py::_sources
+      - qa_tools/common/validate_check_lifecycle.py::_legacy_sources
+      - qa_tools/common/validate_check_lifecycle.py::sources_fingerprint
+      - qa_tools/common/validate_check_lifecycle.py::dbt_definitions
+      - qa_tools/common/check_lifecycle.py::evidently_checks_from_text
+      - qa_tools/common/check_lifecycle.py::contract_columns
+      - qa_tools/common/evidently_common.py::collection_checks
+      - qa_tools/common/validate_collections.py::check_file_problems
+      - qa_tools/common/tables_read.py::real_sources
+      - qa_tools/common/soda_common.py::soda_check_files
+      - qa_tools/common/check_bands.py::evidently_bounds
+      - qa_tools/collections/__init__.py::Collection
+      - contract/registry-services/bdm-birth-registrations-evidently-checks.yml
+      - contract/child-protection-family-support/child-protection-evidently-checks.yml
+    evidence:
+      - "2026-10-16, CRITERION 13 (REQ-TEST-239): `mothman debug equivalence compare after-240 after-241` - after-240 a full capture of 0e5bacf, after-241 of ca6747b, this change, 5 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same. Nothing differed, so there are no dbt file-path differences to list. Bootstrap 1972s against 1964s, +9s."
+      - "2026-10-16, CRITERION 6: collect_checks('da3644f') against the working tree - 307 checks on both sides (datacontract 89, soda 86, dbt 81, file 42, evidently 9), none added, removed, retired or with a changed config_hash or lifecycle field; check_lifecycle.validate() returned no errors."
+      - "2026-10-16, CRITERION 3: each Evidently YAML loaded equal to the Python dict it replaced, active and retired, for both collections, with every config_hash equal."
+      - "2026-10-16, full `mothman check` on fcdd247: pytest 5601 passed, 1 xfailed; npm test 830 passed; every gate passed but `requirements`, which named nine implemented_by paths not yet repointed - fixed in ca6747b, whose `mothman check --docs` passed."
+
 
   - id: REQ-QAC-242
     title: "One shared module per QA tool and one staging module serve every collection, with each collection's differences preserved behind named legacy flags on its own adapter"
