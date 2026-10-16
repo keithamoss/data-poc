@@ -101,7 +101,7 @@ class TestARelativeVolumeCheckOnEveryDataset:
         """A warn band and a fail band, in the criterion's own words -
         read from each check's own CHECK_LIFECYCLE entry (REQ-QAC-223
         criterion 3), the same values Birth Registrations uses."""
-        from qa_tools.cp.evidently_check_lifecycle import CHECK_LIFECYCLE
+        from qa_tools.cp.run_evidently_cp import CHECK_LIFECYCLE
 
         for r in _volume(_run(monkeypatch, cp_duckdb_dir, _DIRTY_RUN_ID,
                                "2026-04-01T09:00:00Z")):

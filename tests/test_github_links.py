@@ -43,17 +43,17 @@ def test_build_check_source_links_covers_every_real_check_id():
 
 def test_a_real_known_check_id_resolves_to_its_real_source_line():
     """registration_number's matches_regex dbt check - a real, stable
-    check_id (dbt_project/models/staging/schema.yml) - verified against
+    check_id (dbt_project/models/civil-registration/schema.yml) - verified against
     the file's own real content at the URL's own #L<n> anchor, not a
     hardcoded line number (which would make this test fragile against
     unrelated edits to that file)."""
     check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.matches_regex_dbt"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/dbt_project/models/staging/schema.yml#L")
+    assert url.startswith("https://github.com/keithamoss/data-poc/blob/abc123/dbt_project/models/civil-registration/schema.yml#L")
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "dbt_project/models/staging/schema.yml").read_text().splitlines()
+    lines = (github_links.ROOT / "dbt_project/models/civil-registration/schema.yml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
@@ -65,23 +65,23 @@ def test_a_real_contract_check_id_resolves_to_its_real_source_line():
     check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.registration_number.nullValues_datacontract"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert "contract/bdm-birth-registrations-contract.yaml#L" in url
+    assert "contract/registry-services/bdm-birth-registrations-contract.yaml#L" in url
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "contract/bdm-birth-registrations-contract.yaml").read_text().splitlines()
+    lines = (github_links.ROOT / "contract/registry-services/bdm-birth-registrations-contract.yaml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 
 def test_a_real_evidently_check_id_resolves_to_its_real_source_line():
-    """Evidently's own shape (a plain Python constant assignment, no
-    YAML at all) - a third real format the line-scan needs to handle."""
+    """Evidently's own shape (a `- check_id:` list entry in its check
+    file, REQ-QAC-241) - a third real format the line-scan needs to handle."""
     check_id = "data-asset-1.registry-services.civil-registration.birth-registrations.sex.drift_psi_evidently"
     links = github_links.build_check_source_links(sha="abc123")
     url = links[check_id]
-    assert "qa_tools/bdm/evidently_check_lifecycle.py#L" in url
+    assert "contract/registry-services/bdm-birth-registrations-evidently-checks.yml#L" in url
 
     line_no = int(url.rsplit("#L", 1)[1])
-    lines = (github_links.ROOT / "qa_tools/bdm/evidently_check_lifecycle.py").read_text().splitlines()
+    lines = (github_links.ROOT / "contract/registry-services/bdm-birth-registrations-evidently-checks.yml").read_text().splitlines()
     assert check_id in lines[line_no - 1]
 
 

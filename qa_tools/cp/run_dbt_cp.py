@@ -51,6 +51,7 @@ import json
 import os
 
 
+from qa_tools import collections
 from qa_tools.common import asked_for
 from qa_tools.common import left_out, supply_db
 from qa_tools.common import hierarchy
@@ -66,7 +67,8 @@ from . import cp_common
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 DBT_PROJECT_DIR = os.path.join(ROOT, "dbt_project")
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "..", "dbt_profiles")
-SCHEMA_YML_PATH = os.path.join(DBT_PROJECT_DIR, "models", "staging", "schema.yml")
+# The collection's own schema file, found by convention (REQ-QAC-241).
+SCHEMA_YML_PATH = os.path.join(ROOT, collections.by_id(cp_common.COLLECTION_ID).dbt_schema)
 
 # Built once from schema.yml itself, not the compiled manifest - see
 # dbt_check_id_lookup()'s own docstring and run_dbt_bdm.py's identical

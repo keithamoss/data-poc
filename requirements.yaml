@@ -36744,7 +36744,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As someone adding a collection, I want its checks for all four tools to sit in files found by convention from the registry, so that the lifecycle gate, the band and table-read gates and the runners pick up a new collection's checks without anyone editing a list in code."
     moscow: must
-    status: not_started
+    status: in_progress
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md calls 5, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL define each collection's Evidently checks in contract/<agency-id>/<stem>-evidently-checks.yml, and its retired ones in contract/<agency-id>/<stem>-evidently-checks-retired.yml, where <stem> is the collection's contract file name less '-contract.yaml'."
@@ -36778,8 +36778,12 @@ requirements:
       - "THE BASE SIDE FROM THE BASE REF'S OWN HIERARCHY, WITH A TIME-BOXED LEGACY READER (round-4 call 28): collect_checks() reads each source at the base ref, so deriving the list from today's tree would find no Evidently YAML at a pre-move ref. REJECTED keeping the legacy reader indefinitely - it is dead the moment no diff base predates this change."
       - "THE SOURCE LISTS ARE REWIRED HERE, NOT IN REQ-PIPE-240 - delivery-scoper's departure from call 27's list, for call 27's own one-rewire reason; see REQ-PIPE-240's decisions."
       - "CRITERION 5 IS THE REAL TEST: REQ-QAC-039's 258-id rename was proved the same way - zero config_hash changes against the previous commit."
-    open_questions:
-      - "CHECK AT BUILD (not for Keith): whether moving a singular test changes its dbt definition hash (it covers 'the text and the files it came from') or its recorded node identity; criterion 5 fails if so, and the fix belongs in how the hash names files, not in a tolerance."
+      - "THE BUILD QUESTION, ANSWERED (2026-10-16): moving a singular test DID change its definition hash - dbt_definitions() joined each file's text under a `-- <path>` header, so filing recency.sql under tests/civil-registration/ read as an undocumented change. Fixed where the open question said, in how the hash names files: the header is now the FILE NAME, which dbt also names a singular test by and the collections gate keeps unique. Applied to both sides of every comparison, so no recorded hash moves. dbt's own node identity does not move either: `dbt parse` gives the same 94 unique_ids before and after, differing only in fqn and original_file_path."
+      - "A SECOND SILENT GAP, FOUND BUILDING (post-build-review #215): tables_read's singular-test scan looked for tests/<name>.sql only, so every moved test would have been skipped and the cross-table gate passed over it. Fixed test-first: the scan searches every folder under tests/, as dbt does."
+      - "THE CONTRACT-EXISTS CHECK STAYS IN REQ-PIPE-240's CONFIGURATION HALF; this requirement adds Soda and Evidently beside it, so criterion 9 is one gate with one message per missing file rather than two gates reporting the contract twice."
+      - "A NEW COLLECTION'S EVIDENTLY CHECKS ARE FOUND BY METHOD (criterion 10): one `psi` check, and a `row_drop` check per table whose dataset is the check id's fourth segment. A runner keeps module names for the ids, read from the file - no id is a literal."
+      - "TESTS PATCH vcl._sources, NOT A PRODUCT-CODE OVERRIDE: an early draft kept _YAML_SOURCES/_EVIDENTLY_SOURCES as None-unless-a-test-sets-them, a test seam in product code that CLAUDE.md forbids; removed before commit."
+      - "THE LEGACY READER KEEPS ITS FILE ON THE ALLOWLIST, under REQ-PIPE-248: validate_check_lifecycle.py's only collection literal is the legacy reader's package map for refs that predate REQ-PIPE-240's `short`, and that requirement deletes both."
 
   - id: REQ-QAC-242
     title: "One shared module per QA tool and one staging module serve every collection, with each collection's differences preserved behind named legacy flags on its own adapter"

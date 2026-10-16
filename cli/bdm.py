@@ -34,7 +34,7 @@ from qa_tools.common import asset_time
 
 AGENCY_ID = orchestrate_bdm.AGENCY_ID
 COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
-CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "bdm-birth-registrations-contract.yaml")
+CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
 console = Console()
 

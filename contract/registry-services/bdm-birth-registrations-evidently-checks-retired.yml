@@ -1,0 +1,10 @@
+# Retired Evidently checks for Birth Registrations (REQ-QAC-241; Keith's
+# call 2026-09-16: a check_id, once introduced, is permanently unique - it
+# must never be changed or deleted, even once retired).
+#
+# Retiring a check means MOVING its whole entry here from
+# bdm-birth-registrations-evidently-checks.yml, adding `retired_as_of` and
+# `retired_reason` (both required together - see check_lifecycle.py's
+# CheckMetadata). Never edit a check_id, never delete an entry outright.
+# run_evidently_bdm.py stops evaluating a check the day its entry moves.
+checks: []

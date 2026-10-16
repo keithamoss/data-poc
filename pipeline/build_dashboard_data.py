@@ -44,7 +44,7 @@ from pipeline.dashboard_check_labels import rank_for_headline, display_name, das
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
 
 def _parse_extract_timestamp(s: str) -> datetime:
@@ -187,7 +187,7 @@ def build() -> dict:
     # retired) across all 4 tools x both datasets - Phase 5b's retired-
     # checks toggle (plans/publishing-and-history.md Thread D). Static
     # config-file parsing only (schema.yml/soda YAML/contract YAML/
-    # evidently_check_lifecycle*.py), no live data/DuckDB access, so this
+    # *-evidently-checks*.yml), no live data/DuckDB access, so this
     # is safe for CI same as any other "read committed history" path.
     lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
 

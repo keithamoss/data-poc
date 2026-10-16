@@ -33,15 +33,3 @@ sources:
       record, undifferentiated across runs.
     tables:
       - name: birth_registrations
-
-      # Child Protection collection (qa_tools/cp/build_cp_warehouses.py) -
-      # one snapshot's worth of all 6 tables, staged and then viewed
-      # through the same run schema birth_registrations resolves through.
-      # See generator/generate_cp_runs.py for how these snapshots are
-      # built.
-      - name: cp_clients
-      - name: cp_notifications
-      - name: cp_investigations
-      - name: cp_placements
-      - name: cp_carers
-      - name: cp_case_workers

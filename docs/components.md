@@ -74,8 +74,9 @@ data (`QAC`), how a generated run's results get stored or published
 real tools that evaluate them - the actual substance of "is this data
 good."
 
-**Owns:** `contract/` (the real ODCS contract + SodaCL checks -
-`data-asset.yaml`, `people.yaml`'s own role definitions aside),
+**Owns:** `contract/` (each agency's folder `contract/<agency-id>/` of
+real ODCS contracts, SodaCL and Evidently checks - `data-asset.yaml`,
+`people.yaml`'s own role definitions aside),
 `dbt_project/`, `qa_tools/bdm/` and `qa_tools/cp/` (the real dbt-core/
 Soda Core/datacontract-cli/Evidently AI run + evaluate logic and each
 one's own `dataset_stats.py`), `qa_tools/common/check_lifecycle.py`

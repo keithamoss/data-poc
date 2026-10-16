@@ -11,8 +11,11 @@ import duckdb
 from qa_tools.common.datacontract_common import check_id_from_quality_definition
 from qa_tools.common.dbt_common import failing_sample_keys_direct, failing_sample_keys_via_values
 from qa_tools.common.evidently_common import status_for
-from qa_tools.bdm.evidently_check_lifecycle import CHECK_LIFECYCLE as _BDM_EVIDENTLY, PSI_CHECK_ID as _PSI_ID
+from qa_tools.common.evidently_common import collection_checks
 from qa_tools.common.soda_common import check_id_from_resource_attributes
+
+_BDM_CHECKS = collection_checks("civil-registration")
+_BDM_EVIDENTLY, _PSI_ID = _BDM_CHECKS.checks, _BDM_CHECKS.psi
 
 
 def test_check_id_from_quality_definition_none_when_no_definition():

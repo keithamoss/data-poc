@@ -45,7 +45,7 @@ from qa_tools.common.check_lifecycle import (
 from qa_tools.common.qa_results_writer import run_owner, write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID

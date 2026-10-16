@@ -95,20 +95,23 @@ class TestTheDeclarationsInThisRepo:
     reader will actually meet."""
 
     def test_every_mechanical_cross_table_check_declares_what_it_reads(self):
-        assert tr.undeclared_cross_table(tr.DBT_SCHEMA, tr.SODA_CHECKS, tr.CONTRACTS) == []
+        assert tr.undeclared_cross_table(*tr.real_sources()) == []
 
     def test_the_gate_is_not_passing_vacuously(self, tmp_path):
         """A gate over a corpus that cannot fail is a gate that proves
         nothing. This removes one real declaration and asserts it is
         caught."""
-        source = Path("dbt_project/models/staging/schema.yml").read_text()
+        schemas = tr.real_sources()[0]
+        source = "\n".join(p.read_text() for p in schemas)
         assert "reads_tables:" in source, "nothing declared - this test would prove nothing"
-        stripped = "\n".join(line for line in source.split("\n")
-                              if "reads_tables:" not in line)
-        path = tmp_path / "schema.yml"
-        path.write_text(stripped)
+        paths = []
+        for i, schema in enumerate(schemas):
+            path = tmp_path / f"schema{i}.yml"
+            path.write_text("\n".join(line for line in schema.read_text().split("\n")
+                                      if "reads_tables:" not in line))
+            paths.append(path)
 
-        problems = tr.undeclared_cross_table(dbt_schema=path)
+        problems = tr.undeclared_cross_table(dbt_schema=paths)
 
         assert problems, "the gate did not notice seven undeclared relationships tests"
         assert all("declares no reads_tables" in p for p in problems)
@@ -425,9 +428,9 @@ class TestTheBusinessRuleShapes:
     cross-table one, because only its datacontract third had declared.
     """
 
-    def _dbt_project(self, tmp_path, sql: str, declare: bool):
-        tests = tmp_path / "tests"
-        tests.mkdir()
+    def _dbt_project(self, tmp_path, sql: str, declare: bool, folder: str = ""):
+        tests = tmp_path / "tests" / folder
+        tests.mkdir(parents=True)
         (tests / "joins_two.sql").write_text(sql)
         staging = tmp_path / "models" / "staging"
         staging.mkdir(parents=True)
@@ -455,6 +458,20 @@ class TestTheBusinessRuleShapes:
         assert len(problems) == 1
         assert "joins_two_dbt" in problems[0]
         assert "cp_clients" in problems[0] and "cp_investigations" in problems[0]
+
+    def test_a_singular_test_in_its_collections_folder_is_still_read(self, tmp_path):
+        """REQ-QAC-241 files each singular test under tests/<collection-id>/;
+        the scan looked only at tests/ itself, so every real one would have
+        gone unread and the gate passed over them."""
+        schema = self._dbt_project(
+            tmp_path,
+            "select * from {{ ref('stg_cp_investigations') }} i\n"
+            "join {{ ref('stg_cp_clients') }} c on i.cp_client_id = c.cp_client_id\n",
+            declare=False, folder="child-protection")
+
+        problems = tr.undeclared_cross_table(dbt_schema=schema)
+
+        assert len(problems) == 1 and "joins_two_dbt" in problems[0]
 
     def test_declaring_it_satisfies_the_gate(self, tmp_path):
         schema = self._dbt_project(
@@ -563,4 +580,4 @@ class TestTheReservedNameIsGuardedBeforeItReachesGit:
         hook = next(h for repo in config["repos"] for h in repo.get("hooks", [])
                      if h["id"] == "mothman-check-hierarchy")
 
-        assert _re.search(hook["files"], "contract/child-protection-contract.yaml")
+        assert _re.search(hook["files"], "contract/child-protection-family-support/child-protection-contract.yaml")

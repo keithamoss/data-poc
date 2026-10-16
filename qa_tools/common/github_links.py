@@ -25,7 +25,7 @@ are actually authored in (verified against real file content before
 writing this, not assumed): dbt/soda's `check_id: <value>` on one line,
 the ODCS contract's `value: <value>` on the line under a
 `- property: check_id` customProperty entry, and Evidently's
-`SOME_CHECK_ID = "<value>"` constant assignment.
+`- check_id: <value>` entry in its check file.
 
 CI-safe per CLAUDE.md's hard rule: reads only committed check-definition
 files (the same ones check_lifecycle validation itself walks, via

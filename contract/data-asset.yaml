@@ -281,7 +281,7 @@ hierarchy:
           # arrivalPattern lives, so "which dataset does this file
           # belong to" resolves through one lookup rather than a map
           # somebody maintains (REQ-GEN-043).
-          contract: bdm-birth-registrations-contract.yaml
+          contract: registry-services/bdm-birth-registrations-contract.yaml
           # REQ-PIPE-057. What ONE DELIVERY is, for this source. The
           # boundary comes from the TRANSPORT - one folder drop, one S3
           # prefix, one SFTP session - and is stated rather than
@@ -320,7 +320,7 @@ hierarchy:
           name: Child Protection
           short: cp                # REQ-PIPE-240 - see civil-registration above.
           run_prefix: cp_run_
-          contract: child-protection-contract.yaml
+          contract: child-protection-family-support/child-protection-contract.yaml
           delivery_boundary: directory   # REQ-PIPE-057 - see above.
           datasets:
             - id: cp-clients

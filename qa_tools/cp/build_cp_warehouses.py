@@ -29,7 +29,7 @@ from qa_tools.common import sample_data, supply_holds, trial
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-family-support", "child-protection-contract.yaml")
 
 # The six CP tables, in the order contract/data-asset.yaml declares
 # them - resolved, not restated (REQ-QAC-039).

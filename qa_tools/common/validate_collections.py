@@ -9,6 +9,13 @@ underscore only, and short enough that every name built from it fits
 PostgreSQL's 63 bytes; dataset ids and table names are unique across the
 asset; every collection's contract file exists.
 
+THE CHECK FILES (REQ-QAC-241 criteria 2, 5 and 9): every collection has its
+contract, Soda and Evidently check files, each in its agency's folder
+contract/<agency-id>/ (a retired sibling may be absent); only the asset-wide
+files sit at the top of contract/; and every dbt model, source, schema file
+and singular test sits in a collection's own folder, with no singular test
+name declared by two collections - dbt names a singular test by its file.
+
 THE LITERALS (criteria 8 to 10): no product file names a collection by
 writing it down - a hierarchy id or short as a string, an id as a whole
 segment of one, or an f-string that begins with a run prefix and goes on to
@@ -63,14 +70,9 @@ ALLOWLIST: dict[str, str] = {
     "generator/scenario_injection.py": "REQ-GEN-246",
     "generator/targeting.py": "REQ-GEN-246",
     "generator/targets.py": "REQ-GEN-246",
-    # Where every tool's checks are found: the check-source lists.
-    "qa_tools/common/check_bands.py": "REQ-QAC-241",
-    "qa_tools/common/check_lifecycle.py": "REQ-QAC-241",
-    "qa_tools/common/soda_common.py": "REQ-QAC-241",
-    "qa_tools/common/tables_read.py": "REQ-QAC-241",
-    "qa_tools/common/validate_check_lifecycle.py": "REQ-QAC-241",
-    "qa_tools/bdm/evidently_check_lifecycle.py": "REQ-QAC-241",
-    "qa_tools/cp/evidently_check_lifecycle.py": "REQ-QAC-241",
+    # The lifecycle gate's legacy reader, for a base ref from before
+    # REQ-QAC-241 moved every check file - deleted with it.
+    "qa_tools/common/validate_check_lifecycle.py": "REQ-PIPE-248",
     # One shared module per QA tool, and one staging module.
     "qa_tools/bdm/bdm_common.py": "REQ-QAC-242",
     "qa_tools/bdm/build_per_run_warehouses.py": "REQ-QAC-242",
@@ -162,6 +164,96 @@ def config_problems(package: Path | None = None) -> list[str]:
                                 f"declare the {'dataset id' if field == 'dataset_id' else 'table'}"
                                 f" {value!r}")
             seen[value] = d.collection_id
+    return problems
+
+
+# ---- REQ-QAC-241 criteria 2, 5 and 9: the check files ----------------------
+
+#: The only files at the top of contract/ - the asset's own, not a
+#: collection's (REQ-QAC-241 criterion 2).
+ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "environments.yaml",
+              "file-checks.yaml", "scripted_decisions.yaml")
+_CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")
+#: Shared dbt SQL that belongs to no collection (criterion 4).
+_SHARED_DBT = ("dbt_project/tests/generic/",)
+
+
+def check_file_problems(root: Path | None = None) -> list[str]:
+    """`root` holds contract/ and dbt_project/ - the repository unless a
+    test names another; the hierarchy is read from root/contract."""
+    from qa_tools import collections
+    from qa_tools.common import hierarchy
+
+    root = root or hierarchy.DATA_ASSET_YAML.parent.parent
+    try:
+        declared = collections.all_collections()
+    except ValueError:
+        return []  # config_problems() reports a hierarchy that cannot be read
+    problems: list[str] = []
+    owner = {}
+    for c in declared:
+        if not c.contract.startswith(f"{c.agency_id}/"):
+            problems.append(f"{c.id!r}'s contract {c.contract!r} is not in its agency's folder "
+                            f"{c.folder}/")
+        # Its contract is config_problems()'s (REQ-PIPE-240 criterion 7).
+        for kind in ("soda", "evidently"):
+            if not (root / c.check_file(kind)).is_file():
+                problems.append(f"collection {c.id!r} is missing its {kind} check file "
+                                f"{c.check_file(kind)}")
+        owner[c.stem] = c
+
+    contract = root / "contract"
+    agencies = {c.agency_id for c in declared}
+    for path in sorted(contract.rglob("*")) if contract.is_dir() else []:
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if path.parent == contract:
+            if path.name not in ASSET_WIDE:
+                problems.append(f"{rel} is at the top of contract/, where only the asset-wide "
+                                f"files belong ({', '.join(ASSET_WIDE)})")
+            continue
+        m = _CHECK_FILE.fullmatch(path.name)
+        c = owner.get(m.group("stem")) if m else None
+        if c is None:
+            where = path.relative_to(contract).parts[0]
+            problems.append(f"{rel} is no collection's check file" + (
+                "" if where in agencies else f", in {where}/, which is no agency's folder"))
+        elif path.parent != root / c.folder:
+            problems.append(f"{rel} is {c.id!r}'s, which belongs in its agency's folder "
+                            f"{c.folder}/")
+
+    problems += _dbt_layout_problems(root, declared)
+    return problems
+
+
+def _dbt_layout_problems(root: Path, declared) -> list[str]:
+    """Criterion 5: dbt's models, sources, schema files and singular tests
+    each in a collection's own folder; generic tests and macros shared."""
+    problems = []
+    folders = [c.dbt_models + "/" for c in declared] + [c.dbt_tests + "/" for c in declared]
+    folders += [c.dbt_retired_schema.rsplit("/", 1)[0] + "/" for c in declared]
+    singular: dict[str, str] = {}
+    for top in ("dbt_project/models", "dbt_project/tests", "dbt_project/retired"):
+        base = root / top
+        for path in sorted(base.rglob("*")) if base.is_dir() else []:
+            if not path.is_file() or path.suffix not in (".sql", ".yml", ".yaml"):
+                continue
+            rel = path.relative_to(root).as_posix()
+            if rel.startswith(_SHARED_DBT):
+                continue
+            home = next((f for f in folders if rel.startswith(f)), None)
+            if home is None:
+                problems.append(f"{rel} sits outside every collection's dbt folder "
+                                f"(dbt_project/models/<collection-id>/, "
+                                f"dbt_project/tests/<collection-id>/)")
+                continue
+            if top == "dbt_project/tests" and path.suffix == ".sql":
+                if path.stem in singular and singular[path.stem] != home:
+                    problems.append(f"singular test {path.stem!r} is declared in both "
+                                    f"{singular[path.stem]} and {home} - dbt names a singular "
+                                    f"test by its file, so one would shadow the other")
+                singular.setdefault(path.stem, home)
     return problems
 
 
@@ -301,7 +393,7 @@ def literal_problems(root: Path = ROOT, allowlist: dict[str, str] | None = None)
 
 
 def main() -> int:
-    problems = config_problems() + literal_problems()
+    problems = config_problems() + check_file_problems() + literal_problems()
     if problems:
         for p in problems:
             print(f"  {p}")

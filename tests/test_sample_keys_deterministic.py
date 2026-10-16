@@ -44,7 +44,7 @@ def _soda_limits() -> set[int]:
     import yaml
 
     limits = set()
-    for path in soda_common.SODA_CHECK_FILES:
+    for path in soda_common.soda_check_files():
         doc = yaml.safe_load(open(path)) or {}
         for key, checks in doc.items():
             for item in checks if key.startswith("checks for") else []:

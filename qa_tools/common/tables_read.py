@@ -316,8 +316,10 @@ def _dbt_singular_cross_table_checks(path: Path) -> list[tuple[str, str]]:
             continue
         name = entry.get("name", "")
         meta = ((entry.get("config") or {}).get("meta") or {})
-        sql = tests_dir / f"{name}.sql"
-        if not sql.exists():
+        # In any folder under tests/, as dbt finds it - each collection's
+        # singular tests sit in tests/<collection-id>/ (REQ-QAC-241).
+        sql = next(iter(sorted(tests_dir.rglob(f"{name}.sql"))), None) if name else None
+        if sql is None:
             continue
         try:
             refs = {m.removeprefix(_DBT_MODEL_PREFIX) for m in _DBT_REF.findall(sql.read_text())}
@@ -410,7 +412,7 @@ def _contract_cross_table_checks(path: Path, known: set[str]) -> list[tuple[str,
     return found
 
 
-def undeclared_cross_table(dbt_schema: Path | str | None = None,
+def undeclared_cross_table(dbt_schema: "Path | str | Iterable[Path | str] | None" = None,
                             soda_checks: Iterable[Path | str] = (),
                             contracts: Iterable[Path | str] = ()) -> list[str]:
     """Checks that LOOK cross-table and declare nothing.
@@ -437,10 +439,13 @@ def undeclared_cross_table(dbt_schema: Path | str | None = None,
     """
     known = _known_tables()
     problems = []
-    if dbt_schema is not None and Path(dbt_schema).exists():
-        for check_id, why in _dbt_cross_table_checks(Path(dbt_schema), known):
+    schemas = [dbt_schema] if isinstance(dbt_schema, (str, Path)) else list(dbt_schema or ())
+    for schema in schemas:
+        if not Path(schema).exists():
+            continue
+        for check_id, why in _dbt_cross_table_checks(Path(schema), known):
             problems.append(f"{check_id}: {why}, but declares no reads_tables")
-        for check_id, why in _dbt_singular_cross_table_checks(Path(dbt_schema)):
+        for check_id, why in _dbt_singular_cross_table_checks(Path(schema)):
             problems.append(f"{check_id}: {why}, but declares no reads_tables")
     for path in soda_checks:
         if Path(path).exists():
@@ -453,10 +458,14 @@ def undeclared_cross_table(dbt_schema: Path | str | None = None,
     return sorted(problems)
 
 
-#: The real sources, so a caller does not restate them and drift.
-DBT_SCHEMA = ROOT / "dbt_project" / "models" / "staging" / "schema.yml"
-SODA_CHECKS = (ROOT / "contract" / "child-protection-soda-checks.yml",
-                ROOT / "contract" / "bdm-birth-registrations-soda-checks.yml")
-CONTRACTS = (ROOT / "contract" / "child-protection-contract.yaml",
-              ROOT / "contract" / "bdm-birth-registrations-contract.yaml")
+def real_sources() -> tuple[list[Path], list[Path], list[Path]]:
+    """The real sources - every collection's dbt schema, Soda checks and
+    contract, from the registry (REQ-QAC-241 criterion 8) - so a caller does
+    not restate them and drift."""
+    from qa_tools import collections
+
+    colls = collections.all_collections()
+    return ([ROOT / c.dbt_schema for c in colls],
+            [ROOT / f for f in collections.check_files("soda")],
+            [ROOT / f for f in collections.check_files("contract")])
 

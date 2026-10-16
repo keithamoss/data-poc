@@ -733,13 +733,55 @@ def parse_file_check_metadata(file_checks_yaml_path: Path | str) -> list[CheckMe
     return out
 
 
-# ---- Evidently (plain Python dicts, no YAML) --------------------------
+# ---- Evidently (contract/<agency-id>/<stem>-evidently-checks.yml) ------
+
+class UnquotedTimestampError(ValueError):
+    """An Evidently check file carries a timestamp YAML read as a datetime.
+    Refused rather than coerced: the string it stood for cannot be recovered
+    exactly (a `Z` reads back as `+00:00`), and a changed string moves the
+    check's config_hash (REQ-QAC-241 criterion 3)."""
+
+
+def _as_written(value: Any, where: str) -> Any:
+    """`value` with every YAML date turned back into the string it was
+    written as. A plain date round-trips exactly; a timestamp does not."""
+    import datetime as _dt
+
+    if isinstance(value, _dt.datetime):
+        raise UnquotedTimestampError(f"{where}: timestamp {value!r} is not quoted - quote it")
+    if isinstance(value, _dt.date):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _as_written(v, f"{where}.{k}") for k, v in value.items()}
+    if isinstance(value, list):
+        return [_as_written(v, f"{where}[{i}]") for i, v in enumerate(value)]
+    return value
+
+
+def evidently_checks_from_text(text: str, source: str) -> dict:
+    """`{check_id: metadata}` from an Evidently check file's text - the shape
+    parse_evidently_check_metadata() takes. Every date comes back a string
+    (REQ-QAC-241 criterion 3). A missing or empty `checks:` is no checks,
+    which is what a retired sibling holds until a check is first retired."""
+    doc = config_yaml.parse(text, name=source) or {}
+    out: dict = {}
+    for i, entry in enumerate(doc.get("checks") or []):
+        entry = _as_written(dict(entry), f"{source}: checks[{i}]")
+        check_id = entry.pop("check_id", None)
+        if not check_id:
+            raise MissingCheckIdError(f"{source}: checks[{i}] has no check_id")
+        out[check_id] = entry
+    return out
+
+
+def load_evidently_checks(path: Path | str) -> dict:
+    """evidently_checks_from_text() over a file on disk."""
+    return evidently_checks_from_text(Path(path).read_text(), str(path))
 
 def parse_evidently_check_metadata(check_lifecycle: dict, source: str) -> list[CheckMetadata]:
-    """`check_lifecycle` is a `CHECK_LIFECYCLE`-shaped dict (check_id ->
-    metadata) - imported and passed in by the caller rather than this
-    function importing a module itself, so this stays a pure function
-    testable with a plain dict fixture."""
+    """`check_lifecycle` is a `{check_id: metadata}` dict, as
+    load_evidently_checks() reads one - passed in by the caller rather than
+    read here, so this stays a pure function testable with a plain dict."""
     out = []
     for check_id, meta in check_lifecycle.items():
         category = _require_category(meta, f"{source}: evidently check (check_id={check_id!r})")
@@ -857,12 +899,12 @@ def find_disappeared_check_ids(old_checks: list[CheckMetadata], new_checks: list
     changed or deleted, even once retired (Keith's call, 2026-09-16).
     Retiring a check means MOVING its whole metadata block into that
     tool's own `-retired` sibling file (schema-retired.yml, *-checks-
-    retired.yml, *-contract-retired.yaml, evidently_check_lifecycle_
-    retired.py - see each one's own header comment), never deleting it
+    retired.yml, *-contract-retired.yaml, *-evidently-checks-retired.yml -
+    see each one's own header comment), never deleting it
     outright - so a properly-retired check_id is still found by the
     caller's own collection (both the active AND retired sources feed
     into `old_checks`/`new_checks` here, see validate_check_lifecycle.py's
-    `_YAML_SOURCES`/`_EVIDENTLY_SOURCES`), just now sourced from the
+    `_sources()`), just now sourced from the
     retired file instead of the active one. Only a genuine deletion, or
     an attempted rename (editing the check_id string itself, which reads
     as the old id vanishing and a "new" one appearing), shows up here.
@@ -912,17 +954,16 @@ def validate(old_checks: list[CheckMetadata], new_checks: list[CheckMetadata]) -
 
 # ---- reads_columns (REQ-GEN-183 criteria 8-11) ------------------------
 
-#: The ODCS contracts that define each dataset's tables and columns.
-CONTRACTS = ("contract/bdm-birth-registrations-contract.yaml",
-             "contract/child-protection-contract.yaml")
-
-
-def contract_columns(paths=CONTRACTS) -> dict[str, set[str]]:
+def contract_columns(paths=None) -> dict[str, set[str]]:
     """{table: {column, ...}} from the contracts' own schema - the one
-    spelling a reads_columns entry may use (Keith, 2026-10-11)."""
+    spelling a reads_columns entry may use (Keith, 2026-10-11). `paths`
+    defaults to every collection's contract, from the registry
+    (REQ-QAC-241 criterion 8)."""
+    from qa_tools import collections
+
     root = Path(__file__).resolve().parent.parent.parent
     out: dict[str, set[str]] = {}
-    for rel in paths:
+    for rel in collections.check_files("contract") if paths is None else paths:
         doc = config_yaml.parse((root / rel).read_text()) or {}
         for table in doc.get("schema") or []:
             out.setdefault(str(table.get("name")), set()).update(

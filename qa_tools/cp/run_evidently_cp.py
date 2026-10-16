@@ -25,13 +25,19 @@ from qa_tools.common.csv_io import load_null_values_by_column
 from qa_tools.common import drift_reference
 from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
-from .evidently_check_lifecycle import CHECK_LIFECYCLE, PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_IDS
+from qa_tools.common.evidently_common import collection_checks
+
+#: The checks, from contract/child-protection-family-support/ (REQ-QAC-241).
+_CHECKS = collection_checks(cp_common.COLLECTION_ID)
+PSI_CHECK_ID = _CHECKS.psi
+ROW_COUNT_GROWTH_CHECK_IDS = _CHECKS.row_drop
+CHECK_LIFECYCLE = _CHECKS.checks
 
 # Each check judged by its OWN entry's column and bands (REQ-QAC-223 c3).
 _PSI = CHECK_LIFECYCLE[PSI_CHECK_ID]
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-family-support", "child-protection-contract.yaml")
 _NULL_VALUES = load_null_values_by_column(CONTRACT_PATH).get("cp_notifications", {})
 
 DATASET_ID = hierarchy.dataset_for_table("cp_notifications").dataset_id

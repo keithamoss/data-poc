@@ -65,12 +65,8 @@ class TestAnEditedCheckIsSeen:
     def test_a_changed_source_is_collected_afresh(self, tmp_path, monkeypatch):
         """Keyed on content, not on modification time or size: the edit
         below keeps the file's length exactly."""
-        for rel, _parser in vcl._YAML_SOURCES:
-            src = vcl.ROOT / rel
-            if src.exists():
-                (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy(src, tmp_path / rel)
-        for rel in vcl._EVIDENTLY_SOURCES:
+        yaml_sources, evidently = vcl._sources(None)
+        for rel in [rel for rel, _parser in yaml_sources] + evidently:
             src = vcl.ROOT / rel
             if src.exists():
                 (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -82,7 +78,7 @@ class TestAnEditedCheckIsSeen:
         tables_read.declared_reads()
         assert calls == [], "worked out again with nothing changed"
 
-        contract = tmp_path / "contract" / "child-protection-contract.yaml"
+        contract = tmp_path / "contract" / "child-protection-family-support" / "child-protection-contract.yaml"
         text = contract.read_text()
         assert "cp_carers" in text
         edited = text.replace("cp_carers", "cp_carerz", 1)

@@ -47,7 +47,7 @@ from qa_tools.common.soda_common import (
 from qa_tools.common.qa_results_writer import write_qa_result
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-soda-checks.yml")
+SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-soda-checks.yml")
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID

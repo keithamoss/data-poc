@@ -46,7 +46,7 @@ from pipeline.dashboard_check_labels import rank_for_headline, display_name, das
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
 OUT_PATH = os.path.join(ROOT, "reports", "child_protection_dashboard.json")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "child-protection-family-support", "child-protection-contract.yaml")
 
 
 def _parse_extract_timestamp(s: str) -> datetime:

@@ -735,8 +735,12 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
                 f"not exist.",
                 f"Add contract/{filename}, or correct the name."))
 
-    for path in sorted(src.contract_dir.glob("*.yaml")):
-        if path.name == src.name or path.name in declared:
+    # Each collection's contract sits in its agency's folder (REQ-QAC-241), so
+    # every YAML under contract/ is looked at, named relative to it - which is
+    # how a collection's `contract:` names its file.
+    for path in sorted(src.contract_dir.rglob("*.yaml")):
+        rel = path.relative_to(src.contract_dir).as_posix()
+        if path.name == src.name or rel in declared:
             continue
         try:
             doc = yaml.safe_load(path.read_text()) or {}
@@ -748,7 +752,7 @@ def _contract_errors(raw: dict, src: Source) -> list[ConfigError]:
             # deletes - and that would have switched this check off silently.
             continue  # a checks file or similar, not a dataset contract
         out.append(ConfigError(
-            path.name, None,
+            rel, None,
             "is a data contract that no collection in the hierarchy names.",
             "Add a `contract:` line to the collection it describes, or delete it. A "
             "contract nothing points at is checked by nothing."))
@@ -763,14 +767,14 @@ def _sla_properties_errors(src: Source) -> list[ConfigError]:
     expected time and grace live in contract/calendar.yaml, and a second
     copy nobody reads is a second copy somebody edits."""
     out: list[ConfigError] = []
-    for path in sorted(src.contract_dir.glob("*.yaml")):
+    for path in sorted(src.contract_dir.rglob("*.yaml")):
         try:
             doc = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError:
             continue
         if isinstance(doc, dict) and "slaProperties" in doc:
             out.append(ConfigError(
-                path.name, None,
+                path.relative_to(src.contract_dir).as_posix(), None,
                 "states slaProperties, which no longer exist.",
                 "Delete the block. A dataset's cadence, expected time and grace live on its "
                 "participation in contract/calendar.yaml, and nothing reads them from a "

@@ -132,8 +132,8 @@ def test_every_real_contract_rule_sits_under_the_column_its_id_names():
     intended - the id and the attachment were free to disagree before,
     and nothing would have said so."""
     from qa_tools.common.check_lifecycle import contract_rule_attachments
-    for path in ("contract/bdm-birth-registrations-contract.yaml",
-                 "contract/child-protection-contract.yaml"):
+    for path in ("contract/registry-services/bdm-birth-registrations-contract.yaml",
+                 "contract/child-protection-family-support/child-protection-contract.yaml"):
         assert ci.validate_column_matches(contract_rule_attachments(path)) == [], path
 
 

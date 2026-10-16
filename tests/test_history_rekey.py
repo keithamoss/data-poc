@@ -48,6 +48,11 @@ AGENCY = "child-protection-family-support"
 COLLECTION = "child-protection"
 
 
+def _cp_evidently():
+    from qa_tools.common.evidently_common import collection_checks
+    return collection_checks("child-protection")
+
+
 def _verified(dataset_id: str, tail: str, run_id: str = "r1") -> dict:
     return {"check_id": f"a.b.{COLLECTION}.{dataset_id}.col.{tail}",
              "dataset_id": dataset_id, "run_id": run_id, "status": "pass"}
@@ -366,7 +371,7 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
 
     def test_every_child_protection_dataset_has_exactly_one(self):
         from qa_tools.common import hierarchy
-        from qa_tools.cp.evidently_check_lifecycle import ROW_COUNT_GROWTH_CHECK_IDS
+        ROW_COUNT_GROWTH_CHECK_IDS = _cp_evidently().row_drop
 
         real = {d.table: d.dataset_id
                 for d in hierarchy.datasets_in_collection("child-protection")}
@@ -379,7 +384,7 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
         page and folds into the wrong status - silently, because every
         id is well-formed either way."""
         from qa_tools.common import hierarchy
-        from qa_tools.cp.evidently_check_lifecycle import ROW_COUNT_GROWTH_CHECK_IDS
+        ROW_COUNT_GROWTH_CHECK_IDS = _cp_evidently().row_drop
 
         real = {d.table: d.dataset_id
                 for d in hierarchy.datasets_in_collection("child-protection")}
@@ -387,9 +392,7 @@ class TestTheEvidentlyCheckRegistryAgreesWithTheHierarchy:
             assert check_id.split(".")[3] == real[table], (table, check_id)
 
     def test_every_one_of_them_is_registered_for_its_lifecycle(self):
-        from qa_tools.cp.evidently_check_lifecycle import (
-            CHECK_LIFECYCLE, ROW_COUNT_GROWTH_CHECK_IDS,
-        )
+        CHECK_LIFECYCLE, ROW_COUNT_GROWTH_CHECK_IDS = _cp_evidently().checks, _cp_evidently().row_drop
 
         for check_id in ROW_COUNT_GROWTH_CHECK_IDS.values():
             assert check_id in CHECK_LIFECYCLE, check_id

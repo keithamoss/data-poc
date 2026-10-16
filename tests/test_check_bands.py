@@ -59,11 +59,12 @@ class TestTheRealDefinitions:
 
     def test_evidently_is_read_from_its_own_entry(self, catalogue):
         """Since REQ-QAC-223 each Evidently check's bands live in its own
-        CHECK_LIFECYCLE entry, where the changelog gate sees them."""
-        from qa_tools.bdm import evidently_check_lifecycle as bdm_ev
+        entry in its collection's check file, where the changelog gate sees
+        them."""
+        from qa_tools.common.evidently_common import collection_checks
 
         [psi] = [c for c in catalogue.checks if c.check_id.endswith("sex.drift_psi_evidently")]
-        entry = bdm_ev.CHECK_LIFECYCLE[psi.check_id]
+        entry = collection_checks("civil-registration").checks[psi.check_id]
         assert [b.value for b in psi.warn] == [entry["warn_threshold"]]
         assert [b.value for b in psi.fail] == [entry["fail_threshold"]]
 

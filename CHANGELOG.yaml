@@ -124,6 +124,13 @@ releases:
               with twelve days when each day's supply was due at 22:00 the
               evening before. Arrivals just outside and right on that window
               are planted there; every later day is unchanged.
+          - headline: Every collection's checks live in its agency's folder
+            components: ["QA checks & contract"]
+            description: >
+              Each collection's contract, Soda and Evidently checks now sit
+              together under contract/<agency>/, and its dbt files in folders
+              named after it. Evidently's checks are YAML like the rest rather
+              than Python, and no check changed in the move.
           - headline: Collections come from one registry
             components: ["Pipeline & publishing"]
             description: >

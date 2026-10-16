@@ -196,10 +196,11 @@ def validate() -> list[str]:
     # coverage that list did not have (post-build-review #36).
     if CONTRACT_DIR.exists():
         known = {filename for filename, _ in named}
-        for path in sorted(CONTRACT_DIR.glob("*-contract.yaml")):
-            if path.name not in known:
+        for path in sorted(CONTRACT_DIR.rglob("*-contract.yaml")):
+            rel = path.relative_to(CONTRACT_DIR).as_posix()
+            if rel not in known:
                 errors.append(
-                    f"{path.name}: no dataset in contract/data-asset.yaml names this "
+                    f"{rel}: no dataset in contract/data-asset.yaml names this "
                     f"contract, so nothing checks it. Point a dataset at it, or remove it.")
     for filename, describes in named:
         path = CONTRACT_DIR / filename

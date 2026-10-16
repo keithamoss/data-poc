@@ -28,7 +28,7 @@ from qa_tools.common.qa_results_writer import write_qa_result
 from . import cp_common
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "child-protection-soda-checks.yml")
+SODA_CHECKS_PATH = os.path.join(ROOT, "contract", "child-protection-family-support", "child-protection-soda-checks.yml")
 
 # dimension for the 3 named `failed rows` business-rule checks - matches
 # the dimension each rule's contract/child-protection-contract.yaml quality

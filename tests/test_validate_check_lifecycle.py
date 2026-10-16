@@ -14,6 +14,12 @@ import textwrap
 from qa_tools.common import validate_check_lifecycle as vcl
 
 
+def _use_sources(monkeypatch, yaml_sources, evidently):
+    """Fix the gate's source lists at every ref, in place of the ones it
+    derives from each ref's hierarchy."""
+    monkeypatch.setattr(vcl, "_sources", lambda ref: (list(yaml_sources), list(evidently)))
+
+
 def _git(repo, *args):
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 
@@ -77,8 +83,8 @@ def test_old_file_content_returns_the_content_at_that_ref(tmp_path, monkeypatch)
 def test_collect_checks_reads_old_and_new_from_real_git_history(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
 
     (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
@@ -98,12 +104,12 @@ def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks
     first check ever gets retired (see collect_checks()'s own docstring)."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [
+    _use_sources(monkeypatch, [
         ("schema.yml", vcl.cl.parse_dbt_check_metadata),
         ("schema-retired.yml", vcl.cl.parse_dbt_check_metadata),  # deliberately never created
-    ])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [
-        "evidently_check_lifecycle_retired.py",  # deliberately never created
+    ],
+                 [
+        "evidently-checks-retired.yml",  # deliberately never created
     ])
 
     (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
@@ -116,8 +122,8 @@ def test_collect_checks_treats_a_missing_source_at_the_working_tree_as_no_checks
 def test_main_fails_on_an_undocumented_config_change(tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
 
     (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
@@ -144,11 +150,11 @@ def test_main_fails_when_a_check_id_is_deleted_outright(tmp_path, monkeypatch, c
     history, not just the unit-level function in isolation."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [
+    _use_sources(monkeypatch, [
         ("schema.yml", vcl.cl.parse_dbt_check_metadata),
         ("schema-retired.yml", vcl.cl.parse_dbt_check_metadata),
-    ])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    ],
+                 [])
 
     (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
@@ -174,11 +180,11 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
     disappearance - main() must pass clean."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [
+    _use_sources(monkeypatch, [
         ("schema.yml", vcl.cl.parse_dbt_check_metadata),
         ("schema-retired.yml", vcl.cl.parse_dbt_check_metadata),
-    ])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    ],
+                 [])
 
     (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     (repo / "schema-retired.yml").write_text("models: []\n")
@@ -216,8 +222,8 @@ def test_main_passes_when_a_check_is_properly_retired(tmp_path, monkeypatch, cap
 def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
 
     (repo / "schema.yml").write_text(_dbt_schema("data-asset-1.registry-services.civil-registration.birth-registrations.col.not_null_dbt"))
     _git(repo, "add", "-A")
@@ -225,18 +231,6 @@ def test_main_passes_when_nothing_changed(tmp_path, monkeypatch, capsys):
 
     assert vcl.main() == 0
     assert "zero errors" in capsys.readouterr().out
-
-
-def test_evidently_dict_from_source_evals_the_module_source():
-    source = textwrap.dedent("""\
-        CHECK_LIFECYCLE = {
-            "data-asset-1.registry-services.civil-registration.birth-registrations.col.drift_psi_evidently": {"introduced_date": "2026-01-01", "changelog": []},
-        }
-        """)
-
-    result = vcl._evidently_dict_from_source(source, "fake_evidently_check_lifecycle.py")
-
-    assert result == {"data-asset-1.registry-services.civil-registration.birth-registrations.col.drift_psi_evidently": {"introduced_date": "2026-01-01", "changelog": []}}
 
 
 # ---------------------------------------------------------------------
@@ -275,8 +269,8 @@ def _one_check(tmp_path, monkeypatch, failure_indicates, description=DEFAULT_DES
     """A repo holding exactly one check with the given prose."""
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
     (repo / "schema.yml").write_text(
         _dbt_schema_with_prose("data-asset-1.registry-services.civil-registration.birth-registrations.c.not_null_dbt",
                                failure_indicates, description))
@@ -383,8 +377,8 @@ def test_both_halves_are_reported_in_one_run(tmp_path, monkeypatch):
 def test_the_gate_is_off_by_default_and_fatal_only_when_asked(tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
     (repo / "schema.yml").write_text(
         _dbt_schema_with_prose("data-asset-1.registry-services.civil-registration.birth-registrations.c.not_null_dbt", None))
     _git(repo, "add", "-A")
@@ -409,12 +403,12 @@ def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path,
 
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES",
-                        [("contract.yaml", vcl.cl.parse_contract_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("contract.yaml", vcl.cl.parse_contract_check_metadata)],
+                 [])
     monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD")
 
-    today = (Path(__file__).resolve().parent.parent / "contract" / "child-protection-contract.yaml").read_text()
+    today = (Path(__file__).resolve().parent.parent / "contract" / "child-protection-family-support"
+             / "child-protection-contract.yaml").read_text()
     before = re.sub(r"(?m)^(\s*)- id: \S+\n\1  ", r"\1- ", today)
     assert before != today and "- id:" not in before
     (repo / "contract.yaml").write_text(before)
@@ -481,8 +475,8 @@ def _regex_schema(changelog_on_a: str = "[]", changelog_on_rule: str = "[]") -> 
 def _dbt_repo(tmp_path, monkeypatch):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("schema.yml", vcl.cl.parse_dbt_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("schema.yml", vcl.cl.parse_dbt_check_metadata)],
+                 [])
     (repo / "dbt_project" / "macros").mkdir(parents=True)
     (repo / "dbt_project" / "tests").mkdir(parents=True)
     (repo / "dbt_project" / "macros" / "matches_regex.sql").write_text(_MATCHES_REGEX)
@@ -600,8 +594,8 @@ def test_a_soda_expression_change_fails_without_a_changelog_entry_and_passes_wit
         tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [("soda.yml", vcl.cl.parse_soda_check_metadata)])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", [])
+    _use_sources(monkeypatch, [("soda.yml", vcl.cl.parse_soda_check_metadata)],
+                 [])
     cid = f"{_BDM}.row_count_soda"
 
     def soda(expr, changelog="[]"):
@@ -632,20 +626,21 @@ def test_a_soda_expression_change_fails_without_a_changelog_entry_and_passes_wit
 def test_an_evidently_threshold_change_fails_naming_that_check_alone(tmp_path, monkeypatch, capsys):
     repo = _init_repo(tmp_path)
     monkeypatch.setattr(vcl, "ROOT", repo)
-    monkeypatch.setattr(vcl, "_YAML_SOURCES", [])
-    monkeypatch.setattr(vcl, "_EVIDENTLY_SOURCES", ["ev.py"])
+    _use_sources(monkeypatch, [],
+                 ["ev.yml"])
     a, b = f"{_BDM}.sex.drift_psi_evidently", f"{_BDM}.row_count_growth_evidently"
 
     def ev(fail):
-        return (f"CHECK_LIFECYCLE = {{\n"
-                f"  {a!r}: {{'category': 'consistency', 'changelog': [], 'column': 'sex',"
-                f" 'method': 'psi', 'warn_threshold': 0.10, 'fail_threshold': {fail}}},\n"
-                f"  {b!r}: {{'category': 'timeliness', 'changelog': [], 'column': None,"
-                f" 'method': 'row_drop', 'warn_threshold': 0.10, 'fail_threshold': 0.25}},\n"
-                f"}}\n")
-    (repo / "ev.py").write_text(ev(0.25))
+        return textwrap.dedent(f"""\
+            checks:
+              - {{check_id: {a}, category: consistency, changelog: [], column: sex,
+                 method: psi, warn_threshold: 0.10, fail_threshold: {fail}}}
+              - {{check_id: {b}, category: timeliness, changelog: [], column: null,
+                 method: row_drop, warn_threshold: 0.10, fail_threshold: 0.25}}
+            """)
+    (repo / "ev.yml").write_text(ev(0.25))
     _commit(repo, "introduce")
-    (repo / "ev.py").write_text(ev(0.30))
+    (repo / "ev.yml").write_text(ev(0.30))
     _commit(repo, "loosen one band, no changelog")
     assert vcl.main() == 1
     err = capsys.readouterr().err
@@ -655,11 +650,13 @@ def test_an_evidently_threshold_change_fails_naming_that_check_alone(tmp_path, m
 
 def test_every_real_evidently_check_carries_its_whole_definition():
     """REQ-QAC-223 criterion 3: an Evidently check's column, method and
-    warn/fail bands are literals in its own CHECK_LIFECYCLE entry - where
-    the definition hash sees them - not shared module constants it cannot."""
-    from qa_tools.bdm import evidently_check_lifecycle as bdm
-    from qa_tools.cp import evidently_check_lifecycle as cp
-    entries = {**bdm.CHECK_LIFECYCLE, **cp.CHECK_LIFECYCLE}
+    warn/fail bands are literals in its own entry in its collection's check
+    file - where the definition hash sees them - not shared constants."""
+    from qa_tools import collections
+    from qa_tools.common import evidently_common as ec
+    entries = {}
+    for c in collections.all_collections():
+        entries.update(ec.collection_checks(c.id).checks)
     assert len(entries) >= 9, "precondition: the real registries are not empty"
     for check_id, meta in entries.items():
         assert meta.get("method") in ("psi", "row_drop"), check_id
@@ -675,3 +672,107 @@ def test_the_evidently_runners_judge_by_the_bands_in_each_checks_entry():
     assert ec.status_for(0.3, entry) == "warn"
     assert ec.status_for(0.5, entry) == "fail"
     assert ec.status_for(0.1, entry) == "pass"
+
+
+# ---------------------------------------------------------------------
+# REQ-QAC-241: check files found by convention, at every ref.
+# ---------------------------------------------------------------------
+
+def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
+        tmp_path, monkeypatch, capsys):
+    """The build question REQ-QAC-241 left open: a singular test's definition
+    hash covers its SQL, and named the file by its path, so filing the test
+    under tests/<collection-id>/ read as an undocumented change."""
+    repo = _dbt_repo(tmp_path, monkeypatch)
+    (repo / "dbt_project" / "tests" / "civil-registration").mkdir()
+    _git(repo, "mv", "dbt_project/tests/sibling_rule.sql",
+         "dbt_project/tests/civil-registration/sibling_rule.sql")
+    _commit(repo, "file the test under its collection")
+    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    assert vcl.main() == 0, capsys.readouterr().err
+
+
+def _flat_layout(real_root, repo):
+    """The tree as it stood before REQ-QAC-241: every collection's check
+    files flat in contract/, and Evidently's checks a Python dict under
+    qa_tools/<short>/. Built from today's files, so its checks are today's."""
+    import shutil
+
+    import yaml
+
+    from qa_tools import collections
+    from qa_tools.common import check_lifecycle as cl
+
+    (repo / "contract").mkdir()
+    for asset_wide in (real_root / "contract").glob("*.y*ml"):
+        shutil.copy(asset_wide, repo / "contract" / asset_wide.name)
+    doc = yaml.safe_load((real_root / "contract" / "data-asset.yaml").read_text())
+    for agency in doc["hierarchy"]["agencies"]:
+        for coll in agency["collections"]:
+            coll["contract"] = coll["contract"].rsplit("/", 1)[-1]
+    (repo / "contract" / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    for c in collections.all_collections():
+        for kind in ("contract", "soda"):
+            for retired in (False, True):
+                src = real_root / c.check_file(kind, retired=retired)
+                if src.exists():
+                    shutil.copy(src, repo / "contract" / src.name)
+        package = repo / "qa_tools" / c.short
+        package.mkdir(parents=True)
+        for retired, suffix in ((False, ""), (True, "_retired")):
+            checks = cl.load_evidently_checks(real_root / c.check_file("evidently", retired=retired))
+            (package / f"evidently_check_lifecycle{suffix}.py").write_text(
+                f"CHECK_LIFECYCLE = {checks!r}\n")
+
+
+def test_a_base_ref_from_before_the_move_reads_as_no_change(tmp_path, monkeypatch, capsys):
+    """Criteria 6 and 7: each side's sources come from its own ref's
+    hierarchy, and a ref predating the move is read through the legacy
+    reader - so moving every file reports no check added, removed or
+    changed."""
+    import shutil
+
+    from qa_tools.common import hierarchy
+
+    real_root = vcl.ROOT
+    repo = _init_repo(tmp_path)
+    _flat_layout(real_root, repo)
+    _commit(repo, "before the move")
+    shutil.rmtree(repo / "contract")
+    shutil.rmtree(repo / "qa_tools")
+    shutil.copytree(real_root / "contract", repo / "contract")
+    _commit(repo, "the move")
+
+    monkeypatch.setattr(vcl, "ROOT", repo)
+    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", repo / "contract" / "data-asset.yaml")
+    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    old, new = vcl.collect_checks("HEAD~1"), vcl.collect_checks(None)
+    evidently = [c for c in old if c.tool == "evidently"]
+    assert evidently and all(c.source_file.endswith(".py") for c in evidently), \
+        "precondition: the base side was read through the legacy reader"
+    assert len(old) == len(new) > 0
+    assert vcl.cl.validate(old, new) == []
+    assert ({c.check_id: c.config_hash for c in old}
+            == {c.check_id: c.config_hash for c in new})
+
+
+def test_an_edit_to_any_collections_check_source_moves_the_fingerprint(tmp_path, monkeypatch):
+    """Criterion 11: REQ-PIPE-192's cache is keyed on this, so an edit to an
+    Evidently file or a collection's dbt folder must be seen."""
+    import shutil
+
+    from qa_tools.common import hierarchy
+
+    for top in ("contract", "dbt_project/models", "dbt_project/tests", "dbt_project/macros"):
+        shutil.copytree(vcl.ROOT / top, tmp_path / top)
+    monkeypatch.setattr(vcl, "ROOT", tmp_path)
+    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "contract" / "data-asset.yaml")
+    edits = ["contract/registry-services/bdm-birth-registrations-evidently-checks.yml",
+             "dbt_project/models/child-protection/stg_cp_clients.sql",
+             "dbt_project/tests/civil-registration/recency.sql"]
+    for rel in edits:
+        before = vcl.sources_fingerprint()
+        path = tmp_path / rel
+        assert path.is_file(), f"precondition: {rel} exists"
+        path.write_text(path.read_text() + "\n")
+        assert vcl.sources_fingerprint() != before, rel

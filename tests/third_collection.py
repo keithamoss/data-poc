@@ -28,25 +28,37 @@ CODE = "tests_third_collection_code"
 
 
 def _hierarchy(tmp_path, *, bare: bool) -> None:
+    """contract/ under tmp_path, laid out as the real one (REQ-QAC-241):
+    every collection's check files in its agency's folder."""
     doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
-    contract = "child-protection-contract.yaml"
-    shutil.copy(hierarchy.DATA_ASSET_YAML.parent / contract, tmp_path / contract)
+    contract_dir = tmp_path / "contract"
     for c in collections.all_collections():
-        if not (tmp_path / c.contract).exists():
-            shutil.copy(hierarchy.DATA_ASSET_YAML.parent / c.contract, tmp_path / c.contract)
+        for kind in ("contract", "soda", "evidently"):
+            dest = tmp_path / c.check_file(kind)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(hierarchy.DATA_ASSET_YAML.parent.parent / c.check_file(kind), dest)
     agencies = doc["hierarchy"]["agencies"]
+    stems = [("fake-things", True)] + ([("bare-things", True)] if bare else [])
+    (contract_dir / "fake-agency").mkdir()
+    for stem, _ in stems:
+        shutil.copy(hierarchy.DATA_ASSET_YAML.parent / collections.by_id("child-protection").contract,
+                    contract_dir / "fake-agency" / f"{stem}-contract.yaml")
+        for kind in ("soda-checks", "evidently-checks"):
+            (contract_dir / "fake-agency" / f"{stem}-{kind}.yml").write_text("checks: []\n")
     agencies.append({"id": "fake-agency", "name": "Fake Agency", "collections": [{
         "id": FAKE_ID, "name": "Fake Collection", "short": FAKE_SHORT,
-        "run_prefix": FAKE_PREFIX, "contract": contract, "delivery_boundary": "directory",
+        "run_prefix": FAKE_PREFIX, "contract": "fake-agency/fake-things-contract.yaml",
+        "delivery_boundary": "directory",
         "datasets": [{"id": FAKE_DATASET, "name": "Fake Things", "table": FAKE_TABLE,
                       "arrival_pattern": r"fake_things[^/]*\.csv"}]}]})
     if bare:
         agencies[-1]["collections"].append({
             "id": BARE_ID, "name": "Bare Collection", "short": BARE_SHORT,
-            "run_prefix": "bare_run_", "contract": contract, "delivery_boundary": "directory",
+            "run_prefix": "bare_run_", "contract": "fake-agency/bare-things-contract.yaml",
+            "delivery_boundary": "directory",
             "datasets": [{"id": "bare-things", "name": "Bare Things", "table": "bare_things",
                           "arrival_pattern": r"bare_things[^/]*\.csv"}]})
-    (tmp_path / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
 
 
 def _code(calls: list) -> types.ModuleType:
@@ -62,7 +74,7 @@ def _code(calls: list) -> types.ModuleType:
 
 def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     _hierarchy(tmp_path, bare=bare)
-    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "data-asset.yaml")
+    monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "contract" / "data-asset.yaml")
     hierarchy._load.cache_clear()
     collections._load.cache_clear()
     calls: list = []

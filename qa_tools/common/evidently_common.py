@@ -8,6 +8,8 @@ have) stay in each dataset's own file - see plans/qa-pipeline.md #84.
 """
 from __future__ import annotations
 
+from typing import NamedTuple
+
 ENGINE_TAG = "Evidently 0.7"
 
 # THE BANDS LIVE IN EACH CHECK'S OWN ENTRY (REQ-QAC-223 criterion 3).
@@ -35,6 +37,37 @@ ENGINE_TAG = "Evidently 0.7"
 #: checks are green. A dataset whose EVERY contributing check is quiet
 #: rolls up quiet, which promotion.status_of() refuses.
 NO_REFERENCE = "nodata"
+
+
+class EvidentlyChecks(NamedTuple):
+    """One collection's Evidently checks, as its check file declares them."""
+    checks: dict          # {check_id: metadata}
+    psi: str              # the drift check's id
+    row_drop: dict        # {table: the row-drop check's id}
+
+
+def collection_checks(collection_id: str) -> EvidentlyChecks:
+    """A collection's Evidently checks, read from its own check file
+    (REQ-QAC-241 criterion 10) - no check id is a Python constant.
+
+    Each check is found by its `method`: the one `psi` check, and a
+    `row_drop` check per table, whose dataset is the check id's fourth
+    segment (asset.agency.collection.dataset...) and whose table is that
+    dataset's in the hierarchy."""
+    from pathlib import Path
+
+    from qa_tools import collections
+    from qa_tools.common import check_lifecycle, hierarchy
+
+    coll = collections.by_id(collection_id)
+    rel = coll.check_file("evidently")
+    checks = check_lifecycle.load_evidently_checks(Path(__file__).resolve().parents[2] / rel)
+    psi = [i for i, m in checks.items() if m.get("method") == "psi"]
+    if len(psi) != 1:
+        raise ValueError(f"{rel}: expected one psi check, found {len(psi)}")
+    row_drop = {hierarchy.dataset(i.split(".")[3]).table: i
+                for i, m in checks.items() if m.get("method") == "row_drop"}
+    return EvidentlyChecks(checks, psi[0], row_drop)
 
 
 def status_for(value: float, entry: dict) -> str:

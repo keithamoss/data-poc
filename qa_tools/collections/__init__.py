@@ -63,6 +63,77 @@ class Collection:
         """The adapter module, named by the id with hyphens as underscores."""
         return self.id.replace("-", "_")
 
+    # ---- the collection's check files, found by convention (REQ-QAC-241) ----
+    #
+    # Every collection's contract, Soda, Evidently and retired-check files sit
+    # in its agency's folder, contract/<agency-id>/, named from one stem - its
+    # contract's file name less `-contract.yaml`. Paths are relative to the
+    # repository root, as the lifecycle gate reads them at any git ref.
+
+    @property
+    def folder(self) -> str:
+        return f"contract/{self.agency_id}"
+
+    @property
+    def stem(self) -> str:
+        return self.contract.rsplit("/", 1)[-1].removesuffix("-contract.yaml")
+
+    def check_file(self, kind: str, *, retired: bool = False) -> str:
+        """`kind` is contract, soda or evidently; the retired sibling where
+        `retired` is set."""
+        suffix = {"contract": "contract{r}.yaml", "soda": "soda-checks{r}.yml",
+                  "evidently": "evidently-checks{r}.yml"}[kind]
+        return f"{self.folder}/{self.stem}-" + suffix.format(r="-retired" if retired else "")
+
+    #: The collection's own dbt folders (REQ-QAC-241 criterion 4).
+    @property
+    def dbt_models(self) -> str:
+        return f"dbt_project/models/{self.id}"
+
+    @property
+    def dbt_tests(self) -> str:
+        return f"dbt_project/tests/{self.id}"
+
+    @property
+    def dbt_schema(self) -> str:
+        return f"{self.dbt_models}/schema.yml"
+
+    #: Outside model-paths, so dbt never runs a retired check.
+    @property
+    def dbt_retired_schema(self) -> str:
+        return f"dbt_project/retired/{self.id}/schema-retired.yml"
+
+    def check_sources(self) -> list[tuple[str, str]]:
+        """Every file this collection's checks are defined in, as
+        (path, tool): its contract, Soda, Evidently and dbt schema files,
+        each followed by its retired sibling (REQ-QAC-241 criterion 8)."""
+        out = []
+        for kind, tool in (("contract", "contract"), ("soda", "soda"), ("evidently", "evidently")):
+            out += [(self.check_file(kind), tool), (self.check_file(kind, retired=True), tool)]
+        return out + [(self.dbt_schema, "dbt"), (self.dbt_retired_schema, "dbt")]
+
+
+#: The checks no collection owns: shared dbt SQL, and the file checks
+#: derived once for every dataset (REQ-QAC-241 criterion 8).
+SHARED_DBT_DIRS = ("dbt_project/macros", "dbt_project/tests/generic")
+FILE_CHECKS = "contract/file-checks.yaml"
+
+
+def collections_in(doc: dict) -> list[Collection]:
+    """The collections a parsed data-asset.yaml declares, without datasets -
+    what the lifecycle gate reads at a git ref, whose hierarchy may not be
+    today's (REQ-QAC-241 criterion 7). `short` and `run_prefix` may be
+    absent there, as they were before REQ-PIPE-240."""
+    found = []
+    for agency in ((doc.get("hierarchy") or {}).get("agencies") or []):
+        for coll in agency.get("collections") or []:
+            found.append(Collection(
+                id=coll["id"], name=coll.get("name", coll["id"]), agency_id=agency["id"],
+                agency_name=agency.get("name", agency["id"]),
+                short=str(coll.get("short", "")), run_prefix=str(coll.get("run_prefix", "")),
+                contract=str(coll.get("contract", "")), datasets=()))
+    return found
+
 
 @functools.lru_cache(maxsize=1)
 def _load() -> tuple[Collection, ...]:
@@ -82,6 +153,11 @@ def _load() -> tuple[Collection, ...]:
                 contract=str(hierarchy._require(coll, "contract", where)),
                 datasets=tuple(by_collection.get(coll["id"], ()))))
     return tuple(found)
+
+
+def check_files(kind: str, *, retired: bool = False) -> list[str]:
+    """Every collection's `kind` check file (contract, soda or evidently)."""
+    return [c.check_file(kind, retired=retired) for c in _load()]
 
 
 def all_collections() -> list[Collection]:

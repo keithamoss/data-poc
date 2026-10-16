@@ -35,42 +35,110 @@ from qa_tools.common.diff_base import diff_base
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-# The same YAML files Phase 1's real retrofit covers - kept as a plain
-# list here (not derived from anything dynamic) so a brand-new dataset's
-# check files just get added to this list, same as Phase 1's own
-# retrofit was itself a manual, deliberate act per dataset.
-_YAML_SOURCES = [
-    ("dbt_project/models/staging/schema.yml", cl.parse_dbt_check_metadata),
-    ("dbt_project/schema-retired.yml", cl.parse_dbt_check_metadata),
-    ("contract/bdm-birth-registrations-soda-checks.yml", cl.parse_soda_check_metadata),
-    ("contract/bdm-birth-registrations-soda-checks-retired.yml", cl.parse_soda_check_metadata),
-    ("contract/child-protection-soda-checks.yml", cl.parse_soda_check_metadata),
-    ("contract/child-protection-soda-checks-retired.yml", cl.parse_soda_check_metadata),
-    ("contract/bdm-birth-registrations-contract.yaml", cl.parse_contract_check_metadata),
-    ("contract/bdm-birth-registrations-contract-retired.yaml", cl.parse_contract_check_metadata),
-    ("contract/child-protection-contract.yaml", cl.parse_contract_check_metadata),
-    ("contract/child-protection-contract-retired.yaml", cl.parse_contract_check_metadata),
-    # REQ-QAC-096: written once, a check per dataset derived from each.
-    ("contract/file-checks.yaml", cl.parse_file_check_metadata),
-]
-_EVIDENTLY_SOURCES = [
-    "qa_tools/bdm/evidently_check_lifecycle.py",
-    "qa_tools/bdm/evidently_check_lifecycle_retired.py",
-    "qa_tools/cp/evidently_check_lifecycle.py",
-    "qa_tools/cp/evidently_check_lifecycle_retired.py",
-]
+#: Which parser reads each tool's check files.
+_PARSERS = {"dbt": cl.parse_dbt_check_metadata, "soda": cl.parse_soda_check_metadata,
+            "contract": cl.parse_contract_check_metadata}
+
+
+def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
+    """Every file the checks at `ref` are defined in - `[(path, parser)]`
+    for the YAML tools and `[path]` for Evidently - derived from THAT ref's
+    own hierarchy (REQ-QAC-241 criteria 7 and 8): each collection's
+    contract, Soda, Evidently and dbt schema files with their retired
+    siblings, plus contract/file-checks.yaml. A new collection's files are
+    found without a line here.
+
+    Grouped by tool in a fixed order - dbt, Soda, contracts, file checks,
+    Evidently - the order the hand-written list had, so nothing that lists
+    checks moves."""
+    from qa_tools import collections
+    from qa_tools.common import config_yaml, hierarchy
+
+    asset = hierarchy.DATA_ASSET_YAML
+    rel_asset = asset.relative_to(ROOT).as_posix() if asset.is_relative_to(ROOT) else None
+    text = asset.read_text() if ref is None or rel_asset is None else _old_file_content(rel_asset, ref)
+    colls = collections.collections_in(config_yaml.parse(text or "") or {})
+    if any("/" not in c.contract for c in colls):
+        return _legacy_sources(colls)
+    yaml_sources = [(c.dbt_schema, _PARSERS["dbt"]) for c in colls]
+    yaml_sources += [(c.dbt_retired_schema, _PARSERS["dbt"]) for c in colls]
+    for kind in ("soda", "contract"):
+        for c in colls:
+            yaml_sources += [(c.check_file(kind), _PARSERS[kind]),
+                             (c.check_file(kind, retired=True), _PARSERS[kind])]
+    yaml_sources.append((collections.FILE_CHECKS, cl.parse_file_check_metadata))
+    evidently = [f for c in colls for f in (c.check_file("evidently"),
+                                             c.check_file("evidently", retired=True))]
+    return yaml_sources, evidently
+
+
+# ---- LEGACY: a base ref from before REQ-QAC-241 --------------------------
+#
+# REMOVE WITH REQ-PIPE-248. Before REQ-QAC-241 every check file sat flat in
+# contract/, dbt's in one models/staging/schema.yml, and Evidently's checks
+# were Python dicts under qa_tools/<short>/. The gate reads a base ref's
+# checks AT that ref, so until no diff base predates the move it has to read
+# the old layout too. Dead the day that is true - REQ-PIPE-248 deletes it.
+
+#: The Python packages Evidently's dicts lived in, for refs that predate
+#: REQ-PIPE-240's `short` on each collection.
+_LEGACY_PACKAGE = {"civil-registration": "bdm", "child-protection": "cp"}
+
+
+def _legacy_sources(colls) -> tuple[list[tuple[str, object]], list[str]]:
+    yaml_sources = [("dbt_project/models/staging/schema.yml", _PARSERS["dbt"]),
+                    ("dbt_project/schema-retired.yml", _PARSERS["dbt"])]
+    for kind, suffix in (("soda", "soda-checks{r}.yml"), ("contract", "contract{r}.yaml")):
+        for c in colls:
+            stem = c.contract.removesuffix("-contract.yaml")
+            yaml_sources += [(f"contract/{stem}-" + suffix.format(r=r), _PARSERS[kind])
+                             for r in ("", "-retired")]
+    yaml_sources.append(("contract/file-checks.yaml", cl.parse_file_check_metadata))
+    evidently = []
+    for c in colls:
+        package = c.short or _LEGACY_PACKAGE.get(c.id, c.id)
+        evidently += [f"qa_tools/{package}/evidently_check_lifecycle{r}.py" for r in ("", "_retired")]
+    return yaml_sources, evidently
+
+
+def _legacy_evidently_dict(source: str, filename: str) -> dict:
+    """A pre-REQ-QAC-241 module's CHECK_LIFECYCLE dict, by exec of its own
+    source at that ref (trusted - this repository's own content). REMOVE
+    WITH REQ-PIPE-248."""
+    namespace: dict = {}
+    exec(compile(source, filename, "exec"), namespace)
+    return namespace.get("CHECK_LIFECYCLE", {})
+
+# ---- end of LEGACY --------------------------------------------------------
+
+
+def _evidently_checks(source: str, rel_path: str) -> dict:
+    if rel_path.endswith(".py"):
+        return _legacy_evidently_dict(source, rel_path)
+    return cl.evidently_checks_from_text(source, rel_path)
 
 
 def sources_fingerprint() -> str:
-    """A digest of every file the working tree's checks are collected from,
-    and of contract/ as a whole (a parser may consult the asset file or the
-    hierarchy) - what REQ-PIPE-192's declarations are keyed on, so an edit
-    to any of them is seen however small. Read, never parsed."""
+    """A digest of every file the working tree's checks are collected from -
+    each collection's check files and dbt folders, the shared dbt SQL - and
+    of contract/ as a whole (a parser may consult the asset file or the
+    hierarchy): what REQ-PIPE-192's declarations are keyed on, so an edit to
+    any of them is seen however small (REQ-QAC-241 criterion 11). Read,
+    never parsed."""
     import hashlib
 
+    from qa_tools import collections
+
     digest = hashlib.sha256(str(ROOT).encode())
-    paths = [ROOT / rel for rel, _parser in _YAML_SOURCES]
-    paths += [ROOT / rel for rel in _EVIDENTLY_SOURCES]
+    yaml_sources, evidently = _sources(None)
+    paths = [ROOT / rel for rel, _parser in yaml_sources]
+    paths += [ROOT / rel for rel in evidently]
+    dirs = [*collections.SHARED_DBT_DIRS]
+    for c in collections.all_collections():
+        dirs += [c.dbt_models, c.dbt_tests]
+    for rel_dir in dirs:
+        if (ROOT / rel_dir).is_dir():
+            paths += sorted(p for p in (ROOT / rel_dir).rglob("*") if p.is_file())
     contract = ROOT / "contract"
     if contract.is_dir():
         paths += sorted(contract.rglob("*.y*ml"))
@@ -100,8 +168,9 @@ def _old_file_content(rel_path: str, ref: str | None) -> str | None:
 
 
 #: Where the project's own dbt SQL lives (REQ-QAC-223 criterion 2): macros
-#: and custom generic tests, and singular tests. Package macros
-#: (dbt_packages/) and staging models are deliberately NOT covered.
+#: and custom generic tests, and singular tests - every collection's folder
+#: under tests/. Package macros (dbt_packages/) and models are deliberately
+#: NOT covered.
 _DBT_MACRO_DIRS = ("dbt_project/macros", "dbt_project/tests/generic")
 _DBT_SINGULAR_DIR = "dbt_project/tests"
 _MACRO_HEAD = re.compile(r"{%-?\s*(macro|test)\s+(\w+)\s*\(")
@@ -154,7 +223,11 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
                     files.append(rel)
                     texts.append(text)
             i += 1
-        return "\n".join(f"-- {f}\n{t}" for f, t in zip(files, texts)), tuple(files)
+        # Each file is named by its FILE NAME, not its path, so moving a test
+        # into a collection's folder is not a change to what it does
+        # (REQ-QAC-241's build question): dbt names a singular test by its
+        # file name too, and the collections gate keeps those unique.
+        return "\n".join(f"-- {f.rsplit('/', 1)[-1]}\n{t}" for f, t in zip(files, texts)), tuple(files)
 
     def definition(kind: str, name: str):
         if kind == "singular":
@@ -173,18 +246,6 @@ def dbt_definitions(ref: str | None) -> "cl.DbtDefinition":
     return definition
 
 
-def _evidently_dict_from_source(source: str, filename: str) -> dict:
-    """Evidently's lifecycle metadata is a plain Python dict literal, not
-    YAML - no file-format parser to reuse, so this evals the module's own
-    source text (trusted - our own repo content at a real git ref, same
-    trust level as importing the file directly) and pulls out
-    CHECK_LIFECYCLE, without needing to actually import a whole second
-    copy of the module via importlib machinery."""
-    namespace: dict = {}
-    exec(compile(source, filename, "exec"), namespace)
-    return namespace.get("CHECK_LIFECYCLE", {})
-
-
 def _dbt_kwargs(parser, ref: str | None) -> dict:
     """A dbt parser is given the project SQL as it stood at the SAME ref as
     the YAML it parses, so both sides of the comparison see their own."""
@@ -200,7 +261,8 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
     until a real project's first check ever gets retired, so this can't
     assume every listed path already exists on disk."""
     checks: list[cl.CheckMetadata] = []
-    for rel_path, parser in _YAML_SOURCES:
+    yaml_sources, evidently = _sources(ref)
+    for rel_path, parser in yaml_sources:
         if ref is None:
             if not (ROOT / rel_path).exists():
                 continue
@@ -216,7 +278,7 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
         past = {"past": True} if parser is cl.parse_contract_check_metadata else {}
         checks.extend(parser(tmp_path, **past, **_dbt_kwargs(parser, ref)))
 
-    for rel_path in _EVIDENTLY_SOURCES:
+    for rel_path in evidently:
         if ref is None:
             if not (ROOT / rel_path).exists():
                 continue
@@ -227,7 +289,7 @@ def collect_checks(ref: str | None) -> list[cl.CheckMetadata]:
             if source is None:
                 continue
         checks.extend(cl.parse_evidently_check_metadata(
-            _evidently_dict_from_source(source, rel_path), source=rel_path))
+            _evidently_checks(source, rel_path), source=rel_path))
 
     return checks
 
@@ -249,7 +311,7 @@ def _check_id_errors(checks: list[cl.CheckMetadata]) -> list[str]:
     # An id naming an agency or collection the dataset does not sit
     # under passes the grammar and resolves to nothing.
     errors += cid.validate_hierarchy_agreement(ids)
-    for rel_path, parser in _YAML_SOURCES:
+    for rel_path, parser in _sources(None)[0]:
         if parser is not cl.parse_contract_check_metadata:
             continue  # only the ODCS contracts attach rules to a column
         if not (ROOT / rel_path).exists():

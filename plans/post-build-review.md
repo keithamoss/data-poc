@@ -9998,3 +9998,20 @@ twice. It deliberately did not re-find the `TypeError`.
      locally first and passes now. Missed locally because the gates before
      those pushes ran selected test files rather than the whole suite (rule C);
      the full suite in CI is what caught it.
+
+
+215. **[done, 2026-10-16]** **[QA checks & contract]** **Moving dbt's singular tests
+     into collection folders would have hidden them from the cross-table
+     gate.** Found while building REQ-QAC-241, before anything was pushed.
+     `tables_read._dbt_singular_cross_table_checks()` looked for each
+     singular test at `dbt_project/tests/<name>.sql` exactly; once the five
+     real ones moved to `tests/<collection-id>/`, it skipped every one
+     without a word, and `undeclared_cross_table()` would have stayed green
+     over six business rules that join a second table - the same shape of
+     miss that function's docstring already records once. Fixed test-first:
+     a singular test filed under `tests/child-protection/` failed to be read
+     against the old code, and now is, because the scan searches every
+     folder under `tests/` the way dbt does. The repo-wide "not passing
+     vacuously" test now strips declarations from every collection's schema
+     file rather than one fixed path. Minor and in a gate, so fixed under
+     Keith's polish rule.

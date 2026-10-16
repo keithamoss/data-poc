@@ -264,8 +264,8 @@ class TestTheConfigurationGate:
         (lambda c, _d: c.update(run_prefix="f" * 30 + "_"), "over PostgreSQL's 63"),
         (lambda c, _d: c["datasets"][0].update(id="cp-clients"), "dataset id 'cp-clients'"),
         (lambda c, _d: c["datasets"][0].update(table="cp_clients"), "the table 'cp_clients'"),
-        (lambda c, _d: c.update(contract="no-such-contract.yaml"),
-         "contract file contract/no-such-contract.yaml is missing"),
+        (lambda c, _d: c.update(contract="fake-agency/no-such-contract.yaml"),
+         "contract file contract/fake-agency/no-such-contract.yaml is missing"),
     ])
     def test_each_configuration_fault_fails_naming_it(self, third_collection, tmp_path, edit,
                                                       expected):
@@ -350,6 +350,57 @@ class TestTheLiteralGate:
 
     def test_every_allowlisted_file_names_a_requirement_of_this_set(self):
         signed = {"REQ-QAC-241", "REQ-QAC-242", "REQ-PIPE-243", "REQ-DASH-244",
-                  "REQ-TEST-245", "REQ-GEN-246"}
+                  "REQ-TEST-245", "REQ-GEN-246", "REQ-PIPE-248"}
         assert gate.ALLOWLIST and set(gate.ALLOWLIST.values()) <= signed
 
+
+
+# ---- REQ-QAC-241 criteria 2, 5 and 9: the check-file gate ------------------
+
+class TestTheCheckFileGate:
+
+    def test_the_real_tree_passes(self):
+        assert gate.check_file_problems() == []
+
+    def test_a_third_collection_with_its_files_passes(self, third_collection, tmp_path):
+        assert gate.check_file_problems() == []
+
+    @pytest.mark.parametrize("kind", ["soda-checks", "evidently-checks"])
+    def test_a_missing_check_file_fails_naming_the_collection_and_file(
+            self, third_collection, tmp_path, kind):
+        (tmp_path / "contract" / "fake-agency" / f"fake-things-{kind}.yml").unlink()
+        got = gate.check_file_problems()
+        assert got == [f"collection {FAKE_ID!r} is missing its {kind.split('-')[0]} check file "
+                       f"contract/fake-agency/fake-things-{kind}.yml"]
+
+    def test_a_check_file_outside_its_agencys_folder_fails_naming_it(self, third_collection,
+                                                                    tmp_path):
+        moved = tmp_path / "contract" / "registry-services" / "fake-things-soda-checks.yml"
+        (tmp_path / "contract" / "fake-agency" / "fake-things-soda-checks.yml").rename(moved)
+        got = gate.check_file_problems()
+        assert ("contract/registry-services/fake-things-soda-checks.yml is "
+                f"{FAKE_ID!r}'s, which belongs in its agency's folder contract/fake-agency/") in got
+
+    def test_a_collection_file_at_the_top_of_contract_fails(self, third_collection, tmp_path):
+        (tmp_path / "contract" / "fake-things-contract-retired.yaml").write_text("{}\n")
+        got = gate.check_file_problems()
+        assert any(p.startswith("contract/fake-things-contract-retired.yaml is at the top of "
+                                "contract/") for p in got), got
+
+    def test_a_dbt_model_outside_every_collections_folder_fails(self, third_collection, tmp_path):
+        (tmp_path / "dbt_project" / "models" / "staging").mkdir(parents=True)
+        (tmp_path / "dbt_project" / "models" / "staging" / "stg_x.sql").write_text("select 1\n")
+        (tmp_path / "dbt_project" / "tests" / "generic").mkdir(parents=True)
+        (tmp_path / "dbt_project" / "tests" / "generic" / "shared.sql").write_text("select 1\n")
+        assert gate.check_file_problems() == [
+            "dbt_project/models/staging/stg_x.sql sits outside every collection's dbt folder "
+            "(dbt_project/models/<collection-id>/, dbt_project/tests/<collection-id>/)"]
+
+    def test_two_collections_declaring_one_singular_test_name_fails(self, third_collection,
+                                                                   tmp_path):
+        for collection in ("child-protection", FAKE_ID):
+            folder = tmp_path / "dbt_project" / "tests" / collection
+            folder.mkdir(parents=True)
+            (folder / "same_rule.sql").write_text("select 1\n")
+        [problem] = gate.check_file_problems()
+        assert "singular test 'same_rule' is declared in both" in problem

@@ -39,7 +39,7 @@ from qa_tools.common import asset_time
 AGENCY_ID = cp_common.AGENCY_ID
 COLLECTION_ID = cp_common.COLLECTION_ID
 TABLES = cp_common.TABLES
-CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "child-protection-contract.yaml")
+CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "child-protection-family-support", "child-protection-contract.yaml")
 
 console = Console()
 

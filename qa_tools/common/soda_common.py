@@ -73,9 +73,13 @@ FAILING_SAMPLE_LIMIT = 5
 #: failing rows the five are the lowest of the rows Soda returned.
 SODA_SAMPLES_LIMIT = 100
 
-#: The live checks files, whose every `samples limit:` is SODA_SAMPLES_LIMIT.
-SODA_CHECK_FILES = ("contract/bdm-birth-registrations-soda-checks.yml",
-                    "contract/child-protection-soda-checks.yml")
+#: The live checks files, whose every `samples limit:` is SODA_SAMPLES_LIMIT:
+def soda_check_files() -> list[str]:
+    """Every collection's live Soda checks file, from the registry
+    (REQ-QAC-241 criterion 8)."""
+    from qa_tools import collections
+
+    return collections.check_files("soda")
 
 
 class CaptureSampler(Sampler):

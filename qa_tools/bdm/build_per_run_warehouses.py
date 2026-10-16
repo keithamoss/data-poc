@@ -33,7 +33,7 @@ from qa_tools.common import arrivals, asset_time, file_checks, load_log, sample_
 from qa_tools.common import replay_clock
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
 #: The one logical table this dataset supplies.
 TABLE = "birth_registrations"

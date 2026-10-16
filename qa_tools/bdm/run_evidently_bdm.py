@@ -31,14 +31,20 @@ from qa_tools.common.evidently_common import (
 from qa_tools.common import asked_for
 from qa_tools.common import drift_reference
 from qa_tools.common.qa_results_writer import write_qa_result
-from .evidently_check_lifecycle import CHECK_LIFECYCLE, PSI_CHECK_ID, ROW_COUNT_GROWTH_CHECK_ID
+from qa_tools.common.evidently_common import collection_checks
+
+#: The checks, from contract/registry-services/ (REQ-QAC-241).
+_CHECKS = collection_checks(bdm_common.COLLECTION_ID)
+PSI_CHECK_ID = _CHECKS.psi
+ROW_COUNT_GROWTH_CHECK_ID = _CHECKS.row_drop["birth_registrations"]
+CHECK_LIFECYCLE = _CHECKS.checks
 
 # Each check judged by its OWN entry's column and bands (REQ-QAC-223 c3).
 _PSI = CHECK_LIFECYCLE[PSI_CHECK_ID]
 _VOLUME = CHECK_LIFECYCLE[ROW_COUNT_GROWTH_CHECK_ID]
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "bdm-birth-registrations-contract.yaml")
+CONTRACT_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
 AGENCY_ID = bdm_common.AGENCY_ID
 COLLECTION_ID = bdm_common.COLLECTION_ID

@@ -49,11 +49,6 @@ from qa_tools.common import config_yaml
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
-SODA = ("contract/bdm-birth-registrations-soda-checks.yml",
-        "contract/child-protection-soda-checks.yml")
-DBT = "dbt_project/models/staging/schema.yml"
-CONTRACTS = ("contract/bdm-birth-registrations-contract.yaml",
-             "contract/child-protection-contract.yaml")
 FILE_CHECKS = "contract/file-checks.yaml"
 
 #: Units a bound is stated in. A rule mixing ROWS and PERCENT is compared at
@@ -399,13 +394,16 @@ def contract_bounds(path: Path) -> dict[str, tuple]:
 
 def evidently_bounds(check_ids=None) -> dict[str, tuple]:
     """Evidently's bands, read where they live (Keith, 2026-10-11) - since
-    REQ-QAC-223, each check's OWN CHECK_LIFECYCLE entry: its method, and its
-    warn and fail bands, each tripping on a strict `>`. A check whose method
-    is neither psi nor row_drop is refused rather than given some band."""
-    from qa_tools.bdm import evidently_check_lifecycle as bdm_ev
-    from qa_tools.cp import evidently_check_lifecycle as cp_ev
+    REQ-QAC-223, each check's OWN entry in its collection's Evidently check
+    file (REQ-QAC-241): its method, and its warn and fail bands, each
+    tripping on a strict `>`. A check whose method is neither psi nor
+    row_drop is refused rather than given some band."""
+    from qa_tools import collections
+    from qa_tools.common import check_lifecycle
 
-    entries = {**bdm_ev.CHECK_LIFECYCLE, **cp_ev.CHECK_LIFECYCLE}
+    entries = {}
+    for rel in collections.check_files("evidently"):
+        entries.update(check_lifecycle.load_evidently_checks(ROOT / rel))
     if check_ids is None:
         check_ids = list(entries)
     out = {}
@@ -471,16 +469,19 @@ def catalogue() -> Catalogue:
     """Every check in force, with its bands and what it reads (criteria 1, 2,
     5). Joined to check_lifecycle's own metadata, so a check is catalogued
     exactly when the lifecycle gate sees it."""
+    from qa_tools import collections
     from qa_tools.common import validate_check_lifecycle as vcl
 
     metadata = [m for m in vcl.collect_checks(None) if not m.retired_as_of]
     bounds: dict[str, tuple] = {}
     references: dict[str, tuple[str, str]] = {}
-    for rel in SODA:
+    # Every collection's sources, from the registry (REQ-QAC-241).
+    for rel in collections.check_files("soda"):
         bounds.update(soda_bounds(ROOT / rel))
         references.update(soda_reference_reads(ROOT / rel))
-    bounds.update(dbt_bounds(ROOT / DBT))
-    for rel in CONTRACTS:
+    for c in collections.all_collections():
+        bounds.update(dbt_bounds(ROOT / c.dbt_schema))
+    for rel in collections.check_files("contract"):
         bounds.update(contract_bounds(ROOT / rel))
     bounds.update(evidently_bounds())
     bounds.update(file_bounds(metadata))

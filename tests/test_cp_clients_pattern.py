@@ -39,5 +39,5 @@ class TestThePattern:
         assert "demonstrat" in block.lower() and "contest" in block.lower()
 
     def test_the_odcs_transport_value_is_unchanged(self):
-        text = (ROOT / "contract" / "child-protection-contract.yaml").read_text()
+        text = (ROOT / "contract" / "child-protection-family-support" / "child-protection-contract.yaml").read_text()
         assert "cp_clients(_" not in text

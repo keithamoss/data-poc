@@ -124,8 +124,8 @@ nothing here is a hand-rolled stand-in:
 
 | Tool | What's real | What runs it |
 |---|---|---|
-| **datacontract-cli** | `contract/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/bdm/run_datacontract_bdm.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
-| **Soda Core** | `contract/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/bdm/run_soda_bdm.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
+| **datacontract-cli** | `contract/registry-services/bdm-birth-registrations-contract.yaml` is a genuine ODCS v3.2.0 contract — `datacontract lint` passes on it. | `qa_tools/bdm/run_datacontract_bdm.py` runs the actual `datacontract-cli` Python API (`DataContract.test()`) against each run's raw CSV via a `local` server. |
+| **Soda Core** | `contract/registry-services/bdm-birth-registrations-soda-checks.yml` is genuine SodaCL. | `qa_tools/bdm/run_soda_bdm.py` runs the real `soda-core` `Scan` API against a per-run DuckDB warehouse. |
 | **dbt-core** | `dbt_project/` is a real dbt project — `dbt_project.yml`, a staging model, `schema.yml` with real generic tests and severity config. | `qa_tools/bdm/run_dbt_bdm.py` shells out to the real `dbt` CLI (`dbt build`, dbt-duckdb adapter) against a per-run DuckDB warehouse. |
 | **Evidently AI** | Population Stability Index (PSI) on the `sex` column vs. a reference run. | `qa_tools/bdm/run_evidently_bdm.py` runs the real `evidently.Report` + `DataDriftPreset` (the current 0.7.x API). |
 
