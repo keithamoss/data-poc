@@ -124,6 +124,14 @@ releases:
               with twelve days when each day's supply was due at 22:00 the
               evening before. Arrivals just outside and right on that window
               are planted there; every later day is unchanged.
+          - headline: Prove a refactor changed nothing
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman debug equivalence capture` bootstraps any commit from
+              empty in a worktree of its own, and `compare` shows whether two
+              captures differ in recorded results, generated files, built
+              reports or help and menu text. Its clock is pinned, so captures
+              taken days apart still compare.
       - category: Fixed
         items:
           - headline: Corrected files in the earliest years are accepted

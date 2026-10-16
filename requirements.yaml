@@ -36575,7 +36575,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As whoever generalises the per-collection code, I want one command that captures everything a from-empty bootstrap produces at a named commit, run by that commit's own code, and compares two such captures, so that every refactor step can show it changed no recorded result, generated file, built page or command, rather than assert it."
     moscow: must
-    status: in_progress
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6, reopened 2026-10-15 night ('small adapter per collection'); main session position.md calls 2, 20, 24 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL offer `mothman debug equivalence capture --ref <commit> --label <name>`, which checks the commit out into a git worktree of its own, runs that commit's own `mothman pipeline bootstrap` from empty into a scratch database named for the label, and writes one baseline file describing surfaces S1, S4, S5 and S7, without patching any module of the code under capture."
@@ -36604,6 +36604,34 @@ requirements:
       - "ONLY THROUGH mothman: the snapshot code moves out of tests/equiv_support.py into a module the command imports, and the existing on-demand tests import it from there."
       - "NO NEW DEPENDENCY: git worktrees, PostgreSQL, Playwright and the generators are already required."
     dependencies: []
+    linked_tests:
+      - tests/test_equivalence.py::TestCompare
+      - tests/test_equivalence.py::TestCaptureRefuses
+      - tests/test_equivalence.py::TestTheSurfacesReadTheTree
+      - tests/test_equivalence.py::test_a_failed_capture_names_its_stage_and_leaves_nothing
+      - tests/test_equivalence.py::test_a_killed_captures_leftovers_go_with_the_next_capture
+      - tests/test_equivalence.py::test_a_second_capture_while_one_runs_is_refused
+      - tests/test_equivalence.py::test_a_refiling_is_compared_as_the_decision_that_made_it
+      - tests/test_equivalence.py::test_two_captures_of_one_commit_compare_equal
+      - tests/test_pinned_now.py
+      - tests/test_ci_on_demand.py::test_no_job_takes_full_captures
+    implemented_by:
+      - qa_tools/common/equivalence.py::capture
+      - qa_tools/common/equivalence.py::compare
+      - qa_tools/common/equivalence.py::snapshot
+      - qa_tools/common/equivalence.py::report_context
+      - qa_tools/common/equivalence.py::reports
+      - qa_tools/common/equivalence.py::generated_files
+      - qa_tools/common/equivalence.py::help_and_menus
+      - qa_tools/common/asset_time.py::now
+      - cli/debug.py::equivalence_capture_command
+      - cli/debug.py::equivalence_compare_command
+      - tests/conftest.py::pytest_collection_modifyitems
+    evidence:
+      - "2026-10-16, THE SELF-CHECK (criterion 5), recorded before any other requirement uses the harness: two full captures of 66efd5d, `mothman debug equivalence compare self-check-a self-check-b` - S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same, exit 0. Bootstrap A 1756s (Birth Registrations 562s, Child Protection 1645s), B 1935s (674s, 1811s), difference +179s; B ran alongside this session's test and gate runs for part of its span."
+      - "2026-10-16, BOOTSTRAP-TIME NOISE (NFR 4): +179s, about 10%, between two captures of one commit, so a before-and-after difference under about 10% is not a finding. Measured with other work beside it; a quiet pair would set it tighter."
+      - "2026-10-16, THE FIRST SELF-CHECK FAILED (two captures of 653911d, and CI's on-demand job on 7ac4b1d): S1, S5 and S7 differed, S4 the same - the normaliser gaps the decisions record, fixed by normaliser 2 and the pinned clock."
+      - "2026-10-16, tests/test_equivalence.py 22 passed with the harness free (one full_capture test deselected), tests/test_pinned_now.py 4 passed; the refiled_by test seen failing on the old rule first."
     decisions:
       - "BYTE-IDENTICAL REFACTOR FIRST, BEHAVIOUR CHANGES AFTER, NEVER MIXED (main session, position.md call 2, delegated by Keith 2026-10-15). This harness is what makes that checkable."
       - "SIGNIFICANT, FOR KEITH TO SENSE-CHECK - CAPTURES BY COMMIT, IN A GIT WORKTREE, CHAINED (main session's round-4 call 24, after delivery-architect finding E1a). `capture --ref` runs that commit's own code, so the harness is never edited per step and nothing is patched; about 4-5 hours of captures rather than ~10. REJECTED a full before-and-after per requirement with module-patching redirection, as tests/equiv_support does today: the series deletes the very modules it would patch, so the harness would need rewriting at every step and could not capture the 'before' of a change that removed its own patch targets."
