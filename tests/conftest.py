@@ -885,10 +885,20 @@ NEEDS_DEPLOYMENT = "needs_deployment"
 #: subject changes (Keith, 2026-10-04: the bootstrap equivalence test).
 ON_DEMAND = "on_demand"
 
+#: Tests that take FULL EQUIVALENCE CAPTURES - two from-empty bootstraps,
+#: the better part of an hour - run only when somebody asks, never by CI
+#: (Keith, 2026-10-16: "only run it when it's absolutely essential"; the
+#: work it serves is a faster bootstrap). Not on_demand, which CI runs on
+#: every push.
+FULL_CAPTURE = "full_capture"
+
 
 def pytest_addoption(parser):
     parser.addoption("--run-on-demand", action="store_true", default=False,
                      help="also run tests marked on_demand (slow; deselected otherwise)")
+    parser.addoption("--run-full-capture", action="store_true", default=False,
+                     help="also run tests marked full_capture (two full bootstraps; "
+                          "only when essential)")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -900,9 +910,12 @@ def pytest_collection_modifyitems(config, items):
     half. An on-demand test is not in any half by design, so it must not
     show up as one.
     """
-    if not config.getoption("--run-on-demand"):
-        kept = [i for i in items if i.get_closest_marker(ON_DEMAND) is None]
-        dropped = [i for i in items if i.get_closest_marker(ON_DEMAND) is not None]
+    for marker, option in ((ON_DEMAND, "--run-on-demand"),
+                           (FULL_CAPTURE, "--run-full-capture")):
+        if config.getoption(option):
+            continue
+        kept = [i for i in items if i.get_closest_marker(marker) is None]
+        dropped = [i for i in items if i.get_closest_marker(marker) is not None]
         if dropped:
             config.hook.pytest_deselected(items=dropped)
             items[:] = kept

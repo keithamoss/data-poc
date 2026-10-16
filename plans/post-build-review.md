@@ -9968,3 +9968,18 @@ twice. It deliberately did not re-find the `TypeError`.
      `--no-pytest` plus selected test files, as rule C allows, and none of
      the three is visible from a local run. CLAUDE.md already records the
      git-depth trap; this is a second instance of it.
+
+213. **[done, 2026-10-16]** **[Testing]** **A test's tidy-up could remove a
+     live capture's worktree.** Seen running `tests/test_equivalence.py`
+     while REQ-TEST-239's self-check was mid-bootstrap: since #211 every
+     capture uses one fixed worktree path, and the killed-capture test's
+     `finally` ran `git worktree remove --force` on that path whatever was
+     there. The live tree survived (checked: still registered, clean, its
+     `data/` intact), but by luck rather than design. Fixed in the tests:
+     the three that capture now require the harness to be free and FAIL
+     with a plain message when a capture is running - never skip, which
+     would be a green proving nothing - and the tidy-up holds the capture
+     lock while it removes anything. Seen failing in exactly that way with
+     the self-check running, and the tree was unaffected. Minor, so fixed
+     under Keith's polish rule.
+

@@ -47,6 +47,20 @@ def _baseline(label, *, commit="HEAD", harness=eq.HARNESS_VERSION, s1=None, s4=N
 
 
 @pytest.fixture
+def harness_free():
+    """The capture tests share the harness's one worktree path, so they
+    need no real capture to be running. FAILS rather than skips when one
+    is (post-build-review #213): a skip here would be a green that proved
+    nothing, and the leftover test's tidy-up would otherwise reach a live
+    capture's tree."""
+    try:
+        eq._one_capture_at_a_time().close()
+    except eq.Refused:
+        pytest.fail("an equivalence capture is running - these tests use its worktree "
+                    "path, so run them once it has finished")
+
+
+@pytest.fixture
 def baselines(tmp_path, monkeypatch):
     monkeypatch.setenv("MOTHMAN_EQUIV_DIR", str(tmp_path))
 
@@ -171,7 +185,8 @@ class TestCaptureRefuses:
         assert "no commit 'no-such-ref'" in _words(result)
 
 
-def test_a_failed_capture_names_its_stage_and_leaves_nothing(baselines, tmp_path):
+def test_a_failed_capture_names_its_stage_and_leaves_nothing(baselines, tmp_path,
+                                                             harness_free):
     """Criteria 12 and 14, for real: a commit from before `env mark` fails at
     the mark stage, and then no baseline, no worktree and no database remain."""
     import psycopg
@@ -191,7 +206,7 @@ def test_a_failed_capture_names_its_stage_and_leaves_nothing(baselines, tmp_path
                                 [name]).fetchall()
 
 
-def test_a_killed_captures_leftovers_go_with_the_next_capture(baselines):
+def test_a_killed_captures_leftovers_go_with_the_next_capture(baselines, harness_free):
     """post-build-review #210: a capture that is KILLED - a container restart,
     as on 2026-10-16 - never reaches its own cleanup, so its worktree stays
     registered and its directory stays on disk. The next capture clears
@@ -208,11 +223,15 @@ def test_a_killed_captures_leftovers_go_with_the_next_capture(baselines):
         assert str(left) not in worktrees
         assert not left.exists()
     finally:
-        subprocess.run(["git", "worktree", "remove", "--force", str(left / "tree")],
-                       cwd=eq.ROOT, capture_output=True)
+        lock = eq._one_capture_at_a_time()  # never tidy a live capture's tree
+        try:
+            subprocess.run(["git", "worktree", "remove", "--force", str(left / "tree")],
+                           cwd=eq.ROOT, capture_output=True)
+        finally:
+            lock.close()
 
 
-def test_a_second_capture_while_one_runs_is_refused(baselines):
+def test_a_second_capture_while_one_runs_is_refused(baselines, harness_free):
     """One fixed worktree, so one capture at a time - and a live capture's
     tree is never cleared from under it."""
     held = eq._one_capture_at_a_time()
@@ -278,10 +297,11 @@ class TestTheSurfacesReadTheTree:
         assert eq._timings(out) == {"Birth Registrations": 593.0, "Child Protection": 1642.0}
 
 
-@pytest.mark.on_demand
+@pytest.mark.full_capture
 def test_two_captures_of_one_commit_compare_equal(baselines):
     """Criterion 5, THE SELF-CHECK: the normaliser is quiet. Two full
-    bootstraps - about an hour."""
+    bootstraps - about an hour - so it runs only with --run-full-capture,
+    and never in CI (Keith, 2026-10-16: only when absolutely essential)."""
     for label in ("self-check-a", "self-check-b"):
         result = _runner.invoke(cli, ["debug", "equivalence", "capture", "--ref", "HEAD",
                                       "--label", label, "--yes"])
