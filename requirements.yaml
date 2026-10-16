@@ -11938,6 +11938,7 @@ requirements:
           checkout, which is the property being protected.
     dependencies: []
     decisions:
+      - "A BLOCKED SPRINT'S PILL IS GREY (Keith, 2026-10-16), as built (`nodata`, beside parked and superseded): nothing is happening inside a blocked sprint and the action belongs to its blocker, so amber would compete with the sprints that want attention now. REJECTED amber."
       - >
         COUNT CRITERIA, NOT REQUIREMENTS (Keith, 2026-09-26). Counting
         requirements was the obvious unit and it is wrong: a requirement
@@ -11974,14 +11975,7 @@ requirements:
         Rejected making the gate rewrite the tag automatically. A tag that
         fixes itself records nothing; the point is that a disagreement is
         visible and somebody looks at why.
-    open_questions:
-      - >
-        What COLOUR a blocked sprint's pill takes. `parked` and
-        `superseded` are grey (`nodata`), `in-progress` and `investigate`
-        are amber. Grey is the proposal: nothing is happening inside a
-        blocked sprint and the action belongs to its blocker, so amber
-        would compete with the sprints that genuinely want attention
-        now. Not settled, and cheap to change either way.
+    open_questions: []
 
   - id: REQ-DOCS-073
     title: A deferred criterion names what it waits on, and says when that has shipped
@@ -31863,6 +31857,7 @@ requirements:
     - 'CI: changes qa_tools/, so REQ-TEST-117''s key misses once, as intended.'
     dependencies: []
     decisions:
+    - "THE UNKEYED CACHES BECOME THEIR OWN REQUIREMENT (Keith, 2026-10-16, 'draft a requirement'): hierarchy, schedule, asset_time, arrival patterns and the collection registry keyed on file content, so a changed file is never served stale and tests stop needing cache_clear(). Prompted by plans/post-build-review.md #217. Out of this requirement; to be drafted by delivery-scoper for sign-off."
     - 'KEYED ON CONTENT, NOT MODIFICATION TIME AND SIZE: a test changing ''14d'' to ''21d'' within one filesystem
       time tick keeps both the same. Hashing the bytes costs microseconds; parsing the Child Protection
       contract costs 87ms.'
@@ -31882,10 +31877,7 @@ requirements:
       makes every parse ~9x faster (verified the same hour: 13 contract files 218ms -> 24ms, identical results)
       and the cache removes the repeats.'
     - 'BUILT 2026-10-06. One module, config_yaml, with parse() for text or a stream and load() for a path; every run-path module switched from yaml.safe_load to it (19 modules, 34 call sites). The validate_* gates and sprint_state are not on the run path and stay as they were. The cache key is the TEXT itself rather than a hash of it: a dict lookup on a string already hashes it, and the strings are the documents being kept anyway. Bounded at 256 documents behind one lock; a parse happens outside the lock, so two threads may both parse a document the first time - harmless, the second write is the same value. The existing unkeyed lru_caches (schedule, hierarchy, asset_time) were left as they are: they now read through this loader, and re-keying them on content was the open question not asked.'
-    open_questions:
-    - Whether the existing unkeyed lru_caches (schedule, hierarchy, asset_time, arrival_patterns) should
-      key on content too, so tests stop needing cache_clear(). Not asked; out of this requirement unless
-      Keith widens it.
+    open_questions: []
   - id: REQ-PIPE-157
     title: dbt parses the project once per collection process rather than once per run
     date_written: '2026-10-06'
@@ -36011,6 +36003,7 @@ requirements:
     - "REQ-DOCS-219"
     - "REQ-DASH-222"
     decisions:
+    - "NO DEPLOYMENT SWITCH FOR NOW (Keith, 2026-10-16): the tab shows on every build while there is one deployment and the tab is temporary; revisit when a second deployment exists. REJECTED hiding it outside the PoC site now."
     - "A TOP-LEVEL TAB, NOT A SIDE PANEL. Keith's own call, 2026-10-13: 'its own top-level dashboard tab', like Plans and Demo, so it has a route Keith can open directly in front of someone."
     - "LABELLED 'Feedback' AT `#/feedback` (Keith, 2026-10-14, Q8, option A). REJECTED: `#/you-told-us` / 'You told us' (warmer, but odd to anyone else opening the dashboard, and wrong for entries the project found itself); 'Road testing' (matches the file, jargon to the reviewer)."
     - "STATUS IS DERIVED, NOT TYPED (Keith, 2026-10-14, Q5, option A). A typed status on a card is a second record of the same fact as the requirement's status. Overrides exist only for what no requirement can say: a defect fixed without one (#8), parked (#12) and won't do. REJECTED: typed on every card and cross-checked by the validator - more to keep in step for no gain. Accepted cost, recorded so it is not rediscovered: a card names requirements, not criteria, so a requirement built with unmet criteria unrelated to the card's point reads 'In progress' (REQ-QAC-037 on the 'Client reference' card)."
@@ -36028,8 +36021,7 @@ requirements:
     - "NO ENTRY NUMBERS, AN h2, A REAL HEADER LINK (delivery-dashboard-ux low findings, 2026-10-14): the numbers are the file's bookkeeping and have been reused once (the two #14s); the tab is a page with a heading like its siblings, and its header entry is a real link so it can be opened in a new tab."
     - "REVIEWS FOLDED, 2026-10-14: changed in place 1 (h2, header link), 3 (no longer provisional), 4 (two groups, 'Where to see it', no entry number), 6 (sprint derives Planned; Couldn't reproduce), 8 (counts per group), 9 (requirement status in words, no pill); added 17 to 22 (one pill, 'Why not', past-date landing, sprint as text, the build refuses a bad href, focus back to the link)."
     - 'BUILT 2026-10-14. Status is derived in Python at build time (card_status) with sprint_state''s predicate for built - built and nothing in unmet_criteria - so the page holds no status logic of its own. A past-date link reuses the Scenarios jump (a scenarioJump with no scenario id, whose bar then drops ''for <id>''), so Back and the way to today behave exactly as there. Requirement links carry data-req-link and so take REQ-DASH-222''s own click handler and focus return. Dashboard links resolve their #/ route through pathToState and navigate in the page; an unresolvable one lands where any stale link does. The header entry is an <a> beside the siblings'' buttons, styled to match.'
-    open_questions:
-    - "Does the tab show on every deployment of this codebase, or only on this PoC's own site? Today every tab is on every build; a real deployment for an asset team would not want a tab about one reviewer of the PoC. Recommended: no switch now (the tab is ephemeral and there is only one deployment); not asked now, recorded so it is not forgotten."
+    open_questions: []
     linked_tests:
     - 'tests/test_dashboard_e2e.py::TestTheFeedbackTab'
     implemented_by:
@@ -36810,11 +36802,11 @@ requirements:
     date_written: "2026-10-15"
     story: "As someone adding a collection, I want dbt-core, Soda Core, datacontract-cli and Evidently each run by one shared module, and supplies staged by one, reading what differs from the collection's adapter, so that a new collection gets all four tools without copying a runner."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md section 1; main session position.md calls 1, 2, 11, 25, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL run dbt-core, Soda Core, datacontract-cli and Evidently for every collection through one shared module per tool, and stage every collection's supplies through one shared staging module, built from Child Protection's N-table code."
-      - "THE SYSTEM SHALL take every collection-specific input those modules need from the adapter's per-tool sub-objects - .dbt, .soda, .datacontract, .evidently and .staging."
+      - "THE SYSTEM SHALL take every collection-specific input those modules need from the collection's adapter: a value one tool reads from that tool's own sub-object (today .dbt, .soda and .datacontract; .evidently and .staging once either module has a collection-specific value to read), and a value several tools read from the adapter itself."
       - "WHEN dbt runs for a collection, THE SYSTEM SHALL select only the nodes for the tables in that collection's adapter."
       - "THE SYSTEM SHALL preserve each place either collection's recorded output differs from what the shared code would produce behind a named legacy flag on that collection's own adapter, every flag listed in this requirement's decisions with what it preserves, so that no refactor step changes either collection's output."
       - "IF an adapter declares a legacy flag the shared modules do not know, THEN `mothman check` SHALL fail naming it."
@@ -36843,7 +36835,7 @@ requirements:
       - "LEGACY FLAGS, AS BUILT (replaces the provisional list above; REQ-PIPE-248 retires them): ten, all on Birth Registrations' adapter, each named and explained in qa_tools/tools/legacy.py. datacontract.reads_unreadable_tables, soda.reads_unreadable_tables and evidently.reads_unreadable_tables (its copies ran every check whatever the run could read and noted nothing as left out - the provisional 'no left_out.note' and 'no unrunnable results'); soda.scope_suffix (the '[scope]' check-name suffix); soda.named_check_value_is_invalid_count (one of the divergent row_count_invalid branches); evidently.volume_from_drift_frame (the RowCount snapshot in the raw output, and the rest of its single-table volume check); dbt.no_built_model_guard; dbt.audits_skipped_tests (the provisional 'no skipped status case'); dbt.no_left_out_note; stage.stamps_run_columns (run_id and run_date on every staged row, which its dbt model selects). Child Protection declares none."
       - "CRITERION 4 READ AS ONE TEST PER FLAG ON THE ONE INPUT IT CHANGES (tests/test_collections_registry.py::TestTheSharedToolModules and ::TestTheSharedStagingModule), plus, per tool, a throwaway comparison of the shared module against the runner it replaced on both fixture runs, deleted before commit: results and `verified` identical, raw output different only in fields that differ run to run (datacontract-cli's log timestamps, Soda's query counters and durations, dbt's timings). REJECTED a whole-bootstrap capture per flag: ten half-hour captures to prove what one input shows directly, with criterion 8's single capture still guarding the whole."
       - "ADAPTER DATA, NOT FLAGS, where a difference describes what a collection's checks MEAN rather than drift between two copies: Child Protection's empty Soda dimensions became SodaSpec.dimension_by_metric (an empty mapping is that collection's honest answer), its row_count_invalid branch SodaSpec.invalid_count_metrics, dbt model-level routing DbtSpec.model_level_column, and test-shape sampling DbtSpec.singular_unsampled. So the provisional list's one Child Protection flag is not a flag, and 'adapter to be confirmed at build' resolved to values on both adapters."
-      - "SUB-OBJECTS AS BUILT: .dbt, .soda and .datacontract. There is no .evidently or .staging, because neither module reads a collection-specific value other than its legacy flags - Evidently's checks come from the collection's own check file (REQ-QAC-241) - and an empty sub-object would be a name with nothing behind it; each is added when a value appears. sample_key, the one value three tools read, sits on the adapter itself rather than copied into three sub-objects. Flagged to Keith as a reading of criterion 2's list."
+      - "SUB-OBJECTS AS BUILT: .dbt, .soda and .datacontract. There is no .evidently or .staging, because neither module reads a collection-specific value other than its legacy flags - Evidently's checks come from the collection's own check file (REQ-QAC-241) - and an empty sub-object would be a name with nothing behind it; each is added when a value appears. sample_key, the one value three tools read, sits on the adapter itself rather than copied into three sub-objects. Keith chose to amend criterion 2 to say so (2026-10-16, 'Approve as written' on the exact wording now in criterion 2), over adding empty sub-objects or leaving it a recorded reading."
       - "STAGING FROM CHILD PROTECTION'S BUILDER (qa_tools/tools/stage.py), with one flag. Birth Registrations' builder also built its views without the sample-data branch, which differs only for a dataset with no agreed calendar - unreachable for Birth Registrations, which has one - so it carries no flag. The two builders' progress lines became one form, '<run>: <table>: <n> rows -> <schema>.<table>' and '<run>: staged <n> table(s)', which nothing reads; stage_arrival() returns the tables it staged for both, where Child Protection's returned a run id no caller used."
       - "A COLLECTION'S TABLES ARE ASKED OF THE HIERARCHY ON EVERY CALL, never the registry's cached view (found at build, plans/post-build-review.md): a test that swapped the hierarchy left the registry's cache stale, and the shared stager then rebuilt views over a table of an asset that no longer existed. The tests' cache helper (tests/agreement_split.py::clear_caches) now clears the registry too, which un-masked two fake hierarchies missing `short` and `run_prefix`."
       - "ALLOWLIST: the two *_common modules' entries move to REQ-PIPE-243. Once the tools and staging were shared, what still reads their ids is the orchestrators and the rebuilds, which that requirement replaces."
@@ -36878,6 +36870,9 @@ requirements:
       - "qa_tools/collections/base.py::SodaSpec"
       - "qa_tools/collections/base.py::DatacontractSpec"
       - "qa_tools/common/validate_collections.py::config_problems"
+    evidence:
+      - "2026-10-16, CRITERION 8 (REQ-TEST-239): `mothman debug equivalence compare after-241 after-242` - after-241 a full capture of ca6747b, after-242 of ec78089, this change, 7 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same. Bootstrap 1920s against 1972s, -52s (Birth Registrations 612s against 656s, Child Protection 1793s against 1852s)."
+      - "2026-10-16, CRITERION 6: no file under qa_tools/tools/ names a collection id, short or run prefix, or compares one; the one use of a run prefix passes the registry's value to arrivals.arrivals_for()."
     open_questions: []
 
   - id: REQ-PIPE-243
