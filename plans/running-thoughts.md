@@ -5462,6 +5462,6 @@ could never have computed it), and it belongs with batch 5's check work.
     code is in scope for what we're doing here"), reversing the proposal's
     significant call 9 (position.md call 22) - the CLI and TUI at ~30
     collections is part of item 6, not later work. SCOPED the same morning as
-    REQ-TEST-252 (docs/drafts/item6/requirements-draft.yaml), with Keith's
+    REQ-TEST-252 (requirements.yaml), with Keith's
     answers: N_LIST 9, the Collections/Tools help split at every size, and a
     new `mothman collections` command for the full list. Not yet signed.

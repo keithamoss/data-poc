@@ -3,7 +3,7 @@
 For Keith, morning of 2026-10-16. Scoped overnight under his mandate
 ("research, form your own view, scoper a couple of rounds, then the architect
 and the UX reviewers ... come back with a fully scoped, fully architected and
-fully reviewed proposal"). **Nothing is signed and nothing is built.**
+fully reviewed proposal"). **Nothing is signed and nothing is built.** UPDATE 2026-10-16: all twelve signed by Keith that morning (REQ-TEST-252 added, REQ-TEST-239 cut to the lean harness, REQ-DASH-244 reading the contracts) and moved into requirements.yaml; this page is the history of how they were reached.
 
 How it was made: research (`groundwork.md`) -> the main session's position ->
 delivery-scoper rounds 1 and 2 -> delivery-architect, delivery-cli-ux and
@@ -29,7 +29,7 @@ files - and Child Protection shrinks once its scenarios move.
 
 ## The requirements
 
-`docs/drafts/item6/requirements-draft.yaml` - eleven, in build order:
+`requirements.yaml` - eleven, in build order:
 
 | Id | What |
 |---|---|
