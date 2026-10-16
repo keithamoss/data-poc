@@ -124,6 +124,13 @@ releases:
               with twelve days when each day's supply was due at 22:00 the
               evening before. Arrivals just outside and right on that window
               are planted there; every later day is unchanged.
+          - headline: Collections come from one registry
+            components: ["Pipeline & publishing"]
+            description: >
+              Which collections exist is read from the hierarchy in
+              contract/data-asset.yaml, and each runs through a small adapter.
+              A new collection is picked up everywhere or refused by name, and
+              `mothman check` now fails on any code that names one directly.
           - headline: Prove a refactor changed nothing
             components: ["Testing & dev tooling"]
             description: >

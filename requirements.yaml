@@ -36656,7 +36656,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As someone adding a collection, I want every part of the system to learn the collections from one registry read from contract/data-asset.yaml, so that a new collection is either picked up everywhere or refused by name, never silently skipped or handed another collection's behaviour."
     moscow: must
-    status: in_progress
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night) and plans/data-generation.md #12 (the delivery-architect's dispatch findings); main session position.md calls 1, 4, 10, 18, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL declare on each collection in contract/data-asset.yaml's hierarchy a `short` and a `run_prefix` - bdm and run_ for Civil Registration, cp and cp_run_ for Child Protection."
@@ -36684,6 +36684,37 @@ requirements:
     dependencies:
       - REQ-TEST-239
       - REQ-QAC-039
+    linked_tests:
+      - tests/test_collections_registry.py::TestTheRegistry
+      - tests/test_collections_registry.py::TestAThirdCollectionAtEverySite
+      - tests/test_collections_registry.py::TestTheConfigurationGate
+      - tests/test_collections_registry.py::TestTheLiteralGate
+      - tests/test_bootstrap.py
+      - tests/test_checkpoints.py
+      - tests/test_processing_pass.py
+      - tests/test_recheck.py
+      - tests/test_ticket_sync.py
+    implemented_by:
+      - qa_tools/collections/__init__.py::all_collections
+      - qa_tools/collections/__init__.py::resolve
+      - qa_tools/collections/__init__.py::adapter
+      - qa_tools/collections/base.py::CollectionAdapter
+      - qa_tools/collections/civil_registration.py::ADAPTER
+      - qa_tools/collections/child_protection.py::ADAPTER
+      - qa_tools/common/validate_collections.py::config_problems
+      - qa_tools/common/validate_collections.py::literal_problems
+      - qa_tools/common/validate_collections.py::ALLOWLIST
+      - qa_tools/common/processing_pass.py::all_arrivals
+      - qa_tools/common/recheck.py::execute
+      - qa_tools/common/checkpoints.py::copy_for_resume
+      - qa_tools/common/bootstrap.py::bootstrap
+      - qa_tools/common/ticket_sync.py::_load_scopes
+      - qa_tools/common/schemas.py::CollectionConfig
+      - contract/data-asset.yaml
+    evidence:
+      - "2026-10-16, CRITERION 12 (REQ-TEST-239): `mothman debug equivalence compare self-check-a after-240` - self-check-a a full capture of 66efd5d, the commit before this change, after-240 a full capture of 0e5bacf, this change, 3 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same, exit 0."
+      - "2026-10-16, BOOTSTRAP TIME: after-240 1964s (Birth Registrations 641s, Child Protection 1841s). Against self-check-a (1756s) +208s, just over the self-check's +179s noise; against self-check-b (1935s), the other capture of the same unchanged commit, +29s. The two captures of one commit spanned 1756s to 1935s and after-240 sits 29s above that range, so this is read as noise rather than a per-run cost - the registry is read once per process and cached."
+      - "2026-10-16, tests/test_collections_registry.py 41 passed; with the five rewired sites' own modules 415 passed; mothman check --no-pytest exited 0, the new collections gate reporting 34 files on the allowlist."
     decisions:
       - "SHAPE (main session, position.md call 1, delegated): shared per-tool modules built from Child Protection's N-table code, a registry derived from contract/data-asset.yaml, one QA adapter module per collection behind a CollectionAdapter Protocol, one COLLECTION_DATA const in the dashboard. REJECTED config-only with no Python, and fixing only the dispatch points (Keith, 2026-10-15: 'small adapter per collection'). REJECTED the delivery-architect's registry plus copied runners (offered to Keith and declined, plans/data-generation.md #12 Q1)."
       - "SHORT AND RUN_PREFIX ARE DECLARED, NOT DERIVED (position.md call 4): deriving them would rename every recorded Birth Registrations run."
