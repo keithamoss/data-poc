@@ -124,6 +124,13 @@ releases:
               with twelve days when each day's supply was due at 22:00 the
               evening before. Arrivals just outside and right on that window
               are planted there; every later day is unchanged.
+          - headline: One runner per QA tool, for every collection
+            components: ["Pipeline & publishing"]
+            description: >
+              dbt, Soda, datacontract-cli and Evidently each run through one
+              shared module, and every supply is staged by one more, reading
+              what differs from the collection's adapter. Ten copied modules
+              are gone, and both collections record exactly what they did.
           - headline: Every collection's checks live in its agency's folder
             components: ["QA checks & contract"]
             description: >

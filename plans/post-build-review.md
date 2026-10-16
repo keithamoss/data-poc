@@ -10029,3 +10029,25 @@ twice. It deliberately did not re-find the `TypeError`.
      coverage never treats as a source file; the same report now raises
      nothing. Missed locally because the full gate runs pytest without
      coverage. Minor, so fixed under Keith's polish rule.
+
+
+217. **[done, 2026-10-16]** **[Testing & dev tooling]** **The tests' cache
+     helper never cleared the collection registry, so a swapped hierarchy
+     outlived its test.** Found while building REQ-QAC-242, before anything
+     was pushed. `tests/agreement_split.py::clear_caches()` predates
+     REQ-PIPE-240 and cleared the hierarchy's cache but not the registry's,
+     which is built from it. A test that swapped in a smaller asset left
+     the registry holding that asset for the rest of its worker. The first
+     shared stager read a collection's tables from the registry, so
+     `test_build_warehouses_rebuild.py`'s Child Protection test failed
+     whenever it ran after `test_sample_data.py` on the same worker: it
+     rebuilt views over `cp_referrals`, a table only the earlier test's
+     asset had. Two fixes. The stager asks the hierarchy on every call, as
+     the builder it replaced did, because a dataset graduating out of
+     sample data is a configuration change a running process must see. And
+     the helper now clears the registry too. That un-masked two fake
+     hierarchies in `test_sample_data.py` and `test_no_calendar.py` that
+     had never declared `short` or `run_prefix`: they had only ever been
+     read through the stale real registry. Both now declare them. The
+     failing ordering reproduced before the fix and passes after it.
+     Minor and test-side, so fixed under Keith's polish rule.

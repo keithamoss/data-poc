@@ -350,10 +350,10 @@ requirements:
         the kind catches them.'
     implemented_by:
     - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
-    - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
-    - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
-    - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
-    - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
+    - qa_tools/tools/run_dbt.py::evaluate
+    - qa_tools/tools/run_soda.py::evaluate
+    - qa_tools/tools/run_datacontract.py::evaluate
+    - qa_tools/tools/run_evidently.py::evaluate
     - dbt_project/models/civil-registration/schema.yml
     - contract/registry-services/bdm-birth-registrations-contract.yaml
     - contract/registry-services/bdm-birth-registrations-soda-checks.yml
@@ -416,10 +416,10 @@ requirements:
         the kind catches them.'
     implemented_by:
     - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
-    - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
-    - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
-    - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
-    - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
+    - qa_tools/tools/run_dbt.py::evaluate
+    - qa_tools/tools/run_soda.py::evaluate
+    - qa_tools/tools/run_datacontract.py::evaluate
+    - qa_tools/tools/run_evidently.py::evaluate
     - contract/child-protection-family-support/child-protection-contract.yaml
     - contract/child-protection-family-support/child-protection-soda-checks.yml
     - qa_tools/common/soda_common.py::unreported_checks
@@ -1149,8 +1149,7 @@ requirements:
       - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
       - cli/supply.py::tidy_command
       - qa_tools/common/supply_db.py::connect_dbt
-      - qa_tools/bdm/build_per_run_warehouses.py::build_one
-      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+      - qa_tools/tools/stage.py::stage_table
     evidence:
       - >-
         2026-09-25: the migration was proved BEHAVIOUR-PRESERVING
@@ -1950,8 +1949,7 @@ requirements:
       - qa_tools/common/check_lifecycle.py::contract_rule_attachments
       - qa_tools/common/check_lifecycle.py::name_by_check_id
       - qa_tools/common/validate_check_lifecycle.py::_check_id_errors
-      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
-      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
+      - qa_tools/tools/run_datacontract.py::evaluate
       - contract/child-protection-family-support/child-protection-contract.yaml
       - contract/registry-services/bdm-birth-registrations-contract.yaml
     evidence:
@@ -6411,8 +6409,7 @@ requirements:
       - generator/generate_runs.py::_write_bookkeeping
       - generator/generate_cp_runs.py::_write_bookkeeping
       - qa_tools/bdm/dataset_stats.py::_arrival_record
-      - qa_tools/bdm/build_per_run_warehouses.py::build_all
-      - qa_tools/cp/build_cp_warehouses.py::build_all
+      - qa_tools/tools/stage.py::build_all
       - cli/bdm.py::load_manifest
       - cli/cp.py::load_manifest
       - cli/debug.py::capture_arrival_golden_command
@@ -10047,8 +10044,7 @@ requirements:
       - qa_tools/common/supply_db.py::staged_table
       - qa_tools/common/supply_db.py::candidates_in
       - qa_tools/common/supply_db.py::expected_tables
-      - qa_tools/bdm/build_per_run_warehouses.py::build_one
-      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+      - qa_tools/tools/stage.py::stage_table
       - cli/supply.py::load_command
       - cli/supply.py::failures_command
     evidence:
@@ -17873,14 +17869,10 @@ requirements:
       - tests/test_run_evidently_bdm.py
       - tests/test_run_evidently_cp.py
     implemented_by:
-      - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
-      - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
-      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
-      - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
-      - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
-      - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
-      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
-      - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
+      - qa_tools/tools/run_dbt.py::evaluate
+      - qa_tools/tools/run_soda.py::evaluate
+      - qa_tools/tools/run_datacontract.py::evaluate
+      - qa_tools/tools/run_evidently.py::evaluate
     evidence:
       - >
         2026-09-27: 28 tests pass across all eight real-tool modules -
@@ -19996,8 +19988,8 @@ requirements:
     - qa_tools/common/qa_results_reader.py::read_file_results
     - qa_tools/common/load_log.py::record
     - qa_tools/common/promotion.py::status_of
-    - qa_tools/bdm/build_per_run_warehouses.py::build_one
-    - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    - qa_tools/tools/stage.py::stage_table
+    - qa_tools/tools/stage.py::stage_table
     linked_tests:
     - tests/test_file_checks.py
     - tests/test_staging_loads.py
@@ -21321,18 +21313,16 @@ requirements:
       - tests/test_generate_cp_runs.py
       - tests/test_generate_runs.py
     implemented_by:
-      - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
-      - qa_tools/cp/build_cp_warehouses.py::build_all
-      - qa_tools/cp/run_evidently_cp.py::_current_frame
-      - qa_tools/cp/run_evidently_cp.py::_reference_frame
+      - qa_tools/tools/stage.py::stage_table
+      - qa_tools/tools/stage.py::build_all
+      - qa_tools/tools/run_evidently.py::_current_frame
+      - qa_tools/tools/run_evidently.py::_reference_frame
       - qa_tools/common/supply_db.py::arrival_segment
       - cli/cp.py::arrival_path
       - cli/cp.py::has_arrival
       - generator/generate_cp_runs.py::main
       - generator/generate_runs.py::main
       - qa_tools/common/supply_db.py::_bounded
-      - qa_tools/bdm/run_evidently_bdm.py::_current_frame
-      - qa_tools/bdm/run_evidently_bdm.py::_reference_frame
       - qa_tools/bdm/orchestrate_bdm.py::run_single
       - cli/bdm.py::run_check_local_file
     evidence:
@@ -21626,8 +21616,8 @@ requirements:
     - cli/cp.py::run_check_single_table
     - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
     - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
-    - qa_tools/bdm/build_per_run_warehouses.py::build_one
-    - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    - qa_tools/tools/stage.py::stage_table
+    - qa_tools/tools/stage.py::stage_table
     - qa_tools/common/delivery_log.py::_stated_instant
     evidence:
     - '2026-10-04 (overnight sprint 5): criteria 9 to 20 built and tested in tests/test_stated_original_arrival.py
@@ -22947,8 +22937,8 @@ requirements:
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_one
       - qa_tools/common/dataset_status.py::in_no_rollup
-      - qa_tools/cp/build_cp_warehouses.py::_build_run_views
-      - qa_tools/bdm/build_per_run_warehouses.py::build_one
+      - qa_tools/tools/stage.py::_build_run_views
+      - qa_tools/tools/stage.py::stage_table
       - pipeline/build_cp_dashboard_data.py::share_cross_table_results
       - dashboard/qa-reporting-dashboard.template.html
       - cli/supply.py::discard_sample_command
@@ -23479,9 +23469,9 @@ requirements:
     - qa_tools/common/filing.py::period_of
     - qa_tools/common/evidently_common.py::status_for
     - qa_tools/common/evidently_common.py::recorded_row_counts
-    - qa_tools/cp/run_evidently_cp.py::_volume_results
-    - qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp
-    - qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm
+    - qa_tools/tools/run_evidently.py::_volume_per_table
+    - qa_tools/tools/run_evidently.py::evaluate
+    - qa_tools/tools/run_evidently.py::evaluate
     - qa_tools/common/drift_reference.py::assess
     - qa_tools/common/drift_reference.py::judge
     - qa_tools/common/drift_reference.py::reference_note
@@ -27897,7 +27887,7 @@ requirements:
     - qa_tools/common/qa_results_writer.py::scope_of_run
     - qa_tools/common/unrunnable.py::results_for
     - qa_tools/common/soda_common.py::left_out_checks
-    - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
+    - qa_tools/tools/run_dbt.py::evaluate
     - qa_tools/cp/orchestrate_cp.py::_run_one_inner
     - qa_tools/bdm/orchestrate_bdm.py::_run_one_inner
     - dashboard/qa-reporting-dashboard.template.html::blockerOpenInPlaceOn
@@ -31002,8 +30992,8 @@ requirements:
     - qa_tools/common/dataset_blockers.py::all_blockers
     - qa_tools/common/own_table.py::why_unreadable
     - qa_tools/common/unrunnable.py::results_for
-    - qa_tools/bdm/build_per_run_warehouses.py::build_one
-    - qa_tools/cp/build_cp_warehouses.py::add_table_to_run
+    - qa_tools/tools/stage.py::stage_table
+    - qa_tools/tools/stage.py::stage_table
     - dashboard/qa-reporting-dashboard.template.html::blockerOpenInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
     - cli/supply.py::failures_command
@@ -31222,8 +31212,8 @@ requirements:
     - qa_tools/common/qa_store.py::ensure_schema
     - qa_tools/common/processing_pass.py::unprocessed
     - qa_tools/common/bootstrap.py::bootstrap
-    - qa_tools/bdm/build_per_run_warehouses.py::stage_arrival
-    - qa_tools/cp/build_cp_warehouses.py::stage_arrival
+    - qa_tools/tools/stage.py::stage_arrival
+    - qa_tools/tools/stage.py::stage_arrival
     - cli/pipeline.py::process_command
     - cli/pipeline.py::run_process
     - cli/pipeline.py::run_command
@@ -32893,9 +32883,8 @@ requirements:
     implemented_by:
       - qa_tools/common/dbt_common.py::parsed_test_nodes
       - qa_tools/common/dbt_common.py::selection
-      - qa_tools/cp/run_dbt_cp.py::evaluate_dbt_cp
-      - qa_tools/bdm/run_dbt_bdm.py::evaluate_dbt_bdm
-      - qa_tools/bdm/run_dbt_bdm.py::_check_id_for
+      - qa_tools/tools/run_dbt.py::evaluate
+      - qa_tools/tools/run_dbt.py::_check_id_for
     evidence:
       - "2026-10-12: tests/test_dbt_scoped.py - real dbt over the dirty fixture, whole collection then scoped, for notifications, placements, carers and Birth Registrations: every in-scope record identical field for field, failing samples and audit re-counts included, and no test outside the scope ran (c1, c2, c4); a test reading an unreadable table is left out and reported (c3); the project is parsed once while unchanged (c5)."
       - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c6)"
@@ -32944,8 +32933,7 @@ requirements:
       - qa_tools/common/datacontract_common.py::selection_for
       - qa_tools/common/datacontract_common.py::run_against_warehouse
       - qa_tools/common/check_lifecycle.py::odcs_quality_id
-      - qa_tools/cp/run_datacontract_cp.py::evaluate_datacontract_cp
-      - qa_tools/bdm/run_datacontract_bdm.py::evaluate_datacontract_bdm
+      - qa_tools/tools/run_datacontract.py::evaluate
     evidence:
       - "2026-10-12: tests/test_datacontract_scoped.py - all 89 quality rules carry their id (c1); a missing or different id fails the lifecycle parse naming the rule (c2); scoped by quality_ids, narrowed by schema_name where every rule sits on one model, with identical records to the whole contract for three Child Protection tables and Birth Registrations (c3); neither option for a run naming no table (c5); the contract handed is the committed one plus the server (c6); an unknown id refuses (c7); a rule over an unreadable table is left out and reported (c8)."
       - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c9)"
@@ -32986,8 +32974,7 @@ requirements:
       - tests/test_run_soda_cp.py
     implemented_by:
       - qa_tools/common/soda_common.py::readable_checks_yaml
-      - qa_tools/cp/run_soda_cp.py::evaluate_soda_cp
-      - qa_tools/bdm/run_soda_bdm.py::evaluate_soda_bdm
+      - qa_tools/tools/run_soda.py::evaluate
     evidence:
       - "2026-10-12: tests/test_soda_scoped.py - only the asked checks are handed, removed by check id, and a section left empty is dropped (c1); identical in-scope records scoped and whole for three Child Protection tables and Birth Registrations; an unreported handed check is recorded red and nothing outside the scope is counted (c2)."
       - "2026-10-12, two bootstraps from empty into fresh databases on this sandbox, same day, nothing else running: f92d26c (the commit before, carrying the Soda sample fix Keith asked to land first) and the scoped tree. 162 runs each - 159 arrival runs, 0 re-check runs, 3 readers-only runs - and 8,633 recorded results each, identical by tests/equiv_support.snapshot except qa.delivery_file.receipt_sequence (#85), the schema version (37 vs 38), qa.asked_check (present only after, as allowed) and decision ids: qa.decision's serial ids follow how the two collections' parallel processes interleave, so the three readers-only runs name decision 116/117/119 before and 89/91/95 after. Read as the decision each id names (dataset, action, supply, effective time) every run and every result is identical. (c3)"
@@ -35895,9 +35882,9 @@ requirements:
     - 'qa_tools/common/validate_check_lifecycle.py::_by_source_file'
     - 'qa_tools/common/evidently_common.py::status_for'
     - 'qa_tools/common/check_bands.py::evidently_bounds'
-    - 'qa_tools/bdm/run_evidently_bdm.py::evaluate_evidently_bdm'
-    - 'qa_tools/cp/run_evidently_cp.py::evaluate_evidently_cp'
-    - 'qa_tools/cp/run_evidently_cp.py::_volume_results'
+    - 'qa_tools/tools/run_evidently.py::evaluate'
+    - 'qa_tools/tools/run_evidently.py::evaluate'
+    - 'qa_tools/tools/run_evidently.py::_volume_per_table'
     evidence:
     - 'tests/test_validate_check_lifecycle.py (seven new tests, run 2026-10-14; the five gate tests each assert the only failures are changelog ones, so no fixture passes on another gate''s refusal): an unexplained edit to a macro fails naming the file once and every check its test type backs, and no other; a singular test''s SQL edit fails naming that check alone; a singular test covers the project macros its SQL uses; a Soda expression change fails without a changelog entry and passes with one; an Evidently threshold change fails naming that check alone; every real Evidently check carries its column, method and bands; the runners judge by the entry. Four of the five gate tests and both Evidently tests failed on the code before the change.'
     - 'Run against the real repository on 2026-10-14: 307 checks pass the gate with the new definition hash (the formula applies to both sides of the comparison, so nothing reads as changed), and 11 checks carry project SQL in their hash - matches_regex.sql behind 6. A real one-line edit to dbt_project/macros/matches_regex.sql failed the gate with one message naming the file and its 6 checks; reverted.'
@@ -36853,6 +36840,44 @@ requirements:
       - "PER-TOOL SUB-OBJECTS (round-4 call 28): an adapter is .dbt, .soda, .datacontract, .evidently, .staging (here), .stats (REQ-PIPE-243) and .present (REQ-DASH-244), so each shared module reads only its own part."
       - "THE dbt RUNNER SCOPES BY THE ADAPTER'S TABLE SET (round-4 call 28), relying on REQ-QAC-241's per-collection folders."
       - "TESTS FOLLOW THE CODE (position.md call 11)."
+      - "LEGACY FLAGS, AS BUILT (replaces the provisional list above; REQ-PIPE-248 retires them): ten, all on Birth Registrations' adapter, each named and explained in qa_tools/tools/legacy.py. datacontract.reads_unreadable_tables, soda.reads_unreadable_tables and evidently.reads_unreadable_tables (its copies ran every check whatever the run could read and noted nothing as left out - the provisional 'no left_out.note' and 'no unrunnable results'); soda.scope_suffix (the '[scope]' check-name suffix); soda.named_check_value_is_invalid_count (one of the divergent row_count_invalid branches); evidently.volume_from_drift_frame (the RowCount snapshot in the raw output, and the rest of its single-table volume check); dbt.no_built_model_guard; dbt.audits_skipped_tests (the provisional 'no skipped status case'); dbt.no_left_out_note; stage.stamps_run_columns (run_id and run_date on every staged row, which its dbt model selects). Child Protection declares none."
+      - "CRITERION 4 READ AS ONE TEST PER FLAG ON THE ONE INPUT IT CHANGES (tests/test_collections_registry.py::TestTheSharedToolModules and ::TestTheSharedStagingModule), plus, per tool, a throwaway comparison of the shared module against the runner it replaced on both fixture runs, deleted before commit: results and `verified` identical, raw output different only in fields that differ run to run (datacontract-cli's log timestamps, Soda's query counters and durations, dbt's timings). REJECTED a whole-bootstrap capture per flag: ten half-hour captures to prove what one input shows directly, with criterion 8's single capture still guarding the whole."
+      - "ADAPTER DATA, NOT FLAGS, where a difference describes what a collection's checks MEAN rather than drift between two copies: Child Protection's empty Soda dimensions became SodaSpec.dimension_by_metric (an empty mapping is that collection's honest answer), its row_count_invalid branch SodaSpec.invalid_count_metrics, dbt model-level routing DbtSpec.model_level_column, and test-shape sampling DbtSpec.singular_unsampled. So the provisional list's one Child Protection flag is not a flag, and 'adapter to be confirmed at build' resolved to values on both adapters."
+      - "SUB-OBJECTS AS BUILT: .dbt, .soda and .datacontract. There is no .evidently or .staging, because neither module reads a collection-specific value other than its legacy flags - Evidently's checks come from the collection's own check file (REQ-QAC-241) - and an empty sub-object would be a name with nothing behind it; each is added when a value appears. sample_key, the one value three tools read, sits on the adapter itself rather than copied into three sub-objects. Flagged to Keith as a reading of criterion 2's list."
+      - "STAGING FROM CHILD PROTECTION'S BUILDER (qa_tools/tools/stage.py), with one flag. Birth Registrations' builder also built its views without the sample-data branch, which differs only for a dataset with no agreed calendar - unreachable for Birth Registrations, which has one - so it carries no flag. The two builders' progress lines became one form, '<run>: <table>: <n> rows -> <schema>.<table>' and '<run>: staged <n> table(s)', which nothing reads; stage_arrival() returns the tables it staged for both, where Child Protection's returned a run id no caller used."
+      - "A COLLECTION'S TABLES ARE ASKED OF THE HIERARCHY ON EVERY CALL, never the registry's cached view (found at build, plans/post-build-review.md): a test that swapped the hierarchy left the registry's cache stale, and the shared stager then rebuilt views over a table of an asset that no longer existed. The tests' cache helper (tests/agreement_split.py::clear_caches) now clears the registry too, which un-masked two fake hierarchies missing `short` and `run_prefix`."
+      - "ALLOWLIST: the two *_common modules' entries move to REQ-PIPE-243. Once the tools and staging were shared, what still reads their ids is the orchestrators and the rebuilds, which that requirement replaces."
+      - "CRITERION 8'S 'COMMIT BEFORE THIS CHANGE' is the after-241 capture (ca6747b): this change was built across several checkpoint commits, and the commit before its first is REQ-QAC-241's last."
+    linked_tests:
+      - "tests/test_collections_registry.py::TestTheSharedToolModules"
+      - "tests/test_collections_registry.py::TestTheSharedStagingModule"
+      - "tests/test_run_dbt_bdm.py"
+      - "tests/test_run_dbt_cp.py"
+      - "tests/test_run_soda_bdm.py"
+      - "tests/test_run_soda_cp.py"
+      - "tests/test_run_datacontract_bdm.py"
+      - "tests/test_run_datacontract_cp.py"
+      - "tests/test_run_evidently_bdm.py"
+      - "tests/test_run_evidently_cp.py"
+      - "tests/test_dbt_scoped.py"
+      - "tests/test_soda_scoped.py"
+      - "tests/test_datacontract_scoped.py"
+      - "tests/test_staging_loads.py"
+      - "tests/test_build_warehouses_rebuild.py"
+      - "tests/test_cli_debug.py"
+    implemented_by:
+      - "qa_tools/tools/run_dbt.py::evaluate"
+      - "qa_tools/tools/run_soda.py::evaluate"
+      - "qa_tools/tools/run_datacontract.py::evaluate"
+      - "qa_tools/tools/run_evidently.py::evaluate"
+      - "qa_tools/tools/stage.py::stage_table"
+      - "qa_tools/tools/stage.py::stage_arrival"
+      - "qa_tools/tools/stage.py::build_all"
+      - "qa_tools/tools/legacy.py::KNOWN"
+      - "qa_tools/collections/base.py::DbtSpec"
+      - "qa_tools/collections/base.py::SodaSpec"
+      - "qa_tools/collections/base.py::DatacontractSpec"
+      - "qa_tools/common/validate_collections.py::config_problems"
     open_questions: []
 
   - id: REQ-PIPE-243

@@ -73,10 +73,11 @@ ALLOWLIST: dict[str, str] = {
     # The lifecycle gate's legacy reader, for a base ref from before
     # REQ-QAC-241 moved every check file - deleted with it.
     "qa_tools/common/validate_check_lifecycle.py": "REQ-PIPE-248",
-    # One shared module per QA tool, and one staging module.
-    "qa_tools/bdm/bdm_common.py": "REQ-QAC-242",
-    "qa_tools/cp/cp_common.py": "REQ-QAC-242",
-    # One shared orchestrator, dataset-stats computation and rebuild.
+    # One shared orchestrator, dataset-stats computation and rebuild. The two
+    # *_common modules were REQ-QAC-242's; once the tools and staging were
+    # shared, what still reads their ids is the orchestrators and rebuilds.
+    "qa_tools/bdm/bdm_common.py": "REQ-PIPE-243",
+    "qa_tools/cp/cp_common.py": "REQ-PIPE-243",
     "qa_tools/bdm/orchestrate_bdm.py": "REQ-PIPE-243",
     "qa_tools/cp/orchestrate_cp.py": "REQ-PIPE-243",
     "qa_tools/cp/dataset_stats.py": "REQ-PIPE-243",
