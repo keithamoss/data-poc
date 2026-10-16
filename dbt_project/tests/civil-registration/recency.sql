@@ -9,7 +9,7 @@
 -- have the same fix, same reason.
 --
 -- Each run's own DuckDB warehouse holds only that run's own batch
--- (see qa_tools/tools/run_dbt.py's own docstring), and stg_birth_registrations
+-- (see run_dbt_bdm.py's own docstring), and stg_birth_registrations
 -- already carries date_registered as a real column - daily_batch.py
 -- sets it to exactly this run's own run_date for every row (its own
 -- comment: "this run's registrations cluster on run_date"). So "is

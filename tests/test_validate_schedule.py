@@ -777,11 +777,14 @@ class TestTheDiffBase:
     on top, and neither gate sees it.
     """
 
-    def test_it_falls_back_when_nothing_is_configured(self, monkeypatch):
+    def test_it_falls_back_when_nothing_is_configured(self, monkeypatch, tmp_path):
+        """Asked of a directory with no upstream to compare against - a
+        local branch with one compares against it instead (tests/
+        test_diff_base.py)."""
         from qa_tools.common import diff_base
 
         monkeypatch.delenv("MOTHMAN_DIFF_BASE", raising=False)
-        assert diff_base.diff_base() == "HEAD~1"
+        assert diff_base.diff_base(root=tmp_path) == "HEAD~1"
 
     def test_it_uses_a_configured_ref_that_resolves(self, monkeypatch):
         # HEAD rather than an ancestor: `actions/checkout@v4` defaults
@@ -796,14 +799,14 @@ class TestTheDiffBase:
         monkeypatch.setenv("MOTHMAN_DIFF_BASE", "HEAD")
         assert diff_base.diff_base() == "HEAD"
 
-    def test_it_falls_back_when_the_configured_ref_does_not_resolve(self, monkeypatch):
+    def test_it_falls_back_when_the_configured_ref_does_not_resolve(self, monkeypatch, tmp_path):
         """A first push sets the before-SHA to all zeros, and a shallow
         checkout cannot reach an older one. Neither is a finding, and
         neither should crash the gate."""
         from qa_tools.common import diff_base
 
         monkeypatch.setenv("MOTHMAN_DIFF_BASE", "0" * 40)
-        assert diff_base.diff_base() == "HEAD~1"
+        assert diff_base.diff_base(root=tmp_path) == "HEAD~1"
 
     # The function existing is not the fix. The defect was that both
     # gates named their own ref - one as a parameter default, one as a

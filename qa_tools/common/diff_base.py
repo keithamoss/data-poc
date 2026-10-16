@@ -31,14 +31,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 
 #: CI sets this to the commit the push started from
-#: (`github.event.before`). Unset locally, where HEAD~1 is what a
-#: person comparing against "before my change" means anyway.
+#: (`github.event.before`). Unset locally, where the branch's upstream is
+#: what the push will be judged against - see diff_base().
 ENV_VAR = "MOTHMAN_DIFF_BASE"
 
 FALLBACK = "HEAD~1"
 
 
-def _resolves(ref: str) -> bool:
+def _resolves(ref: str, root: Path | None = None) -> bool:
     """True if `ref` names a commit this checkout can actually read.
 
     Checked rather than assumed, because the two ways it legitimately
@@ -49,10 +49,10 @@ def _resolves(ref: str) -> bool:
     """
     return subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
-        cwd=ROOT, capture_output=True, text=True).returncode == 0
+        cwd=root or ROOT, capture_output=True, text=True).returncode == 0
 
 
-def diff_base(fallback: str = FALLBACK) -> str:
+def diff_base(fallback: str = FALLBACK, root: Path | None = None) -> str:
     """The ref to compare against - the push's base where CI says so,
     `HEAD~1` otherwise.
 
@@ -63,11 +63,23 @@ def diff_base(fallback: str = FALLBACK) -> str:
     would turn every first push of a branch red.
     """
     ref = (os.environ.get(ENV_VAR) or "").strip()
-    if ref and _resolves(ref):
+    if ref and _resolves(ref, root):
         return ref
     # INSIDE A PRE-COMMIT HOOK the staged content is what is about to become
     # history, so "before my change" is HEAD itself (REQ-PIPE-111 criterion
     # 13). pre-commit sets PRE_COMMIT=1 for every hook it runs.
-    if os.environ.get("PRE_COMMIT") == "1" and _resolves("HEAD"):
+    if os.environ.get("PRE_COMMIT") == "1" and _resolves("HEAD", root):
         return "HEAD"
+    # LOCALLY, WHERE THE PUSH WILL START FROM (plans/post-build-review.md
+    # #218): work committed as several local checkpoints and then gated
+    # used to be compared against HEAD~1 only, which already held any edit
+    # made in an earlier checkpoint - the multi-commit hole above, at the
+    # desk instead of in CI. The merge base with the upstream is the
+    # commit CI will be handed as `github.event.before`. Asked of `root`,
+    # the repository the calling gate reads, which a test may point elsewhere.
+    upstream = subprocess.run(
+        ["git", "merge-base", "HEAD", "@{upstream}"],
+        cwd=root or ROOT, capture_output=True, text=True)
+    if upstream.returncode == 0 and upstream.stdout.strip():
+        return upstream.stdout.strip()
     return fallback

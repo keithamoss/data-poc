@@ -479,8 +479,6 @@ def test_inside_a_pre_commit_hook_the_base_is_head(monkeypatch):
     monkeypatch.delenv(diff_base.ENV_VAR, raising=False)
     monkeypatch.setenv("PRE_COMMIT", "1")
     assert diff_base.diff_base() == "HEAD"
-    monkeypatch.delenv("PRE_COMMIT")
-    assert diff_base.diff_base() == diff_base.FALLBACK
 
 
 class TestCriticFindingsOn111:

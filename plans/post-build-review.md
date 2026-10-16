@@ -10051,3 +10051,27 @@ twice. It deliberately did not re-find the `TypeError`.
      read through the stale real registry. Both now declare them. The
      failing ordering reproduced before the fix and passes after it.
      Minor and test-side, so fixed under Keith's polish rule.
+
+
+218. **[done, 2026-10-16]** **[Testing & dev tooling]** **A local gate compared
+     against the previous commit, not against what the push would be judged
+     against.** CI's validate-config run on 81b4ce2 failed: the check-lifecycle
+     gate found `recency_dbt`'s definition changed with no changelog entry. My
+     REQ-QAC-242 docs sweep had edited a comment in
+     `dbt_project/tests/civil-registration/recency.sql`, and a singular test's
+     hash covers its whole SQL text, comments included. The full local gate
+     passed beforehand because `diff_base()` falls back to `HEAD~1` when CI's
+     `MOTHMAN_DIFF_BASE` is unset, and the work had been committed as several
+     local checkpoints (rule D), so `HEAD~1` already held the edit. That is the
+     multi-commit hole #44 closed for CI, reopened at the desk. Two fixes. The
+     comment edit is reverted rather than given a changelog entry, because it
+     changed nothing the check does. And `diff_base()` now compares, locally,
+     against the merge base with the branch's upstream, which is the commit CI
+     is handed as `github.event.before`, falling back to `HEAD~1` only where
+     there is no upstream. Each gate passes its own repository root, because
+     tests point the gates at temporary repositories. Test-first:
+     `tests/test_diff_base.py` failed against the old code (two local commits
+     ahead of an upstream came back as `HEAD~1`) and passes now. Reproduced the
+     CI failure locally with `MOTHMAN_DIFF_BASE=b5253dd` before the revert, and
+     the same command passes after it. Minor and in a gate, so fixed under
+     Keith's polish rule.

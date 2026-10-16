@@ -405,7 +405,7 @@ def test_a_contract_from_before_rule_ids_is_still_read_as_the_old_side(tmp_path,
     monkeypatch.setattr(vcl, "ROOT", repo)
     _use_sources(monkeypatch, [("contract.yaml", vcl.cl.parse_contract_check_metadata)],
                  [])
-    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD")
 
     today = (Path(__file__).resolve().parent.parent / "contract" / "child-protection-family-support"
              / "child-protection-contract.yaml").read_text()
@@ -540,7 +540,7 @@ def test_a_singular_test_also_covers_the_project_macros_its_sql_uses(tmp_path, m
         "{% macro clean_name(c) %} lower(trim({{ c }})) {% endmacro %}\n")
     _commit(repo, "change the helper macro, no changelog")
 
-    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
     assert vcl.main() == 1
     err = capsys.readouterr().err
     _only_changelog_errors(err)
@@ -619,7 +619,7 @@ def test_a_soda_expression_change_fails_without_a_changelog_entry_and_passes_wit
     (repo / "soda.yml").write_text(soda(
         "row_count > 10", changelog='[{"date": "2026-10-14", "change": "Tightened to 10."}]'))
     _commit(repo, "add the changelog entry")
-    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~2")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~2")
     assert vcl.main() == 0
 
 
@@ -688,7 +688,7 @@ def test_moving_a_singular_test_into_a_collections_folder_is_not_a_change(
     _git(repo, "mv", "dbt_project/tests/sibling_rule.sql",
          "dbt_project/tests/civil-registration/sibling_rule.sql")
     _commit(repo, "file the test under its collection")
-    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
     assert vcl.main() == 0, capsys.readouterr().err
 
 
@@ -745,7 +745,7 @@ def test_a_base_ref_from_before_the_move_reads_as_no_change(tmp_path, monkeypatc
 
     monkeypatch.setattr(vcl, "ROOT", repo)
     monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", repo / "contract" / "data-asset.yaml")
-    monkeypatch.setattr(vcl, "diff_base", lambda: "HEAD~1")
+    monkeypatch.setattr(vcl, "diff_base", lambda **_: "HEAD~1")
     old, new = vcl.collect_checks("HEAD~1"), vcl.collect_checks(None)
     evidently = [c for c in old if c.tool == "evidently"]
     assert evidently and all(c.source_file.endswith(".py") for c in evidently), \

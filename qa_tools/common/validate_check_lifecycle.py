@@ -418,7 +418,7 @@ def main(require_explanations: bool = False) -> int:
     # only ever be checked on its last one, and every retroactive edit
     # underneath it would pass unread. See qa_tools/common/diff_base.py
     # (plans/post-build-review.md #44).
-    base = diff_base()
+    base = diff_base(root=ROOT)
     old_checks = collect_checks(base)
     new_checks = collect_checks(None)
     errors = _by_source_file(cl.validate(old_checks, new_checks), old_checks, new_checks, base)

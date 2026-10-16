@@ -857,7 +857,7 @@ def _freeze_errors(raw: dict, cal_raw: dict, src: Source,
 
     from qa_tools.common import agreement_freeze as freeze
 
-    ref = ref or diff_base()
+    ref = ref or diff_base(root=ROOT)
     cal_path, asset_path = src.agreement_path, src.asset_path
 
     def rel(path: Path) -> str | None:
@@ -972,7 +972,7 @@ def _amber_setting_errors(raw: dict, src: Source, today: date | None = None,
         "Give each version its own effective_from, and keep a data-asset-level version "
         "in effect - there is no default.")
         for where, problem in module.standing_problems(raw, today)]
-    ref = ref or diff_base()
+    ref = ref or diff_base(root=ROOT)
     previous = _content_at(str(src.asset_path.relative_to(ROOT)), ref) \
         if src.asset_path.is_relative_to(ROOT) else None
     if previous is None:

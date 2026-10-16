@@ -595,9 +595,10 @@ def preview(ref: str | None = None, *, at: datetime | None = None) -> str:
     from datetime import UTC
 
     from qa_tools.common import supply_db
+    from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
 
-    ref = ref or diff_base()
+    ref = ref or diff_base(root=validate_schedule.ROOT)
     at = at or datetime.now(UTC)
     base, work = at_ref(ref), working()
     with supply_db.connect(read_only=True, label="mothman:correction-preview") as conn:
@@ -612,10 +613,11 @@ def draft(ref: str | None = None, **given) -> list[str]:
     from datetime import UTC
 
     from qa_tools.common import agreement_freeze, asset_time, config_yaml
+    from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
     from qa_tools.common.validate_schedule import _content_at
 
-    ref = ref or diff_base()
+    ref = ref or diff_base(root=validate_schedule.ROOT)
     base, work = at_ref(ref), working()
     people = config_yaml.parse(_content_at(agreement_freeze.PEOPLE_REL, ref) or "") or {}
     return agreement_freeze.drafts(
@@ -628,10 +630,11 @@ def may_approve(ref: str | None = None) -> list[str]:
     """Who the gate will accept as approver of a calendar correction, at the
     base - offered when the terminal asks (criterion 14)."""
     from qa_tools.common import agreement_freeze, config_yaml
+    from qa_tools.common import validate_schedule
     from qa_tools.common.diff_base import diff_base
     from qa_tools.common.validate_schedule import _content_at
 
-    ref = ref or diff_base()
+    ref = ref or diff_base(root=validate_schedule.ROOT)
     people = config_yaml.parse(_content_at(agreement_freeze.PEOPLE_REL, ref) or "") or {}
     owners = agreement_freeze.code_owners(_content_at(agreement_freeze.CODEOWNERS_REL, ref),
                                           agreement_freeze.CALENDAR_REL)
