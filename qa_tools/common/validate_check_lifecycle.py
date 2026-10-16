@@ -106,7 +106,10 @@ def _legacy_evidently_dict(source: str, filename: str) -> dict:
     source at that ref (trusted - this repository's own content). REMOVE
     WITH REQ-PIPE-248."""
     namespace: dict = {}
-    exec(compile(source, filename, "exec"), namespace)
+    # Compiled under a `<...>` name, never the repo path it came from: that
+    # path no longer exists, and coverage, which records any code object
+    # filed under a path in the tree, then fails its report (#216).
+    exec(compile(source, f"<legacy {filename}>", "exec"), namespace)
     return namespace.get("CHECK_LIFECYCLE", {})
 
 # ---- end of LEGACY --------------------------------------------------------

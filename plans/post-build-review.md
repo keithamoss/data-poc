@@ -10015,3 +10015,17 @@ twice. It deliberately did not re-find the `TypeError`.
      vacuously" test now strips declarations from every collection's schema
      file rather than one fixed path. Minor and in a gate, so fixed under
      Keith's polish rule.
+
+
+216. **[done, 2026-10-16]** **[Testing & dev tooling]** **CI's coverage combine
+     failed on the legacy Evidently reader.** Run 38879892217 on ca6747b: both
+     test halves green, then `coverage report` exited 1 on "No source for code:
+     qa_tools/bdm/evidently_check_lifecycle.py". REQ-QAC-241's legacy reader
+     `exec`s a pre-move module's source to read a base ref's checks, and
+     compiled it under that module's repo path, so coverage recorded code for
+     a file the tree no longer has. Reproduced locally the same way - one test
+     module under `--cov`, then `coverage report` exiting 1 on the four
+     deleted paths - and fixed by compiling under `<legacy <path>>`, a name
+     coverage never treats as a source file; the same report now raises
+     nothing. Missed locally because the full gate runs pytest without
+     coverage. Minor, so fixed under Keith's polish rule.
