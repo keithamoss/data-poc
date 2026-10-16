@@ -30,6 +30,7 @@ ADAPTER = CollectionAdapter(
     results_rebuild="qa_tools.bdm.build_results_from_history",
     generator="cli.bdm:generate_synthetic_data",
     target_datasets=("birth-registrations",),
+    results_json="results_bdm.json",
     dashboard_json="birth_registrations_dashboard.json",
     # One dataset, written as the document itself.
     dashboard_datasets=lambda doc: [doc],
@@ -143,5 +144,7 @@ ADAPTER = CollectionAdapter(
         "stats.rows_by_run_id",
         "stats.zero_counts_kept",
         "stats.arrival_after_registration",
+        "results.single_dataset_header",
+        "results.every_recorded_run",
     }),
 )

@@ -118,6 +118,9 @@ class CollectionAdapter:
     #: its own (REQ-PIPE-243 criterion 2); None means no window, never a
     #: borrowed one.
     claim_window_dataset: str | None = None
+    #: The results file under reports/ the batch and the rebuild write
+    #: (REQ-PIPE-243); REQ-PIPE-248 names every collection's from its id.
+    results_json: str = ""
     #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place
     #: this collection's recorded output differs from what the shared code
     #: would produce. Every name is in qa_tools/tools/legacy.py, which says

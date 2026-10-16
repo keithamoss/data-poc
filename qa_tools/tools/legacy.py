@@ -67,4 +67,10 @@ KNOWN: dict[str, str] = {
     "stats.arrival_after_registration": (
         "the earliest extract is the earliest among rows extracted on or after their "
         "registration date, falling back to the earliest of all."),
+    "results.single_dataset_header": (
+        "the results file names its one dataset under `dataset` rather than the "
+        "collection under `collection` and its datasets under `datasets`."),
+    "results.every_recorded_run": (
+        "the rebuild from history reads the results of every recorded run, superseded "
+        "re-runs included, rather than only each supply's current run's."),
 }

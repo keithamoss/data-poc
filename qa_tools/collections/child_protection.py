@@ -48,6 +48,7 @@ ADAPTER = CollectionAdapter(
     results_rebuild="qa_tools.cp.build_results_from_history",
     generator="cli.cp:generate_synthetic_data",
     target_datasets=("cp-clients",),
+    results_json="results_cp.json",
     dashboard_json="child_protection_dashboard.json",
     # Its datasets, listed under `datasets` in the file's own order.
     dashboard_datasets=lambda doc: list(doc["datasets"]),
