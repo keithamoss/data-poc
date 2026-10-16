@@ -37218,3 +37218,54 @@ requirements:
       - "THE SERIES-WIDE COMPARE AND THE EMPTY ALLOWLIST LIVE HERE (round-4 call 24; delivery-scoper, round 3): this is the one requirement that depends on all seven refactors."
       - "ONE TABLE, NOT N: the next real collection (Emergency Department) is one table, and Child Protection's corpus already exercises N tables."
     open_questions: []
+  - id: REQ-PIPE-254
+    title: "A cache built from a configuration file always answers for what the file says now"
+    date_written: "2026-10-16"
+    story: "As whoever maintains the pipeline, and as the long-running processing pass it becomes at around thirty collections, I want every in-process cache built from a configuration file to be keyed on that file's current content, so that an edited or swapped file is never answered for stale, and a test that swaps a file no longer has to know which caches to clear."
+    moscow: should
+    status: not_started
+    source: "Keith, 2026-10-16, answering REQ-PIPE-156's open question with 'draft a requirement' (plans/running-thoughts.md #102), prompted by plans/post-build-review.md #217. Drafted by delivery-scoper 2026-10-16. A PROPOSAL, not signed."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL key each of these five caches on the content of the configuration file it is built from, rather than holding one value for the life of the process: hierarchy._load, collections._load and asset_time.timezone_versions (contract/data-asset.yaml), arrival_patterns.compiled_patterns (contract/data-asset.yaml, through the hierarchy), and agreement.current (contract/calendar.yaml)."
+      - "WHEN a file one of the five is built from is edited in place, including an edit that leaves its size and modification time unchanged, THE SYSTEM SHALL return a value built from the new content on the next call, with no cache cleared."
+      - "WHEN a test points hierarchy.DATA_ASSET_YAML, asset_time.DATA_ASSET_YAML or agreement.CALENDAR_YAML at another file, THE SYSTEM SHALL return values built from that file on the next call, and from the original file again once the patch is undone, with no cache cleared."
+      - "WHILE a file's content is unchanged since a value was built from it, THE SYSTEM SHALL return that value without parsing the file or building the value again."
+      - "THE SYSTEM SHALL provide the content keying from qa_tools/common/config_yaml, extending REQ-PIPE-156's loader, and none of the five functions SHALL carry functools.lru_cache or functools.cache."
+      - "THE SYSTEM SHALL build each value from a single read of each file it depends on, so that collections._load, which today reads contract/data-asset.yaml and then asks the hierarchy, which reads it again, can never combine two versions of the file."
+      - "THE SYSTEM SHALL ensure no caller's change to a returned value reaches any other caller's result, either by returning immutable values or by returning each caller its own copy."
+      - "WHEN several threads call one of the five at once, including while its file is being replaced, THE SYSTEM SHALL return each a value built entirely from one version of the file."
+      - "IF a file cannot be read or does not parse, THEN THE SYSTEM SHALL raise the same error it raises today on every call, and SHALL NOT cache the failure, so a corrected file is read on the next call."
+      - "WHEN the test suite runs, THE SYSTEM SHALL pass with no test calling cache_clear() on any of the five, including the test that swaps a smaller hierarchy in plans/post-build-review.md #217 run before tests/test_build_warehouses_rebuild.py on the same worker."
+      - "WHEN this requirement is built, THE SYSTEM SHALL contain no cache_clear() call on any of the five anywhere under tests/ (40 of the 41 there today; validate_requirements._parsed's is out of scope), no tests/agreement_split.py::clear_caches and no call to it, and no agreement.current.cache_clear alias."
+      - "THE SYSTEM SHALL carry no docstring or comment saying one of the five is read once per process or that its file cannot change mid-run, including the ones in qa_tools/common/asset_time.py, qa_tools/common/agreement.py and qa_tools/common/sample_data.py."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record the same filings, decisions, verdicts and supply tables from a full bootstrap from empty as the commit before it, compared by tests/equiv_support.snapshot with only the columns it already excludes allowed to differ."
+      - "WHEN this requirement is built, THE SYSTEM SHALL record in its evidence how many times each of the five was called in one full bootstrap, and the bootstrap's wall-clock time from empty before and after, same machine, same day, nothing else running; the after time SHALL be no more than 2% slower (budget provisional, open question 3)."
+    non_functional_requirements:
+      - "CORRECTNESS UNDER FAST EDITS: an in-place edit within one filesystem time tick, same size, is seen on the next call - the case REQ-PIPE-156 keyed on content for. A test proves it with a same-length edit and no sleep."
+      - "HOT PATH, measured 2026-10-16 on this sandbox: today's cache hit on hierarchy.all_datasets() costs 0.4us. Reading contract/data-asset.yaml (19KB) and looking its text up costs about 22us; contract/calendar.yaml (26KB) about 27us. Going back through config_yaml.load and rebuilding the hierarchy costs about 190us, of which the deep copy of the parsed document is 110us. Call counts per bootstrap are not yet known, which is why criterion 14 measures them."
+      - "SCALE: content keying costs grow with the file, and contract/data-asset.yaml grows with every collection. A 288KB stand-in for a thirty-collection file cost 468us per read-and-lookup, measured the same day - twenty times today's. Open question 2 is the design answer to that."
+      - "MEMORY: each of the five holds a bounded number of built values (proposed 4 versions each), so a long-running process that sees repeated edits does not accumulate them; config_yaml's own 256-document bound is unchanged."
+      - "THREAD SAFETY: the same pattern as config_yaml - the store behind one lock, building outside it, so two threads may both build the first value and the second write is the same value."
+      - "RELIABILITY: a missing or malformed file fails loudly on every call and is never remembered as a failure (criterion 9)."
+      - "No new dependency - standard library only. Configuration only, never supply data, so nothing here changes what a build may read."
+      - "CI: changes qa_tools/, so REQ-TEST-117's bootstrap cache key misses once, as intended."
+      - "MAINTAINABILITY: removes 40 test-side cache clears and one helper; what keeps a sixth unkeyed cache from appearing is open question 4."
+    dependencies:
+      - REQ-PIPE-156
+      - REQ-PIPE-240
+      - REQ-PIPE-110
+    decisions:
+      - "BUILDS ON REQ-PIPE-156's LOADER, NOT A SECOND MECHANISM (Keith, 2026-10-16, #102's own next step): the keying lives in qa_tools/common/config_yaml beside parse/load/clear, so configuration has one caching mechanism rather than one per module."
+      - "PROVISIONAL - THE BUILT VALUE IS CACHED, NOT ONLY THE PARSE: each of the five keeps the value it builds (Dataset records, compiled patterns, zone versions, the Agreement) keyed on the file's text. REJECTED calling config_yaml.load on every call and rebuilding, which needs no new cache at all: measured 2026-10-16 at about 190us per hierarchy call against 0.4us today, mostly the deep copy REQ-PIPE-156 gives every caller."
+      - "REJECTED: keying on modification time and size alone - REQ-PIPE-156's own decision, for the same reason: a same-size edit inside one time tick keeps both. A stat check that falls back to reading the content when the modification time is too recent to trust is a different thing and is open question 2."
+      - "REJECTED: keeping the lru_caches and clearing them all from an autouse test fixture. It fixes tests and not a running process - a dataset graduating out of sample data is a configuration change a running process must see (plans/post-build-review.md #217) - and it is still a list someone has to keep complete, which #217 is the incident of."
+      - "REJECTED: a clear-everything helper in product code. Test helpers live in tests/, and product code only tests call is dead code (CLAUDE.md)."
+      - "THE SCHEDULE CACHE #102 NAMES NO LONGER EXISTS: REQ-PIPE-110 replaced schedule._load with agreement.current, which is the one in scope. qa_tools/common/sample_data.py's docstring still says schedule caches the parsed asset and that three lru_caches hold it - criterion 12 corrects it."
+      - "OUT OF SCOPE, with reasons: datacontract_common._derived is already keyed on the rule's own text; validate_schedule._content_at is keyed on a git ref; validate_requirements._parsed and _sprint_numbers belong to a short-lived validator off the run path and were settled by REQ-TEST-253; run_dbt._check_ids and run_datacontract._authored_names are open question 1."
+      - "ONE READ PER FILE PER BUILT VALUE (criterion 6): collections._load reads data-asset.yaml itself and then through hierarchy.all_datasets, so once each read can see a different version the two must come from one text."
+    open_questions:
+      - "1. SCOPE: should run_dbt._check_ids and run_datacontract._authored_names - path-keyed caches over a collection's dbt schema file and ODCS contract, both on the run path - be keyed on content here too, or left as their own follow-up? Including them makes every run-path configuration cache behave the same; leaving them keeps this requirement to the five #102 names."
+      - "2. COST AT SCALE: always read and key on the content (simple, about 22us a call today, about 470us at a thirty-collection-sized file), or check the file's modification time, size and inode first and read the content only when they changed or the modification time is within about two seconds of the last read (git's own racy-clean rule, about 2us a call, the in-tick edit still caught)? The second reopens a mechanism REQ-PIPE-156 set aside, in a narrower form."
+      - "3. BUDGET: is no more than 2% slower on a full bootstrap the right bar for criterion 14, or should the timing only be reported?"
+      - "4. GUARD: should mothman check fail on a new functools.lru_cache or functools.cache under qa_tools/ that is not on an allowlist naming why it is safe, or is a rule in config_yaml's docstring enough?"
+      - "5. NOT ASKED YET: hierarchy, asset_time and validate_schedule each hold their own DATA_ASSET_YAML constant, so a test that patches one reads the real file through the others. Proposed out of scope as its own item; it does not change what this requirement builds."

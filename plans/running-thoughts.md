@@ -5466,13 +5466,14 @@ could never have computed it), and it belongs with batch 5's check work.
     answers: N_LIST 9, the Collections/Tools help split at every size, and a
     new `mothman collections` command for the full list. Not yet signed.
 
-102. **[todo, 2026-10-16]** **[Pipeline & publishing]** **Key the
-     configuration caches on file content.** Keith, 2026-10-16, answering
-     REQ-PIPE-156's open question: "draft a requirement". The module caches
-     over the hierarchy, schedule, asset_time, arrival patterns and the
-     collection registry are unkeyed, so a changed file can be served
-     stale and tests must remember to clear them. Prompted by
-     plans/post-build-review.md #217, where a stale registry cache broke a
-     test depending on what ran before it. Next step: delivery-scoper drafts
-     it for sign-off, building on REQ-PIPE-156's content-keyed loader
-     rather than a second mechanism.
+102. **[in-progress, 2026-10-16]** **[Pipeline & publishing]** **Key the
+     configuration caches on file content.** Drafted by delivery-scoper as
+     REQ-PIPE-254 (a proposal, not signed); its open questions 1-4 are with
+     Keith. Remove this entry once REQ-PIPE-254 is built.
+
+103. **[todo, 2026-10-16]** **[Testing & dev tooling]** **Three copies of
+     the asset file's path.** Found by delivery-scoper drafting REQ-PIPE-254:
+     `hierarchy`, `asset_time` and `validate_schedule` each hold their own
+     `DATA_ASSET_YAML` constant, so a test that patches one still reads the
+     real file through the other two. Separate from REQ-PIPE-254, which it
+     does not change; not yet scoped or put to Keith.

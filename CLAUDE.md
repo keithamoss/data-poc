@@ -916,6 +916,12 @@ Rough layout:
   Restore both trees afterwards, and mind that a test run RECREATES
   `data/`, so a bare `mv /tmp/data_aside data` nests it.
 
+  -> **~1444s/5621 tests (2026-10-16 evening, REQ-QAC-242)**. Full
+  `mothman check` 27 minutes, of which pytest is 24m04s and `npm test`
+  2m11s (830 tests). The ~5-minute gate figure further up is long stale;
+  this sandbox's suite now runs against a database bootstrapped from the
+  grown Child Protection history (REQ-GEN-207). Not profiled yet.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.
