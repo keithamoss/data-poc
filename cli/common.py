@@ -165,8 +165,17 @@ def select(message: str, choices: list[str], flag_hint: str,
     return answer
 
 
+def collection_terms(coll) -> tuple[str, ...]:
+    """What else a collection is known by, for the typed filter (Keith,
+    2026-10-18, "filter on short and names"): its short, its id, and each of
+    its datasets' names and ids."""
+    return (coll.short, coll.id, *(d.dataset_name for d in coll.datasets),
+            *(d.dataset_id for d in coll.datasets))
+
+
 def grouped_select(message: str, groups: list[tuple[str, list[str]]], flag_hint: str, *,
-                   many: bool, top: tuple[str, ...] = ()) -> str | None:
+                   many: bool, top: tuple[str, ...] = (),
+                   terms: dict | None = None) -> str | None:
     """A picker over choices in named groups (REQ-TEST-252 criteria 4 to 8).
 
     `many` is the caller's own count against N_LIST - collections for a
@@ -174,20 +183,21 @@ def grouped_select(message: str, groups: list[tuple[str, list[str]]], flag_hint:
     select() over every choice in order, headings unseen, so the picker
     reads as it always has. MANY: each group under a heading that cannot
     be chosen, and typing narrows the list to the choices whose own text or
-    whose group's heading contains what was typed, case-insensitively, the
-    prompt saying so. `top` choices sit above every group and are never
-    filtered out. Back and Ctrl-C return None, as from select()."""
+    whose group's heading or `terms` (choice -> what else it is known by)
+    contains what was typed, case-insensitively, the prompt saying so. `top`
+    choices sit above every group and are filtered by their own text. Back
+    and Ctrl-C return None, as from select()."""
     if not many:
         return select(message, [*top, *(c for _, cs in groups for c in cs)], flag_hint=flag_hint)
     require_tty(flag_hint)
-    answer = _ask(_filtered_question(message, groups, top))
+    answer = _ask(_filtered_question(message, groups, top, terms))
     if answer is None or answer == BACK:
         return None
     return answer
 
 
 def _filtered_question(message: str, groups: list[tuple[str, list[str]]],
-                       top: tuple[str, ...]):
+                       top: tuple[str, ...], terms: dict | None = None):
     """The filtered, grouped picker as a questionary Question, built on
     prompt_toolkit directly.
 
@@ -207,16 +217,27 @@ def _filtered_question(message: str, groups: list[tuple[str, list[str]]],
 
     state = {"text": "", "at": 0, "answer": None}
 
-    def rows() -> list[tuple[str, str]]:
-        """(kind, text) in display order - kind is 'choice' or 'heading'."""
+    terms = terms or {}
+
+    def matches(choice: str, heading: str = "") -> bool:
+        """The typed text, case-insensitively, in the choice, its group's
+        heading, or anything else it is known by (Keith, 2026-10-18: a
+        collection's short, id and datasets' names)."""
         typed = state["text"].lower()
-        out = [("choice", t) for t in top]
+        return not typed or any(typed in t.lower() for t in (choice, heading, *terms.get(choice, ())))
+
+    def rows() -> list[tuple[str, str]]:
+        """(kind, text) in display order - kind is 'choice' or 'heading'.
+        A top entry is filtered like any other choice (post-build-review
+        #231): left on screen but unmatched, it was highlighted under
+        'Nothing matches' and Enter did nothing."""
+        out = [("choice", t) for t in top if matches(t)]
         for heading, choices in groups:
-            shown = [c for c in choices if not typed or typed in c.lower() or typed in heading.lower()]
+            shown = [c for c in choices if matches(c, heading)]
             if shown:
                 out.append(("heading", heading))
                 out.extend(("choice", c) for c in shown)
-        if not typed or any(k == "choice" and t not in top for k, t in out):
+        if not state["text"] or out:
             out.append(("choice", BACK))
         return out
 
@@ -237,7 +258,7 @@ def _filtered_question(message: str, groups: list[tuple[str, list[str]]],
         clamp()
         tokens, i = [], 0
         typed = state["text"]
-        if typed and not [c for c in choices() if c != BACK and c not in top]:
+        if typed and not [c for c in choices() if c != BACK]:
             tokens.append(("class:text", f"  Nothing matches {typed!r} - delete to widen, "
                                          "or Ctrl-C to go back.\n"))
         for kind, text in rows():
@@ -285,7 +306,7 @@ def _filtered_question(message: str, groups: list[tuple[str, list[str]]],
         typed = state["text"]
         # NOTHING MATCHES: Enter chooses nothing - least of all a choice the
         # filter is hiding (criterion 8) - and the prompt stays open.
-        if not found or (typed and not [c for c in found if c != BACK and c not in top]):
+        if not found or (typed and not [c for c in found if c != BACK]):
             return
         state["answer"] = found[min(state["at"], len(found) - 1)]
         event.app.exit(result=state["answer"])
@@ -1241,11 +1262,20 @@ class CollectionParam(click.ParamType):
             return "all"
         found = next((c for c in _registered() if value in (c.short, c.id)), None)
         if found is None:
-            self.fail(unknown_collection_message(value), param, ctx)
+            self.fail(unknown_collection_message(value, all_choice=self.all_choice), param, ctx)
+        # A REGISTERED COLLECTION WHOSE ADAPTER WILL NOT LOAD is refused here,
+        # by name, as its own commands refuse it (REQ-TEST-245 criterion 8;
+        # post-build-review #229) - not left to fail as a traceback later.
+        from qa_tools import collections
+
+        try:
+            collections.adapter(found)
+        except Exception as exc:  # noqa: BLE001 - any failure to load is refused, by name
+            self.fail(f"{found.id} cannot run: its adapter could not be loaded - {exc}", param, ctx)
         return found.short if self.to == "short" else found.id
 
 
-def unknown_collection_message(value: str) -> str:
+def unknown_collection_message(value: str, *, all_choice: bool = False) -> str:
     """REQ-TEST-252 criterion 13: the value, up to three registered shorts or
     ids closest to it, and where every collection is listed - with every one
     listed here too only while there are N_LIST or fewer."""
@@ -1259,6 +1289,8 @@ def unknown_collection_message(value: str) -> str:
         said += f" Closest: {', '.join(close)}."
     if not many_collections():
         said += " Known: " + ", ".join(f"{c.short} ({c.id})" for c in every) + "."
+    if all_choice:
+        said += " This option also takes `all`."
     return said + " `mothman collections` lists every collection."
 
 

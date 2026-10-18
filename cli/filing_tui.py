@@ -1341,16 +1341,23 @@ def filing_menu() -> None:
         return
     # BY NAME, as every pointer into this menu names them (Keith,
     # 2026-10-13, post-build-review #170); the id is what the code keeps.
-    by_name = {_collection_name(c): c for c in _collections()}
-    collections = list(by_name)
-    # GROUPED BY AGENCY AND FILTERED BY TYPING ABOVE N_LIST (REQ-TEST-252
-    # criteria 4 and 5); today's list at or below it.
+    # BY THE QA MENU'S LABELS, IN HIERARCHY ORDER, AT EVERY SIZE (Keith,
+    # 2026-10-18): one rule for a collection's label in every picker, so the
+    # word that finds it in one menu finds it in the next, and an asset that
+    # grows past N_LIST does not see the order flip. It listed collections by
+    # their own names, sorted by id, until then.
     from qa_tools import collections as registry
 
+    filed = set(_collections())
+    every = [c for c in registry.all_collections() if c.id in filed]
+    by_name = {c.label: c.id for c in every}
+    collections = list(by_name)
+    terms = {c.label: common.collection_terms(c) for c in every}
+    # GROUPED BY AGENCY AND FILTERED BY TYPING ABOVE N_LIST (REQ-TEST-252
+    # criteria 4 and 5); today's list at or below it.
     by_agency: dict[str, list[str]] = {}
-    for coll in registry.all_collections():  # hierarchy order, for the headings
-        if coll.id in by_name.values():
-            by_agency.setdefault(coll.agency_name, []).append(_collection_name(coll.id))
+    for coll in every:
+        by_agency.setdefault(coll.agency_name, []).append(coll.label)
     grouped = list(by_agency.items()) if common.many_collections() else [("", collections)]
     # PENDING CORRECTIONS ABOVE THE CHOICE OF COLLECTION (REQ-PIPE-170
     # criterion 13): a correction is asset-wide, so it cannot wait inside one.
@@ -1366,7 +1373,7 @@ def filing_menu() -> None:
             + ([f"{_MENU_PARKED} ({len(parked)})"] if parked else [])
         picked = common.grouped_select("Which collection - or the corrections?", grouped,
                                        flag_hint=_FLAG_HINT, many=common.many_collections(),
-                                       top=tuple(entries))
+                                       top=tuple(entries), terms=terms)
         if picked and picked.startswith(_MENU_CORRECTIONS):
             corrections_flow(waiting)
             return
@@ -1377,13 +1384,13 @@ def filing_menu() -> None:
     else:
         picked = (collections[0] if len(collections) == 1 else
                   common.grouped_select("Which collection?", grouped, flag_hint=_FLAG_HINT,
-                                        many=common.many_collections()))
+                                        many=common.many_collections(), terms=terms))
         collection_id = by_name.get(picked)
     if collection_id is None:
         return
     while True:
         choice = common.select(
-            f"{_collection_name(collection_id)} - what are you doing?",
+            f"{registry.by_id(collection_id).label} - what are you doing?",
             [_MENU_QUEUE, _MENU_PERIOD, _MENU_STANDING], flag_hint=_FLAG_HINT)
         if choice is None:
             return

@@ -297,7 +297,14 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
     from generator import driver
     from qa_tools.common import scenario_map
 
-    provider = providers.provider(collection_id)
+    try:
+        provider = providers.provider(collection_id)
+    except providers.NoProviderError as exc:
+        # REFUSED BY NAME, NOT A TRACEBACK (post-build-review #229): a real
+        # deployment's collections have no synthetic generator at all.
+        raise click.ClickException(
+            f"{collection_id} has no synthetic data generator, so there is nothing to "
+            f"generate ({exc})") from None
     if trial and not provider.target_trial:
         raise TargetTrialUnavailable(
             f"{collection_id} has no target trial: its generator provider declares none, so "

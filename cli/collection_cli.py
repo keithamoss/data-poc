@@ -56,7 +56,7 @@ class TargetTrialFailed(click.ClickException):
 def label(coll) -> str:
     """A one-table collection by its dataset's name, an N-table one by its
     collection's name (criterion 2)."""
-    return coll.datasets[0].dataset_name if len(coll.datasets) == 1 else coll.name
+    return coll.label
 
 
 def _provider(coll):
@@ -209,18 +209,29 @@ class CollectionCLI:
 
 # ---- the registry of command objects ------------------------------------------
 
-@functools.cache
+#: One command object per collection for the life of the process, by id. A
+#: plain dict rather than functools.cache so a test can evict the collections
+#: it registered without replacing the real ones other modules hold
+#: (post-build-review #228).
+COMMANDS: dict[str, CollectionCLI] = {}
+
+
 def _cached(collection_id: str) -> CollectionCLI:
+    found = COMMANDS.get(collection_id)
+    if found is not None:
+        return found
     from qa_tools import collections
 
     coll = collections.by_id(collection_id)
     if len(coll.datasets) == 1:
         from cli.one_table import OneTableCLI
 
-        return OneTableCLI(coll)
-    from cli.many_tables import ManyTablesCLI
+        made = OneTableCLI(coll)
+    else:
+        from cli.many_tables import ManyTablesCLI
 
-    return ManyTablesCLI(coll)
+        made = ManyTablesCLI(coll)
+    return COMMANDS.setdefault(collection_id, made)
 
 
 def of(value: str) -> CollectionCLI:

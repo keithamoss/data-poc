@@ -111,7 +111,7 @@ def config_problems(package: Path | None = None) -> list[str]:
     for orphan in sorted(modules - set(wanted)):
         problems.append(f"qa_tools/collections/{orphan}.py names no declared collection")
 
-    for field in ("short", "run_prefix"):
+    for field in ("short", "run_prefix", "label"):
         seen: dict[str, str] = {}
         for c in declared:
             value = getattr(c, field)

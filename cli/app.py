@@ -152,7 +152,9 @@ def _which_collection(flag_hint: str):
     for c in every:
         groups.setdefault(c.agency_name, []).append(collection_cli.label(c))
     chosen = common.grouped_select("Which dataset?", list(groups.items()), flag_hint=flag_hint,
-                                   many=common.many_collections())
+                                   many=common.many_collections(),
+                                   terms={collection_cli.label(c): common.collection_terms(c)
+                                          for c in every})
     if chosen is None:
         return None
     collection_cli.refuse_a_broken_adapter(by_label[chosen])

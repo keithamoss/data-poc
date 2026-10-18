@@ -662,7 +662,8 @@ def calendar_menu() -> None:
             by_collection.setdefault(d.collection_name, []).append(d.dataset_id)
         dataset_id = common.grouped_select("Which dataset?", list(by_collection.items()),
                                            flag_hint="mothman schedule show --dataset <id>",
-                                           many=len(every) > common.N_LIST)
+                                           many=len(every) > common.N_LIST,
+                                           terms={d.dataset_id: (d.dataset_name,) for d in every})
         if dataset_id is None:
             return
         today = asset_time.local_date(asset_time.now())

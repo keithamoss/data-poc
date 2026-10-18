@@ -59,6 +59,14 @@ class Collection:
     datasets: tuple[hierarchy.Dataset, ...]
 
     @property
+    def label(self) -> str:
+        """How people know it (REQ-TEST-245 criterion 2): a one-table
+        collection by its dataset's name, an N-table one by its collection's
+        name. Unique across the asset (post-build-review #230), because every
+        picker shows a collection by it."""
+        return self.datasets[0].dataset_name if len(self.datasets) == 1 else self.name
+
+    @property
     def module_name(self) -> str:
         """The adapter module, named by the id with hyphens as underscores."""
         return self.id.replace("-", "_")

@@ -259,3 +259,21 @@ class TestTheMenusAtThirty:
         finally:
             session.close()
 
+
+
+class TestTheFilingMenuAtTwo:
+    """Keith, 2026-10-18: the filing menu labels a collection as the QA menu
+    does and lists it in hierarchy order at every size - it showed Child
+    Protection before 'Civil Registration' until then."""
+
+    def test_it_offers_the_qa_menus_labels_in_hierarchy_order(self, monkeypatch):
+        from cli import filing_tui
+
+        asked = {}
+        monkeypatch.setattr(filing_tui, "actor_at_the_keyboard", lambda: {"email": "t@example.com"})
+        monkeypatch.setattr(filing_tui, "_pending_corrections", lambda: [])
+        monkeypatch.setattr(filing_tui, "_parked_moves", lambda: [])
+        monkeypatch.setattr(common, "grouped_select",
+                            lambda message, groups, flag_hint, **kw: asked.update(groups=groups) or None)
+        filing_tui.filing_menu()
+        assert asked["groups"] == [("", ["Birth Registrations", "Child Protection"])]

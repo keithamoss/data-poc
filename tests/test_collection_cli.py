@@ -30,10 +30,14 @@ _runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _fresh_command_objects():
     """One command object per collection for the life of the process - so a
-    test's third collection must not outlive it."""
-    collection_cli._cached.cache_clear()
+    test's third collection must not outlive it. ONLY the collections the
+    test registered are evicted: the real ones' objects are held by other
+    modules from import, and replacing them made those modules' stubs miss
+    (post-build-review #228)."""
+    real = set(collection_cli.COMMANDS)
     yield
-    collection_cli._cached.cache_clear()
+    for cid in set(collection_cli.COMMANDS) - real:
+        del collection_cli.COMMANDS[cid]
 
 
 def _coll(cid):
@@ -242,3 +246,42 @@ class TestHelpImportsNoTool:
         assert done.returncode == 0, done.stderr
         assert "Usage:" in done.stdout, "the probe must actually have printed the help"
         assert json.loads(done.stdout.strip().splitlines()[-1]) == []
+
+
+def _flat(text: str) -> str:
+    """One line of words, rich's box characters removed."""
+    return " ".join(re.sub(r"[│╭╮╰╯─]", " ", text).split())
+
+
+class TestABrokenCollectionIsRefusedByNameEverywhere:
+    """post-build-review #229: criterion 8 held for a collection's own commands
+    and the TUI, but a --collection option accepted a collection whose adapter
+    will not load, and generating one with no provider, both ended in a
+    traceback."""
+
+    def test_a_collection_option_refuses_one_whose_adapter_will_not_load(self, without_adapter):
+        from cli import debug as debug_cli
+
+        out = _runner.invoke(debug_cli.debug_group,
+                             ["run-dbt", "--collection", BARE_SHORT, "--run-id", "x"])
+        assert out.exit_code == 2, out.output
+        assert isinstance(out.exception, SystemExit), out.exception
+        assert f"{BARE_ID} cannot run: its adapter could not be loaded" in _flat(out.output)
+
+    def test_generating_a_collection_with_no_provider_is_refused_by_name(self, third_collection,
+                                                                         monkeypatch):
+        from third_collection import PROVIDER_MODULE
+
+        monkeypatch.delitem(sys.modules, PROVIDER_MODULE)
+        group = collection_cli.make_group(_coll(FAKE_ID))
+        out = _runner.invoke(group, ["generate-synthetic-data", "--yes"])
+        assert out.exit_code == 1, out.output
+        assert isinstance(out.exception, SystemExit), out.exception
+        assert f"{FAKE_ID} has no synthetic data generator" in _flat(out.output)
+
+    def test_an_unknown_value_says_all_is_accepted_where_it_is(self):
+        from cli import pipeline as pipeline_cli
+
+        out = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--collection", "zzz"])
+        assert out.exit_code == 2
+        assert "This option also takes `all`" in _flat(out.output), out.output
