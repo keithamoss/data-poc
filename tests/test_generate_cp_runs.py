@@ -115,11 +115,8 @@ def _shape_of(entry, manifest) -> str | None:
     """The file shape an injected delivery was written in, by its position
     in its slot - None for an ordinary one (REQ-GEN-199's shapes leave a
     table out, or carry one alone, ON PURPOSE)."""
-    from generator.anchor_date import get_anchor_date
-
-    periods = cp_provider.schedule.periods_for_dataset(
-        cp_provider.DATASET_ID, until=get_anchor_date())[-len(cp_provider.RUN_PLAN):]
-    _, injected = cp_provider._plan_injections(periods)
+    # OVER THE WHOLE HISTORY: scenarios sit in the grown quarters too (REQ-GEN-207).
+    _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
     if entry["period"] not in injected:
         return None
     slot = sorted((e for e in manifest if e["slot_id"] == entry["slot_id"]),
@@ -200,11 +197,7 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
     for e in manifest:
         by_slot.setdefault(e["slot_id"], []).append(e)
 
-    from generator.anchor_date import get_anchor_date
-
-    periods = cp_provider.schedule.periods_for_dataset(
-        cp_provider.DATASET_ID, until=get_anchor_date())[-len(cp_provider.RUN_PLAN):]
-    _, injected = cp_provider._plan_injections(periods)
+    _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
     for slot_id, deliveries in by_slot.items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
         # A SCENARIO WHOSE FIRST DELIVERY KEEPS ITS QUARTER'S DRAWN AMBER is
@@ -217,9 +210,12 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
         # scripted file fault (REQ-GEN-044: TS-14's corrected Client Register,
         # weeks after TS-12's unreadable one) - not a resupply the drawn
         # severity chose, which is all this test is about.
+        # Nor TS-42's, whose clean Client Register follows its contested pair
+        # (REQ-GEN-203): every arrival of a scenario with several is scripted.
         if deliveries[0]["period"] in injected:
             first = injected[deliveries[0]["period"]][0]
-            if len(first.arrivals) > 1 and first.arrivals[0].file_shape:
+            if len(first.arrivals) > 1 and (first.arrivals[0].file_shape
+                                            or first.arrivals[0].files):
                 continue
         if len(deliveries) > 1:
             assert deliveries[0]["dirty_severity"] == "red", \
@@ -661,3 +657,116 @@ class TestAScenarioInAGrownQuarter:
         _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
         grown = cp_provider.grown_periods()
         assert len(cp_provider._grown_severities(grown, injected)) == len(grown)
+
+
+class TestTheContestedClientRegisterPairs:
+    """REQ-GEN-203: TS-42's pair superseded by a later file and TS-80's stray
+    test file, each a Child Protection delivery whose Client Register files
+    carry their own receipts (criterion 2), around green lead-in and following
+    quarters (criterion 4) in the grown history (criterion 5). Shapes and
+    instants only - the pipeline decides what they read as."""
+
+    @staticmethod
+    def _placed():
+        from generator import scenario_injection as si
+
+        return json.loads(Path(si.PLACEMENTS_PATH).read_text())["placements"]
+
+    def _placement(self, sid):
+        [record] = [p for p in self._placed() if p["scenario_id"] == sid]
+        return record
+
+    @staticmethod
+    def _receipts(name):
+        from qa_tools.common import delivery
+
+        return {f: r[0] for f, r in delivery.read_file_receipts(
+            name, driver.RECEIPTS_DIR).items()}
+
+    @staticmethod
+    def _slot(record):
+        from qa_tools.common import slots
+
+        return slots.slot_instants("cp-clients", date.fromisoformat(
+            next(p.date.isoformat() for p in cp_provider.generated_periods()
+                 if p.name == record["period"])))
+
+    def test_each_sits_in_its_grown_quarter_with_green_neighbours(self, manifest):
+        grown = {p.name for p in cp_provider.grown_periods()}
+        for sid, period, lead, follow in (("TS-42a", "2019-Q4", "2019-Q3", "2020-Q1"),
+                                          ("TS-80", "2020-Q4", "2020-Q3", "2021-Q1")):
+            record = self._placement(sid)
+            assert (record["period"], record["lead_in"], record["follow"]) == (
+                period, [lead], [follow]), sid
+            assert {period, lead, follow} <= grown, sid
+            for name in (lead, follow):
+                # ONE CLEAN DELIVERY EACH (REQ-GEN-185 criterion 1).
+                built = [e for e in manifest if e["period"] == name]
+                assert [e["dirty_severity"] for e in built] == [None], (sid, name)
+
+    def test_ts42s_pair_is_two_differing_client_registers_ten_minutes_apart(self, manifest, raw_dir):
+        record = self._placement("TS-42a")
+        assert "TS-42b" in {p["scenario_id"] for p in self._placed()}
+        pair, _later = self._deliveries(manifest, record)
+        files = {f.name for f in (raw_dir / pair).iterdir()}
+        assert files == self._usual(record["period"]) | {"cp_clients_v2.csv"}
+        first = pd.read_csv(raw_dir / pair / "cp_clients.csv", dtype=str)
+        second = pd.read_csv(raw_dir / pair / "cp_clients_v2.csv", dtype=str)
+        assert list(first.columns) == list(second.columns) and len(first) == len(second)
+        assert not first.equals(second), "the re-export's rows do not differ"
+        got = self._receipts(pair)
+        slot = self._slot(record)
+        assert got["cp_clients_v2.csv"] - got["cp_clients.csv"] == pd.Timedelta(minutes=10)
+        for name in ("cp_clients.csv", "cp_clients_v2.csv"):
+            assert slot.claim_opens_at < got[name] < slot.due_at, name
+        # ONE SHARED INSTANT FOR THE FILES THE SCENARIO STATES NONE FOR.
+        assert {got[f] for f in files - {"cp_clients_v2.csv"}} == {got["cp_clients.csv"]}
+
+    def test_ts42s_later_client_register_comes_alone_after_due_before_the_next_window(
+            self, manifest, raw_dir):
+        from qa_tools.common import slots
+
+        record = self._placement("TS-42a")
+        _pair, later = self._deliveries(manifest, record)
+        assert {f.name for f in (raw_dir / later).iterdir()} == {"cp_clients.csv"}
+        [at] = set(self._receipts(later).values())
+        nxt = slots.slot_instants("cp-clients", date.fromisoformat("2020-02-01"))
+        assert self._slot(record).due_at < at < nxt.claim_opens_at
+
+    def test_ts80s_stray_test_file_comes_ten_minutes_before_the_real_one(self, manifest, raw_dir):
+        record = self._placement("TS-80")
+        [delivery_name] = self._deliveries(manifest, record)
+        files = {f.name for f in (raw_dir / delivery_name).iterdir()}
+        assert files == self._usual(record["period"]) | {"cp_clients_TEST.csv"}
+        test = pd.read_csv(raw_dir / delivery_name / "cp_clients_TEST.csv", dtype=str)
+        real = pd.read_csv(raw_dir / delivery_name / "cp_clients.csv", dtype=str)
+        assert list(test.columns) == list(real.columns) and len(test)
+        assert set(test["given_name"]) == {"TEST"} and set(test["family_name"]) == {"TEST"}
+        assert set(real["given_name"]) != {"TEST"}
+        got = self._receipts(delivery_name)
+        assert asset_time.isoformat(got["cp_clients_TEST.csv"]).startswith("2020-11-01T08:20")
+        assert asset_time.isoformat(got["cp_clients.csv"]).startswith("2020-11-01T08:30")
+        assert got["cp_clients.csv"] < self._slot(record).due_at
+        assert {got[f] for f in files - {"cp_clients.csv"}} == {got["cp_clients_TEST.csv"]}
+
+    def test_an_injected_delivery_stating_no_instants_keeps_one_shared(self, manifest):
+        """Criterion 2's other half: TS-12's delivery states no per-file
+        instants, so all its files share one."""
+        record = self._placement("TS-12")
+        first = self._deliveries(manifest, record)[0]
+        assert len(set(self._receipts(first).values())) == 1
+
+    @staticmethod
+    def _deliveries(manifest, record):
+        """The placement's own deliveries, in receipt order."""
+        return [e["delivery"] for e in sorted(
+            (e for e in manifest if e["period"] == record["period"]),
+            key=lambda e: e["run_index"])]
+
+    @staticmethod
+    def _usual(period):
+        """The files an ordinary delivery for this grown quarter carries: all
+        six, less Case Workers where it owes nothing (REQ-GEN-207)."""
+        owed = {p.name for p in cp_provider.schedule.periods_for_dataset("cp-case-workers")
+                if p.expected}
+        return {f"{t}.csv" for t in TABLES if t != "cp_case_workers" or period in owed}

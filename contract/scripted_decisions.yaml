@@ -155,6 +155,19 @@ decisions:
     day_offset: 1
     files: ["refile:+1", reject]
     reason: "The first file is the next day's extract, sent early, and the second is test data; nothing came for this day."
+  # REQ-GEN-203 criterion 11: TS-80's Client Register pair - a stray test file
+  # at 08:20, the real extract at 08:30 - settled by a person at 11:00 the day
+  # after its due day, so its arrival day reads contested. File 1 by receipt is
+  # the test file, although the real extract sorts first by name.
+  - scenario: TS-80
+    name: TS-80 settle
+    operation: choose-file
+    dataset: cp-clients
+    supply: 0
+    at: "11:00"
+    day_offset: 1
+    files: [reject, supply]
+    reason: "The first file is the supplier's test data, sent by mistake; the real Client Register extract is the quarter's supply."
   # REQ-GEN-199: what the as-at panel and qualifier say on a past date.
   # TS-75: cp_clients' red supply waits, and a person rejects it three weeks
   # after it arrived; a corrected one-table resupply fills the quarter later.

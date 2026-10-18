@@ -144,12 +144,11 @@ class TestTheGeneratedHistory:
 
     def test_child_protection_ambers_avoid_injected_periods(self):
         from generator.collections import child_protection as cp
-        from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
 
-        periods = schedule.periods_for_dataset(cp.DATASET_ID,
-                                               until=get_anchor_date())[-len(cp.RUN_PLAN):]
-        _r, by_period = cp._plan_injections(periods)
+        # PLANNED OVER THE WHOLE HISTORY (REQ-GEN-207): scenarios sit in the
+        # grown quarters too; the original fifteen's ambers are what this counts.
+        _r, by_period = cp._plan_injections(cp.generated_periods())
+        periods = cp.original_periods()
         sevs = cp._ordinary_severities(periods, by_period)
         assert sevs.count("amber") == [s for _q, s in cp.RUN_PLAN].count("amber")
         # EXCEPT where the scenario keeps its period's drawn amber
@@ -542,7 +541,9 @@ class TestRefusedBeforeAnythingIsWritten:
         try:
             periods = schedule.periods_for_dataset(cp.DATASET_ID,
                                                    until=get_anchor_date())[-len(cp.RUN_PLAN):]
-            with pytest.raises(targeting.TargetError, match="TS-CPRED.*lead-in"):
+            # Its lead-ins are planned now (REQ-GEN-203 criterion 4); the red
+            # target itself is what is refused, naming the scenario.
+            with pytest.raises(targeting.TargetError, match="TS-CPRED.*red cannot be built"):
                 cp._plan_injections(periods)
         finally:
             si.INJECTIONS = original
@@ -833,25 +834,79 @@ class TestRefusals156:
         with pytest.raises(si.CannotPlace, match="its own lead-in"):
             si.no_two_scenarios_share_a_period([inj], {BDM_ID: TestLeadIns()._periods()})
 
-    def test_a_child_protection_targeted_injection_is_refused_up_front(self):
-        """Lead-ins are built for Birth Registrations only (finding 8)."""
+    @staticmethod
+    def _cp_plan_alone(injection):
+        """Child Protection's planning with `injection` the only scenario - the
+        planting is the point, not where the planted ones sit."""
         from generator.collections import child_protection as cp
         from generator import scenario_injection as si
-        from generator.anchor_date import get_anchor_date
-        from qa_tools.common import schedule
-        bad = si.Injection(scenario_id="TS-CPAMB", dataset_id="cp-clients", anchor=-10,
-                           config="t", arrivals=(si.ExtraArrival(
-                               0, "09:00", target=targeting.Target("amber")),))
+
         original = si.INJECTIONS
-        # ALONE: the refusal is the point, not where the planted ones sit.
-        si.INJECTIONS = (bad,)
+        si.INJECTIONS = (injection,)
         try:
-            periods = schedule.periods_for_dataset(cp.DATASET_ID,
-                                                   until=get_anchor_date())[-len(cp.RUN_PLAN):]
-            with pytest.raises(targeting.TargetError, match="TS-CPAMB.*lead-in"):
-                cp._plan_injections(periods)
+            periods = cp.generated_periods()
+            resolved, by_period = cp._plan_injections(periods)
+            return (periods, resolved, by_period,
+                    cp._ordinary_severities(cp.original_periods(), by_period),
+                    cp._grown_severities(cp.grown_periods(), by_period))
         finally:
             si.INJECTIONS = original
+
+    def test_a_child_protection_targeted_injection_is_planned_with_green_lead_ins(self):
+        """REQ-GEN-203 criterion 4, which lifted finding 8's refusal: a targeted
+        Child Protection supply has its lead-in quarters before it and the
+        quarter after it generated green, as Birth Registrations' are
+        (REQ-GEN-185) - each a single clean delivery."""
+        from generator.collections import child_protection as cp
+        from generator import scenario_injection as si
+
+        grown = cp.grown_periods()
+        # A GROWN QUARTER DRAWN CLEAN, with its neighbours drawn clean too.
+        plan = [s for _q, s in cp.grown_run_plan()]
+        k = next(i for i in range(2, len(grown) - 1)
+                 if plan[i - 2] is None and plan[i - 1] is None and plan[i] is None
+                 and plan[i + 1] is None)
+        # The grown quarters come first, so a positive index names one of them.
+        inj = si.Injection(scenario_id="TS-CPGRN", dataset_id="cp-clients", anchor=k,
+                           config="t", lead_in=2, arrivals=(si.ExtraArrival(
+                               0, "09:00", target=targeting.Target("green")),))
+        _periods, resolved, _by_period, _orig, grown_sevs = self._cp_plan_alone(inj)
+        [(_inj, placed)] = resolved
+        assert placed.period == grown[k].name
+        assert placed.lead_in == (grown[k - 2].name, grown[k - 1].name)
+        assert placed.follow == (grown[k + 1].name,)
+        names = [p.name for p in grown]
+        for name in placed.built_green:
+            assert grown_sevs[names.index(name)] is None, name
+
+    def test_a_child_protection_targeted_injection_whose_lead_ins_cannot_be_placed_is_refused(self):
+        """REQ-GEN-203 criterion 4: still refused, naming the scenario, where
+        its lead-in quarters fall before the generated history."""
+        from generator import scenario_injection as si
+
+        bad = si.Injection(scenario_id="TS-CPAMB", dataset_id="cp-clients", anchor=0,
+                           config="t", lead_in=1, arrivals=(si.ExtraArrival(
+                               0, "09:00", target=targeting.Target("green")),))
+        with pytest.raises(si.CannotPlace, match="TS-CPAMB.*lead-in"):
+            self._cp_plan_alone(bad)
+
+    def test_a_drawn_red_on_an_original_lead_in_is_refused_naming_the_scenario(self):
+        """A lead-in or following quarter is one clean delivery, so a red drawn
+        there would never be generated - refused naming the scenario, as the
+        grown quarters' plan already refuses it, never swallowed."""
+        from generator.collections import child_protection as cp
+        from generator import scenario_injection as si
+
+        plan = [s for _q, s in cp.run_plan()]
+        red = next(i for i, s in enumerate(plan) if s == "red" and i >= 2)
+        # Its anchor the quarter BEFORE the red, so the red is the following one.
+        anchor = red - 1 - len(plan)
+        inj = si.Injection(scenario_id="TS-CPRED", dataset_id="cp-clients", anchor=anchor,
+                           config="t", lead_in=1, arrivals=(si.ExtraArrival(
+                               0, "09:00", target=targeting.Target("green")),))
+        with pytest.raises(si.CannotPlace) as refused:
+            self._cp_plan_alone(inj)
+        assert "TS-CPRED" in str(refused.value) and "red" in str(refused.value)
 
 
 class TestEachPlantedScenarioSitsInItsEra:

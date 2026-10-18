@@ -73,7 +73,15 @@ class PairFile:
     or `corrected` (the first file's extract without its planted fault).
     `shape` names a per-file transform from FILE_SHAPES - a stray test file
     is `stray_test_rows`, a file the load refuses `unreadable_file`. A SHAPE, NEVER A VERDICT:
-    what the file IS, never what the pipeline will make of it."""
+    what the file IS, never what the pipeline will make of it.
+
+    `table` names the table the file carries, for a collection whose delivery
+    carries several (REQ-GEN-203: Child Protection's Client Register pairs):
+    the pair's files replace that table's usual one and every other table
+    comes as usual, at the delivery's one shared instant. None for a
+    one-table collection. `re_export` is the table re-pulled from the source
+    system - the same rows, each extracted an hour later - so its rows
+    differ from the extract's without either being wrong (TS-42)."""
 
     at: str
     name: str
@@ -84,6 +92,7 @@ class PairFile:
     #: also goes ragged is both).
     shapes: tuple[str, ...] = ()
     note: str = ""
+    table: str | None = None
 
     def filename(self, day: date) -> str:
         return self.name.replace("{D+1}", (day + timedelta(days=1)).isoformat()) \
@@ -95,7 +104,7 @@ class PairFile:
         return 1 if self.content == "next_day" else 0
 
 
-PAIR_CONTENTS = ("extract", "next_day", "duplicate", "corrected")
+PAIR_CONTENTS = ("extract", "next_day", "duplicate", "corrected", "re_export")
 
 
 @dataclass(frozen=True)
@@ -147,6 +156,9 @@ class ExtraArrival:
             if f.target is not None and f.severity is not None:
                 raise CannotPlace(f"a pair file at {f.at} names both a severity and a "
                                   f"target - it is one or the other")
+            if f.content == "re_export" and f.table is None:
+                raise CannotPlace(f"a pair file at {f.at} is a re-export of no table - a "
+                                  f"re-export names the table it re-pulls")
         if self.severity_tables and self.severity is None:
             raise CannotPlace(f"an arrival at {self.at} names the tables a severity "
                               f"dirties ({', '.join(self.severity_tables)}) and no severity")
@@ -444,9 +456,11 @@ FILE_SHAPES: dict[str, str] = {
 
 #: The shapes a single file of a pair may take (REQ-GEN-196).
 FILE_SHAPES_PER_FILE = ("unreadable_file", "stray_test_rows")
-#: The name columns a stray test file fills with TEST.
+#: The name columns a stray test file fills with TEST - Birth Registrations'
+#: registrant and parents, and Child Protection's client (REQ-GEN-203, TS-80).
 _TEST_NAME_COLUMNS = ("child_given_names", "child_family_name",
-                      "registering_parent_1_name", "registering_parent_2_name")
+                      "registering_parent_1_name", "registering_parent_2_name",
+                      "given_name", "family_name")
 
 
 def shape_file(shape: str | None, content: str) -> str:
@@ -671,6 +685,7 @@ def resolve(injection: Injection, periods: Sequence,
             # A PAIR'S FILES, each by its real name and receipt (REQ-GEN-196).
             "files": [{"filename": f.filename(anchor.date + timedelta(days=extra.day_offset)),
                        "at": f.at, "content": f.content, "severity": f.severity,
+                       "table": f.table,
                        "shapes": list(f.shapes), "note": f.note,
                        "built_for": (anchor.date + timedelta(
                            days=extra.day_offset + f.built_for)).isoformat(),
@@ -732,7 +747,8 @@ def link_dates(injection: Injection, placement: Placement,
     An arrival's instant is the one the generator writes - its placed day
     at its `at`, on the asset's clock. A scripted decision's is the one the
     replay plays it at: its supply's receipt, or its period's due instant
-    for a period-scoped one, plus `after_hours`.
+    for a period-scoped one, plus `after_hours` - or, for one timed at a wall
+    clock, its `at` on the day `day_offset` after the placement's.
     """
     from qa_tools.common import asset_time, scripted_decisions
 
@@ -780,6 +796,13 @@ def link_dates(injection: Injection, placement: Placement,
             return label, None, (f"{len(named)} scripted decisions of {', '.join(ours)} "
                                  f"are named {ref!r}, so it names none of them - rename one")
         s = named[0]
+        if s.at is not None and s.scope != scripted_decisions.PERIOD and s.period is None:
+            # AT A WALL CLOCK, as the replay times it (Player._timed): `at` on
+            # the day `day_offset` after the placement period's date.
+            at = scripted_decisions._wall_clock_after(s, placement.period)
+            return label, at, (None if at is not None else
+                               f"{label} cannot be timed: {s.dataset_id} has no date for "
+                               f"{placement.period}")
         if s.scope == scripted_decisions.PERIOD:
             base = scripted_decisions._due_at(s.dataset_id, placement.period)
             why = f"{s.dataset_id} has no slot for {placement.period}"
@@ -1887,6 +1910,71 @@ INJECTIONS: tuple[Injection, ...] = (
                     scenario_map.SUBSTITUTION_DRILL_DOWN),
                Link("TS-77b", 0, 0, "TS-77 promote", scenario_map.AS_AT_PANEL)),
         keeps_drawn_severity=True,
+    ),
+    # A CONTESTED CLIENT REGISTER IN CHILD PROTECTION (REQ-GEN-203): two
+    # cp_clients files in one delivery contest the table (REQ-PIPE-202), and its
+    # three readers' cross-table checks with it. TS-42's contest is ended by a
+    # later file and TS-80's by a person - the two ways it can end, on the one
+    # collection with cross-table readers. IN THE GROWN QUARTERS (REQ-GEN-207,
+    # criterion 5), each drawn clean with clean neighbours, so no planted
+    # scenario and no ordinary amber moves; 2021-Q4 to 2022-Q3 are TS-63's.
+    # Each pair file carries its own receipt and the other tables share the
+    # delivery's (criterion 2). Shapes and instants only (criterion 6).
+    Injection(
+        scenario_id="TS-42a",
+        dataset_id="cp-clients",
+        # 2019-Q4, its lead-in 2019-Q3 and following quarter 2020-Q1.
+        anchor=-28,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. "
+               "2019-Q4's delivery carries the usual files and two Client Registers - "
+               "cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose "
+               "rows differ - both before due; a clean cp_clients.csv follows alone on 29 "
+               "November at 10:00, after due and before 2020-Q1's window opens.",
+        arrivals=(
+            ExtraArrival(0, "08:30", note="the quarter's delivery, its Client Register sent "
+                                          "twice", files=(
+                PairFile("08:30", "cp_clients.csv", table="cp_clients",
+                         note="the quarter's Client Register"),
+                PairFile("08:40", "cp_clients_v2.csv", content="re_export", table="cp_clients",
+                         note="a re-export of it, its rows re-pulled - nobody can tell which "
+                              "is right"),
+            )),
+            # 28 DAYS: a Friday, weeks before 2020-Q1's window opens on 18 January.
+            ExtraArrival(28, "10:00", None,
+                         "a clean cp_clients alone - it supersedes the pair",
+                         file_shape="one_table_only", target=Target("green")),
+        ),
+        also_demonstrates=("TS-42b",),
+        lead_in=1,
+        # TS-42a ON THE PAIR'S ARRIVAL DAY, contested; TS-42b on the later
+        # file's, the pair superseded by it (criterion 7).
+        links=(Link("TS-42a", 0, 0, 1), Link("TS-42b", 0, 1, HISTORY_END)),
+    ),
+    Injection(
+        scenario_id="TS-80",
+        dataset_id="cp-clients",
+        # 2020-Q4, its lead-in 2020-Q3 and following quarter 2021-Q1.
+        anchor=-24,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. "
+               "2020-Q4's delivery carries the usual files and two Client Registers - a "
+               "stray test file, cp_clients_TEST.csv, at 08:20 on the due day and the real "
+               "cp_clients.csv at 08:30, both before 09:00; a person settles the pair at "
+               "11:00 the next day, the test file rejected and the real extract the "
+               "quarter's supply.",
+        arrivals=(
+            ExtraArrival(0, "08:20", note="the quarter's delivery, a test Client Register "
+                                          "and the real one", files=(
+                PairFile("08:20", "cp_clients_TEST.csv", table="cp_clients",
+                         shapes=("stray_test_rows",),
+                         note="test rows that should never have been sent - rejected"),
+                PairFile("08:30", "cp_clients.csv", table="cp_clients",
+                         target=Target("green"), note="the quarter's real Client Register"),
+            )),
+        ),
+        lead_in=1,
+        # ON THE PAIR'S ARRIVAL DAY, where it reads contested (REQ-GEN-196
+        # criterion 5's rule for a settled pair); settled from the next.
+        links=(Link("TS-80", 0, 0, "TS-80 settle"),),
     ),
     Injection(
         scenario_id="TS-78a",
