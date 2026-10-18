@@ -37766,6 +37766,9 @@ requirements:
   - id: REQ-TEST-260
     title: Sessions push far less often, CI's measured usage is a command away, and a private repository's
       free allowance decides the flip
+    signed_off:
+      by: Keith
+      date: '2026-10-18'
     date_written: '2026-10-18'
     story: As Keith, I want each piece of work pushed once its local gate is green rather than at every
       checkpoint, with CI's real billable minutes measured before and after, so that the repository can
@@ -37863,7 +37866,6 @@ requirements:
     - A MEASURING COMMAND, NOT A ONE-OFF SCRIPT, because the flip's precondition and every month after it
       need the same number, and CLAUDE.md requires anything run more than once to be a mothman command.
     open_questions: []
-
   - id: REQ-DOCS-259
     title: The repository is made private only once the private dashboard is live, a teammate has signed
       in, and CI fits the free allowance
