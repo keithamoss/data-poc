@@ -5152,6 +5152,19 @@ requirements:
         CLAUDE.md records a real ~13x suite regression from git-history
         walking that scaled with commit count AND diff size, and a
         full-tree rewrite commit is exactly that growth."
+      - >
+        WHERE THIS STARTED, carried from plans/publishing-and-history.md item 6
+        when it was deleted (2026-10-18): Keith asked on 2026-09-20 what
+        actually groups Child Protection data as a collection, and the answer
+        was four different names - COLLECTION_ID child-protection, contract id
+        child-protection-casework, name "Child Protection Casework Collection",
+        domain child-and-family-safety - while Birth Registrations named its
+        collection in four copy-pasted constants and never passed it to the
+        writer, and check_id skipped the collection level the URL carried. He
+        chose to KEEP the collection level (it groups things well, "even if it
+        means inventing some collection names for smaller agencies") over one
+        dataset holding several tables, and this requirement is that choice
+        stated once.
   - id: REQ-GEN-040
     title: The generator can deliver one table at a time, and can deliver early
     date_written: "2026-09-21"
@@ -7308,7 +7321,6 @@ requirements:
       - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/asset_time.py::end_of_day
       - qa_tools/common/arrival_classification.py::classify
-      - qa_tools/tools/dataset_stats.py::_earliest_extract
       - contract/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
     evidence:
@@ -11255,7 +11267,6 @@ requirements:
     implemented_by:
       - qa_tools/common/arrival_classification.py::classify
       - qa_tools/common/arrival_classification.py::describe
-      - qa_tools/tools/dataset_stats.py::_earliest_extract
     unmet_criteria:
       - criterion: >-
           Criterion 9, in part - recording the classification with the supply
@@ -36700,6 +36711,7 @@ requirements:
       - "ELEVEN REQUIREMENTS, NOT position.md call 12's EIGHT (main session's round-2 call): dashboard and CLI split; behavioural retirement and shape unification split; the fake-collection proof added."
       - "AWS IS SCOPED OUT (position.md call 9): the ingest handlers reach collections only through s3_arrival and the processing pass, which this rewires; tests/test_lambda_handlers.py must still pass."
       - "PROPOSED WORDING FOR REQ-PIPE-170 CRITERION 31, for Keith (built behaviour, outside the delegation; position.md call 13): 'WHEN a replay of every collection the data asset declares finishes - a bootstrap, or `mothman pipeline run` over all of them - THE SYSTEM SHALL confirm every pending correction dated up to now, the oldest first, through the same confirmation a person uses, as the synthetic actor holding the asset manager role during playback, and SHALL rebuild every collection's results if any was confirmed; a replay of fewer than every collection SHALL leave them pending. AMENDED <date applied> by REQ-PIPE-240.'"
+      - "WHY THIS CHAIN EXISTS, carried from plans/publishing-and-history.md item 6 when it was deleted (REQ-PIPE-248 built, 2026-10-18): Keith, 2026-09-19, 'every new data set currently means copy pasting a whole file and manually picking apart which parts to keep - that is not tolerable'; on 2026-10-15 night he chose to GENERALISE FIRST, before adding the Emergency Department dataset, and defined done as 'small adapter per collection' - shared per-tool code plus one short module per collection for what genuinely differs. REJECTED both ends of that: config only with no Python (plans/qa-pipeline.md #84 found the per-collection check-to-field logic is genuinely different, so forcing it into one abstraction to cut the file count is false DRY), and fixing only the dispatch points (it leaves the copy-paste in place)."
     open_questions:
       - "APPROVED (Keith, 2026-10-16, 'Approve as written'): the proposed wording for REQ-PIPE-170 criterion 31, applied in this requirement's change (criterion 14)."
       - "CHECK AT BUILD (not for Keith): that adding short and run_prefix to a collection entry is not a change agreement_freeze (REQ-PIPE-111) refuses."
@@ -36763,7 +36775,6 @@ requirements:
       - tests/test_run_evidently_cp_real.py
     implemented_by:
       - qa_tools/common/validate_check_lifecycle.py::_sources
-      - qa_tools/common/validate_check_lifecycle.py::_legacy_sources
       - qa_tools/common/validate_check_lifecycle.py::sources_fingerprint
       - qa_tools/common/validate_check_lifecycle.py::dbt_definitions
       - qa_tools/common/check_lifecycle.py::evidently_checks_from_text
@@ -37521,6 +37532,29 @@ requirements:
       - REQ-PIPE-243
       - REQ-DASH-244
       - REQ-QAC-241
+    linked_tests:
+      - tests/test_dataset_stats.py
+      - tests/test_build_dashboard_data.py
+      - tests/test_build_dashboard_child_protection.py
+      - tests/test_orchestrate_shared.py
+      - tests/test_collections_registry.py
+      - tests/test_run_evidently_bdm.py
+      - tests/test_evidently_recorded_reference.py
+      - tests/test_equivalence.py
+      - tests/test_publish.py
+      - tests/test_dashboard_e2e.py
+    implemented_by:
+      - qa_tools/tools/dataset_stats.py::compute_dataset_stats
+      - qa_tools/tools/run_evidently.py::_volume_per_table
+      - qa_tools/common/evidently_common.py::recorded_row_counts
+      - qa_tools/tools/results_history.py::build_results_from_history
+      - qa_tools/tools/stage.py::stage_table
+      - qa_tools/tools/orchestrate.py::entry_for
+      - pipeline/build_dashboard_data.py::build
+      - qa_tools/collections/__init__.py::Collection
+      - qa_tools/common/validate_collections.py::config_problems
+      - qa_tools/common/equivalence.py::compare
+      - dbt_project/models/civil-registration/stg_birth_registrations.sql
     decisions:
       - "AGENCY SHORTS IN THE FILE NAMES (Keith, 2026-10-16, 'Add agency shorts'): agencies get a short of their own, since bdm and cp are collection shorts. PROPOSED values, to confirm at build: registry-services -> rs, child-protection-family-support -> cpfs, department-of-health -> doh."
       - "SIGNIFICANT, FOR KEITH TO SENSE-CHECK - UNIFY ON CHILD PROTECTION'S N-TABLE FORMS (main session, position.md call 3): Birth Registrations' history is regenerated. REJECTED keeping two shapes behind a per-collection switch: every reader would carry both forever."
@@ -37530,8 +37564,12 @@ requirements:
       - "TWO ITEMS LEFT THIS REQUIREMENT FOR REQ-QAC-247 (Keith, 2026-10-18): stats.zero_counts_kept (kept for every collection, criterion 1 amended) and evidently.volume_from_drift_frame, which turned out to be behaviour rather than shape."
       - "TWO OF REQ-QAC-247'S RESOLUTIONS LAND IN THIS REQUIREMENT'S STATS STEP (Keith, 2026-10-18): evidently.volume_from_drift_frame unified on Child Protection's per-table count, and earliest_extract no longer recorded - both decided in REQ-QAC-247, both moved here because they read or write the stats record this requirement reshapes (Birth Registrations' `row_count` becoming `row_counts`). Each is still its own commit, inside the capture this requirement already compares."
       - "AGENCY SHORTS CONFIRMED (Keith, 2026-10-18): registry-services -> rs, child-protection-family-support -> cpfs, as proposed at scoping."
-    open_questions:
-      - "CHECK AT BUILD (not for Keith): whether Birth Registrations' row-count-growth check reads the previous run's row_count from its Evidently raw output; if it does, criterion 3 moves that read to the dataset stats first, as its own behaviour-preserving step."
+      - "CRITERION 3 ANSWERED AT BUILD (the open question that sat here): nothing read the row_count snapshot in Birth Registrations' Evidently raw output - the row-count-growth check read its reference from the dataset stats once REQ-QAC-247's volume call unified it on Child Protection's per-table count - so the snapshot went with that change (d7ba899) and needed no behaviour-preserving step first."
+      - "SCOPING IS BY THE RUN'S VIEW SCHEMA ALONE: a run's view holds exactly the arrival's rows, so stats.rows_by_run_id, the data_run_id plumbing and the aggregates' bind-parameter seam went (3bc9f00). REJECTED keeping a run_id filter as belt and braces: it would be a second definition of which rows a run is, and could disagree with the view."
+      - "BIRTH REGISTRATIONS' STAGED ROWS ARE AS DELIVERED: stage.stamps_run_columns, the last legacy flag, retired (c0503e6), and stg_birth_registrations selects no run_id/run_date. With it legacy.KNOWN is empty, so criterion 6 and REQ-QAC-247 criterion 5 are one gate: any declared legacy flag fails the collections gate."
+      - "THE LEGACY EVIDENTLY READER WENT ON A CHECKED BASIS, not a date: the remote branch tip (8e643ae) already carries REQ-QAC-241, so no diff base anyone can compare against predates the move (7ef2684). The migration allowlist emptied with it."
+      - "AN ARRIVAL'S RUN ENTRY IS ITS OWN for every collection: entry_carries_csv_path retired (5ac0906) - Birth Registrations' extra csv_path was read by nothing."
+      - "EMPTY SECTIONS: a one-table collection gets no Cross-table section and always gets its Table-level one (REQ-QAC-247's call), so Birth Registrations' page shows supply and table sections in that order."
 
   - id: REQ-TEST-249
     title: "A fake collection added to a copy of the repository - its configuration, check files, adapter and provider, nothing else - goes from generation to a rendered page, proving a collection is a small adapter"

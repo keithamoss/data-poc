@@ -279,8 +279,9 @@ one dataset gets disabled by users; navigation built for a 2-item tree
 is a different problem at 30), and a design that assumes a recurring
 supply excludes the project-extraction shape entirely. Neither is
 visible from the current repo, so it has to be carried in deliberately.
-See `plans/publishing-and-history.md` item 6 and `plans/running-
-thoughts.md` #23 for the design work this is feeding.
+See REQ-PIPE-240 to REQ-PIPE-248 (the collection registry and the shared
+per-tool code that replaced `plans/publishing-and-history.md` item 6) and
+`plans/running-thoughts.md` #23 for the design work this is feeding.
 
 Rough layout:
 

@@ -470,7 +470,7 @@ tools/common/check_lifecycle.py`'s own `check_id` convention.
     **Keith's answers, 2026-10-15 ~23:20 Perth, after the delivery-architect
     pass:**
     - Q1 code shape: **generalise first** - resolve
-      `plans/publishing-and-history.md` #6 (one module per tool, not per
+      `plans/publishing-and-history.md` #6, now REQ-PIPE-240 to REQ-PIPE-248 (one module per tool, not per
       dataset) before Emergency Department, which becomes its first user.
       (Not the architect's recommendation, which was a collection registry
       plus copied runners; his call, made with the trade-off stated.)

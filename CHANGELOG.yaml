@@ -135,6 +135,15 @@ releases:
               all go through one shared module each, reading what differs from
               the collection's adapter. The last ten copied modules are gone,
               and both collections record exactly what they did before.
+          - headline: Birth Registrations is no longer a special case
+            components: ["Pipeline & publishing"]
+            description: >
+              Birth Registrations now records and publishes its results in the
+              same shape as Child Protection, as a collection with one table.
+              Its row-count check is counted for its table like every other
+              collection's. Each collection's report files are named from its
+              agency and collection, for example
+              `reports/results_rs_civil-registration.json`.
           - headline: One synthetic data generator for every collection
             components: ["Data generation"]
             description: >

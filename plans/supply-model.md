@@ -613,7 +613,7 @@ how a closed question gets silently reopened:
    we get to batch six." Not an input to batches 1-5, so it does not
    gate the scoper.
 3. **"Current version" vs "good version"** - inherited from
-   `plans/publishing-and-history.md` item 6, deliberately parked to be
+   `plans/publishing-and-history.md` item 6 (deleted 2026-10-18 once REQ-PIPE-240 to REQ-PIPE-248 were built; its decisions are on those requirements and REQ-QAC-039), deliberately parked to be
    settled alongside `plans/conceptual-design.md` Thread A's amber
    accept/reject governance rather than separately.
 
@@ -2532,7 +2532,7 @@ exist.
 **Not in these sprints, deliberately.** Adding two more datasets and
 making the data-asset level concrete (`plans/running-thoughts.md` #23)
 is sequenced AFTER this work - it is what makes the file-architecture
-question in `plans/publishing-and-history.md` item 6 answerable, and it
+question in `plans/publishing-and-history.md` item 6 (now REQ-PIPE-240 to REQ-PIPE-248, all built) answerable, and it
 needs the model here to be real first.
 
 ## Sign-off pack for sprint 26 (2026-09-27)
