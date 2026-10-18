@@ -59,8 +59,4 @@ KNOWN: dict[str, str] = {
     "dashboard.drops_empty_sections": (
         "a section with no checks is left out of the dataset, rather than shown with "
         "a 'No automated quality rule defined' card as every other collection's is."),
-    "dashboard.reference_reason_fallback": (
-        "a check reads as not evaluated only on a tool's own reason, or on its "
-        "reference's reason when it is red with no value; can't-run records keep the "
-        "order they were recorded in rather than following the real results."),
 }

@@ -321,10 +321,6 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     table, dataset_id = dataset.table, dataset.dataset_id
     legacy = _legacy(coll)
     single = "stats.single_table_shape" in legacy
-    # BIRTH REGISTRATIONS' READING OF "NOT EVALUATED" (legacy flag): only a
-    # tool's own reason, or a red's reference reason - and its records keep
-    # the order they were recorded in.
-    reference_fallback = "dashboard.reference_reason_fallback" in legacy
     meta = column_meta(coll, dataset)
     all_columns = list(meta)
     stats_spec = collections.adapter(coll).stats
@@ -333,14 +329,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
 
     cross_table_ids = _cross_table_check_ids()
     by_column: dict[str, dict[str, dict]] = {}
-    if not reference_fallback:
-        # A CHECK THAT COULD NOT BE EVALUATED (post-build-review #77) arrives
-        # under a pseudo-tool with a check_name of its own, so keying it like
-        # a real result would open a SECOND card for the same check. Real
-        # results go first so every check's card exists, and each can't-run
-        # record then joins the card with its check_id.
-        results = ([r for r in results if not _not_evaluated_reason(r)]
-                   + [r for r in results if _not_evaluated_reason(r)])
+    # A CHECK THAT COULD NOT BE EVALUATED (post-build-review #77) arrives
+    # under a pseudo-tool with a check_name of its own, so keying it like
+    # a real result would open a SECOND card for the same check. Real
+    # results go first so every check's card exists, and each can't-run
+    # record then joins the card with its check_id.
+    results = ([r for r in results if not _not_evaluated_reason(r)]
+               + [r for r in results if _not_evaluated_reason(r)])
     for r in results:
         if r["check_id"] in cross_table_ids:
             # Ahead of the column_name branches below, deliberately: a
@@ -364,8 +359,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
             "status_by_run": {}, "reference": {}, "not_evaluated": {},
         })
-        slot["not_evaluated"][r["run_id"]] = (r.get("not_evaluated_reason") if reference_fallback
-                                              else _not_evaluated_reason(r))
+        slot["not_evaluated"][r["run_id"]] = _not_evaluated_reason(r)
         slot["by_run"][r["run_id"]] = r["metric_value"]
         # item 74 Bug A: the tool's own verdict, carried through rather than
         # dropped here and re-derived from thresholds downstream.
@@ -410,17 +404,9 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 if attach_aggregate:
                     aggregate_values = (dataset_stats.get(run_id) or {}).get(
                         "check_aggregates", {}).get(_aggregate_key(table, col, single))
-                if reference_fallback:
-                    # Criterion 9's red is NOT EVALUATED, said in words.
-                    not_evaluated = slot["not_evaluated"].get(run_id) or (
-                        (slot["reference"].get(run_id) or {}).get("reason")
-                        if slot["status_by_run"].get(run_id) == "red"
-                        and slot["by_run"][run_id] is None
-                        and slot["reference"].get(run_id) else None)
-                else:
-                    # Why this run's check could NOT be evaluated, or None
-                    # for a real verdict - never a value or a pass.
-                    not_evaluated = slot["not_evaluated"].get(run_id)
+                # Why this run's check could NOT be evaluated, or None for a
+                # real verdict - never a value or a pass.
+                not_evaluated = slot["not_evaluated"].get(run_id)
                 history.append({
                     "run_id": run_id, "run_date": run_date_by_id[run_id],
                     "value": slot["by_run"][run_id],
