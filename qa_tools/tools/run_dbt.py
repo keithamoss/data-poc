@@ -187,7 +187,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         run_results = json.load(f)
 
     nodes = test_nodes(manifest)
-    if exclude and "dbt.no_left_out_note" not in legacy:
+    if exclude:
         # SAID, so the run can reconcile it (REQ-PIPE-115 criterion 17).
         ran = {r["unique_id"] for r in run_results["results"]}
         wanted = set(asked)

@@ -130,7 +130,6 @@ ADAPTER = CollectionAdapter(
         "evidently.volume_from_drift_frame",
         "dbt.no_built_model_guard",
         "dbt.audits_skipped_tests",
-        "dbt.no_left_out_note",
         "stage.stamps_run_columns",
         "stats.single_table_shape",
         "stats.rows_by_run_id",

@@ -727,14 +727,13 @@ class TestTheSharedToolModules:
         [r], _, _, _ = self._dbt(monkeypatch, tmp_path, legacy=legacy, built=False)
         assert r["row_count_total"] == total
 
-    @pytest.mark.parametrize("legacy,noted", [
-        (frozenset(), ["fake.not_null_dbt"]), (frozenset({"dbt.no_left_out_note"}), [])])
-    def test_dbt_no_left_out_note(self, third_collection, monkeypatch, tmp_path, legacy, noted):
+    def test_dbt_notes_a_test_left_out_for_an_unreadable_model(self, third_collection,
+                                                                 monkeypatch, tmp_path):
         """A test excluded for an unreadable model never runs, so it is absent
-        from run_results - and is noted as left out unless the flag says not."""
-        _, _, _, notes = self._dbt(monkeypatch, tmp_path, legacy=legacy, unreadable={FAKE_TABLE},
+        from run_results - and is noted as left out."""
+        _, _, _, notes = self._dbt(monkeypatch, tmp_path, unreadable={FAKE_TABLE},
                                    asked=["fake.not_null_dbt"], ran=False)
-        assert notes == noted
+        assert notes == ["fake.not_null_dbt"]
 
     def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
         import dataclasses
