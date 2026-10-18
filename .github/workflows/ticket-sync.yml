@@ -21,8 +21,8 @@ name: Sync QA status to GitHub Issues
 # Keith's own explicit call when scoping this.
 #
 # Reads ONLY the same CI-safe, committed-history-only build chain
-# deploy-pages.yml already runs (qa_tools.{bdm,cp}.build_results_from_
-# history -> pipeline.build_{,cp_}dashboard_data) - never data/, never
+# deploy-pages.yml already ran (qa_tools.tools.results_history ->
+# pipeline.build_dashboard_data) - never data/, never
 # a live DuckDB connection, per CLAUDE.md's hard rule. No dashboard
 # embed step needed here (that's HTML-specific, this workflow never
 # touches the dashboard itself), and no Playwright/Chromium install

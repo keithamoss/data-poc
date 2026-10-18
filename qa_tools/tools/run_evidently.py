@@ -162,6 +162,12 @@ def _volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id) -> 
     counts = _current_row_counts(run_id, checks.row_drop)
     reference = (None if reference_run_id is None
                  else recorded_row_counts(coll.agency_id, coll.id, reference_run_id))
+    if reference_run_id is not None and reference is None:
+        # NOTHING RECORDED FOR IT - a hand-supplied check's reference, staged
+        # moments ago and never through QA here: count its staged rows, as
+        # _reference_frame rebuilds the drift reference from them
+        # (post-build-review #236).
+        reference = _current_row_counts(reference_run_id, checks.row_drop)
     out = []
     for table, check_id in checks.row_drop.items():
         if table not in counts:

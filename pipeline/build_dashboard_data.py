@@ -633,6 +633,15 @@ def build_datasets(collection_id: str) -> list[dict]:
     manifest = sorted(payload["runs"], key=_run_date)
     results = payload["results"]
     dataset_stats = payload["dataset_stats"]
+    # ONE RECORDED SHAPE (REQ-PIPE-248): a record without `row_counts` was
+    # written before it, and read as this shape it would say every table
+    # measured nothing (post-build-review #236).
+    for run_id, stats in dataset_stats.items():
+        if "row_counts" not in stats:
+            raise ValueError(
+                f"{coll.id}: run {run_id}'s dataset stats have no row_counts - recorded in the "
+                f"shape before REQ-PIPE-248. Regenerate the history: `mothman env "
+                f"reset-synthetic`, then `mothman pipeline bootstrap`.")
 
     # Every real check definition, active and retired - config-file parsing
     # only, no supply rows, so safe for any read-committed-history path.

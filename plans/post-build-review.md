@@ -10444,3 +10444,45 @@ twice. It deliberately did not re-find the `TypeError`.
      gate and passes now, and two tests that used the short `bdm` as their
      example literal use the id `civil-registration` instead. REQ-PIPE-240's
      criterion 8 is amended to say so, with the reason in its decisions.
+
+236. **[done, 2026-10-18]** **[Pipeline & publishing]** **The post-build critic on
+     REQ-QAC-247 and REQ-PIPE-248.** One defect, one silent-reading risk, one
+     latent shape question and leftovers; each verified against the code before
+     it was acted on.
+     - DEFECT, FIXED TEST-FIRST: a hand-supplied check's volume result always
+       read "no reference". `mothman bdm qa --file X --reference-file Y` stages
+       the reference without checking it, so nothing is recorded for it, and the
+       shared per-table volume path read only the record, where Birth
+       Registrations' retired path had counted the reference's rows. The drift
+       check already fell back to the staged rows. The test that should have
+       caught it, tests/test_run_evidently_bdm.py, had a stand-in recounting live
+       in place of the record; removing it made
+       test_dirty_run_produces_a_real_row_count_drop_failure fail ("nodata"
+       where "fail" was expected), and `_volume_per_table` now counts the
+       reference's staged rows when nothing is recorded for it, as
+       `_reference_frame` does. It applies to Child Protection too, which never
+       had the fallback. A bootstrap's references are always recorded runs, so
+       a recorded history should not change; the re-capture says whether it did.
+     - RISK, FIXED TEST-FIRST: a database recorded before REQ-PIPE-248 holds
+       Birth Registrations' stats as one `row_count`, and the builder read that
+       as "no table measured" - every row count absent, totals zero, no error.
+       tests/test_build_dashboard_data.py's
+       test_a_stats_record_in_the_old_single_table_shape_is_refused failed, and
+       the build now refuses a record without `row_counts`, naming the run and
+       the two commands that regenerate.
+     - LATENT, NOT CHANGED, FOR KEITH: `value_counts` is still keyed by bare
+       column, not `table.column` as the aggregates are, so two tables of one
+       collection declaring value counts on the same column name would
+       overwrite each other, the second's distribution becoming the first's
+       drift reference. No collection does today; changing the key changes the
+       recorded shape, which is REQ-PIPE-248's kind of change and wants a
+       capture of its own. Worth a line in a requirement before the thirtieth
+       collection, not tonight.
+     - POLISH, DONE: the collections gate's legacy-flag message now says every
+       flag is retired; the adapter's `legacy` field documented as retired; the
+       trial run entry no longer carries `csv_path`; stale
+       `qa_tools.{bdm,cp}.build_results_from_history` prose in the ticket-sync
+       workflow comment and `cli/dashboard.py`; dead `legacy=` parameters in four
+       test helpers, and one test that duplicated its neighbour's column
+       assertion deleted. Left: `entry_for`'s now-unused `collection_id`
+       parameter, kept so the four step functions keep one signature.

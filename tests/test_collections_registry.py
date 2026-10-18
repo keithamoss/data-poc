@@ -536,7 +536,7 @@ class TestTheSharedToolModules:
 
         assert (len(got), len(notes)) == (0, 1)
 
-    def _soda(self, monkeypatch, tmp_path, legacy=frozenset(), soda=None, readable=(FAKE_TABLE,),
+    def _soda(self, monkeypatch, tmp_path, soda=None, readable=(FAKE_TABLE,),
               extra_checks=()):
         """The shared Soda runner over a stub scan, for the third collection:
         one generic check with a filter, one custom-named `failed rows`."""
@@ -547,7 +547,7 @@ class TestTheSharedToolModules:
 
         adapter = sys.modules["qa_tools.collections.fake_collection"]
         adapter.ADAPTER = dataclasses.replace(
-            adapter.ADAPTER, legacy=legacy,
+            adapter.ADAPTER,
             soda=soda or SodaSpec(data_source="fake_source",
                                   column_by_name={"things pair up": "things"},
                                   label_by_name={"things pair up": "Pairing"}))
@@ -630,18 +630,15 @@ class TestTheSharedToolModules:
             pass  # nothing readable, so no row count for the stub's checks
         assert handed == [{FAKE_TABLE}]
 
-    def _evidently(self, monkeypatch, legacy=frozenset(), readable=True):
+    def _evidently(self, monkeypatch, readable=True):
         """The shared Evidently runner for the third collection, the tool and
         the warehouse stood in for: one drift check, one volume check."""
-        import dataclasses
 
         import pandas as pd
 
         from qa_tools.common.evidently_common import EvidentlyChecks
         from qa_tools.tools import run_evidently as ev
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
-        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=legacy)
         prefix = f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}"
         band = {"warn_threshold": 0.1, "fail_threshold": 0.25}
         checks = EvidentlyChecks(
@@ -679,7 +676,7 @@ class TestTheSharedToolModules:
         got, _, notes = self._evidently(monkeypatch, readable=False)
         assert ("drift:PSI" in got, bool(notes)) == (False, True)
 
-    def _dbt(self, monkeypatch, tmp_path, legacy=frozenset(), status="pass", built=True,
+    def _dbt(self, monkeypatch, tmp_path, status="pass", built=True,
              unreadable=frozenset(), asked=(), ran=True):
         """The shared dbt runner for the third collection, dbt itself and the
         warehouse stood in for: one not_null test on its one model, and one
@@ -692,7 +689,7 @@ class TestTheSharedToolModules:
 
         adapter = sys.modules["qa_tools.collections.fake_collection"]
         adapter.ADAPTER = dataclasses.replace(
-            adapter.ADAPTER, legacy=legacy,
+            adapter.ADAPTER,
             dbt=DbtSpec(dimension_by_test={"not_null": "completeness"},
                         label_by_test={"not_null": "Null rate"}))
         mine = {"name": "not_null_x", "resource_type": "test", "column_name": "things",
@@ -789,7 +786,8 @@ class TestTheSharedToolModules:
         got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
                                             "fake_collection"))
         assert got == ["qa_tools/collections/fake_collection.py declares legacy flag "
-                       "'no.such.flag', which no shared module knows (qa_tools/tools/legacy.py)"]
+                       "'no.such.flag', but every legacy flag is retired (REQ-QAC-247, REQ-PIPE-248) - "
+                       "remove it, or unify the behaviour it preserved"]
 
 
 class TestTheSharedStagingModule:
@@ -799,14 +797,11 @@ class TestTheSharedStagingModule:
 
     RECEIVED = "2026-01-01T01:00:00+00:00"
 
-    def _stage(self, tmp_path, monkeypatch, legacy=frozenset()):
-        import dataclasses
+    def _stage(self, tmp_path, monkeypatch):
 
         from qa_tools.common import supply_db
         from qa_tools.tools import stage
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
-        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=legacy)
         contract = tmp_path / "fake-contract.yaml"
         contract.write_text(yaml.safe_dump({"schema": [{"name": FAKE_TABLE, "properties": [
             {"name": "fake_id"}, {"name": "things"}]}]}))
@@ -833,13 +828,6 @@ class TestTheSharedStagingModule:
         assert cols == ["fake_id", "things"]
         [record] = [r for r in load_log.records() if r.physical == physical]
         assert record.dataset_id == FAKE_DATASET
-
-    def test_a_staged_table_holds_the_rows_as_delivered(
-            self, third_collection, supply_dsn, tmp_path, monkeypatch):
-        """No column is added to a staged table for any collection
-        (REQ-PIPE-248 retired Birth Registrations' run_id/run_date stamp)."""
-        _, cols, _ = self._stage(tmp_path, monkeypatch, frozenset())
-        assert cols == ["fake_id", "things"]
 
 
 class TestTheSharedOrchestratorStatsAndRebuild:

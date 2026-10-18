@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from qa_tools.common.check_lifecycle import CheckMetadata
 from pipeline import build_dashboard_data as bdd
 from qa_tools import collections
@@ -559,3 +561,22 @@ def test_a_check_soda_could_not_evaluate_says_why(tmp_path, monkeypatch):
     assert by_run["run_002"]["status"] == "red"
     assert by_run["run_002"]["not_evaluated"] == "Soda could not evaluate it - needs Soda Cloud"
     assert by_run["run_001"]["not_evaluated"] is None
+
+
+def test_a_stats_record_in_the_old_single_table_shape_is_refused(tmp_path, monkeypatch):
+    """post-build-review #236: a database recorded before REQ-PIPE-248 holds
+    Birth Registrations' stats as one `row_count`. Read as the N-table shape
+    it found no `row_counts`, so every row count came out absent and the
+    totals zero, with no error. A record with no `row_counts` is refused,
+    naming the run, rather than read as having measured nothing."""
+    _no_retired_checks(monkeypatch)
+    old = {**FIXTURE_DATASET_STATS["run_002"]}
+    old.pop("row_counts")
+    old["row_count"] = 4
+    path = tmp_path / "results_rs_civil-registration.json"
+    path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS,
+                                "dataset_stats": {**FIXTURE_DATASET_STATS, "run_002": old}}))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
+
+    with pytest.raises(ValueError, match="run_002.*row_counts"):
+        bdd.build(_BDM)

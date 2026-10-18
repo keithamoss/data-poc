@@ -4,8 +4,8 @@ here calls the real, unmodified function each retired bare-script
 invocation already called - this is a reorg of entry points, not a
 rewrite of what they do. CI-safe: none of this ever opens data/raw/,
 data/cp_raw/, or any DuckDB warehouse - every number comes from
-committed qa_results/ history (qa_tools.{bdm,cp}.build_results_from_
-history) or from files these commands themselves just wrote."""
+recorded QA history (qa_tools.tools.results_history) or from files
+these commands themselves just wrote."""
 from __future__ import annotations
 
 import rich_click as click

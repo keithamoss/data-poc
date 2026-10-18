@@ -337,7 +337,7 @@ def run_single_file(collection_id: str, run_id: str, table: str, csv_path: str, 
     # exists and before run_one's own tidy-up can reach it.
     run_by = run_by or get_run_by()
     run_timestamp = asset_time.now().isoformat()
-    entry = {"run_id": run_id, "run_index": 1, "csv_path": csv_path,
+    entry = {"run_id": run_id, "run_index": 1,
              "received_at": asset_time.isoformat(
                  received_at or asset_time.start_of_day(date.fromisoformat(run_date))),
              "delivery": run_id}

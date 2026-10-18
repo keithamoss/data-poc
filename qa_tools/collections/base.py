@@ -94,8 +94,9 @@ class CollectionAdapter:
     #: its own (REQ-PIPE-243 criterion 2); None means no window, never a
     #: borrowed one.
     claim_window_dataset: str | None = None
-    #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place
-    #: this collection's recorded output differs from what the shared code
-    #: would produce. Every name is in qa_tools/tools/legacy.py, which says
-    #: what it preserves; `mothman check` refuses one that is not.
+    #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4), ALL RETIRED: each
+    #: preserved one place a collection's recorded output differed from the
+    #: shared code's, and REQ-QAC-247 and REQ-PIPE-248 unified every one, so
+    #: qa_tools/tools/legacy.py knows none and `mothman check` refuses any
+    #: flag declared here. Kept as a field so that refusal can name it.
     legacy: frozenset = frozenset()

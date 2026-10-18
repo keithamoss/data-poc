@@ -113,13 +113,16 @@ def config_problems(package: Path | None = None) -> list[str]:
             if adapter.collection_id != c.id:
                 problems.append(f"qa_tools/collections/{c.module_name}.py is the adapter of "
                                 f"{adapter.collection_id!r}, not {c.id!r}")
-    # REQ-QAC-242 criterion 5: a legacy flag only the shared modules know.
+    # REQ-QAC-242 criterion 5, closed by REQ-QAC-247 criterion 5 and REQ-PIPE-248
+    # criterion 6: every legacy flag is retired, so legacy.KNOWN is empty and
+    # any flag an adapter declares fails.
     from qa_tools.tools import legacy
     for c in declared:
         if c.id in loaded:
             for flag in sorted(loaded[c.id].legacy - set(legacy.KNOWN)):
                 problems.append(f"qa_tools/collections/{c.module_name}.py declares legacy flag "
-                                f"{flag!r}, which no shared module knows (qa_tools/tools/legacy.py)")
+                                f"{flag!r}, but every legacy flag is retired (REQ-QAC-247, REQ-PIPE-248) - "
+                                f"remove it, or unify the behaviour it preserved")
     for orphan in sorted(modules - set(wanted)):
         problems.append(f"qa_tools/collections/{orphan}.py names no declared collection")
 
