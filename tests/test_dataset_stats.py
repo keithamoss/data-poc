@@ -19,16 +19,15 @@ def test_bdm_compute_dataset_stats_shape():
     conn = duckdb.connect(":memory:")
     conn.execute("""
         CREATE TABLE birth_registrations (
-            run_id VARCHAR, sex VARCHAR, place_of_birth_suburb VARCHAR,
+            sex VARCHAR, place_of_birth_suburb VARCHAR,
             date_of_birth DATE, date_registered DATE, extract_timestamp TIMESTAMP
         )
     """)
     conn.execute("""
         INSERT INTO birth_registrations VALUES
-        ('run_01', 'M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 10:00:00'),
-        ('run_01', 'F', 'Fremantle', '2020-02-01', '2020-02-05', '2020-02-05 12:00:00'),
-        ('run_01', 'Q', 'Fremantle', '2020-03-01', '2020-03-05', '2020-03-05 08:00:00'),
-        ('run_02', 'M', 'Fremantle', '2021-01-01', '2021-01-05', '2021-01-05 10:00:00')
+        ('M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 10:00:00'),
+        ('F', 'Fremantle', '2020-02-01', '2020-02-05', '2020-02-05 12:00:00'),
+        ('Q', 'Fremantle', '2020-03-01', '2020-03-05', '2020-03-05 08:00:00')
     """)
     arrival = {"run_id": "run_01", "run_index": 1, "delivery": "BDM_20200105",
                "received_at": "2020-01-05T06:00:00+00:00",
@@ -45,26 +44,6 @@ def test_bdm_compute_dataset_stats_shape():
         "measured from the warehouse, not taken from the arrival"
     assert stats["value_counts"]["sex"] == [["M", 1], ["F", 1], ["X", 0], ["(invalid code)", 1]]
     assert stats["check_aggregates"]["birth_registrations.sex"]["total_invalid"] == 1  # 'Q'
-
-
-def test_bdm_check_aggregates_are_scoped_by_run_id():
-    conn = duckdb.connect(":memory:")
-    conn.execute("""
-        CREATE TABLE birth_registrations (
-            run_id VARCHAR, sex VARCHAR, place_of_birth_suburb VARCHAR,
-            date_of_birth DATE, date_registered DATE, extract_timestamp TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        INSERT INTO birth_registrations VALUES
-        ('run_01', 'M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 10:00:00'),
-        ('run_02', 'Q', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 10:00:00')
-    """)
-
-    stats = dataset_stats.compute_dataset_stats(BDM, conn, {"run_id": "run_01", "received_at": "2020-01-05T06:00:00+00:00"})
-
-    # run_02's invalid 'Q' must not leak into run_01's own aggregate
-    assert stats["check_aggregates"]["birth_registrations.sex"]["total_invalid"] == 0
 
 
 def test_cp_compute_dataset_stats_shape():

@@ -230,7 +230,7 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
         # re-check recorded without one crashed it the first time a history
         # held a re-check that ran.
         "run_index": _run_index_of(first),
-        "csv_path": "", "data_run_id": first,
+        "csv_path": "",
         # WHAT THIS RUN IS FOR, AND WHY (criteria 3 and 4).
         "purpose": {"dataset_id": dataset_id, "supply_id": supply_id, "period": period,
                     **purpose},

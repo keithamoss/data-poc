@@ -107,6 +107,5 @@ ADAPTER = CollectionAdapter(
     claim_window_dataset="birth-registrations",
     legacy=frozenset({
         "stage.stamps_run_columns",
-        "stats.rows_by_run_id",
     }),
 )

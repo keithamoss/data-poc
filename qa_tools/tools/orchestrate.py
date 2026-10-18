@@ -186,8 +186,7 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     _announce(on_step, RUN_STEPS[4])
     conn = supply_db.connect(read_only=True)
     conn.execute(f"SET search_path = '{supply_db.run_schema(run_id)}'")
-    stats = dataset_stats.compute_dataset_stats(coll.id, conn, entry,
-                                                entry.get("data_run_id", run_id))
+    stats = dataset_stats.compute_dataset_stats(coll.id, conn, entry)
     resolution = supply_db.resolution_for(conn, run_id)
     tables_read = resolution.as_record()
     conn.close()

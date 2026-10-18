@@ -47,41 +47,18 @@ def _readable(conn) -> frozenset[str]:
         "WHERE table_schema = current_schema()").fetchall())
 
 
-class _Rows:
-    """How a query is scoped to this run's rows: by the view schema alone, or
-    - under `stats.rows_by_run_id` - also by the `run_id` every staged row
-    carries (stage.stamps_run_columns)."""
-
-    def __init__(self, run_id: str | None):
-        self.run_id = run_id
-
-    def where(self, condition: str | None = None) -> tuple[str, list]:
-        parts = [f"({condition})"] if condition else []
-        params: list = []
-        if self.run_id is not None:
-            parts.append("run_id = ?")
-            params.append(self.run_id)
-        return " AND ".join(parts), params
-
-
-def _aggregate(conn, table: str, column: str, spec: dict, rows: _Rows) -> dict:
+def _aggregate(conn, table: str, column: str, spec: dict) -> dict:
     run = categorical_aggregate if spec["kind"] == "categorical" else numeric_date_aggregate
-    if rows.run_id is None:
-        return run(conn, table, column, spec["invalid_condition"], spec["classification"])
-    condition, params = rows.where(spec["invalid_condition"])
-    return run(conn, table, column, condition, spec["classification"], params)
+    return run(conn, table, column, spec["invalid_condition"], spec["classification"])
 
 
-def _value_counts(conn, table: str, column: str, known: list[str], rows: _Rows) -> list[list]:
+def _value_counts(conn, table: str, column: str, known: list[str]) -> list[list]:
     """Every known value's count, ZEROS INCLUDED (REQ-QAC-247): a category
     that falls to zero shows as a 0 rather than vanishing from the chart."""
-    condition, params = rows.where()
-    sql = f"SELECT {column}, COUNT(*) FROM {table}"
-    if condition:
-        sql += f" WHERE {condition}"
     counts = {k: 0 for k in known}
     other = 0
-    for value, n in conn.execute(f"{sql} GROUP BY {column}", params).fetchall():
+    for value, n in conn.execute(
+            f"SELECT {column}, COUNT(*) FROM {table} GROUP BY {column}").fetchall():
         if value in counts:
             counts[value] += n
         else:
@@ -92,31 +69,24 @@ def _value_counts(conn, table: str, column: str, known: list[str], rows: _Rows) 
     return out
 
 
-def _count(conn, table: str, rows: _Rows) -> int:
-    condition, params = rows.where()
-    sql = f"SELECT COUNT(*) FROM {table}" + (f" WHERE {condition}" if condition else "")
-    return conn.execute(sql, params).fetchone()[0]
+def _count(conn, table: str) -> int:
+    return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
 
-def compute_dataset_stats(collection_id: str, conn, entry: dict,
-                          data_run_id: str | None = None) -> dict[str, Any]:
-    """`conn` has this run's own view schema on its search path.
-
-    `data_run_id` is the run whose id the rows carry, under
-    `stats.rows_by_run_id`: a re-run reads the same supply, whose rows carry
-    the first run's id in their own column (REQ-PIPE-140)."""
+def compute_dataset_stats(collection_id: str, conn, entry: dict) -> dict[str, Any]:
+    """`conn` has this run's own view schema on its search path, which holds
+    exactly the arrival's rows - so nothing here scopes by a row column. A
+    re-check's view resolves to the same supply (REQ-PIPE-140)."""
     coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
-    legacy, spec = adapter.legacy, adapter.stats
+    spec = collections.adapter(coll).stats
     tables = [d.table for d in coll.datasets]
-    rows = _Rows((data_run_id or entry["run_id"]) if "stats.rows_by_run_id" in legacy else None)
     readable = _readable(conn)
 
     return {
         "arrival_record": arrival_record(entry),
-        "row_counts": {t: _count(conn, t, rows) for t in tables if t in readable},
-        "value_counts": {col: _value_counts(conn, t, col, known, rows)
+        "row_counts": {t: _count(conn, t) for t in tables if t in readable},
+        "value_counts": {col: _value_counts(conn, t, col, known)
                          for (t, col), known in spec.value_counts.items() if t in readable},
-        "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s, rows)
+        "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s)
                              for (t, col), s in spec.aggregates.items() if t in readable},
     }

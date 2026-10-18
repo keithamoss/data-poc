@@ -19,7 +19,4 @@ KNOWN: dict[str, str] = {
         "every staged row is stamped with `run_id` and `run_date` columns, which "
         "Birth Registrations' dbt model selects and Child Protection's tables have "
         "never carried."),
-    "stats.rows_by_run_id": (
-        "every statistic is scoped by the `run_id` column each staged row carries, "
-        "as well as by the run's view schema."),
 }
