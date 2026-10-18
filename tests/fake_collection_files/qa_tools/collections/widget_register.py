@@ -5,7 +5,6 @@ from qa_tools.collections.base import CollectionAdapter, DbtSpec, SodaSpec, Stat
 ADAPTER = CollectionAdapter(
     collection_id="widget-register",
     label="Widget Register",
-    dashboard_datasets=lambda doc: list(doc["datasets"]),
     sample_key={"widgets": "widget_id"},
     dbt=DbtSpec(
         dimension_by_test={"unique": "uniqueness", "not_null": "completeness"},

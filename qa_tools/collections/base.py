@@ -1,12 +1,12 @@
 """What a collection's adapter carries (REQ-PIPE-240).
 
-IDENTITY, WHAT EACH SHARED MODULE READS, AND THE LAST TEMPORARY POINTER.
-The per-tool sub-objects (.dbt, .soda, .datacontract, .stats) are what
-qa_tools/tools/* read for this collection (REQ-QAC-242, REQ-PIPE-243), the
-`legacy` flags name the behaviours Birth Registrations kept, and the one
-pointer left - dashboard_json/dashboard_datasets - names the requirement
-that removes it (REQ-PIPE-248); REQ-TEST-249 criterion 9 asserts none is
-left. The generator entry point and the target-trial datasets went with
+IDENTITY AND WHAT EACH SHARED MODULE READS. The per-tool sub-objects
+(.dbt, .soda, .datacontract, .stats) are what qa_tools/tools/* read for this
+collection (REQ-QAC-242, REQ-PIPE-243), and the `legacy` flags name the
+behaviours Birth Registrations kept until REQ-PIPE-248 retired them. The
+last temporary pointer, dashboard_json/dashboard_datasets, went with
+REQ-PIPE-248: a collection's report files are named by the registry and
+every dashboard file lists its datasets under `datasets`. The generator entry point and the target-trial datasets went with
 REQ-GEN-246, which put both on the collection's generator provider
 (generator/collections/<id>.py) - a real deployment's collections have no
 synthetic generator, so an adapter is the wrong place for either.
@@ -14,7 +14,6 @@ synthetic generator, so an adapter is the wrong place for either.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
 
 
 # ---- per-tool sub-objects (REQ-QAC-242 criterion 2) ------------------------
@@ -83,11 +82,6 @@ class CollectionAdapter:
     #: How the bootstrap names this collection's work when it reports it -
     #: the words it has always used, so nothing it prints changes.
     label: str
-    #: TEMPORARY POINTER (6), found at build and removed by REQ-PIPE-248, which
-    #: gives every collection one dashboard JSON shape: how its datasets are
-    #: listed in its built dashboard file. (The file's NAME is the
-    #: collection's own, `Collection.dashboard_file`, since criterion 7.)
-    dashboard_datasets: Callable[[dict], list[dict]] = field(compare=False)
     #: Each table's key column, the only value a failing-row sample keeps -
     #: never full row content (plans/qa-pipeline.md #15).
     sample_key: dict = field(default_factory=dict)

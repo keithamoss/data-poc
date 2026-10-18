@@ -242,7 +242,8 @@ class TestAThirdCollectionAtEverySite:
         built = tmp_path / "built"
         built.mkdir()
         _datasets_json(built / "rs_civil-registration_dashboard.json",
-                       {"id": "birth-registrations", "name": "Birth Registrations"})
+                       {"datasets": [{"id": "birth-registrations",
+                                      "name": "Birth Registrations"}]})
         _datasets_json(built / "cpfs_child-protection_dashboard.json",
                        {"datasets": [{"id": "cp-clients", "name": "Client Register"}]})
         _datasets_json(built / f"fka_{FAKE_ID}_dashboard.json",

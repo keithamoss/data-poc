@@ -44,7 +44,6 @@ ADAPTER = CollectionAdapter(
     collection_id="child-protection",
     label="Child Protection",
     # Its datasets, listed under `datasets` in the file's own order.
-    dashboard_datasets=lambda doc: list(doc["datasets"]),
     datacontract=DatacontractSpec(
         # Only a `relationships_*` rule is an FK check, decided from the
         # check id's tail. Asking it the other way round ("not a business

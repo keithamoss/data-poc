@@ -167,12 +167,8 @@ def column_meta(coll, dataset) -> dict[str, tuple[str, str]]:
     note = next((p.get("value") for p in el.get("customProperties") or []
                  if p.get("property") == "tableLevelChecksNote"), None)
     table_level = ("table-level", note or TABLE_LEVEL_DEFAULT_NOTE)
-    if "dashboard.supply_section_first" in _legacy(coll):
-        meta[SUPPLY_LEVEL_PSEUDO_COLUMN] = SUPPLY_LEVEL_META
-        meta[TABLE_LEVEL_PSEUDO_COLUMN] = table_level
-    else:
-        meta[TABLE_LEVEL_PSEUDO_COLUMN] = table_level
-        meta[SUPPLY_LEVEL_PSEUDO_COLUMN] = SUPPLY_LEVEL_META
+    meta[TABLE_LEVEL_PSEUDO_COLUMN] = table_level
+    meta[SUPPLY_LEVEL_PSEUDO_COLUMN] = SUPPLY_LEVEL_META
     meta[CROSS_TABLE_PSEUDO_COLUMN] = CROSS_TABLE_META
     return meta
 
@@ -662,13 +658,9 @@ def build_datasets(collection_id: str) -> list[dict]:
 
 
 def build(collection_id: str) -> dict:
-    """The collection's dashboard document, in the shape its file has always
-    had - Birth Registrations' one dataset as the document itself (legacy
-    flag), every other collection's under `datasets`."""
-    datasets = build_datasets(collection_id)
-    if "dashboard.single_dataset_document" in _legacy(collection_id):
-        return datasets[0]
-    return {"datasets": datasets}
+    """The collection's dashboard document: its datasets under `datasets`,
+    one shape for every collection (REQ-PIPE-248 criterion 2)."""
+    return {"datasets": build_datasets(collection_id)}
 
 
 def write(collection_id: str) -> str:

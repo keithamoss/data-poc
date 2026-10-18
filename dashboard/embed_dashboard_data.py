@@ -226,7 +226,6 @@ def collection_data() -> dict:
     missing file means a build step did not run - and a page that silently
     lacks a collection is the false quiet REQ-PIPE-240's series exists to
     remove."""
-    from qa_tools import collections
 
     out = {}
     for collection_id, path in collection_targets():
@@ -237,8 +236,7 @@ def collection_data() -> dict:
                 f"No page was written.")
         with open(path) as f:
             doc = json.load(f)
-        datasets = collections.adapter(collection_id).dashboard_datasets(doc)
-        out[collection_id] = {"datasets": datasets}
+        out[collection_id] = {"datasets": list(doc["datasets"])}
     return out
 
 # (agency, collection, display label) - the same two real scopes TARGETS

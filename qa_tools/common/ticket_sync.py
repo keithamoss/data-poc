@@ -125,7 +125,7 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
         dashboard_file = collections.by_id(adapter.collection_id).dashboard_file
         with open(os.path.join(REPORTS_DIR, dashboard_file)) as f:
             doc = json.load(f)
-        for ds in adapter.dashboard_datasets(doc):
+        for ds in doc["datasets"]:
             scopes.append((_scope_for(ds), ds))
     return scopes
 

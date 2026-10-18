@@ -196,7 +196,7 @@ def capture_arrival_golden_command(yes: bool) -> None:
     captured: dict[str, dict] = {}
     for name in reports:
         doc = json.loads((root / "reports" / name).read_text())
-        for ds in (doc["datasets"] if "datasets" in doc else [doc]):
+        for ds in doc["datasets"]:
             by_run = ds.get("arrivalByRun") or {}
             captured[ds["id"]] = {
                 a["run_id"]: {"arrivalStatus": a["arrivalStatus"],

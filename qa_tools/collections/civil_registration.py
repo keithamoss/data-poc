@@ -26,7 +26,6 @@ ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
     label="Birth Registrations",
     # One dataset, written as the document itself.
-    dashboard_datasets=lambda doc: [doc],
     datacontract=DatacontractSpec(
         # Each the same real-world check as a dbt (and, for the sibling
         # check, Soda) counterpart; the label is what shows the overlap.
@@ -114,7 +113,5 @@ ADAPTER = CollectionAdapter(
         "stats.arrival_after_registration",
         "results.single_dataset_header",
         "orchestrate.entry_carries_csv_path",
-        "dashboard.single_dataset_document",
-        "dashboard.supply_section_first",
     }),
 )

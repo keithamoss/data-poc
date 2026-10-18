@@ -42,11 +42,4 @@ KNOWN: dict[str, str] = {
     "orchestrate.entry_carries_csv_path": (
         "each run entry, and so the batch's results file, also names the arrival's "
         "file, or its delivery directory where two files contest the dataset."),
-    "dashboard.single_dataset_document": (
-        "the dashboard file is the collection's one dataset object itself, rather than "
-        "its datasets under `datasets` (REQ-DASH-244 criterion 11)."),
-    "dashboard.supply_section_first": (
-        "the Supply-level section's pseudo-column is listed before the Table-level "
-        "one in the dashboard file. The page orders the sections itself, so no reader "
-        "sees it; the file's order is kept so the build's output is unchanged."),
 }

@@ -110,7 +110,7 @@ def _built_datasets():
         if not path.exists():
             pytest.skip(f"{name} not built - run `mothman dashboard build-data`")
         doc = json.loads(path.read_text())
-        for ds in (doc["datasets"] if "datasets" in doc else [doc]):
+        for ds in doc["datasets"]:
             out[ds["id"]] = ds
     return out
 
