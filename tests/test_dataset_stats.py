@@ -163,7 +163,11 @@ def test_cp_compute_dataset_stats_shape():
     assert stats["arrival_record"] == {"run_id": "cp_run_01", "run_index": 1,
                                         "delivery": "cp-drop-1",
                                         "received_at": "2020-01-05T06:00:00+00:00"}
-    assert stats["value_counts"]["concern_type"] == [["Neglect", 1], ["(invalid code)", 1]]
+    # EVERY KNOWN VALUE, ZEROS INCLUDED (REQ-QAC-247, Keith 2026-10-18): a
+    # category that falls to zero shows as a 0 rather than vanishing.
+    from qa_tools.collections.child_protection import _CONCERN_TYPE_VALID
+    assert stats["value_counts"]["concern_type"] == (
+        [[k, 1 if k == "Neglect" else 0] for k in _CONCERN_TYPE_VALID] + [["(invalid code)", 1]])
     assert stats["check_aggregates"]["cp_clients.postcode"]["total_invalid"] == 1  # the '9999' row
     assert set(stats["arrival"].keys()) == set(CP_TABLES)
 

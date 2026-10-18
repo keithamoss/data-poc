@@ -129,7 +129,6 @@ ADAPTER = CollectionAdapter(
         "stage.stamps_run_columns",
         "stats.single_table_shape",
         "stats.rows_by_run_id",
-        "stats.zero_counts_kept",
         "stats.arrival_after_registration",
         "results.single_dataset_header",
         "orchestrate.entry_carries_csv_path",

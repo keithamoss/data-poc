@@ -70,8 +70,9 @@ def _aggregate(conn, table: str, column: str, spec: dict, rows: _Rows) -> dict:
     return run(conn, table, column, condition, spec["classification"], params)
 
 
-def _value_counts(conn, table: str, column: str, known: list[str], rows: _Rows,
-                  keep_zeros: bool) -> list[list]:
+def _value_counts(conn, table: str, column: str, known: list[str], rows: _Rows) -> list[list]:
+    """Every known value's count, ZEROS INCLUDED (REQ-QAC-247): a category
+    that falls to zero shows as a 0 rather than vanishing from the chart."""
     condition, params = rows.where()
     sql = f"SELECT {column}, COUNT(*) FROM {table}"
     if condition:
@@ -83,7 +84,7 @@ def _value_counts(conn, table: str, column: str, known: list[str], rows: _Rows,
             counts[value] += n
         else:
             other += n
-    out = [[k, v] for k, v in counts.items() if keep_zeros or v]
+    out = [[k, v] for k, v in counts.items()]
     if other:
         out.append(["(invalid code)", other])
     return out
@@ -120,7 +121,6 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict,
     legacy, spec = adapter.legacy, adapter.stats
     tables = [d.table for d in coll.datasets]
     rows = _Rows((data_run_id or entry["run_id"]) if "stats.rows_by_run_id" in legacy else None)
-    keep_zeros = "stats.zero_counts_kept" in legacy
     after_registration = "stats.arrival_after_registration" in legacy
     readable = _readable(conn)
 
@@ -132,7 +132,7 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict,
         return {
             "arrival_record": arrival_record(entry),
             "row_count": _count(conn, table, rows),
-            "value_counts": {col: _value_counts(conn, t, col, known, rows, keep_zeros)
+            "value_counts": {col: _value_counts(conn, t, col, known, rows)
                              for (t, col), known in spec.value_counts.items()},
             "arrival": _earliest_extract(conn, table, rows, after_registration,
                                          f"earliest_extract for run {data_run_id or entry['run_id']}"),
@@ -142,7 +142,7 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict,
     return {
         "arrival_record": arrival_record(entry),
         "row_counts": {t: _count(conn, t, rows) for t in tables if t in readable},
-        "value_counts": {col: _value_counts(conn, t, col, known, rows, keep_zeros)
+        "value_counts": {col: _value_counts(conn, t, col, known, rows)
                          for (t, col), known in spec.value_counts.items() if t in readable},
         "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s, rows)
                              for (t, col), s in spec.aggregates.items() if t in readable},

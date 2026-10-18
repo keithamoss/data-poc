@@ -33,9 +33,6 @@ KNOWN: dict[str, str] = {
     "stats.rows_by_run_id": (
         "every statistic is scoped by the `run_id` column each staged row carries, "
         "as well as by the run's view schema."),
-    "stats.zero_counts_kept": (
-        "a value-count distribution lists every known value, zeros included; Child "
-        "Protection's lists only the values present."),
     "stats.arrival_after_registration": (
         "the earliest extract is the earliest among rows extracted on or after their "
         "registration date, falling back to the earliest of all."),
