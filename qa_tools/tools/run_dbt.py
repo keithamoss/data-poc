@@ -12,7 +12,7 @@ never pulls in another collection's test if the project's DAG changes.
 BUILT FROM CHILD PROTECTION'S COPY: N tables, each test's dataset from the
 model dbt attaches it to, and REQ-PIPE-078's handling of a model the run
 cannot build. What differs between collections is read from the adapter's
-`.dbt` and its legacy flags (qa_tools/tools/legacy.py).
+`.dbt`; REQ-QAC-247 retired the legacy flags this module read.
 
 THE AUDIT TABLE, NOT dbt's OWN COUNT (_AUDIT_*). A confirmed dbt-core bug
 (failures hardcoded to 0 whenever a test lands on "Pass", dbt-labs/
@@ -154,7 +154,6 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
     coll = collections.by_id(collection_id)
     adapter = collections.adapter(coll)
     spec = adapter.dbt
-    legacy = adapter.legacy
     models = _models(coll)
     tables = [d.table for d in coll.datasets]
     # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
@@ -230,7 +229,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             fail_t = parse_threshold(config.get("error_if"))
 
             relation_name = node.get("relation_name")
-            unaudited = ("error",) if "dbt.audits_skipped_tests" in legacy else ("error", "skipped")
+            unaudited = ("error", "skipped")
             model_built = f"stg_{table}" in built
             if test_name in _AUDIT_COUNTED or test_name in _AUDIT_SUMMED or meta is None:
                 if relation_name and status not in unaudited and model_built:

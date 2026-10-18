@@ -714,12 +714,10 @@ class TestTheSharedToolModules:
             (FAKE_ID, FAKE_DATASET, "completeness", "Null rate")
         assert (r["metric_value"], r["status"], r["row_count_total"]) == (4, "fail", 4)
 
-    @pytest.mark.parametrize("legacy,recounted", [
-        (frozenset(), False), (frozenset({"dbt.audits_skipped_tests"}), True)])
-    def test_dbt_audits_skipped_tests(self, third_collection, monkeypatch, tmp_path,
-                                      legacy, recounted):
-        _, _, queries, _ = self._dbt(monkeypatch, tmp_path, legacy=legacy, status="skipped")
-        assert any('"audit"' in q for q in queries) is recounted
+    def test_dbt_never_recounts_a_skipped_test(self, third_collection, monkeypatch, tmp_path):
+        _, _, queries, _ = self._dbt(monkeypatch, tmp_path, status="skipped")
+        assert queries, "the stub recorded no queries - the test would prove nothing"
+        assert not any('"audit"' in q for q in queries)
 
     def test_dbt_counts_nothing_over_a_model_it_did_not_build(self, third_collection,
                                                                 monkeypatch, tmp_path):

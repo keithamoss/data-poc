@@ -29,9 +29,6 @@ KNOWN: dict[str, str] = {
         "with no recorded count is counted from its rows; a reference of zero rows "
         "reads as no drop; and the result sits on the check's own column rather than "
         "the table - Birth Registrations' single-table copy."),
-    "dbt.audits_skipped_tests": (
-        "a test dbt reports as skipped is still recounted from its audit table; only "
-        "an errored one is not."),
     "stage.stamps_run_columns": (
         "every staged row is stamped with `run_id` and `run_date` columns, which "
         "Birth Registrations' dbt model selects and Child Protection's tables have "
