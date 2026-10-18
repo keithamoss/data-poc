@@ -2285,6 +2285,11 @@ one or more component tags, and a date.
       the bootstrap and committed locally in /home/user/ed-wt (branch
       ed-build, not pushed): TS-57 to TS-61 confirmed as built, and TS-63's
       filings and holds correct. Only the inheritances are wrong.
+    - **THE PUSHED 248 HEAD, CAPTURED** (`after-248-pushed`, 1191221,
+      1473s): compared with after-248 (578b2d5), all of S1, S4, S5 and S7
+      are the same. The four fixes pushed since (#238 to #241) changed
+      nothing anyone sees or records. It is the baseline for Emergency
+      Department's capture once #245 is settled.
     - **QUESTIONS FOR YOU, in the order I would take them:**
       1. #245, the timing-dependent bootstrap: option (a), (b) or (c). It
          gates the Emergency Department push.
