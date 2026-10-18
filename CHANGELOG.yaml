@@ -112,7 +112,8 @@ releases:
   - date: "2026-10-18"
     summary: >
       Every collection's supplies are now generated, run, summarised and
-      rebuilt by one shared set of modules, and a new command shows how many
+      rebuilt by one shared set of modules, its commands are built from the
+      register, and a new command shows how many
       GitHub Actions minutes the project is using.
     changes:
       - category: New
@@ -141,6 +142,14 @@ releases:
               generator, with each collection's rows, seeds and schedule in a
               small module of its own. A new collection is that one module,
               and every delivery comes out byte-for-byte as before.
+          - headline: Every collection's commands come from the register
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman bdm` and `mothman cp`, and the TUI's "Which dataset?"
+              menus, are now built from the list of collections, so a new
+              collection gets its commands and its menu entry without code of
+              its own. Every command reads and behaves as before, and
+              `mothman --help` opens in about half the time.
   - date: "2026-10-16"
     summary: >
       Birth Registrations' history now opens with twelve days when each

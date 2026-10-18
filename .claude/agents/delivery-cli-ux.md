@@ -93,7 +93,8 @@ generic user.
 `docs/project-context-for-agents.md` and `docs/hci-ux-psychology.md` in
 full, then the scoper's draft requirement(s) you've been handed, then
 the real `cli/` source (`cli/app.py`, `cli/common.py`, and whichever of
-`cli/bdm.py`/`cli/cp.py`/`cli/dashboard.py`/`cli/debug.py`/
+`cli/collection_cli.py`/`cli/one_table.py`/`cli/many_tables.py`/
+`cli/dashboard.py`/`cli/debug.py`/
 `cli/github.py`/`cli/pipeline.py`/`cli/population.py` is most relevant
 to the requirement) - you need to know what conventions actually
 already exist before you can say whether something's consistent with

@@ -235,7 +235,10 @@ reports/                       generated - results_bdm.json, results_cp.json,
 cli/                          `mothman` (plans/tooling.md #1) - the unified CLI/TUI, the only
                                programmatic access point to this repo; run `./mothman` or
                                `uv run mothman` - `mothman pipeline run` replaces the retired
-                               run_pipeline.sh (runs the whole real-tools pipeline end to end)
+                               run_pipeline.sh (runs the whole real-tools pipeline end to end);
+                               every collection's `mothman <short>` group is built from the
+                               registry by collection_cli.py, by its shape: one_table.py for a
+                               one-file collection, many_tables.py for a delivery folder
 pyproject.toml                 the real tool packages + dev tooling (pytest, ruff, pre-commit) -
                                verified installing and running together; uv.lock pins exact versions
 tests/                         pytest smoke tests - generator and dashboard-builder layers

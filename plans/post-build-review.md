@@ -10204,3 +10204,30 @@ twice. It deliberately did not re-find the `TypeError`.
      name does not fail when the call moves - it just stops being reached,
      and the real thing runs. A guard on a destructive side effect has to
      cover every step of it, not only the one that writes.
+
+222. **[done, 2026-10-18]** **[Testing & dev tooling]** **REQ-TEST-245's
+     rewire found a test that had passed for weeks while checking nothing,
+     and three tests clearing against the real receipts folder.**
+
+     THE EMPTY TEST. tests/test_chain_progress.py's
+     `test_no_check_chain_call_site_is_left_without_a_progress_indicator`
+     searched cli/bdm.py and cli/cp.py for `results, tmp_dir = run_check`.
+     No line of either module had that shape any more: the call sites had
+     been renamed to `results, filed = ...` long before this change, so the
+     test compared an empty list with an empty list and passed (CLAUDE.md's
+     test rule 3). Rewritten against the new modules: it matches the real
+     call form, refuses to pass if it finds fewer than sixteen call sites,
+     and names its one exemption, the generation-time target trial, whose
+     "Trying ..." lines are its progress. It finds all sixteen and every one
+     sits inside a progress block, so no route was in fact missing a bar.
+
+     THE CLEARS. Three tests in tests/test_target_agreement.py drove
+     `try_targets` with the generator's paths left at the real data/ tree
+     and an empty list of names to remove. Removing nothing touched nothing,
+     so no data was ever at risk; but #221's guard now refuses any clear of
+     the real tree, so they failed until pointed at tmp_path. The guard was
+     kept strict rather than taught that an empty clear is harmless: a test
+     that names the real tree is wrong whatever it removes.
+
+     Neither is a product defect, so neither got a failing product test
+     first; both are tests corrected to test what they say.

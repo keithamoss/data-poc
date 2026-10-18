@@ -316,8 +316,8 @@ def report_recorded(run_id: str, count: int) -> None:
 def raw_bucket_name() -> str:
     """Reads S3_BUCKET_ENV_VAR dynamically at call time (this project's
     own established convention against a module-level constant captured
-    once at import time - see cli/bdm.py's raw_dir() for the real bug
-    class that guards against). Raised as a real, clear ClickException
+    once at import time - a raw_dir() constant in the old per-collection
+    CLI modules was the real bug class that guards against). Raised as a real, clear ClickException
     here rather than reading None and failing deeper inside a confusing
     boto3 error."""
     bucket = os.environ.get(S3_BUCKET_ENV_VAR)

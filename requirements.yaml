@@ -37137,7 +37137,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As someone adding a collection, I want `mothman <short>` and the TUI's menus to appear for it from the registry, labelled as people already know them, so that a new collection gets its generate and qa commands without a copied CLI module and without slowing or breaking anyone else's."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sites 13 to 16; main session position.md calls 1, 12 and 19 to 23 (after the CLI UX review), and 27. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; re-scoped by delivery-scoper 2026-10-16 after Keith's two decisions that day, which split the ~30-collection behaviour out into REQ-TEST-252. A PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL create the `mothman <short>` group for every registered collection through one factory, and SHALL delete cli/bdm.py and cli/cp.py in the same change."
@@ -37169,6 +37169,41 @@ requirements:
       - "THE OPTION SHAPE FOLLOWS THE TABLE COUNT, NOT THE COLLECTION, so an Emergency Department group behaves as Birth Registrations' does without a branch on its name."
       - "TARGET TRIAL IS DECLARED ONCE, ON THE GENERATOR PROVIDER (position.md call 8; main session's round-5 call 30, P3), and this group reads it there - not a second declaration on the QA adapter. REJECTED declaring it on the adapter as round 1 had it: two declarations of one capability can disagree. REQ-GEN-246 owns the refusal. Because REQ-GEN-246 lands before this (P2), the factory reads the provider directly and never the temporary pointer."
       - "THE --collection HELPER LIVES HERE: cli/pipeline.py, cli/debug.py and cli/supply.py are rewritten here, so under call 27 their sites are rewired here, not in REQ-PIPE-240. It PRESERVES each site's accepted values and wording in this step (today supply accepts an id or a short and refuses with its own 'Known: ...' line, while pipeline and debug accept shorts only with Click's own refusal); making them uniform is REQ-TEST-252's, because it changes help text."
+      - "LANDED BEFORE REQ-DASH-244, SWAPPING THE TWO (Keith, 2026-10-18, verbatim: 'do 245 straight after 246'): both were refactors of their own surface with no dependency between them, and doing the CLI next kept the generator and the commands that reach it in one stretch of work."
+      - "A COMMAND OBJECT PER COLLECTION, ONE CLASS PER SHAPE: cli/collection_cli.py holds what every collection shares, cli/one_table.py and cli/many_tables.py what a one-file and a delivery-folder supply need, and of(value) returns the one object for a collection by id, short or run prefix. The shape is chosen by the hierarchy's table count, never by a collection's name. REJECTED one module of free functions taking a collection argument: every call site would carry the argument, and a test could no longer patch one collection's behaviour without the other's."
+      - "THE --collection CHOICE AND THE TUI MENUS READ THE REGISTRY WHEN USED, not when the command module is imported, so a collection registered later is accepted and listed without re-importing anything. Today's two collections read and refuse exactly as before; the help legend is still formatted as the command is defined."
+      - "A BROKEN ADAPTER IS REFUSED WHEN ITS OWN COMMAND RUNS, by refuse_a_broken_adapter() at the top of each command and in the TUI's dispatch: building the groups reads only the hierarchy, so `mothman --help` and every other collection keep working. A provider that will not load offers no target trial rather than failing the group."
+      - "HELP IMPORTS NO QA TOOL: every command imports what it runs inside its own body. The remaining import cost on `mothman --help` is psycopg, which the environment banner needs; it is not on criterion 7's list."
+      - "qa_tools/tools/steps.py HOLDS RUN_STEPS so the CLI's progress bar can name the chain's steps without importing the orchestrator, which pulls in every tool."
+      - "TEST STUBS MOVED WITH THE CODE: tests patch the command object's method (of('bdm').run_check) or the shared module a function now lives in, never a deleted module's name - the lesson of post-build-review #221. Two tests found proving nothing or clearing against the real tree were corrected (post-build-review #222)."
+      - "NO PLANS PROSE DELETED: plans/publishing-and-history.md item 6 feeds this whole series and goes whole when REQ-PIPE-248 is built (CLAUDE.md's batch rule 4)."
+    evidence:
+      - "2026-10-18, CRITERION 7, measured before the change at ffc54bc in this sandbox: importing cli.app took 0.7s to 1.0s and loaded 1,167 modules, among them pandas, numpy, duckdb and soda; `mothman --help` took about 0.85s to 0.9s under uv. After, on b3f9f4f's tree: cli.app imports in 0.35s to 0.40s with 647 modules and none of the listed tools (psycopg only), and `mothman --help` takes 0.43s to 0.45s. tests/test_collection_cli.py's TestHelpImportsNoTool checks all five help forms in a fresh interpreter, and was shown able to fail by importing pandas first."
+      - "2026-10-18, CRITERION 5, driven with scripts/dev/tui_drive.py against the real `./mothman`: the Quality Assurance and Generate synthetic data menus each asked 'Which dataset?' with Birth Registrations, Child Protection and Back, in hierarchy order."
+      - "2026-10-18, TESTS on the tree after b3f9f4f (groups() removed, comments repointed): tests/test_cli_bdm.py, test_cli_cp.py, test_cli_app.py, test_cli_pipeline.py, test_cli_debug.py, test_terminal_routes.py, test_cp_load_by_pattern.py, test_cp_pair.py, test_target_agreement.py, test_collections_registry.py, test_checkpoints.py, test_lifecycle_report.py, test_offer_after_hand_filed_run.py, test_kept_routes_agree.py, test_bootstrap_equivalence.py, test_generate_to_target.py, test_chain_progress.py, test_cli_common.py, test_publish.py, test_arrivals.py, test_arrivals_from_records.py, test_bootstrap.py, test_collection_cli.py and test_cli_supply.py - 527 passed, 1 failed: a supply test still calling the moved --collection callback by its old name, repointed. Then every tests/test_cli_*.py module not in that list, with test_cli_supply.py, test_collection_cli.py, test_cli_common.py and test_cli_app.py - 208 passed. The full gate runs once after REQ-PIPE-248 (Keith, 2026-10-18)."
+    linked_tests:
+      - tests/test_collection_cli.py
+      - tests/test_cli_bdm.py
+      - tests/test_cli_cp.py
+      - tests/test_cli_app.py
+      - tests/test_chain_progress.py
+    implemented_by:
+      - cli/collection_cli.py::CollectionCLI
+      - cli/collection_cli.py::of
+      - cli/collection_cli.py::make_group
+      - cli/collection_cli.py::label
+      - cli/collection_cli.py::refuse_a_broken_adapter
+      - cli/one_table.py::OneTableCLI
+      - cli/one_table.py::add_commands
+      - cli/many_tables.py::ManyTablesCLI
+      - cli/many_tables.py::add_commands
+      - cli/app.py::_which_collection
+      - cli/common.py::short_collection_option
+      - cli/common.py::id_collection_option
+      - cli/common.py::_RegistryChoice
+      - cli/pipeline.py::_run_collection
+      - cli/debug.py::_manifest_entry
+      - qa_tools/tools/steps.py::RUN_STEPS
     open_questions: []
 
   - id: REQ-TEST-252
@@ -37241,7 +37276,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith planting scenarios, I want the generator's slot loop, bookkeeping, delivery writing and injection placement shared, with only each collection's rows, seeds and period plan in its own provider, so that the Emergency Department generator is a provider from its first day rather than a third copy to unpick later."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md section 4; main session position.md calls 7, 8, 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL generate every collection's synthetic history through one shared driver - the slot loop, bookkeeping, delivery and receipt writing, and injection placement - with each collection's rows, seed schedule and period plan in a provider module of its own at generator/collections/<id>.py, separate from the collection's QA adapter."
@@ -37271,6 +37306,39 @@ requirements:
       - "SEED SCHEDULES ARE A PROVIDER METHOD AND A GENUINE, NEVER-RETIRED DIFFERENCE (main session's round-4 call 28), not a legacy flag; criteria 2 and 3 make REQ-GEN-232 criterion 2's disjoint Emergency Department seeds a check rather than a promise."
       - "TARGET TRIAL IS AN OPTIONAL CAPABILITY, REFUSED BY NAME ELSEWHERE (position.md call 8)."
       - "THE EMPTY-ALLOWLIST CHECK LIVES IN REQ-TEST-249 (delivery-scoper, round 3): this requirement lands before REQ-DASH-244 and REQ-TEST-245, whose files are still on the allowlist when it does."
+      - "THE DRIVER CALLS THE HOOKS IN ONE FIXED ORDER, and that order is the contract a provider writes to (generator/collections/base.py): plan before the first write, then the previous deliveries cleared, then per slot slot(), entries(), and per arrival received_at(), the delivery name, files() and the write, then after_slot(); once every slot is written, the instant-uniqueness guard, the bookkeeping and the placements. Random draw order is part of the output, so moving a hook is a behaviour change even where it looks like tidying."
+      - "THE SEED SPAN IS A DECLARED PROMISE, NOT A MEASUREMENT: seed_schedule() reports each derived seed as (what it is for, first, last), the last covering the largest offset the provider adds (999 for Birth Registrations, 5999 for Child Protection), and check_seeds() refuses before anything is written. REJECTED recording seeds as they are drawn and checking afterwards: by then the files exist."
+      - "THE TARGET TRIAL IS REACHED THROUGH THE COLLECTION'S COMMAND OBJECT (cli.pipeline.generate_collection calls of(cid).try_targets), so the generator never imports cli/ and the trial runs the same check chain `mothman <short> qa --trial` uses. REJECTED moving the trial into generator/: it would need the CLI's check chain, which is the dependency direction this repo does not allow."
+      - "THE INSTANT-UNIQUENESS GUARD NOW COVERS CHILD PROTECTION TOO (it was Birth Registrations only): it lives in the shared driver, so every collection gets it. Child Protection's history already satisfied it, which the S4 comparison confirms."
+      - "PLANS ARE BUILT LAZILY: run_plan() and grown_run_plan() are cached functions and a module __getattr__ serves the old constant names (RUN_PLAN, SCHEDULED_DATES and the rest), so importing a provider costs no pandas or numpy (criterion 7). Tests patch run_plan, never the constant, because the constant is computed on first read."
+      - "A TEST THAT STUBS GENERATION STUBS cli.pipeline.generate_collection, the one place generation is reached from. Stubs left on the deleted modules' functions let the real driver run under pytest and empty the real data/ tree; tests/conftest.py's guard now refuses a CLEAR of the real tree as well as a write into it (post-build-review #221)."
+      - "NO PLANS PROSE DELETED IN THIS CHANGE, deliberately: plans/publishing-and-history.md item 6 feeds every requirement of this series up to REQ-PIPE-248, and CLAUDE.md's batch rule 4 deletes a thread whole once its last dependent requirement is built."
+    evidence:
+      - "2026-10-18, CRITERION 4 (REQ-TEST-239): `mothman debug equivalence compare after-243 after-246` - after-243 a full capture of 2e3e76e (REQ-PIPE-243's after, this change's before), after-246 of 86fdc05, 12 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same. S7 help-and-menus differs only by `mothman github ci-usage`, which REQ-TEST-260 added between the two captures. Bootstrap 1245s against 1298s, +53s (Birth Registrations 457s against 429s, Child Protection 1165s against 1213s)."
+      - "2026-10-18, TESTS on the tree of b3f9f4f plus the register edit: tests/test_generator_providers.py, test_scenario_map.py, test_scenario_injection.py, test_generate_runs.py, test_generate_cp_runs.py, test_generate_to_target.py, test_scenario_links.py, test_scenario_subjects.py, test_bootstrap.py and test_collections_registry.py - 367 passed. The full gate runs once after REQ-PIPE-248 (Keith, 2026-10-18)."
+      - "2026-10-18, GATES: `mothman check --no-pytest` - every gate passed, the new providers gate among them."
+    linked_tests:
+      - tests/test_generator_providers.py
+      - tests/test_scenario_map.py::TestItIsRebuiltWithTheHistory
+      - tests/test_bootstrap.py
+      - tests/test_generate_runs.py
+      - tests/test_generate_cp_runs.py
+    implemented_by:
+      - generator/driver.py::generate
+      - generator/driver.py::no_two_arrivals_share_an_instant
+      - generator/collections/__init__.py::provider
+      - generator/collections/__init__.py::seed_range_problems
+      - generator/collections/base.py::Provider
+      - generator/collections/civil_registration.py::CivilRegistration
+      - generator/collections/child_protection.py::ChildProtection
+      - generator/validate_providers.py::problems
+      - generator/scenario_injection.py::generated_periods
+      - generator/scenario_injection.py::unprovided_scenarios
+      - generator/output.py::generated_into
+      - generator/targeting.py::levers_for
+      - generator/targets.py::_trialled
+      - cli/pipeline.py::generate_collection
+      - cli/pipeline.py::target_datasets
     open_questions: []
 
   - id: REQ-QAC-247

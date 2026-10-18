@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import pytest
 from click.testing import CliRunner
 
+from cli import common
 from cli.app import cli
 from cli.supply import supply_group
 from qa_tools.common import delivery
@@ -377,11 +378,9 @@ class TestACollectionIsNamedOrRefusedInWords:
             result.exception, SystemExit)
 
     def test_the_short_names_pipeline_run_takes_are_taken_here(self):
-        from cli import supply
-
-        assert supply._collection(None, None, "cp") == "child-protection"
-        assert supply._collection(None, None, "bdm") == "civil-registration"
-        assert supply._collection(None, None, None) is None
+        assert common._collection_id_or_short(None, None, "cp") == "child-protection"
+        assert common._collection_id_or_short(None, None, "bdm") == "civil-registration"
+        assert common._collection_id_or_short(None, None, None) is None
 
 
 def test_discard_sample_names_an_unknown_dataset_without_a_repr():

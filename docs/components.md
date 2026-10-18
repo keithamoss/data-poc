@@ -180,7 +180,9 @@ workflow, REQ-QAC-017); who's assigned to what.
 verified - not the product itself, the tooling around building it.
 
 **Owns:** `cli/` (the whole `mothman` CLI/TUI shell - `app.py`/
-`common.py`/`banner.py`, and each Tier's own command group file, even
+`common.py`/`banner.py`, the per-collection command factory
+`collection_cli.py` with its two shapes `one_table.py`/`many_tables.py`
+since REQ-TEST-245, and each Tier's own command group file, even
 though a given subcommand's own underlying work may belong to a
 different component - e.g. `mothman dashboard embed` wraps `DASH` work,
 but the CLI mechanism itself is `TEST`), `tests/`, `tests-js/`,

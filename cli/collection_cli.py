@@ -269,9 +269,3 @@ def qa_hint(coll) -> str:
     return (f"mothman {coll.short} qa [--run-id/--file]" if len(coll.datasets) == 1
             else f"mothman {coll.short} qa [--run-id/--folder]")
 
-
-def groups() -> list[click.Group]:
-    """Every registered collection's group, in hierarchy order."""
-    from qa_tools import collections
-
-    return [make_group(c) for c in collections.all_collections()]

@@ -3,7 +3,7 @@ tooling.md #1 Phase 3) - list what's under a dataset's configured prefix,
 download a chosen object (or every object under a chosen "delivery"
 prefix, for Child Protection's 6-table shape) to a local staging dir, so
 the rest of the flow can reuse the exact same Local files logic
-(cli/bdm.py's run_check_local_file()/cli/cp.py's run_check_local_folder())
+(cli/one_table.py's run_check_local_file()/cli/many_tables.py's run_check_local_folder())
 Phase 2 already built - S3 mode is "download, then Local files mode",
 not a third parallel check-running code path.
 
