@@ -10534,3 +10534,25 @@ twice. It deliberately did not re-find the `TypeError`.
        date. Its history ends 2026-09-22, so every section correctly read
        "No data". It now navigates in place on the newest supply's day,
        read from the built data - CLAUDE.md's shelf-life note, met again.
+
+239. **[done, 2026-10-19]** **[Testing & dev tooling]** **The 248 push's
+     on-demand CI job went red; a local full gate does not run it.**
+     Eight on-demand tests failed (1ee4926, run 39142366483) for two causes:
+     - TEST, FIXED: tests/test_bootstrap_equivalence.py stubbed generation on
+       the two old per-collection CLIs. The bootstrap now reaches the
+       generator through `cli.pipeline.generate_collection`, so it
+       regenerated the cut-down corpus. That regeneration ran under
+       equiv_support's redirect, which points the scripts at an empty file,
+       and the scenario-link check then refused TS-78's links. All six
+       errors were this. The partial run also left dbt scratch under the real
+       `data/` tree, which failed the adapter test's "nothing written under
+       the real tree" check. The fix stubs `bootstrap._generate` itself.
+       Run locally with `--run-on-demand`: 6 passed.
+     - CI, FIXED: the on-demand job never installed Playwright's Chromium,
+       and tests/test_a_collection_is_a_small_adapter.py (REQ-TEST-252)
+       drives a dataset page in a real browser. The step is added. Locally
+       that module passes (12).
+     The lesson for the gate: `mothman check` deselects on_demand tests, so
+     a full local gate cannot prove this job. A push touching the bootstrap,
+     the generator or the adapter tests should run
+     `pytest --run-on-demand -m on_demand` first.
