@@ -37434,7 +37434,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As an accountable data owner, I want my collection's QA held to the same rules as every other - skipped and unrunnable checks recorded, the same guards, the same check names and dimensions - with every result that changes as a consequence put in front of me, so that a behaviour difference left over from copied code does not quietly decide what I see."
     moscow: should
-    status: in_progress
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md calls 2, 3 and 25. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "For each behavioural legacy flag, THE SYSTEM SHALL bring Keith, before changing anything, a description of what the two collections do differently today, with a worked example from recorded runs, and one or more proposals for the final shape, each with its consequence for recorded results. The flags known today: for Birth Registrations left_out.note, dbt's built-model guard, the skipped status case, unrunnable results, dropping empty pseudo-columns, the not_evaluated reference-reason fallback and the Soda '[scope]' check-name suffix; for Child Protection the empty Soda dimensions on 88 checks; and any the refactor adds."
@@ -37449,6 +37449,9 @@ requirements:
     dependencies:
       - REQ-QAC-242
       - REQ-DASH-244
+    evidence:
+      - "2026-10-18, CRITERION 3 FOR THE TWELVE NO-CHANGE FLAGS (one capture pair, Keith's call): `mothman debug equivalence compare after-252 after-247a` (254d060 against 0298824, 16 commits, twelve of them one retirement each; bootstraps 1506s and 1359s) - S1 recorded results, S4 generated files, S5 reports and S7 help and menus all the same, which is what every one of the twelve briefs predicted. Criterion 4 therefore has nothing to report for these twelve."
+      - "2026-10-18, CRITERIA 3 AND 4 FOR THE FIVE THAT CHANGED THINGS (one capture, Keith's call): `mothman debug equivalence compare after-247a after-247b` (0298824 against 7c2913a; bootstraps 1359s and 1460s). S4 and S7 the same. S1: 6,335 recorded results changed, matched row for row, every one in exactly one predicted field - 3,357 dimensions (52 Child Protection Soda checks taking their category), 2,220 check names (20 Birth Registrations Soda checks losing `[all]`), 758 failed-rows counts (692 passes empty -> 0; 65 fails and 1 warn empty -> their count, post-build-review #226's 66). No status, value or threshold changed. S5: the same three in both results files, Child Protection's cards gaining their dimension, and Birth Registrations' dataset gaining its grey Table-level column (14 -> 15). Zero counts changed nothing, as predicted. The by-check list criterion 4 asks for is docs/drafts/item-6/247-changed-results.md, reported to Keith in the morning report."
     decisions:
       - "KEITH DECIDES EACH FLAG (2026-10-16): 'bring me a description of the change, your proposal or proposals for how to address it, and I'll sign off on each one as we go ... doesn't need to be a requirement for each.' Each call is recorded here as a decision; a flag may end as a real per-collection setting rather than unified."
       - "BEHAVIOUR AND SHAPE SPLIT INTO TWO REQUIREMENTS (main session's round-2 call)."
@@ -37465,10 +37468,31 @@ requirements:
       - "SODA DIMENSIONS FROM THE CHECKS FILE (Keith, 2026-10-18): the empty Child Protection dimensions are fixed by reading each check's own `category` from its Soda checks file, and both adapters' Soda dimension maps go. Every non-empty dimension recorded today already matches its category. MEASURED 52 checks (3,357 results, 59 cards), NOT criterion 1's 88 - that figure was not reproducible and the only 88 in the database is an unrelated left-out total. REJECTED copying Birth Registrations' metric map to Child Protection: same values, but it keeps a second copy, which is how the gap arose."
       - "EVIDENTLY VOLUME CHECK MOVED HERE FROM REQ-PIPE-248 (Keith, 2026-10-18): evidently.volume_from_drift_frame was listed as shape, but it changes how the row-count check is worked out and where it shows, so it is behaviour. Unified on Child Protection's: counted from the table and recorded on (table), so Birth Registrations' 'Row count vs. last promoted supply' card moves from the registration_number column to Supply-level checks (111 results). REJECTED moving Child Protection's 337 results onto a column."
       - "THE SODA FAILED-ROWS COUNT IS FIXED TEST-FIRST IN THIS REQUIREMENT (Keith, 2026-10-18, confirming the fold-in): the reader takes totalFailingRows where Soda writes totalRowCount."
-      - "MEASURED, TO BECOME EVIDENCE AT BUILT - 2026-10-18, CRITERION 3 FOR THE TWELVE NO-CHANGE FLAGS (one capture pair, Keith's call): `mothman debug equivalence compare after-252 after-247a` (254d060 against 0298824, 16 commits, twelve of them one retirement each; bootstraps 1506s and 1359s) - S1 recorded results, S4 generated files, S5 reports and S7 help and menus all the same, which is what every one of the twelve briefs predicted. Criterion 4 therefore has nothing to report for these twelve."
       - "TWO OF THE SEVEN MOVE TO REQ-PIPE-248'S STATS STEP (Keith, 2026-10-18 ~21:15): the Evidently volume check and stopping earliest_extract both live in the dataset-stats record, and Birth Registrations' still has the single-table shape (`row_count`, not `row_counts` by table) that REQ-PIPE-248 owns. Retiring the volume check first would leave all 111 Birth Registrations volume results with no reference - 'not evaluated' - until 248 landed. So both land in the same change that gives Birth Registrations `row_counts`, each still its own commit, and their decisions above stand unchanged. REJECTED a temporary singular-to-plural fallback in recorded_row_counts: a shim written to be deleted one requirement later."
       - "ONE CAPTURE FOR THE SEVEN THAT CHANGE THINGS (Keith, 2026-10-18 ~20:40): the Soda suffix, zero counts, empty sections, earliest_extract, Soda dimensions, the volume check and the Soda count are each their own commit, compared together by one capture after all seven against the capture after the twelve. Each touches different fields, so every difference can still be traced to the change that predicted it. REJECTED a pair per change: about three hours of captures for no extra attribution."
     open_questions: []
+    unmet_criteria:
+      - criterion: "Criterion 2, for two flags, and criterion 5 - evidently.volume_from_drift_frame and stats.arrival_after_registration resolved as decided above, and `mothman check` failing any adapter that still declares a legacy flag."
+        why: "Keith moved the two flags into REQ-PIPE-248's stats step (2026-10-18), so no Birth Registrations volume result goes un-evaluated in between; and the gate cannot fail on a legacy flag while REQ-PIPE-248's shape flags are still declared. REQ-PIPE-248 criterion 6 is the same gate for every kind of flag."
+        owner: REQ-PIPE-248
+        blocked_by:
+          requirements:
+            - REQ-PIPE-248
+    linked_tests:
+      - tests/test_collections_registry.py
+      - tests/test_orchestrate_shared.py
+      - tests/test_dataset_stats.py
+      - tests/test_dashboard_for_every_collection.py
+      - tests/test_build_dashboard_data.py
+      - tests/test_dashboard_e2e.py
+      - tests/test_equivalence.py
+    implemented_by:
+      - qa_tools/tools/run_soda.py::evaluate
+      - qa_tools/common/soda_common.py::resource_attribute
+      - qa_tools/tools/dataset_stats.py::_value_counts
+      - pipeline/build_dashboard_data.py::build_one_table
+      - qa_tools/tools/orchestrate.py::_reconciles
+      - qa_tools/tools/results_history.py::build_results_from_history
 
   - id: REQ-PIPE-248
     title: "Every collection records and publishes the same N-table shapes under file names from its collection id, so Birth Registrations stops being a special case"
