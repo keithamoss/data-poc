@@ -77,8 +77,8 @@ S3 (raw-data bucket)
 └──────────┬───────────────┘     └──────────┬────────────────┘
            │                                 │ (every file, at once)
            ▼                                 ▼
-   qa_tools.bdm.orchestrate_bdm      qa_tools.cp.orchestrate_cp
-     .run_single()                     .run_single()
+   qa_tools.tools.orchestrate        qa_tools.tools.orchestrate
+     .run_single_file()                .run_single()  (one shared module since REQ-PIPE-243)
            │                                 │
            ▼                                 ▼
    real dbt/Soda/datacontract-cli/Evidently runs, one delivery's worth

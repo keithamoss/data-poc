@@ -14,14 +14,13 @@ into the supply database; nothing is staged up front.
 BUILT FROM CHILD PROTECTION'S COPY, the N-table one: the reference, the
 own-table guard, the could-not-run records and the reconciliation of what the
 tools left out are all asked of the run's own table, and are the degenerate
-case for a one-table collection. Birth Registrations' copy differed in three
-places that change what is recorded, kept behind its legacy flags
-(qa_tools/tools/legacy.py). Run through `mothman pipeline run`/`bootstrap` or
+case for a one-table collection. Birth Registrations' copy differed in four
+places that change what is recorded, kept behind its `orchestrate.*` legacy
+flags (qa_tools/tools/legacy.py). Run through `mothman pipeline run`/`bootstrap` or
 a collection's `qa` command, never bare.
 """
 from __future__ import annotations
 
-import functools
 import shutil
 from collections.abc import Callable
 
@@ -64,7 +63,7 @@ def _run_step(collection: str, tool: str, run_id: str, call):
         raise QaRunFailure(
             f"{collection} run {run_id}: {tool} failed - {type(exc).__name__}: {exc}. "
             f"This run is INCOMPLETE and is not recorded as a finished one; "
-            f"its partial results stay on disk.") from exc
+            f"its partial results stay recorded, under an unfinished run.") from exc
 
 
 def _announce(on_step, label: str) -> None:
@@ -82,6 +81,10 @@ def _sole(coll):
 def run_one(collection_id: str, entry: dict, run_timestamp: str, run_by: str,
             reference_run_id: str | None = None,
             on_step: Callable[[str], None] | None = None) -> list[dict]:
+    """One QA run over one already-staged arrival of `collection_id`: every
+    tool, the dataset statistics, the reconciliation and the records, with
+    the run's own schemas discarded whatever happens. Returns the verified
+    check results."""
     run_id = entry["run_id"]
     print(f"--- {run_id} ---")
     try:
@@ -235,7 +238,7 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # finished. Each tool's in-scope left-out set is recorded where non-empty.
     noted = left_out.take(run_id)
     in_scope = scope_of_run(run_id)
-    reconciles = _reconciles(entry, run_id)
+    reconciles = _reconciles(entry, run_id, adapter.legacy)
     if reconciles:
         compared = left_out.reconcile(run_id, noted, [*blast, *missing], in_scope)
         if compared:
@@ -275,9 +278,13 @@ def _excusing_unreadable(in_scope, resolution, noted: dict[str, set[str]]):
     return guarded
 
 
-def _reconciles(entry: dict, run_id: str) -> bool:
+def _reconciles(entry: dict, run_id: str, legacy: frozenset = frozenset()) -> bool:
     """A run with a scope, and a TRIAL (Keith, 2026-10-05), whose id names no
-    table, so its scope is the whole collection."""
+    table, so its scope is the whole collection - or every run, under
+    `orchestrate.always_reconciles` (Birth Registrations' old behaviour,
+    kept; post-build-review #220)."""
+    if "orchestrate.always_reconciles" in legacy:
+        return True
     return trial.is_trial(run_id) or _has_scope(entry, run_id)
 
 
@@ -346,14 +353,19 @@ def run_single_file(collection_id: str, run_id: str, table: str, csv_path: str, 
     from datetime import date
 
     trial.require_trial(run_id, "orchestrate.run_single_file")
+    # IDENTITY AND CLOCK BEFORE ANYTHING IS STAGED: a missing git identity
+    # fails here, with nothing to clean up, rather than after the trial table
+    # exists and before run_one's own tidy-up can reach it.
+    run_by = run_by or get_run_by()
+    run_timestamp = asset_time.now().isoformat()
     entry = {"run_id": run_id, "run_index": 1, "csv_path": csv_path,
              "received_at": asset_time.isoformat(
                  received_at or asset_time.start_of_day(date.fromisoformat(run_date))),
              "delivery": run_id}
     stage.stage_table(collection_id, run_id, table, csv_path,
                       run_date=run_date, received_at=received_at)
-    return run_one(collection_id, entry, asset_time.now().isoformat(), run_by or get_run_by(),
-                   reference_run_id, on_step=on_step)
+    return run_one(collection_id, entry, run_timestamp, run_by, reference_run_id,
+                   on_step=on_step)
 
 
 def simultaneous_with(arrival, among) -> list:
@@ -434,12 +446,14 @@ def entry_for(collection_id: str, arrival) -> dict:
     return entry
 
 
-@functools.lru_cache(maxsize=None)
 def steps(collection_id: str) -> arrival_lifecycle.Steps:
     """A collection's half of the one per-arrival lifecycle (REQ-PIPE-086
     criterion 2). `among` is every arrival the caller knows of: a zip is
     filed whole. A collection with no adapter is refused here, by name,
-    before any step runs (REQ-PIPE-240 criterion 6)."""
+    before any step runs (REQ-PIPE-240 criterion 6) - on EVERY call, which
+    is why this is not cached: a cached Steps outlived a registry change and
+    skipped the refusal (post-build-review #220), and building four lambdas
+    costs nothing."""
     collections.adapter(collections.by_id(collection_id))
     return arrival_lifecycle.Steps(
         file_and_overlay=lambda arrival, among: file_and_overlay(collection_id, arrival, among),

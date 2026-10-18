@@ -36866,109 +36866,220 @@ requirements:
     open_questions: []
 
   - id: REQ-PIPE-243
-    title: "One shared orchestrator, dataset-stats computation and results-from-history rebuild serve every collection"
+    title: One shared orchestrator, dataset-stats computation and results-from-history rebuild serve every
+      collection
     signed_off:
       by: Keith
-      date: "2026-10-16"
-    date_written: "2026-10-15"
-    story: "As someone adding a collection, I want the run orchestration, the dataset statistics and the rebuild of results from recorded history shared, so that a new collection's supplies are run, summarised and rebuilt without more copied modules."
+      date: '2026-10-16'
+    date_written: '2026-10-15'
+    story: As someone adding a collection, I want the run orchestration, the dataset statistics and the
+      rebuild of results from recorded history shared, so that a new collection's supplies are run, summarised
+      and rebuilt without more copied modules.
     moscow: must
     status: built
-    source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sections 1 and 4; main session position.md calls 1, 2, 12, 19 and 27. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
+    source: Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sections 1 and
+      4; main session position.md calls 1, 2, 12, 19 and 27. Drafted by delivery-scoper 2026-10-15, revised
+      rounds 2 and 3/4; signed by Keith 2026-10-16.
     acceptance_criteria:
-      - "THE SYSTEM SHALL run every collection's single runs and batch pipeline through one shared orchestrator, compute every collection's dataset statistics through one shared module reading the adapter's .stats, and rebuild every collection's results from recorded history through one shared module."
-      - "THE SYSTEM SHALL take each collection's aggregate specification, value-count column and claim-window dataset from its adapter, and SHALL NOT fall back to a named dataset when an adapter gives none (groundwork site 25, `_claim_window`'s default of cp-clients)."
-      - "THE SYSTEM SHALL preserve Birth Registrations' recorded dataset-stats shape (row_count rather than row_counts, aggregates keyed by column, zeros kept) and its results JSON shape behind named legacy flags."
-      - "THE SYSTEM SHALL remove qa_tools/cp/dataset_stats.py's import of qa_tools.bdm.dataset_stats and cli/common.py's import of RUN_STEPS from orchestrate_bdm."
-      - "THE SYSTEM SHALL keep every adapter module importable without importing any QA tool library, so that the registry and the CLI can read an adapter's declarations cheaply."
-      - "WHEN the processing pass, a recheck or a bootstrap runs a collection, THE SYSTEM SHALL reach the shared orchestrator through the registry, and the adapters SHALL lose the temporary orchestrator and warehouse-builder pointers REQ-PIPE-240 gave them."
-      - "WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S4, S5 and S7, and that capture SHALL serve as REQ-GEN-246's 'before'."
-      - "THE SYSTEM SHALL delete both orchestrators, both dataset_stats.py, both build_results_from_history.py, bdm_common.py and cp_common.py, and with them the qa_tools/bdm/ and qa_tools/cp/ packages, in the same change, and SHALL remove from the migration allowlist every file whose dispatch sites this requirement rewires, each with a third-collection test."
+    - THE SYSTEM SHALL run every collection's single runs and batch pipeline through one shared orchestrator,
+      compute every collection's dataset statistics through one shared module reading the adapter's .stats,
+      and rebuild every collection's results from recorded history through one shared module.
+    - THE SYSTEM SHALL take each collection's aggregate specification, value-count column and claim-window
+      dataset from its adapter, and SHALL NOT fall back to a named dataset when an adapter gives none (groundwork
+      site 25, `_claim_window`'s default of cp-clients).
+    - THE SYSTEM SHALL preserve Birth Registrations' recorded dataset-stats shape (row_count rather than
+      row_counts, aggregates keyed by column, zeros kept) and its results JSON shape behind named legacy
+      flags.
+    - THE SYSTEM SHALL remove qa_tools/cp/dataset_stats.py's import of qa_tools.bdm.dataset_stats and cli/common.py's
+      import of RUN_STEPS from orchestrate_bdm.
+    - THE SYSTEM SHALL keep every adapter module importable without importing any QA tool library, so that
+      the registry and the CLI can read an adapter's declarations cheaply.
+    - WHEN the processing pass, a recheck or a bootstrap runs a collection, THE SYSTEM SHALL reach the shared
+      orchestrator through the registry, and the adapters SHALL lose the temporary orchestrator and warehouse-builder
+      pointers REQ-PIPE-240 gave them.
+    - WHEN `mothman debug equivalence compare` runs between the full capture of the commit before this change
+      and the full capture of this change, THE SYSTEM SHALL report no difference on S1, S4, S5 and S7, and
+      that capture SHALL serve as REQ-GEN-246's 'before'.
+    - THE SYSTEM SHALL delete both orchestrators, both dataset_stats.py, both build_results_from_history.py,
+      bdm_common.py and cp_common.py, and with them the qa_tools/bdm/ and qa_tools/cp/ packages, in the
+      same change, and SHALL remove from the migration allowlist every file whose dispatch sites this requirement
+      rewires, each with a third-collection test.
     non_functional_requirements:
-      - "BYTE-IDENTICAL (REQ-TEST-239): criterion 7."
-      - "A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27): the shared rebuild-from-history reads only the qa schema."
-      - "BOOTSTRAP TIME, MEASURED (REQ-TEST-239): the orchestrator is the inner loop, so a per-run cost added here multiplies by every arrival (150 or more today)."
-      - "RELIABILITY: a run that fails partway records what it recorded before, exactly as the copies do."
-      - "DOCS: CLAUDE.md's layout table, README.md and docs/components.md stop naming the deleted packages in the same change."
+    - 'BYTE-IDENTICAL (REQ-TEST-239): criterion 7.'
+    - 'A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27):
+      the shared rebuild-from-history reads only the qa schema.'
+    - 'BOOTSTRAP TIME, MEASURED (REQ-TEST-239): the orchestrator is the inner loop, so a per-run cost added
+      here multiplies by every arrival (150 or more today).'
+    - 'RELIABILITY: a run that fails partway records what it recorded before, exactly as the copies do.'
+    - 'DOCS: CLAUDE.md''s layout table, README.md and docs/components.md stop naming the deleted packages
+      in the same change.'
     dependencies:
-      - REQ-QAC-242
+    - REQ-QAC-242
     decisions:
-      - "STATS, RESULTS AND ORCHESTRATOR IN ONE REQUIREMENT (position.md call 12): they are the last users of the per-collection packages, so together they let qa_tools/bdm/ and qa_tools/cp/ go whole."
-      - "ADAPTERS IMPORTABLE WITHOUT TOOL CODE (main session's round-3 call 19, after the CLI UX review): criterion 5 is what lets REQ-TEST-245's `--help` stay import-free at 30 collections."
-      - "THE claim-window FALLBACK silently defaults to a Child Protection dataset; a third collection would claim under cp-clients' window."
-      - "THE SHAPE LEGACY FLAGS HERE ARE RETIRED BY REQ-PIPE-248: they change formats, not verdicts."
-      - "REQ-GEN-246 LANDS STRAIGHT AFTER THIS ONE (main session's round-5 call 30, P2): its 'before' is this requirement's kept 'after', so the chain needs no extra full capture; REQ-DASH-244 and REQ-TEST-245 follow REQ-GEN-246."
-      - "ONE ORCHESTRATOR BUILT FROM CHILD PROTECTION'S COPY, Birth Registrations' differences as legacy flags (2026-10-17): the CP copy already handled many tables, siblings read from a period and an unreadable own table; BDM's single-table copy differed in nine places, each now a named flag in qa_tools/tools/legacy.py declared on its adapter - stats.single_table_shape, stats.rows_by_run_id, stats.zero_counts_kept, stats.arrival_after_registration, results.single_dataset_header, results.every_recorded_run, orchestrate.single_table_guard, orchestrate.files_one_arrival, orchestrate.entry_carries_csv_path - so criterion 7's byte-identical comparison could hold without a second code path."
-      - "WHAT A COLLECTION MEASURES IS ITS ADAPTER'S `.stats` (StatsSpec: aggregates keyed by (table, column), value_counts keyed the same), read by one compute_dataset_stats(collection_id, conn, entry); the dashboard builds read the same spec rather than their own copy of the aggregate list. REJECTED: keeping the aggregate dicts in pipeline/build_*_dashboard_data.py as well, which is the duplication this requirement removes."
-      - "THE CLAIM WINDOW IS THE SHORTEST OF THE DATASETS THE ARRIVAL CARRIES, else the adapter's `claim_window_dataset`, else none (criterion 2): the old CP `_claim_window` defaulted to cp-clients, which a third collection would have borrowed. Tested with the fake collection, whose adapter names none and gets None."
-      - "A COLLECTION WITH NO ADAPTER IS REFUSED BEFORE ANY STEP RUNS: orchestrate.steps() resolves the adapter eagerly and recheck.execute() resolves it before the period overlay, so REQ-PIPE-240 criterion 6's refusal-by-name survived the move from per-collection modules to lambdas (two third-collection tests went red when it did not)."
-      - "THE RESULTS FILE IS `<ROOT>/reports/<adapter.results_json>`, written by one results_history.write_results_file(); tests redirect it by patching results_history.ROOT rather than a per-module RESULTS_PATH, which is also how the equivalence harness redirects a capture's outputs."
-      - "THE `_provenance` STRINGS IN THE DASHBOARD JSON STILL NAME qa_tools/bdm/orchestrate_bdm.py AND qa_tools/cp/orchestrate_cp.py, deliberately: they are inside S5 and criterion 7 holds that surface byte-identical, so the rename rides REQ-DASH-244 (one dashboard-data build), which rebuilds that JSON anyway."
-      - "run_single() IS FOR AN ALREADY-STAGED ENTRY (Child Protection's shape) and run_single_file() stages one file and runs it (Birth Registrations' shape); both are trials only, as before. The test-only helper that redirects a rebuild (tests/rebuild_support.py) is parametrised over collection ids, not module names."
-      - "TESTS THAT ASSERTED ON BOTH ORCHESTRATORS' SOURCE (AST walks for the lifecycle, the reconciler, the overlap) now assert on the one shared module; tests that asserted on behaviour per collection are parametrised over collection ids and still run for both."
+    - 'STATS, RESULTS AND ORCHESTRATOR IN ONE REQUIREMENT (position.md call 12): they are the last users
+      of the per-collection packages, so together they let qa_tools/bdm/ and qa_tools/cp/ go whole.'
+    - 'ADAPTERS IMPORTABLE WITHOUT TOOL CODE (main session''s round-3 call 19, after the CLI UX review):
+      criterion 5 is what lets REQ-TEST-245''s `--help` stay import-free at 30 collections.'
+    - THE claim-window FALLBACK silently defaults to a Child Protection dataset; a third collection would
+      claim under cp-clients' window.
+    - 'THE SHAPE LEGACY FLAGS HERE ARE RETIRED BY REQ-PIPE-248: they change formats, not verdicts.'
+    - 'REQ-GEN-246 LANDS STRAIGHT AFTER THIS ONE (main session''s round-5 call 30, P2): its ''before'' is
+      this requirement''s kept ''after'', so the chain needs no extra full capture; REQ-DASH-244 and REQ-TEST-245
+      follow REQ-GEN-246.'
+    - 'ONE ORCHESTRATOR BUILT FROM CHILD PROTECTION''S COPY, Birth Registrations'' differences as legacy
+      flags (2026-10-17): the CP copy already handled many tables, siblings read from a period and an unreadable
+      own table; BDM''s single-table copy differed in nine places, each now a named flag in qa_tools/tools/legacy.py
+      declared on its adapter - stats.single_table_shape, stats.rows_by_run_id, stats.zero_counts_kept,
+      stats.arrival_after_registration, results.single_dataset_header, results.every_recorded_run, orchestrate.single_table_guard,
+      orchestrate.files_one_arrival, orchestrate.entry_carries_csv_path - so criterion 7''s byte-identical
+      comparison could hold without a second code path.'
+    - 'WHAT A COLLECTION MEASURES IS ITS ADAPTER''S `.stats` (StatsSpec: aggregates keyed by (table, column),
+      value_counts keyed the same), read by one compute_dataset_stats(collection_id, conn, entry); the dashboard
+      builds read the same spec rather than their own copy of the aggregate list. REJECTED: keeping the
+      aggregate dicts in pipeline/build_*_dashboard_data.py as well, which is the duplication this requirement
+      removes.'
+    - 'THE CLAIM WINDOW IS THE SHORTEST OF THE DATASETS THE ARRIVAL CARRIES, else the adapter''s `claim_window_dataset`,
+      else none (criterion 2): the old CP `_claim_window` defaulted to cp-clients, which a third collection
+      would have borrowed. Tested with the fake collection, whose adapter names none and gets None.'
+    - 'A COLLECTION WITH NO ADAPTER IS REFUSED BEFORE ANY STEP RUNS: orchestrate.steps() resolves the adapter
+      eagerly and recheck.execute() resolves it before the period overlay, so REQ-PIPE-240 criterion 6''s
+      refusal-by-name survived the move from per-collection modules to lambdas (two third-collection tests
+      went red when it did not).'
+    - THE RESULTS FILE IS `<ROOT>/reports/<adapter.results_json>`, written by one results_history.write_results_file();
+      tests redirect it by patching results_history.ROOT rather than a per-module RESULTS_PATH, which is
+      also how the equivalence harness redirects a capture's outputs.
+    - 'THE `_provenance` STRINGS IN THE DASHBOARD JSON STILL NAME qa_tools/bdm/orchestrate_bdm.py AND qa_tools/cp/orchestrate_cp.py,
+      deliberately: they are inside S5 and criterion 7 holds that surface byte-identical, so the rename
+      rides REQ-DASH-244 (one dashboard-data build), which rebuilds that JSON anyway.'
+    - run_single() IS FOR AN ALREADY-STAGED ENTRY (Child Protection's shape) and run_single_file() stages
+      one file and runs it (Birth Registrations' shape); both are trials only, as before. The test-only
+      helper that redirects a rebuild (tests/rebuild_support.py) is parametrised over collection ids, not
+      module names.
+    - TESTS THAT ASSERTED ON BOTH ORCHESTRATORS' SOURCE (AST walks for the lifecycle, the reconciler, the
+      overlap) now assert on the one shared module; tests that asserted on behaviour per collection are
+      parametrised over collection ids and still run for both.
+    - 'A TENTH DIFFERENCE, FOUND BY THE POST-BUILD CRITIC AND KEPT BEHIND A FLAG (Keith, 2026-10-18; post-build-review
+      #220): the old Birth Registrations orchestrator always reconciled what the tools left out and always
+      ran the full nothing-missing guard, even for a supply filed to no period, where Child Protection''s
+      copy excuses what such a run cannot read. `orchestrate.always_reconciles` on the Birth Registrations
+      adapter keeps that; REJECTED: accepting Child Protection''s rule for both, because this chain promised
+      behaviour-preserving refactors and REQ-PIPE-248 is where flags retire.'
+    - 'steps() IS NOT CACHED: an lru_cache kept a refusal from re-running after the registry changed (demonstrated
+      by the critic), and four lambdas cost nothing to rebuild. run_single_file() resolves the git identity
+      and the clock BEFORE staging, as the old BDM run_single did, so a missing identity leaves no trial
+      table behind. The collections gate refuses an adapter with an empty results_json, which would otherwise
+      fail at the very end of a whole batch by writing over reports/.'
+    - 'CRITERION 7 WAS MEASURED BETWEEN TWO PROXY COMMITS: after-242 is ec78089 (a REQ-QAC-242 checkpoint,
+      not f9c2bb7, the last pushed commit before this change) and after-243 is 2e3e76e (the last code checkpoint
+      before the register edits and a three-line load-by-path fix, not 5340399). Nothing between the proxies
+      and the literal pair changes what a capture records, and the 675s bootstrap speed-up is REPORTED,
+      not attributed - the two captures ran two days apart on a shared sandbox and were not re-measured
+      the same day.'
+    - CHILD PROTECTION'S LIVE RESULTS FILE CHANGED KEY ORDER (generated_at, collection, datasets, runs,
+      dataset_stats, ... rather than the old live batch's generated_at, dataset_stats, collection, ...),
+      because the live batch now goes through the same write_results_file() the rebuild uses, atomically.
+      The equivalence harness compares parsed JSON and the rebuild overwrites the file anyway, so 'byte-identical'
+      on this one surface means parse-equal; live now matches rebuild, which is the improvement.
     open_questions: []
     evidence:
-      - "2026-10-18, CRITERION 7 (REQ-TEST-239): `mothman debug equivalence compare after-242 after-243` - after-242 a full capture of ec78089, after-243 of 2e3e76e (this change at its last code checkpoint), 9 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same. Bootstrap 1920s against 1245s, -675s (Birth Registrations 612s against 457s, Child Protection 1793s against 1165s). after-243 is REQ-GEN-246's 'before'."
-      - "2026-10-18, GATES: full `mothman check` on e768c0c - every gate passed except pytest, 5618 passed / 1 failed / 1 xfailed in 988s (npm test 830 passed in 88s), the one failure tests/test_cli_config_unreadable.py: the registry parsed data-asset.yaml from text, so a slip named `<unicode string>` once the CLI reached the registry at import. Fixed by loading by path (collections/__init__.py, and the same nameless reads in asset_time.py and replay_clock.py); that test plus test_collections_registry, test_replay_clock, test_pinned_now and test_asset_time: 119 passed; `mothman check --no-pytest` passed on the fixed tree. The rewired test modules were run before that on 05dc318's tree: 1,015 passed, 6 failed - the stub signature, the claim-window fixture, two date-dependent --commit tests (post-build-review #219) and one timing flake, all fixed in 2e3e76e."
-      - "2026-10-18, CRITERIA 1, 4, 6 AND 8: qa_tools/bdm/ and qa_tools/cp/ are deleted whole (ten modules), every caller - the bootstrap, the processing pass, re-checks, the dashboard rebuild, `mothman pipeline run`, `mothman bdm qa`, `mothman cp qa`, cli/common.py's RUN_STEPS - reaches qa_tools/tools/orchestrate.py, dataset_stats.py and results_history.py by collection id, and the five migration-allowlist entries those modules carried are removed; `mothman check --only collections` passes. The adapters lost the orchestrator and results-rebuild pointers and their orchestrator_module()/run_pipeline()/rebuild_results() methods."
-      - "2026-10-18, CRITERION 8's THIRD-COLLECTION TESTS: tests/test_collections_registry.py::TestAThirdCollectionAtEverySite (processing pass, re-check and bootstrap each reach the shared orchestrator under the fake collection's id, and a collection with no adapter is refused by name before any step) and ::TestTheSharedOrchestratorStatsAndRebuild (dataset stats count the fake table from the registry, the rebuild writes results_fk.json with the collection header, and the claim window is None where the adapter names no dataset): 74 passed on this tree."
-      - "2026-10-18, CRITERION 2: _claim_window() takes the shortest window of the datasets the arrival carries, else the adapter's claim_window_dataset, else None - the fake collection gets None and Child Protection still gets cp-clients'; _AGGREGATES in both dashboard builds and compute_dataset_stats() read the adapter's .stats."
-      - "2026-10-18, CRITERION 3: Birth Registrations' single-table stats shape (row_count, column-keyed aggregates, zeros kept) and single-dataset results header are behind stats.single_table_shape, stats.zero_counts_kept and results.single_dataset_header on its adapter; the shared compute_dataset_stats() was compared equal to both deleted modules on every fixture run (BDM dirty and reference; CP placements and notifications, dirty and reference) and the shared rebuild equal to both deleted rebuilds (8,880 and 12,317 results, generated_at aside) before the old modules went."
-      - "2026-10-18, CRITERION 5: every module under qa_tools/collections/ imports only dataclasses, typing, yaml-free registry code and qa_tools.common.hierarchy - no QA tool library; `uv run python -c 'import qa_tools.collections.civil_registration, qa_tools.collections.child_protection'` loads with no dbt, soda, datacontract or evidently module in sys.modules."
-      - "2026-10-18, DOCS NFR: CLAUDE.md's layout table, README.md's qa_tools/ tree and docs/components.md name qa_tools/tools/orchestrate.py, dataset_stats.py and results_history.py and no longer name the deleted packages, except where a sentence is explicitly history."
+    - '2026-10-18, CRITERION 7 (REQ-TEST-239): `mothman debug equivalence compare after-242 after-243` -
+      after-242 a full capture of ec78089, after-243 of 2e3e76e (this change at its last code checkpoint),
+      9 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus
+      same. Bootstrap 1920s against 1245s, -675s (Birth Registrations 612s against 457s, Child Protection
+      1793s against 1165s). after-243 is REQ-GEN-246''s ''before''.'
+    - '2026-10-18, GATES: full `mothman check` on e768c0c - every gate passed except pytest, 5618 passed
+      / 1 failed / 1 xfailed in 988s (npm test 830 passed in 88s), the one failure tests/test_cli_config_unreadable.py:
+      the registry parsed data-asset.yaml from text, so a slip named `<unicode string>` once the CLI reached
+      the registry at import. Fixed by loading by path (collections/__init__.py, and the same nameless reads
+      in asset_time.py and replay_clock.py); that test plus test_collections_registry, test_replay_clock,
+      test_pinned_now and test_asset_time: 119 passed; `mothman check --no-pytest` passed on the fixed tree.
+      The rewired test modules were run before that on 05dc318''s tree: 1,015 passed, 6 failed - the stub
+      signature, the claim-window fixture, two date-dependent --commit tests (post-build-review #219) and
+      one timing flake, all fixed in 2e3e76e.'
+    - '2026-10-18, CRITERIA 1, 4, 6 AND 8: qa_tools/bdm/ and qa_tools/cp/ are deleted whole (ten modules),
+      every caller - the bootstrap, the processing pass, re-checks, the dashboard rebuild, `mothman pipeline
+      run`, `mothman bdm qa`, `mothman cp qa`, cli/common.py''s RUN_STEPS - reaches qa_tools/tools/orchestrate.py,
+      dataset_stats.py and results_history.py by collection id, and the five migration-allowlist entries
+      those modules carried are removed; `mothman check --only collections` passes. The adapters lost the
+      orchestrator and results-rebuild pointers and their orchestrator_module()/run_pipeline()/rebuild_results()
+      methods.'
+    - '2026-10-18, CRITERION 8''s THIRD-COLLECTION TESTS: tests/test_collections_registry.py::TestAThirdCollectionAtEverySite
+      (processing pass, re-check and bootstrap each reach the shared orchestrator under the fake collection''s
+      id, and a collection with no adapter is refused by name before any step) and ::TestTheSharedOrchestratorStatsAndRebuild
+      (dataset stats count the fake table from the registry, the rebuild writes results_fk.json with the
+      collection header, and the claim window is None where the adapter names no dataset): 74 passed on
+      this tree.'
+    - '2026-10-18, CRITERION 2: _claim_window() takes the shortest window of the datasets the arrival carries,
+      else the adapter''s claim_window_dataset, else None - the fake collection gets None and Child Protection
+      still gets cp-clients''; _AGGREGATES in both dashboard builds and compute_dataset_stats() read the
+      adapter''s .stats.'
+    - '2026-10-18, CRITERION 3: Birth Registrations'' single-table stats shape (row_count, column-keyed
+      aggregates, zeros kept) and single-dataset results header are behind stats.single_table_shape, stats.zero_counts_kept
+      and results.single_dataset_header on its adapter; the shared compute_dataset_stats() was compared
+      equal to both deleted modules on every fixture run (BDM dirty and reference; CP placements and notifications,
+      dirty and reference) and the shared rebuild equal to both deleted rebuilds (8,880 and 12,317 results,
+      generated_at aside) before the old modules went.'
+    - '2026-10-18, CRITERION 5: every module under qa_tools/collections/ imports only dataclasses, typing,
+      the registry''s own code, config_yaml and qa_tools.common.hierarchy - no QA tool library; after importing
+      both adapters, sys.modules holds no dbt, soda, datacontract, evidently, pandas, duckdb or psycopg
+      module (verified by the post-build critic''s import probe as well as the session''s).'
+    - '2026-10-18, DOCS NFR: CLAUDE.md''s layout table, README.md''s qa_tools/ tree and docs/components.md
+      name qa_tools/tools/orchestrate.py, dataset_stats.py and results_history.py and no longer name the
+      deleted packages, except where a sentence is explicitly history.'
     linked_tests:
-      - "tests/test_collections_registry.py::TestAThirdCollectionAtEverySite"
-      - "tests/test_collections_registry.py::TestTheSharedOrchestratorStatsAndRebuild"
-      - "tests/test_dataset_stats.py"
-      - "tests/test_build_results_from_history.py"
-      - "tests/test_orchestrate_single_run.py"
-      - "tests/test_orchestrate_reference_run.py"
-      - "tests/test_arrival_lifecycle.py"
-      - "tests/test_promotion_waits_for_next_receipt.py"
-      - "tests/test_promotion_actor.py"
-      - "tests/test_filing_before_checks.py"
-      - "tests/test_ticket_reconciler.py::TestTheReconcilerIsInvokedAfterEveryRun"
-      - "tests/test_run_single_is_for_trials.py"
-      - "tests/test_run_schema_lifecycle.py"
-      - "tests/test_cli_pipeline.py"
-      - "tests/test_cli_dashboard.py"
-      - "tests/test_bootstrap.py"
-      - "tests/test_processing_pass.py::TestTheLocks"
-      - "tests/test_recheck.py"
-      - "tests/test_cross_table_scope.py"
-      - "tests/test_atomic_file.py"
-      - "tests/test_readers_read_no_supply_rows.py"
-      - "tests/test_unreadable_own_table.py"
+    - tests/test_collections_registry.py::TestAThirdCollectionAtEverySite
+    - tests/test_collections_registry.py::TestTheSharedOrchestratorStatsAndRebuild
+    - tests/test_dataset_stats.py
+    - tests/test_build_results_from_history.py
+    - tests/test_orchestrate_single_run.py
+    - tests/test_orchestrate_reference_run.py
+    - tests/test_arrival_lifecycle.py
+    - tests/test_promotion_waits_for_next_receipt.py
+    - tests/test_promotion_actor.py
+    - tests/test_filing_before_checks.py
+    - tests/test_ticket_reconciler.py::TestTheReconcilerIsInvokedAfterEveryRun
+    - tests/test_run_single_is_for_trials.py
+    - tests/test_run_schema_lifecycle.py
+    - tests/test_cli_pipeline.py
+    - tests/test_cli_dashboard.py
+    - tests/test_bootstrap.py
+    - tests/test_processing_pass.py::TestTheLocks
+    - tests/test_recheck.py
+    - tests/test_cross_table_scope.py
+    - tests/test_atomic_file.py
+    - tests/test_readers_read_no_supply_rows.py
+    - tests/test_unreadable_own_table.py
+    - tests/test_orchestrate_shared.py
     implemented_by:
-      - "qa_tools/tools/orchestrate.py::run_one"
-      - "qa_tools/tools/orchestrate.py::run_single"
-      - "qa_tools/tools/orchestrate.py::run_single_file"
-      - "qa_tools/tools/orchestrate.py::run_arrivals"
-      - "qa_tools/tools/orchestrate.py::run_pipeline"
-      - "qa_tools/tools/orchestrate.py::steps"
-      - "qa_tools/tools/orchestrate.py::file_and_overlay"
-      - "qa_tools/tools/orchestrate.py::promote_after"
-      - "qa_tools/tools/orchestrate.py::_claim_window"
-      - "qa_tools/tools/orchestrate.py::discard_run_schemas"
-      - "qa_tools/tools/dataset_stats.py::compute_dataset_stats"
-      - "qa_tools/tools/dataset_stats.py::arrival_record"
-      - "qa_tools/tools/results_history.py::build_results_from_history"
-      - "qa_tools/tools/results_history.py::write_results_file"
-      - "qa_tools/tools/results_history.py::results_path"
-      - "qa_tools/tools/legacy.py::KNOWN"
-      - "qa_tools/collections/base.py::StatsSpec"
-      - "qa_tools/collections/base.py::CollectionAdapter"
-      - "qa_tools/common/bootstrap.py::_run_collection"
-      - "qa_tools/common/processing_pass.py::_steps"
-      - "qa_tools/common/recheck.py::execute"
-      - "cli/dashboard.py::_rebuild_results"
-      - "cli/pipeline.py::_run_bdm"
-      - "cli/pipeline.py::_run_cp"
-      - "cli/bdm.py::_run_single_preserving_manifest"
-      - "pipeline/build_dashboard_data.py::_AGGREGATES"
-      - "pipeline/build_cp_dashboard_data.py::_AGGREGATES"
-      - "qa_tools/common/validate_collections.py::ALLOWLIST"
-
+    - qa_tools/tools/orchestrate.py::run_one
+    - qa_tools/tools/orchestrate.py::run_single
+    - qa_tools/tools/orchestrate.py::run_single_file
+    - qa_tools/tools/orchestrate.py::run_arrivals
+    - qa_tools/tools/orchestrate.py::run_pipeline
+    - qa_tools/tools/orchestrate.py::steps
+    - qa_tools/tools/orchestrate.py::file_and_overlay
+    - qa_tools/tools/orchestrate.py::promote_after
+    - qa_tools/tools/orchestrate.py::_claim_window
+    - qa_tools/tools/orchestrate.py::discard_run_schemas
+    - qa_tools/tools/dataset_stats.py::compute_dataset_stats
+    - qa_tools/tools/dataset_stats.py::arrival_record
+    - qa_tools/tools/results_history.py::build_results_from_history
+    - qa_tools/tools/results_history.py::write_results_file
+    - qa_tools/tools/results_history.py::results_path
+    - qa_tools/tools/legacy.py::KNOWN
+    - qa_tools/collections/base.py::StatsSpec
+    - qa_tools/collections/base.py::CollectionAdapter
+    - qa_tools/common/bootstrap.py::_run_collection
+    - qa_tools/common/processing_pass.py::_steps
+    - qa_tools/common/recheck.py::execute
+    - cli/dashboard.py::_rebuild_results
+    - cli/pipeline.py::_run_bdm
+    - cli/pipeline.py::_run_cp
+    - cli/bdm.py::_run_single_preserving_manifest
+    - pipeline/build_dashboard_data.py::_AGGREGATES
+    - pipeline/build_cp_dashboard_data.py::_AGGREGATES
+    - qa_tools/common/validate_collections.py::ALLOWLIST
+    - qa_tools/tools/orchestrate.py::_reconciles
   - id: REQ-DASH-244
     title: "The dashboard is built for every collection by one Python builder and rendered from one COLLECTION_DATA const, with a dataset's GitHub link opening its contract and the agency pill removed"
     signed_off:

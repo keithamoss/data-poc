@@ -100,7 +100,6 @@ class TestAThirdCollectionAtEverySite:
         ran = []
         monkeypatch.setattr(orchestrate, "run_one",
                             lambda collection_id, entry, *a, **k: ran.append((collection_id, entry)) or [])
-        orchestrate.steps.cache_clear()
         steps = processing_pass._steps(FAKE_ID)
         steps.run_one({"run_id": "fk_run_001"}, "now", "pytest")
         assert ran == [(FAKE_ID, {"run_id": "fk_run_001"})]

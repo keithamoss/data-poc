@@ -82,4 +82,8 @@ KNOWN: dict[str, str] = {
     "orchestrate.entry_carries_csv_path": (
         "each run entry, and so the batch's results file, also names the arrival's "
         "file, or its delivery directory where two files contest the dataset."),
+    "orchestrate.always_reconciles": (
+        "what the tools left out is reconciled, and every in-scope check guarded, on "
+        "every run - even one whose supply is filed to no period, which Child "
+        "Protection's copy excuses (post-build-review #220, the tenth difference)."),
 }

@@ -95,7 +95,6 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
         seen = {}
         monkeypatch.setattr(orchestrate, "file_and_overlay",
                             lambda collection_id, arrival, among=None: seen.update(among=among))
-        orchestrate.steps.cache_clear()
         orchestrate.steps("child-protection").file_and_overlay(A, [A, B])
         assert seen["among"] == [A, B]
 
@@ -106,7 +105,6 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
                                 lambda cid, *a, **k: calls.append(("run", cid)) or [])
             monkeypatch.setattr(orchestrate, "promote_after",
                                 lambda cid, *a, **k: calls.append(("gate", cid)))
-            orchestrate.steps.cache_clear()
             steps = orchestrate.steps(collection_id)
             steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
             steps.promote_after(A, [], "x")

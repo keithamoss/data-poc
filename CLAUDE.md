@@ -506,7 +506,8 @@ Rough layout:
   (`supply_db.dbt_target_path(run_id)`, so two parallel workers cannot
   clobber each other's `manifest.json`).
 
-  Fixed at the source: both orchestrators' `_discard_this_runs_schemas()`
+  Fixed at the source: the orchestrator's `discard_run_schemas()` (one
+  shared one since REQ-PIPE-243; it was both copies' `_discard_this_runs_schemas()`)
   now removes the run's dbt target directory alongside its schemas,
   covered by `tests/test_run_schema_lifecycle.py`'s own
   `TestARunGivesBackItsDiskSpaceToo` (confirmed failing against the
@@ -1644,9 +1645,9 @@ Rough layout:
   to be synthetic isn't a pipeline that's actually safe - it's one
   accident away from being pointed at something real. See
   `plans/publishing-and-history.md`'s Phase 3 write-up for the full
-  incident and fix (`qa_tools/*/dataset_stats.py` - any computation
+  incident and fix (`qa_tools/tools/dataset_stats.py` - any computation
   that needs a live connection gets computed once, at real-run time,
-  by whichever `orchestrate_*.py` already has one legitimately open,
+  by `qa_tools/tools/orchestrate.py`'s run step, which already has one legitimately open,
   and committed to `qa_results/` alongside that run's check results -
   never deferred to a later read). Before adding ANY new computation to
   the dashboard-build path, ask first whether it needs SUPPLY ROWS - if

@@ -583,7 +583,8 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
         # an optional on_step callback (plans/tooling.md #13) and this
         # fake rejected it, failing a test that has nothing to do with
         # progress reporting.
-        captured.update(entry=entry, reference_run_id=reference_run_id, run_by=run_by)
+        captured.update(collection_id=collection_id, entry=entry,
+                        reference_run_id=reference_run_id, run_by=run_by)
         return [{"status": "pass"}]
 
     monkeypatch.setattr(orchestrate, "run_single", _fake_run_single)
@@ -593,6 +594,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
         run_id="table_cp_clients_001", keep=False)
 
     assert delivery_loads == ["cp_run_promoted"]
+    assert captured["collection_id"] == "child-protection"
 
     # ONLY THE SUPPLIED TABLE IS STAGED (REQ-PIPE-103). The other five
     # used to be re-staged under THIS run, which recorded five tables

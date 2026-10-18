@@ -10101,3 +10101,63 @@ twice. It deliberately did not re-find the `TypeError`.
      Child Protection dataset has an open slot for, so the receipt is the same
      on every day the suite runs. Fixed in the test, since nothing in the code
      is wrong, under Keith's polish rule.
+
+220. **[done, 2026-10-18]** **[Pipeline & publishing]** **What delivery-critic
+     found in REQ-PIPE-243's shared orchestrator, verified and fixed the
+     same day.** Nine findings against 5340399, each checked against the
+     code and the deleted modules at f9c2bb7 before anything was written
+     here. **F1, medium, real: a tenth Birth Registrations difference the
+     nine flags did not cover.** The old `orchestrate_bdm.py` always ran
+     `left_out.reconcile` and always checked nothing-missing over the full
+     scope (its lines 283 and 290); the shared orchestrator, built from
+     Child Protection's copy, gates both on `_reconciles()`, which for a
+     supply filed to no period is False and falls back to excusing what
+     the run cannot read. Masked today because Birth Registrations' tool
+     flags mean its tools note nothing as left out, and no history has an
+     unfiled Birth Registrations run - which is why the equivalence
+     corpus could not see it. Keith's call: keep the old behaviour behind
+     a flag, `orchestrate.always_reconciles`, retired with the others by
+     REQ-PIPE-248. Test-first: `tests/test_orchestrate_shared.py` failed
+     (the flag unknown, `_reconciles` without a legacy argument) and
+     passes now. **F4, demonstrated: `steps()`'s `lru_cache` cached the
+     refusal.** A cached Steps for a collection outlived the removal of
+     its adapter and `steps()` went on returning it; the cache is gone,
+     since four lambdas cost nothing, and the two tests that cleared it
+     no longer need to. **F5: `run_single_file()` staged before resolving
+     the git identity**, so a direct caller with no `run_by` and no
+     identity would leave a trial table with nothing to clean it (the old
+     BDM `run_single` resolved identity first). Identity and clock now
+     come before staging; test-first, the stub stage_table recorded a
+     call before the fix and none after. **F3, reproduced: an adapter
+     with an empty `results_json` fails at the very END of a whole batch**
+     (`os.replace` of a temp file over the `reports/` directory). The
+     collections gate now refuses it up front, test-first against the
+     fake collection. **F2, a caveat on criterion 7, recorded not fixed:**
+     the comparison ran between proxy commits (ec78089 and 2e3e76e)
+     rather than the literal before-and-after pair, nothing in between
+     changes what a capture records, and the 675s bootstrap speed-up is
+     reported rather than attributed - two captures two days apart on a
+     shared sandbox. **F6, recorded:** Child Protection's live results
+     file changed key order by going through the shared writer; the
+     harness compares parsed JSON, so byte-identical there means
+     parse-equal, and live now matches rebuild. **F7, noted, not fixed:**
+     `run_pipeline` surveys deliveries and records the in-flight log
+     before the adapter refusal fires; the bootstrap pre-checks adapters,
+     so the real path is safe, and the refusal-before-any-step promise is
+     `steps()`'s. **F8/F9, stale text, fixed:** the orchestrator's "three
+     places" and "stay on disk", `cli/common.py`'s "both orchestrators",
+     `base.py`'s "temporary pointers" docstring, CLAUDE.md's three
+     present-tense mentions, README's two deleted `pipeline/` modules and
+     the `results_<short>.json` wording, the generator's and the CDK
+     stack's comments; `run_one`, `results_path` and
+     `build_results_from_history` gained docstrings. **Missing tests the
+     critic named, added:** a fake adapter with a real StatsSpec proving
+     the stats are read from the adapter; the claim window equal to
+     cp-clients', to birth-registrations', the adapter's dataset only when
+     none is named, and the shortest of two; `test_cli_cp.py`'s
+     run_single stub asserting its collection id. Not added: a third
+     collection's `run_pipeline` with the tools stubbed, and a behavioural
+     test per `orchestrate.*` flag beyond the AST shape test - both worth
+     having, both larger than a polish fix, both left for REQ-TEST-249's
+     own third-collection pass. Minor defects and polish under Keith's
+     polish rule; F1 was his call.

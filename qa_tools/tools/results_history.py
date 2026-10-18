@@ -35,6 +35,8 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
 
 def results_path(collection_id: str) -> str:
+    """`<ROOT>/reports/<the adapter's results_json>` - the one file both the
+    live batch and the rebuild write."""
     return os.path.join(ROOT, "reports",
                         collections.adapter(collections.by_id(collection_id)).results_json)
 
@@ -78,6 +80,8 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
 
 
 def build_results_from_history(collection_id: str) -> dict:
+    """Rebuild the collection's results file from the recorded `qa` schema
+    alone - the dashboard build's source, no tool re-run, no supply rows."""
     coll = collections.by_id(collection_id)
     adapter = collections.adapter(coll)
     run_ids = current_runs_only(list_run_ids(coll.agency_id, coll.id))

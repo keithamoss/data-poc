@@ -129,7 +129,7 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
     # after this point. One CHARACTERISTIC offset per run (not per row -
     # a real batch's extraction genuinely starts at one point in time,
     # not 2000 independent random times; earliest_extract is a MIN()
-    # over the whole run downstream (qa_tools/bdm/dataset_stats.py), so
+    # over the whole run downstream (qa_tools/tools/dataset_stats.py), so
     # per-row-independent offsets across a wide range would make that
     # MIN collapse onto the range's extreme low tail almost every run,
     # regardless of the intended on-time/early/late split above), plus a

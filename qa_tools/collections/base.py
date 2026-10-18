@@ -1,10 +1,11 @@
 """What a collection's adapter carries (REQ-PIPE-240).
 
-IDENTITY PLUS TEMPORARY POINTERS, FOR NOW. The protocol grows step by step,
-as per-tool sub-objects (.dbt, .soda, .datacontract, .evidently, .staging,
-.stats, .present) in the requirements that follow. Here it carries only
-what the five surviving dispatch sites need, and every pointer to a
-collection's existing code names the requirement that removes it -
+IDENTITY, WHAT EACH SHARED MODULE READS, AND THE LAST TEMPORARY POINTERS.
+The per-tool sub-objects (.dbt, .soda, .datacontract, .stats) are what
+qa_tools/tools/* read for this collection (REQ-QAC-242, REQ-PIPE-243), the
+`legacy` flags name the behaviours Birth Registrations kept, and the three
+pointers left - generator, target_datasets, dashboard_json/dashboard_datasets
+- each name the requirement that removes them (REQ-GEN-246, REQ-DASH-244);
 REQ-TEST-249 criterion 9 asserts none is left.
 """
 from __future__ import annotations

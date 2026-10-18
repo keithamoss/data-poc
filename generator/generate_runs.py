@@ -129,7 +129,7 @@ ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single del
 # red to 2 so the resupply-chain simulation below had more than one
 # independent example to demonstrate variability), generated rather than
 # hand-listed at this length. First and last deliveries are always clean
-# by construction: the first is orchestrate_bdm.py's own Evidently
+# by construction: the first is the orchestrator's own Evidently
 # reference run (must be clean to be a meaningful baseline), the last
 # being clean is the same deliberate framing choice as the original
 # 10-run plan (Keith's own call, 2026-09-13) - Child Protection's own
@@ -327,7 +327,7 @@ class BirthRegistrationsProvider:
         # Phase 5f (plans/qa-pipeline.md #61): occasional whole-run
         # staleness, exempting the same two bookend deliveries severity
         # already exempts (see RUN_PLAN's own comment) - the first
-        # (orchestrate_bdm.py's Evidently reference run, must be a clean
+        # (the orchestrator's Evidently reference run, must be a clean
         # baseline) and the last (deliberately fresh so the "current"
         # view reads healthy by default, same reason START_DATE's own
         # rolling window exists). A distinct seed offset (+50) from
@@ -431,7 +431,7 @@ def _received_at(payload, received_date: date, where: str) -> str:
     rows, planted for the "extract timestamp ordering" check to catch.
     Including them would let one corrupted row decide when the whole
     supply arrived, which is the exact bug
-    qa_tools/bdm/dataset_stats.py's own earliest_extract already
+    qa_tools/tools/dataset_stats.py's own earliest_extract already
     documents and filters against.
     """
     legitimate = payload["extract_timestamp"] >= pd.to_datetime(payload["date_registered"])
@@ -964,7 +964,7 @@ def main() -> None:
             # THE RECEIPT INSTANT IS THE DATA'S OWN, not a separately
             # invented one: the earliest extract_timestamp in the file
             # that just landed. That is the same value
-            # qa_tools/bdm/dataset_stats.py computes downstream as
+            # qa_tools/tools/dataset_stats.py computes downstream as
             # earliest_extract, so the manifest and the warehouse cannot
             # disagree about when a supply turned up.
             if injected is not None:

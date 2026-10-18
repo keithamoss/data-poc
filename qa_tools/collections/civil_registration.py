@@ -146,5 +146,6 @@ ADAPTER = CollectionAdapter(
         "orchestrate.single_table_guard",
         "orchestrate.files_one_arrival",
         "orchestrate.entry_carries_csv_path",
+        "orchestrate.always_reconciles",
     }),
 )

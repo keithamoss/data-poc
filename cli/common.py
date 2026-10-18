@@ -28,8 +28,8 @@ from rich.text import Text
 from questionary import Style
 
 from qa_tools.common import hand_filing, supply_db, trial
-# Both orchestrators define an identical RUN_STEPS; importing one keeps
-# this helper honest about the real step count rather than hardcoding 5.
+# The shared orchestrator defines RUN_STEPS; importing it keeps this
+# helper honest about the real step count rather than hardcoding 5.
 from qa_tools.tools.orchestrate import RUN_STEPS
 
 # S3 QA source mode (plans/tooling.md #1 Phase 3) - the real raw-data

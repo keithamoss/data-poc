@@ -112,6 +112,12 @@ def config_problems(package: Path | None = None) -> list[str]:
             if adapter.collection_id != c.id:
                 problems.append(f"qa_tools/collections/{c.module_name}.py is the adapter of "
                                 f"{adapter.collection_id!r}, not {c.id!r}")
+            # REQ-PIPE-243: the results file is `reports/<results_json>`, and an
+            # empty name would fail at the very END of a whole batch, writing
+            # over the reports/ directory (post-build-review #220).
+            if not adapter.results_json:
+                problems.append(f"qa_tools/collections/{c.module_name}.py ({c.id!r}) sets no "
+                                f"results_json - the name of its results file under reports/")
     # REQ-QAC-242 criterion 5: a legacy flag only the shared modules know.
     from qa_tools.tools import legacy
     for c in declared:

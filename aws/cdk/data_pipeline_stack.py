@@ -94,8 +94,8 @@ class DataPipelineStack(Stack):
 
         # Real dependency bundling (this repo's own qa_tools/generator/
         # pipeline packages, plus dbt-core, Soda Core, datacontract-cli,
-        # Evidently, duckdb - the actual 4-real-tool stack orchestrate_bdm.
-        # py/orchestrate_cp.py's run_single() needs to import) is NOT solved
+        # Evidently, duckdb - the actual 4-real-tool stack the shared
+        # orchestrator's run_single() needs to import) is NOT solved
         # by Code.from_asset(LAMBDA_HANDLERS_DIR) below - that call only ever
         # bundles the two handler modules themselves. Those real
         # dependencies (several with compiled/native components - duckdb,
