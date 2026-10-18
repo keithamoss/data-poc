@@ -51,7 +51,7 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
                     contract_dir / "fake-agency" / f"{stem}-contract.yaml")
         for kind in ("soda-checks", "evidently-checks"):
             (contract_dir / "fake-agency" / f"{stem}-{kind}.yml").write_text("checks: []\n")
-    agencies.append({"id": "fake-agency", "name": "Fake Agency", "collections": [{
+    agencies.append({"id": "fake-agency", "name": "Fake Agency", "short": "fka", "collections": [{
         "id": FAKE_ID, "name": "Fake Collection", "short": FAKE_SHORT,
         "run_prefix": FAKE_PREFIX, "contract": "fake-agency/fake-things-contract.yaml",
         "delivery_boundary": "directory",

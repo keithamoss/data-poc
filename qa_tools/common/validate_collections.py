@@ -66,6 +66,7 @@ LONGEST_SUFFIX = "_" + "9" * 20 + "__99__r99"
 NAME_FORMS = ("qa_{p}", "qa_adhoc_{p}", "qa_adhoc_ref_{p}", "qa_ref_{p}")
 PG_IDENTIFIER_BYTES = 63
 RUN_PREFIX_PATTERN = re.compile(r"[a-z0-9_]+")
+AGENCY_SHORT_PATTERN = re.compile(r"[a-z0-9]+")
 
 
 # ---- criterion 7: the configuration ---------------------------------------
@@ -110,6 +111,18 @@ def config_problems(package: Path | None = None) -> list[str]:
                                 f"{flag!r}, which no shared module knows (qa_tools/tools/legacy.py)")
     for orphan in sorted(modules - set(wanted)):
         problems.append(f"qa_tools/collections/{orphan}.py names no declared collection")
+
+    # REQ-PIPE-248 criterion 7: an agency's short names its collections'
+    # report files, so it must be unique and safe in a file name.
+    agency_shorts: dict[str, str] = {}
+    for agency_id, short in dict((c.agency_id, c.agency_short) for c in declared).items():
+        if not AGENCY_SHORT_PATTERN.fullmatch(short):
+            problems.append(f"agency {agency_id!r}'s short {short!r} is not made only of "
+                            f"a-z and 0-9")
+        if short in agency_shorts:
+            problems.append(f"agencies {agency_id!r} and {agency_shorts[short]!r} share the "
+                            f"short {short!r}")
+        agency_shorts[short] = agency_id
 
     for field in ("short", "run_prefix", "label"):
         seen: dict[str, str] = {}

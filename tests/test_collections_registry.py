@@ -33,6 +33,15 @@ class TestTheRegistry:
         assert collections.by_short("bdm").id == "civil-registration"
         assert collections.by_run_prefix("run_").id == "civil-registration"
 
+    def test_a_collection_names_its_report_files_by_its_agency_short(self):
+        """REQ-PIPE-248 criterion 7 (Keith, 2026-10-18: rs and cpfs)."""
+        got = [(c.agency_short, c.results_file, c.dashboard_file)
+               for c in collections.all_collections()]
+        assert got == [
+            ("rs", "results_rs_civil-registration.json", "rs_civil-registration_dashboard.json"),
+            ("cpfs", "results_cpfs_child-protection.json",
+             "cpfs_child-protection_dashboard.json")]
+
     def test_a_dataset_resolves_through_one_index(self):
         assert collections.collection_of("cp-carers").id == "child-protection"
         assert collections.dataset("birth-registrations").table == "birth_registrations"
@@ -303,6 +312,12 @@ class TestTheConfigurationGate:
         # the wrong collection.
         (lambda c, _d: c["datasets"][0].update(name="Child Protection"),
          "share the label 'Child Protection'"),
+        # REQ-PIPE-248 criterion 7: an agency's short names its collections'
+        # report files, so two agencies sharing one would write one file.
+        (lambda _c, d: d["hierarchy"]["agencies"][-1].update(short="cpfs"),
+         "agencies 'fake-agency' and 'child-protection-family-support' share the short 'cpfs'"),
+        (lambda _c, d: d["hierarchy"]["agencies"][-1].update(short="Fk-A"),
+         "agency 'fake-agency''s short 'Fk-A' is not made only of a-z and 0-9"),
     ])
     def test_each_configuration_fault_fails_naming_it(self, third_collection, tmp_path, edit,
                                                       expected):

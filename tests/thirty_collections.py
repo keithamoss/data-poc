@@ -125,6 +125,7 @@ def build(dest: Path) -> Path:
                 "        return Plan(jobs=[])\n\n\n"
                 "PROVIDER = _Fixture()\n")
             seed += 1000
-        agencies.append({"id": agency_id, "name": agency_name, "collections": entries})
+        agencies.append({"id": agency_id, "name": agency_name,
+                         "short": agency_id.replace("-", "")[:8], "collections": entries})
     hierarchy_path.write_text(yaml.safe_dump(doc, sort_keys=False))
     return dest

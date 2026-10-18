@@ -266,6 +266,11 @@ hierarchy:
   agencies:
     - id: registry-services
       name: Registry Services
+      # REQ-PIPE-248 criterion 7. The agency's own short name, unique across
+      # the asset, which names its collections' report files -
+      # reports/results_<agency short>_<collection id>.json - because the
+      # collection shorts (bdm, cp) are collections', not agencies'.
+      short: rs
       collections:
         - id: civil-registration
           name: Civil Registration
@@ -315,6 +320,7 @@ hierarchy:
 
     - id: child-protection-family-support
       name: Department for Child Protection and Family Support
+      short: cpfs
       collections:
         - id: child-protection
           name: Child Protection

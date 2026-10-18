@@ -57,6 +57,9 @@ class Collection:
     run_prefix: str
     contract: str
     datasets: tuple[hierarchy.Dataset, ...]
+    #: The agency's short (REQ-PIPE-248 criterion 7), which names the
+    #: collection's report files.
+    agency_short: str = ""
 
     @property
     def label(self) -> str:
@@ -65,6 +68,16 @@ class Collection:
         name. Unique across the asset (post-build-review #230), because every
         picker shows a collection by it."""
         return self.datasets[0].dataset_name if len(self.datasets) == 1 else self.name
+
+    @property
+    def results_file(self) -> str:
+        """Its results file's name under reports/ (REQ-PIPE-248 criterion 7)."""
+        return f"results_{self.agency_short}_{self.id}.json"
+
+    @property
+    def dashboard_file(self) -> str:
+        """Its dashboard data file's name under reports/."""
+        return f"{self.agency_short}_{self.id}_dashboard.json"
 
     @property
     def module_name(self) -> str:
@@ -139,7 +152,8 @@ def collections_in(doc: dict) -> list[Collection]:
                 id=coll["id"], name=coll.get("name", coll["id"]), agency_id=agency["id"],
                 agency_name=agency.get("name", agency["id"]),
                 short=str(coll.get("short", "")), run_prefix=str(coll.get("run_prefix", "")),
-                contract=str(coll.get("contract", "")), datasets=()))
+                contract=str(coll.get("contract", "")), datasets=(),
+                agency_short=str(agency.get("short", ""))))
     return found
 
 
@@ -162,7 +176,9 @@ def _load() -> tuple[Collection, ...]:
                 short=str(hierarchy._require(coll, "short", where)),
                 run_prefix=str(hierarchy._require(coll, "run_prefix", where)),
                 contract=str(hierarchy._require(coll, "contract", where)),
-                datasets=tuple(by_collection.get(coll["id"], ()))))
+                datasets=tuple(by_collection.get(coll["id"], ())),
+                agency_short=str(hierarchy._require(agency, "short",
+                                                    f"agency {agency.get('id')!r}"))))
     return tuple(found)
 
 
