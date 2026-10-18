@@ -2077,3 +2077,42 @@ one or more component tags, and a date.
       backup branch, the PR branch and leaving it local), so the work survives
       the container overnight. CI WILL BE RED on the configuration tests above
       until the next session finishes them; that red is known, not a new finding.
+
+6. **[in-progress, 2026-10-18]** **[Docs & process]** **Overnight 2026-10-18 to
+   19: finish item 6's chain - REQ-QAC-247, then REQ-PIPE-248 - and push once.**
+
+    - **KEITH'S GO, ~21:25 Perth**, asked what he needed to give for the night
+      to run through 248 and push. His four answers:
+      - **PUSH ONCE, without checking in**, after 248 is built, on three
+        conditions: a fresh bootstrap, the full `mothman check` green on
+        exactly that tree, and an equivalence comparison whose every
+        difference a requirement predicted. Then the real CI run is checked
+        and pushed to green if it goes red. Until then the 48+ local commits
+        stay local.
+      - **POST-BUILD-REVIEW #235: the collections gate's literal check
+        matches ids and run prefixes only, not shorts** - a two-letter short
+        such as the agency short `rs` collides with ordinary text, and a
+        hard-coded short still surfaces as a broken command.
+      - **A CAPTURE DIFFERENCE NO REQUIREMENT PREDICTED**: fix it test-first
+        and re-capture if it is plainly a defect of the change; stop that
+        piece and write it up only if it is a judgement call.
+      - **POST-BUILD CRITICS** on 247 and 248: defects (test-first) and minor
+        polish fixed before the push; anything significant or
+        behaviour-changing written up for Keith.
+    - **STANDING TERMS, as every night**: nothing unsigned is built; only
+      scratch databases are written, and the real `supply` database only via
+      `mothman env reset-synthetic` then `mothman pipeline bootstrap`; every
+      defect gets a failing test first and a post-build-review entry.
+    - **THE PLAN.**
+      1. Compare the after-247b capture (started ~21:16) against after-247a:
+         the predicted differences are the Soda suffix (20 checks, 2,220
+         results), Child Protection's dimensions (52 checks, 3,357 results),
+         the failed-rows count (fails and warns gain a count, passes gain 0)
+         and Birth Registrations' grey Table-level card.
+      2. #235's gate change, test-first.
+      3. REQ-QAC-247 criterion 5 and its register fields.
+      4. REQ-PIPE-248: shorts `rs`/`cpfs`, the file names, Birth
+         Registrations' stats and results in Child Protection's forms (with
+         the volume check and earliest_extract moved in from 247), the shape
+         flags gone, its capture, then deleting item 6's thread whole.
+      5. Fresh bootstrap, full gate, push, CI.
