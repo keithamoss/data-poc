@@ -112,9 +112,18 @@ releases:
   - date: "2026-10-18"
     summary: >
       Every collection's supplies are now run, summarised and rebuilt by
-      one shared set of modules, so adding a collection no longer means
-      copying code.
+      one shared set of modules, and a new command shows how many GitHub
+      Actions minutes the project is using.
     changes:
+      - category: New
+        items:
+          - headline: See what CI is costing
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman github ci-usage` reports the last week's test runs,
+              cancelled runs, pushes and billable minutes per workflow, scaled
+              to a month against the 2,000 minutes a private repository gets
+              for free. It says plainly whether the project fits.
       - category: Improved
         items:
           - headline: One pipeline for every collection

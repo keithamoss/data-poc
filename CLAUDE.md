@@ -608,6 +608,13 @@ Rough layout:
   turn on it. Report back proactively if it's actually red; a green run
   doesn't need its own announcement, just a passing mention next time
   it's relevant.
+  **Amended 2026-10-18 (REQ-TEST-260): "after every push" now means
+  after the ONE push per finished piece of work the commit-cadence rule
+  below allows, its run checked at the next natural pause as before.**
+  Every push costs about 39 billable minutes on a private repository
+  against 2,000 a month, so a push exists to carry finished work, never
+  to ask CI a question a local gate can answer; `mothman github ci-usage`
+  says where the month stands before a push late in it.
   **Amended again, 2026-09-18 evening (Keith's own explicit call): run selective
   tests locally for smaller/medium changes, rely on CI for the full
   suite.** For a change scoped to one or two modules, run just the
@@ -951,6 +958,18 @@ Rough layout:
     local gate is for large or cross-cutting changes.
   - **D.** Long work may be committed locally as checkpoints, with no test
     claims in those messages. A gate runs before anything is pushed.
+
+  **Amended 2026-10-18 (REQ-TEST-260, Keith's call): rule D is the
+  DEFAULT, not an option, because the repository is going private and a
+  private free repository gets 2,000 GitHub Actions minutes a month.**
+  Work is committed locally as checkpoints with no test claims, and
+  PUSHED ONCE PER FINISHED, GATE-GREEN PIECE OF WORK - not once per
+  checkpoint, not once per register edit. Rules A to C apply to that one
+  push. The arithmetic that forces it: a full `test.yml` run bills about
+  39 minutes, so the allowance is about 50 pushes a month, about 12 a
+  week, against roughly 320 the week before this rule; `mothman github
+  ci-usage --days 7` reports the real figure, and REQ-DOCS-259's flip
+  waits on a measured week that fits.
 
   Why it changed: holding every commit until the critic's fixes and a
   final full gate kept the tree dirty for an hour at a time, and any

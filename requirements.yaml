@@ -37774,7 +37774,7 @@ requirements:
       checkpoint, with CI's real billable minutes measured before and after, so that the repository can
       go private on GitHub's free plan without CI stopping a few days into each month.
     moscow: must
-    status: not_started
+    status: built
     source: Keith, answering delivery-scoper's question 5 on 2026-10-18 (option A - cut CI first, as a precondition
       of the flip), then the follow-up the same day (option C - push far less, using the existing local
       checkpoint commits, cadence rule D, and keep validate-config on every push). Drafted by delivery-scoper
@@ -37865,7 +37865,56 @@ requirements:
       GitHub plan.
     - A MEASURING COMMAND, NOT A ONE-OFF SCRIPT, because the flip's precondition and every month after it
       need the same number, and CLAUDE.md requires anything run more than once to be a mothman command.
+    - 'THE MEASURED BEFORE FIGURE IS LOWER THAN THE ESTIMATE AND STILL FOURTEEN TIMES OVER (2026-10-18):
+      6,513 billable minutes in the week to 18 October, 27,913 a month, where the draft estimated ~10,900
+      a week. 130 of 239 test runs were cancelled by a later push - the same waste the cadence rule removes
+      - and the signing pushes of 2026-10-18 themselves cancelled REQ-PIPE-243''s own full-suite run, which
+      is what a push per register edit costs.'
     open_questions: []
+    linked_tests:
+    - tests/test_ci_usage.py
+    implemented_by:
+    - qa_tools/common/ci_usage.py::billable_minutes
+    - qa_tools/common/ci_usage.py::summarise
+    - qa_tools/common/ci_usage.py::fetch
+    - qa_tools/common/ci_usage.py::render
+    - cli/github.py::ci_usage_command
+    evidence:
+    - '2026-10-18, CRITERIA 1-3: .github/workflows/test.yml keeps `on: push: branches: [claude/**]` and
+      `workflow_dispatch`, its `concurrency: group: test-${{ github.ref }}, cancel-in-progress: true`, and
+      REQ-TEST-117''s cache restore; validate-config.yml keeps its push trigger. Nothing in either workflow
+      changed.'
+    - '2026-10-18, CRITERIA 4 AND 5: CLAUDE.md''s commit-cadence bullet carries the 2026-10-18 amendment
+      making rule D the default with one push per finished, gate-green piece of work, and the check-CI bullet
+      carries the matching amendment with the 2,000-minute budget stated beside it.'
+    - '2026-10-18, CRITERION 6 AND 9: `mothman github ci-usage --days N` (qa_tools/common/ci_usage.py) reads
+      runs and each run''s jobs through `gh api`, bills each job''s duration rounded up to a whole minute,
+      counts runs, cancelled runs and pushes (distinct commits arriving by a push event) per workflow and
+      in total, and scales to a 30-day month against 2,000. tests/test_ci_usage.py drives the arithmetic
+      against recorded responses - a cancelled run, a job with no completion time, a job whose clock reads
+      backwards, a manual dispatch that is not a push - and the command end to end against a fake at the
+      gh boundary: 4 passed.'
+    - '2026-10-18, CRITERION 7, THE BEFORE FIGURE, measured with the command itself (`GITHUB_REPOSITORY=keithamoss/data-poc
+      uv run mothman github ci-usage --days 7`, 5m29s for 452 runs): Run test suite 239 runs, 130 cancelled,
+      239 pushes, 6,289 billable minutes; Validate committed configuration 213 runs, 0 cancelled, 224 minutes;
+      total 6,513 minutes in 7 days, scaled to 27,913 a month against 2,000 - does NOT fit, about 14 times
+      over. (The scoper''s estimate of ~10,900 a week was high by two thirds; it extrapolated from the 100
+      newest runs, which were heavier than the week''s average.) The AFTER figure, a full working week under
+      the new cadence, is still to measure; see unmet_criteria.'
+    unmet_criteria:
+    - criterion: Criterion 7, in part - the AFTER figure from `mothman github ci-usage --days 7` covering
+        a full working week under the new cadence.
+      why: The cadence rule took effect on 2026-10-18; a working week under it has not happened yet. Measure
+        in the week beginning 2026-10-19 and record the figure here.
+      owner: the next session to run a full working week after 2026-10-18
+      blocked_by:
+        unowned: true
+    - criterion: Criterion 8 - if the measured week scales to more than 2,000 billable minutes a month,
+        record this requirement as not met and REQ-DOCS-259's flip waits on a fallback.
+      why: Decided by the measurement criterion 7 is waiting on.
+      owner: the same session as criterion 7
+      blocked_by:
+        unowned: true
   - id: REQ-DOCS-259
     title: The repository is made private only once the private dashboard is live, a teammate has signed
       in, and CI fits the free allowance
