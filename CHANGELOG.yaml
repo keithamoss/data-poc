@@ -109,6 +109,33 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-19"
+    summary: >
+      A third collection, Emergency Department, joins the asset with its own
+      history, and the synthetic data now shows a calendar being corrected
+      part way through.
+    changes:
+      - category: New
+        items:
+          - headline: Emergency Department arrives
+            components: ["Data generation", "QA checks & contract"]
+            description: >
+              A third collection, ED Presentations, now has a quarterly history
+              going back to 2013, its own contract and checks, and a quarter
+              it was never owed, so you can see a gap read as one.
+          - headline: Calendars corrected mid-history
+            components: ["Data generation", "Pipeline & publishing"]
+            description: >
+              The synthetic history now includes calendar corrections that are
+              merged, then confirmed: one supply re-judged, one moved, one
+              kept by a person, one held, and one parked behind a later
+              quarter.
+          - headline: A dataset switched off, then on
+            components: ["Data generation"]
+            description: >
+              Child Protection's carers are turned off for two quarters, so you
+              can see a late supply still counted, a supply in the gap held,
+              and the quarters between owing nothing.
   - date: "2026-10-18"
     summary: >
       Every collection's supplies are now generated, run, summarised and

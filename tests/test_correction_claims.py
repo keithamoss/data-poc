@@ -174,21 +174,48 @@ class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
         assert not cc.is_version_level("CAB-1", docs=docs)
 
 
-class TestAWrittenArrivalIsCheckedOnlyForWhatItCarries:
+class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
     """correction_claims.check_written asks a version-level correction about
-    the datasets an ordinary arrival carries, by the tables its entry counts
-    (2026-10-19): Child Protection's routine 2022-Q1 delivery, which no longer
-    sends the turned-off cp_carers, has no cp_carers filing for REQ-GEN-218 to
-    change."""
+    an ordinary arrival only where its confirmation could re-file it: an
+    arrival received BEFORE the correction's date, of a dataset it carries.
+    One received after was filed under the corrected agreement as it arrived.
 
-    def _entry(self, tables):
-        return {"run_id": "cp_run_x", "period": "2022-Q1",
-                "received_at": "2022-02-01T08:30:00+08:00",
+    A real defect, found by the first Emergency Department bootstrap
+    (post-build-review #244): Child Protection's ordinary 2022-Q1 delivery,
+    received after REQ-GEN-218's 15 December 2021 date and carrying cp_carers
+    as REQ-GEN-218's decision says the gap's deliveries do, was refused as an
+    arrival the correction would re-file."""
+
+    def _cp(self, tables, at="2022-02-01T08:30:00+08:00"):
+        return {"run_id": "cp_run_x", "period": "2022-Q1", "received_at": at,
                 "row_counts": {t: 10 for t in tables}}
 
-    def test_an_arrival_counting_the_turned_off_table_is_refused(self):
-        with pytest.raises(si.CannotPlace, match="cp-carers"):
-            cc.check_written(["cp-carers"], [self._entry(["cp_carers", "cp_clients"])])
+    def test_a_gap_delivery_received_after_the_correction_is_not_asked(self):
+        cc.check_written(["cp-carers"], [self._cp(["cp_carers", "cp_clients"])])
 
-    def test_an_arrival_without_it_is_not(self):
-        cc.check_written(["cp-carers"], [self._entry(["cp_clients"])])
+    def test_an_arrival_without_the_dataset_is_not_asked(self):
+        cc.check_written(["cp-carers"], [self._cp(["cp_clients"])])
+
+    @pytest.fixture
+    def backdated(self, monkeypatch):
+        """CAB-W's wider window from 2026-09-19, declared on 2026-09-25 and
+        ridden by one scenario, as a version-level correction would be."""
+        import dataclasses
+
+        rider = dataclasses.replace(si.INJECTIONS[0], correction="CAB-W")
+        monkeypatch.setattr(si, "INJECTIONS", [rider])
+        return _declare(_docs(), _widen_daily, "CAB-W", "2026-09-25")
+
+    def _br(self, at):
+        return {"run_id": "run_x", "period": "2026-09-20", "received_at": at,
+                "row_counts": {"birth_registrations": 10}}
+
+    def test_an_arrival_before_the_correction_it_would_refile_is_refused(self, backdated):
+        with pytest.raises(si.CannotPlace, match="run_x"):
+            cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
+                             docs=backdated)
+
+    def test_the_same_arrival_after_the_correction_is_not(self, backdated, monkeypatch):
+        later = _declare(_docs(), _widen_daily, "CAB-W", "2026-09-19")
+        cc.check_written(["birth-registrations"], [self._br("2026-09-20T09:00:00+08:00")],
+                         docs=later)

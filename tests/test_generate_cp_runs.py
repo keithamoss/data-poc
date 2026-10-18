@@ -147,10 +147,8 @@ def test_every_manifest_entry_has_real_files_on_disk(manifest, raw_dir):
         run_dir = _delivery_dir(raw_dir, entry)
         shape = _shape_of(entry, manifest)
         five = entry["period"] in grown - owed
-        # A TURNED-OFF TABLE IS NOT SENT, and not counted (REQ-PIPE-179).
         for table in (t for t in cp_provider.TABLES if si.carries(shape, t)
-                      and not (five and t == "cp_case_workers")
-                      and (shape is not None or t in entry["row_counts"])):
+                      and not (five and t == "cp_case_workers")):
             path = run_dir / f"{table}.csv"
             assert path.exists(), f"{entry['run_id']}: {path} missing"
             assert path.stat().st_size > 0
@@ -616,24 +614,6 @@ def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, ra
         assert not (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
     for e in on_grown + off_original:
         assert (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
-
-
-def test_no_ordinary_delivery_carries_a_dataset_turned_off_for_its_quarter(manifest, raw_dir):
-    """A real defect found bootstrapping Emergency Department (2026-10-19):
-    cp-carers is turned off for 2022-Q1 and 2022-Q2 (TS-63, REQ-GEN-218), yet
-    Child Protection's ordinary deliveries there still carried cp_carers.csv -
-    a supplier does not send a dataset it is not supplying, and the
-    correction would have re-filed those supplies, which correction_claims
-    refuses. Only a scenario's own arrival may carry one (TS-63a's gap
-    supply)."""
-    from qa_tools.common import turned_off
-
-    gap = {p.name for p in cp_provider.generated_periods()
-           if turned_off.gap_for_period("cp-carers", p.name) is not None}
-    ordinary = [e for e in manifest if e["period"] in gap and _shape_of(e, manifest) is None]
-    assert gap and ordinary, (gap, len(ordinary))
-    for e in ordinary:
-        assert not (_delivery_dir(raw_dir, e) / "cp_carers.csv").exists(), e["delivery"]
 
 
 class TestAScenarioInAGrownQuarter:

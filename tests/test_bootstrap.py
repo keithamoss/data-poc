@@ -103,6 +103,10 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
+        # The corrections step is its own subject (test_correction_replay.py):
+        # over this empty history a committed scripted keep has nothing to keep.
+        monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
+                            lambda **k: [])
         _in_process(monkeypatch)
 
         result = boot.bootstrap(force=True)

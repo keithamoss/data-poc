@@ -304,33 +304,6 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
-      # TS-62 (REQ-GEN-205): a fictional one-day version, widening the claim
-      # window to six hours for 2026-07-25 alone and narrowing it back the
-      # next day - declared as one correction below and left awaiting the
-      # asset manager's confirmation. One day, so no other scenario's day
-      # sits under a window it was not built for; late July, where no scenario
-      # claims the day or the day before it.
-      - effective_from: "2026-07-25"
-        changelog:
-          - date: "2026-10-19"
-            author: REQ-GEN-205
-            change: >-
-              A fictional six-hour claim window for 2026-07-25, made to
-              demonstrate a correction merged and not yet confirmed on this
-              synthetic asset (TS-62). The same rule as before it.
-        claim_window: 6h
-        cadence:
-          rule: daily
-      - effective_from: "2026-07-26"
-        changelog:
-          - date: "2026-10-19"
-            author: REQ-GEN-205
-            change: >-
-              The four-hour claim window again from 2026-07-26, ending TS-62's
-              one fictional day. The same rule as before it.
-        claim_window: 4h
-        cadence:
-          rule: daily
       - effective_from: "2026-08-14"
         changelog:
           - date: "2026-10-11"
@@ -352,23 +325,6 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
-    corrections:
-      - change_reference: REQ-GEN-205-TS62
-        date: "2026-07-25"
-        author: Claude (for Keith)
-        approver: fpycnkgvmt@privaterelay.appleid.com
-        reason: >-
-          A fictional correction made to demonstrate a correction merged and left
-          awaiting confirmation on this synthetic asset (TS-62): Birth
-          Registrations' claim window widens from four hours to six for
-          2026-07-25 alone.
-        changes:
-          - item: calendar daily version 2026-07-25
-            old: null
-            new: {claim_window: 6h, cadence: {rule: daily}}
-          - item: calendar daily version 2026-07-26
-            old: null
-            new: {claim_window: 4h, cadence: {rule: daily}}
 
 # ---------------------------------------------------------------------
 # WHICH CALENDAR EACH COLLECTION IS ON. A dataset that names none takes

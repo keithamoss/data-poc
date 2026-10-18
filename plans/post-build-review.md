@@ -10625,23 +10625,30 @@ twice. It deliberately did not re-find the `TypeError`.
      from the base is exempt as a whole, membership included. A real asset
      still refuses it.
 
-244. **[done, 2026-10-19]** **[Data generation]** **Child
-     Protection's ordinary deliveries still sent a dataset turned off for
-     their quarter.** Found by the first fresh bootstrap of the Emergency
-     Department tree. cp-carers is turned off for 2022-Q1 and 2022-Q2 (TS-63,
-     REQ-GEN-218), yet the provider wrote cp_carers.csv into every ordinary
-     2022-Q1 and 2022-Q2 delivery. A supplier does not send a dataset it is
-     not supplying. The declared correction would also have re-filed those
-     supplies, and `correction_claims.check_written` refused the generation
-     ("would change where cp_run_053 ... is filed").
-     - DEFECT, FIXED test-first (tests/test_generate_cp_runs.py): a dataset
-       turned off for a quarter is left out of the provider's ordinary
-       delivery for it, and out of the entry's `row_counts`, which now say
-       what the delivery carries. Only a scenario's own arrival carries one
-       (TS-63a's gap supply). Case Workers' off months already worked this
-       way.
-     - DEFECT, FIXED test-first (tests/test_correction_claims.py):
-       `check_written` asked a correction about every dataset in the
-       collection, for every ordinary arrival. It now asks only about the
-       datasets the arrival's entry counts, or every dataset where the
-       entry counts none.
+244. **[done, 2026-10-19]** **[Data generation]** **The written-supply check
+     refused a Child Protection delivery a confirmation could never move.**
+     Found by the first fresh bootstrap of the Emergency Department tree:
+     `correction_claims.check_written` refused cp_run_053, an ordinary 2022-Q1
+     delivery carrying cp_carers, "would change where cp_run_053 ... is
+     filed". cp-carers is turned off for 2022-Q1 and 2022-Q2 by REQ-GEN-218's
+     correction, dated 15 December 2021.
+     - DEFECT, FIXED test-first (tests/test_correction_claims.py,
+       TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove):
+       `check_written` ignored the correction's date. An arrival received on
+       or after it was filed under the corrected agreement as it arrived,
+       so a confirmation has nothing of it to move. Only an arrival received
+       before the date is asked now, only about datasets it carries, and
+       only datasets on a calendar. That last condition also fixed
+       tests/test_generator_providers.py's third-collection tests, whose
+       fake dataset names no calendar.
+     - A WRONG FIRST FIX, REVERTED THE SAME NIGHT: before finding the date
+       rule, the provider was changed to leave cp_carers out of the gap
+       quarters' ordinary deliveries. That contradicted REQ-GEN-218's signed
+       decision "THE GAP'S DELIVERIES STILL CARRY THE FILE" and its
+       criterion 5, which the post-build register audit found. The provider
+       change and its test are gone (45c3347 reverted), and the gap
+       deliveries carry the file again, each held as turned off.
+     - The lesson: read the requirement's decisions before fixing what a
+       generator writes. The refusal named the symptom ("would change
+       where ... is filed"), and the first fix removed the symptom's input
+       rather than the check's mistake.

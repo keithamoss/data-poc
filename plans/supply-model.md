@@ -3831,58 +3831,109 @@ REQ-PIPE-111 already allows a synthetic asset to add past-dated versions,
 so the shape exists; how the generator stages a merge and a later
 confirmation is for whoever builds it (REQ-PIPE-170's own criterion).
 
-Unless stated, *Config: Child Protection, quarterly Feb/May/Aug/Nov,
-due 15th 17:00, grace 2 days, claim window 30 days, correction moves
-the due date of one already-frozen period.*
+PLANTED by REQ-GEN-205 (2026-10-19). TS-57 to TS-61 are in Emergency
+Department (REQ-GEN-237), whose quarters are one correction's subject: a
+single declared correction, REQ-GEN-205, dated 1 September 2026, edits five
+of its early quarters' dates in the 2013 quarterly version, and the replay
+confirms it after every arrival (REQ-PIPE-170). Child Protection writes no
+routine supply in the quarters the edits alter, so the correction moves only
+what each scenario built. TS-62 is Birth Registrations' own and NOT PLANTED:
+REQ-GEN-205 criteria 11, 24 and 25 want its version after 2026-09-08 and
+near the history's end, and no two days there are free (a question for
+Keith, morning report 6). TS-63 is Child Protection's. Each a/b pair shares one placement (REQ-GEN-201): `a` opens
+while the correction awaits confirmation, `b` on the history's last day,
+after it.
 
-**TS-57 `[INJECT]` A correction that only re-judges.**
-The August period's due date moves three days later. One supply that
-arrived a day after the old due date was judged late.
-**Expect**: after merge, the dataset reads awaiting confirmation and
-nothing else changes. In the terminal the correction shows one verdict
-change (late -> on time) and NO moves, and still needs confirming. On
-confirmation a new verdict is recorded naming the change reference; the
-late verdict stays readable as history (REQ-PIPE-168 criteria 3-6).
-**Breaks as**: applied on merge with nobody confirming because there
-were no moves; or the late verdict overwritten.
+Unless stated, *Config: Emergency Department, quarterly Feb/May/Aug/Nov,
+due 09:00 on the 1st, 8 hours' grace, claim window 14 days.*
 
-**TS-58 `[INJECT]` A correction that moves supplies, all confirmed.**
-*Config: the August period's claim window opens two weeks earlier.*
-A supply filed as a resupply of May now falls in August's window.
-**Expect**: the terminal proposes moving it May -> August with its
-re-judged verdict; on confirmation it is re-filed as a person's re-file
-naming the correction, re-QA'd and re-gated automatically, and judged
-against August (REQ-PIPE-170 criteria 2, 7).
-**Breaks as**: moved with the verdict computed against May; or not
-re-QA'd.
+**TS-57a `[INJECT]` A correction that only re-judges, before it is
+confirmed.**
+*Config: 2015-Q1's date is corrected from 1 to 2 February 2015; its one
+supply arrives at 12:00 on 2 February - late against the old date, on time
+against the corrected one.*
+**Expect**: the quarter reads late, and the correction awaits confirmation
+with one verdict change (late -> on time) and no moves (REQ-PIPE-168
+criteria 3-6).
+**Breaks as**: applied on merge with nobody confirming because there were
+no moves.
 
-**TS-59 `[INJECT]` The asset manager keeps a supply.**
-Same correction shape as TS-58, but two supplies would move. The asset
-manager keeps one, with a reason, and confirms the other.
-**Expect**: the kept supply stays filed where it is, with a KEPT
-decision-log entry naming it, its period, the change reference, the
-actor and the reason, and its verdict judged against the period it
-stays in; the other moves as in TS-58. The applied-summary lists both
-(REQ-PIPE-170 criteria 5, 6, 22).
-**Breaks as**: the kept supply moved anyway, kept silently with no
-reason, or re-judged against the period it did not go to.
+**TS-57b `[INJECT]` A correction that only re-judges, once confirmed.**
+TS-57a's placement.
+*Config: as TS-57a.*
+**Expect**: a new verdict naming the change reference, on time; the late
+verdict still readable as history.
+**Breaks as**: the late verdict overwritten, or no verdict naming the
+correction.
 
-**TS-60 `[INJECT]` A correction that leaves a supply with no period.**
-*Config: the period's claim window is shortened so an early supply no
-longer falls in any window.*
-**Expect**: proposed as "would be held"; on confirmation it is held
-(REQ-PIPE-064), the hold's reason naming the correction.
-**Breaks as**: left filed in a period the corrected agreement does not
-give it; or dropped.
+**TS-58a `[INJECT]` A correction that moves a supply, before it is
+confirmed.**
+*Config: 2013-Q4's date is corrected from 1 November to 20 October 2013. Its
+supply arrives on 10 October, before the old window opened, so it is filed
+as a resupply of 2013-Q3; the corrected window covers it.*
+**Expect**: the correction proposes moving it 2013-Q3 -> 2013-Q4 with its
+re-judged verdict, and awaits confirmation.
+**Breaks as**: moved on merge, or proposed with the verdict computed
+against 2013-Q3.
 
-**TS-61 `[INJECT]` A move that is blocked.**
-A supply the correction would move has a later period inheriting from
-it.
-**Expect**: listed as blocked, naming the decision that would unblock
-it; not moved, not dropped; the correction stays among the states
-needing action until it is moved or kept (REQ-PIPE-170 criteria 9, 19).
-**Breaks as**: moved out from under the inheriting period; or the
-correction marked done with the supply silently left.
+**TS-58b `[INJECT]` A correction that moves a supply, once confirmed.**
+TS-58a's placement.
+*Config: as TS-58a.*
+**Expect**: re-filed to 2013-Q4 as a re-file naming the correction,
+re-QA'd and re-gated, judged against 2013-Q4 (REQ-PIPE-170 criteria 2, 7).
+**Breaks as**: left in 2013-Q3, or moved and not re-QA'd.
+
+**TS-59a `[INJECT]` A supply the asset manager will keep, before the
+correction is confirmed.**
+*Config: as TS-58 for 2014-Q3, corrected from 1 August to 20 July 2014; its
+supply arrives on 10 July, filed as a resupply of 2014-Q2, which the
+corrected agreement would move. A scripted confirmation keeps it
+(contract/scripted_decisions.yaml).*
+**Expect**: the move is proposed like TS-58a's.
+**Breaks as**: kept or moved before anyone confirmed.
+
+**TS-59b `[INJECT]` A supply the asset manager kept.**
+TS-59a's placement.
+*Config: as TS-59a.*
+**Expect**: the supply stays filed where it is, with a KEPT decision-log
+entry naming it, its period, the change reference, the actor and the
+reason, and its verdict judged against the period it stays in (REQ-PIPE-170
+criteria 5, 6, 22).
+**Breaks as**: moved anyway, kept silently with no reason, or re-judged
+against the period it did not go to.
+
+**TS-60a `[INJECT]` A correction that leaves a supply with no period,
+before it is confirmed.**
+*Config: Emergency Department's first quarter, 2013-Q1, has its date
+corrected from 1 to 11 February 2013. Its supply arrived on 22 January,
+inside the old window, before the corrected one opens and with no quarter
+before it.*
+**Expect**: proposed as "would be held".
+**Breaks as**: held, or dropped, before confirmation.
+
+**TS-60b `[INJECT]` A supply left with no period, once confirmed.**
+TS-60a's placement.
+*Config: as TS-60a.*
+**Expect**: held (REQ-PIPE-064), the hold's reason naming the correction.
+**Breaks as**: left filed in a period the corrected agreement does not give
+it, or dropped.
+
+**TS-61a `[INJECT]` A move that will be blocked, before the correction is
+confirmed.**
+*Config: 2015-Q3's date is corrected from 1 to 11 August 2015. Its supply
+arrived on 22 July, which the corrected agreement files to 2015-Q2 - a move
+blocked because 2015-Q4, the participation gap (REQ-GEN-251), stands on it.*
+**Expect**: the move is proposed, naming the period that stands on it.
+**Breaks as**: moved out from under the inheriting period.
+
+**TS-61b `[INJECT]` A move that is blocked, once confirmed.**
+TS-61a's placement.
+*Config: as TS-61a.*
+**Expect**: parked as blocked, naming the decision that would unblock it -
+not moved, not dropped; the correction stays among the states needing
+action (REQ-PIPE-170 criteria 9, 19).
+**Breaks as**: moved, or the correction marked done with the supply
+silently left.
 
 **TS-62 `[INJECT]` A correction merged and not yet confirmed.**
 The correction is merged and a new supply arrives before anyone
@@ -3895,25 +3946,29 @@ difference (REQ-PIPE-170 criteria 20-21).
 **Breaks as**: the backstop's "configuration problem on our side" red;
 or the arrival judged against the old date.
 
-**TS-63 `[both]` A dataset turned off for a while.**
-*Config: quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim
-window 30 days before due, 2 days' grace; a participation version with
-`effective_to: 2026-03-31` and a `turned_off_reason`, then a later version
-from 2026-10-01 turning it back on.*
-**Expect** (Keith's worked example, 2026-10-10, REQ-PIPE-179 and
-REQ-DASH-180): February 2026 is still owed and its slot closes 15 April,
-when May's window would have opened; May and August owe nothing. A February
-supply arriving 10 March files to February, late; one arriving 5 April
-(dataset off, February still open) also files to February, late - or as a
-resupply if February is filled; one arriving 20 April finds no open owed
-slot and is held as turned off. The dataset keeps its real verdict with a
-'Turning off - last supply owed: February, open until 15 Apr' marker until
-15 April, then 'Turned off since 1 Apr'; gap periods read as owed-nothing
-rows and inherit the last promoted supply. After 1 October it reads as any
-dataset between deliveries, not 'No data'.
-**Breaks as**: the gap reads as missed supplies; the 5 April supply held
-instead of filed late; February going quiet before 15 April; a red verdict
-hidden behind the turn-off; or a gap arrival filed into a gap period.
+**TS-63a `[INJECT]` A dataset turned off for a while: the turn-off.**
+PLANTED by REQ-GEN-218 (2026-10-18) in Child Protection's grown history.
+*Config: Child Protection, quarterly Feb/May/Aug/Nov, due 09:00 on the 1st,
+14-day claim window. cp-carers is turned off after 31 December 2021 by
+correction REQ-GEN-218 dated 15 December 2021, and owed again from 2022-Q3.
+2021-Q4's delivery leaves cp_carers out; cp_carers follows on 5 January
+2022, after the turn-off but while 2021-Q4's slot is open.*
+**Expect**: the late cp_carers files to 2021-Q4, late; 2021-Q4 stays owed
+until its slot closes (REQ-PIPE-179, REQ-DASH-180).
+**Breaks as**: the 5 January supply held instead of filed late, or 2021-Q4
+going quiet before its slot closes.
+
+**TS-63b `[INJECT]` A dataset turned off for a while: the gap.**
+TS-63a's placement; this link opens on 2021-Q4's delivery and runs to the
+end of the history.
+*Config: as TS-63a, with a further cp_carers arriving on 15 March 2022, in
+the gap. The ordinary deliveries inside the gap still carry the dataset's
+file, as a supplier still sending files would (REQ-GEN-218 criterion 5).*
+**Expect**: the 15 March supply, and each ordinary gap delivery's
+cp_carers, finds no open owed slot and is held as turned off; 2022-Q1 and 2022-Q2 read owed-nothing and inherit the last
+promoted supply; from 2022-Q3 it reads as any dataset between deliveries.
+**Breaks as**: the gap read as missed supplies, or a gap arrival filed into
+a gap period.
 
 **TS-64 `[unit]` An undeclared change to a frozen date.**
 **Expect**: the draft-correction command prints a correction entry for

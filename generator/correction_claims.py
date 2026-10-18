@@ -292,11 +292,28 @@ def _carries(entry, dataset_id) -> bool:
     return hierarchy.dataset(dataset_id).table in counts
 
 
+def _on_a_calendar(dataset_id: str) -> bool:
+    """A DATASET ON NO CALENDAR has no filing a correction could change - as
+    _slots() says of its slots."""
+    from qa_tools.common import schedule, slots
+
+    try:
+        slots.slots_for_dataset(dataset_id, until=_history_end())
+    except (schedule.ScheduleConfigError, LookupError):
+        return False
+    return True
+
+
 def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=None) -> None:
     """After the deliveries are written: no ORDINARY arrival's filing may be
     changed by a version-level correction (REQ-GEN-205 criterion 10, REQ-GEN-237
     criterion 4) - only a scenario's may, and those are its riders' own,
-    already checked from configuration. Refused naming the run."""
+    already checked from configuration. Refused naming the run.
+
+    ONLY AN ARRIVAL RECEIVED BEFORE THE CORRECTION'S DATE is asked
+    (post-build-review #244): one received on or after it was filed under the
+    corrected agreement as it arrived, so a confirmation has nothing of its to
+    move. REQ-GEN-218's gap deliveries are those."""
     from generator import scenario_injection
     from qa_tools.common import asset_time
 
@@ -307,13 +324,17 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
     for reference, datasets in riders.items():
         if not is_version_level(reference, docs=docs):
             continue
+        p, _before, _after = _docs_either_side(reference, docs)
+        merged = asset_time.wall_clock(date.fromisoformat(p.date[:10]), "00:00")
         for e in entries:
             if e.get("period") in injected_periods or not e.get("received_at"):
                 continue
+            at = asset_time.parse_instant(e["received_at"], e["run_id"])
+            if at >= merged:
+                continue
             for dataset_id in dataset_ids:
-                if not _carries(e, dataset_id):
+                if not _carries(e, dataset_id) or not _on_a_calendar(dataset_id):
                     continue
-                at = asset_time.parse_instant(e["received_at"], e["run_id"])
                 moved = filing_changes(reference, dataset_id, [at], docs=docs)
                 if moved:
                     raise CannotPlace(

@@ -34435,7 +34435,7 @@ requirements:
       two files a person settles, so that I can show the table read contested, its three readers' cross-table checks read not
       evaluated for it, and both ways the contest ends clear them - on a real page rather than in a test.
     moscow: should
-    status: not_started
+    status: "built"
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -34546,6 +34546,41 @@ requirements:
     - 'SIGNED OFF by Keith, 2026-10-14, with two edits: the readers'' status is no longer stated as red but deferred to running-thoughts
       #95 (red is today''s false red); REQ-PIPE-211 a dependency (still a draft, so recorded here and to be added to dependencies when it is signed), because criterion 13''s knock-on re-check after a
       settlement does not happen until it is built (round 4 architect B1). Build order per round 4 H5: 207, 202, 211, then 203.'
+    - "BUILT 2026-10-18 by a build agent in its own worktree (6355a29), merged 2f122c0."
+    - "TS-42 AT 2019-Q4 AND TS-80 AT 2020-Q4, PROVISIONAL (plans/morning-reports.md #6): each with one green lead-in quarter and a green following one, all grown quarters drawn clean, clear of TS-63's 2021-Q4 to 2022-Q3 and of the nine quarters REQ-GEN-237 empties."
+    - "TS-42: cp_clients.csv at 08:30 and a differing re-export cp_clients_v2.csv at 08:40 on the due day, then cp_clients.csv alone at 10:00 on 29 November, after due and before 2020-Q1's window, built green; links TS-42a on the pair's day and TS-42b on the later file's."
+    - "TS-80: a stray cp_clients_TEST.csv at 08:20 and the real cp_clients.csv at 08:30, the real one built green, settled by a scripted choose-file ('TS-80 settle') at 11:00 the next day."
+    - "A TARGETED CHILD PROTECTION INJECTION GETS ITS LEAD-INS (criterion 4): one clean delivery for each lead-in and following quarter instead of a refusal; one whose lead-ins cannot be placed is still refused naming it, and a drawn red on an original lead-in or following quarter is refused too."
+    - "PAIR FILES CARRY THEIR OWN RECEIPT INSTANTS, the other tables sharing the delivery's; an injected delivery stating none keeps one shared instant (criterion 2)."
+    - "FIXED TEST-FIRST (6355a29): a scenario link bounded by a decision timed at a wall clock (at:/day_offset:) read it as after_hours past its supply's receipt."
+    linked_tests:
+      - "tests/test_generate_cp_runs.py::TestTheContestedClientRegisterPairs::test_each_sits_in_its_grown_quarter_with_green_neighbours"
+      - "tests/test_generate_cp_runs.py::TestTheContestedClientRegisterPairs::test_ts42s_pair_is_two_differing_client_registers_ten_minutes_apart"
+      - "tests/test_generate_cp_runs.py::TestTheContestedClientRegisterPairs::test_ts42s_later_client_register_comes_alone_after_due_before_the_next_window"
+      - "tests/test_generate_cp_runs.py::TestTheContestedClientRegisterPairs::test_ts80s_stray_test_file_comes_ten_minutes_before_the_real_one"
+      - "tests/test_generate_cp_runs.py::TestTheContestedClientRegisterPairs::test_an_injected_delivery_stating_no_instants_keeps_one_shared"
+      - "tests/test_generate_cp_runs.py::TestAScenarioInAGrownQuarter::test_a_drawn_red_there_is_refused_naming_the_scenario"
+      - "tests/test_generate_to_target.py::TestRefusals156::test_a_child_protection_targeted_injection_is_planned_with_green_lead_ins"
+      - "tests/test_generate_to_target.py::TestRefusals156::test_a_child_protection_targeted_injection_whose_lead_ins_cannot_be_placed_is_refused"
+      - "tests/test_generate_to_target.py::TestRefusals156::test_a_drawn_red_on_an_original_lead_in_is_refused_naming_the_scenario"
+      - "tests/test_cp_pair.py"
+      - "tests/test_scenario_links.py"
+    implemented_by:
+      - "generator/collections/child_protection.py::_pair_files"
+      - "generator/collections/child_protection.py::_injected_chain"
+      - "generator/collections/child_protection.py::_grown_severities"
+      - "generator/collections/child_protection.py::ChildProtection::files"
+      - "generator/scenario_injection.py::INJECTIONS"
+      - "contract/scripted_decisions.yaml"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). TestTheContestedClientRegisterPairs, TestAScenarioInAGrownQuarter, TestRefusals156 and tests/test_cp_pair.py passed."
+      - "Criteria 11 and 13 on the final bootstrap - TS-80's settlement at 11:00 the next day, its QA run and gate in the replay, and the page on TS-42's and TS-80's link dates: BOOTSTRAP-EVIDENCE-PENDING."
+    unmet_criteria:
+      - criterion: "Criterion 9 - TS-42's register entry with what it expects, and REQ-GEN-136's unmet entry for criterion 3 cleared naming this requirement."
+        why: "TS-42a, TS-42b and TS-80's entries in plans/supply-model.md carry Config and Breaks as but no Expect (6355a29: 'Expect left for the bootstrapped build'), and REQ-GEN-136 still lists criterion 3 (TS-42) as unmet."
+        owner: "the main session, from the final Emergency Department bootstrap"
+        blocked_by:
+          unowned: true
   - id: REQ-PIPE-163
     title: A person can place a held supply into a period, from the terminal
     date_written: '2026-10-07'
@@ -35234,7 +35269,7 @@ requirements:
       one parked behind an inheriting quarter and one only re-judged - and a second correction still awaiting confirmation,
       so that every shape of REQ-PIPE-170 can be shown on the real dashboard and in the terminal rather than only in unit tests.
     moscow: must
-    status: not_started
+    status: "built"
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35536,6 +35571,16 @@ requirements:
     - SIGNED OFF by Keith, 2026-10-14. Its two build-time checks stay with the architect (open questions 1 and 2).
     - 'TS-63 RE-POINTED (Keith, 2026-10-14, REQ-PIPE-179 own pass Q1): TS-63 is planted by REQ-GEN-218, built after REQ-DASH-180;
       criterion 10 checks against its correction where it is already planted. Recorded 2026-10-14 by REQ-GEN-218 criterion 7.'
+    - "BUILT 2026-10-18 overnight, each piece test-first (3875979, 4cb83ee, fbf3631, 0ad55c3, cf2f2b9, 88505d5, 6db08d6, ab04841, 2a8afd5, ee93a5b, 880b6ec)."
+    - "SCRIPTED CONFIRMATIONS (3875979): a top-level corrections: list in contract/scripted_decisions.yaml - REQ-GEN-205 keeps TS-59a's supply with one reason, REQ-GEN-205-TS62 says pending - read only by correction_replay.confirm_due, validated by `mothman scenarios validate`. qa_tools/common/scripted_corrections.py does not import the generator (6db08d6)."
+    - "THE BOOTSTRAP RUNS WHAT CONFIRMATIONS OWE (fbf3631): recheck.run_all_owed for re-checks and knock-on re-evaluations, inside the pass lock under the replay clock, announced first, stopping on one that does not complete; a resumed bootstrap and `mothman pipeline run` over every collection reach the same _confirm_corrections."
+    - "LINK EVENTS (0ad55c3): correction_event(<change_reference>) and HISTORY_END bound a link; TS-57a to TS-61a each link 'a' 7 days after the correction's date and 'b' 21 days after it, to the history's end."
+    - "CLAIMS (cf2f2b9, ab04841): the altered periods with their neighbours, refused against another scenario, against a supply another collection holds in an altered quarter, and for a correction dated after the history or altering a period outside it. A version-level correction claims only the filings it changes (filing_changes, by assignment.open_slot as the impact trial does): injected arrivals checked from configuration, ordinary ones once written (check_written)."
+    - "THE CONFIRMED CORRECTION EDITS FIVE EMERGENCY DEPARTMENT QUARTER DATES IN THE 2013 VERSION, dated 2026-09-01 (PROVISIONAL, 6db08d6): 2015-Q1 1 to 2 February (TS-57, re-judged), 2013-Q4 1 November to 20 October (TS-58, moved from 2013-Q3), 2014-Q3 1 August to 20 July (TS-59, kept), 2013-Q1 1 to 11 February (TS-60, held), 2015-Q3 1 to 11 August (TS-61, parked behind the 2015-Q4 gap). Why the 2013 version: the freeze gate compares declared old values against the push base. See REQ-GEN-237."
+    - "TS-62 NOT PLANTED (2026-10-19, morning report 6): planned three days before the history's end, its correction claimed TS-45's following day and TS-46's lead-in, and no two days of Birth Registrations' history after 2026-09-08 are free. A move to a one-day version on 2026-07-25 was built and then taken out, because criterion 25 says a version on or before 2026-09-08 SHALL be refused and SHALL NOT be shifted - so TS-62's register entry is as it was, and its placement is Keith's call."
+    - "TS-62 ARRIVES 09:00 ON ITS OWN DAY (880b6ec): written for the evening-before era, its 21:00-the-evening-before supply filed to the day before as a late resupply, because Birth Registrations has been due 14:00 on the day since 30 June. At 09:00 the corrected six-hour window (opening 08:00) takes it and the old four-hour one (opening 10:00) does not, so it claims its day only under the merged, pending correction - REQ-PIPE-170 criteria 20-21."
+    - "THE 2013-Q3 GROWN RED CHAIN'S SCRIPT GOES WITH THE QUARTER (88505d5): Child Protection no longer supplies 2013-Q3, one of the nine quarters the confirmed correction alters."
+    - "CRITERION 16'S RESUMED-BOOTSTRAP HALF is TestAResumeConfirmsAsABootstrapDoes, which asserts resume reaches the same confirmation path with corrections due; the keep and pending assertions run on the bootstrap path only."
     open_questions:
     - '1. CHECK AT BUILD (architect, not a question for Keith): on a synthetic asset, adding a past-dated calendar version needs
       no correction (REQ-PIPE-111 criterion 9; agreement_freeze skips it). Read 2026-10-14, a declared correction naming the
@@ -35546,6 +35591,57 @@ requirements:
       on or after a version''s effective date - filed under the new version at receipt rather than moved - as well as supplies
       it would move. If it does not, criterion 10''s narrowed claim and criterion 26''s proof compute those filings with the
       same implementation (REQ-PIPE-169 criterion 6), never a second rule.'
+    linked_tests:
+      - "tests/test_scripted_corrections.py"
+      - "tests/test_correction_claims.py"
+      - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_a_link_between_its_arrival_and_its_correction"
+      - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_a_link_on_the_historys_last_day"
+      - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_a_link_after_the_history_is_refused"
+      - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_an_undeclared_correction_is_refused_naming_it"
+      - "tests/test_correction_replay.py"
+      - "tests/test_cli_pipeline.py::TestCorrectionsAfterAFullRun::test_after_both"
+      - "tests/test_correction_apply.py"
+    implemented_by:
+      - "qa_tools/common/scripted_corrections.py::load"
+      - "qa_tools/common/scripted_corrections.py::problems"
+      - "qa_tools/common/scripted_corrections.py::resolve"
+      - "qa_tools/common/correction_replay.py::confirm_due"
+      - "qa_tools/common/bootstrap.py::_confirm_corrections"
+      - "qa_tools/common/bootstrap.py::_run_what_the_confirmations_owe"
+      - "qa_tools/common/bootstrap.py::resume"
+      - "generator/correction_claims.py::check"
+      - "generator/correction_claims.py::filing_changes"
+      - "generator/correction_claims.py::check_written"
+      - "generator/scenario_injection.py::correction_event"
+      - "generator/scenario_injection.py::INJECTIONS"
+      - "cli/scenarios.py::validate_command"
+      - "contract/calendar.yaml"
+      - "contract/scripted_decisions.yaml"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). Two of the four failures are this requirement's: the register test (TS-57a to TS-61a not in plans/supply-model.md - see the unmet entry for criteria 13 to 15) and test_force_rebuilds_anyway."
+      - "The overlap gate (criterion 27): `mothman check --only schedule`, same tree, 2026-10-19, 'passed, with a warning' (runway only)."
+      - "On the final bootstrap - TS-57 to TS-61's shapes after confirmation (moved, kept, held, parked, re-judged), TS-62's 09:00 supply claiming its day only under the pending correction, and the confirmation's owed runs: BOOTSTRAP-EVIDENCE-PENDING. The bootstrap of plans/morning-reports.md #6 (1303s) showed TS-57 to TS-61 but predates 880b6ec, TS-62's arrival fix."
+    unmet_criteria:
+      - criterion: "Criterion 10, in part - the claim checked against every post-generation placement (TS-52, TS-79a, TS-79b)."
+        why: "generator/correction_claims.check compares a correction's claim with INJECTIONS only; nothing there or in the driver reads scenario_injection.inheritance_placements() or the providers' extra_placements() (searched 2026-10-19). Injections and TS-63's correction are checked."
+        owner: "the main session"
+        blocked_by:
+          unowned: true
+      - criterion: "Criteria 11, 21, 24 and 25 - TS-62's correction dated a few days before the history's end, its version taking effect near the end and after 2026-09-08, and generation refusing a version taking effect on or before 2026-09-08 naming TS-62."
+        why: "TS-62 IS NOT PLANTED (2026-10-19; plans/morning-reports.md #6). Its correction claims the day its version governs and the day before, and every day of Birth Registrations' history after 2026-09-08 is claimed by TS-1, TS-2, TS-43 to TS-47 or their lead-ins, except 2026-09-19 alone - so criteria 11, 24 and 25 cannot all hold. A move to 2026-07-25 was tried and taken out again, because criterion 25 says generation SHALL refuse a version on or before 2026-09-08 and SHALL NOT shift it. Keith's call: give Birth Registrations room at its end, move an existing scenario, or amend criteria 11, 24 and 25."
+        owner: "Keith"
+        blocked_by:
+          unowned: true
+      - criterion: "Criteria 13, 14 and 15 - the register entries of TS-57 to TS-62 rewritten to the quarterly calendar's real values and their corrections, with Config, Expect from the first bootstrapped build and Breaks as; TS-61's Expect to the parking; what each leaves standing."
+        why: "TS-57a to TS-61b are rewritten to Emergency Department's calendar and the correction (plans/supply-model.md, Calendar corrections); TS-62's entry stays as it was, the scenario not planted (criteria 11, 24 and 25). Their Expect lines are to be re-read against the final bootstrapped build."
+        owner: "the main session, from the final Emergency Department bootstrap"
+        blocked_by:
+          unowned: true
+      - criterion: "Criterion 17 - REQ-PIPE-170's unmet entry for criterion 23 cleared, naming this requirement."
+        why: "REQ-PIPE-170 still carries it. Left for the change that settles criteria 11 to 15, since the entry says what the history shows."
+        owner: "the main session"
+        blocked_by:
+          unowned: true
   - id: REQ-GEN-218
     title: 'TS-63 is planted in the synthetic history: a Child Protection dataset turned off for two quarters by a declared
       correction, with a late supply for the quarter it still owed and one received inside the gap'
@@ -35555,7 +35651,7 @@ requirements:
       and terminal what a turn-off does - the marker before it, a supply for a quarter it still owed filed there, a supply received
       inside the gap held quietly, and the gap's owed-nothing rows.
     moscow: must
-    status: not_started
+    status: "built"
     signed_off:
       by: Keith
       date: '2026-10-14'
@@ -35725,6 +35821,30 @@ requirements:
       plants it'' is left as history; a decision is appended to REQ-GEN-205 when this lands: ''TS-63 RE-POINTED (Keith, 2026-10-14,
       REQ-PIPE-179 own pass Q1): TS-63 is planted by REQ-GEN-218, built after REQ-DASH-180; criterion 10 checks against its
       correction where it is already planted. Recorded <date applied> by REQ-GEN-218 criterion 7.'''
+    - "BUILT 2026-10-18 (51e1e97, 08d8044, 45c3347)."
+    - "TS-63 IN GROWN QUARTERS 2021-Q4 TO 2022-Q3: cp-carers split from the shared participation, turned off after 31 December 2021 by correction REQ-GEN-218 dated 15 December 2021 (Keith's real identity approving, its reason saying it is fictional), owed nothing for 2022-Q1 and 2022-Q2, owed again from 2022-Q3 by a version from 2022-06-01."
+    - "THE INJECTION (anchor -20, 2021-Q4): five of the six tables on time with cp_carers held back, cp_carers alone on 5 January 2022 while 2021-Q4's slot is open, and again on 15 March 2022 inside the gap; links TS-63a (from the correction's date) and TS-63b (from the gap supply to the history's end), indexed among the arrivals that carry cp_carers (08d8044)."
+    - "THE GAP'S DELIVERIES STILL CARRY THE FILE, KEPT (post-build-review #244): the first Emergency Department bootstrap refused Child Protection's ordinary 2022-Q1 delivery as one this correction would re-file. That was a defect of correction_claims.check_written, which ignored the correction's date - the delivery arrived after 15 December 2021, so it was filed under the corrected agreement as it arrived and a confirmation has nothing of it to move. A first fix that left cp_carers out of the gap deliveries contradicted the decision above and criterion 5, and was reverted the same night (45c3347 reverted)."
+    - "A WRITTEN ARRIVAL IS ASKED ONLY WHAT A CONFIRMATION COULD MOVE (post-build-review #244): correction_claims.check_written asks a version-level correction about an ordinary arrival only if it was received before the correction's date, only for datasets the arrival carries, and only for datasets on a calendar."
+    - "CORRECTION CLAIMS COMPARE BY COLLECTION (51e1e97): a collection delivering every table together has one delivery a period, so a claim on one dataset's period is a claim on that delivery."
+    linked_tests:
+      - "tests/test_correction_apply.py::TestScenarioRegister::test_ts63_a_dataset_turned_off_for_a_while"
+      - "tests/test_correction_claims.py::TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove::test_a_gap_delivery_received_after_the_correction_is_not_asked"
+      - "tests/test_turn_off.py"
+      - "tests/test_scenario_links.py::TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd::test_a_link_between_its_arrival_and_its_correction"
+    implemented_by:
+      - "contract/calendar.yaml"
+      - "generator/scenario_injection.py::INJECTIONS"
+      - "generator/correction_claims.py::check_written"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). TestScenarioRegister's TS-63 test, tests/test_turn_off.py and the turned-off-delivery test passed in it."
+      - "On the final bootstrap: the January cp_carers supply filed late to 2021-Q4, the March one held as turned off, cp-carers 'awaiting confirmation' from 2021-12-15 and the 'Turning off after' marker on link TS-63a's date: BOOTSTRAP-EVIDENCE-PENDING."
+    unmet_criteria:
+      - criterion: "Criterion 5 - TS-63's register entry in plans/supply-model.md rewritten to the Child Protection calendar's real dates and REQ-DASH-180's marker wording."
+        why: "Rewritten as TS-63a and TS-63b to the Child Protection calendar's real dates, saying the ordinary gap deliveries still carry the file and are held as turned off; the marker wording and the quiet line's count are to be quoted from the final bootstrapped build."
+        owner: "the main session, from the final Emergency Department bootstrap"
+        blocked_by:
+          unowned: true
   - id: REQ-DASH-209
     title: A period-composition view shows, for one period of a collection, what each dataset holds there and how it got there
       - promoted, inherited or substituted
@@ -38585,7 +38705,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith adding test scenarios, I want a small one-table quarterly dataset under its own agency with a real contract and a few checks in each tool, so that a scenario that needs no Child Protection shape can be planted where a quarter costs about five seconds rather than about thirty."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, scoping conversation 2026-10-15 evening (plans/running-thoughts.md #99) and his answers recorded in plans/data-generation.md #12. Drafted by delivery-scoper 2026-10-15, re-drafted 2026-10-16 on item 6's final drafts. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL declare, in contract/data-asset.yaml's hierarchy, an agency department-of-health named 'Department of Health' with short doh, holding one collection emergency-department named 'Emergency Department' with short ed and run_prefix ed_run_, holding one dataset ed-presentations named 'ED Presentations', table ed_presentations, with an exact arrival pattern for one file, ed_presentations.csv."
@@ -38620,7 +38740,42 @@ requirements:
       - "ANSWERED (Keith, 2026-10-16): the check set (13) signed off as listed, and the ids, names and due time kept as proposed."
       - "ANSWERED (Keith, 2026-10-16): Emergency Department checks on postcode, sex, age group and arrival time RECORD FAILING ROWS, as other checks do (architect finding A8) - his call, knowing those four together re-identify a patient in real data."
       - "WORDING UPDATED TO THE REGISTRY WHEN MOVED IN (2026-10-18, under Keith's sign-off of the drafts as they stood): criterion 1 gives the agency its short, doh, which REQ-PIPE-248 criterion 7 made every agency declare (the value proposed at 248's scoping); criterion 3's contract path is in the agency's folder, as REQ-QAC-241 put every collection's check files; criterion 4's check files are in the agency's folder with their -retired siblings, as REQ-QAC-241's convention requires; criterion 8 names the file, contract/presentation.yaml. No change to what is built."
+      - "BUILT 2026-10-18 overnight in the ed-build worktree (12d6bd9, 3e50868, 52f32c8, 6db08d6), under Keith's sign-off of the drafts as they stood."
+      - "THIRTEEN CHECKS AS SIGNED: datacontract-cli presentation_id not null and unique, triage_category in 1-5, sex in M/F/X, row count 1000-4000 (warning); Soda postcode missing percent (warn >2, fail >5), departure_status invalid percent, length of stay invalid count (0 to 4320 minutes); dbt arrival_datetime not_null, age_group accepted_values, length of stay dbt_utils.accepted_range; Evidently PSI drift on triage_category and on age_group."
+      - "SEVERAL EVIDENTLY DRIFT CHECKS ON ONE DATASET (12d6bd9): a collection may now declare more than one, each with its own result and its own snapshot in the raw output by check id - the first collection to need it. REJECTED one drift check, which would have dropped one of the two signed."
+      - "THE CONTRACT CARRIES ITS DATASET'S IDENTITY (6db08d6): a one-table collection's contract id, name and domain are its dataset's and its agency's (REQ-QAC-039), as Birth Registrations' is."
+      - "NO dbt_project/tests/emergency-department/ AND NO dbt retired file: every dbt check is a generic test in schema.yml, so there is no singular test to file; Child Protection likewise has no retired dbt file. The collections gate passes without them."
+      - "OWED FROM 2013-01-01, PROVISIONAL (6db08d6, plans/morning-reports.md #6): the participation_defaults and participation versions start at 2013-01-01 because REQ-GEN-205's corrected quarters live in the quarterly calendar's existing 2013 version - the freeze gate compares a correction's declared old values against the push base, so a new, earlier calendar version would leave the correction's 'old' dates absent from the base and the correction refused. 52f32c8 first grew Emergency Department to 2010 with a new 2010 calendar version; 6db08d6 replaced that."
+      - "A NEW DATASET DATED IN THE PAST, ON A SYNTHETIC ASSET (post-build-review #243, 52f32c8, test-first): agreement_freeze exempted past-dated versions but not a new dataset's calendar membership, which REQ-PIPE-111 criterion 9 as amended allows; CI would have refused the Emergency Department push."
+      - "soda:invalid_count NAMED IN MEASURES (pipeline/dashboard_check_labels.py, 6db08d6): the length-of-stay Soda check is the first invalid_count check, and the dashboard had no word for its measure."
     open_questions: []
+    linked_tests:
+      - "tests/test_emergency_department.py"
+      - "tests/test_collections_registry.py::TestTheSharedToolModules::test_a_collection_may_declare_several_drift_checks_on_one_dataset"
+      - "tests/test_agreement_freeze.py::TestVersions::test_a_synthetic_asset_may_add_a_new_dataset_dated_in_the_past"
+      - "tests/test_hierarchy.py"
+      - "tests/test_validate_schedule.py"
+      - "tests/test_check_lifecycle.py"
+    implemented_by:
+      - "contract/data-asset.yaml"
+      - "contract/calendar.yaml"
+      - "contract/presentation.yaml"
+      - "contract/department-of-health/emergency-department-contract.yaml"
+      - "contract/department-of-health/emergency-department-contract-retired.yaml"
+      - "contract/department-of-health/emergency-department-soda-checks.yml"
+      - "contract/department-of-health/emergency-department-soda-checks-retired.yml"
+      - "contract/department-of-health/emergency-department-evidently-checks.yml"
+      - "contract/department-of-health/emergency-department-evidently-checks-retired.yml"
+      - "dbt_project/models/emergency-department/schema.yml"
+      - "dbt_project/models/emergency-department/sources.yml"
+      - "dbt_project/models/emergency-department/stg_ed_presentations.sql"
+      - "qa_tools/common/evidently_common.py::collection_checks"
+      - "qa_tools/tools/run_evidently.py::evaluate"
+      - "qa_tools/common/agreement_freeze.py::check"
+    evidence:
+      - "The configuration gates (criterion 9): mothman check --only for hierarchy, collections, providers, patterns, soda and columns: each 'passed'; schedule 'passed, with a warning' (the quarterly calendar's runway for cp-case-workers); and `mothman schedule validate` with MOTHMAN_DIFF_BASE at the push base 1191221 (origin/claude/qac-024-explanations-qx8hx8): 'schedule validation OK - 2 calendar(s), 8 dataset(s), no configuration errors', so the agreement freeze passes with no exemption. `mothman dashboard validate-check-lifecycle --require-explanations`: '326 checks (313 in the previous commit), zero errors'. Same tree, 2026-10-19 (Perth), the patterns gate with no database reachable (its delivery-log half skipped, as it says)."
+      - "Thirteen active checks (criterion 4), counted in the files: datacontract-cli 5, Soda 3, dbt 3, Evidently 2; the check-lifecycle gate's count rose from 313 to 326 with them."
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). None of the four is in an Emergency Department configuration test."
 
   - id: REQ-GEN-232
     title: "An Emergency Department generator provider writes one quarterly CSV per supply with Child Protection's severity mix, for as many quarters as its scenarios need"
@@ -38630,7 +38785,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith planting scenarios, I want an Emergency Department provider under the shared generator driver that writes ordinary quarterly supplies with the same kind of mix Child Protection has, so that the scenarios that move off Child Protection have somewhere cheap to live."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, scoping conversation 2026-10-15 evening (plans/running-thoughts.md #99) and his answers in plans/data-generation.md #12. Re-drafted 2026-10-16 on item 6's final drafts. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL generate Emergency Department's history through REQ-GEN-246's shared driver, from a provider at generator/collections/emergency_department.py, each period one delivery carrying one file, ed_presentations.csv, with the contract's eight columns."
@@ -38658,7 +38813,42 @@ requirements:
       - "WA POSTCODES FROM generator/names_au.py (delivery-architect, 2026-10-15). REJECTED a licensed Australia Post list."
       - "SUPPRESSION IS GENERIC (main session, 2026-10-15): the routine supply for a period a scenario needs empty is not generated."
       - "PROPOSED, NOT KEITH'S - ENDS WHERE CHILD PROTECTION ENDS: the moved scenarios keep their quarters only if this history covers 2023-Q3 to 2026-Q3 on the same anchor."
+      - "BUILT 2026-10-18 (3e50868, 0bd6e88, 6db08d6, 52f32c8): a provider of the shared driver, as REQ-GEN-246 requires; no Emergency Department code in the driver."
+      - "SEEDS 60000-70000 (slots 60001.. each plus up to 1999 for its resupply chain's dirty rolls and churns; the run plan 69000), disjoint by the providers gate."
+      - "ABOUT 2,000 PRESENTATIONS A SUPPLY (2000 plus or minus 150), the NFR's 'a few thousand' kept at the low end so a quarter costs seconds."
+      - "CHILD PROTECTION'S MIX, ITS OWN SEED: the oldest supply clean, round(n x 0.25) amber, two red, shuffled from seed 69000; reds get resupply chains through generator/resupply.run_slot_chain with Child Protection's five-to-twenty-day turnaround. A scenario's own or suppressed period takes no drawn amber (targeting.outside_hold)."
+      - "ORDINARY ARRIVALS AT 07:00 PLUS A DRAWN MINUTE (up to 08:59), before the 09:00 due time, so an ordinary quarter is on time."
+      - "SUPPRESSION IS GENERIC, IN THE PROVIDER (0bd6e88): a scenario's suppressed period writes no routine supply (TS-3b); a participation gap writes none because the gap quarter is not an owed period at all."
+      - "THE HISTORY STARTS AT 2013-Q1, PROVISIONAL: set by REQ-GEN-205's corrected quarters in the 2013 calendar version, not by criterion 4's dry run - see unmet_criteria."
     open_questions: []
+    linked_tests:
+      - "tests/test_emergency_department.py::TestTheProvider::test_two_generations_with_the_same_seed_are_byte_identical"
+      - "tests/test_emergency_department.py::TestTheProvider::test_each_supply_is_one_file_with_the_contracts_eight_columns"
+      - "tests/test_emergency_department.py::TestTheProvider::test_the_ordinary_quarters_carry_child_protections_severity_mix"
+      - "tests/test_emergency_department.py::TestTheProvider::test_postcodes_come_from_the_wa_pool"
+      - "tests/test_generator_providers.py::TestTheSeedSchedule::test_the_real_providers_derive_only_seeds_they_declare"
+      - "tests/test_generator_providers.py::TestTheProvidersGateKnowsWhatAProviderMayDeclare::test_the_real_providers_pass"
+      - "tests/test_generator_providers.py::TestEverySeedDrawnIsOneItsProviderDeclares::test_a_real_generation_draws_only_declared_seeds"
+      - "tests/test_generator_providers.py::TestImportingAProviderCostsNoToolImport::test_every_provider_module_imports_without_pandas_or_numpy"
+      - "tests/test_correction_claims.py::test_the_driver_refuses_before_it_writes"
+    implemented_by:
+      - "generator/collections/emergency_department.py::EmergencyDepartment"
+      - "generator/collections/emergency_department.py::Rows"
+      - "generator/collections/emergency_department.py::run_plan"
+      - "generator/collections/emergency_department.py::generated_periods"
+      - "generator/collections/base.py::Provider"
+      - "generator/driver.py::generate"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_emergency_department.py's own seven tests all passed in it."
+      - "The providers gate (`mothman check --only providers`, same tree, 2026-10-19): 'passed' - seeds 60000-70000 disjoint from Birth Registrations' and Child Protection's."
+      - "generated_periods() on this tree, 2026-10-19: 54 owed quarters, 2013-Q1 (dated 2013-02-11, the corrected date) to 2026-Q3 - 2015-Q4, the participation gap, not among them."
+      - "Per-supply bootstrap cost and REQ-TEST-239's S4 compare of Birth Registrations and Child Protection (NFRs 1 and 2): BOOTSTRAP-EVIDENCE-PENDING."
+    unmet_criteria:
+      - criterion: "Criterion 4 - the history sized by a dry run of REQ-GEN-044's collision refusal over every Emergency Department scenario, adding the fewest whole years that leave it with no refusal, with the count and output in evidence."
+        why: "Not done that way. The history runs 2013-Q1 to 2026-Q3 because REQ-GEN-205's five corrected quarters were put in the quarterly calendar's existing 2013 version (PROVISIONAL, plans/morning-reports.md #6 - the freeze gate compares a correction's old values against the push base), not because a dry run asked for 14 years; no dry run's count or output is recorded. It ends at Child Protection's newest quarter as the criterion asks. Whether to accept the 2013 start and amend the criterion, or re-size, is Keith's call."
+        owner: "Keith, with the PROVISIONAL placement in plans/morning-reports.md #6"
+        blocked_by:
+          unowned: true
 
   - id: REQ-PIPE-233
     title: "Emergency Department runs end to end as a third collection through its QA adapter - what item 6 does not already make true"
@@ -38668,7 +38858,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As whoever maintains the pipeline, I want Emergency Department QA'd, recorded, bootstrapped and replayed exactly as the other two collections are, through one short adapter, so that a scenario moved onto it is judged by the same tools and rules it was on Child Protection."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/running-thoughts.md #99 and plans/data-generation.md #12. Re-drafted 2026-10-16: most of the 2026-10-15 draft is now item 6's (REQ-PIPE-240 to REQ-TEST-249). A PROPOSAL, not signed. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL provide Emergency Department's QA adapter at qa_tools/collections/emergency_department.py, carrying no legacy flag and no temporary pointer, with its logic reported against REQ-TEST-249's 150-line soft budget."
@@ -38690,7 +38880,36 @@ requirements:
       - "CRITERION 2 IS ITEM 6'S PROMISE CHECKED ON A REAL COLLECTION: REQ-TEST-249 proves it on a fake one."
       - "CRITERION 4 RIDES ON REQ-PIPE-170 CRITERION 31'S AMENDMENT, which is Keith's to approve in REQ-PIPE-240; without it the code says every collection and the built criterion's text lags."
       - "WORDING UPDATED TO THE REGISTRY WHEN MOVED IN (2026-10-18, under Keith's sign-off of the drafts as they stood): criterion 4: REQ-PIPE-170 criterion 31's amendment has since been applied. No change to what is built."
+      - "BUILT 2026-10-18 (3e50868): a sixteen-line adapter declaring only what its checks need read - dbt's dimension and label per generic test, Soda's data source, the recorded value counts Evidently's drift reference is rebuilt from, and the claim-window dataset. No legacy flag, no temporary pointer."
+      - "TESTS READ THE REGISTRY (2eb5a80, CLAUDE.md test rule 4): tests that assumed exactly two real collections went red because Emergency Department arrived; they were made to read the registry rather than the third collection being hidden from them."
+      - "THE SCENARIO REGISTER NAMES ed-presentations: generator/scenario_injection.py's INJECTIONS is scenario configuration, as it is for every other collection's scenarios, and the collections gate passes with nothing allowlisted."
     open_questions: []
+    linked_tests:
+      - "tests/test_collections_registry.py"
+      - "tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_corrections_are_confirmed_once_both_replays_finish"
+      - "tests/test_cli_pipeline.py::TestCorrectionsAfterAFullRun::test_after_both"
+      - "tests/test_collection_cli.py"
+      - "tests/test_cli_at_thirty_collections.py"
+    implemented_by:
+      - "qa_tools/collections/emergency_department.py::ADAPTER"
+      - "qa_tools/common/bootstrap.py::bootstrap"
+      - "qa_tools/common/bootstrap.py::_confirm_corrections"
+    evidence:
+      - "Criterion 1: `python -m qa_tools.common.validate_collections` (REQ-TEST-249's report), same tree, 2026-10-19: 'emergency-department: adapter 16 lines of logic against a budget of 150; its generator provider 170.' (civil-registration 71 and 441, child-protection 63 and 493)."
+      - "The collections gate (criterion 2's 'no Emergency Department name outside its configuration, check files, adapter and provider'): `mothman check --only collections`, same tree, 2026-10-19, 'passed', reporting '0 file(s) still wait on the requirement that rewires them'."
+      - "Selected suites: tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth)."
+      - "Criteria 2 to 4 on a bootstrap from empty holding all three collections - each collection's time, Emergency Department filed, staged, checked, recorded and gated, and the corrections confirmed across all three: BOOTSTRAP-EVIDENCE-PENDING."
+    unmet_criteria:
+      - criterion: "Criterion 3, in part - each collection's bootstrap time logged in CLAUDE.md's running log."
+        why: "No entry naming Emergency Department is in CLAUDE.md's running log on this tree. The bootstrap reported in plans/morning-reports.md #6 (1303s; Birth Registrations 613s, Child Protection 1184s, Emergency Department 222s) predates 880b6ec and 45c3347, so the figure to log is the final bootstrap's."
+        owner: "the main session, from the final Emergency Department bootstrap"
+        blocked_by:
+          unowned: true
+      - criterion: "Criterion 5 - CI's deployment half run against a bootstrap holding all three collections, with its duration recorded."
+        why: "Nothing on this branch has been pushed, so no CI run holds Emergency Department."
+        owner: "the main session, after the Emergency Department push"
+        blocked_by:
+          unowned: true
 
   - id: REQ-DASH-234
     title: "The dashboard shows Department of Health as a third real agency, from the executive view down to its dataset page"
@@ -38700,7 +38919,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As a data team leader glancing at the register, I want the Department of Health to appear as a real agency beside the other two, so that the page shows what is actually checked, and the moved scenarios' links land on a real page."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/running-thoughts.md #99 ('so the executive view shows a third agency'). Re-drafted 2026-10-16 on item 6's final drafts. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "WHEN the dashboard is built from recorded results holding Emergency Department, THE SYSTEM SHALL show Department of Health as an agency card on the executive view, its collection and its dataset page, with the same status, as-at and supply-history behaviour the other agencies have."
@@ -38719,7 +38938,21 @@ requirements:
       - "A THIRD AGENCY ON THE EXECUTIVE VIEW (Keith, 2026-10-15)."
       - "DROPPED as covered by REQ-DASH-244: the third data const (one COLLECTION_DATA const now); rendering with no Emergency Department data (a zero-run collection renders the never-supplied notice, REQ-DASH-244 criterion 5); the agency's GitHub pill (removed for every agency, round-3 call 17)."
       - "ALREADY SAFE, VERIFIED 2026-10-15: TestExecutiveLegend reads the total from the page; the gap test needs 'at least two' real agency cards."
+      - "BUILT 2026-10-18 (5dc74a3, 2eb5a80): the footer names no collection - 'Every dataset on this page is real' - rather than listing three, so the next collection needs no edit to it."
+      - "NO FIXED COUNT IN A TEST (criterion 5, 5dc74a3 and 2eb5a80): tests that listed two collections or two agencies read the registry; a grep of tests/ and tests-js/ on 2026-10-19 found no remaining count assertion on agencies or collections, only prose in docstrings."
+      - "NOTHING ELSE IN THE TEMPLATE CHANGED: the agency card, legend and dataset page already render whatever COLLECTION_DATA holds (REQ-DASH-244), which is why criteria 1, 2 and 4 rest on the bootstrapped build rather than on new code."
     open_questions: []
+    linked_tests:
+      - "tests/test_dashboard_e2e.py"
+      - "tests/test_cli_dashboard.py"
+      - "tests/test_embed_dashboard_data.py"
+    implemented_by:
+      - "dashboard/qa-reporting-dashboard.template.html"
+      - "contract/presentation.yaml"
+    evidence:
+      - "Selected suites: tests/test_cp_pair.py, test_runway.py, test_target_agreement.py, test_calendar_move_pin.py, test_census.py, test_delivery_boundary.py, test_collection_defaults.py, test_cli_pipeline.py, test_collection_cli.py, test_cli_at_thirty_collections.py, test_common_helpers.py, test_cli_dashboard.py, test_run_evidently_cp_real.py, test_bootstrap_equivalence.py, test_publish.py, test_embed_dashboard_data.py, test_build_dashboard_data.py, test_check_lifecycle.py and test_validate_requirements.py: '409 passed, 393 warnings in 121.21s' with -m 'not needs_deployment', the same tree, 2026-10-19 (Perth). npm test on the same tree, 2026-10-19 (Perth): 'Test Files 61 passed (61)', 'Tests 835 passed (835)'."
+      - "Criteria 1, 2 and 4 on a dashboard built from a bootstrap holding Emergency Department - tests/test_dashboard_e2e.py, which needs the bootstrapped deployment database and was not run in this pass: BOOTSTRAP-EVIDENCE-PENDING."
+      - "Render budget (NFR 1) - page size and tests/test_dashboard_e2e.py's duration before and after: BOOTSTRAP-EVIDENCE-PENDING."
 
   - id: REQ-GEN-235
     title: "The built early-arrival scenarios TS-9, TS-65, TS-66 and TS-67 move to Emergency Department, keeping their TS numbers and quarters"
@@ -38749,7 +38982,8 @@ requirements:
       - "EVERYTHING THAT DOES NOT NEED CHILD PROTECTION MOVES AND KEEPS ITS TS NUMBER (Keith, 2026-10-15): a scenario stays only if it needs a supply of several files, a cross-table check, or several datasets in one collection."
       - "WHAT THE MOVE LOSES, ACCEPTED BY KEITH'S NAMING: TS-67 on Child Protection also showed cp-case-workers rejected in a quarter it is not delivered in, and each early scenario a whole six-table delivery. TS-52 and TS-79 keep the partial-participation shapes."
       - "PROPOSED, NOT KEITH'S - SAME QUARTERS: keeps TS-9's '22 April, nine days early' and TS-67's 12 and 21 October quotes true."
-    open_questions: []
+    open_questions:
+      - "FOR KEITH (2026-10-19, raised overnight): criterion 3 - every other Child Protection delivery and receipt byte-identical once TS-9, TS-65, TS-66 and TS-67 leave - is the open one. Either amend criterion 3 to accept the predicted differences the move causes in Child Protection's generated history (replacing four injected quarters and TS-67's filed-early 2023-Q3 with ordinary deliveries changes what the severity planner moves and the runs that follow), or keep Child Protection's relocation frozen and leave the four scenarios where they are. Nothing of this requirement is built on ed-build: all four injections are still on cp-clients (generator/scenario_injection.py) and TS-67's six scripted decisions are unchanged."
 
   - id: REQ-GEN-236
     title: "TS-3a and TS-3b are planted on Emergency Department - a quarterly arrival one day outside the claim window, with the prior slot filled and unfilled"
@@ -38759,7 +38993,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith, I want the quarterly half of the claim-window family planted on Emergency Department, so that the window is seen gating at its own boundary on a real page without spending Child Protection quarters."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/running-thoughts.md #99, superseding his answer of 2026-10-15 ~12:15 that put TS-3a and TS-3b in REQ-GEN-207's grown quarters. Delivers REQ-GEN-044 criterion 1 for these two. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL generate, as TS-3a, an Emergency Department supply received one day before the next quarter's claim window opens, while the current quarter's slot is filled."
@@ -38777,7 +39011,22 @@ requirements:
       - "TS-3a AND TS-3b MOVE (Keith, 2026-10-15, #99)."
       - "SUPPRESSION IS GENERIC (main session, 2026-10-15)."
       - "THE REGISTER'S CONFIG LINE IS NOT THE CALENDAR: it says Feb 2 / May 1 / Aug 3 / Nov 2; the calendar is the 1st of each month. Criterion 4, the same correction REQ-GEN-195 made for TS-9."
+      - "BUILT 2026-10-18 (0bd6e88): TS-3a at anchor -6 (2025-Q2, February 2025 filled as usual) and TS-3b at anchor -2 (2026-Q2, February 2026 suppressed), each arriving 10:00 fifteen days before the quarter's 1st - 23 hours before the window opens at 09:00 fourteen days before."
+      - "THE PROVIDER HONOURS A SCENARIO'S SUPPRESSED PERIOD (0bd6e88): the routine supply for TS-3b's previous quarter is not generated. Generic, as the signed decision says."
+      - "REGISTER ENTRIES REWRITTEN TO THE CALENDAR'S REAL VALUES (criterion 4): the 1st of February, May, August and November, due 09:00, 14 days; each with a Breaks as line and the family's 'contained imperfection, not a defect' note kept."
     open_questions: []
+    linked_tests:
+      - "tests/test_emergency_department.py::TestTheQuarterlyArrivalsJustOutsideTheWindow::test_ts_3a_arrives_a_day_before_its_quarters_window_with_the_previous_filled"
+      - "tests/test_emergency_department.py::TestTheQuarterlyArrivalsJustOutsideTheWindow::test_ts_3b_is_the_same_arrival_with_the_previous_quarter_suppressed"
+      - "tests/test_emergency_department.py::TestTheQuarterlyArrivalsJustOutsideTheWindow::test_neither_generates_a_resupply"
+    implemented_by:
+      - "generator/scenario_injection.py::INJECTIONS"
+      - "generator/scenario_injection.py::resolve"
+      - "generator/collections/emergency_department.py::EmergencyDepartment"
+      - "plans/supply-model.md"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). The three TS-3a/TS-3b tests passed in it."
+      - "The Expect lines in plans/supply-model.md's TS-3a and TS-3b entries, quoted from the first bootstrapped build of 2026-10-18, re-checked against the final bootstrap: BOOTSTRAP-EVIDENCE-PENDING."
 
   - id: REQ-GEN-251
     title: "Emergency Department has a participation gap, so a later quarter inherits an earlier supply as Child Protection's case workers do"
@@ -38787,7 +39036,7 @@ requirements:
     date_written: "2026-10-16"
     story: "As Keith, I want the Emergency Department dataset not owed one quarter of its history, so that the quarter after inherits the supply before it and TS-61's blocked move has an inheritance of its own to be blocked by."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/data-generation.md #12 Q3 (2026-10-15): 'Emergency Department gets a participation gap so it has an inheritance of its own; TS-61 moves.' Drafted by delivery-scoper 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL declare in contract/calendar.yaml a participation version for ed-presentations under which it is not owed one quarter of its generated history, and a later version from the next quarter under which it is owed again, so that the dataset's resolved participation changes on no date outside that gap."
@@ -38805,7 +39054,27 @@ requirements:
       - "A GAP OF ITS OWN, SO TS-61 CAN MOVE (Keith, Q3). REJECTED keeping TS-61 on Child Protection riding the same correction (delivery-scoper's 2026-10-15 recommendation): Keith chose to give Emergency Department the inheritance it lacked."
       - "A REQUIREMENT OF ITS OWN, not a criterion of REQ-GEN-237: it is configuration plus suppression with a fact of its own (an inheritance), and REQ-GEN-237 is the scenarios that use it."
       - "PROPOSED, NOT KEITH'S - ONE QUARTER: the least that gives a following quarter something to inherit."
+      - "BUILT 2026-10-18 (52f32c8, 6db08d6): the gap is 2015-Q4 - a version from 2015-10-01 owing February, May and August, with a reason saying it is fictional, then one from 2015-12-01 owing every quarter again - so the resolved participation differs from 'all' on 2015-Q4's date alone."
+      - "INHERITANCE READS THE VERSION IN FORCE ON THE PERIOD'S DATE (post-build-review #242, 2ff53cd, test-first): it read the newest participation version, so a versioned gap read as owed. Fixed in qa_tools/common/inheritance.py; tests/test_participation_gap.py failed 1 before, 2 passed after."
+      - "WHICH QUARTER INHERITS, FOR KEITH TO READ: in the bootstrap of plans/morning-reports.md #6 TS-61's move was 'blocked by 2015-Q4 standing on it' - the GAP quarter inherits 2015-Q3's supply, as cp-case-workers' unowed quarters do. Criterion 3 and REQ-GEN-205 criterion 9 say 'the quarter after the gap'. The behaviour matches 'as cp-case-workers' quarters do today'; the wording may need to say 'the gap quarter'."
+      - "2012-Q4 FIRST, THEN 2015-Q4: 52f32c8 put the gap in 2012-Q4 with a 2010 history; 6db08d6 moved the history to 2013 and the gap to 2015-Q4, after TS-61a."
     open_questions: []
+    linked_tests:
+      - "tests/test_participation_gap.py::test_the_gap_quarter_is_owed_nothing"
+      - "tests/test_participation_gap.py::test_the_quarters_either_side_are_still_owed"
+      - "tests/test_inheritance.py"
+    implemented_by:
+      - "contract/calendar.yaml"
+      - "qa_tools/common/inheritance.py::_does_not_participate"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_participation_gap.py (2) and tests/test_inheritance.py passed in it."
+      - "Criterion 3 on the final bootstrap - which quarter records the inheritance, and of which supply: BOOTSTRAP-EVIDENCE-PENDING."
+    unmet_criteria:
+      - criterion: "Criterion 4 - the gap placed through REQ-GEN-232's dry run, and generation refusing, naming both, where the gap meets a period another scenario claims."
+        why: "The gap is placed by hand at 2015-Q4, after TS-61a's 2015-Q3 supply, and no code compares a participation gap with other scenarios' claims: correction_claims and scenario_injection.no_two_scenarios_share_a_period check injections and corrections only (searched generator/ on 2026-10-19). 2015-Q4 lies inside REQ-GEN-205's own claim, which TS-61 rides, so nothing collides today; the refusal is what is missing."
+        owner: "the main session"
+        blocked_by:
+          unowned: true
 
   - id: REQ-GEN-237
     title: "The correction scenarios TS-57 to TS-61 are re-pointed at Emergency Department, with each corrected quarter empty in Child Protection"
@@ -38815,7 +39084,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith, I want the calendar-correction scenarios planted on Emergency Department, every quarter a correction touches holding nothing in Child Protection, so that the correction's quarters stop costing Child Protection runs and the shared calendar's edit re-judges only what the scenarios name."
     moscow: "must"
-    status: "not_started"
+    status: "built"
     source: "Keith, plans/running-thoughts.md #99 and his answers in plans/data-generation.md #12 (Q2 empty-elsewhere, Q3 TS-61 moves, Q6 TS-63 stays). Amendment wording on REQ-GEN-044 and REQ-GEN-205 delegated by Keith to the main session. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL apply, in the change that adds this requirement to requirements.yaml, the amendments to REQ-GEN-044 and REQ-GEN-205 recorded in this requirement's decisions, each marked 'AMENDED <date applied> by REQ-GEN-237'."
@@ -38847,8 +39116,37 @@ requirements:
       - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 22: 'THE SYSTEM SHALL make each change the confirmed correction declares an edit to one Emergency Department quarter's date in the quarterly calendar's dates: list, one such edit per shape, each quarter empty in Child Protection (REQ-GEN-237 criterion 3), and SHALL NOT change a claim window or any other version-level value. AMENDED <date applied> by REQ-GEN-237.' (SUBSTANTIVE)"
       - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 23: as signed, with 'its Correction move waiting item on cp-case-workers' replaced by 'its Correction move waiting item on ed-presentations', and the AMENDED line."
       - "CRITERION 1 APPLIED IN THE CHANGE THAT ADDED THIS REQUIREMENT (2026-10-18): REQ-GEN-044's appended decision and REQ-GEN-205 criteria 6, 8, 9, 10, 11, 13, 22 and 23, each carrying 'AMENDED 2026-10-18 by REQ-GEN-237'. REQ-GEN-205's and REQ-GEN-044's blocks were re-written by the YAML dumper in the file's existing style, which re-wrapped two hand-edited lines in each; no other value changed."
+      - "BUILT 2026-10-18 (cf2f2b9, 6db08d6, 88505d5, 45c3347)."
+      - "CORRECTED QUARTERS IN THE EXISTING 2013 VERSION, PROVISIONAL (plans/morning-reports.md #6): criterion 3 allows lying outside Child Protection's history or suppressing its routine supply. Lying outside meant dates before 2013, needing a new, earlier quarterly calendar version, and the freeze gate then refuses the correction because its 'old' dates do not exist in the push base. So the five edited dates are in the 2013 version (2013-Q1, 2013-Q4, 2014-Q3, 2015-Q1, 2015-Q3) and Child Protection writes no routine supply in the nine quarters those edits alter."
+      - "SUPPRESSION IS GENERIC: a provider flag, Provider.suppresses_others_corrections, plus correction_claims.foreign_altered - the periods a correction ridden only by other collections' scenarios alters. When REQ-GEN-238 shrinks Child Protection those years leave its history and the suppression stops mattering."
+      - "A DRAWN RED IN AN EMPTIED QUARTER GOES WITH IT (88505d5): grown quarter 2013-Q3's red chain and its scripted resend promote were removed with the quarter's supply; the severity planner moves ambers only, never a red."
+      - "THE REFUSAL NAMES ALL THREE: 'correction <reference> alters <quarters>, where <collection> (<dataset>) holds a supply' - the change reference, the collection and the quarter, as criterion 3 asks."
+      - "TS-63, TS-42 AND TS-80 STAY ON CHILD PROTECTION (criterion 5), planted by REQ-GEN-218 and REQ-GEN-203 in grown quarters 2019-Q4 to 2022-Q3, outside the nine emptied ones."
     open_questions:
       - "CHECK AT BUILD (not for Keith): that REQ-PIPE-169's impact preview runs over every collection on a calendar with the same implementation (REQ-PIPE-169 criterion 6), never a second rule."
+    linked_tests:
+      - "tests/test_correction_claims.py::TestTheClaimIsChecked::test_another_collection_holding_a_supply_in_an_altered_quarter_is_refused"
+      - "tests/test_correction_claims.py::TestTheClaimIsChecked::test_a_quarter_another_collection_suppresses_is_not_a_supply"
+      - "tests/test_correction_claims.py::TestAnotherCollectionsCorrectionEmptiesItsQuarters::test_child_protection_writes_nothing_there"
+      - "tests/test_correction_claims.py::test_the_driver_refuses_before_it_writes"
+      - "tests/test_generate_cp_runs.py"
+    implemented_by:
+      - "generator/correction_claims.py::check"
+      - "generator/correction_claims.py::check_all"
+      - "generator/correction_claims.py::foreign_altered"
+      - "generator/collections/child_protection.py::_foreign_altered"
+      - "generator/collections/child_protection.py::ChildProtection::slot"
+      - "generator/collections/base.py::Provider"
+      - "generator/scenario_injection.py::INJECTIONS"
+    evidence:
+      - "Selected suites: tests/test_emergency_department.py, test_collections_registry.py, test_generator_providers.py, test_correction_claims.py, test_scripted_corrections.py, test_participation_gap.py, test_scenario_links.py, test_scenario_injection.py, test_generate_cp_runs.py, test_turn_off.py, test_agreement_freeze.py, test_bootstrap.py, test_correction_replay.py, test_correction_apply.py, test_evidently_reads_its_entry.py, test_hierarchy.py, test_validate_schedule.py, test_inheritance.py and test_generate_to_target.py: '4 failed, 714 passed, 316 warnings in 145.32s' with -m 'not needs_deployment', on branch ed-build at 7da8773 plus an uncommitted SCENARIOS.md and plans/morning-reports.md, 2026-10-19 (Perth). The four failures: test_scenario_injection.py::TestTheInjectedSetItself::test_every_injection_names_a_scenario_the_register_marks_for_injection (TS-57a is not in the register), test_generator_providers.py::TestOneDriverForEveryCollection::test_a_third_collections_history_is_written_by_the_shared_driver and ::test_a_regeneration_overwrites_rather_than_accumulates (correction_claims.check_written raises ScheduleConfigError on the fake collection's calendar-less dataset), and test_bootstrap.py::TestItDoesNotRebuildWhatIsAlreadyThere::test_force_rebuilds_anyway (the real scripted keep of TS-59a refused over an empty history). tests/test_correction_claims.py and tests/test_generate_cp_runs.py passed in it."
+      - "Criterion 1: 'AMENDED 2026-10-18 by REQ-GEN-237' counted in requirements.yaml on 2026-10-19 on REQ-GEN-044's appended decision and REQ-GEN-205 criteria 6, 8, 9, 10, 11, 13, 22 and 23."
+    unmet_criteria:
+      - criterion: "Criterion 4 - generation refusing, naming the change reference and the supply, where the correction's impact preview (REQ-PIPE-169) over every collection on the calendar shows a move or re-judgement of a supply no scenario names."
+        why: "Not built for the confirmed date-level correction, and not yet checked: correction_claims.check_written runs the filing rule over written ordinary arrivals for VERSION-LEVEL corrections only (TS-62's), and the date-level REQ-GEN-205 relies on criterion 3's emptied quarters instead. Whether the impact preview over the final bootstrap shows any unnamed move is to be checked once that bootstrap exists."
+        owner: "the main session, after the final Emergency Department bootstrap"
+        blocked_by:
+          unowned: true
 
   - id: REQ-GEN-238
     title: "Child Protection's grown history drops its oldest years down to what a fresh dry run of its remaining scenarios needs, amending REQ-GEN-207"
@@ -38890,6 +39188,7 @@ requirements:
       - "AMENDMENT, FINAL TEXT - REQ-GEN-207 criterion 2, appended: 'AMENDED <date applied> by REQ-GEN-238: TS-3a, TS-3b and TS-57 to TS-61 moved to Emergency Department (Keith, 2026-10-15), and the growth was re-sized by the same dry run over the scenarios that stayed, to <N> years, dropping the oldest.'"
       - "AMENDMENT, FINAL TEXT - REQ-GEN-207 criterion 1: as signed, with 'add Child Protection quarters before 2023-Q1' followed by ' - <N> years since REQ-GEN-238 re-sized it, from ten -', and 'AMENDED <date applied> by REQ-GEN-238.'"
       - "CRITERION 7 WAITS FOR CRITERION 1 (2026-10-18, when this was moved into the register): its final amendment text carries <N>, the number of years criterion 1's dry run keeps, so REQ-GEN-207 is amended in the change that runs the dry run rather than the one that added this requirement. Departs from criterion 7's 'in the change that adds this requirement' only in timing, because the text cannot be written before the count exists."
+      - "DEFERRED, NOT BUILT (2026-10-18 overnight, plans/morning-reports.md #6): criterion 1's dry run counts REQ-GEN-206's TS-50, TS-55 and TS-81, and REQ-GEN-206 is unsigned, so the fewest years cannot be sized. Keith's call is needed - sign REQ-GEN-206, or re-scope criterion 1 without it - before anything here starts. Until then Child Protection keeps all 55 quarters, and the nine 2013-2015 quarters REQ-GEN-237 empties stay in its history with their routine supply suppressed."
     open_questions: []
 
   - id: REQ-PIPE-250
@@ -38900,7 +39199,7 @@ requirements:
     date_written: "2026-10-16"
     story: "As Keith, I want a fresh bootstrap of the whole synthetic history to take at most twelve minutes, so that regenerating it - in a fresh session, in CI, after any history change - is something done without planning around it."
     moscow: "must"
-    status: "not_started"
+    status: "in_progress"
     source: "Keith, plans/data-generation.md #12 Q5 (2026-10-15): 'a hard 12 minutes', confirmed after the architect's 15-17 minute estimate, with profiling in scope. Drafted by delivery-scoper 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
     acceptance_criteria:
       - "THE SYSTEM SHALL profile a from-empty bootstrap by collection, stage and quarter, and SHALL record in this requirement's evidence where the time goes, including why Child Protection's per-quarter cost rose from about 21s to about 33s with the growth."
@@ -38919,4 +39218,7 @@ requirements:
       - "A HARD 12 MINUTES FROM EMPTY (Keith, Q5), BELOW the architect's 15-17 minute estimate for about thirty Child Protection quarters - which is why profiling is in scope, not optional."
       - "'HARD' IS READ AS AN ACCEPTANCE MEASUREMENT ON THIS SANDBOX (three runs) AND A PRINTED BUDGET LINE, NOT A FAILING GATE (delivery-scoper, proposed): a wall-clock gate in CI fails on a slow runner rather than a slow pipeline. REJECTED a CI timing gate. CONFIRMED by Keith, 2026-10-18: a measurement, three runs on this sandbox and a printed budget line, not a CI gate; IF 12 minutes is not reached, the other nine ship and this requirement stays in progress, with the measured time, the profile and the next speed-ups written up."
       - "A REQUIREMENT OF ITS OWN: the shrink (REQ-GEN-238) reduces how much work there is; this makes the remaining work fast enough. Either may turn out to be most of the answer."
+      - "IN PROGRESS, NOT MET (Keith, 2026-10-18: if 12 minutes is not reached overnight, ship the other nine and leave this in progress with the measured time, the profile and the next speed-ups written up). Measured: the last bootstrap from empty of the Emergency Department tree took 1303s (21m43s) - Birth Registrations 613s, Child Protection 1184s and Emergency Department 222s, side by side - against a budget of 720s (plans/morning-reports.md #6; before 880b6ec and 45c3347). Child Protection is the critical path; Emergency Department is not."
+      - "NOT YET BUILT (2026-10-19, read on ed-build): criterion 1's profile by collection, stage and quarter has not been taken; criterion 3's budget line is not printed - qa_tools/common/bootstrap.bootstrap says 'Took <collection> Ns, ..., total Ns' with no budget; criterion 2's three runs and criterion 5's CI figure are not recorded. No speed-up has been made, so criterion 4 has nothing to show yet."
+      - "THE NEXT SPEED-UP IS REQ-GEN-238'S SHRINK, which waits on REQ-GEN-206's sign-off: Child Protection's 55 quarters are the 1184s, and the shrink takes its grown years down to what TS-42, TS-80 and TS-63 need."
     open_questions: []

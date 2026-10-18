@@ -2213,9 +2213,12 @@ one or more component tags, and a date.
         identity is outranked by the runner's own identity.
       Both fixed in the tests and pushed together as 9d9def0, after
       reproducing them locally with `GITHUB_ACTIONS=true` (6 failed, then 83
-      passed with the variable set and without). The CI result is at the
-      next entry.
-    - **TS-62 MOVED, PROVISIONAL.** TS-62 was planned three days before the
+      passed with the variable set and without). The on-demand job then
+      showed one more (#241: the equivalence harness wrote dbt scratch under
+      the real tree while the adapter module checked it), pushed as 1191221.
+      **CI GREEN ON 1191221**, run 39146997470: both test halves, on-demand,
+      JS and coverage, about 01:10 Perth. 248's chain is done.
+    - **TS-62 MOVED, PROVISIONAL - SUPERSEDED BELOW (not planted).** TS-62 was planned three days before the
       history's end, with an open-ended six-hour claim window from
       2026-09-19. It could not be placed there: a correction claims its day
       and the day either side, and TS-45's following day and TS-46's lead-in
@@ -2232,6 +2235,40 @@ one or more component tags, and a date.
       its end, which is a growth call for you. The old bootstrap never
       caught the clash because it had loaded its configuration before TS-62
       existed; a fresh one refused in 3 seconds.
+    - **TS-62's ARRIVAL WAS WRONG AS WELL AS ITS PLACE, fixed the same hour.**
+      The bootstrapped build showed its supply, at 21:00 the evening before,
+      filed to the day before as a late resupply. TS-62 was written for
+      the evening-before era, but Birth Registrations has been due at 14:00
+      on the day since 30 June - at the old 2026-09-19 placement too. The
+      supply now arrives at 09:00 on 2026-07-25. The corrected six-hour
+      window opens at 08:00 and the old four-hour one at 10:00, so it
+      claims its own day only under the merged, still-pending correction,
+      which is what REQ-PIPE-170 criteria 20-21 ask it to show. The error
+      was in what I wrote tonight, and the bootstrap caught it before the
+      register quoted it.
+    - **A DEFECT THE FIRST ED BOOTSTRAP FOUND** (#244, fixed test-first):
+      the written-supply check asked a correction about arrivals received
+      after it, which it could never move. My first fix was wrong: it
+      took cp_carers out of the gap deliveries, against REQ-GEN-218's
+      signed decision that they still carry the file. The register audit
+      caught it, and the first fix was reverted.
+    - **TS-62 IS NOT PLANTED - A QUESTION FOR YOU.** The register audit
+      also caught the 25 July move breaking REQ-GEN-205 criteria 11, 24
+      and 25. Its version must take effect after 2026-09-08, near the
+      history's end, and generation must refuse rather than shift it. Its
+      correction claims its day and the day before, and every day after
+      09-08 is taken except 09-19 on its own. So TS-62 is out of tonight's
+      build, its register entry is as it was, and the 25 July version,
+      correction and script are gone. Options: give Birth Registrations a
+      few more days at its end (a growth call), move TS-45 or TS-46 (their
+      register texts are quoted), or amend criteria 11, 24 and 25.
+    - **THE FIRST CLEAN ED BOOTSTRAP** (before the TS-62 arrival fix), 1303s:
+      REQ-GEN-205 confirmed - 1 moved (TS-58: 2013-Q3 -> 2013-Q4), 1 held
+      (TS-60, naming the correction), 1 parked (TS-61, blocked by 2015-Q4
+      standing on it), 1 re-judged (TS-57: late, then on time, both
+      verdicts kept), and TS-59 kept by a person with its reason. TS-63:
+      the January cp_carers filed late to 2021-Q4, the March one held as
+      turned off. REQ-GEN-205-TS62 left pending, as scripted.
     - **FOR THE MORNING, Keith's own list**: talk through the 77,000 lines
       of code (running-thoughts #107) and the test-duplication report
       (now docs/drafts/item-6/test-duplication.md), plus anything else left
