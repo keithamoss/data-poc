@@ -214,8 +214,7 @@ class OneTableCLI(CollectionCLI):
         reference_run_id = common.reference_run_id()
         # THE REFERENCE IS STAGED TOO (REQ-PIPE-102), so it is checked against
         # the warehouse like every other supply.
-        stage.stage_table(self.collection_id, reference_run_id, self.table,
-                          reference_csv, run_date=run_date)
+        stage.stage_table(self.collection_id, reference_run_id, self.table, reference_csv)
         try:
             results = self._run_single(
                 run_id, csv_path, run_date, reference_run_id=reference_run_id, run_by=run_by,

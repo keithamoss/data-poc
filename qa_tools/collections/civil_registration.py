@@ -105,7 +105,4 @@ ADAPTER = CollectionAdapter(
         value_counts={("birth_registrations", "sex"): _SEX_VALID},
     ),
     claim_window_dataset="birth-registrations",
-    legacy=frozenset({
-        "stage.stamps_run_columns",
-    }),
 )

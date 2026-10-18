@@ -341,8 +341,7 @@ def run_single_file(collection_id: str, run_id: str, table: str, csv_path: str, 
              "received_at": asset_time.isoformat(
                  received_at or asset_time.start_of_day(date.fromisoformat(run_date))),
              "delivery": run_id}
-    stage.stage_table(collection_id, run_id, table, csv_path,
-                      run_date=run_date, received_at=received_at)
+    stage.stage_table(collection_id, run_id, table, csv_path, received_at=received_at)
     return run_one(collection_id, entry, run_timestamp, run_by, reference_run_id,
                    on_step=on_step)
 

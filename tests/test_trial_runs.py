@@ -232,7 +232,7 @@ class TestARealTrialStagesAndVanishes:
             before_staged, before_schemas = _database_state(conn)
 
         physical = stage_bdm(
-            run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
+            run_id, self._csv(bdm_delivery_dirs))
         assert physical, "the real loader staged nothing"
 
         with supply_db.connect(label="test-trial") as conn:
@@ -285,7 +285,7 @@ class TestARealTrialStagesAndVanishes:
         before = len(load_log.records())
 
         physical = stage_bdm(
-            run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
+            run_id, self._csv(bdm_delivery_dirs))
 
         assert len(load_log.records()) == before, \
             "a trial's load record turned up among the real ones"
@@ -309,7 +309,7 @@ class TestARealTrialStagesAndVanishes:
         exists to keep."""
 
         physical = stage_bdm(
-            "run_999", self._csv(bdm_delivery_dirs), "2099-03-03",
+            "run_999", self._csv(bdm_delivery_dirs),
             received_at="2099-03-03T01:02:03+00:00")
         with supply_db.connect(label="test-trial") as conn:
             staged, _ = _database_state(conn)
@@ -327,7 +327,7 @@ class TestARealTrialStagesAndVanishes:
         from qa_tools.common import qa_store
 
         run_id = trial.trial_run_id(reference=True)
-        stage_bdm(run_id, self._csv(bdm_delivery_dirs), "2026-01-01")
+        stage_bdm(run_id, self._csv(bdm_delivery_dirs))
         with supply_db.connect(label="test-trial") as conn:
             trial.discard(conn, run_id)
             assert not conn.execute(

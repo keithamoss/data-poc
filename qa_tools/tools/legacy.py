@@ -1,22 +1,20 @@
-"""Every legacy flag an adapter may declare (REQ-QAC-242 criteria 4 and 5).
+"""The legacy flags an adapter may declare (REQ-QAC-242 criteria 4 and 5) -
+NONE, since REQ-QAC-247 and REQ-PIPE-248 retired every one.
 
-A LEGACY FLAG PRESERVES DRIFT. The shared modules start from Child
-Protection's code, which had grown past Birth Registrations' copy in places,
-and the two had drifted in others. Where a collection's recorded output
-differs from what the shared code would produce, the difference is kept
-behind a flag on that collection's own adapter, so no refactor step changes
-either collection's output. Each flag says what it preserves; REQ-PIPE-248
-retires them as the shapes are unified.
+A LEGACY FLAG PRESERVED DRIFT. The shared modules started from Child
+Protection's code, and where Birth Registrations' recorded output differed,
+the difference was kept behind a flag on its adapter so no refactor step
+changed either collection's output. REQ-QAC-247 resolved the behavioural
+ones flag by flag at Keith's calls, and REQ-PIPE-248 unified the shapes.
 
-An adapter declaring a name not here fails `mothman check`'s collections
-gate, naming it.
+KNOWN STAYS, EMPTY, BECAUSE IT IS THE GATE (REQ-QAC-247 criterion 5,
+REQ-PIPE-248 criterion 6): an adapter declaring any name not here - which is
+now every name - fails `mothman check`'s collections gate, naming it. A new
+difference between collections is a per-collection setting on the adapter,
+named for what it is, never a new legacy flag.
 """
 from __future__ import annotations
 
 #: name -> what it preserves.
 KNOWN: dict[str, str] = {
-    "stage.stamps_run_columns": (
-        "every staged row is stamped with `run_id` and `run_date` columns, which "
-        "Birth Registrations' dbt model selects and Child Protection's tables have "
-        "never carried."),
 }

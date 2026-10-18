@@ -73,7 +73,7 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # No out_dir: there is one supply database and it is named by the
     # environment, which _patch_bdm_dirs() above has already set.
     stage_bdm(
-        _REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"), "2026-01-01")
+        _REF_RUN_ID, os.path.join(raw_dir, f"{_REF_RUN_ID}.csv"))
 
     # No injected severity is passed - run_single() has nowhere to put
     # one any more (REQ-GEN-043), which is the point: a real arriving

@@ -93,8 +93,8 @@ tests:
 models:
   - name: stg_birth_registrations
     description: >
-      One row per birth registration, across all loaded runs
-      (run_id/run_date identify which run a row came from). dirty_severity
+      One row per birth registration in this run's arrival (the run's own
+      view schema says which run; no row column does). dirty_severity
       was dropped by REQ-GEN-043: it is generator bookkeeping, and a
       pipeline reading it is filing from a declaration rather than from
       what arrived.

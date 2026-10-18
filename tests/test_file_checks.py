@@ -152,7 +152,7 @@ def _staged():
 
 
 def _stage(path, received=_RECEIPT, run="run_001"):
-    return stage_bdm(run, str(path), "2026-09-25", received_at=received,
+    return stage_bdm(run, str(path), received_at=received,
                           delivery_name="drop-1")
 
 

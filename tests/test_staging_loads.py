@@ -57,9 +57,9 @@ class TestTheNameCarriesTheArrival:
     """Criterion 4."""
 
     def test_a_resupply_does_not_overwrite_the_earlier_arrival(self, staging):
-        first = stage_bdm("run_001", _csv(staging / "a.csv", 2), "2026-09-25",
+        first = stage_bdm("run_001", _csv(staging / "a.csv", 2),
                                received_at=_RECEIPT)
-        second = stage_bdm("run_002", _csv(staging / "b.csv", 5), "2026-11-01",
+        second = stage_bdm("run_002", _csv(staging / "b.csv", 5),
                                 received_at=_LATER)
         assert first != second
         assert _tables() == sorted([first, second]), (
@@ -77,16 +77,16 @@ class TestTheNameCarriesTheArrival:
         """Criterion 11. The instant in the name is ours, so a supplier
         cannot move a supply in time by touching a file or writing a
         column."""
-        physical = stage_bdm("run_001", _csv(staging / "a.csv"), "2026-09-25",
+        physical = stage_bdm("run_001", _csv(staging / "a.csv"),
                                   received_at=_RECEIPT)
         assert physical.endswith("__" + supply_db.arrival_key(_RECEIPT))
 
     def test_restaging_the_same_arrival_replaces_it_rather_than_adding(self, staging):
         """Criterion 15, and it is what makes an interrupted run
         resumable: what is already there is not trusted."""
-        first = stage_bdm("run_001", _csv(staging / "a.csv", 2), "2026-09-25",
+        first = stage_bdm("run_001", _csv(staging / "a.csv", 2),
                                received_at=_RECEIPT)
-        again = stage_bdm("run_001", _csv(staging / "a.csv", 7), "2026-09-25",
+        again = stage_bdm("run_001", _csv(staging / "a.csv", 7),
                                received_at=_RECEIPT)
         assert first == again and _tables() == [first]
         conn = supply_db.connect(read_only=True)
@@ -117,7 +117,7 @@ class TestAFileThatCannotBeLoaded:
     """Criteria 5 and 6."""
 
     def test_it_leaves_no_table_and_records_why(self, staging):
-        physical = stage_bdm("run_001", str(staging / "not-here.csv"), "2026-09-25",
+        physical = stage_bdm("run_001", str(staging / "not-here.csv"),
                                   received_at=_RECEIPT, delivery_name="drop-1")
         assert physical is None
         assert _tables() == [], "a file that could not be loaded must leave NO table"
@@ -141,7 +141,7 @@ class TestAFileThatCannotBeLoaded:
         path.write_text("registration_id,child_family_name\n"
                         "BR0001,SMITH\n"
                         "BR0002,SECRETNAME,EXTRA,FIELDS\n")
-        stage_bdm("run_001", str(path), "2026-09-25", received_at=_RECEIPT,
+        stage_bdm("run_001", str(path), received_at=_RECEIPT,
                       delivery_name="drop-1")
         (failed,) = load_log.failures()
         assert failed.reason == (
@@ -152,9 +152,9 @@ class TestAFileThatCannotBeLoaded:
         assert "SECRETNAME" not in out
 
     def test_the_rest_of_the_delivery_still_stages(self, staging):
-        stage_bdm("run_001", str(staging / "not-here.csv"), "2026-09-25",
+        stage_bdm("run_001", str(staging / "not-here.csv"),
                        received_at=_RECEIPT, delivery_name="drop-1")
-        good = stage_bdm("run_002", _csv(staging / "b.csv"), "2026-11-01",
+        good = stage_bdm("run_002", _csv(staging / "b.csv"),
                               received_at=_LATER, delivery_name="drop-1")
         assert good is not None and _tables() == [good]
         assert load_log.loaded_tables() == frozenset({good})
@@ -162,7 +162,7 @@ class TestAFileThatCannotBeLoaded:
     def test_a_failed_load_writes_no_loaded_record(self, staging):
         """Criterion 14 from the other side: nothing may claim a load
         that did not happen, which is the half that fails silently."""
-        stage_bdm("run_001", str(staging / "not-here.csv"), "2026-09-25",
+        stage_bdm("run_001", str(staging / "not-here.csv"),
                        received_at=_RECEIPT)
         assert all(not r.loaded for r in load_log.records())
 
@@ -180,7 +180,7 @@ class TestAFileThatCannotBeLoaded:
         finally:
             conn.close()
 
-        assert stage_bdm("run_001", str(staging / "not-here.csv"), "2026-09-25",
+        assert stage_bdm("run_001", str(staging / "not-here.csv"),
                               received_at=_RECEIPT) is None
         assert _tables() == [], "the stale table must go, not be left for a check to read"
 
@@ -189,7 +189,7 @@ class TestOnlyLoadedTablesAreReadable:
     """Criterion 7, at the layer a check actually reads."""
 
     def test_a_check_reads_the_run_view_only_where_a_record_exists(self, staging):
-        physical = stage_bdm("run_001", _csv(staging / "a.csv", 3), "2026-09-25",
+        physical = stage_bdm("run_001", _csv(staging / "a.csv", 3),
                                   received_at=_RECEIPT)
         schema = supply_db.run_schema("run_001")
         conn = supply_db.connect(read_only=True)
@@ -236,7 +236,7 @@ class TestNothingIsWrittenIntoTheDelivery:
         source = _csv(drop / "birth_registrations_2026-09-25.csv", 3)
         before = sorted(p.name for p in drop.iterdir())
 
-        physical = stage_bdm("run_001", source, "2026-09-25",
+        physical = stage_bdm("run_001", source,
                                   received_at=_RECEIPT)
         assert physical is not None
         after = sorted(p.name for p in drop.iterdir())
@@ -249,6 +249,6 @@ class TestNothingIsWrittenIntoTheDelivery:
         drop = staging / "delivery"
         drop.mkdir(parents=True, exist_ok=True)
         before = sorted(p.name for p in drop.iterdir())
-        assert stage_bdm("run_001", str(drop / "missing.csv"), "2026-09-25",
+        assert stage_bdm("run_001", str(drop / "missing.csv"),
                               received_at=_RECEIPT) is None
         assert sorted(p.name for p in drop.iterdir()) == before

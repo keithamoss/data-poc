@@ -22,7 +22,5 @@ select
     registering_parent_2_name,
     cast(is_multiple_birth as boolean) as is_multiple_birth,
     source_system_record_id,
-    extract_timestamp,
-    run_id,
-    run_date
+    extract_timestamp
 from source

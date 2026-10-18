@@ -10,9 +10,8 @@ BDM = "civil-registration"
 CP = "child-protection"
 
 
-def stage_bdm(run_id: str, csv_path: str, run_date: str | None = None, **kwargs):
-    return stage.stage_table(BDM, run_id, "birth_registrations", csv_path,
-                             run_date=run_date, **kwargs)
+def stage_bdm(run_id: str, csv_path: str, **kwargs):
+    return stage.stage_table(BDM, run_id, "birth_registrations", csv_path, **kwargs)
 
 
 def stage_cp(run_id: str, table: str, csv_path: str, **kwargs):

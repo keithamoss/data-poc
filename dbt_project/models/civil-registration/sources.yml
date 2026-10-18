@@ -27,8 +27,7 @@ sources:
     # about a stale config.
     schema: "{{ env_var('DBT_RUN_SCHEMA') }}"
     description: >
-      Runs loaded straight from the generator's CSVs, tagged with
-      run_id/run_date. One row per birth registration
-      record, undifferentiated across runs.
+      One arrival's rows, as delivered, through the run's own view schema.
+      One row per birth registration record.
     tables:
       - name: birth_registrations

@@ -642,7 +642,7 @@ class TestATableNameIsNotADatasetId:
         else:
             csv.write_text("registration_id,child_family_name\nBR0001,SMITH\n")
             physical = stage_bdm(
-                "sample_table_run", str(csv), "2026-01-01")
+                "sample_table_run", str(csv))
         assert physical, "the builder staged nothing"
         try:
             with supply_db.connect(read_only=True, label="test-sample-landing") as conn:

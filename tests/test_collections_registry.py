@@ -791,8 +791,7 @@ class TestTheSharedStagingModule:
         csv.write_text("fake_id,things\nF1,2\nF2,3\n")
         run_id = f"{FAKE_PREFIX}001"
         physical = stage.stage_table(FAKE_ID, run_id, FAKE_TABLE, str(csv),
-                                     contract_path=str(contract), received_at=self.RECEIVED,
-                                     run_date="2026-01-01")
+                                     contract_path=str(contract), received_at=self.RECEIVED)
         with supply_db.connect(read_only=True, label="test-third-stage") as conn:
             cols = [r[0] for r in conn.execute(
                 "SELECT column_name FROM information_schema.columns "
@@ -812,17 +811,12 @@ class TestTheSharedStagingModule:
         [record] = [r for r in load_log.records() if r.physical == physical]
         assert record.dataset_id == FAKE_DATASET
 
-    @pytest.mark.parametrize("legacy,stamped", [
-        (frozenset(), False),
-        (frozenset({"stage.stamps_run_columns"}), True),
-    ])
-    def test_stamps_run_columns_keeps_birth_registrations_behaviour(
-            self, third_collection, supply_dsn, tmp_path, monkeypatch, legacy, stamped):
-        """The flag's whole effect, on the one thing it changes: the staged
-        table's columns."""
-        _, cols, _ = self._stage(tmp_path, monkeypatch, legacy)
-        assert ("run_id" in cols and "run_date" in cols) is stamped
-        assert cols[:2] == ["fake_id", "things"]
+    def test_a_staged_table_holds_the_rows_as_delivered(
+            self, third_collection, supply_dsn, tmp_path, monkeypatch):
+        """No column is added to a staged table for any collection
+        (REQ-PIPE-248 retired Birth Registrations' run_id/run_date stamp)."""
+        _, cols, _ = self._stage(tmp_path, monkeypatch, frozenset())
+        assert cols == ["fake_id", "things"]
 
 
 class TestTheSharedOrchestratorStatsAndRebuild:

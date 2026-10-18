@@ -31,7 +31,7 @@ import sys
 
 from qa_tools import collections
 from qa_tools.common import (
-    arrivals, asset_time, file_checks, hierarchy, load_log, replay_clock, sample_data,
+    arrivals, file_checks, hierarchy, load_log, replay_clock, sample_data,
     supply_db, supply_holds, trial,
 )
 from qa_tools.common.csv_io import DUCKDB_NULLSTR, load_null_values_by_column, read_csv_explicit_nulls
@@ -114,7 +114,7 @@ def _build_run_views(conn, collection_id: str, run_id: str, key: str,
 def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
                 dsn: str | None = None, *, contract_path: str | None = None,
                 ordinal: int = 0, received_at=None, dataset_id: str = "",
-                delivery_name: str = "", run_date: str | None = None) -> str | None:
+                delivery_name: str = "") -> str | None:
     """Stage exactly one arriving file as one table of that run, and rebuild
     the run's views. Returns the physical staged table, or None where the
     file could not be loaded at all.
@@ -143,11 +143,11 @@ def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
     file in the same delivery is still staged (criterion 6). The failure is
     durable, and `mothman supply failures` is the queue it lands in.
 
-    `run_date` is read only under the `stage.stamps_run_columns` legacy
-    flag, and defaults to the receipt's local date on the asset clock.
+    THE ROWS AS DELIVERED, never stamped (REQ-PIPE-248): a staged table is
+    one arrival's, so the run's view says which run a row is in, and no
+    column needs to.
     """
-    coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
+    collections.by_id(collection_id)  # refuses an unknown collection by name
     contract_path = contract_path or contract_for(collection_id)
     arrival = received_at if received_at is not None else run_id
     # A REPLAY STAMPS THE LOAD AS RECEIVED (REQ-PIPE-081 criteria 27-31).
@@ -163,12 +163,6 @@ def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
     # under 'cp_carers' belongs to no dataset, so no failed-load blocker
     # keyed on 'cp-carers' ever saw it (found with REQ-QAC-096).
     dataset_id = dataset_id or hierarchy.dataset_for_table(table).dataset_id
-    stamps = "stage.stamps_run_columns" in adapter.legacy
-    if stamps and run_date is None:
-        if received_at is None:
-            raise ValueError(f"{coll.id}: staging {run_id!r} needs a run_date or a receipt "
-                             f"instant to stamp its rows with")
-        run_date = asset_time.local_date(received_at).isoformat()
 
     conn = supply_db.connect(dsn=dsn)
     try:
@@ -199,9 +193,6 @@ def stage_table(collection_id: str, run_id: str, table: str, csv_path: str,
         try:
             df = read_csv_explicit_nulls(
                 csv_path, load_null_values_by_column(contract_path).get(table, {}))
-            if stamps:
-                df["run_id"] = run_id
-                df["run_date"] = run_date
             # Handed over as a real staging CSV rather than through the
             # dataframe, so the explicit-null handling csv_io owns stays the
             # one place that decides what an empty cell means. IN OUR OWN
@@ -254,7 +245,6 @@ def stage_arrival(collection_id: str, arrival, dsn: str | None = None) -> list[s
     """Stage ONE recognised arrival - build_all()'s loop body, shared with the
     processing pass (REQ-PIPE-151), which stages only the arrivals it is
     about to process. Returns the physical tables staged."""
-    run_date = asset_time.local_date(arrival.received_at).isoformat()
     staged = []
     # WHAT IS IN THIS DELIVERY, not what we assumed would be (REQ-PIPE-058):
     # a supplier renaming an extract is a configuration change, and a
@@ -275,7 +265,7 @@ def stage_arrival(collection_id: str, arrival, dsn: str | None = None) -> list[s
                 os.path.join(str(arrival.path), filename), dsn=dsn,
                 ordinal=ordinal if len(filenames) > 1 else 0,
                 received_at=arrival.received_at, dataset_id=dataset_id,
-                delivery_name=arrival.delivery_name, run_date=run_date)
+                delivery_name=arrival.delivery_name)
             if physical is not None:
                 staged.append(physical)
     print(f"{arrival.run_id}: staged {len(staged)} table(s)")
