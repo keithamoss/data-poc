@@ -84,7 +84,7 @@ class TestBothCollectionsSupplyTheirHalf:
             def as_entry(self):
                 return {"run_id": self.run_id}
 
-        assert orchestrate.entry_for("civil-registration", Contested())["csv_path"] == "/deliveries/run_x"
+        assert orchestrate.entry_for("civil-registration", Contested()) == {"run_id": "run_x"}
 
 
 class TestTheCollectionsHalvesForwardWhatTheyAreGiven:

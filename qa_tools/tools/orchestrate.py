@@ -72,12 +72,6 @@ def _announce(on_step, label: str) -> None:
         on_step(label)
 
 
-def _sole(coll):
-    """A one-table collection's one dataset."""
-    [only] = coll.datasets
-    return only
-
-
 def run_one(collection_id: str, entry: dict, run_timestamp: str, run_by: str,
             reference_run_id: str | None = None,
             on_step: Callable[[str], None] | None = None) -> list[dict]:
@@ -415,18 +409,11 @@ def promote_after(collection_id: str, arrival, got: list[dict], run_by: str) -> 
 
 
 def entry_for(collection_id: str, arrival) -> dict:
-    """The run entry for one arrival. Under `orchestrate.entry_carries_csv_path`
-    it also names the arrival's file - or its delivery directory where two
-    files contest the dataset (REQ-PIPE-105 criterion 6), since path_for()
-    refuses to choose."""
-    coll = collections.by_id(collection_id)
-    entry = arrival.as_entry()
-    if "orchestrate.entry_carries_csv_path" in collections.adapter(coll).legacy:
-        dataset_id = _sole(coll).dataset_id
-        path = (arrival.path_for(dataset_id) if dataset_id not in arrival.contested
-                else arrival.path)
-        entry |= {"csv_path": str(path)}
-    return entry
+    """The run entry for one arrival - the same for every collection since
+    REQ-PIPE-248 (Birth Registrations' also named the arrival's file, which
+    nothing read). It never asks the arrival for one path, so a contested
+    file is checked rather than refused (REQ-PIPE-105 criterion 6)."""
+    return arrival.as_entry()
 
 
 def steps(collection_id: str) -> arrival_lifecycle.Steps:
