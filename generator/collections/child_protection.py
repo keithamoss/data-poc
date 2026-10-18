@@ -588,10 +588,113 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
             this = provider.dirty(payload, severity=drawn, seed=seed + 800,
                                    previous_row_count=None)
             severity = drawn
+        if extra.files:
+            # TWO FILES FOR ONE TABLE (REQ-GEN-203 criterion 2): the pair's own
+            # files, each with its own receipt, beside the other tables.
+            deliveries.append(PairDelivery(
+                received_date=period.date + timedelta(days=extra.day_offset),
+                severity=severity, payload=this,
+                files=_pair_files(provider, injection, extra, n, this, period, seed,
+                                  placement)))
+            continue
         deliveries.append(Delivery(
             received_date=period.date + timedelta(days=extra.day_offset),
             severity=severity, payload=this))
     return deliveries
+
+
+@dataclasses.dataclass
+class PairDelivery:
+    """ONE DELIVERY CARRYING TWO FILES for one of its tables (REQ-GEN-203),
+    Birth Registrations' PairDelivery for a six-table collection: `payload`
+    is every table as built, which sizes and describes the delivery, and
+    `files` the pair's own files - filename -> (CSV text, wall-clock receipt
+    on received_date) - which replace their table's usual file."""
+
+    received_date: date
+    severity: str | None
+    payload: dict
+    files: dict
+
+
+#: What a pair file of this collection may be. `next_day` is Birth
+#: Registrations' - a quarterly extract is not sent a period early in one
+#: delivery with its own.
+PAIR_CONTENTS = ("extract", "duplicate", "corrected", "re_export")
+
+
+def _re_exported(df: pd.DataFrame) -> pd.DataFrame:
+    """The table re-pulled from the source system: the same rows, each
+    extracted an hour later than the extract it repeats - so the rows differ
+    while neither file is wrong (REQ-GEN-203, TS-42)."""
+    import pandas as pd
+
+    out = df.copy()
+    out["extract_timestamp"] = pd.to_datetime(out["extract_timestamp"]) + pd.Timedelta(hours=1)
+    return out
+
+
+def _pair_files(provider, injection, extra, n: int, base: dict, period, seed: int,
+                placement) -> dict:
+    """A pair's files, built as the injection says (REQ-GEN-203): each file's
+    content from its table as built, then its target or severity, then its
+    named shapes. A SHAPE, NEVER A VERDICT - the pipeline decides."""
+    from generator import scenario_injection, targeting
+
+    day = period.date + timedelta(days=extra.day_offset)
+    files: dict[str, tuple[str, str]] = {}
+    previous = None
+    for k, f in enumerate(extra.files):
+        where = f"{injection.scenario_id}, its {extra.at} delivery, file {k + 1}"
+        if f.content == "duplicate":
+            if previous is None:
+                raise scenario_injection.CannotPlace(
+                    f"{where} is a duplicate of nothing - a duplicate follows the file it "
+                    f"copies")
+            csv = previous
+        else:
+            df = base[f.table]
+            if f.content == "re_export":
+                df = _re_exported(df)
+            if f.target is not None:
+                built, moved = targeting.cp_target({**base, f.table: df}, f.target,
+                                                   seed=seed + 810 + k, where=where)
+                df = built[f.table]
+                if placement is not None:
+                    placement.arrivals[n]["files"][k]["target"]["moved"] = moved
+            elif f.severity:
+                df = provider.dirty({f.table: df}, severity=f.severity, seed=seed + 820 + k,
+                                    previous_row_count=None)[f.table]
+            csv = df[[c for c in df.columns if not c.startswith("_")]].to_csv(index=False)
+            for shape in f.shapes:
+                csv = scenario_injection.shape_file(shape, csv)
+        files[f.filename(day)] = (csv, f.at)
+        previous = csv
+    return files
+
+
+def _pair_problems(injection) -> list[str]:
+    """Why a Child Protection pair cannot be built as declared, before the
+    first write (REQ-GEN-044 criterion 4)."""
+    out = []
+    for extra in injection.arrivals:
+        if not extra.files:
+            continue
+        where = f"{injection.scenario_id}, its {extra.at} delivery"
+        if extra.at != min(f.at for f in extra.files):
+            out.append(f"{where}: the delivery's `at` is its earliest file's receipt, and "
+                       f"its files arrive from {min(f.at for f in extra.files)}")
+        for k, f in enumerate(extra.files, 1):
+            if f.table not in TABLES:
+                out.append(f"{where}, file {k}: names table {f.table!r}, which is not one "
+                           f"of {', '.join(TABLES)}")
+            if f.content not in PAIR_CONTENTS:
+                out.append(f"{where}, file {k}: {f.content!r} is not a Child Protection "
+                           f"pair file's content - one of {', '.join(PAIR_CONTENTS)}")
+            if f.target is not None and f.target.verdict != "green" and f.table != "cp_clients":
+                out.append(f"{where}, file {k}: a {f.target.verdict} target is built on "
+                           f"client postcodes, and this file is {f.table}")
+    return out
 
 
 def generated_periods() -> list:
@@ -640,18 +743,19 @@ def _plan_injections(periods):
     # EVERY TARGET CHECKED BEFORE THE FIRST WRITE (REQ-GEN-184 criterion 11).
     from generator import targeting
 
+    # A TARGETED SUPPLY HAS GREEN LEAD-IN AND FOLLOWING QUARTERS (REQ-GEN-203
+    # criterion 4, as REQ-GEN-185 for Birth Registrations), which lifted
+    # post-build-review #156's refusal: resolve() above names them and refuses,
+    # naming the scenario, where the history cannot hold them; _severities()
+    # builds each as one clean delivery, and slot() writes it. Every delivery
+    # is the same base collection, so it is sized to the lead-in by construction.
     for injection in mine:
-        # NOT YET FOR CHILD PROTECTION (post-build-review #156): its plan()
-        # builds no green lead-in or following delivery and sizes nothing to
-        # one, so REQ-GEN-185's criteria 1-3 would not hold. Refused rather
-        # than half-built; no Child Protection scenario needs it yet.
-        if injection.is_targeted:
-            raise targeting.TargetError(
-                f"{injection.scenario_id}: a targeted Child Protection injection needs "
-                f"lead-in deliveries, which are built for Birth Registrations only")
+        problems = _pair_problems(injection)
+        if problems:
+            raise scenario_injection.CannotPlace("; ".join(problems))
         for extra in injection.arrivals:
-            if extra.target is not None:
-                targeting.check_target(extra.target, injection.dataset_id,
+            for target in extra.targets:
+                targeting.check_target(target, injection.dataset_id,
                                        f"{injection.scenario_id}, its {extra.at} arrival")
     by_period = {placement.period: (injection, placement)
                  for injection, placement in resolved}
@@ -698,7 +802,20 @@ def _severities(plan, periods, injected_by_period) -> list:
 
 
 def _ordinary_severities(periods, injected_by_period) -> list:
-    """The original fifteen quarters' severities (_severities)."""
+    """The original fifteen quarters' severities (_severities). A drawn red on a
+    lead-in or following quarter is refused naming the scenario, as in the
+    grown quarters: that quarter is one clean delivery, so the red would be
+    planned and never written."""
+    from generator import scenario_injection
+
+    drawn = {p.name: sev for p, (_q, sev) in zip(periods, run_plan())}
+    for injection, placement in injected_by_period.values():
+        for name in placement.built_green:
+            if drawn.get(name) == "red":
+                raise scenario_injection.CannotPlace(
+                    f"{injection.scenario_id}: an ordinary red is drawn for {name}, which the "
+                    f"scenario needs generated green - move its anchor to a quarter whose "
+                    f"lead-in and following quarters are drawn clean or amber")
     return _severities(run_plan(), periods, injected_by_period)
 
 
@@ -745,9 +862,10 @@ class ChildProtection(Provider):
     collection_id = "child-protection"
     dataset_id = DATASET_ID
     seed_ranges = ((5000, 11100), (29000, 36100))
-    # NO TARGET TRIAL: a targeted Child Protection injection is refused at
-    # planning (REQ-GEN-185), and ordinary ambers are compared after the
-    # replay, never trialled (REQ-GEN-186, Keith 2026-10-11).
+    # NO TARGET TRIAL: a six-table collection has no single target to try
+    # (generator/validate_providers.py), its targeted supplies are green - the
+    # delivery as built (REQ-GEN-203) - and ordinary ambers are compared after
+    # the replay, never trialled (REQ-GEN-186, Keith 2026-10-11).
     target_trial = False
     target_datasets = (DATASET_ID,)
     target_levers = "client-postcodes"
@@ -805,6 +923,9 @@ class ChildProtection(Provider):
                            # twice a year would. The original fifteen keep sending
                            # all six, so their held shape stays.
                            "grown_names": {p.name for p in grown},
+                           "green": frozenset(name for _inj, placement
+                                              in injected_by_period.values()
+                                              for name in placement.built_green),
                            "case_workers_owed": {p.name for p in schedule.periods_for_dataset(
                                _CASE_WORKERS) if p.expected}})
 
@@ -820,6 +941,20 @@ class ChildProtection(Provider):
         if injected is not None:
             return _injected_chain(provider, injected[0], job.period, job.seed,
                                    placement=injected[1], drawn=job.severity)
+        if job.period.name in plan.state["green"]:
+            # A GREEN LEAD-IN OR FOLLOWING QUARTER (REQ-GEN-203 criterion 4, as
+            # REQ-GEN-185 criteria 1 and 3): once, on its own date, no resupply,
+            # as built - a Child Protection green target is the delivery as built
+            # (targeting.cp_target), so these are the bytes an ordinary clean
+            # quarter writes.
+            from generator import targeting
+            from generator.resupply import Delivery
+
+            payload, _moved = targeting.cp_target(
+                provider.generate(job.period.date, seed=job.seed, n_rows=0, id_offset=0),
+                targeting.Target("green"), seed=job.seed + 700,
+                where=f"the green quarter {job.period.name}")
+            return [Delivery(received_date=job.period.date, severity=None, payload=payload)]
         delay_days, delay_weights = _cp_delay()
         return list(run_slot_chain(
             provider, job.period.date, job.seed, id_offset=0, n_rows=0,
@@ -863,7 +998,17 @@ class ChildProtection(Provider):
             # match, a rename nothing claims - so shaping the delivery is the
             # whole injection rather than a detail of it.
             csvs = scenario_injection.apply_file_shape(injected[0].arrivals[n - 1].file_shape, csvs)
-            return csvs, first
+            if not isinstance(delivery_obj, PairDelivery):
+                return csvs, first
+            # A PAIR'S FILES REPLACE THEIR TABLE'S, EACH AT ITS OWN RECEIPT
+            # (REQ-GEN-203 criterion 2); the rest share the delivery's instant.
+            for f in injected[0].arrivals[n - 1].files:
+                csvs.pop(f"{f.table}.csv", None)
+            received = {fn: first for fn in csvs}
+            for fn, (csv, at) in delivery_obj.files.items():
+                csvs[fn] = csv
+                received[fn] = asset_time.wall_clock(delivery_obj.received_date, at)
+            return csvs, received
         # EACH FILE ITS OWN INSTANT (REQ-GEN-044 criteria 12-14): mostly all
         # at once, as if unzipped, sometimes trickling in over ten minutes.
         return csvs, receipt_instants.instants_for(csvs, first, name)

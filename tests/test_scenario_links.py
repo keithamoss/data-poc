@@ -344,6 +344,23 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
         assert d.first[1] == timed.at
 
 
+    def test_timed_by_the_clock(self, monkeypatch):
+        """A decision timed at a wall clock (`at:` and `day_offset:`, REQ-GEN-196
+        criterion 10) is played there, not `after_hours` after its supply's
+        receipt - found when TS-80's settlement bounded its link (REQ-GEN-203):
+        the link read it as 09:20 on the arrival day rather than 11:00 the next."""
+        monkeypatch.setattr("qa_tools.common.schedule.date_of",
+                            lambda period, ds: date.fromisoformat(period))
+        script = _script(name="settle", operation="choose-file", files=("reject", "supply"),
+                         at="11:00", day_offset=1, after_hours=0)
+        placed = si.resolve(_injection(), _periods())
+        [d] = si.link_dates(_injection(si.Link("TS-75a", 0, 0, "settle")), placed,
+                            scripts=[script])
+        assert d.second[1] == sd._wall_clock_after(script, placed.period)
+        assert d.second[1] == _at(ANCHOR + timedelta(days=1), "11:00")
+        assert d.problem is None
+
+
 class TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd:
     """REQ-GEN-205 criterion 12: a declared correction's date, named by its
     change_reference, and the end of the history are events too."""

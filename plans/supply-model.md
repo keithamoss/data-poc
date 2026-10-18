@@ -3655,11 +3655,47 @@ the period's superseded schema, named as superseded by the resend
 **Breaks as**: two versions of one table waiting for one day, every reader
 contested.
 
-**TS-42 `[INJECT]` A contested pair of one Child Protection table,
-resolved by a later file.** NOT IN THE DATA YET, but reachable: REQ-PIPE-202
-(2026-10-15, Keith's call of 2026-10-13) widened `cp_clients`' pattern so two
-of its files in one delivery contest the table, and REQ-GEN-203 plants it.
-`tests/test_cp_pair.py` drives the shape through the real orchestrator.
+**TS-42a `[INJECT]` A contested pair of one Child Protection table, while
+it is contested.** PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter
+(REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its
+files in one delivery contest the table; `tests/test_cp_pair.py` drives the
+shape through the real orchestrator. Two lettered siblings share the one
+placement (REQ-GEN-201): this one's link opens on the pair's arrival day.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14
+days. 2019-Q4's delivery carries the usual files and two Client Registers -
+cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose
+rows differ (each re-pulled an hour later) - both before due; a clean
+cp_clients.csv follows alone on 29 November at 10:00, after due and before
+2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in
+quarter (2019-Q3) and before a green one (2020-Q1).*
+**Breaks as**: one of the two files taken as the quarter's supply, or the
+three readers' cross-table checks evaluated against either.
+
+**TS-42b `[INJECT]` A contested pair of one Child Protection table,
+resolved by a later file.** TS-42a's placement; this link opens on the later
+file's asset day.
+*Config: as TS-42a.*
+**Breaks as**: the pair still contested after the later file, or the later
+file filed as a resupply rather than ending the contest.
+
+**TS-80 `[INJECT]` A contested pair of one Child Protection table, settled
+by a person.** PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter
+(REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client
+Register, so a settlement can be seen clearing the cross-table readers the
+contest held, which only Child Protection has. Its link opens on the pair's
+arrival day.
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14
+days. 2020-Q4's delivery carries the usual files and two Client Registers -
+a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on
+the due day and the real cp_clients.csv at 08:30, both before 09:00 - after
+one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the
+real extract built green. A scripted person settles the pair at 11:00 the
+next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by
+receipt, the test file, rejected; file two, the real extract, the quarter's
+supply.*
+**Breaks as**: the test rows checked as the quarter's supply, the readers
+left contested after the settlement, or the file named by sorted name
+rather than by receipt position.
 
 **TS-43 `[INJECT]` An amber supply held under hold.**
 PLANTED 2026-10-11 (parked 2026-10-05 for want of an amber supply): built

@@ -687,7 +687,15 @@ def test_a_pair_targets_only_the_files_its_script_makes_supplies():
 
     scripts = {s.scenario: s for s in sd.load() if s.operation == sd.CHOOSE_FILE}
     pairs = [i for i in si.INJECTIONS if any(a.files for a in i.arrivals)]
-    assert len(pairs) == 7, [i.scenario_id for i in pairs]
+    assert pairs
+    # A PAIR NO PERSON SETTLES (REQ-GEN-203, TS-42) is superseded by a later
+    # file, so neither of its files is a supply - and neither is targeted.
+    for injection in pairs:
+        if injection.scenario_id not in scripts:
+            (arrival,) = [a for a in injection.arrivals if a.files]
+            assert all(f.target is None for f in arrival.files), injection.scenario_id
+    pairs = [i for i in pairs if i.scenario_id in scripts]
+    assert pairs
     for injection in pairs:
         (arrival,) = [a for a in injection.arrivals if a.files]
         outcomes = scripts[injection.scenario_id].files
@@ -753,3 +761,56 @@ class TestTheLaterSingleTableResupplyAndTheStoodOnPeriod:
             linked = {d.scenario_id for d in dates}
             assert {"TS-12"} <= linked if sid == "TS-12" else {"TS-54", "TS-76"} <= linked
             assert not [d.problem for d in dates if d.problem], dates
+
+
+class TestTheChildProtectionPairsArePlacedAsDecided:
+    """REQ-GEN-203 criteria 5 and 8: TS-42 and TS-80 in the grown quarters
+    (REQ-GEN-207), each with one green lead-in and a green following quarter,
+    clear of every other scenario's claim - and the settlement and links
+    their pages are read by, from configuration alone."""
+
+    @staticmethod
+    def _injection(sid):
+        [found] = [i for i in si.INJECTIONS if i.scenario_id == sid]
+        return found
+
+    @pytest.mark.parametrize("sid,period,lead,follow", [
+        ("TS-42a", "2019-Q4", "2019-Q3", "2020-Q1"),
+        ("TS-80", "2020-Q4", "2020-Q3", "2021-Q1")])
+    def test_it_lands_in_its_grown_quarter(self, sid, period, lead, follow):
+        from generator.collections import child_protection as cp
+
+        placed = si.resolve(self._injection(sid), cp.generated_periods())
+        assert (placed.period, placed.lead_in, placed.follow) == (period, (lead,), (follow,))
+        grown = {p.name for p in cp.grown_periods()}
+        assert {period, lead, follow} <= grown
+
+    def test_no_other_scenario_claims_their_quarters(self):
+        from generator.collections import child_protection as cp
+
+        periods = cp.generated_periods()
+        ours = {sid: set(si.claimed_periods(self._injection(sid), periods))
+                for sid in ("TS-42a", "TS-80")}
+        assert not ours["TS-42a"] & ours["TS-80"]
+        cp_ids = {d.dataset_id for d in cp.hierarchy.datasets_in_collection("child-protection")}
+        for other in si.INJECTIONS:
+            if other.dataset_id in cp_ids and other.scenario_id not in ours:
+                theirs = set(si.claimed_periods(other, periods))
+                for sid, claimed in ours.items():
+                    assert not claimed & theirs, (sid, other.scenario_id)
+
+    def test_ts80_is_settled_by_one_scripted_choose_file_the_next_day(self):
+        from qa_tools.common import scripted_decisions
+
+        [script] = [s for s in scripted_decisions.load() if s.scenario == "TS-80"]
+        assert (script.operation, script.dataset_id, script.supply_index) == (
+            "choose-file", "cp-clients", 0)
+        assert (script.at, script.day_offset) == ("11:00", 1)
+        # BY RECEIPT POSITION (REQ-GEN-196 criterion 7): the test file came first.
+        assert list(script.files) == ["reject", "supply"]
+
+    def test_their_links_stand(self):
+        assert si.link_problems(injections=[self._injection("TS-42a"),
+                                            self._injection("TS-80")]) == []
+        assert {link.scenario_id for link in self._injection("TS-42a").links} == {
+            "TS-42a", "TS-42b"}
