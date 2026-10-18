@@ -14,10 +14,26 @@ import pytest
 from click.testing import CliRunner
 
 import cli.pipeline as pipeline_cli
+from qa_tools import collections
 from qa_tools.tools import orchestrate
 
 _runner = CliRunner()
-_SHORT = {"civil-registration": "bdm", "child-protection": "cp"}
+#: Every collection the hierarchy declares, by id - a run over the whole
+#: asset generates and runs each of them, not only the first two.
+_SHORT = {c.id: c.short for c in collections.all_collections()}
+
+
+def _stub_generation(monkeypatch, record=None):
+    """Stub every registered collection's generation, so none of them
+    reaches the real driver; `record` is called with each one's short."""
+    from cli.collection_cli import of as _cli_of
+
+    shorts = [c.short for c in collections.all_collections()]
+    assert shorts[:2] == ["bdm", "cp"], shorts
+    for short in shorts:
+        monkeypatch.setattr(_cli_of(short), "generate_synthetic_data",
+                            lambda _s=short, **_: record and record(_s))
+    return shorts
 
 
 @pytest.fixture(autouse=True)
@@ -87,12 +103,10 @@ def _patch_snapshot(monkeypatch, calls):
 
 
 def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
-    from cli.collection_cli import of as _cli_of
-    bdm, cp = _cli_of('bdm'), _cli_of('cp')
-
+    """Every registered collection, in hierarchy order - Birth
+    Registrations and Child Protection first, then any added since."""
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: calls.append("cp-generate"))
+    shorts = _stub_generation(monkeypatch, lambda short: calls.append(f"{short}-generate"))
     monkeypatch.setattr(orchestrate, "run_pipeline",
                         lambda collection_id, sequential=False:
                         calls.append((f"{_SHORT[collection_id]}-run", sequential)))
@@ -102,11 +116,10 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
 
     assert result.exit_code == 0, result.output
-    assert calls == [
-        "bdm-generate", ("bdm-run", False),
-        "cp-generate", ("cp-run", False),
-        "build-data", "embed", "sync",
-    ]
+    expected = []
+    for short in shorts:
+        expected += [f"{short}-generate", (f"{short}-run", False)]
+    assert calls == [*expected, "build-data", "embed", "sync"]
 
 
 def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
@@ -155,12 +168,9 @@ def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
 
 
 def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
-    from cli.collection_cli import of as _cli_of
-    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     seen = {}
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
+    shorts = _stub_generation(monkeypatch)
     monkeypatch.setattr(orchestrate, "run_pipeline",
                         lambda collection_id, sequential=False:
                         seen.__setitem__(_SHORT[collection_id], sequential))
@@ -170,16 +180,13 @@ def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run", "--sequential"])
 
     assert result.exit_code == 0, result.output
-    assert seen == {"bdm": True, "cp": True}
+    assert seen == {short: True for short in shorts}
 
 
 def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
-    from cli.collection_cli import of as _cli_of
-    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
+    _stub_generation(monkeypatch)
     monkeypatch.setattr(orchestrate, "run_pipeline", lambda collection_id, sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
@@ -193,12 +200,9 @@ def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
 
 
 def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
-    from cli.collection_cli import of as _cli_of
-    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
-    monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
-    monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: None)
+    _stub_generation(monkeypatch)
     monkeypatch.setattr(orchestrate, "run_pipeline", lambda collection_id, sequential=False: None)
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)

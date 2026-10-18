@@ -19,13 +19,32 @@ from qa_tools.common import validate_collections as gate
 from third_collection import BARE_ID, FAKE_DATASET, FAKE_ID, FAKE_PREFIX, FAKE_SHORT, FAKE_TABLE
 
 
+def _declared() -> list[tuple[dict, dict]]:
+    """Every (agency, collection) the hierarchy file declares, read straight
+    from the YAML rather than through the registry under test - whichever
+    file is current, so a fixture's added collection is in it too. Never
+    empty: a test comparing against it must be able to fail."""
+    doc = yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())
+    found = [(a, c) for a in doc["hierarchy"]["agencies"] for c in a.get("collections") or []]
+    assert found, "the hierarchy declares no collection - the comparison would prove nothing"
+    return found
+
+
+#: The real adapter modules, one per collection the real hierarchy declares
+#: (read once, at import, before any fixture adds a collection).
+REAL_MODULES = tuple(c.module_name for c in collections.collections_in(
+    yaml.safe_load(hierarchy.DATA_ASSET_YAML.read_text())))
+
+
 class TestTheRegistry:
     """Criteria 1 to 4."""
 
     def test_it_lists_the_hierarchys_collections_in_order(self):
         got = [(c.id, c.short, c.run_prefix) for c in collections.all_collections()]
-        assert got == [("civil-registration", "bdm", "run_"),
-                       ("child-protection", "cp", "cp_run_")]
+        assert got == [(c["id"], c["short"], c["run_prefix"]) for _a, c in _declared()]
+        # And the two the rest of this suite leans on, as they are written.
+        assert got[:2] == [("civil-registration", "bdm", "run_"),
+                           ("child-protection", "cp", "cp_run_")]
 
     def test_a_collection_resolves_by_id_short_or_run_prefix(self):
         for value in ("child-protection", "cp", "cp_run_"):
@@ -37,7 +56,9 @@ class TestTheRegistry:
         """REQ-PIPE-248 criterion 7 (Keith, 2026-10-18: rs and cpfs)."""
         got = [(c.agency_short, c.results_file, c.dashboard_file)
                for c in collections.all_collections()]
-        assert got == [
+        assert got == [(a["short"], f"results_{a['short']}_{c['id']}.json",
+                        f"{a['short']}_{c['id']}_dashboard.json") for a, c in _declared()]
+        assert got[:2] == [
             ("rs", "results_rs_civil-registration.json", "rs_civil-registration_dashboard.json"),
             ("cpfs", "results_cpfs_child-protection.json",
              "cpfs_child-protection_dashboard.json")]
@@ -46,13 +67,15 @@ class TestTheRegistry:
         assert collections.collection_of("cp-carers").id == "child-protection"
         assert collections.dataset("birth-registrations").table == "birth_registrations"
 
-    @pytest.mark.parametrize("lookup,value,known", [
-        (collections.by_id, "emergency-department", "civil-registration, child-protection"),
-        (collections.by_short, "ed", "bdm, cp"),
-        (collections.by_run_prefix, "ed_run_", "run_, cp_run_"),
+    @pytest.mark.parametrize("lookup,value,field", [
+        (collections.by_id, "no-such-collection", "id"),
+        (collections.by_short, "nsc", "short"),
+        (collections.by_run_prefix, "nsc_run_", "run_prefix"),
     ])
     def test_an_unknown_value_is_refused_naming_it_and_every_known_one(self, lookup, value,
-                                                                       known):
+                                                                       field):
+        known = ", ".join(c[field] for _a, c in _declared())
+        assert value not in known.split(", ")
         with pytest.raises(collections.UnknownCollectionError) as raised:
             lookup(value)
         assert repr(value) in str(raised.value) and known in str(raised.value)
@@ -96,7 +119,7 @@ class TestAThirdCollectionAtEverySite:
         monkeypatch.setattr(arrivals, "arrivals_from_records",
                             lambda collection_id, _d: asked.append(collection_id) or [])
         processing_pass.all_arrivals()
-        assert asked == ["civil-registration", "child-protection", FAKE_ID]
+        assert asked == [c["id"] for _a, c in _declared()] and asked[-1] == FAKE_ID
 
     def test_the_processing_pass_runs_it_through_the_shared_orchestrator(
             self, third_collection, monkeypatch):
@@ -223,9 +246,11 @@ class TestAThirdCollectionAtEverySite:
         dispatched = self._stub_the_real_collections(monkeypatch)
         result = boot.bootstrap(collection="all")
         assert result.populated
-        assert dispatched == [["bdm", "cp", FAKE_SHORT]]
+        declared = _declared()
+        assert dispatched == [[c["short"] for _a, c in declared]]
+        assert dispatched[0][-1] == FAKE_SHORT
         assert [c[0] for c in third_collection] == ["generate"]
-        assert self.ran == ["civil-registration", "child-protection", FAKE_ID]
+        assert self.ran == [c["id"] for _a, c in declared] and self.ran[-1] == FAKE_ID
 
     def test_a_bootstrap_refuses_one_with_no_adapter_before_anything_runs(
             self, without_adapter, empty_db, monkeypatch):
@@ -241,17 +266,23 @@ class TestAThirdCollectionAtEverySite:
 
         built = tmp_path / "built"
         built.mkdir()
-        _datasets_json(built / "rs_civil-registration_dashboard.json",
-                       {"datasets": [{"id": "birth-registrations",
-                                      "name": "Birth Registrations"}]})
-        _datasets_json(built / "cpfs_child-protection_dashboard.json",
-                       {"datasets": [{"id": "cp-clients", "name": "Client Register"}]})
+        # One dataset per real collection, each in its own report file, so
+        # the order read back is the hierarchy's.
+        expected = []
+        for c in collections.all_collections():
+            if c.id == FAKE_ID:
+                continue
+            first = c.datasets[0]
+            _datasets_json(built / c.dashboard_file,
+                           {"datasets": [{"id": first.dataset_id, "name": first.dataset_name}]})
+            expected.append(first.dataset_id)
+        assert expected[:2] == ["birth-registrations", "cp-clients"]
         _datasets_json(built / f"fka_{FAKE_ID}_dashboard.json",
                        {"datasets": [{"id": FAKE_DATASET, "name": "Fake Things"}]})
         monkeypatch.setattr(ticket_sync, "REPORTS_DIR", str(built))
         got = [(s.id, s.agency_id, s.collection_id) for s, _ in ticket_sync._load_scopes()]
         assert got[-1] == (FAKE_DATASET, "fake-agency", FAKE_ID)
-        assert [g[0] for g in got] == ["birth-registrations", "cp-clients", FAKE_DATASET]
+        assert [g[0] for g in got] == [*expected, FAKE_DATASET]
 
     def test_ticket_sync_refuses_one_with_no_adapter(self, without_adapter):
         from qa_tools.common import ticket_sync
@@ -280,7 +311,7 @@ def _edit(edit) -> None:
 
 class TestTheConfigurationGate:
 
-    REAL = ("civil_registration", "child_protection")
+    REAL = REAL_MODULES
 
     def test_the_real_configuration_passes(self):
         assert gate.config_problems() == []
@@ -294,8 +325,9 @@ class TestTheConfigurationGate:
                        "(qa_tools/collections/fake_collection.py)"]
 
     def test_an_adapter_naming_no_collection_fails(self, tmp_path):
-        got = gate.config_problems(_package(tmp_path, *self.REAL, "emergency_department"))
-        assert got == ["qa_tools/collections/emergency_department.py names no declared "
+        assert "no_such_collection" not in self.REAL
+        got = gate.config_problems(_package(tmp_path, *self.REAL, "no_such_collection"))
+        assert got == ["qa_tools/collections/no_such_collection.py names no declared "
                        "collection"]
 
     @pytest.mark.parametrize("edit,expected", [

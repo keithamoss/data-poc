@@ -312,8 +312,12 @@ class TestHowItReports:
             for dataset in _datasets(doc):
                 dataset["calendar"] = "no-such-calendar"
         errors = _run(mutate)
+        from qa_tools.common import hierarchy
+
         named = {e.scope for e in errors if e.scope}
-        assert len(named) == 7, f"expected one error per dataset, got {len(named)}: {named}"
+        every = {f"dataset {d.dataset_id!r}" for d in hierarchy.all_datasets()}
+        assert len(every) >= 7, every
+        assert named == every, f"expected one error per dataset, got {len(named)}: {named}"
 
     def test_it_does_not_stop_at_the_first_error(self):
         def mutate(doc):
@@ -520,8 +524,16 @@ class TestOneTypoReadsAsOneTypo:
         """Keith's 2026-09-23 rule. The cause line is printed ABOVE the
         detail; it suppresses nothing and changes no count."""
         errors = self._errors(renamed_calendar)
+        from qa_tools.common import hierarchy, schedule
+
         unknown = [e for e in errors if "does not define" in e.problem]
-        assert len(unknown) == 6, f"expected all six CP datasets reported, got {len(unknown)}"
+        # Every dataset on the renamed calendar: Child Protection's six, and
+        # any collection added on it since (Emergency Department, REQ-QAC-231).
+        quarterly = [d.dataset_id for d in hierarchy.all_datasets()
+                     if schedule.calendar_for_dataset(d.dataset_id).name == "quarterly"]
+        assert len(quarterly) >= 6, quarterly
+        assert len(unknown) == len(quarterly), (
+            f"expected all {len(quarterly)} quarterly datasets reported, got {len(unknown)}")
         validate_schedule.main(renamed_calendar)
         err = capsys.readouterr().err
         assert f"{len(errors)} error(s)" in err

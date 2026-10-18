@@ -1,6 +1,10 @@
 """Emergency Department's generator provider (REQ-GEN-232) and the two
 scenarios planted on it (REQ-GEN-236), driven through the shared driver into a
-scratch directory - never the repository's own data/."""
+scratch directory - never the repository's own data/.
+
+READS ONLY ITS OWN REPORTS: the scenario_placements.json it reads is the one
+`generator.output.redirect()` writes under that scratch directory, never the
+real data/ one a bootstrap leaves (tests/test_publish.py's fast-half guard)."""
 from __future__ import annotations
 
 import csv

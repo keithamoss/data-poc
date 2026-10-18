@@ -245,17 +245,35 @@ class TestTheRecordTheScenarioMapReads:
         assert back["TS-1"].supplies == ("run_028",)
         assert back["TS-1"].is_complete
 
-    def test_a_shared_placement_is_recorded_under_both_scenarios(self):
+    def test_a_shared_placement_is_recorded_under_both_scenarios(self, tmp_path):
         """TS-1's third file IS TS-4's arrival into a filled slot.
         Recording one placement under both is honest; generating a
-        second identical arrival would be padding."""
+        second identical arrival would be padding.
+
+        Proved by writing a TS-1 placement, so it holds on a clean checkout;
+        then held against the generated record where that record has
+        Birth Registrations' scenarios in it at all - a history generated
+        for other collections only (a worktree that never generated Birth
+        Registrations) has neither TS-1 nor TS-4, which is not a fault."""
         import json
 
         assert "TS-4" in si._ALSO.get("TS-1", ())
+        placed = si.resolve(si.Injection(
+            "TS-1", "birth-registrations", -8, "daily, due 14:00",
+            arrivals=(si.ExtraArrival(0, "14:00"),)), _daily(30))
+        placed.arrivals[0]["delivery"] = "d"
+        si.resolve_run_ids([placed], [_Recognised("run_028", "d")])
+        written = json.loads(si.write_placements(
+            [placed], tmp_path / "placements.json").read_text())["placements"]
+        by_id = {r["scenario_id"]: r for r in written}
+        assert by_id["TS-1"]["supplies"] == ["run_028"]
+        assert by_id["TS-4"]["supplies"] == by_id["TS-1"]["supplies"]
+
         recorded = json.loads(si.PLACEMENTS_PATH.read_text())["placements"] \
             if si.PLACEMENTS_PATH.exists() else []
-        if recorded:
-            by_id = {r["scenario_id"]: r for r in recorded}
+        by_id = {r["scenario_id"]: r for r in recorded}
+        assert ("TS-1" in by_id) == ("TS-4" in by_id), sorted(by_id)
+        if "TS-1" in by_id:
             assert by_id["TS-4"]["supplies"] == by_id["TS-1"]["supplies"]
 
     def test_the_config_is_recorded_beside_the_placement(self):

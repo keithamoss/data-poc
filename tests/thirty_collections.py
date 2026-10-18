@@ -1,6 +1,6 @@
 """Thirty collections, in a copy of the tree (REQ-TEST-252 criterion 15).
 
-The two real collections plus twenty-eight more across five more agencies,
+The real collections plus twenty-eight more across five more agencies,
 with names that share leading words ("Emergency Department ...", "Hospital
 ...") so a reader has to tell similar names apart. One-table and N-table
 collections, with and without the target-trial capability. Each has a QA
@@ -23,7 +23,9 @@ from tree_copy import copy_tracked_tree
 #: A table list of one is a one-table collection.
 AGENCIES = [
     ("health-hospitals", "Department of Health - Hospitals", [
-        ("Emergency Department Presentations", "edp", ["ed_presentations"], True),
+        # Not `ed_presentations`: that is the real Emergency Department's
+        # table (REQ-QAC-231), and a fixture must never collide with one.
+        ("Emergency Department Presentations", "edp", ["edp_presentations"], True),
         ("Emergency Department Admissions", "eda", ["ed_admissions"], False),
         ("Emergency Department Waiting Times", "edw", ["ed_waits", "ed_triage"], False),
         ("Hospital Admissions", "hadm", ["hospital_admissions"], True),
@@ -88,6 +90,19 @@ def build(dest: Path) -> Path:
     hierarchy_path = dest / "contract" / "data-asset.yaml"
     doc = yaml.safe_load(hierarchy_path.read_text())
     agencies = doc["hierarchy"]["agencies"]
+    # NOTHING ADDED MAY COLLIDE WITH A REAL COLLECTION - refused here by
+    # name, rather than as a "defined twice" traceback out of the copy's CLI.
+    real = {(kind, v) for a in agencies for c in a.get("collections") or []
+            for kind, v in [("agency", a["id"]), ("id", c["id"]), ("short", c["short"]),
+                            ("run_prefix", c["run_prefix"])]
+            + [(k, d[f]) for d in c.get("datasets") or [] for k, f in
+               (("dataset", "id"), ("table", "table"))]}
+    for c in added():
+        mine = {("agency", c["agency_id"]), ("id", c["id"]), ("short", c["short"]),
+                ("run_prefix", f"{c['short']}_run_")}
+        mine |= {("table", t) for t in c["tables"]} | {("dataset", t.replace("_", "-"))
+                                                       for t in c["tables"]}
+        assert not mine & real, f"the fixture's {c['id']} collides with a real one: {mine & real}"
     seed = 2_000_000
     for agency_id, agency_name, colls in AGENCIES:
         entries = []

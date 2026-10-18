@@ -72,7 +72,12 @@ class TestTheFixture:
         out = _run(thirty, "collections")
         assert out.returncode == 0, out.stderr
         rows = [r for r in out.stdout.splitlines() if r.strip()]
-        assert len(rows) == 30
+        from qa_tools import collections
+
+        # Every real collection plus the twenty-eight added - thirty when
+        # there were two real ones, one more for each collection since.
+        assert len(rows) == len(collections.all_collections()) + len(thirty_collections.added())
+        assert len(rows) >= 30
         assert len({c["agency_id"] for c in thirty_collections.added()}) >= 5
 
     def test_it_writes_nothing_to_the_repository(self, thirty):
@@ -293,4 +298,11 @@ class TestTheFilingMenuAtTwo:
         monkeypatch.setattr(common, "grouped_select",
                             lambda message, groups, flag_hint, **kw: asked.update(groups=groups) or None)
         filing_tui.filing_menu()
-        assert asked["groups"] == [("", ["Birth Registrations", "Child Protection"])]
+        from qa_tools import collections
+
+        # At N_LIST or fewer, one ungrouped list: every collection the menu
+        # offers, by its QA-menu label, in hierarchy order.
+        filed = set(filing_tui._collections())
+        expected = [c.label for c in collections.all_collections() if c.id in filed]
+        assert expected[:2] == ["Birth Registrations", "Child Protection"]
+        assert asked["groups"] == [("", expected)]

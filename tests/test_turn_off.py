@@ -1116,13 +1116,22 @@ class TestCriticFindingsOn190:
         authored by then says no more dates are needed for it, and does not
         ask for dates. Every Child Protection dataset turns off here: since
         #199 F7 a turning-off dataset drives the minimum only where none on
-        its calendar still owes."""
+        its calendar still owes - so every OTHER dataset on Child Protection's
+        calendar (Emergency Department's, since REQ-QAC-231) turns off for
+        good on the same terms, or it would still owe and drive the minimum."""
+        from qa_tools import collections
         from qa_tools.common import runway
 
         doc = _unshare(_doc())
-        _turn_off(_defaults_version(doc), to="2027-03-31",
-                  log=[{"date": "2026-09-01", "author": "a test", "change": "off",
-                        "turns_off": True}])
+        log = [{"date": "2026-09-01", "author": "a test", "change": "off", "turns_off": True}]
+        _turn_off(_defaults_version(doc), to="2027-03-31", log=log)
+        cp_calendar = _collection(doc)["calendar"]
+        others = [e["id"] for e in doc["datasets"]
+                  if not e["id"].startswith("cp-") and e.get("participation")
+                  and _collection(doc, collections.collection_of(e["id"]).id).get("calendar")
+                  == cp_calendar]
+        for ds in others:
+            _turn_off(_versions(doc, ds)[0], to="2027-03-31", log=log)
         using(doc)
         before = runway.warning_lines(date(2026, 8, 1))
         assert before and "candidate-dates" in before[0]

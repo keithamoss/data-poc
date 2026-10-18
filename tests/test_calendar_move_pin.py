@@ -14,7 +14,11 @@ from calendar_move_pin import PIN, capture
 def test_every_dataset_computes_what_it_did_before_the_move():
     pinned = json.loads(PIN.read_text())
     now = capture()
-    assert set(now) == set(pinned), "the datasets themselves changed"
+    # A DATASET ADDED SINCE (Emergency Department's, REQ-QAC-231) has no
+    # pinned past to keep, so the pin speaks for the datasets it holds: none
+    # of them may be lost or renamed, and each computes what it did.
+    assert pinned, "the pin holds no dataset - the comparison would prove nothing"
+    assert set(pinned) <= set(now), "the datasets themselves changed"
     for dataset_id, before in pinned.items():
         after = (_from_the_pinned_start(now[dataset_id], before)
                  if dataset_id in _EARLIER_DAYS_ADDED else now[dataset_id])

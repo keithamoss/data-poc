@@ -23,6 +23,19 @@ from qa_tools.common import hierarchy, runway, schedule
 # constant so a test that goes stale when somebody authors 2028 fails
 # with an obvious reason rather than a mystery.
 LAST_QUARTERLY = date(2027, 11, 1)
+
+CP = {"cp-clients", "cp-notifications", "cp-investigations", "cp-placements", "cp-carers",
+      "cp-case-workers"}
+
+
+def _quarterly() -> set[str]:
+    """Every dataset naming the quarterly calendar, read off the hierarchy -
+    Child Protection's six, and any collection added on it since (Emergency
+    Department, REQ-QAC-231)."""
+    found = {d.dataset_id for d in hierarchy.all_datasets()
+             if schedule.calendar_for_dataset(d.dataset_id).name == "quarterly"}
+    assert CP <= found, found
+    return found
 BEFORE_ANY_RUNOUT = date(2023, 6, 1)
 AFTER_EVERYTHING = date(2028, 6, 1)
 
@@ -58,7 +71,7 @@ class TestRunwayIsMeasuredInSlots:
         result = runway.calendar_runway("quarterly", date(2026, 9, 23))
         assert result.last_date == LAST_QUARTERLY
         assert result.last_period == "2027-Q4"
-        assert result.dataset_count == 6
+        assert result.dataset_count == len(_quarterly())
 
 
 class TestACadenceRuleNeverWarns:
@@ -120,7 +133,7 @@ class TestItWarnsOncePerCalendarNotOncePerDataset:
         datasets and is what makes the figure checkable.
         """
         line = runway.warning_lines(date(2026, 9, 23))[0]
-        assert "6 datasets name this calendar" in line
+        assert f"{len(_quarterly())} datasets name this calendar" in line
         named = [d.dataset_id for d in hierarchy.all_datasets() if d.dataset_id in line]
         assert named == ["cp-case-workers"], (
             f"exactly the driving dataset should be named, not {named}")
@@ -163,8 +176,7 @@ class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
 
     def test_every_quarterly_dataset_is_exhausted_once_the_dates_run_out(self):
         exhausted = runway.exhausted_datasets(AFTER_EVERYTHING)
-        assert set(exhausted) == {"cp-clients", "cp-notifications", "cp-investigations",
-                                   "cp-placements", "cp-carers", "cp-case-workers"}
+        assert set(exhausted) == _quarterly()
         assert set(exhausted.values()) == {"quarterly"}
 
     def test_the_daily_dataset_carries_on(self):
@@ -187,7 +199,7 @@ class TestAnExhaustedScheduleIsScopedToItsOwnDatasets:
 
     def test_the_summary_says_how_many_datasets_cannot_be_processed(self):
         note = runway.summary(AFTER_EVERYTHING)
-        assert "6 dataset(s) have no remaining slots" in note
+        assert f"{len(_quarterly())} dataset(s) have no remaining slots" in note
 
 
 class TestTheThresholdIsConfigurable:

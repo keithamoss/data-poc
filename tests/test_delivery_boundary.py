@@ -29,7 +29,11 @@ def _sources(monkeypatch, mapping: dict[str, str]):
 class TestTheRealConfiguration:
     def test_every_source_states_what_a_delivery_is(self):
         found = delivery_boundary.check_all()
-        assert set(found) == {"child-protection", "civil-registration"}
+        from qa_tools import collections
+
+        declared = {c.id for c in collections.all_collections()}
+        assert {"child-protection", "civil-registration"} <= declared
+        assert set(found) == declared
         assert set(found.values()) == {delivery_boundary.DIRECTORY}
 
 

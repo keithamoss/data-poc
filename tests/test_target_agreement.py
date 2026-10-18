@@ -246,7 +246,11 @@ class TestSkippingTheTrial:
         monkeypatch.setattr(boot, "holds_history", lambda conn: False)
         monkeypatch.setattr(boot, "targets_agree", lambda names: ())
         boot.bootstrap(sequential=True, skip_target_trial=True)
-        assert seen == [("civil-registration", False), ("child-protection", False)]
+        from qa_tools import collections
+
+        # Every registered collection, in hierarchy order, none with a trial.
+        assert seen == [(c.id, False) for c in collections.all_collections()]
+        assert [cid for cid, _ in seen[:2]] == ["civil-registration", "child-protection"]
 
 
 # ---- after a replay (criteria 3, 6) ----
@@ -354,7 +358,11 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
                             lambda c: (_ for _ in ()).throw(Stop()))
         with pytest.raises(Stop):
             boot.resume("ckpt")
-        assert seen == [("civil-registration", False), ("child-protection", False)]
+        from qa_tools import collections
+
+        # Every registered collection, in hierarchy order, none with a trial.
+        assert seen == [(c.id, False) for c in collections.all_collections()]
+        assert [cid for cid, _ in seen[:2]] == ["civil-registration", "child-protection"]
 
 
 class TestEveryFailureNamesWhatToLookAt:

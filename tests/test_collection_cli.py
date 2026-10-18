@@ -95,7 +95,9 @@ class TestTheTUIMenus:
         ran = []
         monkeypatch.setattr(collection_cli.of(FAKE_ID), "run_qa_interactive",
                             lambda: ran.append(FAKE_ID))
-        for cid in ("civil-registration", "child-protection"):
+        from qa_tools import collections
+
+        for cid in (c.id for c in collections.all_collections() if c.id != FAKE_ID):
             monkeypatch.setattr(collection_cli.of(cid), "run_qa_interactive",
                                 lambda cid=cid: ran.append(cid))
         app._qa_menu()
@@ -103,8 +105,14 @@ class TestTheTUIMenus:
 
     def test_a_third_collection_is_offered_and_runs_its_own_flow(self, third_collection,
                                                                 monkeypatch):
+        from qa_tools import collections
+
         choices, ran = self._drive(monkeypatch, "Fake Things")
-        assert choices == ["Birth Registrations", "Child Protection", "Fake Things"]
+        # Every registered collection by its label, in hierarchy order, the
+        # fake one last.
+        assert choices == [c.label for c in collections.all_collections()]
+        assert choices[:2] == ["Birth Registrations", "Child Protection"]
+        assert choices[-1] == "Fake Things"
         assert ran == [FAKE_ID]
 
     def test_child_protection_is_not_where_an_unknown_choice_falls(self, third_collection,
@@ -166,7 +174,14 @@ class TestTheSharedCollectionOption:
         # REQ-TEST-252 criterion 13: at N_LIST or fewer the refusal still lists
         # every collection, short and id, and says where they are all listed.
         flat = " ".join(re.sub(r"[│╭╮╰╯─]", " ", out.output).split())
-        assert "Known: bdm (civil-registration), cp (child-protection), fk (fake-collection)" in flat, flat
+        from qa_tools import collections
+
+        every = collections.all_collections()
+        assert len(every) <= common.N_LIST, "this case is the listing one, at N_LIST or fewer"
+        known = ", ".join(f"{c.short} ({c.id})" for c in every)
+        assert known.startswith("bdm (civil-registration), cp (child-protection), ")
+        assert known.endswith("fk (fake-collection)")
+        assert f"Known: {known}" in flat, flat
         assert "mothman collections" in flat, flat
 
     @pytest.mark.parametrize("value", [FAKE_SHORT, FAKE_ID])

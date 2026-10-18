@@ -17,10 +17,16 @@ from __future__ import annotations
 import dbsupport
 import pytest
 
+from qa_tools import collections
 from qa_tools.common import bootstrap as boot
 from qa_tools.common import supply_db
 
-_SHORT = {"civil-registration": "bdm", "child-protection": "cp"}
+#: Every registered collection's short, by id - a bootstrap of "all" runs
+#: each of them, not only the first two.
+_SHORT = {c.id: c.short for c in collections.all_collections()}
+#: In hierarchy order, Birth Registrations and Child Protection first.
+SHORTS = list(_SHORT.values())
+assert SHORTS[:2] == ["bdm", "cp"], SHORTS
 
 
 @pytest.fixture(autouse=True)
@@ -101,8 +107,8 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
 
         result = boot.bootstrap(force=True)
         assert result.populated is True
-        assert ("bdm", {"sequential": False, "record_deliveries": False}) in called
-        assert ("cp", {"sequential": False, "record_deliveries": False}) in called
+        for short in SHORTS:
+            assert (short, {"sequential": False, "record_deliveries": False}) in called
 
 
 class TestWhatItRuns:
@@ -126,13 +132,13 @@ class TestWhatItRuns:
         boot.bootstrap(collection="all")
         # Each collection records a delivery at its first arrival; the ones
         # neither claimed are recorded once both finish (REQ-TEST-159).
-        assert spy == ["gen-bdm", "gen-cp", "concurrently", "bdm", "cp", "record"]
+        assert spy == [*(f"gen-{s}" for s in SHORTS), "concurrently", *SHORTS, "record"]
 
     def test_sequential_does_one_collection_then_the_other(self, spy):
         """REQ-TEST-116 criterion 5 - the reference a parallel bootstrap
         is compared against, so it has to be the old behaviour exactly."""
         boot.bootstrap(collection="all", sequential=True)
-        assert spy == ["gen-bdm", "bdm", "gen-cp", "cp"]
+        assert spy == [step for s in SHORTS for step in (f"gen-{s}", s)]
 
     def test_one_collection_leaves_the_other_alone(self, spy):
         boot.bootstrap(collection="bdm")
@@ -240,7 +246,7 @@ class TestCollectionsRunSideBySide:
     def test_generation_finishes_before_any_checking_starts(self, spy):
         called, _ = spy
         boot.bootstrap(collection="all")
-        assert called[:2] == ["gen-bdm", "gen-cp"]
+        assert called[:len(SHORTS)] == [f"gen-{s}" for s in SHORTS]
 
     def test_one_collection_is_not_dispatched_to_a_pool(self, spy):
         called, dispatched = spy
@@ -252,5 +258,5 @@ class TestCollectionsRunSideBySide:
     def test_the_wall_clock_is_reported(self, spy):
         """Criterion 6: the gain is measured rather than estimated."""
         result = boot.bootstrap(collection="all")
-        assert set(result.timings) == {"bdm", "cp", "total"}
+        assert set(result.timings) == {*SHORTS, "total"}
         assert all(isinstance(v, float) for v in result.timings.values())

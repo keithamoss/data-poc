@@ -29,17 +29,33 @@ LOG = [{"date": "2023-01-01", "author": "a test", "change": "a test"}]
 def _per_dataset(doc: dict) -> dict:
     """The premise these cases are written against: each Child Protection
     dataset stating its own due time and grace, and the collection stating
-    nothing - the real file as it stood before its own migration."""
+    nothing - the real file as it stood before its own migration.
+
+    EVERY COLLECTION'S DEFAULTS COME DOWN, not only Child Protection's: a
+    collection added since (Emergency Department, REQ-QAC-231) states its
+    due time and grace only as defaults, so removing them without moving
+    them onto its datasets would leave those datasets stating none - a
+    calendar no real file has ever been, refused for that reason."""
+    from qa_tools import collections
+
+    stated = {}
     for coll in doc["collections"]:
-        coll.pop("participation_defaults", None)
+        defaults = coll.pop("participation_defaults", None)
+        if defaults:
+            first = (defaults.get("versions") or [{}])[0]
+            stated[coll["id"]] = (first.get("expected_time", "09:00"), first.get("grace", "8h"))
         coll.pop("corrections", None)
     for entry in doc["datasets"]:
         entry.pop("corrections", None)
-        if entry["id"].startswith("cp-"):
+        cid = collections.collection_of(entry["id"]).id
+        if (cid in stated or entry["id"].startswith("cp-")) and entry.get("participation"):
+            due, grace = stated.get(cid, ("09:00", "8h"))
             entry["participation"]["versions"] = [
-                {**v, "expected_time": v.get("expected_time", "09:00"),
-                 "grace": v.get("grace", "8h")}
+                {**v, "expected_time": v.get("expected_time", due),
+                 "grace": v.get("grace", grace)}
                 for v in entry["participation"]["versions"]]
+    assert any(e["id"].startswith("cp-") for e in doc["datasets"]), \
+        "no Child Protection dataset in the calendar - these cases would prove nothing"
     return doc
 
 

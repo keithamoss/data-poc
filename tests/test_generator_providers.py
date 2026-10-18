@@ -23,6 +23,7 @@ from generator import collections as providers
 from generator import driver
 from generator.collections.base import Job, Plan, Provider
 from generator.output import redirect
+from qa_tools import collections as registry
 from third_collection import FAKE_DATASET, FAKE_ID, FAKE_PREFIX, PROVIDER_MODULE
 
 
@@ -188,8 +189,11 @@ class TestTheTargetTrialIsTheProvidersToDeclare:
         assert pipeline.has_target_trial("child-protection") is False
         assert pipeline.has_target_trial(FAKE_ID) is False
         assert pipeline.target_datasets(FAKE_ID) == (FAKE_DATASET,)
-        assert pipeline.generated_collections() == ["civil-registration", "child-protection",
-                                                    FAKE_ID]
+        # Every collection the hierarchy declares, in its order, the fake last.
+        assert pipeline.generated_collections() == [
+            c.id for c in registry.all_collections()]
+        assert pipeline.generated_collections()[:2] == ["civil-registration", "child-protection"]
+        assert pipeline.generated_collections()[-1] == FAKE_ID
 
     def test_the_adapters_carry_no_generator_pointer_any_more(self):
         from qa_tools import collections
@@ -263,7 +267,10 @@ class TestTheRegistryRoutesTheRest:
                             lambda cid: ran.append((cid, str(driver.DELIVERIES_DIR))))
         with generated_into(tmp_path):
             pass
-        assert [cid for cid, _ in ran] == ["civil-registration", "child-protection", FAKE_ID]
+        expected = [c.id for c in registry.all_collections()]
+        assert expected[:2] == ["civil-registration", "child-protection"]
+        assert expected[-1] == FAKE_ID
+        assert [cid for cid, _ in ran] == expected
         assert all(where == str(tmp_path / "deliveries") for _, where in ran)
 
 
