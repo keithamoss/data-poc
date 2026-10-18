@@ -10402,11 +10402,15 @@ twice. It deliberately did not re-find the `TypeError`.
        the bootstrap's own read of the trial declaration (246 T3); several
        252 criteria with no test of their own (calendar picker at thirty,
        the generic hint text, Tools in today's order, the three-closest cap).
+     - POLISH DONE 2026-10-18 evening: README's delivery counts (97 for Birth
+       Registrations, 55 for Child Protection - the long "The 120 (scheduled)
+       runs" section below them is still the old history and still open),
+       Child Protection's generating note (now derived, 55), "This will
+       regenerate data/raw/" (now "the synthetic deliveries"), and "a
+       Emergency" and "all 2 tables" (cli/wording.py's a_or_an and all_of,
+       kept out of cli/common.py so `--help` imports nothing new).
      - POLISH still open: stale references to the deleted per-collection
-       modules in test docstrings and aliases, README's 120 scheduled deliveries
-       (85 + 12 now), Child Protection's "15 quarterly snapshots" note (55),
-       "This will regenerate data/raw/", "a Emergency" and "all 2 tables"
-       grammar, the dataset-anchor substring match and an anchor-less tooltip,
+       modules in test docstrings and aliases, the README section above, the dataset-anchor substring match and an anchor-less tooltip,
        repeated check-file parsing per dataset, the presentation provenance
        naming deleted modules (REQ-PIPE-248's to reword), embed docstrings
        naming the two builders, lowercase `{legend}` text, `source:` fields

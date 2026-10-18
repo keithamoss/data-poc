@@ -23,6 +23,7 @@ import tempfile
 import rich_click as click
 
 from cli.collection_cli import CollectionCLI, console, refuse_a_broken_adapter
+from cli import wording
 
 
 class OneTableCLI(CollectionCLI):
@@ -371,7 +372,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
         refuse_a_broken_adapter(coll)
         cli_ = me()
         if cli_.manifest_exists() and not common.confirm(
-                "This will regenerate data/raw/ (deterministic - same content either way). "
+                "This will regenerate the synthetic deliveries (deterministic - same content either way). "
                 "Continue?", yes=yes, default=True):
             console.print("Not regenerated.", style="yellow")
             return
@@ -395,7 +396,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
 
     prefix = coll.run_prefix
 
-    @group.command("qa", help=f"Run the real QA check chain against a {name} run - Synthetic "
+    @group.command("qa", help=f"Run the real QA check chain against {wording.a_or_an(name)} run - Synthetic "
                               f"(--run-id), Local files (--file/--reference-file), or S3 "
                               f"(--s3-key/--s3-reference-key) source mode.")
     @click.option("--run-id", default=None,

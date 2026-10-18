@@ -24,6 +24,7 @@ from datetime import date
 import rich_click as click
 
 from cli.collection_cli import CollectionCLI, console, refuse_a_broken_adapter, words
+from cli import wording
 
 
 class ManyTablesCLI(CollectionCLI):
@@ -35,7 +36,7 @@ class ManyTablesCLI(CollectionCLI):
     def __init__(self, coll):
         super().__init__(coll)
         n = len(self.tables)
-        self._DELIVERY_FULL = f"Full delivery - all {n} real tables"
+        self._DELIVERY_FULL = f"Full delivery - {wording.all_of(n, 'real tables')}"
         self._DELIVERY_SINGLE_TABLE = "Single table - a partial resupply (one table only)"
         #: What the messages have always called this collection's deliveries.
         self.upper = coll.short.upper()
@@ -139,8 +140,8 @@ class ManyTablesCLI(CollectionCLI):
         missing = [t for t in self.tables if t not in found]
         if missing:
             raise click.ClickException(
-                f"{folder} is missing a file for: {', '.join(missing)} - a {self.upper} delivery "
-                f"needs all {len(self.tables)} real tables, the cross-table checks can't run on "
+                f"{folder} is missing a file for: {', '.join(missing)} - {wording.a_or_an(self.upper)} "
+                f"delivery needs {wording.all_of(len(self.tables), 'real tables')}, the cross-table checks can't run on "
                 f"a partial set")
         return {table: paths[0] for table, paths in found.items()}
 
@@ -486,7 +487,7 @@ class ManyTablesCLI(CollectionCLI):
         reference_folder = None
         if not keep:
             reference_folder = common.path_prompt(
-                f"Path to a known-good reference delivery folder (all {len(self.tables)} tables) "
+                f"Path to a known-good reference delivery folder ({wording.all_of(len(self.tables), 'tables')}) "
                 f"to compare against:",
                 flag_hint=f"mothman {short} qa --folder <dir> --trial --reference-folder <dir>")
             if reference_folder is None:
@@ -620,7 +621,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
 
     prefix = coll.run_prefix
 
-    @group.command("qa", help=f"Run the real QA check chain against a {name} run - Synthetic "
+    @group.command("qa", help=f"Run the real QA check chain against {wording.a_or_an(name)} run - Synthetic "
                               f"(--run-id), Local files (--folder/--reference-folder), S3 "
                               f"(--s3-delivery/--s3-reference-delivery), or single-table "
                               f"(--table plus --file or --s3-key) source mode.")
@@ -635,7 +636,7 @@ def add_commands(group: click.Group, coll, *, with_target_trial: bool) -> None:
                   type=click.Path(exists=True, file_okay=False),
                   help=f"Local files mode: an already-downloaded delivery folder (instead of "
                        f"--run-id). Kept, whatever recognition places in it is the delivery; a "
-                       f"trial needs all {len(tables)} tables.")
+                       f"trial needs {wording.all_of(len(tables), 'tables')}.")
     @click.option("--reference-folder", default=None, type=click.Path(exists=True, file_okay=False),
                   help="Local files mode: a known-good reference delivery folder to compare "
                        "distribution drift against. A trial's only: a kept supply is measured "

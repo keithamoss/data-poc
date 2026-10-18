@@ -65,10 +65,9 @@ you'd hit the real package conflict described just below with no
 equivalent one-step override `uv` gives you — not worth the workaround
 when `uv` is one command to install.)
 
-This regenerates 120 scheduled daily deliveries (176 manifest entries
-once red-triggered resupply attempts are included — see "The 120
-(scheduled) runs" below), loads them into DuckDB, runs the four real tools
-against every run, and builds `dashboard/qa-reporting-dashboard.html` from
+This regenerates Birth Registrations' 97 scheduled daily deliveries (85,
+plus twelve older "evening-before" days) and their resupplies, stages each
+arrival in PostgreSQL, runs the four real tools against every run, and builds `dashboard/qa-reporting-dashboard.html` from
 `dashboard/qa-reporting-dashboard.template.html` plus the results. Every
 step is seeded, so re-running reproduces the same runs and the same
 numbers.
@@ -510,7 +509,7 @@ never built to do.
 ./mothman pipeline run --collection cp
 ```
 
-(Generates data/cp_raw/'s 15 quarterly snapshots, runs the real tools ->
+(Generates Child Protection's 55 quarterly deliveries, runs the real tools ->
 reports/results_cp.json, reshapes -> reports/child_protection_dashboard.json,
 then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
 the default, does the same for Birth Registrations too in one call.)

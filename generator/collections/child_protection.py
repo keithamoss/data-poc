@@ -741,7 +741,7 @@ class ChildProtection(Provider):
     target_datasets = (DATASET_ID,)
     target_levers = "client-postcodes"
     amber_dataset = DATASET_ID
-    generating_note = "population=70,000, 15 quarterly snapshots"
+    generating_note = f"population=70,000, {N_QUARTERS + GROWN_QUARTERS} quarterly snapshots"
 
     def seed_schedule(self) -> list[tuple[str, int, int]]:
         out = [("the population", BASE_SEED, BASE_SEED),
