@@ -482,20 +482,13 @@ class TestTheSharedToolModules:
         assert written[0][5]["path"].endswith("contract/fake-agency/fake-things-contract.yaml")
         assert sampled == []  # custom_sql is never sampled; the key is the adapter's when it is
 
-    @pytest.mark.parametrize("legacy,recorded,noted", [
-        (frozenset(), 0, 1),
-        (frozenset({"datacontract.reads_unreadable_tables"}), 1, 0),
-    ])
-    def test_reads_unreadable_tables_keeps_birth_registrations_behaviour(
-            self, third_collection, monkeypatch, legacy, recorded, noted):
-        """The flag's whole effect, shown on the one input it changes: a rule
-        over a table the run has no view for."""
-        import dataclasses
-
+    def test_a_rule_over_an_unreadable_table_is_left_out_and_noted(
+            self, third_collection, monkeypatch):
+        """A rule over a table the run has no view for is not recorded, and
+        is noted as left out - for every collection since REQ-QAC-247
+        retired Birth Registrations' exemption."""
         from qa_tools.tools import run_datacontract as dc
 
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
-        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, legacy=legacy)
         check = SimpleNamespace(
             type="field_null_values", model=FAKE_TABLE, field="things", name="n",
             qualityDefinition=f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}.things.nullValues_datacontract",
@@ -517,7 +510,7 @@ class TestTheSharedToolModules:
 
         got = dc.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z")
 
-        assert (len(got), len(notes)) == (recorded, noted)
+        assert (len(got), len(notes)) == (0, 1)
 
     def _soda(self, monkeypatch, tmp_path, legacy=frozenset(), soda=None, readable=(FAKE_TABLE,)):
         """The shared Soda runner over a stub scan, for the third collection:

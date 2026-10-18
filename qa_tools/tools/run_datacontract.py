@@ -88,9 +88,8 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
     options = (selection_for(path, asked)
                if scoped and run_owner(run_id) is not None else {})
     run = run_against_warehouse(path, supply_db.run_schema(run_id), **options)
-    reads_unreadable = "datacontract.reads_unreadable_tables" in adapter.legacy
-    unreadable = frozenset() if reads_unreadable else _unreadable_in(run_id, tables)
-    declared = {} if reads_unreadable else _declared_reads_tables()
+    unreadable = _unreadable_in(run_id, tables)
+    declared = _declared_reads_tables()
     names = _authored_names(path)
 
     results = []
@@ -173,8 +172,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
     # No live-query correction needed (row_count is already in the raw
     # output's own diagnostics); `verified` is still written, for uniformity
     # with the other three tools.
-    if not reads_unreadable:
-        left_out.note(run_id, "datacontract", left)
+    left_out.note(run_id, "datacontract", left)
     write_qa_result(coll.agency_id, coll.id, run_id, run_timestamp,
                     "datacontract", run.model_dump(), verified=results)
     return results

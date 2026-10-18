@@ -15,10 +15,6 @@ from __future__ import annotations
 
 #: name -> what it preserves.
 KNOWN: dict[str, str] = {
-    "datacontract.reads_unreadable_tables": (
-        "datacontract-cli's rules are recorded even over a table the run has no view "
-        "for, and nothing is noted as left out - Birth Registrations' copy never "
-        "had REQ-PIPE-078's left-out handling."),
     "soda.reads_unreadable_tables": (
         "Soda is handed every check whatever the run can read, and nothing is noted "
         "as left out - REQ-PIPE-078's handling, as for datacontract-cli above."),
