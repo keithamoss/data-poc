@@ -5595,6 +5595,18 @@ could never have computed it), and it belongs with batch 5's check work.
     one-push-per-finished-piece default for this chain alone. Record the
     swap in REQ-TEST-245's decisions when it is built.
 
+    A TEST ACCOUNT AT THE END OF THE CHAIN (Keith, 2026-10-18 evening, his
+    words: "please report at the end of this chain how many tests you've
+    deleted and how many you've migrated that were pointing at very
+    particular BDM and CP behavior. And check for duplication amongst tests
+    that point to the new registry stuff."). So the report put to him with
+    the push question carries: tests deleted, tests migrated off
+    collection-specific modules, both counted from the commit before
+    REQ-GEN-246 (86fdc05) to the chain's last commit; and a duplication
+    check across the tests of the registry, the generator providers, the
+    CLI factory and the one dashboard builder - which tests assert the same
+    behaviour twice, and which could go.
+
 107. **[todo, 2026-10-18]** **[Docs & process]** **Why is there 77,000 lines
     of product code?** Keith, 2026-10-18: "how the fuck do we have 77,000
     lines of product code? That's ridiculous." Measured the same day: 76,720
