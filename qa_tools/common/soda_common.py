@@ -148,8 +148,14 @@ def check_id_from_resource_attributes(check: dict) -> str | None:
     yml-wide lookup (see check_lifecycle.dbt_check_id_lookup()'s own
     docstring on the collision bug that needed guarding against), there's
     no cross-check ambiguity to resolve here."""
+    return resource_attribute(check, "check_id")
+
+
+def resource_attribute(check: dict, name: str):
+    """One of the check's own `attributes:`, as Soda copied it into the
+    scan result - `category`, say - or None."""
     for attr in check.get("resourceAttributes") or []:
-        if attr.get("name") == "check_id":
+        if attr.get("name") == name:
             return attr.get("value")
     return None
 

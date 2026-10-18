@@ -78,14 +78,6 @@ ADAPTER = CollectionAdapter(
             "date_of_birth out of range": "date_of_birth",
             "end_date is not earlier than start_date": "end_date",
         },
-        # Matching each rule's own contract quality entry.
-        dimension_by_name={
-            "Escalation completeness": "completeness",
-            "Closed-case investigation hygiene": "consistency",
-            "Placement/carer approval compliance": "consistency",
-            "date_of_birth out of range": "conformity",
-        },
-        dimension_by_metric={"reference": "consistency", "row_count": "completeness"},
         invalid_count_metrics=frozenset({"reference"}),
     ),
     stats=StatsSpec(

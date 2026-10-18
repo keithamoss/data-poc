@@ -15,7 +15,6 @@ ADAPTER = CollectionAdapter(
     ),
     soda=SodaSpec(
         data_source="widget_register",
-        dimension_by_metric={"row_count": "completeness"},
     ),
     # Evidently's drift reference is rebuilt from these recorded counts.
     stats=StatsSpec(value_counts={("widgets", "colour"): ["red", "green", "blue"]}),

@@ -81,22 +81,6 @@ ADAPTER = CollectionAdapter(
             "date_of_birth is within a plausible range": "Date-of-birth range",
             "date_registered is not earlier than date_of_birth": "Registration/birth date ordering",
         },
-        dimension_by_name={
-            "sex validity, last 24h only": "conformity",
-            "extract timestamp is logically ordered after date_registered": "consistency",
-            "multiple birth records have a matching sibling": "consistency",
-            "recent birth dates present (freshness)": "timeliness",
-            "date_of_birth is within a plausible range": "conformity",
-            "date_registered is not earlier than date_of_birth": "consistency",
-        },
-        name_dimension_default=None,
-        # Explicit per metric, never a substring guess at the check's name
-        # (plans/qa-pipeline.md #10).
-        dimension_by_metric={
-            "missing_count": "completeness", "missing_percent": "completeness",
-            "invalid_percent": "conformity", "duplicate_count": "uniqueness",
-            "row_count": "completeness",
-        },
         invalid_count_metrics=frozenset({"missing_count"}),
     ),
     stats=StatsSpec(

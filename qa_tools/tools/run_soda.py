@@ -24,7 +24,7 @@ from qa_tools.common.qa_results_writer import write_qa_result
 from qa_tools.common.soda_common import (
     ENGINE_TAG, CaptureSampler, check_id_from_resource_attributes, execute_scan,
     failing_sample_keys, left_out_checks, not_evaluated_record, readable_checks_yaml,
-    threshold, unreported_checks,
+    resource_attribute, threshold, unreported_checks,
 )
 
 __all__ = ["ENGINE_TAG", "evaluate"]
@@ -133,12 +133,13 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             elif base_check in spec.invalid_count_metrics:
                 row_count_invalid = int(value) if value is not None else None
 
-            if is_custom_name:
-                dimension = spec.dimension_by_name.get(c["name"], spec.name_dimension_default)
-                label = spec.label_by_name.get(c["name"])
-            else:
-                dimension = spec.dimension_by_metric.get(base_check, "")
-                label = _LABEL_BY_METRIC.get(base_check)
+            # THE DIMENSION IS THE CHECK'S OWN `category` (REQ-QAC-247, Keith
+            # 2026-10-18), written beside it in the checks file - never a
+            # second copy kept in the adapter, which is how Child
+            # Protection's 52 checks came to be recorded with none.
+            dimension = resource_attribute(c, "category") or ""
+            label = (spec.label_by_name.get(c["name"]) if is_custom_name
+                     else _LABEL_BY_METRIC.get(base_check))
 
             results.append({
                 "agency_id": coll.agency_id,

@@ -526,9 +526,7 @@ class TestTheSharedToolModules:
             adapter.ADAPTER, legacy=legacy,
             soda=soda or SodaSpec(data_source="fake_source",
                                   column_by_name={"things pair up": "things"},
-                                  label_by_name={"things pair up": "Pairing"},
-                                  dimension_by_name={"things pair up": "consistency"},
-                                  dimension_by_metric={"missing_count": "completeness"}))
+                                  label_by_name={"things pair up": "Pairing"}))
         checks = tmp_path / "fake-soda.yml"
         checks.write_text(f"checks for {FAKE_TABLE}:\n  - row_count > 0:\n"
                           f"      attributes: {{check_id: x}}\n")
@@ -537,10 +535,12 @@ class TestTheSharedToolModules:
             {"table": FAKE_TABLE, "column": "things", "name": "missing_count(things) = 0 warn when > 0",
              "filter": "recent", "metrics": ["m1"], "outcome": "fail",
              "diagnostics": {"value": 3}, "resourceAttributes": [
-                 {"name": "check_id", "value": f"{prefix}.things.missing_count_soda"}]},
+                 {"name": "check_id", "value": f"{prefix}.things.missing_count_soda"},
+                 {"name": "category", "value": "completeness"}]},
             {"table": FAKE_TABLE, "column": None, "name": "things pair up", "filter": None,
              "metrics": [], "outcome": "fail", "diagnostics": {"value": 2}, "resourceAttributes": [
-                 {"name": "check_id", "value": f"{prefix}.things.pair_soda"}]},
+                 {"name": "check_id", "value": f"{prefix}.things.pair_soda"},
+                 {"name": "category", "value": "consistency"}]},
             *extra_checks,
         ]}
         conn = SimpleNamespace(execute=lambda sql: SimpleNamespace(fetchone=lambda: (7,)),

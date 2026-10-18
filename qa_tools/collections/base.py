@@ -55,11 +55,8 @@ class SodaSpec:
     column_by_name: dict = field(default_factory=dict)
     #: A custom-named check's cross-tool label, by its name.
     label_by_name: dict = field(default_factory=dict)
-    #: A check's dimension: a custom-named one's by its name (with
-    #: `name_dimension_default` where it has none), any other by its metric.
-    dimension_by_name: dict = field(default_factory=dict)
-    name_dimension_default: str | None = ""
-    dimension_by_metric: dict = field(default_factory=dict)
+    # A check's dimension is its own `category` in the checks file
+    # (REQ-QAC-247), so there is no map of it here.
     #: The metrics whose own value is the count of invalid rows.
     invalid_count_metrics: frozenset = frozenset()
 
