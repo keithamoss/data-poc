@@ -531,7 +531,7 @@ def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
             "run_index": run_index,
             "slot_id": slot_id,
             "period": period,
-            "received_at": None,  # filled in by main() from the payload's own earliest extract
+            "received_at": None,  # filled in by received_at(), via the driver
             "dirty_severity": delivery_obj.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "seed": seed,
             "row_counts": {name: int(len(delivery_obj.payload[name])) for name in TABLES},
@@ -641,7 +641,7 @@ def _plan_injections(periods):
     from generator import targeting
 
     for injection in mine:
-        # NOT YET FOR CHILD PROTECTION (post-build-review #156): its main()
+        # NOT YET FOR CHILD PROTECTION (post-build-review #156): its plan()
         # builds no green lead-in or following delivery and sizes nothing to
         # one, so REQ-GEN-185's criteria 1-3 would not hold. Refused rather
         # than half-built; no Child Protection scenario needs it yet.

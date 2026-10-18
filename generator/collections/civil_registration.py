@@ -329,12 +329,12 @@ class BirthRegistrationsProvider:
     signatures. Swapping the underlying generator later (per
     docs/synthetic-data-generation-tools-research.md) means writing a new
     class like this one, not touching resupply.py or the chain-walking
-    loop in main() below."""
+    loop in generator/driver.py."""
 
     def __init__(self, amber_dates: frozenset[date] = frozenset()):
         #: An ordinary amber is never also made stale: a stale delivery
         #: fails the freshness checks, which would make it red
-        #: (REQ-GEN-184 criterion 4). main() sets it once ambers are planned.
+        #: (REQ-GEN-184 criterion 4). plan() sets it once ambers are planned.
         self.amber_dates = amber_dates
 
     def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> pd.DataFrame:
@@ -474,8 +474,8 @@ def _manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
                                 run_index_start: int, id_offset: int, seed: int) -> list[dict]:
     """Pure manifest-entry construction for the deliveries filling ONE
     SLOT - no file I/O, so this is independently testable
-    (tests/test_resupply.py) without main()'s CSV writes or a real
-    provider. main() calls this directly and only adds the file-writing
+    (tests/test_resupply.py) without the driver's CSV writes or a real
+    provider. entries() calls this directly and the driver only adds the file-writing
     side effect on top, so the two cannot drift apart.
 
     `run_index_start` is the manifest's own running length BEFORE this
@@ -516,7 +516,7 @@ def _manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
             # period a supply is FOR, and when it actually turned up.
             # A single delivery_date conflated them.
             "period": period,
-            "received_at": None,  # filled in by main() from the payload's own earliest extract
+            "received_at": None,  # filled in by received_at(), via the driver
             "n_rows_generated": int(len(delivery_obj.payload)),
             "dirty_severity": delivery_obj.severity,  # None | "amber" | "red" - this ARRIVAL's own outcome
             "id_offset": id_offset,

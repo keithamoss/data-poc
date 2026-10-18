@@ -111,9 +111,9 @@ intro: >
 releases:
   - date: "2026-10-18"
     summary: >
-      Every collection's supplies are now run, summarised and rebuilt by
-      one shared set of modules, and a new command shows how many GitHub
-      Actions minutes the project is using.
+      Every collection's supplies are now generated, run, summarised and
+      rebuilt by one shared set of modules, and a new command shows how many
+      GitHub Actions minutes the project is using.
     changes:
       - category: New
         items:
@@ -134,6 +134,13 @@ releases:
               all go through one shared module each, reading what differs from
               the collection's adapter. The last ten copied modules are gone,
               and both collections record exactly what they did before.
+          - headline: One synthetic data generator for every collection
+            components: ["Data generation"]
+            description: >
+              Both collections' synthetic histories are written by one shared
+              generator, with each collection's rows, seeds and schedule in a
+              small module of its own. A new collection is that one module,
+              and every delivery comes out byte-for-byte as before.
   - date: "2026-10-16"
     summary: >
       Birth Registrations' history now opens with twelve days when each
