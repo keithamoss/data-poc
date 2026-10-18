@@ -1741,12 +1741,13 @@ INJECTIONS: tuple[Injection, ...] = (
                Link("TS-61b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
     # A CORRECTION MERGED AND NOT YET CONFIRMED (REQ-GEN-205, TS-62): Birth
-    # Registrations' claim window widens to six hours from 2026-09-19 by a
-    # declared correction the scripted manager leaves pending. 2026-09-19's
-    # own supply arrives the evening before, under the old version; every
-    # supply after it is filed and judged against the corrected one. Its claim
-    # is only the filings the wider window changes (correction_claims), which
-    # for these arrival times is none.
+    # Registrations' claim window widens to six hours for 2026-07-25 alone,
+    # by a declared correction the scripted manager leaves pending. That day's
+    # supply arrives the evening before, under the old version. A version for
+    # one day, so no other scenario's day sits under a window it was not built
+    # for; at 2026-09-19, open-ended, the correction claimed days TS-45 and
+    # TS-46 need, and no two days at the history's end are free. Its claim is
+    # the day and the evening before it (correction_claims).
     Injection(
         scenario_id="TS-62",
         dataset_id="birth-registrations",
