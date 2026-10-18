@@ -521,6 +521,10 @@ def carries(shape: str | None, table: str) -> bool:
         return table == "cp_placements"
     if shape == "one_table_missing":
         return table != "cp_placements"
+    if shape == "carers_missing":
+        return table != "cp_carers"
+    if shape == "carers_alone":
+        return table == "cp_carers"
     return True
 
 
@@ -1825,8 +1829,10 @@ INJECTIONS: tuple[Injection, ...] = (
         ),
         also_demonstrates=("TS-63b",),
         correction="REQ-GEN-218",
-        links=(Link("TS-63a", 5, correction_event("REQ-GEN-218"), 1),
-               Link("TS-63b", 5, 2, HISTORY_END)),
+        # Indexed among the arrivals carrying cp_carers (carries()): 0 is the
+        # January one, 1 the gap's.
+        links=(Link("TS-63a", 5, correction_event("REQ-GEN-218"), 0),
+               Link("TS-63b", 5, 1, HISTORY_END)),
     ),
     Injection(
         scenario_id="TS-76",
