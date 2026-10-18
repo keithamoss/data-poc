@@ -108,6 +108,10 @@ def generate(collection_id: str) -> list[dict]:
         raise scenario_injection.CannotPlace(
             "no generator provider makes the dataset these scenarios name, so nothing was "
             "written:\n" + "\n".join(f"  - {u}" for u in unprovided))
+    # WHAT EACH DECLARED CORRECTION CLAIMS (REQ-GEN-205 criteria 10 and 18).
+    from generator import correction_claims
+
+    correction_claims.check_all()
     provider.check_seeds()
     plan = provider.plan()
 

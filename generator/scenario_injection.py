@@ -269,6 +269,9 @@ class Injection:
     #: (REQ-GEN-201). An id with no link keeps the default - the latest
     #: day the placement has anything to show (criterion 6).
     links: tuple[Link, ...] = ()
+    #: The declared correction this scenario rides, by change_reference
+    #: (REQ-GEN-205 criterion 10): it may sit inside that correction's claim.
+    correction: str | None = None
 
     #: A green day after the anchor, though nothing in it is targeted
     #: (REQ-GEN-196): a pair settled at 11:00 the next day needs that day's
@@ -947,12 +950,7 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
                 f"{injection.scenario_id} suppresses {', '.join(sorted(own))}, which is "
                 f"its own lead-in or following period - a targeted supply needs that "
                 f"day generated green")
-        stood = stood_on(injection, periods)
-        for name in dict.fromkeys((placement.period, *placement.covered,
-                                   *((stood,) if stood else ()),
-                                   *placement.suppressed, *placement.quiet,
-                                   *placement.built_green,
-                                   *filed_early_into(injection, placement, periods))):
+        for name in claimed_periods(injection, periods, placement):
             key = (injection.dataset_id, name)
             if key in seen and seen[key] != injection.scenario_id:
                 raise CannotPlace(
@@ -961,6 +959,21 @@ def no_two_scenarios_share_a_period(injections: Sequence[Injection],
                     f"what it claims - each one's outcome would depend on the other's "
                     f"arrivals. Move one to a different anchor.")
             seen[key] = injection.scenario_id
+
+
+def claimed_periods(injection: Injection, periods: Sequence,
+                    placement: Placement | None = None) -> list[str]:
+    """Every period an injection needs to itself: its anchor, the periods it
+    covers, stands on, suppresses or quiets, its green lead-in and following
+    periods, and any it files early into."""
+    if placement is None:
+        placement = resolve(dataclasses.replace(injection, links=()), periods)
+    stood = stood_on(injection, periods)
+    return list(dict.fromkeys((placement.period, *placement.covered,
+                               *((stood,) if stood else ()),
+                               *placement.suppressed, *placement.quiet,
+                               *placement.built_green,
+                               *filed_early_into(injection, placement, periods))))
 
 
 def stood_on(injection: Injection, periods: Sequence) -> str | None:
