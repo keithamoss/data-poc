@@ -263,3 +263,17 @@ class TestTheRegistryRoutesTheRest:
             pass
         assert [cid for cid, _ in ran] == ["civil-registration", "child-protection", FAKE_ID]
         assert all(where == str(tmp_path / "deliveries") for _, where in ran)
+
+
+class TestNoTestClearsTheRealDeliveryTree:
+    """Post-build-review #221: a gate run of REQ-GEN-246 emptied data/
+    deliveries and receipts. Bootstrap tests stubbed the old per-collection
+    generate functions, reached the real shared driver instead, and its
+    clear-before-write deleted the real history before the conftest guard
+    refused the first write. The guard now refuses the clear too."""
+
+    def test_clearing_the_real_tree_from_a_test_is_refused(self):
+        from qa_tools.common import delivery
+
+        with pytest.raises(AssertionError, match="real"):
+            delivery.remove_deliveries(["no-such-delivery"])

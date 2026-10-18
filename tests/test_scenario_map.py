@@ -7,7 +7,6 @@ as a defect nobody got round to.
 """
 from __future__ import annotations
 
-import ast
 import json
 from pathlib import Path
 
@@ -219,17 +218,21 @@ class TestTheCommittedMap:
 class TestItIsRebuiltWithTheHistory:
     """Criterion 3: in the same act, so the two cannot disagree."""
 
-    @pytest.mark.parametrize("path", ["cli/bdm.py", "cli/cp.py"])
-    def test_generating_synthetic_data_also_rebuilds_the_map(self, path):
-        tree = ast.parse(Path(path).read_text())
-        function = next(n for n in ast.walk(tree)
-                         if isinstance(n, ast.FunctionDef)
-                         and n.name == "generate_synthetic_data")
-        calls = {getattr(n.func, "attr", None) for n in ast.walk(function)
-                  if isinstance(n, ast.Call)}
-        assert "write_map" in calls, (
-            f"{path}'s generate_synthetic_data no longer rebuilds the scenario map - "
-            f"the map and the history can now disagree silently")
+    def test_generating_any_collection_also_rebuilds_the_map(self, monkeypatch):
+        """Driven through the one entry point every collection generates by
+        (REQ-GEN-246), for every collection with a provider."""
+        from cli import pipeline
+        from generator import driver
+
+        done = []
+        monkeypatch.setattr(driver, "generate", lambda cid: done.append(("generate", cid)))
+        monkeypatch.setattr(sm, "write_map", lambda: done.append(("map", None)))
+        collections = pipeline.generated_collections()
+        assert collections
+        for cid in collections:
+            done.clear()
+            pipeline.generate_collection(cid, trial=False)
+            assert done == [("generate", cid), ("map", None)], done
 
 
 class TestTheMapCanBeCheckedWithoutWriting:

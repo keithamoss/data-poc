@@ -5139,6 +5139,38 @@ could never have computed it), and it belongs with batch 5's check work.
     (cut to N, weakest first), and a speed-only pass on the browser tests,
     which are ~85% of the suite's wall clock.
 
+    **RAISED AGAIN, 2026-10-18, harder - and still deferred.** Keith, watching
+    the REQ-GEN-246 gate take 18 minutes: "I don't understand how we have so
+    many goddamn tests ... You've done something seriously wrong in how
+    you've been doing testing. We need to, honestly, I think we need to rip
+    it out and start again at some point. Challenge me on this." Measured
+    that afternoon: about 5,000 Python test functions in 294 modules, 830
+    JavaScript tests, 84k lines of test code against 77k lines of product
+    Python (about 39k of them code, the rest comments, docstrings and
+    blank lines). The full `mothman check` 18m02s, pytest 15m47s of it.
+
+    THE CHALLENGE GIVEN, which he accepted for now: the COUNT is a real
+    problem - one test per acceptance criterion and per critic finding,
+    exact-wording pins, and the same behaviour tested once directly and
+    again through the browser - but the TIME is per-test cost, not count:
+    a few hundred tests drive real dbt/Soda/datacontract/Evidently runs, a
+    real PostgreSQL bootstrapped from the grown Child Protection history,
+    the real generators, and 239 real-browser tests in one module pinned to
+    one worker. Ripping everything out would discard the ~3,000 cheap tests
+    that cost seconds and rebuild the expensive ones, which are the ones
+    that catch real breakage. Proposed instead, as its own requirement: (1)
+    profile one full run (`--durations=0`) for each test's real cost; (2)
+    budgets - a default local gate under ~5 minutes, the real-tool and
+    browser tests a separate tier run before a push; (3) cut by category -
+    browser tests to real user journeys, wording pins deleted (REQ-TEST-239's
+    S7 capture already covers help and menus), duplicate coverage merged,
+    real-tool runs shared through fixtures; (4) change the habit: a test per
+    behaviour worth protecting, not per criterion or finding.
+
+    Keith, 2026-10-18: "Don't worry about culling tests now." So this stays
+    in the pocket until item 6's chain (#106) is done. What changed today
+    is the GATING, recorded in #106.
+
 
 92. **[todo, 2026-10-13]** **[Docs & process, Dashboard UI]** **What comes
     after the contested-pair batch, and a "we heard / we built" view of
@@ -5551,7 +5583,31 @@ could never have computed it), and it belongs with batch 5's check work.
     now REQ-GEN-246, REQ-TEST-245, REQ-DASH-244, then REQ-TEST-252,
     REQ-TEST-249, REQ-QAC-247 and REQ-PIPE-248 - swapped because nothing
     ties 244 before 245; they touch different files. Every piece is still
-    gated before its own local commit (rule D's checkpoints), the chain is
-    pushed once at the end, and ONLY AFTER ASKING KEITH. This overrides the
+    checkpointed locally (rule D), the chain is pushed once at the end, and
+    ONLY AFTER ASKING KEITH. GATING, the same day (Keith: "I agree with your
+    approach of only running the test modules the piece touches and the
+    cheap gates. That's good. Let's do that more."): each piece runs the
+    test modules it touches, `mothman check --no-pytest`, and its
+    equivalence capture where its requirement asks for one; ONE full
+    `mothman check` runs after REQ-PIPE-248, before the push is put to
+    him. The cost, accepted: a failure an early piece causes surfaces only
+    at the end, and is harder to pin on its cause. This overrides the
     one-push-per-finished-piece default for this chain alone. Record the
     swap in REQ-TEST-245's decisions when it is built.
+
+107. **[todo, 2026-10-18]** **[Docs & process]** **Why is there 77,000 lines
+    of product code?** Keith, 2026-10-18: "how the fuck do we have 77,000
+    lines of product code? That's ridiculous." Measured the same day: 76,720
+    lines of product Python, of which 38,605 are code and the rest
+    comments, docstrings and blank lines - roughly half the files are
+    prose. By area: qa_tools/common 51,880 (141 modules - the supply
+    lifecycle of filing, slots, promotion, decisions, corrections and holds
+    alone ~18,600; storage ~5,900; schedule and time ~5,500; checks and
+    statuses ~4,100; the `mothman check` validators ~3,000), cli 9,981,
+    generator 6,452, pipeline 3,449, dashboard Python 2,225, qa_tools/tools
+    2,114; plus the dashboard template's 10,246 lines of HTML/CSS/JS.
+    Not scoped: whether the docstrings should shrink (they carry decisions
+    and incident history that arguably belongs in requirements.yaml's
+    decisions, not in code), and whether the lifecycle's ~40 modules have
+    grown more surface than the model needs. Ask Keith which he wants
+    looked at, and when, after item 6's chain.

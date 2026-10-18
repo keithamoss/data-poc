@@ -10161,3 +10161,46 @@ twice. It deliberately did not re-find the `TypeError`.
      having, both larger than a polish fix, both left for REQ-TEST-249's
      own third-collection pass. Minor defects and polish under Keith's
      polish rule; F1 was his call.
+
+221. **[done, 2026-10-18]** **[Testing & dev tooling]** **REQ-GEN-246's gate
+     emptied the real delivery tree.** Not a critic finding - the build's own
+     gate found it, on the run Keith watched take 18 minutes: 18 failures,
+     and afterwards `data/deliveries` and `data/receipts` held nothing. The
+     database was untouched.
+
+     THE CAUSE, a defect of the change. Sixteen tests (tests/test_bootstrap.py,
+     tests/test_scenario_map.py) stubbed `cli.bdm.generate_synthetic_data`
+     and `cli.cp.generate_synthetic_data`; REQ-GEN-246 sent the bootstrap
+     through `cli.pipeline.generate_collection()` instead, so the stubs no
+     longer caught anything and the REAL shared driver ran. The driver
+     clears what a collection wrote last time BEFORE it writes, so it
+     deleted the real history and only then reached
+     `_no_test_files_a_real_delivery`, which refused the first write. The
+     guard was sound about writes and blind to the clear that precedes them;
+     the old per-collection generators had the same order, so the gap is
+     older than this change, and this change is what walked into it. The
+     other two failures (tests/test_arrivals_from_records.py) were the empty
+     tree, read.
+
+     FIXED, test first: tests/test_generator_providers.py's
+     `TestNoTestClearsTheRealDeliveryTree` failed against the old guard
+     (`remove_deliveries` against the real tree returned 0 and deleted
+     whatever it was given) and passes now that conftest.py guards the clear
+     as well as the write. The sixteen tests stub `generate_collection`, the
+     one entry point; the scenario-map test, which read cli/bdm.py's and
+     cli/cp.py's source for a `write_map` call, is replaced by one that
+     drives `generate_collection` for every collection with a provider and
+     asserts generation then the map (CLAUDE.md's rule against source-reading
+     tests).
+
+     RESTORED by regenerating with the real commands: byte-identical to the
+     pre-change generation (`diff -r`, deliveries, receipts and bookkeeping),
+     SCENARIOS.md unchanged. One field still differed from the database -
+     each receipt's `sequence`, a global counter that moves on every
+     regeneration - so the deployment was rebuilt from empty (`mothman env
+     reset-synthetic`, then `mothman pipeline bootstrap`).
+
+     THE LESSON, for whoever next moves an entry point: a stub on the old
+     name does not fail when the call moves - it just stops being reached,
+     and the real thing runs. A guard on a destructive side effect has to
+     cover every step of it, not only the one that writes.

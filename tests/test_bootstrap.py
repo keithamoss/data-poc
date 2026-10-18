@@ -91,8 +91,10 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
         empty_db.execute(
             f'CREATE TABLE "{supply_db.STAGING_SCHEMA}".t__20260101000000 (id int)')
         called = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
+        # Generation goes through cli/pipeline.py's one entry point since
+        # REQ-GEN-246 - stubbed there, or the real driver runs.
+        monkeypatch.setattr("cli.pipeline.generate_collection",
+                            lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
         _in_process(monkeypatch)
@@ -107,8 +109,10 @@ class TestWhatItRuns:
     @pytest.fixture
     def spy(self, empty_db, monkeypatch):
         called = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
+        # Generation goes through cli/pipeline.py's one entry point since
+        # REQ-GEN-246 - stubbed there, or the real driver runs.
+        monkeypatch.setattr("cli.pipeline.generate_collection",
+                            lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append(_SHORT[collection_id]))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
@@ -171,8 +175,10 @@ class TestCollectionsRunSideBySide:
     @pytest.fixture
     def spy(self, empty_db, monkeypatch):
         called = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
+        # Generation goes through cli/pipeline.py's one entry point since
+        # REQ-GEN-246 - stubbed there, or the real driver runs.
+        monkeypatch.setattr("cli.pipeline.generate_collection",
+                            lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))

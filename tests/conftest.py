@@ -411,11 +411,33 @@ def _no_test_files_a_real_delivery():
                 f"(see tests/conftest.py's _no_test_files_a_real_delivery)")
         return real(*args, **kwargs)
 
+    # THE CLEAR IS GUARDED TOO (post-build-review #221). A generator clears
+    # what it wrote last time BEFORE it writes, so a test that reached the
+    # real driver deleted the whole real history and only then hit the write
+    # guard above - every delivery and receipt in data/ gone, on a gate run.
+    real_remove = delivery.remove_deliveries
+    remove_signature = inspect.signature(real_remove)
+
+    @functools.wraps(real_remove)
+    def guarded_remove(*args, **kwargs):
+        bound = remove_signature.bind(*args, **kwargs)
+        bound.apply_defaults()
+        target = Path(bound.arguments.get("deliveries_dir") or delivery.DELIVERIES_DIR).resolve()
+        if target == real_tree:
+            raise AssertionError(
+                f"a test tried to clear deliveries from this repo's real {real_tree} - "
+                f"redirect the generator (generator/output.py's redirect()) or point "
+                f"deliveries_dir and receipts_dir at tmp_path (see tests/conftest.py's "
+                f"_no_test_files_a_real_delivery)")
+        return real_remove(*args, **kwargs)
+
     delivery.write_delivery = guarded
+    delivery.remove_deliveries = guarded_remove
     try:
         yield
     finally:
         delivery.write_delivery = real
+        delivery.remove_deliveries = real_remove
 
 
 @pytest.fixture(scope="session", autouse=True)
