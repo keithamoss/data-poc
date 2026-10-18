@@ -2,10 +2,9 @@
 Builds dashboard/qa-reporting-dashboard.html from dashboard/qa-reporting-
 dashboard.template.html (2026-09-16, Keith's call - plans/publishing-
 and-history.md): reads the committed, hand-edited template, regenerates
-the `const REAL_BIRTH_REG_DATA = {...};` and `const REAL_CP_DATA =
-{...};` lines from reports/birth_registrations_dashboard.json and
-reports/child_protection_dashboard.json (pipeline/build_dashboard_
-data.py's/build_cp_dashboard_data.py's output), and writes the result
+the `const COLLECTION_DATA = {...};` line from every registered
+collection's reports/ dashboard file (pipeline/build_dashboard_data.py's
+output, REQ-DASH-244), and writes the result
 to the real, viewable HTML - gitignored, never committed, rebuilt fresh
 by CI on every push and locally by `mothman pipeline run`/`mothman
 dashboard rebuild`. Run this last, after the pipeline (qa_tools/tools/
@@ -18,7 +17,7 @@ removed entirely 2026-09-17 (plans/qa-pipeline.md Phase 5j), replaced
 by real per-dataset cadence config - each dataset's participation in
 contract/calendar.yaml since REQ-PIPE-110 (the contracts' `slaProperties:`
 before it), read by qa_tools/common/agreement.py's cadence() and already
-folded into REAL_BIRTH_REG_DATA/REAL_CP_DATA's own `sla.cadence` field
+folded into each COLLECTION_DATA dataset's own `sla.cadence` field
 by the two build_*_dashboard_data.py scripts above - nothing left for
 this script to separately embed).
 
@@ -161,7 +160,12 @@ template's own const comment for the full reasoning). Empty/null
 locally if the file hasn't been recorded yet, same graceful-degradation
 treatment as everything else this script embeds.
 
-This only replaces those thirteen consts - the rest of the dashboard (its
+And `const COLLECTION_DATA` (REQ-DASH-244), which replaced one const per
+collection: every registered collection's
+dashboard file, keyed by collection id, and `const AGENCY_BLURB` from
+contract/presentation.yaml. A collection with no file refuses the build.
+
+This only replaces those consts - the rest of the dashboard (its
 CSS, the rendering code, the other 14 illustrative datasets, and the
 separate SNAPSHOT_MANIFEST const dashboard/snapshot_dashboard.py owns)
 is copied through unchanged from the template.
@@ -199,10 +203,43 @@ REQUIREMENTS_YAML = os.path.join(ROOT, "requirements.yaml")
 OPEN_TICKETS_JSON = os.path.join(ROOT, "reports", "open_tickets.json")
 TICKET_RESOLUTIONS_JSON = os.path.join(ROOT, "reports", "ticket_resolutions.json")
 
-TARGETS = [
-    ("REAL_BIRTH_REG_DATA", os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")),
-    ("REAL_CP_DATA", os.path.join(ROOT, "reports", "child_protection_dashboard.json")),
-]
+class MissingCollectionData(RuntimeError):
+    """A collection the hierarchy declares has no dashboard file to embed
+    (REQ-DASH-244 criterion 7) - the page is not written."""
+
+
+def collection_targets() -> list[tuple[str, str]]:
+    """(collection id, its dashboard file) for every registered collection,
+    in hierarchy order - from the registry (REQ-DASH-244 criterion 9)."""
+    from pipeline import build_dashboard_data
+    from qa_tools import collections
+
+    return [(c.id, build_dashboard_data.out_path(c.id)) for c in collections.all_collections()]
+
+
+def collection_data() -> dict:
+    """COLLECTION_DATA: {collection id: {"datasets": [...]}} in hierarchy
+    order, each entry self-contained (REQ-DASH-244 criterion 4).
+
+    ONE MISSING COLLECTION FAILS THE WHOLE BUILD (criterion 7): `mothman
+    check` already refuses a collection the builder cannot describe, so a
+    missing file means a build step did not run - and a page that silently
+    lacks a collection is the false quiet REQ-PIPE-240's series exists to
+    remove."""
+    from qa_tools import collections
+
+    out = {}
+    for collection_id, path in collection_targets():
+        if not os.path.exists(path):
+            raise MissingCollectionData(
+                f"collection {collection_id!r} has no dashboard data at "
+                f"{os.path.relpath(path, ROOT)} - run `mothman dashboard build-data` first. "
+                f"No page was written.")
+        with open(path) as f:
+            doc = json.load(f)
+        datasets = collections.adapter(collection_id).dashboard_datasets(doc)
+        out[collection_id] = {"datasets": datasets}
+    return out
 
 # (agency, collection, display label) - the same two real scopes TARGETS
 # above embeds, identified the way qa_results/'s own directory layout
@@ -305,12 +342,18 @@ def embed() -> None:
     with open(TEMPLATE_HTML) as f:
         html = f.read()
 
-    for const_name, data_json_path in TARGETS:
-        with open(data_json_path) as f:
-            data = json.load(f)
-        real_json = json.dumps(data, separators=(",", ":"))
-        html = _replace_const(html, const_name, real_json)
-        print(f"Re-embedded {len(real_json)} bytes of real data into {const_name}")
+    # COLLECTION_DATA - REQ-DASH-244. Read before anything else, so a missing
+    # collection refuses the build before any other work is done.
+    data = collection_data()
+    real_json = json.dumps(data, separators=(",", ":"))
+    html = _replace_const(html, "COLLECTION_DATA", real_json)
+    print(f"Re-embedded {len(real_json)} bytes of real data into COLLECTION_DATA "
+          f"({len(data)} collection(s): {', '.join(data)})")
+
+    # AGENCY_BLURB - REQ-DASH-244 criterion 10, from contract/presentation.yaml.
+    from qa_tools.common import presentation
+    html = _replace_const(html, "AGENCY_BLURB",
+                           json.dumps(presentation.agency_blurbs(), separators=(",", ":")))
 
     # HIERARCHY - REQ-QAC-039. The one statement of the
     # agency/collection/dataset tree, from contract/data-asset.yaml, so

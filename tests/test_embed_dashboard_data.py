@@ -33,9 +33,8 @@ pytestmark = pytest.mark.needs_deployment
 @pytest.fixture(autouse=True)
 def _isolate_embed_data_targets(monkeypatch, tmp_path):
     """plans/tooling.md #10 - every test here drives the real embed(),
-    which reads edd.TARGETS: the real, repo-relative
-    reports/birth_registrations_dashboard.json and
-    child_protection_dashboard.json. Those are BUILD ARTIFACTS, rewritten
+    which reads every collection's real, repo-relative dashboard file under
+    reports/ (edd.collection_targets(), REQ-DASH-244). Those are BUILD ARTIFACTS, rewritten
     from scratch by tests/test_dashboard_e2e.py's own session-scoped
     built_dashboard_html fixture - so under pytest-xdist the two modules
     land on different workers and this one reads a 6.5MB file mid-rewrite,
@@ -48,15 +47,15 @@ def _isolate_embed_data_targets(monkeypatch, tmp_path):
     pointing them at tiny local stubs is both the real isolation fix and
     strictly more honest about what's under test. Every other real file
     embed() touches was already monkeypatched per-test; TARGETS was the
-    one shared read nobody had covered."""
+    one shared read nobody had covered (it was edd.TARGETS until REQ-DASH-244)."""
     stub = tmp_path / "targets"
     stub.mkdir()
     targets = []
-    for const_name, real_path in edd.TARGETS:
-        p = stub / f"{const_name}.json"
-        p.write_text(json.dumps({"stub": const_name}))
-        targets.append((const_name, str(p)))
-    monkeypatch.setattr(edd, "TARGETS", targets)
+    for collection_id, _real_path in edd.collection_targets():
+        p = stub / f"{collection_id}.json"
+        p.write_text(json.dumps({"datasets": []}))
+        targets.append((collection_id, str(p)))
+    monkeypatch.setattr(edd, "collection_targets", lambda: targets)
 
 
 @pytest.fixture(autouse=True)

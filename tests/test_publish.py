@@ -315,11 +315,11 @@ class TestTheArtifactSaysWhereItCameFrom:
         from pipeline import corrections
 
         targets = []
-        for const_name, _real in edd.TARGETS:
-            stub = tmp_path / f"{const_name}.json"
-            stub.write_text(json.dumps({"stub": const_name}))
-            targets.append((const_name, str(stub)))
-        monkeypatch.setattr(edd, "TARGETS", targets)
+        for collection_id, _real in edd.collection_targets():
+            stub = tmp_path / f"{collection_id}.json"
+            stub.write_text(json.dumps({"datasets": []}))
+            targets.append((collection_id, str(stub)))
+        monkeypatch.setattr(edd, "collection_targets", lambda: targets)
         monkeypatch.setattr(corrections, "applied_feed", lambda: [])
         # The sprint graph re-parses requirements.yaml several times over,
         # which is most of embed()'s cost and nothing to do with the stamp.

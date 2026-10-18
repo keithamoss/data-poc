@@ -1,6 +1,6 @@
 """Tests for qa_tools/tools/dataset_stats.py, driven for each collection
 - the presentation-layer computation moved out of pipeline/
-build_dashboard_data.py's/build_cp_dashboard_data.py's own live queries
+the dashboard builders' own live queries
 (plans/publishing-and-history.md Phase 3, Keith's hard rule: CI must
 never touch data). Real small DuckDB fixtures, since these functions'
 whole job is running real SQL - a mock wouldn't test anything real."""

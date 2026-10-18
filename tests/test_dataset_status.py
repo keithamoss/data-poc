@@ -2,7 +2,7 @@
 real-check rollup used by the ticketing MVP (item 76, plans/qa-
 pipeline.md), mirroring the dashboard's own client-side worstOf()/
 checkStatus(). Fixture-based dataset dicts, matching the real shape
-pipeline/build_dashboard_data.py/build_cp_dashboard_data.py produce."""
+pipeline/build_dashboard_data.py produces."""
 from __future__ import annotations
 
 from qa_tools.common.dataset_status import dataset_status, status_by_run, status_for_value

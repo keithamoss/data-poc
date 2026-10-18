@@ -25,22 +25,22 @@ def test_rebuild_results_rebuilds_every_registered_collection(monkeypatch):
     assert called == ["civil-registration", "child-protection"]
 
 
-def test_build_data_writes_both_datasets_output(monkeypatch, tmp_path):
-    import pipeline.build_dashboard_data as build_dashboard_data
-    import pipeline.build_cp_dashboard_data as build_cp_dashboard_data
+def test_build_data_writes_every_collections_output(monkeypatch, tmp_path):
+    """REQ-DASH-244 criterion 9: one builder, every registered collection."""
+    import json
 
-    bdm_out = tmp_path / "bdm.json"
-    cp_out = tmp_path / "cp.json"
-    monkeypatch.setattr(build_dashboard_data, "OUT_PATH", str(bdm_out))
-    monkeypatch.setattr(build_dashboard_data, "build", lambda: {"dataset": "bdm"})
-    monkeypatch.setattr(build_cp_dashboard_data, "OUT_PATH", str(cp_out))
-    monkeypatch.setattr(build_cp_dashboard_data, "build", lambda: {"dataset": "cp"})
+    import pipeline.build_dashboard_data as build_dashboard_data
+    from qa_tools import collections
+
+    monkeypatch.setattr(build_dashboard_data, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
+    monkeypatch.setattr(build_dashboard_data, "build", lambda cid: {"collection": cid})
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["build-data"])
 
     assert result.exit_code == 0, result.output
-    assert bdm_out.exists()
-    assert cp_out.exists()
+    ids = [c.id for c in collections.all_collections()]
+    assert ids and sorted(p.stem for p in tmp_path.iterdir()) == sorted(ids)
+    assert all(json.loads((tmp_path / f"{i}.json").read_text()) == {"collection": i} for i in ids)
 
 
 def test_embed_calls_the_real_embed_function(monkeypatch):

@@ -119,11 +119,10 @@ class TestTheBuildWarns:
     def test_build_data_prints_the_warning_and_still_writes(self, monkeypatch, tmp_path,
                                                             capsys):
         from cli import dashboard as cli_dashboard
-        from pipeline import build_cp_dashboard_data, build_dashboard_data
+        from pipeline import build_dashboard_data
 
-        for module in (build_dashboard_data, build_cp_dashboard_data):
-            monkeypatch.setattr(module, "build", lambda: {"datasets": []})
-            monkeypatch.setattr(module, "OUT_PATH", str(tmp_path / f"{module.__name__}.json"))
+        monkeypatch.setattr(build_dashboard_data, "build", lambda cid: {"datasets": []})
+        monkeypatch.setattr(build_dashboard_data, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
         monkeypatch.setattr(census, "build_warnings",
                             lambda: ["warning: census x: the log says P holds t"])
         cli_dashboard._build_data()

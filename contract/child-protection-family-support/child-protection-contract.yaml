@@ -108,14 +108,19 @@ servers:
 schema:
   - name: cp_clients
     physicalType: table
-    description: One row per child with a Child Protection casework history.
+    description: "One row per child with a Child Protection casework history, per quarterly snapshot extract."
+    customProperties:
+      # The dashboard's note on this table's Table-level checks section
+      # (REQ-DASH-244 criterion 2, moved from the dashboard builder).
+      - property: tableLevelChecksNote
+        value: "No cross-table business rule is anchored on this table today."
     properties:
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
         required: true
         unique: true
-        description: This agency's unique client identifier. Primary key of this table.
+        description: "This agency's unique client identifier — primary key of this table."
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:cp_client_id:nullValues_datacontract
             metric: nullValues
@@ -156,6 +161,7 @@ schema:
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -180,6 +186,7 @@ schema:
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -204,6 +211,7 @@ schema:
       - name: date_of_birth
         logicalType: date
         physicalType: date
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:date_of_birth:nullValues_datacontract
@@ -261,6 +269,7 @@ schema:
       - name: sex
         logicalType: string
         physicalType: varchar(1)
+        description: "Closed value set (M / F / X)."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:sex:invalidValues_datacontract
@@ -287,6 +296,7 @@ schema:
       - name: suburb
         logicalType: string
         physicalType: varchar(100)
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:suburb:nullValues_datacontract
@@ -310,6 +320,7 @@ schema:
       - name: postcode
         logicalType: string
         physicalType: varchar(4)
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:postcode:nullValues_datacontract
@@ -363,6 +374,7 @@ schema:
       - name: case_opened_date
         logicalType: date
         physicalType: date
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:case_opened_date:nullValues_datacontract
@@ -387,7 +399,7 @@ schema:
         logicalType: string
         physicalType: varchar(10)
         required: true
-        description: Open or Closed.
+        description: "Open or Closed — derived from investigation state, not independently random (see child_protection.py)."
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-clients:case_status:invalidValues_datacontract
             metric: invalidValues
@@ -435,13 +447,17 @@ schema:
 
   - name: cp_notifications
     physicalType: table
-    description: >
-      One row per notification (a report of concern about a child) -
-      1-4 per client, more for children with a higher-risk history.
+    description: "One row per notification (a report of concern about a child) - 1-4 per client, more for children with a higher-risk history."
+    customProperties:
+      # The dashboard's note on this table's Table-level checks section
+      # (REQ-DASH-244 criterion 2, moved from the dashboard builder).
+      - property: tableLevelChecksNote
+        value: "Escalation completeness — see that check's own note for the real numbers."
     properties:
       - name: notification_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Primary key. dirty(amber/red) presets inject near-duplicates here."
         required: true
         unique: true
         quality:
@@ -510,6 +526,7 @@ schema:
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_clients.cp_client_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:cp_client_id:nullValues_datacontract
@@ -557,6 +574,7 @@ schema:
       - name: notification_date
         logicalType: date
         physicalType: date
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:notification_date:nullValues_datacontract
@@ -580,6 +598,7 @@ schema:
       - name: source_type
         logicalType: string
         physicalType: varchar(30)
+        description: "Closed value set."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:source_type:invalidValues_datacontract
@@ -606,10 +625,12 @@ schema:
         logicalType: string
         physicalType: varchar(50)
         required: true
-        description: >
-          Closed value set. The dirty(amber/red) presets inject unknown
-          codes here - the deliberate traffic-light demo column for this
-          collection, same role sex plays for Birth Registrations.
+        # What this description said before REQ-DASH-244 moved the page's
+        # note here - kept for whoever maintains the contract:
+        #   Closed value set. The dirty(amber/red) presets inject unknown codes
+        #   here - the deliberate traffic-light demo column for this collection,
+        #   same role sex plays for Birth Registrations.
+        description: "Closed value set — the traffic-light demo column for this collection, same role sex plays for Birth Registrations."
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:concern_type:invalidValues_datacontract
             metric: invalidValues
@@ -634,6 +655,7 @@ schema:
       - name: risk_rating
         logicalType: string
         physicalType: varchar(10)
+        description: "Closed value set."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:risk_rating:invalidValues_datacontract
@@ -659,6 +681,7 @@ schema:
       - name: assigned_worker_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_case_workers.worker_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:assigned_worker_id:nullValues_datacontract
@@ -706,6 +729,7 @@ schema:
       - name: outcome
         logicalType: string
         physicalType: varchar(30)
+        description: "Closed value set — 'Investigation opened' is what the escalation-completeness rule checks."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:outcome:invalidValues_datacontract
@@ -731,6 +755,7 @@ schema:
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
+        description: "When this snapshot was extracted from the casework system."
         required: true
     quality:
       - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:rowCount_datacontract
@@ -756,11 +781,17 @@ schema:
 
   - name: cp_investigations
     physicalType: table
-    description: One row per investigation opened from an escalated notification.
+    description: "One row per investigation opened from an escalated notification."
+    customProperties:
+      # The dashboard's note on this table's Table-level checks section
+      # (REQ-DASH-244 criterion 2, moved from the dashboard builder).
+      - property: tableLevelChecksNote
+        value: "Closed-case investigation hygiene — see that check's own note for the real numbers."
     properties:
       - name: investigation_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Primary key."
         required: true
         unique: true
         quality:
@@ -830,6 +861,7 @@ schema:
       - name: notification_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_notifications.notification_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:notification_id:nullValues_datacontract
@@ -877,6 +909,7 @@ schema:
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_clients.cp_client_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:cp_client_id:nullValues_datacontract
@@ -924,6 +957,7 @@ schema:
       - name: start_date
         logicalType: date
         physicalType: date
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:start_date:nullValues_datacontract
@@ -948,10 +982,11 @@ schema:
         logicalType: date
         physicalType: date
         required: false
-        description: Nullable - the investigation may still be open (~12% of them are, by generator design).
+        description: "Nullable — the investigation may still be open (~12% of them are, by generator design)."
       - name: substantiated
         logicalType: string
         physicalType: varchar(20)
+        description: "Closed value set."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:substantiated:invalidValues_datacontract
@@ -977,6 +1012,7 @@ schema:
       - name: lead_worker_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_case_workers.worker_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:lead_worker_id:nullValues_datacontract
@@ -1024,6 +1060,7 @@ schema:
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
+        description: "When this snapshot was extracted from the casework system."
         required: true
     quality:
       - id: data-asset-1:child-protection-family-support:child-protection:cp-investigations:rowCount_datacontract
@@ -1049,11 +1086,17 @@ schema:
 
   - name: cp_placements
     physicalType: table
-    description: One row per out-of-home-care placement (0-2 per client; not every client has one).
+    description: "One row per out-of-home-care placement (0-2 per client; not every client has one)."
+    customProperties:
+      # The dashboard's note on this table's Table-level checks section
+      # (REQ-DASH-244 criterion 2, moved from the dashboard builder).
+      - property: tableLevelChecksNote
+        value: "Placement/carer approval compliance — see that check's own note for the real numbers."
     properties:
       - name: placement_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Primary key."
         required: true
         unique: true
         quality:
@@ -1096,6 +1139,7 @@ schema:
       - name: cp_client_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_clients.cp_client_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:cp_client_id:nullValues_datacontract
@@ -1143,6 +1187,7 @@ schema:
       - name: placement_type
         logicalType: string
         physicalType: varchar(30)
+        description: "Closed value set."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_type:invalidValues_datacontract
@@ -1168,6 +1213,7 @@ schema:
       - name: carer_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Foreign key → cp_carers.carer_id."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:carer_id:nullValues_datacontract
@@ -1242,6 +1288,7 @@ schema:
       - name: placement_start
         logicalType: date
         physicalType: date
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_start:nullValues_datacontract
@@ -1266,10 +1313,11 @@ schema:
         logicalType: date
         physicalType: date
         required: false
-        description: Nullable - the placement may still be ongoing (~22% of them are, by generator design).
+        description: "Nullable — the placement may still be ongoing (~22% of them are, by generator design)."
       - name: placement_suburb
         logicalType: string
         physicalType: varchar(100)
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:placement_suburb:nullValues_datacontract
@@ -1293,6 +1341,7 @@ schema:
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
+        description: "When this snapshot was extracted from the casework system."
         required: true
     quality:
       - id: data-asset-1:child-protection-family-support:child-protection:cp-placements:rowCount_datacontract
@@ -1318,11 +1367,17 @@ schema:
 
   - name: cp_carers
     physicalType: table
-    description: One row per approved (or in-approval) carer available for placements.
+    description: "One row per approved (or in-approval) carer available for placements."
+    customProperties:
+      # The dashboard's note on this table's Table-level checks section
+      # (REQ-DASH-244 criterion 2, moved from the dashboard builder).
+      - property: tableLevelChecksNote
+        value: "No cross-table business rule is anchored on this table today."
     properties:
       - name: carer_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Primary key."
         required: true
         unique: true
         quality:
@@ -1365,6 +1420,7 @@ schema:
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -1389,6 +1445,7 @@ schema:
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -1413,6 +1470,7 @@ schema:
       - name: carer_type
         logicalType: string
         physicalType: varchar(20)
+        description: "Closed value set."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:carer_type:invalidValues_datacontract
@@ -1438,6 +1496,7 @@ schema:
       - name: approval_status
         logicalType: string
         physicalType: varchar(20)
+        description: "Closed value set — what the placement/carer approval compliance rule checks placements against."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:approval_status:invalidValues_datacontract
@@ -1463,6 +1522,7 @@ schema:
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
+        description: "When this snapshot was extracted from the casework system."
         required: true
     quality:
       - id: data-asset-1:child-protection-family-support:child-protection:cp-carers:rowCount_datacontract
@@ -1488,11 +1548,17 @@ schema:
 
   - name: cp_case_workers
     physicalType: table
-    description: One row per case worker who may be assigned notifications or lead investigations.
+    description: "One row per case worker who may be assigned notifications or lead investigations."
+    customProperties:
+      # The dashboard's note on this table's Table-level checks section
+      # (REQ-DASH-244 criterion 2, moved from the dashboard builder).
+      - property: tableLevelChecksNote
+        value: "No cross-table business rule is anchored on this table today."
     properties:
       - name: worker_id
         logicalType: string
         physicalType: varchar(20)
+        description: "Primary key."
         required: true
         unique: true
         quality:
@@ -1535,6 +1601,7 @@ schema:
       - name: given_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -1559,6 +1626,7 @@ schema:
       - name: family_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -1583,6 +1651,7 @@ schema:
       - name: team_region
         logicalType: string
         physicalType: varchar(30)
+        description: "Closed value set."
         required: true
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:team_region:invalidValues_datacontract
@@ -1609,6 +1678,7 @@ schema:
       - name: extract_timestamp
         logicalType: date
         physicalType: timestamp
+        description: "When this snapshot was extracted from the casework system."
         required: true
     quality:
       - id: data-asset-1:child-protection-family-support:child-protection:cp-case-workers:rowCount_datacontract

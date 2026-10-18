@@ -100,8 +100,8 @@ describe("a placed turned-off hold stays in its quiet section (decision, with RE
 // first. A contested pair placed whole and later superseded says both.
 describe("post-build-review #196: a placed blocker's real ending", () => {
   const withData = placements => {
-    const html = readFileSync(TEMPLATE, "utf-8").replace("const REAL_CP_DATA = null;",
-      `const REAL_CP_DATA = ${JSON.stringify({ datasets: [{ id: "cp-clients", placements }] })};`);
+    const html = readFileSync(TEMPLATE, "utf-8").replace("const COLLECTION_DATA = null;",
+      `const COLLECTION_DATA = ${JSON.stringify({ "child-protection": { datasets: [{ id: "cp-clients", placements }] } })};`);
     return (dashboard = loadDashboard({ html })).window;
   };
   const PAIR = { kind: "contested", datasetId: "cp-clients", supply: "cp-clients@a",

@@ -85,10 +85,22 @@ def test_a_real_evidently_check_id_resolves_to_its_real_source_line():
     assert check_id in lines[line_no - 1]
 
 
-def test_build_folder_links_covers_every_real_agency_and_dataset():
+def test_a_dataset_opens_its_contract_at_its_own_entry_and_an_agency_its_folder():
+    """REQ-DASH-244 criteria 12 and 13: every registered dataset and agency,
+    from the registry, with a tooltip naming the target."""
+    from qa_tools import collections
+
     folders = github_links.build_folder_links(sha="abc123")
-    assert folders["agencies"]["registry-services"].endswith("/qa_tools/bdm")
-    assert folders["agencies"]["child-protection-family-support"].endswith("/qa_tools/cp")
-    assert folders["datasets"]["birth-registrations"].endswith("/qa_tools/bdm")
-    for cp_dataset in ("cp-clients", "cp-notifications", "cp-investigations", "cp-placements", "cp-carers", "cp-case-workers"):
-        assert folders["datasets"][cp_dataset].endswith("/qa_tools/cp")
+    every = collections.all_collections()
+    assert every, "the registry must hold collections for this test to mean anything"
+    for coll in every:
+        assert folders["agencies"][coll.agency_id] == (
+            f"https://github.com/keithamoss/data-poc/tree/abc123/contract/{coll.agency_id}")
+        assert f"contract/{coll.agency_id}/" in folders["titles"]["agencies"][coll.agency_id]
+        contract = coll.check_file("contract")
+        lines = (github_links.ROOT / contract).read_text().splitlines()
+        for d in coll.datasets:
+            url = folders["datasets"][d.dataset_id]
+            assert url.startswith(f"https://github.com/keithamoss/data-poc/blob/abc123/{contract}#L")
+            assert lines[int(url.rsplit("#L", 1)[1]) - 1].strip() == f"- name: {d.table}"
+            assert contract in folders["titles"]["datasets"][d.dataset_id]

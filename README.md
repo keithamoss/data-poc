@@ -216,8 +216,9 @@ qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently
   collections/               the collection registry, and each collection's adapter (what the tools read)
 pipeline/                    a real package (pipeline/__init__.py) - invoked via `mothman pipeline
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
-  build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
-  build_cp_dashboard_data.py    reshapes results_cp.json into 6 datasets' worth of dashboard data
+  build_dashboard_data.py       reshapes every collection's results file into the dashboard's data
+                               shape - one builder for every collection, each column's type and
+                               description from its contract, the rest from contract/presentation.yaml
 dashboard/
   qa-reporting-dashboard.template.html   the 3-tier QA dashboard's hand-authored UI source (HTML/CSS/JS) -
                                edit this file, not the built .html below
@@ -225,7 +226,7 @@ dashboard/
                                real data embedded, Birth Registrations and the whole Child Protection
                                collection wired to real data
   embed_dashboard_data.py       builds qa-reporting-dashboard.html from the template above, embedding
-                               both real datasets (REAL_BIRTH_REG_DATA, REAL_CP_DATA)
+                               every registered collection's data into one COLLECTION_DATA const
 data/                          generated - raw run CSVs, manifest.json, cp_raw/, and supply.duckdb:
                                ONE database holding every staged supply, which each QA run reads
                                through a schema of views of its own (REQ-PIPE-068). Not checked in.
@@ -546,7 +547,7 @@ it end to end rather than assumed:
   `fail_threshold` to `0`, which made `checkStatus()` (`current > fail`)
   read any healthy positive row count as red. Fixed by excluding
   `row_count` from the per-column checks entirely
-  (`pipeline/build_cp_dashboard_data.py`), the same way
+  (what was then `pipeline/build_cp_dashboard_data.py`), the same way
   `build_dashboard_data.py` already handles Birth Registrations' rowCount
   rule (it only ever feeds the dataset's own `rowCount`/`prevRowCount`
   fields, never a column tile) — this bug was latent in that shared

@@ -53,11 +53,6 @@ SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET")
 #: collection literal when REQ-PIPE-240 landed, with the requirement that
 #: rewires it. It may only shrink.
 ALLOWLIST: dict[str, str] = {
-    # The dashboard: one builder, one COLLECTION_DATA const, contract links.
-    "dashboard/qa-reporting-dashboard.template.html": "REQ-DASH-244",
-    "pipeline/build_dashboard_data.py": "REQ-DASH-244",
-    "pipeline/build_cp_dashboard_data.py": "REQ-DASH-244",
-    "qa_tools/common/github_links.py": "REQ-DASH-244",
     # The lifecycle gate's legacy reader, for a base ref from before
     # REQ-QAC-241 moved every check file - deleted with it.
     "qa_tools/common/validate_check_lifecycle.py": "REQ-PIPE-248",
@@ -158,7 +153,7 @@ def config_problems(package: Path | None = None) -> list[str]:
 #: The only files at the top of contract/ - the asset's own, not a
 #: collection's (REQ-QAC-241 criterion 2).
 ASSET_WIDE = ("data-asset.yaml", "calendar.yaml", "people.yaml", "environments.yaml",
-              "file-checks.yaml", "scripted_decisions.yaml")
+              "file-checks.yaml", "scripted_decisions.yaml", "presentation.yaml")
 _CHECK_FILE = re.compile(r"(?P<stem>.+)-(?:contract|soda-checks|evidently-checks)(?:-retired)?\.ya?ml")
 #: Shared dbt SQL that belongs to no collection (criterion 4).
 _SHARED_DBT = ("dbt_project/tests/generic/",)
@@ -378,8 +373,17 @@ def literal_problems(root: Path = ROOT, allowlist: dict[str, str] | None = None)
     return problems
 
 
+def presentation_problems() -> list[str]:
+    """REQ-DASH-244 criterion 8: a registered collection the dashboard has no
+    words for fails here, naming it, before any build."""
+    from qa_tools.common import presentation
+
+    return presentation.problems()
+
+
 def main() -> int:
-    problems = config_problems() + check_file_problems() + literal_problems()
+    problems = (config_problems() + check_file_problems() + literal_problems()
+                + presentation_problems())
     if problems:
         for p in problems:
             print(f"  {p}")

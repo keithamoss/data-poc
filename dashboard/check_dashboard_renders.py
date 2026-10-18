@@ -13,16 +13,12 @@ Keith's explicit requirement, 2026-09-16 (the same day the template/
 build-output split landed): opening the raw template (before
 embed_dashboard_data.py has ever run - a real path a contributor can
 hit, not just a hypothetical) must not crash just because its
-REAL_BIRTH_REG_DATA/REAL_CP_DATA/SNAPSHOT_MANIFEST consts are still
-placeholders (null/null/[]). See buildBirthRegistrations()'s/
-buildChildProtectionDatasets()'s own comment in the template for the
-fallback mechanism (genDataset(), the same illustrative-mock generator
-the other 14 non-real datasets already use) this check verifies.
+COLLECTION_DATA/SNAPSHOT_MANIFEST consts are still placeholders
+(null/[]).
 
 Doesn't build anything itself - run this after the full rebuild
-(qa_tools.tools.results_history, pipeline.
-build_dashboard_data/build_cp_dashboard_data, dashboard.
-embed_dashboard_data) has already produced the file. Needs Playwright's
+(qa_tools.tools.results_history, pipeline.build_dashboard_data,
+dashboard.embed_dashboard_data) has already produced the file. Needs Playwright's
 Chromium already available (see pyproject.toml's dev dependency group).
 
 Run as `python3 -m dashboard.check_dashboard_renders`.
@@ -38,7 +34,6 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-from dashboard.embed_dashboard_data import TARGETS
 
 ROOT = Path(__file__).resolve().parent.parent
 DASHBOARD_PATH = ROOT / "dashboard" / "qa-reporting-dashboard.html"
@@ -84,19 +79,20 @@ def _check_embedded_json() -> list[str]:
     exact same single-line regex embed_dashboard_data.py itself uses to
     find and replace these lines, reused here rather than re-derived, so
     the two never drift apart on what "the embedded data line" means."""
+    from qa_tools import collections
+
     html = DASHBOARD_PATH.read_text()
-    errors = []
-    for const_name, _data_path in TARGETS:
-        pattern = re.compile(rf"const {const_name} = (.*?);\n")
-        match = pattern.search(html)
-        if not match:
-            errors.append(f"{const_name}: no embedded const found in the built HTML")
-            continue
-        try:
-            json.loads(match.group(1))
-        except json.JSONDecodeError as e:
-            errors.append(f"{const_name}: embedded data isn't valid JSON - {e}")
-    return errors
+    match = re.compile(r"const COLLECTION_DATA = (.*?);\n").search(html)
+    if not match:
+        return ["COLLECTION_DATA: no embedded const found in the built HTML"]
+    try:
+        data = json.loads(match.group(1))
+    except json.JSONDecodeError as e:
+        return [f"COLLECTION_DATA: embedded data isn't valid JSON - {e}"]
+    # EVERY REGISTERED COLLECTION IS IN IT (REQ-DASH-244 criterion 9) -
+    # the list from the registry, never a second one here.
+    return [f"COLLECTION_DATA: no entry for collection {c.id!r}"
+            for c in collections.all_collections() if c.id not in (data or {})]
 
 
 async def _check_render(html_path: Path, label: str) -> list[str]:

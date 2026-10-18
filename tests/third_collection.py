@@ -65,6 +65,10 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
             "datasets": [{"id": "bare-things", "name": "Bare Things", "table": "bare_things",
                           "arrival_pattern": r"bare_things[^/]*\.csv"}]})
     (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    # How the dashboard describes the asset sits beside the hierarchy
+    # (REQ-DASH-244); the third collection has no entry until a test gives it one.
+    shutil.copy(hierarchy.DATA_ASSET_YAML.parent / "presentation.yaml",
+                contract_dir / "presentation.yaml")
 
 
 def _provider(calls: list) -> types.ModuleType:

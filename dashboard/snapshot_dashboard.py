@@ -8,7 +8,7 @@ Scoping recap, since the design choices here aren't obvious from the code
 alone:
 
 - What gets frozen: the ENTIRE rendered dashboard HTML (shell + CSS + JS
-  + embedded REAL_BIRTH_REG_DATA/REAL_CP_DATA), not just a data payload.
+  + embedded COLLECTION_DATA), not just a data payload.
   Deliberately NOT a "data snapshot + shared shell" hybrid, and NOT a
   "raw inputs, rebuild on demand" scheme - both were considered and
   rejected. A snapshot must be openable with nothing but a browser,
@@ -309,7 +309,7 @@ def _append_manifest_entry(snapshots_dir: Path, entry: dict) -> list:
 def _embed_snapshot_manifest_into_html(html: str, manifest: list, source_desc: str) -> str:
     """Returns `html` with its `const SNAPSHOT_MANIFEST = [...];` line
     replaced - same mechanism as dashboard/embed_dashboard_data.py's
-    REAL_BIRTH_REG_DATA/REAL_CP_DATA replacement (a single-line const,
+    COLLECTION_DATA replacement (a single-line const,
     regex-replaced with a lambda substitution so any special characters
     already in the JSON are never reinterpreted as regex backreferences).
     `source_desc` is just for the error message, identifying which HTML

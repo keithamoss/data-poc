@@ -464,7 +464,7 @@ requirements:
       - dashboard/qa-reporting-dashboard.template.html::navigate
       - qa_tools/common/dataset_status.py::dataset_status
       - pipeline/build_dashboard_data.py::build
-      - pipeline/build_cp_dashboard_data.py::build
+      - pipeline/build_dashboard_data.py::build
 
   - id: REQ-PIPE-004
     title: Committed, permanent QA history
@@ -2315,7 +2315,7 @@ requirements:
       - qa_tools/common/validate_check_lifecycle.py::_explanation_errors
       - qa_tools/common/validate_check_lifecycle.py::_looks_like_sentinel
       - pipeline/build_dashboard_data.py::build
-      - pipeline/build_cp_dashboard_data.py::build_one_table
+      - pipeline/build_dashboard_data.py::build_one_table
       - dashboard/qa-reporting-dashboard.template.html::openCheckPanel
     linked_tests:
       - tests/test_check_lifecycle.py::test_parse_contract_check_metadata_reads_failure_indicates_and_technical_note
@@ -2564,7 +2564,7 @@ requirements:
     implemented_by:
       - pipeline/dashboard_check_labels.py::tool_ref
       - pipeline/build_dashboard_data.py::build
-      - pipeline/build_cp_dashboard_data.py::build
+      - pipeline/build_dashboard_data.py::build
       - dashboard/qa-reporting-dashboard.template.html
     evidence:
       - >
@@ -2842,10 +2842,10 @@ requirements:
     linked_tests:
       - tests-js/table-level-checks.test.js
       - tests/test_build_dashboard_data.py
-      - tests/test_build_cp_dashboard_data.py::TestTwoChecksThatShareANameStayTwoCards
+      - tests/test_build_dashboard_child_protection.py::TestTwoChecksThatShareANameStayTwoCards
     implemented_by:
       - pipeline/build_dashboard_data.py::SUPPLY_LEVEL_PSEUDO_COLUMN
-      - pipeline/build_cp_dashboard_data.py::build_one_table
+      - pipeline/build_dashboard_data.py::build_one_table
       - dashboard/qa-reporting-dashboard.template.html
     evidence:
       - >
@@ -2927,7 +2927,7 @@ requirements:
       - tests/test_dashboard_e2e.py::TestSupplyAndTableLevelSections
     implemented_by:
       - pipeline/build_dashboard_data.py::COLUMN_SCOPE_KEY
-      - pipeline/build_cp_dashboard_data.py::build_one_table
+      - pipeline/build_dashboard_data.py::build_one_table
       - dashboard/qa-reporting-dashboard.template.html::columnKey
       - dashboard/qa-reporting-dashboard.template.html::scopedColumns
     evidence:
@@ -3989,7 +3989,7 @@ requirements:
       - qa_tools/common/qa_results_reader.py::read_cross_table_results
       - qa_tools/common/validate_hierarchy.py::reserved_name_errors
       - qa_tools/common/tables_read.py::undeclared_cross_table
-      - pipeline/build_cp_dashboard_data.py::build
+      - pipeline/build_dashboard_data.py::build
       - pipeline/dashboard_check_labels.py::pooled_url_key
       - dashboard/qa-reporting-dashboard.template.html::collectionCrossTableChecks
       - dashboard/qa-reporting-dashboard.template.html::collectionCrossTableSection
@@ -6021,7 +6021,7 @@ requirements:
       - generator/collections/child_protection.py::_cp_received_at
       - qa_tools/common/asset_time.py::local_date
       - pipeline/build_dashboard_data.py::_run_date
-      - pipeline/build_cp_dashboard_data.py::_run_date
+      - pipeline/build_dashboard_data.py::_run_date
     evidence:
       - >
         2026-09-23: the vocabulary is reversed where it was wrong. A
@@ -8906,7 +8906,7 @@ requirements:
     - qa_tools/common/promotion_state.py::State
     - qa_tools/common/promotion_state.py::WHY_NOT
     - pipeline/build_dashboard_data.py::build
-    - pipeline/build_cp_dashboard_data.py::build_one_table
+    - pipeline/build_dashboard_data.py::build_one_table
     linked_tests:
     - tests/test_promotion_state.py::TestItIsQuietWhenTheyAgree
     - tests/test_promotion_state.py::TestItShowsBothWhenTheyDiffer
@@ -11251,7 +11251,7 @@ requirements:
       - tests/test_arrival_classification.py
       - tests/test_dataset_stats.py
       - tests/test_build_dashboard_data.py
-      - tests/test_build_cp_dashboard_data.py
+      - tests/test_build_dashboard_child_protection.py
     implemented_by:
       - qa_tools/common/arrival_classification.py::classify
       - qa_tools/common/arrival_classification.py::describe
@@ -21991,7 +21991,7 @@ requirements:
       - tests/test_delivery_hold_retired.py
       - tests/test_lambda_handlers.py
       - tests/test_qa_results_reader.py
-      - tests/test_build_cp_dashboard_data.py
+      - tests/test_build_dashboard_child_protection.py
       - tests-js/not-evaluated.test.js
     implemented_by:
       - qa_tools/common/arrivals.py::arrivals_for
@@ -21999,7 +21999,7 @@ requirements:
       - qa_tools/common/period_overlay.py::build
       - qa_tools/tools/orchestrate.py::file_and_overlay
       - qa_tools/common/qa_results_reader.py::RESULT_TOOLS
-      - pipeline/build_cp_dashboard_data.py::_not_evaluated_reason
+      - pipeline/build_dashboard_data.py::_not_evaluated_reason
       - qa_tools/tools/orchestrate.py::simultaneous_with
       - qa_tools/common/qa_results_writer.py::_scope_to_run
       - qa_tools/common/unrunnable.py::results_for
@@ -22923,7 +22923,7 @@ requirements:
       - qa_tools/common/dataset_status.py::in_no_rollup
       - qa_tools/tools/stage.py::_build_run_views
       - qa_tools/tools/stage.py::stage_table
-      - pipeline/build_cp_dashboard_data.py::share_cross_table_results
+      - pipeline/build_dashboard_data.py::share_cross_table_results
       - dashboard/qa-reporting-dashboard.template.html
       - cli/supply.py::discard_sample_command
     linked_tests:
@@ -25081,7 +25081,7 @@ requirements:
     - 'dashboard/embed_dashboard_data.py::embed'
     - 'dashboard/qa-reporting-dashboard.template.html'
     - 'pipeline/build_dashboard_data.py::build'
-    - 'pipeline/build_cp_dashboard_data.py::build_one_table'
+    - 'pipeline/build_dashboard_data.py::build_one_table'
     evidence:
     - '2026-10-15 overnight: tests/test_turn_off.py (79 tests) plus TestATurnOffDeclaredAsACorrection (3) and TestATurnOffOverAJudgedPeriod (3), written before or alongside each chunk; the false-quiet guards (criteria 14, 15/16 holds, 18, 25, 31, 36, 37, 38, the claim window under criterion 14) were each run against the code before the change and seen to fail. Full gate result in the commit message that flips this to built.'
 
@@ -29733,7 +29733,7 @@ requirements:
     implemented_by:
     - pipeline/closed_slots.py::for_dataset
     - pipeline/build_dashboard_data.py::build
-    - pipeline/build_cp_dashboard_data.py::build_one_table
+    - pipeline/build_dashboard_data.py::build_one_table
     - dashboard/qa-reporting-dashboard.template.html
     - pipeline/closed_slots.py::late_slots
     - qa_tools/common/outstanding.py::_from_awaiting_decisions
@@ -31733,7 +31733,7 @@ requirements:
     - qa_tools/common/schedule_ended.py::for_dataset
     - dashboard/embed_dashboard_data.py::embed
     - pipeline/build_dashboard_data.py::build
-    - pipeline/build_cp_dashboard_data.py::build
+    - pipeline/build_dashboard_data.py::build
     linked_tests:
     - tests-js/schedule-ended-notice.test.js
     - tests-js/schedule-runway.test.js
@@ -33472,7 +33472,7 @@ requirements:
     - qa_tools/common/decision_log.py::promoted_supply
     - dashboard/embed_dashboard_data.py::embed
     - pipeline/build_dashboard_data.py::build
-    - pipeline/build_cp_dashboard_data.py::build_one_table
+    - pipeline/build_dashboard_data.py::build_one_table
     - qa_tools/common/filing.py::settled_away
     evidence:
     - '2026-10-13: every embedded change point held against the SQL readers (promotion_state.state_for(as_at=end of that day)) on the bootstrapped history - 37 for Birth Registrations, 27 to 32 for each Child Protection dataset, 222 in all - zero disagreements; the newest of each equals state_for() with no instant.
@@ -36387,7 +36387,7 @@ requirements:
       - 'pipeline/dashboard_check_labels.py::MEASURES'
       - 'pipeline/dashboard_check_labels.py::measure'
       - 'pipeline/build_dashboard_data.py::build'
-      - 'pipeline/build_cp_dashboard_data.py::build'
+      - 'pipeline/build_dashboard_data.py::build'
       - 'dashboard/qa-reporting-dashboard.template.html::trendChart'
     evidence:
       - 'tests/test_check_measures.py (4 tests, run 2026-10-14): the committed configuration declares 48 rule kinds across its active checks and every one has a measure; deleting dbt:unique from MEASURES makes the completeness test fail naming it; an unmapped kind reads ''Value (%)''. Reads collect_checks(None), so it runs with no deployment.'
@@ -37074,7 +37074,7 @@ requirements:
     - cli/pipeline.py::_run_collection
     - cli/one_table.py::OneTableCLI::_run_single
     - pipeline/build_dashboard_data.py::_AGGREGATES
-    - pipeline/build_cp_dashboard_data.py::_AGGREGATES
+    - pipeline/build_dashboard_data.py::_AGGREGATES
     - qa_tools/common/validate_collections.py::ALLOWLIST
     - qa_tools/tools/orchestrate.py::_reconciles
   - id: REQ-DASH-244

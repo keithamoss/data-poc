@@ -1,7 +1,7 @@
 """
-Shared, small helpers for pipeline/build_dashboard_data.py and
-pipeline/build_cp_dashboard_data.py - split out so a fix here can't drift
-between the two builders.
+Shared, small helpers for pipeline/build_dashboard_data.py (one builder for
+every collection since REQ-DASH-244, which were two) - split out when there
+were two, so a fix here could not drift between them.
 
 1. A hand-curated CHECK_PRIORITY dict used to decide which check is shown
    first in a column's drawer (checks[0] drives the headline "current vs

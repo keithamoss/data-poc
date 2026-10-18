@@ -14,18 +14,23 @@ from __future__ import annotations
 from dashboard import check_dashboard_renders as cdr
 
 
-def _write_dashboard(path, birth_reg_json="{}", cp_json="{}"):
-    path.write_text(
-        "<html><script>\n"
-        f"const REAL_BIRTH_REG_DATA = {birth_reg_json};\n"
-        f"const REAL_CP_DATA = {cp_json};\n"
-        "</script></html>\n"
-    )
+def _write_dashboard(path, collection_data):
+    path.write_text("<html><script>\n"
+                    f"const COLLECTION_DATA = {collection_data};\n"
+                    "</script></html>\n")
 
 
-def test_check_embedded_json_passes_for_valid_json(tmp_path, monkeypatch):
+def _every_collection() -> str:
+    from qa_tools import collections
+
+    ids = [c.id for c in collections.all_collections()]
+    assert ids, "the registry must hold collections for these tests to mean anything"
+    return "{" + ",".join(f'"{i}": {{"datasets": []}}' for i in ids) + "}"
+
+
+def test_check_embedded_json_passes_when_every_collection_is_there(tmp_path, monkeypatch):
     dashboard_path = tmp_path / "dashboard.html"
-    _write_dashboard(dashboard_path, birth_reg_json='{"a": 1}', cp_json='{"b": [1, 2]}')
+    _write_dashboard(dashboard_path, _every_collection())
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
 
     assert cdr._check_embedded_json() == []
@@ -33,24 +38,35 @@ def test_check_embedded_json_passes_for_valid_json(tmp_path, monkeypatch):
 
 def test_check_embedded_json_flags_invalid_json(tmp_path, monkeypatch):
     dashboard_path = tmp_path / "dashboard.html"
-    _write_dashboard(dashboard_path, birth_reg_json='{"a": 1,}')  # trailing comma - invalid JSON
+    _write_dashboard(dashboard_path, '{"a": 1,}')  # trailing comma - invalid JSON
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
 
     errors = cdr._check_embedded_json()
 
-    assert len(errors) == 1
-    assert "REAL_BIRTH_REG_DATA" in errors[0]
+    assert len(errors) == 1 and "COLLECTION_DATA" in errors[0]
 
 
 def test_check_embedded_json_flags_a_missing_const(tmp_path, monkeypatch):
     dashboard_path = tmp_path / "dashboard.html"
-    dashboard_path.write_text("<html><script>\nconst REAL_BIRTH_REG_DATA = {};\n</script></html>\n")
+    dashboard_path.write_text("<html><script>\nconst OTHER = {};\n</script></html>\n")
     monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
 
-    errors = cdr._check_embedded_json()
+    assert cdr._check_embedded_json() == ["COLLECTION_DATA: no embedded const found in the built HTML"]
 
-    assert len(errors) == 1
-    assert "REAL_CP_DATA" in errors[0]
+
+def test_check_embedded_json_names_a_collection_that_is_not_in_it(tmp_path, monkeypatch):
+    """REQ-DASH-244 criterion 9: the registry says which collections must be
+    there, so a third one registered but not built is named."""
+    import json
+
+    dashboard_path = tmp_path / "dashboard.html"
+    data = json.loads(_every_collection())
+    dropped = next(iter(data))
+    del data[dropped]
+    _write_dashboard(dashboard_path, json.dumps(data))
+    monkeypatch.setattr(cdr, "DASHBOARD_PATH", dashboard_path)
+
+    assert cdr._check_embedded_json() == [f"COLLECTION_DATA: no entry for collection {dropped!r}"]
 
 
 def test_main_fails_fast_when_the_dashboard_was_never_built(tmp_path, monkeypatch):

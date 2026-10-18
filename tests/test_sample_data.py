@@ -532,7 +532,7 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
 
     def test_a_mixed_result_reaches_the_calendar_less_table_only(
             self, tmp_path, monkeypatch):
-        from pipeline import build_cp_dashboard_data as build_cp
+        from pipeline import build_dashboard_data as build_cp
 
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         self._sharing(monkeypatch,
@@ -549,7 +549,7 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
             self, tmp_path, monkeypatch):
         """REQ-QAC-037's own behaviour, unchanged - the regression this
         exclusion could most easily cause."""
-        from pipeline import build_cp_dashboard_data as build_cp
+        from pipeline import build_dashboard_data as build_cp
 
         _asset_with([AGREED, SAMPLE], tmp_path, monkeypatch)
         self._sharing(monkeypatch,
@@ -565,7 +565,7 @@ class TestTheDashboardReportsItAgainstTheRightDataset:
             self, tmp_path, monkeypatch):
         """Criterion 2 of REQ-QAC-037 forbids a second record, not a second
         reader - so the identity matters, not just the equality."""
-        from pipeline import build_cp_dashboard_data as build_cp
+        from pipeline import build_dashboard_data as build_cp
 
         _asset_with([AGREED, SAMPLE, SECOND_SAMPLE], tmp_path, monkeypatch)
         self._sharing(monkeypatch,

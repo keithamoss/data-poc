@@ -14,6 +14,12 @@ import json
 
 from qa_tools.common.check_lifecycle import CheckMetadata
 from pipeline import build_dashboard_data as bdd
+from qa_tools import collections
+
+#: The shared builder takes a collection (REQ-DASH-244); these are its tests
+#: on Birth Registrations, whose one dataset is the document itself.
+_BDM = "civil-registration"
+_COLUMNS = list(bdd.column_meta(collections.by_id(_BDM), collections.by_id(_BDM).datasets[0]))
 
 # ARRIVAL RECORDS, not manifest entries (REQ-GEN-043). What the
 # pipeline observed - which run, when we received it, which delivery -
@@ -54,7 +60,7 @@ def _check(run_id, column_name, value, status="pass", **overrides):
     rec = {
         "column_name": column_name, "check_name": "dbt:accepted_values",
         "dimension": "validity", "label": "Invalid values",
-        "run_id": run_id, "metric_value": value, "unit": "count",
+        "run_id": run_id, "dataset_id": "birth-registrations", "metric_value": value, "unit": "count",
         "warn_threshold": 0.0, "fail_threshold": 5.0, "status": status,
         "row_count_total": 3, "row_count_invalid": 0,
         "engine": "dbt-core 1.12 + dbt-duckdb (real)",
@@ -90,15 +96,15 @@ def _no_retired_checks(monkeypatch):
 
 def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_results(tmp_path)))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
 
     # Every REAL column, in order. The two pseudo-columns are in
     # ALL_COLUMNS too but only appear when the dataset actually has a
     # table-level check to put in them - this fixture has none, and an
     # empty "(supply-level checks)" tile would be noise.
-    real_columns = [c for c in bdd.ALL_COLUMNS if c not in bdd._PSEUDO_COLUMNS]
+    real_columns = [c for c in _COLUMNS if c not in bdd._PSEUDO_COLUMNS]
     assert [col["name"] for col in data["columns"]] == real_columns
     assert data["rowCount"] == 4  # latest run (run_02)'s n_rows_generated
     assert data["prevRowCount"] == 3
@@ -106,9 +112,9 @@ def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
 
 def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_results(tmp_path)))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
     sex_col = next(c for c in data["columns"] if c["name"] == "sex")
     assert len(sex_col["checks"]) == 1
     assert sex_col["checks"][0]["current"] == 1  # run_02's metric_value
@@ -121,9 +127,9 @@ def test_a_column_with_a_real_check_carries_it_through(tmp_path, monkeypatch):
 
 def test_a_column_with_no_check_gets_an_honest_placeholder(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_results(tmp_path)))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
     # No check in FIXTURE_RESULTS covers "date_registered" - should get the
     # honest placeholder, not a crash or a silently-empty checks list.
     uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
@@ -136,9 +142,9 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, m
     ["byRun"] now carries every run, keyed by run_id - the actual data
     Thread C's as-of picker will need."""
     _no_retired_checks(monkeypatch)
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_results(tmp_path)))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
     sex_col = next(c for c in data["columns"] if c["name"] == "sex")
     by_run = sex_col["stats"]["byRun"]
 
@@ -184,8 +190,8 @@ def test_the_suppliers_own_timestamp_no_longer_decides_punctuality(tmp_path, mon
         path.write_text(json.dumps({
             "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": stats,
         }))
-        monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
-        return bdd.build()
+        monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
+        return bdd.build(_BDM)
 
     inside = _build("2026-09-01T06:30:00+00:00", "2026-09-02T06:30:00+00:00")
     outside = _build("2026-09-01T10:00:00+00:00", "2026-09-02T10:00:00+00:00")
@@ -205,9 +211,9 @@ def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
         CheckMetadata(check_id=sex_check_id, category="conformity", tool="dbt", config_hash="abc123", source_file="fake.yml",
                       retired_as_of="2026-09-17", retired_reason="Superseded by a stricter rule."),
     ])
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_results(tmp_path)))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
 
     sex_col = next(c for c in data["columns"] if c["name"] == "sex")
     assert sex_col["checks"][0]["retired_as_of"] == "2026-09-17"
@@ -230,9 +236,9 @@ def test_a_checks_description_and_changelog_are_carried_through(tmp_path, monkey
         CheckMetadata(check_id=sex_check_id, category="conformity", tool="dbt", config_hash="abc123", source_file="fake.yml",
                       description="Sex must be one of the closed value set.", changelog=changelog),
     ])
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_results(tmp_path)))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
 
     sex_col = next(c for c in data["columns"] if c["name"] == "sex")
     assert sex_col["checks"][0]["description"] == "Sex must be one of the closed value set."
@@ -304,10 +310,10 @@ def test_a_checks_real_tool_verdict_is_carried_into_every_history_entry(tmp_path
     result record - it just used to be dropped when building history[],
     leaving the dashboard to re-derive it from thresholds."""
     _no_retired_checks(monkeypatch)
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_rowcount_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_rowcount_results(tmp_path)))
 
     check = next(c for c in next(
-        col for col in bdd.build()["columns"] if col["name"] == "sex")["checks"])
+        col for col in bdd.build(_BDM)["columns"] if col["name"] == "sex")["checks"])
 
     assert [h["status"] for h in check["history"]] == ["green", "green"], (
         "each history entry should carry the real tool verdict, mapped to "
@@ -324,10 +330,10 @@ def test_a_two_sided_range_check_keeps_its_null_thresholds(tmp_path, monkeypatch
     must stay None rather than being substituted with 0, so nothing
     downstream can mistake 'no upper bound' for 'zero tolerance'."""
     _no_retired_checks(monkeypatch)
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(_write_rowcount_results(tmp_path)))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(_write_rowcount_results(tmp_path)))
 
     check = next(c for c in next(
-        col for col in bdd.build()["columns"] if col["name"] == "sex")["checks"])
+        col for col in bdd.build(_BDM)["columns"] if col["name"] == "sex")["checks"])
 
     assert check["warn"] is None and check["fail"] is None, (
         "a mustBeBetween rule has no single-sided warn/fail bound; "
@@ -352,10 +358,10 @@ def test_a_violation_count_checks_zero_tolerance_is_not_regressed(tmp_path, monk
         ],
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(results_path))
 
     check = next(c for c in next(
-        col for col in bdd.build()["columns"] if col["name"] == "sex")["checks"])
+        col for col in bdd.build(_BDM)["columns"] if col["name"] == "sex")["checks"])
 
     assert [h["status"] for h in check["history"]] == ["green", "red"]
     assert check["current_status"] == "red"
@@ -381,8 +387,8 @@ def _build_with_authored_check(tmp_path, monkeypatch, **authored):
                            check_id=check_id)],
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
-    col = next(c for c in bdd.build()["columns"] if c["name"] == "sex")
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(results_path))
+    col = next(c for c in bdd.build(_BDM)["columns"] if c["name"] == "sex")
     return next(c for c in col["checks"] if c.get("check_id") == check_id)
 
 
@@ -419,7 +425,7 @@ def test_technical_note_never_reaches_the_page(tmp_path, monkeypatch):
         technical_note="Paired with the Soda check on the same column.")
 
     assert "technical_note" not in check
-    assert "Paired with the Soda check" not in json.dumps(bdd.build())
+    assert "Paired with the Soda check" not in json.dumps(bdd.build(_BDM))
 
 
 def test_a_check_with_no_authored_prose_still_builds(tmp_path, monkeypatch):
@@ -474,9 +480,9 @@ def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
         ],
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(results_path))
 
-    dob = next(c for c in bdd.build()["columns"] if c["name"] == "date_of_birth")
+    dob = next(c for c in bdd.build(_BDM)["columns"] if c["name"] == "date_of_birth")
     by_id = {c["check_id"]: c for c in dob["checks"]}
 
     assert RANGE_ID in by_id and FRESH_ID in by_id, "one check swallowed the other"
@@ -517,9 +523,9 @@ def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
         ],
         "dataset_stats": FIXTURE_DATASET_STATS,
     }))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(results_path))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(results_path))
 
-    by_name = {c["name"]: c for c in bdd.build()["columns"]}
+    by_name = {c["name"]: c for c in bdd.build(_BDM)["columns"]}
 
     supply = by_name[bdd.SUPPLY_LEVEL_PSEUDO_COLUMN]
     table = by_name[bdd.TABLE_LEVEL_PSEUDO_COLUMN]
@@ -547,9 +553,9 @@ def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
             "arrival_record": contested, "row_count": None, "value_counts": {},
             "arrival": {}, "check_aggregates": {}}},
     }))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
 
-    data = bdd.build()
+    data = bdd.build(_BDM)
 
     assert data["rowCount"] == 4 and data["prevRowCount"] == 3
     assert "run_003" in {a["run_id"] for a in data["arrivalHistory"]}
@@ -567,8 +573,8 @@ def test_a_headline_check_with_no_value_for_a_run_does_not_crash_the_build(tmp_p
     path = tmp_path / "results_bdm.json"
     path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
                                 "dataset_stats": FIXTURE_DATASET_STATS}))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
-    data = bdd.build()
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
+    data = bdd.build(_BDM)
     sex = next(c for c in data["columns"] if c["name"] == "sex")
     assert set(sex["stats"]["byRun"]) == {"run_002"}
 
@@ -584,8 +590,8 @@ def test_a_check_soda_could_not_evaluate_says_why(tmp_path, monkeypatch):
     path = tmp_path / "results_bdm.json"
     path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
                                 "dataset_stats": FIXTURE_DATASET_STATS}))
-    monkeypatch.setattr(bdd, "REAL_RESULTS_PATH", str(path))
-    check = next(c for c in bdd.build()["columns"] if c["name"] == "sex")["checks"][0]
+    monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
+    check = next(c for c in bdd.build(_BDM)["columns"] if c["name"] == "sex")["checks"][0]
     by_run = {h["run_id"]: h for h in check["history"]}
     assert by_run["run_002"]["status"] == "red"
     assert by_run["run_002"]["not_evaluated"] == "Soda could not evaluate it - needs Soda Cloud"

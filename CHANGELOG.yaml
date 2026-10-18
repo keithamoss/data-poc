@@ -142,6 +142,13 @@ releases:
               generator, with each collection's rows, seeds and schedule in a
               small module of its own. A new collection is that one module,
               and every delivery comes out byte-for-byte as before.
+          - headline: A dataset's GitHub link opens what it is held to
+            components: ["Dashboard UI"]
+            description: >
+              A dataset's GitHub link now opens its collection's data contract
+              at that dataset's own entry, and an agency's opens its folder of
+              contracts and checks. Both had pointed at code folders that no
+              longer exist, and each tooltip now says where it goes.
           - headline: Every collection's commands come from the register
             components: ["Testing & dev tooling"]
             description: >

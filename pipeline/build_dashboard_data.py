@@ -1,87 +1,80 @@
 """
-Reshapes reports/results_bdm.json (qa_tools/tools/orchestrate.py's real,
-computed check output - actual dbt-core/Soda Core/datacontract-cli/
-Evidently runs) into the exact JSON shape the QA reporting dashboard's
-drawer/chart code expects for a dataset - the "reskin the same 3-tier
-dashboard, wired to real data" piece of the brief, for the Birth
-Registrations dataset only.
+One dashboard builder for every collection (REQ-DASH-244).
 
-This does NOT touch the dashboard's rendering code or its other 14
-datasets (Death/Marriage Registrations and everything outside Registry
-Services) - those stay the existing illustrative mock, clearly labeled as
-such. Only Birth Registrations' columns/checks/stats are replaced, with
-every number traceable back to a real tool run in qa_tools/tools/*.py.
+Reshapes a collection's results file (reports/<adapter.results_json>, the
+shared orchestrator's real dbt-core/Soda Core/datacontract-cli/Evidently
+output, rebuilt from recorded history) into the JSON the dashboard's
+drawer and chart code reads, one dataset object per dataset the hierarchy
+declares, and writes it to reports/<adapter.dashboard_json>.
 
-Previously merged this with reports/results.json, the output of a set of
-four hand-written equivalent check engines (engines/*.py) built when the
-original session had no PyPI access. Those engines were removed once that
-constraint no longer applied and they'd drifted out of sync with newer
-checks that were only ever built real-tools-only - results_bdm.json
-alone is now a complete superset (824 checks vs. the old equivalent
-path's 630), so the merge logic is gone too. See plans/wider.md #3
-for the full history.
+WHAT USED TO BE TWO MODULES. Birth Registrations and Child Protection
+each had a builder of their own, about 1,400 lines between them and most
+of it the same code twice, with every column's type and note typed into
+Python. Nothing about a collection is code here any more:
 
-Output: reports/birth_registrations_dashboard.json, embedded into the HTML
-by embed_dashboard_data.py as a JS const.
+- a column's and a table's TYPE AND DESCRIPTION come from the collection's
+  ODCS contract (criterion 1), in the words the contract holds it to; the
+  builders' notes were moved into the contracts first (criterion 2);
+- who supplies a collection and how, and each dataset's provenance note,
+  come from contract/presentation.yaml (criterion 10);
+- which value-count distribution and aggregates a column shows come from
+  the adapter's .stats, the same table the statistics are computed from;
+- the few places Birth Registrations' output has always differed are
+  named legacy flags on its adapter (qa_tools/tools/legacy.py), never a
+  comparison of collection ids (criterion 11).
+
+A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING
+ELSE (Keith, 2026-09-27): every input below is a results file, a decision
+or filing the pipeline recorded, or configuration.
+
+A COLLECTION WITH NO RECORDED RUNS is built too (criterion 6): each of its
+declared datasets is written with an empty history, which the page renders
+as never supplied or not owed yet - never as a missing collection.
 """
 from __future__ import annotations
+
+import functools
 import json
 import os
-from datetime import datetime
 
+import yaml
+
+from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel,
+                      owed_nothing, placements, promotion_timeline, recorded_arrival, red_promoted,
+                      slot_timeline)
+from pipeline.dashboard_check_labels import (dashboard_status, display_name, measure, pooled_url_key,
+                                             rank_for_headline, tool_ref, url_key)
 from qa_tools import collections
-from qa_tools.common import schedule_ended
-from qa_tools.common import turned_off
-from pipeline import owed_nothing, placements
-from qa_tools.common import amber_setting, census, drift_reference
+from qa_tools.common import (agreement, amber_setting, asset_time, census, drift_reference, hierarchy,
+                             qa_store, schedule_ended, turned_off)
 from qa_tools.common.validate_check_lifecycle import collect_checks
-from qa_tools.common import agreement
-from qa_tools.common import asset_time
-from pipeline import (acknowledgements, closed_slots, corrections, excuses, file_check_panel, recorded_arrival,
-                      promotion_timeline, red_promoted, slot_timeline)
-from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, measure, pooled_url_key, tool_ref, url_key
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
-
-# Which checks an aggregate attaches to, by column - the same table the
-# statistics are computed from (REQ-PIPE-243: the adapter's .stats).
-_AGGREGATES = {col: spec for (_t, col), spec in
-               collections.adapter(collections.by_id("civil-registration")).stats.aggregates.items()}
-OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
-CONTRACT_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
+REPORTS = os.path.join(ROOT, "reports")
 
 
-def _parse_extract_timestamp(s: str) -> datetime:
-    """One committed arrival instant. Delegates to asset_time so a value
-    stored without an offset fails loudly here rather than being read as
-    UTC by whichever caller got to it first (REQ-PIPE-048)."""
-    return asset_time.parse_instant(s, "arrival.earliest_extract in committed qa_results/")
+def results_path(collection_id: str) -> str:
+    return os.path.join(REPORTS, collections.adapter(collection_id).results_json)
+
+
+def out_path(collection_id: str) -> str:
+    return os.path.join(REPORTS, collections.adapter(collection_id).dashboard_json)
 
 
 def _run_date(entry: dict) -> str:
     """One manifest entry's receipt DATE, as a string.
 
     The manifest carries a receipt INSTANT since REQ-GEN-042 - the
-    generator's own `received_at` - and the two axes it separates
-    (which period a supply is for, when it actually turned up) are the
-    point of that change. Everything below wants a date, for a cadence
-    cycle or a row in a supply-history table, so it is derived here in
-    one place rather than at eleven call sites.
-
-    `run_date` survives as the DASHBOARD-FACING name deliberately. The
-    vocabulary change is the generator's; renaming a presentation field
-    the template, the JS tests and the e2e suite all key on would be
-    churn this requirement did not ask for, and `run_date` is not one
-    of the names it retires.
+    generator's own `received_at` - and everything below wants a date, for
+    a cadence cycle or a row in a supply-history table, so it is derived
+    here in one place. `run_date` survives as the DASHBOARD-FACING name
+    deliberately: the template, the JS tests and the e2e suite all key on
+    it.
     """
     return asset_time.local_date(entry["received_at"]).isoformat()
 
+
 ENGINE_SHORT = {
-    # Same short-name convention as build_cp_dashboard_data.py's own
-    # ENGINE_SHORT for these 4 tags. No "(real)" suffix on the tag itself
-    # any more - there's nothing left to distinguish it from since
-    # engines/*.py was removed (see plans/qa-pipeline.md #84's follow-up).
     "dbt-core 1.12 + dbt-duckdb": "dbt-core",
     "dbt-core 1.12 + dbt-postgres": "dbt-core",
     "Soda Core 3.5": "Soda Core",
@@ -89,88 +82,202 @@ ENGINE_SHORT = {
     "Evidently 0.7": "Evidently AI",
 }
 
-COLUMN_META = {
-    "registration_number": ("string · varchar(20)", "BDM's unique registration identifier — primary key of the feed."),
-    "child_given_names": ("string · varchar(200)", "Required. Small non-zero null rate expected from data-entry lag at source."),
-    "child_family_name": ("string · varchar(200)", "Required."),
-    "date_of_birth": ("date", "Required, and range-checked against 1900-01-01..today."),
-    "sex": ("string · varchar(1)", "Closed value set (M / F / X) that several downstream eligibility systems key off directly."),
-    "place_of_birth_suburb": ("string · varchar(100)", "Required."),
-    "place_of_birth_facility": ("string · varchar(200)", "Nullable — not every birth occurs in a registered facility (home births are legitimate)."),
-    "date_registered": ("date", "Required; must be ≥ date_of_birth."),
-    "registering_parent_1_name": ("string · varchar(200)", "Optional."),
-    "registering_parent_2_name": ("string · varchar(200)", "Optional — single-parent registrations are legitimately common."),
-    "is_multiple_birth": ("boolean", "Required."),
-    "source_system_record_id": ("string · varchar(50)", "BDM's internal record ID, kept for re-extraction tracing."),
-    "extract_timestamp": ("timestamp", "When the record was extracted at BDM's source system."),
-}
-
-# Two pseudo-columns, so a check that belongs to the whole table rather
-# than to any one column still has somewhere to live. Before these, the
-# builder dropped every "(table)" result on the floor - 13 real checks
-# across both datasets, carrying prose nobody could read
-# (REQ-DASH-032).
-#
-# Deliberately TWO rather than one (Keith, 2026-09-20). "Is this supply
-# the right size and current enough" is a different question from "do
-# these tables agree with each other", and lumping them together made a
-# grab-bag. Child Protection already had the second one under this exact
-# name, so that name is reused rather than invented.
+# THREE SECTION PSEUDO-COLUMNS (REQ-DASH-033, REQ-QAC-037), so a check that
+# belongs to the whole table, the whole supply or two tables at once still
+# has somewhere to live. Deliberately separate (Keith, 2026-09-20): "is
+# this supply the right size and current enough" is a different question
+# from "do these tables agree with each other".
 SUPPLY_LEVEL_PSEUDO_COLUMN = "Supply-level checks"
 TABLE_LEVEL_PSEUDO_COLUMN = "Table-level checks"
+# A cross-table check cannot keep its own column name: a referential check
+# declared on cp_notifications reads cp_client_id, which is a column of
+# cp_notifications and not of cp_carers.
+CROSS_TABLE_PSEUDO_COLUMN = "Cross-table checks"
 
-# REQ-DASH-033. These two stopped being columns-in-disguise and became
-# real sections of the dataset page, so they need a name a person reads
-# (above) and a slug a URL carries (here) - which a bracketed
-# "(supply-level checks)" was doing badly as both: it rendered as a
-# column called something no column is called, and it encoded into
-# %28supply-level%20checks%29 in the address bar.
-#
-# Every column carries a `key` now, equal to its own name for a real
-# one, so nothing about real column URLs changes. Only these two differ
-# from their display name.
+#: A section's URL slug - a column's `key` is its own name for a real one,
+#: so only these differ from their display name.
 COLUMN_SCOPE_KEY = {
     SUPPLY_LEVEL_PSEUDO_COLUMN: "supply",
     TABLE_LEVEL_PSEUDO_COLUMN: "table",
+    CROSS_TABLE_PSEUDO_COLUMN: "cross-table",
 }
+_PSEUDO_COLUMNS = tuple(COLUMN_SCOPE_KEY)
 
-COLUMN_META[SUPPLY_LEVEL_PSEUDO_COLUMN] = (
+SUPPLY_LEVEL_META = (
     "supply-level",
     "Checks on the supply as a whole rather than on any one column - whether it "
     "arrived the right size, and whether it is current.")
-COLUMN_META[TABLE_LEVEL_PSEUDO_COLUMN] = (
-    "table-level",
-    "Rules that span the whole table rather than any one column.")
+#: A table's own note on its Table-level section is the contract's
+#: `tableLevelChecksNote` custom property; this is the note where it has none.
+TABLE_LEVEL_DEFAULT_NOTE = "Rules that span the whole table rather than any one column."
+CROSS_TABLE_META = (
+    "cross-table",
+    "Checks about the relationship between this table and another. A failure "
+    "here is a disagreement between tables rather than a fault in either one "
+    "alone, so it counts against every table the check reads.")
 
-# datacontract-cli and Soda each spell the row-count check differently.
-_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count"}
-_PSEUDO_COLUMNS = (SUPPLY_LEVEL_PSEUDO_COLUMN, TABLE_LEVEL_PSEUDO_COLUMN)
+# datacontract-cli and Soda each spell the row-count check differently, and
+# `evidently:row_count_growth` asks the same question relative to the last
+# promoted supply (REQ-QAC-108 criterion 1).
+_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count",
+                              "evidently:row_count_growth"}
 
 
-def _pseudo_column_for(check_name: str) -> str:
-    return (SUPPLY_LEVEL_PSEUDO_COLUMN if check_name in _SUPPLY_LEVEL_CHECK_NAMES
-            else TABLE_LEVEL_PSEUDO_COLUMN)
+# ---- what differs by collection, read from configuration --------------------
+
+def _legacy(coll) -> frozenset:
+    return collections.adapter(coll).legacy
 
 
-ALL_COLUMNS = list(COLUMN_META.keys())
+def _contract(contract: str) -> dict:
+    """A collection's contract, beside the hierarchy that names it."""
+    return _contract_at(str(hierarchy.DATA_ASSET_YAML.parent / contract))
+
+
+@functools.cache
+def _contract_at(path: str) -> dict:
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+def _type(prop: dict) -> str:
+    """How the page states a column's type, from the contract: the logical
+    type alone where the two agree, `string · <physical>` for a string, and
+    otherwise the physical type, which is the more specific of the two."""
+    logical, physical = prop.get("logicalType"), prop.get("physicalType")
+    if logical == physical or not physical:
+        return logical or ""
+    return f"{logical} · {physical}" if logical == "string" else physical
+
+
+def _element(coll, dataset) -> dict:
+    """The dataset's table in its collection's contract."""
+    for el in _contract(coll.contract).get("schema") or []:
+        if el.get("name") == dataset.table:
+            return el
+    raise ValueError(f"{coll.contract} has no schema entry for {dataset.dataset_id}'s table "
+                     f"{dataset.table!r}")
+
+
+def column_meta(coll, dataset) -> dict[str, tuple[str, str]]:
+    """Each column the page shows, in order, as (type, description) - the
+    contract's real columns, then the section pseudo-columns."""
+    el = _element(coll, dataset)
+    meta = {p["name"]: (_type(p), (p.get("description") or "").strip())
+            for p in el.get("properties") or []}
+    note = next((p.get("value") for p in el.get("customProperties") or []
+                 if p.get("property") == "tableLevelChecksNote"), None)
+    table_level = ("table-level", note or TABLE_LEVEL_DEFAULT_NOTE)
+    if "dashboard.supply_section_first" in _legacy(coll):
+        meta[SUPPLY_LEVEL_PSEUDO_COLUMN] = SUPPLY_LEVEL_META
+        meta[TABLE_LEVEL_PSEUDO_COLUMN] = table_level
+    else:
+        meta[TABLE_LEVEL_PSEUDO_COLUMN] = table_level
+        meta[SUPPLY_LEVEL_PSEUDO_COLUMN] = SUPPLY_LEVEL_META
+    meta[CROSS_TABLE_PSEUDO_COLUMN] = CROSS_TABLE_META
+    return meta
+
+
+def table_description(coll, dataset) -> str:
+    return (_element(coll, dataset).get("description") or "").strip()
+
+
+def _presented(coll) -> dict:
+    from qa_tools.common import presentation
+
+    return presentation.for_collection(coll.id)
+
+
+# ---- the statistics, in either recorded shape --------------------------------
+
+def _row_count(stats: dict | None, table: str, single: bool):
+    """A run's recorded row count for `table` - absent, never zero, where the
+    run could not read it (REQ-PIPE-105)."""
+    stats = stats or {}
+    return stats.get("row_count") if single else (stats.get("row_counts") or {}).get(table)
+
+
+def _aggregate_key(table: str, col: str, single: bool) -> str:
+    return col if single else f"{table}.{col}"
+
+
+def _value_counts(dataset_stats: dict, run_id: str, col: str):
+    """A column's recorded distribution for a run, or None where that run
+    could not read its table (REQ-PIPE-105)."""
+    return ((dataset_stats.get(run_id) or {}).get("value_counts") or {}).get(col)
+
+
+# ---- the per-check helpers --------------------------------------------------
+
+def _disambiguate_pooled_keys(cards: list[dict]) -> None:
+    """Where two cards in one section share a URL key, prefix each with
+    the dataset that DECLARES it (post-build-review #88).
+
+    A pooled section gathers checks declared by several datasets, so
+    `cp_client_id.relationships_dbt` arrives once from cp-investigations
+    and once from cp-placements - two checks, one key, and the template
+    resolves a key to its first match. Only colliding keys change, so
+    every URL that was unambiguous yesterday still works today.
+    """
+    from qa_tools.common.check_id import try_parse
+
+    counts: dict[str, int] = {}
+    for card in cards:
+        counts[card["key"]] = counts.get(card["key"], 0) + 1
+    for card in cards:
+        if counts[card["key"]] > 1:
+            parsed = try_parse(card["check_id"])
+            if parsed:
+                card["key"] = f"{parsed.dataset}.{card['key']}"
+
+
+def _cross_table_check_ids() -> set[str]:
+    """Every check that reads a table other than its own, read from the
+    check definitions rather than the results, so a check absent from one
+    run is still known to be cross-table."""
+    from qa_tools.common import tables_read
+
+    return set(tables_read.declared_by_check_id(collect_checks(None)))
+
+
+def _not_evaluated_reason(record: dict) -> str | None:
+    """Why a record's check could not be evaluated, or None for a real
+    verdict. Read from the reason each pseudo-tool writes -
+    `unrunnable_reason` (REQ-PIPE-105 criterion 13) and `held_reason`
+    (REQ-PIPE-078 criterion 10) - so a real tool's result can never be
+    mistaken for one."""
+    return (record.get("unrunnable_reason") or record.get("held_reason")
+            # A real tool that could not evaluate a check it was handed
+            # (Soda leaving it out of its results - the road-testing
+            # sweep's #7, 2026-10-06).
+            or record.get("not_evaluated_reason")
+            # REQ-QAC-108 criterion 9: red, not evaluated, under Evidently.
+            or (record.get("reference_reason") if record.get("reference_not_evaluated")
+                else None)
+            or None)
+
+
+def own_runs(manifest: list[dict], table: str) -> list[dict]:
+    """The runs that are FOR this table (REQ-PIPE-105).
+
+    One file is one arrival and a run id is its staged table's spelling,
+    so a six-table delivery is six runs and each belongs to one table. A
+    run whose id names no table (a fixture's, a trial's) belongs to every
+    table, as every run did before.
+    """
+    from qa_tools.common.qa_results_writer import run_owner
+
+    return [m for m in manifest
+            if (owner := run_owner(m["run_id"])) is None or owner[1] == table]
 
 
 def _schedule_not_agreed(dataset_id: str) -> str | None:
     """Whether this dataset has declared it has no delivery calendar, and
-    which kind (REQ-PIPE-106 criteria 3, 8 and 9).
-
-    Carried onto the dataset so the page can say so IN WORDS beside the
-    dataset's own real verdict, and so every rollup above it can leave it
-    out. Read from CONFIGURATION, which is what makes it safe here: this
-    build may read recorded QA results and never supply rows, and a
-    declaration in contract/data-asset.yaml is neither.
-
-    None for every dataset that has a calendar, which today is all seven.
-    """
+    which kind (REQ-PIPE-106 criteria 3, 8 and 9) - configuration, so safe
+    here. None for every dataset that has a calendar."""
     from qa_tools.common import schedule
 
     return schedule.no_calendar(dataset_id)
-
 
 
 def _agreement_refusal(dataset_id: str) -> dict | None:
@@ -181,79 +288,115 @@ def _agreement_refusal(dataset_id: str) -> dict | None:
     return found.as_record() if found else None
 
 
-def build() -> dict:
-    with open(REAL_RESULTS_PATH) as f:
-        payload = json.load(f)
-    manifest = sorted(payload["runs"], key=_run_date)
-    results = payload["results"]
-    dataset_stats = payload["dataset_stats"]
+def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict]]) -> None:
+    """Give each cross-table result to every table it reads.
 
-    # check_id -> CheckMetadata, from every real check definition (active +
-    # retired) across all 4 tools x both datasets - Phase 5b's retired-
-    # checks toggle (plans/publishing-and-history.md Thread D). Static
-    # config-file parsing only (schema.yml/soda YAML/contract YAML/
-    # *-evidently-checks*.yml), no live data/DuckDB access, so this
-    # is safe for CI same as any other "read committed history" path.
-    lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
+    REQ-QAC-037 criteria 6 and 7: a cross-table result belongs to EVERY
+    table it reads, not only to the one it happened to be declared on. THE
+    RESULT IS SHARED, NOT COPIED: the same record object is added to each
+    participant's list, and it is recorded once under the reserved scope.
+    """
+    from qa_tools.common import tables_read
 
-    # column_name -> (engine, check_name) -> {unit, warn, fail, by_run_id: {run_id: value}}
-    by_column: dict[str, dict[tuple, dict]] = {}
+    reads = tables_read.declared_by_check_id(collect_checks(None))
     for r in results:
-        col = r["column_name"]
-        if col == "(table)":
-            col = _pseudo_column_for(r["check_name"])
-        # Keyed on check_id, NOT (engine, check_name). Those two are a
-        # DISPLAY name, and two different checks can genuinely share one:
-        # datacontract-cli reports every `type: sql` rule as
-        # "datacontract:custom_sql", so date_of_birth's range check and
-        # its freshness check collided here and one silently swallowed
-        # the other - while both kept writing into the survivor's own
-        # by_run values, which disagree on 166 of the 352 committed runs.
-        # check_id is the identity this system already guarantees unique
-        # (REQ-QAC-023's grammar and tail-uniqueness gates).
-        key = r["check_id"]
-        slot = by_column.setdefault(col, {}).setdefault(key, {
+        for other in reads.get(r.get("check_id")) or ():
+            if other not in by_table or r in by_table[other]:
+                continue
+            # BUT AN IN-DEVELOPMENT RESULT IS NOT SHARED WITH AN AGREED
+            # PARTICIPANT (REQ-PIPE-106 criterion 15, Keith 2026-09-27: "allow
+            # it, but don't let it affect the agreed data set"). It is still
+            # run, recorded and reported on the calendar-less participant's
+            # page, which is where somebody developing the check is looking.
+            if r.get("supply_state") == qa_store.IN_DEVELOPMENT and \
+                    not _schedule_not_agreed(hierarchy.dataset_for_table(other).dataset_id):
+                continue
+            by_table[other].append(r)
+
+
+# ---- one dataset ------------------------------------------------------------
+
+def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
+                    lifecycle_by_id: dict) -> dict:
+    table, dataset_id = dataset.table, dataset.dataset_id
+    legacy = _legacy(coll)
+    single = "stats.single_table_shape" in legacy
+    # BIRTH REGISTRATIONS' READING OF "NOT EVALUATED" (legacy flag): only a
+    # tool's own reason, or a red's reference reason - and its records keep
+    # the order they were recorded in.
+    reference_fallback = "dashboard.reference_reason_fallback" in legacy
+    meta = column_meta(coll, dataset)
+    all_columns = list(meta)
+    stats_spec = collections.adapter(coll).stats
+    aggregates = stats_spec.aggregates
+    value_count_cols = {col for (t, col) in stats_spec.value_counts if t == table}
+
+    cross_table_ids = _cross_table_check_ids()
+    by_column: dict[str, dict[str, dict]] = {}
+    if not reference_fallback:
+        # A CHECK THAT COULD NOT BE EVALUATED (post-build-review #77) arrives
+        # under a pseudo-tool with a check_name of its own, so keying it like
+        # a real result would open a SECOND card for the same check. Real
+        # results go first so every check's card exists, and each can't-run
+        # record then joins the card with its check_id.
+        results = ([r for r in results if not _not_evaluated_reason(r)]
+                   + [r for r in results if _not_evaluated_reason(r)])
+    for r in results:
+        if r["check_id"] in cross_table_ids:
+            # Ahead of the column_name branches below, deliberately: a
+            # cross-table check has a column name of its own and it means
+            # nothing on the tables it READS.
+            col = CROSS_TABLE_PSEUDO_COLUMN
+        elif r["column_name"] == "(table)":
+            col = (SUPPLY_LEVEL_PSEUDO_COLUMN if r["check_name"] in _SUPPLY_LEVEL_CHECK_NAMES
+                   else TABLE_LEVEL_PSEUDO_COLUMN)
+        else:
+            col = r["column_name"]
+        if col not in meta:
+            continue
+        # KEYED BY check_id - a check's identity (post-build-review #88). The
+        # display name (engine, check_name) is not unique: datacontract-cli
+        # reports every `type: sql` rule as "datacontract:custom_sql".
+        slot = by_column.setdefault(col, {}).setdefault(r["check_id"], {
+            "engine": r["engine"], "check_name": r["check_name"],
             "unit": r["unit"], "warn": r["warn_threshold"], "fail": r["fail_threshold"],
             "dimension": r["dimension"], "label": r.get("label"), "check_id": r["check_id"],
-            "engine": r["engine"], "check_name": r["check_name"],
             "by_run": {}, "row_count_total": {}, "row_count_invalid": {}, "failing_sample_keys": {},
             "status_by_run": {}, "reference": {}, "not_evaluated": {},
         })
+        slot["not_evaluated"][r["run_id"]] = (r.get("not_evaluated_reason") if reference_fallback
+                                              else _not_evaluated_reason(r))
         slot["by_run"][r["run_id"]] = r["metric_value"]
-        # item 74 Bug A: the tool's own verdict, carried through rather
-        # than dropped here and re-derived from thresholds downstream.
+        # item 74 Bug A: the tool's own verdict, carried through rather than
+        # dropped here and re-derived from thresholds downstream.
         slot["status_by_run"][r["run_id"]] = dashboard_status(r.get("status"))
         # WHAT IT WAS COMPARED WITH, AND THE MEASURED VERDICT BESIDE A GAP'S
         # RED (REQ-QAC-108 criteria 14 and 16).
         slot["reference"][r["run_id"]] = drift_reference.reference_note(r, dashboard_status)
-        # A REAL TOOL THAT COULD NOT EVALUATE A CHECK it was handed says why
-        # (the road-testing sweep's #7, 2026-10-06).
-        slot["not_evaluated"][r["run_id"]] = r.get("not_evaluated_reason")
         slot["row_count_total"][r["run_id"]] = r["row_count_total"]
         slot["row_count_invalid"][r["run_id"]] = r["row_count_invalid"]
         slot["failing_sample_keys"][r["run_id"]] = r.get("failing_sample_keys") or []
 
     run_ids_in_order = [m["run_id"] for m in manifest]
-    # THE NEWEST RUNS THAT MEASURED THE TABLE - see the Child Protection
-    # builder's identical block. A same-day resupply beside an unpromoted
-    # red supply is contested (REQ-PIPE-105 criterion 6), measures
-    # nothing, and is not what "current" means.
+    run_date_by_id = {m["run_id"]: _run_date(m) for m in manifest}
+    # THE NEWEST RUNS THAT MEASURED THIS TABLE, not simply the newest runs
+    # (REQ-PIPE-105): a run whose table was contested or held has nothing of
+    # its own to show. None for a dataset never supplied (criterion 6).
     measured = [r for r in run_ids_in_order
-                if (dataset_stats.get(r) or {}).get("row_count") is not None]
+                if _row_count(dataset_stats.get(r), table, single) is not None]
     measured = measured or run_ids_in_order
-    latest_run, prev_run = measured[-1], (measured[-2] if len(measured) > 1 else measured[-1])
-    # run_date alone can't key a run uniquely - a resupply run shares its
-    # base run's run_date (e.g. run_54_2026-09-10 and
-    # run_54_2026-09-10_resupply1) - so byRun below keys directly on
-    # run_id via each history entry's own "run_id" field, not run_date.
-    row_count_by_run = {run_id: st.get("row_count") for run_id, st in dataset_stats.items()}
+    latest_run = measured[-1] if measured else None
+    prev_run = measured[-2] if len(measured) > 1 else latest_run
+    # A run measures only what it could read (REQ-PIPE-105), so a table can
+    # be missing from a run's counts - absent here, never zero.
+    row_count_by_run = {run_id: _row_count(st, table, single)
+                        for run_id, st in dataset_stats.items()}
 
     columns_out = []
-    for col in ALL_COLUMNS:
-        logical_type, desc = COLUMN_META[col]
+    for col in all_columns:
+        logical_type, desc = meta[col]
         checks_for_col = by_column.get(col, {})
-
-        agg_spec = _AGGREGATES.get(col)
+        agg_spec = aggregates.get((table, col))
 
         checks_out = []
         for slot in checks_for_col.values():
@@ -261,27 +404,34 @@ def build() -> dict:
             attach_aggregate = agg_spec is not None and check_name in agg_spec["check_names"]
             history = []
             for run_id in run_ids_in_order:
-                if run_id in slot["by_run"]:
-                    run_date = next(_run_date(m) for m in manifest if m["run_id"] == run_id)
-                    aggregate_values = None
-                    if attach_aggregate:
-                        aggregate_values = (dataset_stats.get(run_id) or {}).get(
-                            "check_aggregates", {}).get(col)
-                    history.append({
-                        "run_id": run_id, "run_date": run_date, "value": slot["by_run"][run_id],
-                        "row_count_total": slot["row_count_total"].get(run_id),
-                        "row_count_invalid": slot["row_count_invalid"].get(run_id),
-                        "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
-                        "aggregate_values": aggregate_values,
-                        "status": slot["status_by_run"].get(run_id),
-                        "reference": slot["reference"].get(run_id),
-                        # Criterion 9's red is NOT EVALUATED, said in words.
-                        "not_evaluated": slot["not_evaluated"].get(run_id) or (
-                                         (slot["reference"].get(run_id) or {}).get("reason")
-                                          if slot["status_by_run"].get(run_id) == "red"
-                                          and slot["by_run"][run_id] is None
-                                          and slot["reference"].get(run_id) else None),
-                    })
+                if run_id not in slot["by_run"]:
+                    continue
+                aggregate_values = None
+                if attach_aggregate:
+                    aggregate_values = (dataset_stats.get(run_id) or {}).get(
+                        "check_aggregates", {}).get(_aggregate_key(table, col, single))
+                if reference_fallback:
+                    # Criterion 9's red is NOT EVALUATED, said in words.
+                    not_evaluated = slot["not_evaluated"].get(run_id) or (
+                        (slot["reference"].get(run_id) or {}).get("reason")
+                        if slot["status_by_run"].get(run_id) == "red"
+                        and slot["by_run"][run_id] is None
+                        and slot["reference"].get(run_id) else None)
+                else:
+                    # Why this run's check could NOT be evaluated, or None
+                    # for a real verdict - never a value or a pass.
+                    not_evaluated = slot["not_evaluated"].get(run_id)
+                history.append({
+                    "run_id": run_id, "run_date": run_date_by_id[run_id],
+                    "value": slot["by_run"][run_id],
+                    "row_count_total": slot["row_count_total"].get(run_id),
+                    "row_count_invalid": slot["row_count_invalid"].get(run_id),
+                    "failing_sample_keys": slot["failing_sample_keys"].get(run_id) or [],
+                    "aggregate_values": aggregate_values,
+                    "status": slot["status_by_run"].get(run_id),
+                    "reference": slot["reference"].get(run_id),
+                    "not_evaluated": not_evaluated,
+                })
             if not history:
                 continue
             engine_short = ENGINE_SHORT.get(engine, engine)
@@ -290,32 +440,20 @@ def build() -> dict:
                 "check_id": slot["check_id"],
                 # A hand-authored `name` in the check's own metadata wins
                 # over the derived label (REQ-DASH-026).
-                # The field already existed and was parsed but rendered
-                # nowhere - 16 checks carried one, and they are exactly
-                # the headings a reader wants: "Registered on or after
-                # birth", "Carer approval compliance".
                 "name": (lifecycle.name if lifecycle and lifecycle.name
                          else display_name(check_name, engine_short, slot["label"])),
                 # The URL-facing identity, stable across heading rewrites
-                # (REQ-DASH-026). Never `name`.
-                # pooled_url_key() in a scope section, where checks
-                # from several real columns share one pseudo-column and
-                # a bare tail is no longer unique. See its own docstring.
+                # (REQ-DASH-026) - pooled_url_key() in a section, where checks
+                # from several real columns share one pseudo-column.
                 "key": (pooled_url_key(slot["check_id"]) if col in COLUMN_SCOPE_KEY
                         else url_key(slot["check_id"])),
-                # REQ-DASH-026: the terse "dbt:not_null" line under
-                # the headline. Same string as `key` above, tool
-                # moved to the front - deliberately, so the card and
-                # the address bar agree.
                 "tool_ref": tool_ref(slot["check_id"]),
                 "dimension": slot["dimension"],
                 "unit": slot["unit"],
                 # REQ-DASH-228: the chart's axis title and table header.
                 "measure": measure(slot["check_id"], slot["unit"]),
-                # item 74 Bug A: None stays None - it means "this check has
-                # no bound of that kind" (e.g. rowCount's two-sided
-                # mustBeBetween range), NOT "zero tolerance". Substituting
-                # 0 here is what fabricated a red on every run.
+                # item 74 Bug A: None stays None - it means "this check has no
+                # bound of that kind", NOT "zero tolerance".
                 "warn": slot["warn"],
                 "fail": slot["fail"],
                 "current": slot["by_run"].get(latest_run, 0),
@@ -326,61 +464,29 @@ def build() -> dict:
                 "retired_as_of": lifecycle.retired_as_of if lifecycle else None,
                 "retired_reason": lifecycle.retired_reason if lifecycle else None,
                 "description": lifecycle.description if lifecycle else None,
-                # REQ-QAC-024. `description` is the plain-English WHAT;
-                # this is the plain-English SO-WHAT - what a failure most
-                # likely means happened upstream.
-                #
-                # `technical_note` is deliberately NOT here and must not
-                # be added. It is the one authored field written for
-                # contributors rather than viewers ("standing facts a
-                # contributor needs and a viewer must not see"), and this
-                # dict is published to a public site. Its absence is the
-                # requirement being met, not an oversight.
+                # REQ-QAC-024: the plain-English SO-WHAT. `technical_note` is
+                # deliberately NOT here: it is written for contributors, and
+                # this dict is published to a public site.
                 "failure_indicates": lifecycle.failure_indicates if lifecycle else None,
                 "changelog": lifecycle.changelog if lifecycle else [],
             })
 
-        if not checks_out and col in _PSEUDO_COLUMNS:
-            # A real column with no checks says so honestly below. A
-            # pseudo-column with none simply does not exist for this
-            # dataset, and an empty tile would be noise.
+        _disambiguate_pooled_keys(checks_out)
+        if not checks_out and col in _PSEUDO_COLUMNS and "dashboard.drops_empty_sections" in legacy:
+            # Birth Registrations' sections with no checks do not exist
+            # (legacy flag); every other collection's say so below.
             continue
         if not checks_out:
-            # honest placeholder - no rule anywhere covers this column today
             checks_out = [{
                 # A REAL KEY, because everything downstream assumes one
-                # (plans/post-build-review.md #5 and #12). Without it the
-                # scope-section renderer wrote data-check="undefined",
-                # the re-lookup matched nothing, and dereferencing the
-                # result threw - taking out the rest of renderDataset()
-                # AND, because navigate() renders before it pushes
-                # history, the navigation itself. The check panel was
-                # also un-deep-linkable and un-closable with Back, for
-                # the same missing field.
-                #
-                # Unique within its column, which is the scope the
-                # /check/<key> route resolves in - and this placeholder
-                # is by definition the only check on its column.
+                # (post-build-review #5 and #12), unique within its column,
+                # which is the scope the /check/<key> route resolves in.
                 "key": "no_rule_defined",
                 "name": "No automated quality rule defined",
-                # This check is synthesized HERE, not produced by any real
-                # tool - so it has to state its own status explicitly
-                # (item 74). Without it, it would be the only thing left
-                # in the whole app relying on the warn/fail fallback, and
-                # a fallback with exactly one synthetic caller is a trap,
-                # not a safety net: it keeps three status implementations
-                # alive to serve data this file makes up.
-                #
-                # `inactive`, NOT green (post-build-review #4, Keith's
-                # own direction: "a grey, as in a disabled kind of grey
-                # colour - kind of speaks to it's inactive"). The old
-                # comment here argued green was truthful BECAUSE the gap
-                # was labelled in `note` - and `note` renders in exactly
-                # one place, the check panel. So at every level a reader
-                # actually looks, an unchecked column read as a healthy
-                # one, and a table-scope placeholder rolled a whole
-                # section to green on its own. Green is a VERDICT, and
-                # nothing was checked here.
+                # `inactive`, NOT green (post-build-review #4, Keith: "a grey,
+                # as in a disabled kind of grey colour"). Green is a VERDICT,
+                # and nothing was checked here. Stated explicitly because this
+                # check is synthesized here, not produced by any real tool.
                 "dimension": "", "unit": "count", "warn": None, "fail": None,
                 "current": 0, "current_status": "inactive", "previous": 0,
                 "history": [{"run_id": m["run_id"], "run_date": _run_date(m), "value": 0,
@@ -391,229 +497,195 @@ def build() -> dict:
 
         rank_for_headline(checks_out)
 
-        # representative row counts for the stats block: the manifest's own
-        # generated row count for that run (every column shares one table,
-        # so this is the same for all of them - what differs per column is
-        # how many of those rows the *primary* check, checks[0], flagged).
-        total_latest_manifest = row_count_by_run.get(latest_run) or 0
-        total_prev_manifest = row_count_by_run.get(prev_run) or 0
-
+        total_latest = row_count_by_run.get(latest_run) or 0
+        total_prev = row_count_by_run.get(prev_run) or 0
         stats = {
-            "current": {"total": total_latest_manifest, "invalid": 0, "valid": total_latest_manifest, "valueCounts": None},
-            "previous": {"total": total_prev_manifest, "invalid": 0, "valid": total_prev_manifest, "valueCounts": None},
+            "current": {"total": total_latest, "invalid": 0, "valid": total_latest, "valueCounts": None},
+            "previous": {"total": total_prev, "invalid": 0, "valid": total_prev, "valueCounts": None},
         }
-        if checks_out:
-            primary_unit = checks_out[0]["unit"]
-            for label, run_id, total_key in (("current", latest_run, "total_latest_manifest"), ("previous", prev_run, "total_prev_manifest")):
-                total = total_latest_manifest if label == "current" else total_prev_manifest
-                val = checks_out[0]["current"] if label == "current" else checks_out[0]["previous"]
-                if val is None:
-                    continue  # no number for that run - see the byRun loop below
-                n_invalid = int(round(total * val / 100)) if primary_unit == "%" else int(round(val))
-                stats[label]["invalid"] = max(0, n_invalid)
-                stats[label]["valid"] = max(0, total - stats[label]["invalid"])
-
-        if col == "sex":
-            stats["current"]["valueCounts"] = (dataset_stats[latest_run].get("value_counts") or {}).get("sex")
-            stats["previous"]["valueCounts"] = (dataset_stats[prev_run].get("value_counts") or {}).get("sex")
-
-        # Full per-run fidelity, keyed by run_id (not an index-aligned
-        # array like history - the as-of picker this serves needs direct
-        # lookup by an arbitrary run_id, not a scan). "current"/"previous"
-        # above stay exactly as they were - existing rendering keeps
-        # working unchanged; this is additive, for Thread C's as-of UI
-        # (plans/publishing-and-history.md) to consume once it's built.
-        # Computed from checks_out[0]'s own history (the same primary
-        # check "current"/"previous" already use, post rank_for_headline)
-        # rather than re-deriving from raw per-check data, so both stay
-        # governed by the exact same "which check is primary" choice.
         primary_unit = checks_out[0]["unit"]
+        for label, total, val in (("current", total_latest, checks_out[0]["current"]),
+                                   ("previous", total_prev, checks_out[0]["previous"])):
+            # A run whose check could not be evaluated has no value - nothing
+            # was counted, so nothing is reported invalid, rather than a crash.
+            if val is None:
+                continue
+            n_invalid = int(round(total * val / 100)) if primary_unit == "%" else int(round(val))
+            stats[label]["invalid"] = max(0, n_invalid)
+            stats[label]["valid"] = max(0, total - stats[label]["invalid"])
+
+        if col in value_count_cols:
+            stats["current"]["valueCounts"] = _value_counts(dataset_stats, latest_run, col)
+            stats["previous"]["valueCounts"] = _value_counts(dataset_stats, prev_run, col)
+
+        # Full per-run fidelity, keyed by run_id for the as-of picker, from
+        # the same primary check "current"/"previous" use.
         stats_by_run = {}
         for h in checks_out[0]["history"]:
             run_id = h["run_id"]
             total = row_count_by_run.get(run_id)
-            # NO NUMBER FOR THIS RUN - not evaluated, or measured against
-            # nothing - is no byRun entry, never a crash (exposed by
-            # REQ-QAC-108's gap rule making a drift check a headline).
+            # NO NUMBER FOR THIS RUN - a run that did not measure this table,
+            # or a check not evaluated - is no byRun entry, never a crash.
             if total is None or h["value"] is None:
                 continue
             n_invalid = int(round(total * h["value"] / 100)) if primary_unit == "%" else int(round(h["value"]))
             n_invalid = max(0, n_invalid)
             stats_by_run[run_id] = {
                 "total": total, "invalid": n_invalid, "valid": max(0, total - n_invalid),
-                "valueCounts": (dataset_stats[run_id].get("value_counts") or {}).get("sex")
-                               if col == "sex" else None,
+                "valueCounts": _value_counts(dataset_stats, run_id, col) if col in value_count_cols else None,
             }
         stats["byRun"] = stats_by_run
 
-        # (Removed 2026-09-19, plans/qa-pipeline.md item 74's follow-up: a
-        # `worst` column rollup used to be computed here, from each real
-        # engine's own `status` - the right idea - and then never used.
-        # `columns_out.append()` below never carried it, and nothing else
-        # in this file read it. Ruff couldn't flag it either: `worst` is
-        # read inside its own accumulating loop, so F841 never fires. The
-        # dashboard does this rollup client-side instead, because it has
-        # to - the as-of picker re-rolls status for an arbitrary date the
-        # viewer picks in the browser, which no build-time value can
-        # answer. Deleted rather than wired up for that reason.)
-
         columns_out.append({
             "name": col, "logicalType": logical_type, "description": desc,
-            # The URL-facing identity of a column, same split `key` vs
-            # `name` REQ-DASH-026 gave a check. Equal to the name for a
-            # real column, so no real column URL moves.
+            # The URL-facing identity of a column, equal to its name for a
+            # real one; `scope` is present only on the section pseudo-columns
+            # and is what the dataset view keys its split on.
             "key": COLUMN_SCOPE_KEY.get(col, col),
-            # Present only on the two section pseudo-columns, and what
-            # the dataset view keys its own split on - never a string
-            # match against a display name, which is what the bracketed
-            # names were being used for before.
             "scope": COLUMN_SCOPE_KEY.get(col),
             "checks": checks_out, "stats": stats,
         })
 
-    # dataset-level: row counts + arrival, from the real generated manifest
-    # and extract_timestamp data.
-    latest_entry = next(m for m in manifest if m["run_id"] == latest_run)
+    # From the dataset's participation in contract/calendar.yaml (REQ-PIPE-110).
+    cadence = agreement.cadence(dataset_id)
 
-    # From the dataset's participation in contract/calendar.yaml
-    # (REQ-PIPE-110), named by dataset id.
-    cadence = agreement.cadence("birth-registrations")
-
-    # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2). This block
-    # used to call cadence.classify_arrival() twice - once here and
-    # once per run below - deriving the cycle by looking BACKWARDS from
-    # the arrival date, which could never land on a slot that had not
-    # started. The verdict is recorded against the filing now, so the
-    # build reads it and the one derivation is gone.
-    #
-    # KEYED ON THE RUN'S OWN `received_at`, which the manifest has
-    # carried since REQ-GEN-042 and which IS our receipt instant - the
-    # same key `filing.period_of()` matches a supply on.
+    # READ, NOT COMPUTED (REQ-PIPE-080 criteria 1 and 2): the arrival verdict
+    # is recorded against the filing, keyed on the run's own `received_at`.
     arrival_by_run = {}
     arrival_history = []
     for m in manifest:
         run_id = m["run_id"]
-        block = recorded_arrival.for_run("birth-registrations", m["received_at"],
-                                         supply=recorded_arrival.stated_supply(m, "birth-registrations"))
+        block = recorded_arrival.for_run(dataset_id, m["received_at"],
+                                         supply=recorded_arrival.stated_supply(m, dataset_id))
         arrival_by_run[run_id] = block
-        arrival_history.append({"run_id": run_id, "run_date": _run_date(m),
-                                 **block})
-    latest_block = arrival_by_run[latest_run]
+        arrival_history.append({"run_id": run_id, "run_date": _run_date(m), **block})
+    latest_entry = next((m for m in manifest if m["run_id"] == latest_run), None)
+    last_arrival = ({"run_date": _run_date(latest_entry), "run_id": latest_entry.get("run_id"),
+                     **arrival_by_run[latest_run]} if latest_entry else None)
 
+    presented = _presented(coll)
     # What each slot held, read once and shared by two embeds below.
-    slot_timeline_raw = slot_timeline.for_dataset("birth-registrations")
+    slot_timeline_raw = slot_timeline.for_dataset(dataset_id)
     return {
-        "id": "birth-registrations",
-        "name": "Birth Registrations",
-        "provider": "Registry of Births, Deaths & Marriages (BDM)",
-        "deliveryFormat": "CSV (S3 drop) — Parquet planned",
+        "id": dataset_id,
+        "name": dataset.dataset_name,
+        "provider": presented["provider"],
+        "deliveryFormat": presented["delivery_format"],
         # THE DELIVERY TIME IN FORCE ON EACH DATE, and every period owed
-        # nothing up to now (REQ-DASH-182): configuration only; the page
-        # compares the dates with the date on show.
-        "sla": {"cadence": cadence, **owed_nothing.sla_timeline("birth-registrations")},
+        # nothing up to now (REQ-DASH-182): configuration only.
+        "sla": {"cadence": cadence, **owed_nothing.sla_timeline(dataset_id)},
         # Each person's placement of a held supply (REQ-DASH-175).
-        "placements": placements.for_dataset("birth-registrations"),
-        "owedNothing": owed_nothing.for_dataset("birth-registrations", until=asset_time.now().date()),
+        "placements": placements.for_dataset(dataset_id),
+        "owedNothing": owed_nothing.for_dataset(dataset_id, until=asset_time.now().date()),
         # WHETHER ANYBODY HAS AGREED A SCHEDULE FOR THIS DATASET
-        # (REQ-PIPE-106). None for every dataset that has a calendar, so
-        # the page renders nothing extra in the ordinary case - which is
-        # the point at 30 datasets: a marker on every tile is noise that
-        # trains people to stop reading markers.
-        "scheduleNotAgreed": _schedule_not_agreed("birth-registrations"),
-        "lastArrival": {"run_date": _run_date(latest_entry),
-                        "run_id": latest_entry.get("run_id"), **latest_block},
-        # See build_cp_dashboard_data.py's identical block
-        # (REQ-DASH-056).
-        # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081
-        # criteria 1, 2, 3 and 6). The ANSWERS, not the rule - see
-        # pipeline/slot_timeline.py for why the page must not be taught
-        # to derive these for itself. Read from the decision log, with
-        # each entry tied to the run that checked it.
-        "slotTimeline": slot_timeline.with_runs(slot_timeline_raw, "birth-registrations"),
-        # EACH RUN'S SUPPLY, PROMOTED, AWAITING OR WITHDRAWN OVER TIME
-        # (REQ-PIPE-081 criteria 1, 2 and 8 as amended 2026-10-05): the
-        # page's verdict is the newest supply promoted or awaiting on the
-        # date on show. Answers from the decision log, looked up there.
-        "runStates": slot_timeline.run_states("birth-registrations"),
-        # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126): the status
-        # it was promoted on and its status after each run that read it, so
-        # the page can say "red promoted" on the dates it was, and when and
-        # after what it turned. See pipeline/red_promoted.py.
-        "promotedHealth": red_promoted.for_dataset("birth-registrations"),
-        # REQ-DASH-097 - see the Child Protection builder.
-        "fileChecks": file_check_panel.for_dataset("birth-registrations"),
-        # EVERY PERIOD THAT CLOSED WITH NO SUPPLY, and the instants that
-        # decide what it reads as on any date (REQ-DASH-133 criteria 9 and
-        # 10) - see pipeline/closed_slots.py. The page compares instants;
-        # it never re-derives closing.
-        "closedSlots": closed_slots.for_dataset("birth-registrations"),
-        # A SLOT LATE BUT STILL OPEN (REQ-DASH-133, Keith 2026-10-05): every
-        # slot that was ever late while open, so the page can name today's
-        # late file beside an older gap.
-        "lateSlots": closed_slots.late_slots("birth-registrations"),
-        # HELD BECAUSE ITS SCHEDULE ENDED (REQ-DASH-155): receipt and
-        # resolution instants from hold records only, for the notice.
-        "scheduleEndedHolds": schedule_ended.for_dataset("birth-registrations"),
-        # EVERY TURN-OFF IT READS (REQ-PIPE-179 criterion 41), from
-        # configuration only, for REQ-DASH-180's page.
-        "turnOffs": turned_off.timeline("birth-registrations"),
-        # REQ-PIPE-081 criteria 14 and 15: what the RECORDED census found,
-        # as change points - never the warehouse as it stands now.
-        "census": census.for_datasets({"birth-registrations"}),
-        # REQ-PIPE-122 NFR 1: the amber setting in force over time, in
-        # words, from configuration only - the page shows the one in force
-        # on the date on show.
-        "amberSetting": amber_setting.timeline("birth-registrations"),
-        # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122
-        # criterion 21), keyed by run - see pipeline/acknowledgements.py.
-        "acknowledgements": acknowledgements.for_dataset("birth-registrations"),
-        # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162), keyed by run,
-        # each with its withdrawal and lapse - see pipeline/excuses.py.
-        "excuses": excuses.for_dataset("birth-registrations"),
-        # REQ-DASH-172: the original verdict and the correction that re-judged
-        # it, a supply kept against a correction, and a correction awaiting the
-        # asset manager - see pipeline/corrections.py.
-        "corrections": corrections.for_dataset("birth-registrations"),
-        # REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4), from
-        # configuration and recorded verdicts only - None where it is not.
-        "agreementRefusal": _agreement_refusal("birth-registrations"),
-        # WHAT WAS PROMOTED AND WHAT HAD ARRIVED, AND WHAT EACH PERIOD STOOD
-        # ON, AS AT EACH DATE (REQ-DASH-197, REQ-DASH-198): change points, one
-        # walk of the slot timeline above - the page resolves promotionState
-        # for the date on show and never falls back to a build-time answer.
-        "promotionTimeline": promotion_timeline.for_dataset("birth-registrations", slot_timeline_raw),
+        # (REQ-PIPE-106). None in the ordinary case, so the page renders
+        # nothing extra - a marker on every tile is noise at 30 datasets.
+        "scheduleNotAgreed": _schedule_not_agreed(dataset_id),
+        "lastArrival": last_arrival,
+        # WHAT EACH SLOT HELD, AND WHEN THAT CHANGED (REQ-PIPE-081 criteria
+        # 1, 2, 3 and 6): the ANSWERS, from the decision log, never the rule.
+        "slotTimeline": slot_timeline.with_runs(slot_timeline_raw, dataset_id),
+        # EACH RUN'S SUPPLY, PROMOTED, AWAITING OR WITHDRAWN OVER TIME.
+        "runStates": slot_timeline.run_states(dataset_id),
+        # HOW EACH PROMOTED SUPPLY HAS DONE SINCE (REQ-DASH-126).
+        "promotedHealth": red_promoted.for_dataset(dataset_id),
+        # REQ-DASH-097: the file checks, BESIDE `columns` - never inside them,
+        # which is what keeps them out of every roll-up.
+        "fileChecks": file_check_panel.for_dataset(dataset_id),
+        # EVERY PERIOD THAT CLOSED WITH NO SUPPLY (REQ-DASH-133 criteria 9, 10).
+        "closedSlots": closed_slots.for_dataset(dataset_id),
+        # A SLOT LATE BUT STILL OPEN (REQ-DASH-133, Keith 2026-10-05).
+        "lateSlots": closed_slots.late_slots(dataset_id),
+        # HELD BECAUSE ITS SCHEDULE ENDED (REQ-DASH-155).
+        "scheduleEndedHolds": schedule_ended.for_dataset(dataset_id),
+        # EVERY TURN-OFF IT READS (REQ-PIPE-179 criterion 41), configuration only.
+        "turnOffs": turned_off.timeline(dataset_id),
+        # REQ-PIPE-081 criteria 14 and 15: what the RECORDED census found.
+        "census": census.for_datasets({dataset_id}),
+        # REQ-PIPE-122 NFR 1: the amber setting in force over time.
+        "amberSetting": amber_setting.timeline(dataset_id),
+        # WHICH PROMOTED AMBER SUPPLIES WERE ACKNOWLEDGED (REQ-PIPE-122 c21).
+        "acknowledgements": acknowledgements.for_dataset(dataset_id),
+        # WHICH LATE SUPPLIES A PERSON EXCUSED (REQ-DASH-162).
+        "excuses": excuses.for_dataset(dataset_id),
+        # REQ-DASH-172: corrections and what they re-judged.
+        "corrections": corrections.for_dataset(dataset_id),
+        # REFUSED BY THE AGREEMENT BACKSTOP (REQ-PIPE-173 criterion 4).
+        "agreementRefusal": _agreement_refusal(dataset_id),
+        # WHAT WAS PROMOTED AND WHAT HAD ARRIVED, AS AT EACH DATE (REQ-DASH-197,
+        # REQ-DASH-198): change points, one walk of the slot timeline above.
+        "promotionTimeline": promotion_timeline.for_dataset(dataset_id, slot_timeline_raw),
         "arrivalHistory": arrival_history,
         "arrivalByRun": arrival_by_run,
         "rowCount": row_count_by_run.get(latest_run),
         "prevRowCount": row_count_by_run.get(prev_run),
-        # Per-run row counts aren't duplicated into their own dict here -
-        # "runs" (below) already carries each arrival record per
-        # entry, so Thread C's as-of UI can read it straight from there.
-        # Each run as the PAGE sees it: the manifest entry plus a
-        # derived `run_date`. The manifest itself carries a receipt
-        # INSTANT since REQ-GEN-042 (`received_at`), and the template,
-        # the JS tests and the e2e suite all key supply history on a
-        # date - so the date is derived once, here, at the last
-        # transform before the page.
-        #
-        # Spread-then-add rather than a hand-listed copy, deliberately:
-        # a hand-maintained allowlist silently drops every field added
-        # later, which is CLAUDE.md's own standing lesson from item 74.
+        # Each run as the PAGE sees it: the manifest entry plus a derived
+        # `run_date`. Spread-then-add rather than a hand-listed copy: a
+        # hand-maintained allowlist silently drops every field added later
+        # (CLAUDE.md's standing lesson from item 74).
         "runs": [{**m, "run_date": _run_date(m)} for m in manifest],
         "columns": columns_out,
-        "_provenance": "Computed by qa_tools/bdm/orchestrate_bdm.py - actual dbt-core, Soda Core, datacontract-cli "
-                        "and Evidently runs against real generated CSVs, the real ODCS contract, the real Soda "
-                        "checks YAML, and a real dbt schema.yml — see README.md.",
+        "_provenance": presented["provenance"].format(
+            table_description=table_description(coll, dataset)),
     }
 
 
+# ---- one collection ---------------------------------------------------------
+
+def _payload(collection_id: str) -> dict:
+    """The collection's results file, or an empty one where it has none yet -
+    a collection with no recorded runs is built, not refused (criterion 6)."""
+    path = results_path(collection_id)
+    if not os.path.exists(path):
+        return {"runs": [], "results": [], "dataset_stats": {}}
+    with open(path) as f:
+        return json.load(f)
+
+
+def build_datasets(collection_id: str) -> list[dict]:
+    """Every dataset the hierarchy declares for the collection, in order."""
+    coll = collections.by_id(collection_id)
+    payload = _payload(collection_id)
+    manifest = sorted(payload["runs"], key=_run_date)
+    results = payload["results"]
+    dataset_stats = payload["dataset_stats"]
+
+    # Every real check definition, active and retired - config-file parsing
+    # only, no supply rows, so safe for any read-committed-history path.
+    lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
+
+    by_table = {d.table: [r for r in results if r["dataset_id"] == d.dataset_id]
+                for d in coll.datasets}
+    share_cross_table_results(results, by_table)
+    return [build_one_table(coll, d, by_table[d.table], own_runs(manifest, d.table), dataset_stats,
+                            lifecycle_by_id)
+            for d in coll.datasets]
+
+
+def build(collection_id: str) -> dict:
+    """The collection's dashboard document, in the shape its file has always
+    had - Birth Registrations' one dataset as the document itself (legacy
+    flag), every other collection's under `datasets`."""
+    datasets = build_datasets(collection_id)
+    if "dashboard.single_dataset_document" in _legacy(collection_id):
+        return datasets[0]
+    return {"datasets": datasets}
+
+
+def write(collection_id: str) -> str:
+    """Build and write the collection's dashboard file, whole or not at all
+    (another process may be reading it - CI, 2026-10-11)."""
+    path = out_path(collection_id)
+    data = build(collection_id)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2, default=str)
+    return path
+
+
 if __name__ == "__main__":
-    data = build()
-    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
-    # WHOLE OR NOT AT ALL: another process may be reading it (CI, 2026-10-11).
-    from qa_tools.common import atomic_file
-    atomic_file.write_json(OUT_PATH, data)
-    print(f"Wrote {OUT_PATH} ({len(data['columns'])} columns)")
-    # Criterion 16: a WARNING, and the build still publishes.
+    for _coll in collections.all_collections():
+        print(f"Wrote {write(_coll.id)}")
+    # Criterion 16 of REQ-PIPE-081: a WARNING, and the build still publishes.
     for line in census.build_warnings():
         print(line)

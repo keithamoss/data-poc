@@ -1,19 +1,22 @@
 """
-Maps check_id -> a real, clickable GitHub URL, and each dataset/agency
-to its own qa_tools/<bdm|cp>/ folder (running-thoughts.md #8, "deep
-links from the dashboard back into GitHub") - scoped via AskUserQuestion
+Maps check_id -> a real, clickable GitHub URL, each dataset to its
+collection's ODCS contract at the dataset's own entry, and each agency to
+its contract/<agency-id>/ folder (running-thoughts.md #8, "deep links from
+the dashboard back into GitHub"; the dataset and agency targets since
+REQ-DASH-244, below) - scoped via AskUserQuestion
 with Keith first (three real forks, all resolved to the recommended
 option): pin to the exact build commit rather than the live branch (a
 check-source link should always show exactly what that check looked
 like when THIS dashboard was published, matching this project's
 existing reproducibility pattern - qa_results/, snapshots - rather than
-silently drifting if the file changes later); a dataset/agency link
-points at qa_tools/<bdm|cp>/ specifically (the real per-dataset
-orchestration code, already this repo's established one-folder-per-
-dataset convention - CLAUDE.md's own layout table), doubling as the
-agency link too since each real agency maps to exactly one dataset/
-collection today; and a check link gets a real #L<line> anchor, not
-just a file-level link.
+silently drifting if the file changes later); and a check link gets a
+real #L<line> anchor, not just a file-level link.
+
+A DATASET'S AND AN AGENCY'S LINK MOVED (REQ-DASH-244 criteria 12 and 13,
+Keith 2026-10-16). Both used to point at qa_tools/<bdm|cp>/, the
+per-collection code folders, which REQ-QAC-242 deleted - so they had gone
+dead. A dataset now opens its contract, what it is held to, and an agency
+its folder of contracts and check files; both come from the registry.
 
 Line-finding is deliberately a plain text scan for the check_id's own
 literal value, not a per-tool-specific YAML/AST parse: check_lifecycle.
@@ -38,28 +41,10 @@ import os
 import subprocess
 from pathlib import Path
 
-from qa_tools.common import hierarchy
 from qa_tools.common.validate_check_lifecycle import collect_checks
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_REPO = "keithamoss/data-poc"
-
-# agency -> the qa_tools/ source folder its real tool scripts live in.
-# Genuinely NOT part of the hierarchy - it maps an agency onto this
-# repo's own code layout, which contract/data-asset.yaml has no business
-# knowing about - so it stays a literal. Add an entry when an agency
-# arrives.
-AGENCY_QA_FOLDER = {
-    "registry-services": "bdm",
-    "child-protection-family-support": "cp",
-}
-
-# The per-dataset view of the same thing. Derived from the hierarchy
-# (REQ-QAC-039) rather than enumerating every dataset a second time -
-# which is what it used to do, and what made this one of the four copies
-# of the tree that requirement removed.
-DATASET_QA_FOLDER = {d.dataset_id: AGENCY_QA_FOLDER[d.agency_id] for d in hierarchy.all_datasets()}
-
 
 def current_commit_sha(root: Path | str = ROOT) -> str:
     """GITHUB_SHA (set automatically on every real Actions run) if
@@ -106,17 +91,34 @@ def build_check_source_links(repo: str = DEFAULT_REPO, sha: str | None = None, r
     return links
 
 
-def build_folder_links(repo: str = DEFAULT_REPO, sha: str | None = None, root: Path | str = ROOT) -> dict[str, dict[str, str]]:
-    """{"agencies": {agencyId: url}, "datasets": {datasetId: url}} - both
-    keyed off AGENCY_QA_FOLDER/DATASET_QA_FOLDER above, both currently
-    resolving to the same real qa_tools/<bdm|cp>/ folder per real
-    agency/dataset."""
+def build_folder_links(repo: str = DEFAULT_REPO, sha: str | None = None,
+                       root: Path | str = ROOT) -> dict[str, dict[str, str]]:
+    """Where each agency's and each dataset's 'View on GitHub' goes, and the
+    tooltip naming it - every one from the registry (REQ-DASH-244 criteria 9,
+    12 and 13).
+
+    A DATASET OPENS ITS COLLECTION'S ODCS CONTRACT, under its agency's folder,
+    at its own schema entry: the contract is what the dataset is held to.
+    AN AGENCY OPENS ITS FOLDER, contract/<agency-id>/, which holds every one of
+    its collections' contracts and check files (REQ-QAC-241).
+    """
+    from qa_tools import collections
+
     sha = sha or current_commit_sha(root)
-
-    def folder_url(code: str) -> str:
-        return f"https://github.com/{repo}/tree/{sha}/qa_tools/{code}"
-
-    return {
-        "agencies": {agency_id: folder_url(code) for agency_id, code in AGENCY_QA_FOLDER.items()},
-        "datasets": {dataset_id: folder_url(code) for dataset_id, code in DATASET_QA_FOLDER.items()},
-    }
+    root = Path(root)
+    out: dict[str, dict[str, str]] = {"agencies": {}, "datasets": {}, "titles": {"agencies": {},
+                                                                              "datasets": {}}}
+    for coll in collections.all_collections():
+        folder = coll.folder
+        out["agencies"][coll.agency_id] = f"https://github.com/{repo}/tree/{sha}/{folder}"
+        out["titles"]["agencies"][coll.agency_id] = f"View {folder}/ on GitHub"
+        rel = coll.check_file("contract")
+        path = root / rel
+        text = path.read_text() if path.is_file() else ""
+        for d in coll.datasets:
+            line = _find_line(text, f"- name: {d.table}")
+            anchor = f"#L{line}" if line else ""
+            out["datasets"][d.dataset_id] = f"https://github.com/{repo}/blob/{sha}/{rel}{anchor}"
+            out["titles"]["datasets"][d.dataset_id] = (f"Open {rel} on GitHub, at this dataset's "
+                                                       f"entry")
+    return out

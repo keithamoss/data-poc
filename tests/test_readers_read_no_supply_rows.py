@@ -191,15 +191,16 @@ class TestTheDashboardBuild:
     promotion_state, acknowledgements and closed_slots."""
 
     def test_it_builds_as_the_publisher(self, publisher, statements, tmp_path, monkeypatch):
-        from pipeline import build_cp_dashboard_data, build_dashboard_data
+        from pipeline import build_dashboard_data
 
         role, _ = publisher
-        for collection_id, builder, reads in ((BDM, build_dashboard_data, "REAL_RESULTS_PATH"),
-                                              (CP, build_cp_dashboard_data, "RESULTS_PATH")):
+        built = {}
+        for collection_id in (BDM, CP):
             rebuild_support.rebuild(collection_id, tmp_path, monkeypatch)
-            results = rebuild_support.output_path(collection_id, tmp_path)
-            monkeypatch.setattr(builder, reads, str(results))
-            assert builder.build(), f"{builder.__name__} built nothing"
+            built[collection_id] = str(rebuild_support.output_path(collection_id, tmp_path))
+        monkeypatch.setattr(build_dashboard_data, "results_path", lambda cid: built[cid])
+        for collection_id in (BDM, CP):
+            assert build_dashboard_data.build(collection_id), f"{collection_id} built nothing"
         _assert_only_the_publisher_read(role, statements)
 
 

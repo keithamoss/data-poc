@@ -10,7 +10,7 @@ client/server split `pipeline/cadence.py`'s own module docstring
 already explains for cycle_start().
 
 Operates on the SAME already-built dashboard-JSON shape `pipeline/
-build_dashboard_data.py`/`build_cp_dashboard_data.py` produce (a single
+build_dashboard_data.py` produces (a single
 dataset dict with `columns: [{checks: [{current, warn, fail,
 retired_as_of}, ...]}, ...]`, or - for Child Protection - one entry from
 that shape's `datasets` list) - never a live warehouse/DuckDB

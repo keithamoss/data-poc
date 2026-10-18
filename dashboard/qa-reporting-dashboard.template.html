@@ -1961,24 +1961,17 @@ function groupChecksByCategory(checks){
    output, and never commit it even if you build it locally to preview
    a change - see README.md's Development section.
 
-   REAL_BIRTH_REG_DATA — Birth Registrations (Registry Services > Civil
-   Registration). Computed by qa_tools/bdm/orchestrate_bdm.py: actual
-   dbt-core, Soda Core, datacontract-cli, and Evidently runs against
-   real generated synthetic runs (120 scheduled deliveries, 176
-   manifest entries once red-triggered resupply attempts are included -
-   see README.md's "The 120 (scheduled) runs" section).
-
-   REAL_CP_DATA — Child Protection (Department for Child Protection and
-   Family Support > Child Protection), 6 datasets. Computed by
-   qa_tools/cp/orchestrate_cp.py against the same four real tools,
-   including this collection's cross-table FK/business-rule checks - see
-   plans/dashboard.md #1 and plans/qa-pipeline.md for the fuller account.
+   COLLECTION_DATA — every real collection's datasets, keyed by collection
+   id in hierarchy order (REQ-DASH-244), each built by the one
+   pipeline/build_dashboard_data.py from the collection's recorded QA
+   results: actual dbt-core, Soda Core, datacontract-cli and Evidently runs.
+   It replaced one const per collection, one per real feed.
 
    SNAPSHOT_MANIFEST — the "time travel" picker's own bookkeeping
    (dashboard/snapshot_dashboard.py), re-embedded from the real,
    committed dashboard/snapshots/manifest.json on every build - same
    "placeholder here, real data only in the built output" treatment as
-   the two consts above.
+   COLLECTION_DATA above.
 
    AS_OF_OFFSET_DAYS used to be re-embedded here too, from the real,
    committed contract/data-asset.yaml - removed entirely 2026-09-17
@@ -1989,9 +1982,8 @@ function groupChecksByCategory(checks){
    when nothing was wrong). Replaced by real per-dataset cadence config
    now in each dataset's participation in contract/calendar.yaml (the
    contract's `slaProperties:` until REQ-PIPE-110), read by
-   qa_tools/common/agreement.py and already folded into REAL_BIRTH_REG_DATA/
-   REAL_CP_DATA's own `sla.cadence` field by the two build_*_dashboard_
-   data.py scripts. The page used to carry its own JS port of
+   qa_tools/common/agreement.py and already folded into each COLLECTION_DATA
+   dataset's own `sla.cadence` field by pipeline/build_dashboard_data.py. The page used to carry its own JS port of
    pipeline/cadence.py's cycle_start() to turn that cadence into a period
    start; REQ-DASH-054 replaced the port with the embedded period
    sequences themselves - see PERIOD_SEQUENCES below.
@@ -2139,8 +2131,14 @@ const WHY_NOT_SENTENCES = {};
 // NULL HERE is the raw template, same as BUILT_AT - it was never built,
 // so it was built by nobody from nothing.
 const BUILD_PROVENANCE = null;
-const REAL_BIRTH_REG_DATA = null;
-const REAL_CP_DATA = null;
+// COLLECTION_DATA - REQ-DASH-244. Every real collection's dashboard data,
+// keyed by collection id in hierarchy order, each entry self-contained
+// ({datasets: [...]}, one raw dataset object per dataset the hierarchy
+// declares). Built by pipeline/build_dashboard_data.py, embedded by
+// dashboard/embed_dashboard_data.py. It replaced one const per collection
+// (one per real feed), so a new collection needs no page
+// code of its own. Null in the raw template, as before.
+const COLLECTION_DATA = null;
 const SNAPSHOT_MANIFEST = [];
 // SCHEDULE_RUNWAY - REQ-PIPE-053, embedded from contract/calendar.yaml
 // at build time. Every AUTHORED calendar, its warning threshold, its
@@ -2211,7 +2209,7 @@ const CHANGELOG_FEED = [];
 const RELEASE_NOTES = {intro:[], entries:[]};
 const REQUIREMENTS = [];
 const TICKET_STATUS = {};
-const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}};
+const GITHUB_LINKS = {checks:{}, agencies:{}, datasets:{}, titles:{agencies:{}, datasets:{}}};
 const ASSIGNMENTS = {agencies:{}, datasets:{}};
 const LEADERBOARD = [];
 // PLANS — running-thoughts.md #10's "Plans" tab: the project's own
@@ -2280,10 +2278,9 @@ const SPRINT_DEPENDENCIES = null;
 // cramped drawer.
 const DEMO_CAST = null;
 
-// Shared by Birth Registrations (a single dataset) and Child Protection
-// (6 datasets, one per table) - both are reshaped server-side into this
-// exact per-dataset JSON shape (see pipeline/build_dashboard_data.py and
-// pipeline/build_cp_dashboard_data.py), so one function turns either into
+// Shared by every collection - each dataset is reshaped server-side into
+// this exact per-dataset JSON shape by pipeline/build_dashboard_data.py
+// (one builder since REQ-DASH-244), so one function turns any of them into
 // what the dashboard's rendering code expects.
 // Parsing a date string is dear and the same few hundred strings recur on
 // every build of every date the agency trend asks for (REQ-DASH-226 NFR 6),
@@ -2412,7 +2409,7 @@ function buildRealDataset(d){
 }
 // Thread C - cadence-aware "as of" viewing (plans/publishing-and-
 // history.md). Operates on the RAW JSON shape (same as what
-// REAL_BIRTH_REG_DATA/REAL_CP_DATA.datasets[i] already are), BEFORE
+// each COLLECTION_DATA entry's datasets[i] already are), BEFORE
 // buildRealDataset() runs - returns either null (no data available as
 // of the picked date - see the two distinct reasons just below) or a
 // same-shaped-but-smaller raw object that buildRealDataset() then
@@ -2547,8 +2544,8 @@ function coveredDateRange(){
 // data.py - every column shares the same value) - reused here rather
 // than re-deriving row counts from the raw manifest, which for Child
 // Protection would need a table-name lookup (row_counts is keyed by
-// real table name, e.g. "cp_notifications", not this dataset's own
-// hyphenated id, e.g. "cp-notifications") this layer shouldn't have to
+// real table name, e.g. cp_notifications, not this dataset's own
+// hyphenated id, e.g. cp-notifications) this layer shouldn't have to
 // know about. Checked more than one column in case the first one's own
 // byRun doesn't happen to cover every run (a column/check introduced
 // partway through history) - returns null if truly none of them do,
@@ -2955,34 +2952,44 @@ function noDataDataset(id, name, provider, deliveryFormat, sla){
 // Real datasets ARE clipped to the as-of date; a dataset whose history
 // starts after it genuinely has nothing to show as at that date, which
 // is what noDataDataset() is for.
-function buildBirthRegistrations(inPlaceOnDateStr){
-  if(!REAL_BIRTH_REG_DATA) return null;
-  const clipped = clipDatasetToInPlaceOn(REAL_BIRTH_REG_DATA, inPlaceOnDateStr);
-  return clipped ? buildRealDataset(clipped)
-    : {...noDataDataset(REAL_BIRTH_REG_DATA.id, REAL_BIRTH_REG_DATA.name, REAL_BIRTH_REG_DATA.provider,
-                     REAL_BIRTH_REG_DATA.deliveryFormat, REAL_BIRTH_REG_DATA.sla),
-       closedSlots: REAL_BIRTH_REG_DATA.closedSlots || []};
-}
-function buildChildProtectionDatasets(inPlaceOnDateStr){
-  if(!REAL_CP_DATA) return [];
-  return REAL_CP_DATA.datasets.map(d => {
+// EVERY REAL COLLECTION'S DATASETS THROUGH ONE FUNCTION (REQ-DASH-244
+// criterion 5), as at the date on show: each clipped to that date, or a
+// no-data tile where it has nothing yet - a collection with no recorded
+// runs included (criterion 6).
+function buildCollectionDatasets(collectionId, inPlaceOnDateStr){
+  const entry = COLLECTION_DATA && COLLECTION_DATA[collectionId];
+  if(!entry) return [];
+  return (entry.datasets || []).map(d => {
     const clipped = clipDatasetToInPlaceOn(d, inPlaceOnDateStr);
     return clipped ? buildRealDataset(clipped)
       : {...noDataDataset(d.id, d.name, d.provider, d.deliveryFormat, d.sla),
          closedSlots: d.closedSlots || []};
   });
 }
+// ONE DATASET-ID INDEX over every collection (criterion 5): dataset ids are
+// unique across collections, so an id alone finds its raw data and the
+// collection it belongs to. Built once per page, from the embedded const.
+let REAL_DATASET_INDEX = null;
+function realDatasetIndex(){
+  if(REAL_DATASET_INDEX) return REAL_DATASET_INDEX;
+  REAL_DATASET_INDEX = {};
+  for(const [collectionId, entry] of Object.entries(COLLECTION_DATA || {})){
+    for(const d of (entry && entry.datasets) || []){
+      REAL_DATASET_INDEX[d.id] = {collectionId, raw: d};
+    }
+  }
+  return REAL_DATASET_INDEX;
+}
 // Phase 5j Stage 2: the RAW (unclipped, full-history) real dataset
 // object for a given id - renderDataset()'s own `ds` is always the
 // AS-OF-CLIPPED build (buildRealDataset()'s output), whose own `.runs`
 // is only the eligible subset, not the dataset's whole real history -
 // buildSupplyHistory() needs the latter. Dataset ids are unique across
-// both real domains (e.g. "birth-registrations" vs. "cp-notifications"),
-// so no agency/collection context is needed to disambiguate.
+// every collection (REQ-DASH-244's one index), so no agency or collection
+// context is needed to disambiguate.
 function rawRealDatasetById(datasetId){
-  if(REAL_BIRTH_REG_DATA && REAL_BIRTH_REG_DATA.id===datasetId) return REAL_BIRTH_REG_DATA;
-  if(REAL_CP_DATA && REAL_CP_DATA.datasets) return REAL_CP_DATA.datasets.find(d=>d.id===datasetId) || null;
-  return null;
+  const found = realDatasetIndex()[datasetId];
+  return found ? found.raw : null;
 }
 
 
@@ -3359,11 +3366,9 @@ let CURRENT_IN_PLACE_ON = inPlaceOnFromUrl() || DEFAULT_IN_PLACE_ON;
 // "no data" rather than disappearing - "we have not loaded it" and "it
 // does not exist" are different things, and a missing tile says the
 // second when it means the first.
-const AGENCY_BLURB = {
-  "registry-services": "Civil registration of life events for the whole state.",
-  "child-protection-family-support":
-    "Casework for children and families needing protection or support services.",
-};
+// {agency id: blurb}, embedded from contract/presentation.yaml (REQ-DASH-244
+// criterion 10). Empty in the raw template, whose HIERARCHY is null too.
+const AGENCY_BLURB = {};
 
 // Presentation copy, not hierarchy: a blurb is how the page describes
 // an agency, which contract/data-asset.yaml has no business knowing.
@@ -3373,13 +3378,15 @@ const AGENCY_BLURB = {
 // asked for rebuilt all six. Never shared between dates or builds, because
 // buildDatasetsOn() marks statuses onto the objects it is handed.
 function datasetTile(datasetId, inPlaceOnDateStr, cache){
-  if(datasetId === "birth-registrations") return buildBirthRegistrations(inPlaceOnDateStr);
-  let cp = cache && cache.cp;
-  if(!cp){
-    cp = buildChildProtectionDatasets(inPlaceOnDateStr);
-    if(cache) cache.cp = cp;
+  const found = realDatasetIndex()[datasetId];
+  if(!found) return null;
+  const key = "collection:" + found.collectionId;
+  let built = cache && cache[key];
+  if(!built){
+    built = buildCollectionDatasets(found.collectionId, inPlaceOnDateStr);
+    if(cache) cache[key] = built;
   }
-  return cp.find(d => d.id === datasetId) || null;
+  return built.find(d => d.id === datasetId) || null;
 }
 
 // EVERY DATASET'S OWN STATUS ON A DATE (REQ-DASH-224 criterion 7, REQ-DASH-
@@ -4760,10 +4767,15 @@ function githubCheckLink(check){
   if(!url) return "";
   return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="View this check's real source on GitHub"><span class="ico"></span>View source</a>`;
 }
+// A DATASET'S LINK OPENS ITS CONTRACT AT ITS OWN ENTRY, AN AGENCY'S ITS FOLDER
+// (REQ-DASH-244 criteria 12 and 13), and the tooltip names the target - both
+// built from the registry by qa_tools/common/github_links.py.
 function githubFolderLink(kind, id){
   const url = GITHUB_LINKS[kind] && GITHUB_LINKS[kind][id];
   if(!url) return "";
-  return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="View this ${kind==='agencies'?'agency':'dataset'}'s real QA code on GitHub" onclick="event.stopPropagation()"><span class="ico"></span>View on GitHub</a>`;
+  const title = (GITHUB_LINKS.titles && GITHUB_LINKS.titles[kind] && GITHUB_LINKS.titles[kind][id])
+    || "View on GitHub";
+  return `<a href="${url}" target="_blank" rel="noopener" class="pill tag sm" title="${escHtml(title)}" onclick="event.stopPropagation()"><span class="ico"></span>View on GitHub</a>`;
 }
 // running-thoughts.md #2 ("data-asset-level people/roles config",
 // 2026-09-18, scoped via AskUserQuestion) - real people assigned to
@@ -9877,7 +9889,7 @@ function boundInPlaceOnInput(){
 // would hide correct answers to make a point about the date.
 // EVERY REAL DATASET'S RAW DATA, in page order - one place to enumerate them.
 function rawRealDatasets(){
-  return [REAL_BIRTH_REG_DATA, ...((REAL_CP_DATA && REAL_CP_DATA.datasets) || [])].filter(Boolean);
+  return Object.values(COLLECTION_DATA || {}).flatMap(entry => (entry && entry.datasets) || []);
 }
 const DECISION_DONE = {promote:"promoted", reject:"rejected", demote:"demoted",
   supersede:"superseded", "un-supersede":"restored", refile:"re-filed",

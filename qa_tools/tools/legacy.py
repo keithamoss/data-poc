@@ -86,4 +86,18 @@ KNOWN: dict[str, str] = {
         "what the tools left out is reconciled, and every in-scope check guarded, on "
         "every run - even one whose supply is filed to no period, which Child "
         "Protection's copy excuses (post-build-review #220, the tenth difference)."),
+    "dashboard.single_dataset_document": (
+        "the dashboard file is the collection's one dataset object itself, rather than "
+        "its datasets under `datasets` (REQ-DASH-244 criterion 11)."),
+    "dashboard.supply_section_first": (
+        "the Supply-level section's pseudo-column is listed before the Table-level "
+        "one in the dashboard file. The page orders the sections itself, so no reader "
+        "sees it; the file's order is kept so the build's output is unchanged."),
+    "dashboard.drops_empty_sections": (
+        "a section with no checks is left out of the dataset, rather than shown with "
+        "a 'No automated quality rule defined' card as every other collection's is."),
+    "dashboard.reference_reason_fallback": (
+        "a check reads as not evaluated only on a tool's own reason, or on its "
+        "reference's reason when it is red with no value; can't-run records keep the "
+        "order they were recorded in rather than following the real results."),
 }

@@ -121,7 +121,7 @@ schema:
         physicalType: varchar(20)
         required: true
         unique: true
-        description: BDM's unique registration identifier. Primary key of the feed.
+        description: "BDM's unique registration identifier — primary key of the feed."
         # `rule: nullCheck`/`regexPattern`/etc (below and throughout this
         # file) were never real ODCS v3 vocabulary - the DataQuality model
         # datacontract-cli actually validates against has no `rule` field
@@ -190,6 +190,7 @@ schema:
       - name: child_given_names
         logicalType: string
         physicalType: varchar(200)
+        description: "Required. Small non-zero null rate expected from data-entry lag at source."
         required: true
         # Real ODCS property - identifies this as personal data, so any
         # sample-capture mechanism that respects it (datacontract-cli's own
@@ -242,6 +243,7 @@ schema:
       - name: child_family_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Required."
         required: true
         classification: pii
         quality:
@@ -287,6 +289,7 @@ schema:
       - name: date_of_birth
         logicalType: date
         physicalType: date
+        description: "Required, and range-checked against 1900-01-01..today."
         required: true
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_of_birth:nullValues_datacontract
@@ -372,6 +375,7 @@ schema:
       - name: sex
         logicalType: string
         physicalType: varchar(1)
+        description: "Closed value set (M / F / X) that several downstream eligibility systems key off directly."
         required: true
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:sex:invalidValues_datacontract
@@ -397,6 +401,7 @@ schema:
       - name: place_of_birth_suburb
         logicalType: string
         physicalType: varchar(100)
+        description: "Required."
         required: true
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:place_of_birth_suburb:nullValues_datacontract
@@ -451,7 +456,7 @@ schema:
         logicalType: string
         physicalType: varchar(200)
         required: false
-        description: Nullable - not every birth occurs in a registered facility (e.g. home births).
+        description: "Nullable — not every birth occurs in a registered facility (home births are legitimate)."
         quality:
           # Reverse gap, closed 2026-09-15 (plans/qa-pipeline.md's full-
           # triplication pass): both Soda (missing_percent) and dbt
@@ -485,6 +490,7 @@ schema:
       - name: date_registered
         logicalType: date
         physicalType: date
+        description: "Required; must be ≥ date_of_birth."
         required: true
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:date_registered:nullValues_datacontract
@@ -538,6 +544,7 @@ schema:
       - name: registering_parent_1_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Optional."
         required: false
         classification: pii
         quality:
@@ -583,6 +590,7 @@ schema:
       - name: registering_parent_2_name
         logicalType: string
         physicalType: varchar(200)
+        description: "Optional — single-parent registrations are legitimately common."
         required: false
         classification: pii
         quality:
@@ -628,12 +636,14 @@ schema:
         logicalType: boolean
         physicalType: boolean
         required: true
-        description: >
-          A boolean's only two non-null states are both valid values by
-          definition - the nullValues rule below is already the complete
-          "strict values" check this column needs; there's no separate
-          "invalid code" state a boolean column can land in the way a
-          string column like sex can.
+        # What this description said before REQ-DASH-244 moved the page's
+        # note here - kept for whoever maintains the contract:
+        #   A boolean's only two non-null states are both valid values by
+        #   definition - the nullValues rule below is already the complete "strict
+        #   values" check this column needs; there's no separate "invalid code"
+        #   state a boolean column can land in the way a string column like sex
+        #   can.
+        description: "Required."
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:is_multiple_birth:nullValues_datacontract
             metric: nullValues
@@ -709,7 +719,11 @@ schema:
         logicalType: string
         physicalType: varchar(50)
         required: true
-        description: BDM's internal record ID. Kept alongside registration_number to help trace re-extractions.
+        # What this description said before REQ-DASH-244 moved the page's
+        # note here - kept for whoever maintains the contract:
+        #   BDM's internal record ID. Kept alongside registration_number to help
+        #   trace re-extractions.
+        description: "BDM's internal record ID, kept for re-extraction tracing."
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:source_system_record_id:duplicateValues_datacontract
             metric: duplicateValues
@@ -752,7 +766,11 @@ schema:
         logicalType: date
         physicalType: timestamp
         required: true
-        description: When this record was extracted from BDM's source system, not when the file landed in S3.
+        # What this description said before REQ-DASH-244 moved the page's
+        # note here - kept for whoever maintains the contract:
+        #   When this record was extracted from BDM's source system, not when the
+        #   file landed in S3.
+        description: "When the record was extracted at BDM's source system."
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:extract_timestamp:nullValues_datacontract
             metric: nullValues

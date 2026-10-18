@@ -145,5 +145,9 @@ ADAPTER = CollectionAdapter(
         "orchestrate.files_one_arrival",
         "orchestrate.entry_carries_csv_path",
         "orchestrate.always_reconciles",
+        "dashboard.single_dataset_document",
+        "dashboard.supply_section_first",
+        "dashboard.drops_empty_sections",
+        "dashboard.reference_reason_fallback",
     }),
 )

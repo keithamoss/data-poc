@@ -140,7 +140,7 @@ describe("the past-date notice names only decisions behind what is on show (post
                  promotionTimeline: {points, standing: []}};
     dashboard.close();
     dashboard = loadDashboard({ hierarchy: MINIMAL_HIERARCHY, html: builtTemplate()
-      .replace("const REAL_CP_DATA = null;", `const REAL_CP_DATA = ${JSON.stringify({datasets: [raw]})};`) });
+      .replace("const COLLECTION_DATA = null;", `const COLLECTION_DATA = ${JSON.stringify({"child-protection": {datasets: [raw]}})};`) });
     const found = dashboard.window.decisionsChangingDate("2026-08-10", null);
     const actions = found.map(d => d.action);
     // The promotion of s1 - the supply the panel names - recorded after the

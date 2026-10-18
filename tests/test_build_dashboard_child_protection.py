@@ -1,14 +1,22 @@
-"""Smoke test for pipeline/build_cp_dashboard_data.py's reshaping logic,
-against a small fixture rather than a real (slow) qa_tools/tools/
-orchestrate.py run - the Child Protection counterpart to
-tests/test_build_dashboard_data.py. Calls build_one_table() directly
-(no results_cp.json file needed) since that's the actual per-table
-reshaping function under test."""
+"""The shared dashboard builder (pipeline/build_dashboard_data.py, one for
+every collection since REQ-DASH-244) on a Child Protection table, against a
+small fixture rather than a real (slow) orchestrator run. Calls
+build_one_table() directly (no results file needed) since that's the
+actual per-table reshaping function under test. These were the tests of
+pipeline/build_cp_dashboard_data.py, which that requirement deleted."""
 from __future__ import annotations
 
 import pytest
 
-from pipeline import build_cp_dashboard_data as bcd
+from pipeline import build_dashboard_data as bcd
+from qa_tools import collections
+from qa_tools.common import hierarchy
+
+_CP = collections.by_id("child-protection")
+
+
+def _table(table, *args):
+    return bcd.build_one_table(_CP, hierarchy.dataset_for_table(table), *args)
 
 # ARRIVAL RECORDS, not manifest entries (REQ-GEN-043) - and row counts
 # now sit in dataset_stats, MEASURED from the data that landed, rather
@@ -67,7 +75,7 @@ FIXTURE_RESULTS = [
 
 
 def test_stats_by_run_carries_every_run_not_just_latest_and_previous():
-    dataset = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
+    dataset = _table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, FIXTURE_DATASET_STATS, {})
 
     col = next(c for c in dataset["columns"] if c["name"] == "concern_type")
     by_run = col["stats"]["byRun"]
@@ -101,9 +109,9 @@ def test_the_suppliers_own_timestamp_no_longer_decides_punctuality():
     for run in moved.values():
         run["arrival"]["cp_notifications"]["earliest_extract"] = "2026-02-01T23:59:00+00:00"
 
-    before = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS,
+    before = _table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS,
                                   FIXTURE_DATASET_STATS, {})
-    after = bcd.build_one_table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, moved, {})
+    after = _table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, moved, {})
 
     assert ({r: v["arrivalStatus"] for r, v in before["arrivalByRun"].items()}
             == {r: v["arrivalStatus"] for r, v in after["arrivalByRun"].items()}), (
@@ -114,11 +122,9 @@ def test_each_dataset_shows_its_own_runs():
     """One file is one arrival (REQ-PIPE-105), so a delivery is six runs
     and each belongs to one table. Without this every Child Protection
     page listed all 108 runs as its own arrival history."""
-    from pipeline import build_cp_dashboard_data as b
-
     manifest = [{"run_id": "cp_clients__1"}, {"run_id": "cp_placements__1"},
                 {"run_id": "cp_clients__2"}, {"run_id": "cp_run_001"}]
-    assert [m["run_id"] for m in b.own_runs(manifest, "cp_clients")] == [
+    assert [m["run_id"] for m in bcd.own_runs(manifest, "cp_clients")] == [
         "cp_clients__1", "cp_clients__2", "cp_run_001"]
 
 
@@ -147,7 +153,7 @@ class TestACheckThatCouldNotRunStaysOnItsOwnCard:
         pseudo = _check("cp_run_002", "cp_case_workers", None, status="fail", check_id=_XT,
                         check_name="Every notification's worker exists",
                         label="Not evaluated", **{reason_key: "cp_case_workers is held"})
-        table = bcd.build_one_table("cp_notifications", self._results(pseudo), FIXTURE_RUNS,
+        table = _table("cp_notifications", self._results(pseudo), FIXTURE_RUNS,
                                     FIXTURE_DATASET_STATS, {})
         cards = [c for col in table["columns"] for c in col["checks"] if c.get("check_id") == _XT]
 
@@ -169,7 +175,7 @@ class TestACheckATheToolCouldNotEvaluateSaysWhy:
                         not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud")
         real = _check("cp_run_001", "assigned_worker_id", 0, check_id=_XT,
                       check_name="relationships_cp_notifications_assigned_worker_id")
-        table = bcd.build_one_table("cp_notifications", [real, failed], FIXTURE_RUNS,
+        table = _table("cp_notifications", [real, failed], FIXTURE_RUNS,
                                     FIXTURE_DATASET_STATS, {})
         card = next(c for col in table["columns"] for c in col["checks"]
                     if c.get("check_id") == _XT)
@@ -204,7 +210,7 @@ class TestTwoChecksThatShareANameStayTwoCards:
             _check("cp_run_001", "cp_client_id", 3, status="fail", check_id=self._PLA,
                    check_name="relationships_cp_investigations_cp_client_id"),
         ]
-        table = bcd.build_one_table("cp_clients", results, FIXTURE_RUNS,
+        table = _table("cp_clients", results, FIXTURE_RUNS,
                                     FIXTURE_DATASET_STATS, {})
         return [c for col in table["columns"] if col.get("scope") == "cross-table"
                 for c in col["checks"]]

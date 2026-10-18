@@ -50,7 +50,6 @@ TEMPLATE_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.template.html"
 _BUILD_STEPS = [
     ["cli.app", "dashboard", "rebuild-results"],
     ["pipeline.build_dashboard_data"],
-    ["pipeline.build_cp_dashboard_data"],
     ["dashboard.embed_dashboard_data"],
 ]
 
@@ -1073,9 +1072,11 @@ class TestAcknowledgementBadge:
 
     def _page(self, built, tmp_path, acks=None):
         html = built.read_text()
-        start = html.index("const REAL_BIRTH_REG_DATA = ") + len("const REAL_BIRTH_REG_DATA = ")
+        start = html.index("const COLLECTION_DATA = ") + len("const COLLECTION_DATA = ")
         end = html.index(";\n", start)
-        record = json.loads(html[start:end])
+        data = json.loads(html[start:end])
+        record = next(d for entry in data.values() for d in entry["datasets"]
+                      if d["id"] == "birth-registrations")
         run_id = record["runs"][-1]["run_id"]
         record["acknowledgements"] = {run_id: {
             "supply": "birth-registrations@k", "period": "p", "promotedAt": self.PROMOTED,
@@ -1086,7 +1087,7 @@ class TestAcknowledgementBadge:
         for name in ("fonts", "vendor"):
             if not (tmp_path / name).exists():
                 (tmp_path / name).symlink_to((root / name).resolve())
-        out.write_text(html[:start] + json.dumps(record, separators=(",", ":")) + html[end:])
+        out.write_text(html[:start] + json.dumps(data, separators=(",", ":")) + html[end:])
         return out, run_id
 
     def _badge(self, page, run_id, in_place_on):
@@ -1185,7 +1186,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
     _COMPARE_JS = """() => {
       let compared = 0, missingVerdict = 0;
       const disagreements = [];
-      for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+      for (const raw of Object.values(COLLECTION_DATA)) {
         if (!raw) continue;
         for (const d of (raw.datasets ? raw.datasets : [raw])) {
           const built = buildRealDataset(d);
@@ -1220,7 +1221,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
     _IN_PLACE_ON_JS = """() => {
       let compared = 0;
       const disagreements = [];
-      for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+      for (const raw of Object.values(COLLECTION_DATA)) {
         if (!raw) continue;
         for (const d of (raw.datasets ? raw.datasets : [raw])) {
           for (const r of d.runs) {
@@ -1303,7 +1304,7 @@ class TestStatusMatchesEachToolsOwnVerdict:
         _goto(clean_page, built_dashboard_html)
         names = clean_page.evaluate("""() => {
           const out = new Set();
-          for (const raw of [REAL_BIRTH_REG_DATA, REAL_CP_DATA]) {
+          for (const raw of Object.values(COLLECTION_DATA)) {
             if (!raw) continue;
             for (const d of (raw.datasets ? raw.datasets : [raw]))
               for (const col of d.columns)
@@ -3091,7 +3092,7 @@ class TestOutstandingDecisions:
         """
         _goto(clean_page, built_dashboard_html)
         newest = clean_page.evaluate(
-            "REAL_BIRTH_REG_DATA.runs[REAL_BIRTH_REG_DATA.runs.length-1].run_date")
+            "rawRealDatasetById('birth-registrations').runs.at(-1).run_date")
         _goto(clean_page, built_dashboard_html, in_place_on=newest)
         clean_page.locator("#agency-grid .card").first.click()
         clean_page.wait_for_timeout(400)
@@ -3154,10 +3155,9 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
 
     out_html = tmp_path / "dashboard_divergent.html"
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(edd, "TARGETS", [
-            ("REAL_BIRTH_REG_DATA", str(Path(edd.ROOT) / "reports" / "birth_registrations_dashboard.json")),
-            ("REAL_CP_DATA", str(doctored)),
-        ])
+        real = edd.collection_targets
+        mp.setattr(edd, "collection_targets", lambda: [
+            (cid, str(doctored) if cid == "child-protection" else path) for cid, path in real()])
         mp.setattr(edd, "DASHBOARD_HTML", out_html)
         edd.embed()
     return out_html
@@ -3694,7 +3694,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
     from the one above. Drilling REBUILDS DATA for the new as-of date,
     so a standing-in record patched onto DATA disappears on the first
     click - which would make every assertion after it about a page in a
-    state the test never set up. Patching REAL_CP_DATA, which buildData()
+    state the test never set up. Patching COLLECTION_DATA, which buildData()
     reads, survives the rebuild exactly as a real record would.
 
     Still not a real decision, for the reason the class above states:
@@ -3725,7 +3725,7 @@ class TestDrillingThroughToThePeriodThatEarnedTheResults:
             # else, so a patched promotionState would simply be overwritten.
             page.evaluate(
                 """(st) => {
-                     const d = REAL_CP_DATA.datasets.find(x => x.id === "cp-carers");
+                     const d = rawRealDatasetById("cp-carers");
                      const tl = d.promotionTimeline || {points: [], standing: []};
                      d.promotionTimeline = {...tl, standing: [...tl.standing,
                        {on: "2026-08-01", period: st.period, standingIn: st, decisions: []}]};
@@ -3840,10 +3840,10 @@ def _with_blockers(built: Path, out: Path, blockers: list,
                           lambda record: record.__setitem__("blockers", blockers))
     if closed_slots is not None:
         def _slots(record):
-            for d in record.get("datasets") or [record]:
-                d["closedSlots"] = closed_slots.get(d.get("id", "birth-registrations"), [])
-        html = _rewrite_const(html, "REAL_CP_DATA", _slots)
-        html = _rewrite_const(html, "REAL_BIRTH_REG_DATA", _slots)
+            for entry in record.values():
+                for d in entry["datasets"]:
+                    d["closedSlots"] = closed_slots.get(d["id"], [])
+        html = _rewrite_const(html, "COLLECTION_DATA", _slots)
     out.write_text(html)
     return out
 
@@ -4856,10 +4856,10 @@ def dashboard_html_with_a_later_rejection(built_dashboard_html, supply_dsn,
     html = built_dashboard_html.read_text()
 
     def splice(record):
-        for d in record["datasets"]:
+        for d in record["child-protection"]["datasets"]:
             if d["id"] == "cp-carers":
                 d["promotionTimeline"] = points
-    out.write_text(_rewrite_const(html, "REAL_CP_DATA", splice))
+    out.write_text(_rewrite_const(html, "COLLECTION_DATA", splice))
     return out
 
 
@@ -5463,3 +5463,38 @@ class TestTheAsAtReadingsOnTheRealHistory:
               in_place_on=self._on("TS-77a"))
         since = clean_page.locator('[data-testid="standing-in-since"]')
         assert since.count() == 1 and "Since replaced" in since.inner_text()
+
+
+class TestTheGitHubLinks:
+    """REQ-DASH-244 criteria 12, 13 and 15, in a real browser: a dataset's
+    'View on GitHub' opens its collection's ODCS contract at that dataset's
+    own entry, an agency's opens its contract/<agency-id>/ folder, and each
+    one's tooltip names the target - for every registered collection."""
+
+    def test_every_dataset_opens_its_contract_at_its_entry(self, clean_page, built_dashboard_html):
+        from qa_tools import collections
+
+        every = collections.all_collections()
+        assert every, "the registry must hold collections for this test to mean anything"
+        for coll in every:
+            contract = coll.check_file("contract")
+            lines = (Path(__file__).resolve().parent.parent / contract).read_text().splitlines()
+            for d in coll.datasets:
+                _goto(clean_page, built_dashboard_html,
+                      state={"tier": "dataset", "agencyId": coll.agency_id,
+                             "collectionId": coll.id, "datasetId": d.dataset_id})
+                link = clean_page.locator(".view-head a", has_text="View on GitHub").first
+                href, title = link.get_attribute("href"), link.get_attribute("title")
+                assert "/blob/" in href and f"/{contract}#L" in href, (d.dataset_id, href)
+                assert lines[int(href.rsplit("#L", 1)[1]) - 1].strip() == f"- name: {d.table}"
+                assert contract in title, (d.dataset_id, title)
+
+    def test_every_agency_opens_its_folder(self, clean_page, built_dashboard_html):
+        from qa_tools import collections
+
+        for agency_id in dict.fromkeys(c.agency_id for c in collections.all_collections()):
+            _goto(clean_page, built_dashboard_html, state={"tier": "agency", "agencyId": agency_id})
+            link = clean_page.locator("a", has_text="View on GitHub").first
+            href, title = link.get_attribute("href"), link.get_attribute("title")
+            assert href.endswith(f"/contract/{agency_id}"), (agency_id, href)
+            assert f"contract/{agency_id}/" in title, (agency_id, title)
