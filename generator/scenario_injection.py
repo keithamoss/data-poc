@@ -1529,6 +1529,35 @@ INJECTIONS: tuple[Injection, ...] = (
                           "the whole collection, twenty days early - before its window"),
         ),
     ),
+    # ONE DAY OUTSIDE A QUARTERLY CLAIM WINDOW (REQ-GEN-236, Keith 2026-10-15:
+    # TS-3a and TS-3b move to Emergency Department). The quarterly window opens
+    # 14 days before 09:00 on the quarter's 1st, so a supply 15 days before, at
+    # 10:00, is a day short of it - the previous quarter is still the open one.
+    # TS-3a leaves that quarter filled by its own supply; TS-3b suppresses it.
+    # Shapes only: no resupply, late filing or verdict (REQ-GEN-044 criterion 6).
+    Injection(
+        scenario_id="TS-3a",
+        dataset_id="ed-presentations",
+        anchor=-6,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. "
+               "The previous quarter's supply arrived as usual; this one arrives 15 days "
+               "before the quarter's date, a day before its window opens.",
+        arrivals=(
+            ExtraArrival(-15, "10:00", None,
+                          "the supply, fifteen days early - a day before its window"),
+        ),
+    ),
+    Injection(
+        scenario_id="TS-3b",
+        dataset_id="ed-presentations",
+        anchor=-2,
+        config="as TS-3a, but the previous quarter's supply never came.",
+        arrivals=(
+            ExtraArrival(-15, "10:00", None,
+                          "the supply, fifteen days early - a day before its window"),
+        ),
+        suppress=(-1,),
+    ),
     # TWO FILES FOR ONE TABLE (REQ-GEN-196), one pair per way a person can
     # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two
     # files carry their own receipts, settled by a scripted person at 11:00

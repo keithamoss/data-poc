@@ -151,7 +151,8 @@ def _plan_injections(periods):
     mine = [i for i in scenario_injection.INJECTIONS if i.dataset_id == DATASET_ID]
     scenario_injection.no_two_scenarios_share_a_period(mine, {DATASET_ID: periods})
     resolved = [(i, scenario_injection.resolve(i, periods)) for i in mine]
-    return resolved, {placement.period: (i, placement) for i, placement in resolved}
+    suppressed = {name for _i, placement in resolved for name in placement.suppressed}
+    return resolved, {placement.period: (i, placement) for i, placement in resolved}, suppressed
 
 
 def _injected_chain(rows: Rows, injection, period, seed: int):
@@ -188,19 +189,22 @@ class EmergencyDepartment(Provider):
         from generator import targeting
 
         periods = generated_periods()
-        resolved, injected = _plan_injections(periods)
-        owned = frozenset(i for i, p in enumerate(periods) if p.name in injected)
+        resolved, injected, suppressed = _plan_injections(periods)
+        owned = frozenset(i for i, p in enumerate(periods)
+                          if p.name in injected or p.name in suppressed)
         severities = targeting.outside_hold(list(run_plan()), [p.date for p in periods],
                                             DATASET_ID, keep_clean=frozenset({0}),
                                             unavailable=owned)
         jobs = [Job(f"ed_slot_{i:02d}", BASE_SEED + i, sev, p)
                 for i, (sev, p) in enumerate(zip(severities, periods), start=1)]
         return Plan(jobs=jobs, resolved=resolved, injected_by_period=injected,
-                    state={"rows": Rows()})
+                    state={"rows": Rows(), "suppressed": suppressed})
 
-    def slot(self, plan: Plan, job: Job) -> list:
+    def slot(self, plan: Plan, job: Job) -> list | None:
         from generator.resupply import run_slot_chain
 
+        if job.period.name in plan.state["suppressed"]:
+            return None  # a scenario's period with no supply at all (TS-3b)
         rows = plan.state["rows"]
         injected = plan.injected_by_period.get(job.period.name)
         if injected is not None:

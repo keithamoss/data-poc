@@ -2859,16 +2859,32 @@ daily scale prove the rule is cadence-INDEPENDENT and that the window is
 the only thing that varies.
 
 **TS-3a `[INJECT]` Quarterly, prior slot FILLED.**
-*Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window
-14 days. Feb and May filled. Supply arrives 19 July - one day outside
-August's window, which opens 20 July.*
-**Expect**: August's window has not opened, so May is still the OPEN
-period (REQ-PIPE-131), and it is filled -> **resupply of May**. Being a
-filled slot it does **not auto-promote**; it holds and warns (TS-4).
+*Config: Emergency Department, the quarterly calendar - the 1st of
+February, May, August and November, due 09:00, a 14-day claim window, so
+May 2025's window opens 09:00 on 17 April. February 2025's supply arrived
+as usual; this one arrives 10:00 on 16 April 2025, a day before May's
+window opens (REQ-GEN-236).*
+**Expect** (the first bootstrapped build, 2026-10-18): filed to **2025-Q1**
+by the branch `resupply-of-open-slot`, classified `late` - May's window has
+not opened, so February is still the open period, and it is filled. Being
+a resupply of a filled slot it is **not promoted**: 2025-Q2 is left with no
+supply, and the next quarter's drift checks fail by the gap rule
+(REQ-QAC-108), measured against February's supply.
+**Breaks as**: files to May because it is "nearly" May's - the window would
+then mean nothing.
+Keeps the family's note: the filled branch is a contained imperfection -
+a supplier one day early leaves a quarter to be put right by a person -
+not a defect.
 
 **TS-3b `[INJECT]` Quarterly, prior slot UNFILLED.**
-*Same config, but May's slot was never filled.*
-**Expect**: May is still the open period -> fills **May, ~79 days late**.
+*Same config, on Emergency Department, a year later: February 2026's
+supply never came (suppressed), and May's arrives 10:00 on 16 April 2026,
+a day before its window opens.*
+**Expect** (the first bootstrapped build, 2026-10-18): filed to **2026-Q1**
+by the branch `open-slot-unfilled`, classified `late` - about 74 days -
+because February is still the open period and nothing filled it. 2026-Q2
+is left with no supply.
+**Breaks as**: files to May and leaves February owed for ever.
 
 **TS-3c `[INJECT]` Daily, prior slot FILLED.**
 *Config: daily evening-before - the supply for day D is due 22:00 on
