@@ -37084,7 +37084,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As a data team leader, I want every real collection on the register built and shown the same way, so that a newly added collection appears with its real results - or plainly as not yet supplied - rather than looking as though it has no data because nobody wired it in."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sites 17 to 20; main session position.md calls 1 and 14 to 18 (after the dashboard UX review), 27 and 28. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL build every collection's dashboard data through one shared pipeline/build_dashboard_data.py, taking each column's and table's type and description from the collection's ODCS contract, with no per-collection presentation code, and SHALL delete pipeline/build_cp_dashboard_data.py in the same change."
@@ -37139,6 +37139,11 @@ requirements:
       - "AGENCY_BLURB IS EMPTY IN THE RAW TEMPLATE: the raw template's HIERARCHY is null, so its blurb literal was never shown, and keeping it would have left the template naming two agencies on the migration allowlist."
       - "THE RENDER GATE READS THE REGISTRY (criterion 9): check_dashboard_renders.py fails a built page whose COLLECTION_DATA lacks a registered collection, naming it."
       - "NO PLANS PROSE DELETED: plans/publishing-and-history.md item 6 feeds this series and goes whole when REQ-PIPE-248 is built (CLAUDE.md's batch rule 4)."
+    evidence:
+      - "2026-10-18, CRITERION 15 (REQ-TEST-239): `mothman debug equivalence compare after-245 after-244` - after-245 a full capture of b3f9f4f (REQ-TEST-245, the change before this one), after-244 of 843f6d3, 4 commits apart: S1 recorded-results same, S4 generated-files same, S5 reports same, S7 help-and-menus same. Bootstrap 1396s against 1378s. S5 needed no exclusion at all: the links' targets and tooltips live in the built page, not in reports/."
+      - "2026-10-18, CRITERIA 11, 12 AND THE NFR ON WHAT A READER SEES, under MOTHMAN_PINNED_NOW=2026-10-16T12:00:00+08:00 against a baseline built at 5aedb41: both collections' dashboard JSON byte-identical; the page's COLLECTION_DATA equal to the old REAL_BIRTH_REG_DATA and REAL_CP_DATA contents; check links differing only by commit SHA and by 86 line anchors in the two contracts this change enriched; the dataset and agency links now opening the contract at its dataset's entry and the agency's folder, as tests/test_dashboard_e2e.py's TestTheGitHubLinks drives in a real browser; `mothman dashboard check-renders` OK."
+      - "2026-10-18, NFR PAGE SIZE AND RENDER TIME: the built page +0.021% against the baseline's size. tests/test_dashboard_e2e.py serially under the same pinned clock: 902s before (5aedb41, 288 passed, 6 failed) and 943s after (843f6d3's tree, 290 passed, 6 failed), +4.5% with two new link tests - inside the 10% the NFR names. The same six tests fail on both sides and are the pinned clock's artefact (each asserts the default 'in place on' date is today on the asset clock, which a pinned 2026-10-16 is not); a first 'before' run in a worktree with no data/ failed 34 and was discarded as not like for like."
+      - "2026-10-18, CRITERIA 6, 7, 9 AND 17: tests/test_dashboard_for_every_collection.py (9 passed) builds a third collection with no recorded runs and with no file, through the one builder, embed and render gate; tests-js/collection-data.test.js (5 passed) drives the page's one build function and dataset index over three collections; tests/test_check_dashboard_renders.py (8 passed) and tests/test_github_links.py (7 passed) - each run on this change's own tree before the next piece began. REQ-TEST-249's copy then built and rendered a fourth collection's page end to end through the same path."
     linked_tests:
       - tests/test_build_dashboard_data.py
       - tests/test_build_dashboard_child_protection.py
