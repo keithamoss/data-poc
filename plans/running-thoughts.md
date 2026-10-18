@@ -5515,3 +5515,14 @@ could never have computed it), and it belongs with batch 5's check work.
     to him for sign-off); nothing built. Hosts a session cannot reach,
     for CLAUDE.md's blocked list: api.cloudflare.com, *.pages.dev,
     cloudflareaccess.com, dash.cloudflare.com, developers.cloudflare.com.
+    Final round the same afternoon, after the scoper measured CI (about
+    320 pushes and 10,900 billable minutes last week): AUTOMATIC
+    PUBLISHING IS OFF after all - Keith kept REQ-PIPE-092's opt-in rule
+    ("No, keep publishing opt-in"), so the proposed REQ-PIPE-256 is
+    dropped and only `mothman dashboard publish` (and `pipeline run
+    --publish`) publishes; no `--force` to publish an unchanged site;
+    the failed-upload order (results recorded first, then the failure)
+    is confirmed; and for CI minutes he chose "push far less, using the
+    local checkpoint commits, and keep validate-config on every push" -
+    test.yml keeps its push trigger, the lever is fewer pushes, and the
+    flip still waits on a measured week fitting 2,000 minutes a month.
