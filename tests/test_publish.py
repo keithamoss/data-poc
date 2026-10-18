@@ -534,7 +534,7 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
     #: read from the real tree or a redirected one. CI running the fast
     #: half against an empty deployment is the real check; this is the
     #: cheap one that catches the known shapes before a push.
-    GENERATED = (r'["\']reports["\']\s*/', r"reports/\w+\.json",
+    GENERATED = (r'["\']reports["\']\s*/', r"reports/[\w-]+\.json",
                  r"scenario_placements")
 
     def _modules_reading_reports(self) -> set[str]:
@@ -566,7 +566,10 @@ class TestNeitherHalfOfCIQuietlyStopsCovering:
                    "@pytest.mark.needs_deployment",
                    "deployment_history",
                    "generator_isolation",
-                   "PLACEMENTS_PATH\",")
+                   "PLACEMENTS_PATH\",",
+                   # A module that builds its own reports/ under a temporary
+                   # or copied tree and reads only that one says so.
+                   "READS ONLY ITS OWN REPORTS")
         missing = {
             name for name in self._modules_reading_reports()
             if not any(mark in (ROOT / "tests" / name).read_text()

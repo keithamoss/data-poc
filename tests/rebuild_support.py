@@ -63,8 +63,7 @@ def record_run(collection_id: str, run_id: str, run_index: int,
 
 def output_path(collection_id: str, tmp_path) -> pathlib.Path:
     """Where `rebuild(collection_id, tmp_path, ...)` writes the results file."""
-    return pathlib.Path(tmp_path) / "reports" / collections.adapter(
-        collections.by_id(collection_id)).results_json
+    return pathlib.Path(tmp_path) / "reports" / collections.by_id(collection_id).results_file
 
 
 def rebuild(collection_id: str, tmp_path, monkeypatch) -> dict:

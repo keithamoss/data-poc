@@ -107,7 +107,6 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     adapter = types.ModuleType("qa_tools.collections.fake_collection")
     adapter.ADAPTER = CollectionAdapter(
         collection_id=FAKE_ID, label="Fake Things",
-        dashboard_json="fake_collection_dashboard.json", results_json="results_fk.json",
         dashboard_datasets=lambda doc: list(doc["datasets"]),
         datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"}),
         sample_key={FAKE_TABLE: "fake_id"})

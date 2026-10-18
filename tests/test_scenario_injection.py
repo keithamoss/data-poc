@@ -324,8 +324,8 @@ class TestNothingSaysScenarioOnTheDashboard:
         ids = {s.id for s in scenarios.parse_register()}
         pattern = re.compile(r"\bTS-[0-9]+[a-z]?\b")
         root = Path(__file__).resolve().parent.parent
-        for name in ("birth_registrations_dashboard.json",
-                     "child_protection_dashboard.json"):
+        for name in ("rs_civil-registration_dashboard.json",
+                     "cpfs_child-protection_dashboard.json"):
             path = root / "reports" / name
             if not path.is_file():
                 pytest.skip(f"{name} not built - run `mothman dashboard build-data`")

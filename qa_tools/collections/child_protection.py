@@ -43,8 +43,6 @@ def _sql_list(values: list[str]) -> str:
 ADAPTER = CollectionAdapter(
     collection_id="child-protection",
     label="Child Protection",
-    results_json="results_cp.json",
-    dashboard_json="child_protection_dashboard.json",
     # Its datasets, listed under `datasets` in the file's own order.
     dashboard_datasets=lambda doc: list(doc["datasets"]),
     datacontract=DatacontractSpec(

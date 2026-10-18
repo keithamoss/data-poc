@@ -72,23 +72,6 @@ class TestIdentityIsResolvedBeforeAnythingIsStaged:
         assert staged == [], "the file was staged before the identity failure"
 
 
-class TestEveryAdapterNamesItsResultsFile:
-    """An adapter without results_json would fail at the very end of a whole
-    batch, writing over the reports/ directory; the gate catches it first."""
-
-    def test_the_collections_gate_refuses_an_empty_results_json(self, third_collection, tmp_path):
-        from qa_tools.common import validate_collections as gate
-
-        adapter = sys.modules["qa_tools.collections.fake_collection"]
-        adapter.ADAPTER = dataclasses.replace(adapter.ADAPTER, results_json="")
-        package = tmp_path / "package"
-        package.mkdir(exist_ok=True)
-        for module in ("civil_registration", "child_protection", "fake_collection"):
-            (package / f"{module}.py").write_text("")
-        problems = gate.config_problems(package)
-        assert any("results_json" in p and FAKE_ID in p for p in problems), problems
-
-
 class TestAThirdCollectionsStatsAndClaimWindowForReal:
     def test_a_non_empty_stats_spec_is_what_the_fake_collection_measures(self, third_collection):
         from qa_tools.tools import dataset_stats
@@ -109,7 +92,8 @@ class TestAThirdCollectionsStatsAndClaimWindowForReal:
 
         stats = dataset_stats.compute_dataset_stats(FAKE_ID, conn, entry)
 
-        assert stats["value_counts"]["things"] == [["a", 2], ["(invalid code)", 1]]
+        # Every known value, zeros included (REQ-QAC-247, Keith 2026-10-18).
+        assert stats["value_counts"]["things"] == [["a", 2], ["b", 0], ["(invalid code)", 1]]
         assert stats["check_aggregates"][f"{FAKE_TABLE}.things"]["total_invalid"] == 1
 
     def test_the_claim_window_is_the_shortest_of_the_datasets_carried(self):

@@ -93,8 +93,8 @@ ROOT = Path(__file__).resolve().parent.parent
 GOLDEN = Path(__file__).parent / "fixtures" / "arrival_semantics_golden.json"
 
 _REPORTS = {
-    "birth_registrations_dashboard.json": None,
-    "child_protection_dashboard.json": None,
+    "rs_civil-registration_dashboard.json": None,
+    "cpfs_child-protection_dashboard.json": None,
 }
 
 

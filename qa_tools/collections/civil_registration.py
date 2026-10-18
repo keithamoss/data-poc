@@ -25,8 +25,6 @@ def _sql_list(values: list[str]) -> str:
 ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
     label="Birth Registrations",
-    results_json="results_bdm.json",
-    dashboard_json="birth_registrations_dashboard.json",
     # One dataset, written as the document itself.
     dashboard_datasets=lambda doc: [doc],
     datacontract=DatacontractSpec(

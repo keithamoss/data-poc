@@ -3,7 +3,7 @@
 A report other processes read - reports/results_*.json, the dashboard JSON -
 used to be written by truncating it and streaming into it, so a reader in
 another process could parse half a file. That is exactly what CI on d6dce26
-did (2026-10-11): one xdist worker read reports/results_cp.json while
+did (2026-10-11): one xdist worker read reports/results_cpfs_child-protection.json while
 another worker's dashboard build was rewriting it. Writing to a temporary
 file beside it and renaming it into place gives every reader the old file
 or the new one, because a rename within one directory is atomic.

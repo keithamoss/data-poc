@@ -1,11 +1,11 @@
 """
 One dashboard builder for every collection (REQ-DASH-244).
 
-Reshapes a collection's results file (reports/<adapter.results_json>, the
+Reshapes a collection's results file (reports/<collection.results_file>, the
 shared orchestrator's real dbt-core/Soda Core/datacontract-cli/Evidently
 output, rebuilt from recorded history) into the JSON the dashboard's
 drawer and chart code reads, one dataset object per dataset the hierarchy
-declares, and writes it to reports/<adapter.dashboard_json>.
+declares, and writes it to reports/<collection.dashboard_file>.
 
 WHAT USED TO BE TWO MODULES. Birth Registrations and Child Protection
 each had a builder of their own, about 1,400 lines between them and most
@@ -54,11 +54,11 @@ REPORTS = os.path.join(ROOT, "reports")
 
 
 def results_path(collection_id: str) -> str:
-    return os.path.join(REPORTS, collections.adapter(collection_id).results_json)
+    return os.path.join(REPORTS, collections.by_id(collection_id).results_file)
 
 
 def out_path(collection_id: str) -> str:
-    return os.path.join(REPORTS, collections.adapter(collection_id).dashboard_json)
+    return os.path.join(REPORTS, collections.by_id(collection_id).dashboard_file)
 
 
 def _run_date(entry: dict) -> str:

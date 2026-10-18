@@ -3129,7 +3129,7 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
     (tmp_path / "fonts").symlink_to((Path(edd.ROOT) / "dashboard" / "fonts").resolve())
     (tmp_path / "vendor").symlink_to((Path(edd.ROOT) / "dashboard" / "vendor").resolve())
 
-    source = Path(edd.ROOT) / "reports" / "child_protection_dashboard.json"
+    source = Path(edd.ROOT) / "reports" / "cpfs_child-protection_dashboard.json"
     data = json.loads(source.read_text())
 
     # How many of each dataset's own runs to keep. One is left whole,
@@ -3155,7 +3155,7 @@ def dashboard_html_with_divergent_arrivals(built_dashboard_html, tmp_path_factor
             stats = column.get("stats") or {}
             stats["byRun"] = {k: v for k, v in (stats.get("byRun") or {}).items() if k in kept}
 
-    doctored = tmp_path / "child_protection_dashboard.json"
+    doctored = tmp_path / "cpfs_child-protection_dashboard.json"
     doctored.write_text(json.dumps(data))
 
     out_html = tmp_path / "dashboard_divergent.html"

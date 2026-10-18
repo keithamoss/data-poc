@@ -241,11 +241,11 @@ class TestAThirdCollectionAtEverySite:
 
         built = tmp_path / "built"
         built.mkdir()
-        _datasets_json(built / "birth_registrations_dashboard.json",
+        _datasets_json(built / "rs_civil-registration_dashboard.json",
                        {"id": "birth-registrations", "name": "Birth Registrations"})
-        _datasets_json(built / "child_protection_dashboard.json",
+        _datasets_json(built / "cpfs_child-protection_dashboard.json",
                        {"datasets": [{"id": "cp-clients", "name": "Client Register"}]})
-        _datasets_json(built / "fake_collection_dashboard.json",
+        _datasets_json(built / f"fka_{FAKE_ID}_dashboard.json",
                        {"datasets": [{"id": FAKE_DATASET, "name": "Fake Things"}]})
         monkeypatch.setattr(ticket_sync, "REPORTS_DIR", str(built))
         got = [(s.id, s.agency_id, s.collection_id) for s, _ in ticket_sync._load_scopes()]
@@ -878,7 +878,7 @@ class TestTheSharedOrchestratorStatsAndRebuild:
         assert [r["run_id"] for r in output["runs"]] == [f"{FAKE_PREFIX}001"]
         assert len(output["results"]) == 1
         written = rebuild_support.output_path(FAKE_ID, tmp_path)
-        assert written.name == "results_fk.json" and written.is_file()
+        assert written.name == f"results_fka_{FAKE_ID}.json" and written.is_file()
 
     def test_a_third_collection_claims_under_no_borrowed_window(self, third_collection):
         """Criterion 2: an adapter that names no claim-window dataset and an

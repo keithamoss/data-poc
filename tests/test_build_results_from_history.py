@@ -11,12 +11,12 @@ from qa_tools.tools import results_history
 
 
 def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
-    results_path = tmp_path / "reports" / "results_bdm.json"
+    results_path = tmp_path / "reports" / "results_rs_civil-registration.json"
     monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
 
     output = results_history.build_results_from_history("civil-registration")
 
-    assert results_path.exists(), "should write reports/results_bdm.json (redirected to tmp here)"
+    assert results_path.exists(), "should write reports/results_rs_civil-registration.json (redirected to tmp here)"
     assert output["runs"], "the real committed qa_results/registry-services/civil-registration/ history is empty"
     assert output["results"], "no real check results found across committed history"
     # run_index, not run_date - a resupply's own run_date sorts away from its parent delivery (see module docstring)
@@ -43,7 +43,7 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deploym
 
 
 def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
-    results_path = tmp_path / "reports" / "results_cp.json"
+    results_path = tmp_path / "reports" / "results_cpfs_child-protection.json"
     monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
 
     output = results_history.build_results_from_history("child-protection")

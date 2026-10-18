@@ -104,7 +104,6 @@ def build(dest: Path) -> Path:
             (dest / "qa_tools" / "collections" / f"{module}.py").write_text(
                 "from qa_tools.collections.base import CollectionAdapter\n\n"
                 f"ADAPTER = CollectionAdapter(collection_id={cid!r}, label={name!r},\n"
-                f"    dashboard_json={module + '_dashboard.json'!r},\n"
                 "    dashboard_datasets=lambda doc: list(doc['datasets']))\n")
             if short.endswith("w") or short.endswith("s"):
                 continue  # a collection with no synthetic generator, as a real one has

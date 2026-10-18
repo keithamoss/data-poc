@@ -60,7 +60,7 @@ status):
                               original design)
 
 Reads ONLY the already-built dashboard JSON (reports/
-birth_registrations_dashboard.json / child_protection_dashboard.json -
+rs_civil-registration_dashboard.json / cpfs_child-protection_dashboard.json -
 the exact same CI-safe output deploy-pages.yml's own build chain
 already produces from committed qa_results/ history) - never data/,
 never a live DuckDB connection, per CLAUDE.md's hard rule that no "read
@@ -122,7 +122,8 @@ def _load_scopes() -> list[tuple[DatasetScope, dict]]:
 
     scopes: list[tuple[DatasetScope, dict]] = []
     for adapter in collections.adapters():
-        with open(os.path.join(REPORTS_DIR, adapter.dashboard_json)) as f:
+        dashboard_file = collections.by_id(adapter.collection_id).dashboard_file
+        with open(os.path.join(REPORTS_DIR, dashboard_file)) as f:
             doc = json.load(f)
         for ds in adapter.dashboard_datasets(doc):
             scopes.append((_scope_for(ds), ds))

@@ -178,7 +178,9 @@ def capture_arrival_golden_command(yes: bool) -> None:
 
     root = Path(__file__).resolve().parent.parent
     golden = root / "tests" / "fixtures" / "arrival_semantics_golden.json"
-    reports = ["birth_registrations_dashboard.json", "child_protection_dashboard.json"]
+    from qa_tools import collections
+
+    reports = [c.dashboard_file for c in collections.all_collections()]
 
     missing = [r for r in reports if not (root / "reports" / r).exists()]
     if missing:

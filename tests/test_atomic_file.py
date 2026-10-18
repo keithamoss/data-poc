@@ -5,6 +5,11 @@ file - "Expecting ',' delimiter: line 63142").
 
 A reader in another process must only ever see the old file or the new one,
 which a write that truncates and streams in place cannot promise."""
+
+# READS ONLY ITS OWN REPORTS: every reports/ file here is one this module
+# wrote under its own temporary or copied tree, never the real one
+# (tests/test_publish.py's guard).
+
 from __future__ import annotations
 
 import json

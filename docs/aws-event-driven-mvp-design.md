@@ -133,7 +133,7 @@ which a real arriving file never carries)
 (picking up the Lambda-context fallback below) if not passed explicitly,
 calls `_run_one()` with a synthetic one-entry manifest dict, and returns
 the same `list[dict]` of check results `_run_one()` always has, without
-ever touching `reports/results_bdm.json` (that file is the *full-batch*
+ever touching `reports/results_rs_civil-registration.json` (that file is the *full-batch*
 rollup — a single Lambda invocation writes only that one run's
 `qa_results/` entry, same underlying writer, no batch aggregation step).
 The `reference_run_id`/`reference_csv` Evidently needs (drift comparison

@@ -308,8 +308,10 @@ class TestOneAgreedOrdering:
         from collections import Counter
         from pathlib import Path as _Path
 
-        for name in ("cp", "bdm"):
-            built = _Path(f"reports/results_{name}.json")
+        from qa_tools import collections
+
+        for c in collections.all_collections():
+            name, built = c.id, _Path("reports") / c.results_file
             if not built.is_file():
                 pytest.skip("the results have not been built in this checkout")
             results = _json.loads(built.read_text())["results"]

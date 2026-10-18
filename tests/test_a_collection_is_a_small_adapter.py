@@ -11,6 +11,11 @@ ON DEMAND (the requirement's TEST COST NFR): it bootstraps, so it runs in
 CI's on-demand job beside the bootstrap-equivalence test, never in the fast
 half. The copy reuses this checkout's interpreter, dbt packages and browser.
 """
+
+# READS ONLY ITS OWN REPORTS: every reports/ file here is one this module
+# wrote under its own temporary or copied tree, never the real one
+# (tests/test_publish.py's guard).
+
 from __future__ import annotations
 
 import json
@@ -73,7 +78,7 @@ class Copy:
         return done
 
     def results(self) -> list[dict]:
-        doc = json.loads((self.tree / "reports" / "results_widget_register.json").read_text())
+        doc = json.loads((self.tree / "reports" / "results_wdg_widget-register.json").read_text())
         return doc["results"] if isinstance(doc, dict) else doc
 
 

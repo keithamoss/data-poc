@@ -35,10 +35,10 @@ ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 
 
 def results_path(collection_id: str) -> str:
-    """`<ROOT>/reports/<the adapter's results_json>` - the one file both the
-    live batch and the rebuild write."""
-    return os.path.join(ROOT, "reports",
-                        collections.adapter(collections.by_id(collection_id)).results_json)
+    """`<ROOT>/reports/<the collection's results_file>` - the one file both the
+    live batch and the rebuild write, named from its agency short and id
+    (REQ-PIPE-248 criterion 7)."""
+    return os.path.join(ROOT, "reports", collections.by_id(collection_id).results_file)
 
 
 def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: dict,

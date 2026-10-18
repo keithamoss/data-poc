@@ -84,9 +84,9 @@ class CollectionAdapter:
     #: the words it has always used, so nothing it prints changes.
     label: str
     #: TEMPORARY POINTER (6), found at build and removed by REQ-PIPE-248, which
-    #: gives every collection one dashboard JSON shape under a name from its id:
-    #: the built dashboard file, and how its datasets are listed in it.
-    dashboard_json: str
+    #: gives every collection one dashboard JSON shape: how its datasets are
+    #: listed in its built dashboard file. (The file's NAME is the
+    #: collection's own, `Collection.dashboard_file`, since criterion 7.)
     dashboard_datasets: Callable[[dict], list[dict]] = field(compare=False)
     #: Each table's key column, the only value a failing-row sample keeps -
     #: never full row content (plans/qa-pipeline.md #15).
@@ -100,9 +100,6 @@ class CollectionAdapter:
     #: its own (REQ-PIPE-243 criterion 2); None means no window, never a
     #: borrowed one.
     claim_window_dataset: str | None = None
-    #: The results file under reports/ the batch and the rebuild write
-    #: (REQ-PIPE-243); REQ-PIPE-248 names every collection's from its id.
-    results_json: str = ""
     #: NAMED LEGACY FLAGS (REQ-QAC-242 criterion 4): each preserves one place
     #: this collection's recorded output differs from what the shared code
     #: would produce. Every name is in qa_tools/tools/legacy.py, which says

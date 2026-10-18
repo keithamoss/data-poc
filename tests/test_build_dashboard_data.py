@@ -6,7 +6,7 @@ to duplicate qa_tools' own integration coverage.
 
 No real DuckDB warehouse here since Phase 3 (plans/publishing-and-
 history.md) - value-counts/arrival/check-aggregate data comes from
-results_bdm.json's own "dataset_stats" key now (qa_tools/tools/
+results_rs_civil-registration.json's own "dataset_stats" key now (qa_tools/tools/
 dataset_stats.py's precomputed output), not a live query."""
 from __future__ import annotations
 
@@ -77,7 +77,7 @@ FIXTURE_RESULTS = [
 
 
 def _write_results(tmp_path):
-    results_path = tmp_path / "results_bdm.json"
+    results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": FIXTURE_DATASET_STATS,
     }))
@@ -298,7 +298,7 @@ def _rowcount_results():
 
 
 def _write_rowcount_results(tmp_path):
-    results_path = tmp_path / "results_bdm.json"
+    results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS, "results": _rowcount_results(),
         "dataset_stats": FIXTURE_DATASET_STATS,
@@ -349,7 +349,7 @@ def test_a_violation_count_checks_zero_tolerance_is_not_regressed(tmp_path, monk
     tool verdict is `fail`. Carrying the verdict through must keep that
     red - it must not become green just because a threshold was null."""
     _no_retired_checks(monkeypatch)
-    results_path = tmp_path / "results_bdm.json"
+    results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [
@@ -382,7 +382,7 @@ def _build_with_authored_check(tmp_path, monkeypatch, **authored):
                          description="Sex must be one of the values the contract allows.",
                          **authored)
     monkeypatch.setattr(bdd, "collect_checks", lambda ref: [meta])
-    results_path = tmp_path / "results_bdm.json"
+    results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [_check("run_002", "sex", 0, status="pass",
@@ -471,7 +471,7 @@ FRESH_ID = ("data-asset-1.registry-services.civil-registration."
 
 def test_two_checks_sharing_a_display_name_stay_separate(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
-    results_path = tmp_path / "results_bdm.json"
+    results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [
@@ -510,7 +510,7 @@ def test_a_table_level_check_lands_in_a_pseudo_column(tmp_path, monkeypatch):
     question as a cross-table rule's "do these tables agree".
     """
     _no_retired_checks(monkeypatch)
-    results_path = tmp_path / "results_bdm.json"
+    results_path = tmp_path / "results_rs_civil-registration.json"
     results_path.write_text(json.dumps({
         "runs": FIXTURE_RUNS,
         "results": [
@@ -548,7 +548,7 @@ def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
     _no_retired_checks(monkeypatch)
     contested = {"run_id": "run_003", "run_index": 3, "delivery": "resupply",
                  "received_at": "2026-09-02T14:00:00+00:00"}
-    path = tmp_path / "results_bdm.json"
+    path = tmp_path / "results_rs_civil-registration.json"
     path.write_text(json.dumps({
         "runs": [*FIXTURE_RUNS, contested], "results": FIXTURE_RESULTS,
         "dataset_stats": {**FIXTURE_DATASET_STATS, "run_003": {
@@ -572,7 +572,7 @@ def test_a_headline_check_with_no_value_for_a_run_does_not_crash_the_build(tmp_p
     _no_retired_checks(monkeypatch)
     results = [_check("run_001", "sex", None, status="nodata"),
                _check("run_002", "sex", 1, status="fail")]
-    path = tmp_path / "results_bdm.json"
+    path = tmp_path / "results_rs_civil-registration.json"
     path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
                                 "dataset_stats": FIXTURE_DATASET_STATS}))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
@@ -589,7 +589,7 @@ def test_a_check_soda_could_not_evaluate_says_why(tmp_path, monkeypatch):
     results = [_check("run_001", "sex", 0),
                _check("run_002", "sex", None, status="error",
                       not_evaluated_reason="Soda could not evaluate it - needs Soda Cloud")]
-    path = tmp_path / "results_bdm.json"
+    path = tmp_path / "results_rs_civil-registration.json"
     path.write_text(json.dumps({"runs": FIXTURE_RUNS, "results": results,
                                 "dataset_stats": FIXTURE_DATASET_STATS}))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))

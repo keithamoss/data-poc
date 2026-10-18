@@ -229,8 +229,8 @@ dashboard/
 data/                          generated - raw run CSVs, manifest.json, cp_raw/, and supply.duckdb:
                                ONE database holding every staged supply, which each QA run reads
                                through a schema of views of its own (REQ-PIPE-068). Not checked in.
-reports/                       generated - results_bdm.json, results_cp.json,
-                               birth_registrations_dashboard.json, child_protection_dashboard.json
+reports/                       generated - results_rs_civil-registration.json, results_cpfs_child-protection.json,
+                               rs_civil-registration_dashboard.json, cpfs_child-protection_dashboard.json
                                (not checked in)
 cli/                          `mothman` (plans/tooling.md #1) - the unified CLI/TUI, the only
                                programmatic access point to this repo; run `./mothman` or
@@ -482,7 +482,7 @@ Protection collection (see below) is untouched: the same illustrative,
 browser-fabricated mock data as before, still clearly labeled as such in
 the footer. Each real column's drawer shows every check that actually ran
 on it — real dbt-core, Soda Core, datacontract-cli, and Evidently checks
-side by side, straight from `reports/results_bdm.json` — e.g. `sex` shows
+side by side, straight from `reports/results_rs_civil-registration.json` — e.g. `sex` shows
 Soda's `invalid_percent`, the contract's `invalidValues`, dbt's
 `accepted_values`, Soda's scoped last-24h check, *and* Evidently's PSI, all
 computed independently against the same real data, so you can see where
@@ -510,7 +510,7 @@ never built to do.
 ```
 
 (Generates Child Protection's 55 quarterly deliveries, runs the real tools ->
-reports/results_cp.json, reshapes -> reports/child_protection_dashboard.json,
+reports/results_cpfs_child-protection.json, reshapes -> reports/cpfs_child-protection_dashboard.json,
 then re-embeds BOTH real datasets into the dashboard HTML. `--collection all`,
 the default, does the same for Birth Registrations too in one call.)
 
