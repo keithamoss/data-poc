@@ -138,7 +138,7 @@ def _failing_sample_keys(conn, adapter, test_name, column, table, node, status, 
     if not relation_name:
         return []
     key, model = adapter.sample_key[table], f"stg_{table}"
-    if "dbt.no_built_model_guard" not in adapter.legacy and built and model not in built:
+    if built and model not in built:
         return []
     singular = node.get("test_metadata") is None
     if (test_name in _SAMPLED_DIRECTLY
@@ -196,7 +196,6 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             if uid not in ran and _table_for_test(coll, spec, node) is not None
             and _check_id_for(coll, spec, node) in wanted])
 
-    unguarded = "dbt.no_built_model_guard" in legacy
     conn = supply_db.connect_dbt(run_id)
     try:
         built = {row[0] for row in conn.execute(
@@ -204,7 +203,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             [supply_db.dbt_schema(run_id)]).fetchall()}
         n_total_by_table = {
             t: (conn.execute(f"SELECT COUNT(*) FROM stg_{t}").fetchone()[0]
-                if unguarded or f"stg_{t}" in built else None)
+                if f"stg_{t}" in built else None)
             for t in tables}
 
         results = []
@@ -232,7 +231,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
 
             relation_name = node.get("relation_name")
             unaudited = ("error",) if "dbt.audits_skipped_tests" in legacy else ("error", "skipped")
-            model_built = unguarded or f"stg_{table}" in built
+            model_built = f"stg_{table}" in built
             if test_name in _AUDIT_COUNTED or test_name in _AUDIT_SUMMED or meta is None:
                 if relation_name and status not in unaudited and model_built:
                     aggregate = ("COALESCE(SUM(n_records), 0)" if test_name in _AUDIT_SUMMED

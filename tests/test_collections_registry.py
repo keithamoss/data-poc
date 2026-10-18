@@ -721,11 +721,10 @@ class TestTheSharedToolModules:
         _, _, queries, _ = self._dbt(monkeypatch, tmp_path, legacy=legacy, status="skipped")
         assert any('"audit"' in q for q in queries) is recounted
 
-    @pytest.mark.parametrize("legacy,total", [
-        (frozenset(), None), (frozenset({"dbt.no_built_model_guard"}), 4)])
-    def test_dbt_no_built_model_guard(self, third_collection, monkeypatch, tmp_path, legacy, total):
-        [r], _, _, _ = self._dbt(monkeypatch, tmp_path, legacy=legacy, built=False)
-        assert r["row_count_total"] == total
+    def test_dbt_counts_nothing_over_a_model_it_did_not_build(self, third_collection,
+                                                                monkeypatch, tmp_path):
+        [r], _, _, _ = self._dbt(monkeypatch, tmp_path, built=False)
+        assert r["row_count_total"] is None
 
     def test_dbt_notes_a_test_left_out_for_an_unreadable_model(self, third_collection,
                                                                  monkeypatch, tmp_path):

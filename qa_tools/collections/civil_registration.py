@@ -128,7 +128,6 @@ ADAPTER = CollectionAdapter(
         "soda.scope_suffix",
         "soda.named_check_value_is_invalid_count",
         "evidently.volume_from_drift_frame",
-        "dbt.no_built_model_guard",
         "dbt.audits_skipped_tests",
         "stage.stamps_run_columns",
         "stats.single_table_shape",
