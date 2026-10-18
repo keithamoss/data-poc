@@ -110,12 +110,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             # Soda's generated name is the whole check line ("... warn when >
             # 0"); a real custom `name:` reads as a short label with no "when".
             is_custom_name = "when" not in c["name"]
-            if is_custom_name:
-                check_name = c["name"]
-            elif "soda.scope_suffix" in adapter.legacy:
-                check_name = f"{base_check}[{c['filter'] or 'all'}]"
-            else:
-                check_name = base_check
+            check_name = c["name"] if is_custom_name else base_check
             column = (c["column"] or (spec.column_by_name.get(c["name"]) if is_custom_name else None)
                       or "(table)")
 

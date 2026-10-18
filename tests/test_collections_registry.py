@@ -571,18 +571,12 @@ class TestTheSharedToolModules:
         assert named["row_count_invalid"] is None
         assert generic["row_count_total"] == 7 and written[0][:2] == ("fake-agency", FAKE_ID)
 
-    @pytest.mark.parametrize("flag,field,without,with_", [
-        ("soda.scope_suffix", ("missing_count_soda", "check_name"),
-         "missing_count", "missing_count[recent]"),
-    ])
-    def test_each_soda_flag_changes_only_its_own_field(self, third_collection, monkeypatch,
-                                                      tmp_path, flag, field, without, with_):
-        check, key = field
-        plain, _ = self._soda(monkeypatch, tmp_path)
-        flagged, _ = self._soda(monkeypatch, tmp_path, legacy=frozenset({flag}))
-        assert (plain[check][key], flagged[check][key]) == (without, with_)
-        flagged[check][key] = plain[check][key]
-        assert flagged == plain
+    def test_a_generic_soda_check_is_named_by_its_metric_alone(self, third_collection,
+                                                               monkeypatch, tmp_path):
+        """No `[<filter or all>]` suffix for any collection since REQ-QAC-247:
+        the scope it named was always `all` and carried nothing."""
+        got, _ = self._soda(monkeypatch, tmp_path)
+        assert got["missing_count_soda"]["check_name"] == "missing_count"
 
     def test_a_failing_failed_rows_check_records_how_many_rows_failed(self, third_collection,
                                                                        monkeypatch, tmp_path):

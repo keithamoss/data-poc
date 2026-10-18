@@ -105,14 +105,14 @@ ADAPTER = CollectionAdapter(
                 "kind": "categorical",
                 "invalid_condition": f"sex NOT IN ({_sql_list(_SEX_VALID)}) OR sex IS NULL",
                 "classification": None,
-                "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
+                "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
             },
             ("birth_registrations", "place_of_birth_suburb"): {
                 "kind": "categorical",
                 "invalid_condition": (f"place_of_birth_suburb NOT IN ({_sql_list(_SUBURB_VALID)}) "
                                       f"OR place_of_birth_suburb IS NULL"),
                 "classification": None,
-                "check_names": {"dbt:accepted_values", "invalid_percent[all]", "datacontract:invalid_count"},
+                "check_names": {"dbt:accepted_values", "invalid_percent", "datacontract:invalid_count"},
             },
             ("birth_registrations", "date_of_birth"): {
                 "kind": "numeric_date",
@@ -125,7 +125,6 @@ ADAPTER = CollectionAdapter(
     ),
     claim_window_dataset="birth-registrations",
     legacy=frozenset({
-        "soda.scope_suffix",
         "evidently.volume_from_drift_frame",
         "stage.stamps_run_columns",
         "stats.single_table_shape",

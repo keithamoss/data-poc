@@ -119,8 +119,7 @@ CROSS_TABLE_META = (
 # datacontract-cli and Soda each spell the row-count check differently, and
 # `evidently:row_count_growth` asks the same question relative to the last
 # promoted supply (REQ-QAC-108 criterion 1).
-_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "row_count[all]", "datacontract:row_count",
-                              "evidently:row_count_growth"}
+_SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "datacontract:row_count", "evidently:row_count_growth"}
 
 
 # ---- what differs by collection, read from configuration --------------------
