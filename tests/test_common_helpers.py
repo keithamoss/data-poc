@@ -15,7 +15,7 @@ from qa_tools.common.evidently_common import collection_checks
 from qa_tools.common.soda_common import check_id_from_resource_attributes
 
 _BDM_CHECKS = collection_checks("civil-registration")
-_BDM_EVIDENTLY, _PSI_ID = _BDM_CHECKS.checks, _BDM_CHECKS.psi
+_BDM_EVIDENTLY, _PSI_ID = _BDM_CHECKS.checks, _BDM_CHECKS.psi[0]
 
 
 def test_check_id_from_quality_definition_none_when_no_definition():

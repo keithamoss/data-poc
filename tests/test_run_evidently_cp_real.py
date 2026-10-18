@@ -62,7 +62,7 @@ def test_dirty_run_has_a_real_check_id_and_reference(monkeypatch, cp_duckdb_dir)
                    reference_run_id=_REF_NOTIFICATIONS)
 
     psi = _psi(results)
-    assert psi["check_id"] == _CHECKS.psi
+    assert psi["check_id"] == _CHECKS.psi[0]
     assert psi["metric_value"] is not None
     assert psi["reference_run_id"] == _REF_NOTIFICATIONS
 

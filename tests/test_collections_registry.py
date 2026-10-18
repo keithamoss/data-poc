@@ -630,7 +630,7 @@ class TestTheSharedToolModules:
             pass  # nothing readable, so no row count for the stub's checks
         assert handed == [{FAKE_TABLE}]
 
-    def _evidently(self, monkeypatch, readable=True):
+    def _evidently(self, monkeypatch, readable=True, two_drifts=False):
         """The shared Evidently runner for the third collection, the tool and
         the warehouse stood in for: one drift check, one volume check."""
 
@@ -641,25 +641,41 @@ class TestTheSharedToolModules:
 
         prefix = f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}"
         band = {"warn_threshold": 0.1, "fail_threshold": 0.25}
+        drifts = (f"{prefix}.kind.drift_psi_evidently",
+                  *([f"{prefix}.fake_id.drift_psi_evidently"] if two_drifts else []))
         checks = EvidentlyChecks(
-            {f"{prefix}.kind.drift_psi_evidently": {"column": "kind", "method": "psi", **band},
+            {**{c: {"column": c.split(".")[4], "method": "psi", **band} for c in drifts},
              f"{prefix}.row_count_growth_evidently": {"column": "fake_id", "method": "row_drop", **band}},
-            f"{prefix}.kind.drift_psi_evidently", {FAKE_TABLE: f"{prefix}.row_count_growth_evidently"})
+            drifts, {FAKE_TABLE: f"{prefix}.row_count_growth_evidently"})
         written, notes = [], []
         monkeypatch.setattr(ev, "collection_checks", lambda collection_id: checks)
         monkeypatch.setattr(ev.asked_for, "ask", lambda *a, **k: [])
         monkeypatch.setattr(ev, "_psi_applies", lambda run_id, table: readable)
         monkeypatch.setattr(ev, "_unreadable", lambda run_id, table: not readable)
-        monkeypatch.setattr(ev, "_current_frame", lambda *a: pd.DataFrame({"kind": ["a", "b", "a"]}))
+        monkeypatch.setattr(ev, "_current_frame",
+                            lambda run_id, table, column: pd.DataFrame({column: ["a", "b", "a"]}))
         monkeypatch.setattr(ev, "_current_row_counts", lambda run_id, tables: {FAKE_TABLE: 90})
         monkeypatch.setattr(ev, "recorded_row_counts", lambda *a: {FAKE_TABLE: 100})
-        monkeypatch.setattr(ev, "_reference_frame", lambda *a: pd.DataFrame({"kind": ["a", "b", "b"]}))
+        monkeypatch.setattr(ev, "_reference_frame",
+                            lambda coll, ref, table, column: pd.DataFrame({column: ["a", "b", "b"]}))
         monkeypatch.setattr(ev, "compute_psi", lambda current, reference, column: (0.05, {"psi": 0.05}))
         monkeypatch.setattr(ev.drift_reference, "judge", lambda results, assessment: None)
         monkeypatch.setattr(ev.left_out, "note", lambda run_id, tool, ids: notes.extend(ids))
         monkeypatch.setattr(ev, "write_qa_result", lambda *a, **k: written.append(a))
         got = ev.evaluate(FAKE_ID, "fake_things__1", "2026-01-01T00:00:00Z", reference_run_id="r")
+        if two_drifts:
+            return got, written[0][5], notes
         return {r["check_name"]: r for r in got}, written[0][5], notes
+
+    def test_a_collection_may_declare_several_drift_checks_on_one_dataset(
+            self, third_collection, monkeypatch):
+        """REQ-QAC-231's check set has two drift checks; the runner used to
+        refuse any collection with more than one. Each gets a result of its
+        own, and the raw output keeps each one's snapshot by its id."""
+        got, raw, _ = self._evidently(monkeypatch, two_drifts=True)
+        drifts = [r for r in got if r["check_name"] == "drift:PSI"]
+        assert sorted(r["column_name"] for r in drifts) == ["fake_id", "kind"]
+        assert sorted(raw["psi"]) == sorted(r["check_id"] for r in drifts)
 
     def test_evidently_reads_everything_it_needs_from_the_adapter(self, third_collection,
                                                                   monkeypatch):

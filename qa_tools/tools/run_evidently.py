@@ -1,5 +1,5 @@
 """Runs REAL Evidently AI for any collection (REQ-QAC-242): the collection's
-one PSI drift check, and a relative volume check per table, as its own
+PSI drift checks, all on one dataset, and a relative volume check per table, as its own
 Evidently check file declares them (REQ-QAC-241).
 
 The real evidently.Report + DataDriftPreset API, not a reimplementation -
@@ -19,8 +19,7 @@ passing.
 
 BUILT FROM CHILD PROTECTION'S COPY: a check over a table the run cannot read
 is not run and is noted as left out (REQ-PIPE-078), and volume is counted
-per table. Birth Registrations' single-table copy differs in two places,
-kept behind its legacy flags (qa_tools/tools/legacy.py).
+per table, for every collection since REQ-QAC-247 and REQ-PIPE-248.
 """
 from __future__ import annotations
 
@@ -38,9 +37,9 @@ __all__ = ["ENGINE_TAG", "evaluate"]
 
 
 def drift_dataset(collection_id: str) -> str:
-    """The dataset a collection's drift check is about - the check id's
-    fourth segment (asset.agency.collection.dataset...)."""
-    return collection_checks(collection_id).psi.split(".")[3]
+    """The dataset a collection's drift checks are about - the check ids'
+    fourth segment (asset.agency.collection.dataset...), one for all of them."""
+    return collection_checks(collection_id).psi[0].split(".")[3]
 
 
 def _table_of(check_id: str) -> str:
@@ -206,18 +205,20 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
              reference_run_id: str | None = None, assessment=None) -> list[dict]:
     coll = collections.by_id(collection_id)
     checks = collection_checks(coll.id)
-    psi_entry, psi_table = checks.checks[checks.psi], _table_of(checks.psi)
+    psi_table = _table_of(checks.psi[0])
 
     asked_for.ask(run_id, run_timestamp, coll.agency_id, coll.id, "evidently")
     results = []
     if _psi_applies(run_id, psi_table):
-        results.append(_psi_result(coll, psi_entry, checks.psi, psi_table, run_id,
-                                   run_timestamp, reference_run_id))
-    raw_output = {"psi": results[0].pop("_snapshot") if results else None}
+        results.extend(_psi_result(coll, checks.checks[c], c, psi_table, run_id,
+                                   run_timestamp, reference_run_id) for c in checks.psi)
+    # EACH DRIFT CHECK'S SNAPSHOT BY ITS ID (REQ-QAC-231): read by nothing, and
+    # left out of the equivalence capture, so the shape is free to say which.
+    raw_output = {"psi": {r["check_id"]: r.pop("_snapshot") for r in results} or None}
     results.extend(_volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id))
     evaluated = {r["check_id"] for r in results}
     left_out.note(run_id, "evidently", [
-        c for c in (checks.psi, *checks.row_drop.values())
+        c for c in (*checks.psi, *checks.row_drop.values())
         if c not in evaluated and _unreadable(run_id, _table_of(c))])
 
     drift_reference.judge(results, assessment)

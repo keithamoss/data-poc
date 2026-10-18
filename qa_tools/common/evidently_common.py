@@ -41,7 +41,7 @@ NO_REFERENCE = "nodata"
 class EvidentlyChecks(NamedTuple):
     """One collection's Evidently checks, as its check file declares them."""
     checks: dict          # {check_id: metadata}
-    psi: str              # the drift check's id
+    psi: tuple            # the drift checks' ids, in file order (REQ-QAC-231)
     row_drop: dict        # {table: the row-drop check's id}
 
 
@@ -49,7 +49,8 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     """A collection's Evidently checks, read from its own check file
     (REQ-QAC-241 criterion 10) - no check id is a Python constant.
 
-    Each check is found by its `method`: the one `psi` check, and a
+    Each check is found by its `method`: one or more `psi` checks, all on
+    one dataset (Emergency Department declares two, REQ-QAC-231), and a
     `row_drop` check per table, whose dataset is the check id's fourth
     segment (asset.agency.collection.dataset...) and whose table is that
     dataset's in the hierarchy."""
@@ -62,11 +63,17 @@ def collection_checks(collection_id: str) -> EvidentlyChecks:
     rel = coll.check_file("evidently")
     checks = check_lifecycle.load_evidently_checks(Path(__file__).resolve().parents[2] / rel)
     psi = [i for i, m in checks.items() if m.get("method") == "psi"]
-    if len(psi) != 1:
-        raise ValueError(f"{rel}: expected one psi check, found {len(psi)}")
+    if not psi:
+        raise ValueError(f"{rel}: expected at least one psi check, found none")
+    datasets = {i.split(".")[3] for i in psi}
+    if len(datasets) != 1:
+        # ONE DRIFT DATASET: its last promoted supply is the run's reference
+        # (orchestrate's reference choice), so drift checks on two datasets
+        # would each need a reference of their own.
+        raise ValueError(f"{rel}: every psi check must be on one dataset, found {sorted(datasets)}")
     row_drop = {hierarchy.dataset(i.split(".")[3]).table: i
                 for i, m in checks.items() if m.get("method") == "row_drop"}
-    return EvidentlyChecks(checks, psi[0], row_drop)
+    return EvidentlyChecks(checks, tuple(psi), row_drop)
 
 
 def status_for(value: float, entry: dict) -> str:

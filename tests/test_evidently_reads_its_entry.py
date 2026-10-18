@@ -20,8 +20,8 @@ def _entry(collection_id):
     """The collection's drift check entry, its column changed - as an edit to
     the check file would change it."""
     checks = evidently_common.collection_checks(collection_id)
-    entry = dict(checks.checks[checks.psi], column="some_other_column")
-    return collections.by_id(collection_id), entry, checks.psi
+    entry = dict(checks.checks[checks.psi[0]], column="some_other_column")
+    return collections.by_id(collection_id), entry, checks.psi[0]
 
 
 class _Conn:
