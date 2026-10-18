@@ -10500,3 +10500,37 @@ twice. It deliberately did not re-find the `TypeError`.
      existing tests/test_validate_schedule.py
      test_the_committed_configuration_is_valid (red before, green after, with
      the schedule family's 390 tests).
+
+238. **[done, 2026-10-18]** **[Pipeline & publishing]** **The full gate before
+     REQ-PIPE-248's push found four failures.** The first gate run on exactly
+     the 248 tree (after a fresh bootstrap) went red on four tests and a stale
+     plans/INDEX.md. Two are real defects that the retired legacy flags were
+     hiding. The other two are tests that 247/248 should have changed and didn't.
+     - DEFECT, FIXED TEST-FIRST: a FILTERED Soda section (`filter
+       birth_registrations [recent]` and `checks for birth_registrations
+       [recent]`) was not recognised as reading its table. So when the table
+       could not be read, Soda was handed checks over a relation that did not
+       exist, and the run failed with `KeyError: 'birth_registrations'`.
+       Birth Registrations' retired `soda.reads_unreadable_tables` flag had
+       kept it from ever arising. `soda_common._split` now reads a section's
+       table through `_section_table`, which knows both filtered forms. New
+       test: tests/test_soda_scoped.py
+       test_an_unreadable_tables_filtered_section_and_filter_go_too, red
+       before and green after.
+     - DEFECT, FIXED: the settle pointer (`supply_files.where_to_settle`)
+       named a collection by its hierarchy name ("Civil Registration").
+       Since Keith's call the same day, the filing menu lists collections by
+       their QA label ("Birth Registrations"), so the pointer led to a
+       menu entry that did not exist. It now names the registry's label. The
+       failing test was the existing tests/test_settle_tui.py
+       test_the_collection_picker_shows_names_and_the_pointer_walks_it. The
+       hard-coded pointer in tests/test_ticket_reconciler.py moved with it.
+     - TEST, FIXED: tests/test_asked_for.py's held-table fixture still used
+       a run id that names no table. 88ee77c retired
+       `orchestrate.single_table_guard` and renamed two such fixtures, but
+       missed this third one.
+     - TEST, FIXED: the empty-Table-level-section e2e test (written for
+       REQ-QAC-247) read Birth Registrations, which is daily, on today's
+       date. Its history ends 2026-09-22, so every section correctly read
+       "No data". It now navigates in place on the newest supply's day,
+       read from the built data - CLAUDE.md's shelf-life note, met again.

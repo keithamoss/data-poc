@@ -245,7 +245,7 @@ class TestThroughTheRealOrchestrator:
         from fixture_ids import BDM_REF_RUN_ID
         from qa_tools.tools import orchestrate
 
-        mine = f"bdm_asked_held_{uuid.uuid4().hex[:8]}"
+        mine = f"birth_registrations__t{uuid.uuid4().hex[:12]}"
         with supply_db.connect(label="test-asked-for") as conn:
             clone_run_views(conn, BDM_REF_RUN_ID, mine, held={"birth_registrations"})
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",

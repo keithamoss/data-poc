@@ -248,13 +248,16 @@ SETTLE_AT = "mothman > Filing decisions > {collection} > Supplies waiting on a d
 
 
 def where_to_settle(dataset_id: str) -> str:
-    """SETTLE_AT for this dataset's collection, by its name."""
+    """SETTLE_AT for this dataset's collection, BY THE LABEL THE FILING MENU
+    LISTS IT UNDER (Keith, 2026-10-18: one rule for a collection's label in
+    every picker) - a one-table collection by its dataset's name. It named
+    the collection's own name, which that menu no longer shows."""
+    from qa_tools import collections
     from qa_tools.common import hierarchy
 
     try:
-        entry = hierarchy.dataset(dataset_id)
-        collection = entry.collection_name or entry.collection_id
-    except hierarchy.UnknownDatasetError:
+        collection = collections.by_id(hierarchy.dataset(dataset_id).collection_id).label
+    except (hierarchy.UnknownDatasetError, KeyError, LookupError):
         collection = dataset_id
     return SETTLE_AT.format(collection=collection)
 
