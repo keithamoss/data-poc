@@ -36,9 +36,6 @@ KNOWN: dict[str, str] = {
     "stats.arrival_after_registration": (
         "the earliest extract is the earliest among rows extracted on or after their "
         "registration date, falling back to the earliest of all."),
-    "results.single_dataset_header": (
-        "the results file names its one dataset under `dataset` rather than the "
-        "collection under `collection` and its datasets under `datasets`."),
     "orchestrate.entry_carries_csv_path": (
         "each run entry, and so the batch's results file, also names the arrival's "
         "file, or its delivery directory where two files contest the dataset."),

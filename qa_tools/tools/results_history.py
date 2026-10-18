@@ -49,16 +49,11 @@ def write_results_file(collection_id: str, *, runs: list[dict], dataset_stats: d
     rather than under any of the four, which then no longer add up to the
     total on their own."""
     coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
     results = canonical_order(results)
     counts = {s: sum(1 for r in results if r["status"] == s)
               for s in ("pass", "warn", "fail", "error", "nodata")}
-    if "results.single_dataset_header" in adapter.legacy:
-        [dataset] = coll.datasets
-        header = {"dataset": f"{coll.agency_id}.{coll.id}.{dataset.dataset_id}"}
-    else:
-        header = {"collection": f"{coll.agency_id}.{coll.id}",
-                  "datasets": sorted(d.dataset_id for d in coll.datasets)}
+    header = {"collection": f"{coll.agency_id}.{coll.id}",
+              "datasets": sorted(d.dataset_id for d in coll.datasets)}
     output = {
         "generated_at": generated_at,
         **header,

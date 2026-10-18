@@ -111,7 +111,6 @@ ADAPTER = CollectionAdapter(
         "stats.single_table_shape",
         "stats.rows_by_run_id",
         "stats.arrival_after_registration",
-        "results.single_dataset_header",
         "orchestrate.entry_carries_csv_path",
     }),
 )
