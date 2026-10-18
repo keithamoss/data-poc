@@ -72,7 +72,7 @@ class TestAnyOtherReasonIsAFailedRun:
         from conftest import clone_run_views
         from fixture_ids import BDM_REF_RUN_ID
 
-        mine = f"bdm_absent_{uuid.uuid4().hex[:8]}"
+        mine = f"birth_registrations__t{uuid.uuid4().hex[:12]}"
         with supply_db.connect(label="test-own-table") as conn:
             clone_run_views(conn, BDM_REF_RUN_ID, mine, absent={"birth_registrations"})
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",

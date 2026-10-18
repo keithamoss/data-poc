@@ -122,16 +122,6 @@ def discard_run_schemas(run_id: str) -> None:
               f"- results are recorded; `mothman supply tidy` clears leftovers")
 
 
-def _own_table(coll, adapter, run_id: str):
-    """(dataset, table) the run is about - what its id names, or, under
-    `orchestrate.single_table_guard`, the collection's one table whatever the
-    id names."""
-    if "orchestrate.single_table_guard" in adapter.legacy:
-        only = _sole(coll)
-        return only.dataset_id, only.table
-    return run_owner(run_id)
-
-
 def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: str,
                    run_by: str, reference_run_id: str | None,
                    on_step: Callable[[str], None] | None) -> list[dict]:
@@ -158,7 +148,7 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # NO TOOL RUNS FOR A RUN WHOSE OWN TABLE IS UNREADABLE (REQ-PIPE-115
     # criteria 5, 6 and 9): held, contested or refused, and any other reason
     # raises. A run id that names no table has no own table to guard.
-    own = _own_table(coll, adapter, run_id)
+    own = run_owner(run_id)
     why = None
     if own is not None:
         received = entry.get("received_at")

@@ -185,7 +185,7 @@ class TestABirthRegistrationsRunWithNothingItMayRead:
         written = []
         monkeypatch.setattr(orchestrate, "write_qa_result",
                             lambda *a, **k: written.append(a[4]))
-        mine = f"bdm_unreadable_{uuid.uuid4().hex[:8]}"
+        mine = f"birth_registrations__t{uuid.uuid4().hex[:12]}"
         with supply_db.connect(label="test-bdm-unreadable") as conn:
             clone_run_views(conn, BDM_REF_RUN_ID, mine, held=held, contested=contested)
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",

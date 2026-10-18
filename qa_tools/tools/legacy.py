@@ -46,9 +46,6 @@ KNOWN: dict[str, str] = {
     "results.single_dataset_header": (
         "the results file names its one dataset under `dataset` rather than the "
         "collection under `collection` and its datasets under `datasets`."),
-    "orchestrate.single_table_guard": (
-        "the own-table guard always runs, on the collection's one table, whatever the "
-        "run id names - Child Protection's guards only a run whose id names a table."),
     "orchestrate.files_one_arrival": (
         "each arrival is filed on its own, never with the arrivals sharing its receipt "
         "instant."),
