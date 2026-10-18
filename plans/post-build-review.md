@@ -10652,3 +10652,50 @@ twice. It deliberately did not re-find the `TypeError`.
        generator writes. The refusal named the symptom ("would change
        where ... is filed"), and the first fix removed the symptom's input
        rather than the check's mistake.
+
+245. **[todo, 2026-10-19]** **[Pipeline & publishing]** **A third collection on
+     the quarterly calendar makes the parallel bootstrap's history depend on
+     timing - KEITH'S CALL.** Found verifying TS-63 on the Emergency
+     Department tree's bootstrap (edboot6, ed_probe). Both of cp-carers' gap
+     quarters, 2022-Q1 and 2022-Q2, inherit **cp-carers@2016-05-01**, 2016-Q2's
+     supply, when 2021-Q4's promoted supply was the one current.
+     - CAUSE. A period is opened once, for the whole asset
+       (`period_schema.open_period`), and `inheritance.inherit_into` then
+       fills it for EVERY dataset that owes it nothing, from that dataset's
+       newest promoted supply AT THAT MOMENT (signed design: REQ-PIPE-098
+       criterion 4, and inheritance's criterion 2, a historical period never
+       re-resolves). The bootstrap replays each collection in its own process,
+       side by side (REQ-TEST-116), on the stated ground that "the
+       collections share no dataset, slot or promotion". With Birth
+       Registrations alone on the daily calendar that held. Emergency
+       Department shares Child Protection's quarters, though, and runs about
+       seven times faster (158s against 1078s). So ED opens each quarter
+       first, while Child Protection's process is still years behind.
+       Decision 121 (cp-carers inherits 2022-Q1) sits beside 122 (ED promotes
+       into 2022-Q1), while Child Protection had only reached 2016 (120).
+     - WIDER THAN TS-63. cp-case-workers owes nothing two quarters a year,
+       and its inheritances are chosen the same way (decision 117, inheriting
+       2021-Q4 beside ED's 2021-Q4 promotion, 118). Every Child Protection
+       inheritance into a quarter ED opened first is wrong, from 2013 to 2026.
+       It also changes from run to run with process timing. A sequential
+       bootstrap gives a different answer again: Child Protection first leaves
+       ED's own 2015-Q4 gap with nothing to inherit, and ED first is the race
+       above. So neither ordering is right.
+     - WHAT IS RIGHT, as in a real pass: arrivals processed in receipt
+       order ACROSS the collections that share a calendar, as each arrives.
+     - OPTIONS FOR KEITH:
+       (a) The bootstrap replays collections that share a calendar as one
+       receipt-ordered stream, keeping a calendar-separate collection (Birth
+       Registrations) in parallel. Faithful to the real pass and leaves the
+       signed inheritance design alone. Costs roughly Child Protection plus
+       ED in series (about 1240s against 1179s measured) and is a real change
+       to the orchestration.
+       (b) Inherit per collection, when that collection's own processing
+       first reaches the period. Changes signed design: a period would no
+       longer be one event for the whole asset.
+       (c) Accept it for a synthetic history. Not recommended: the bootstrap
+       is no longer deterministic, which breaks REQ-TEST-116's parallel =
+       sequential equivalence and every capture comparison.
+     - The Emergency Department push WAITS ON THIS. Its three conditions
+       cannot honestly be met over a timing-dependent Child Protection
+       history.

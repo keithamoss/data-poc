@@ -2269,6 +2269,38 @@ one or more component tags, and a date.
       verdicts kept), and TS-59 kept by a person with its reason. TS-63:
       the January cp_carers filed late to 2021-Q4, the March one held as
       turned off. REQ-GEN-205-TS62 left pending, as scripted.
+    - **THE EMERGENCY DEPARTMENT PUSH IS HELD - A DEFECT THAT NEEDS YOUR
+      CALL (post-build-review #245).** With a third collection on the
+      quarterly calendar, the parallel bootstrap is no longer deterministic.
+      Emergency Department opens each quarter first, because it is about
+      seven times faster than Child Protection. Opening a quarter fills it
+      for every dataset that owes it nothing, from that dataset's newest
+      promotion at that moment. So cp-carers' gap inherits 2016-Q2's supply,
+      and every cp-case-workers gap from 2013 to 2026 is chosen from wherever
+      Child Protection had got to. Running the collections one after another
+      in either order is also wrong. My recommendation is (a): replay the
+      collections that share a calendar as one receipt-ordered stream, which
+      is what a real pass does, and keep Birth Registrations parallel. The
+      other options are in #245. Everything else for ED is built, verified on
+      the bootstrap and committed locally in /home/user/ed-wt (branch
+      ed-build, not pushed): TS-57 to TS-61 confirmed as built, and TS-63's
+      filings and holds correct. Only the inheritances are wrong.
+    - **QUESTIONS FOR YOU, in the order I would take them:**
+      1. #245, the timing-dependent bootstrap: option (a), (b) or (c). It
+         gates the Emergency Department push.
+      2. TS-62's placement (REQ-GEN-205 criteria 11, 24 and 25): more Birth
+         Registrations days at its end, move TS-45 or TS-46, or amend.
+      3. REQ-GEN-235 criterion 3: amend it, or freeze Child Protection's
+         relocation (still open from before tonight).
+      4. REQ-GEN-238, Child Protection's shrink: it waits on REQ-GEN-206,
+         which is unsigned.
+      5. REQ-PIPE-250's 12-minute target: the last three-collection
+         bootstrap took 1179s (Birth Registrations 492s, Child Protection
+         1078s, ED 158s, in parallel). The profile and the printed budget
+         line are not built.
+      6. The PROVISIONAL choices above: ED's corrected quarters in the 2013
+         calendar version, and Child Protection's supply suppressed in the
+         nine quarters they alter.
     - **FOR THE MORNING, Keith's own list**: talk through the 77,000 lines
       of code (running-thoughts #107) and the test-duplication report
       (now docs/drafts/item-6/test-duplication.md), plus anything else left
