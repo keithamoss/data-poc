@@ -37127,6 +37127,45 @@ requirements:
       - "SPLIT FROM THE CLI FACTORY (main session's round-2 call): different component, proof and reviewers."
       - "REBUILT OVER REQ-PIPE-243's KEPT 'AFTER' (main session's round-5 call 30, P1): REQ-GEN-246 lands between them but is proved byte-identical on S1, so the recorded results that database holds are those this commit's own bootstrap would record. Follows REQ-GEN-246 in sequence (P2)."
       - "THE TWO DISPLAY DRIFTS ARE RETIRED BY REQ-QAC-247; THE JSON SHAPE BY REQ-PIPE-248."
+      - "THE AGENCY PILL IS KEPT, linked to contract/<agency-id>/, per criterion 13 and Keith's own decision of 2026-10-16 ('The agency pill KEPT, linked to the agency's folder'). This requirement's title and the older round-3 decision (call 17) still say it is removed; both predate Keith's call and were not built. Flagged to Keith to correct the title."
+      - "CRITERION 8'S '.present PART' IS READ AS THE COLLECTION'S PRESENTATION ENTRY: Keith dropped .present on 2026-10-16, so what the builder cannot read without is the collection's entry in contract/presentation.yaml, and `mothman check`'s collections gate fails a registered collection with none, naming it. Flagged to Keith with the title, since the criterion's words predate his decision."
+      - "PRESENTATION LIVES IN contract/presentation.yaml, ONE FILE FOR THE ASSET: each agency's blurb (criterion 10) and each collection's provider, delivery format and provenance note - the words no contract field carries. It sits beside the hierarchy and is read relative to it, so a test's moved hierarchy reads its own. REJECTED putting provider and delivery format in each contract: ODCS has no field for them, and a custom property per contract scatters one page's words across files."
+      - "A COLUMN'S TYPE IS DERIVED FROM THE CONTRACT BY ONE RULE: the logical type where logical and physical agree, `string · <physical>` for a string, otherwise the physical type. It reproduces every column the two builders typed by hand, so no type string had to move into a contract."
+      - "THE BUILDERS' COLUMN NOTES MOVED INTO THE CONTRACTS' description FIELDS FIRST (criterion 2), word for word, and each table's Table-level section note into a `tableLevelChecksNote` custom property. Where a contract's own description said MORE than the page did (is_multiple_birth, concern_type), the page's words won, as criterion 2 requires, and the contract's longer text was kept as a YAML comment beside it rather than lost."
+      - "FOUR NEW LEGACY FLAGS, ON BIRTH REGISTRATIONS' ADAPTER (criterion 11): `dashboard.single_dataset_document` (the file is the one dataset itself), `dashboard.drops_empty_sections`, `dashboard.reference_reason_fallback` (its reading of not evaluated, and its records keeping recorded order), and `dashboard.supply_section_first` (the JSON order of two sections, which the page reorders itself). The fourth is not one the requirement named; it changes nothing a reader sees and was kept so the file is byte-identical. REQ-QAC-247 and REQ-PIPE-248 retire them."
+      - "NO FLAG WHERE THE SHARED CODE ALREADY PRODUCES BIRTH REGISTRATIONS' OUTPUT: `evidently:row_count_growth` counts as supply-level for both (Birth Registrations' volume check sits on its column, never on the table), results are filtered by dataset id (every real record carries one), and pooled keys are disambiguated for both (Birth Registrations has no collisions). The byte comparison of both files is the proof."
+      - "A COLLECTION WITH NO RECORDED RUNS IS BUILT, A COLLECTION WITH NO FILE IS NOT (criteria 6 and 7): the builder treats a missing results file as no runs and writes every declared dataset with an empty history, which the page renders as a no-data tile; the embed refuses, naming the collection, the file and `mothman dashboard build-data`, before writing anything."
+      - "ONE DATASET-ID INDEX AND ONE BUILD FUNCTION IN THE PAGE (criterion 5): `realDatasetIndex()` maps each dataset id to its collection and raw data, `buildCollectionDatasets()` builds a collection's datasets for a date, and `datasetTile()` caches each collection's build per date by collection id - Child Protection's datasets are still built once per date, not once per dataset (REQ-DASH-226 NFR 6). `rawRealDatasetById` keeps its name and signature, which several JS tests stub."
+      - "THE GITHUB LINKS WERE DEAD BEFORE THIS CHANGE: both pointed at qa_tools/bdm/ and qa_tools/cp/, which REQ-QAC-242 deleted. A dataset now opens its contract at its `- name: <table>` line and an agency its folder, each with a tooltip naming the target, from the registry. Check-source links are unchanged except that 86 of them in the two contracts now anchor a few lines lower, because the descriptions moved in shifted those lines."
+      - "AGENCY_BLURB IS EMPTY IN THE RAW TEMPLATE: the raw template's HIERARCHY is null, so its blurb literal was never shown, and keeping it would have left the template naming two agencies on the migration allowlist."
+      - "THE RENDER GATE READS THE REGISTRY (criterion 9): check_dashboard_renders.py fails a built page whose COLLECTION_DATA lacks a registered collection, naming it."
+      - "NO PLANS PROSE DELETED: plans/publishing-and-history.md item 6 feeds this series and goes whole when REQ-PIPE-248 is built (CLAUDE.md's batch rule 4)."
+    linked_tests:
+      - tests/test_build_dashboard_data.py
+      - tests/test_build_dashboard_child_protection.py
+      - tests/test_dashboard_for_every_collection.py
+      - tests/test_embed_dashboard_data.py
+      - tests/test_check_dashboard_renders.py
+      - tests/test_github_links.py
+      - tests/test_dashboard_e2e.py
+      - tests-js/collection-data.test.js
+    implemented_by:
+      - pipeline/build_dashboard_data.py::build
+      - pipeline/build_dashboard_data.py::build_datasets
+      - pipeline/build_dashboard_data.py::build_one_table
+      - pipeline/build_dashboard_data.py::column_meta
+      - pipeline/build_dashboard_data.py::write
+      - qa_tools/common/presentation.py::load
+      - qa_tools/common/presentation.py::agency_blurbs
+      - qa_tools/common/validate_collections.py::presentation_problems
+      - qa_tools/common/github_links.py::build_folder_links
+      - dashboard/embed_dashboard_data.py::collection_data
+      - dashboard/embed_dashboard_data.py::collection_targets
+      - dashboard/embed_dashboard_data.py::MissingCollectionData
+      - dashboard/qa-reporting-dashboard.template.html::buildCollectionDatasets
+      - dashboard/qa-reporting-dashboard.template.html::realDatasetIndex
+      - dashboard/qa-reporting-dashboard.template.html::githubFolderLink
+      - contract/presentation.yaml
     open_questions: []
 
   - id: REQ-TEST-245
