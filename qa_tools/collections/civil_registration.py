@@ -133,7 +133,6 @@ ADAPTER = CollectionAdapter(
         "stats.zero_counts_kept",
         "stats.arrival_after_registration",
         "results.single_dataset_header",
-        "results.every_recorded_run",
         "orchestrate.single_table_guard",
         "orchestrate.files_one_arrival",
         "orchestrate.entry_carries_csv_path",

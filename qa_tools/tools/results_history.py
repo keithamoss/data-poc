@@ -26,7 +26,7 @@ from qa_tools import collections
 from qa_tools.common import asset_time, atomic_file
 from qa_tools.common.qa_results_reader import (
     RESULT_TOOLS, canonical_order, current_runs_only, list_run_ids, read_cross_table_results,
-    read_dataset_stats, read_one, read_qa_results,
+    read_dataset_stats, read_one,
 )
 
 __all__ = ["build_results_from_history", "results_path", "write_results_file"]
@@ -83,7 +83,6 @@ def build_results_from_history(collection_id: str) -> dict:
     """Rebuild the collection's results file from the recorded `qa` schema
     alone - the dashboard build's source, no tool re-run, no supply rows."""
     coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
     run_ids = current_runs_only(list_run_ids(coll.agency_id, coll.id))
     manifest, stats_by_run = [], {}
     for run_id in run_ids:
@@ -99,12 +98,9 @@ def build_results_from_history(collection_id: str) -> dict:
     # AND THE IN-DEVELOPMENT ONES (REQ-PIPE-106 criterion 7): `None` is every
     # supply_state, asked for explicitly because the dashboard is the one
     # reader that has to show a calendar-less dataset's real verdicts.
-    if "results.every_recorded_run" in adapter.legacy:
-        results = read_qa_results(coll.agency_id, coll.id, supply_state=None)
-    else:
-        results = [r for entry in manifest for tool in RESULT_TOOLS
-                   for r in read_one(coll.agency_id, coll.id, entry["run_id"], tool,
-                                     supply_state=None)]
+    results = [r for entry in manifest for tool in RESULT_TOOLS
+               for r in read_one(coll.agency_id, coll.id, entry["run_id"], tool,
+                                 supply_state=None)]
     results += read_cross_table_results(coll.agency_id, coll.id, supply_state=None)
     return write_results_file(collection_id, runs=manifest, dataset_stats=stats_by_run,
                               results=results, generated_at=asset_time.now().isoformat(),
