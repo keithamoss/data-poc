@@ -137,7 +137,10 @@ def collections_in(doc: dict) -> list[Collection]:
 
 @functools.lru_cache(maxsize=1)
 def _load() -> tuple[Collection, ...]:
-    doc = config_yaml.parse(hierarchy.DATA_ASSET_YAML.read_text()) or {}
+    # BY PATH, so a slip in the file names it and its line rather than
+    # `<unicode string>` (tests/test_cli_config_unreadable.py): the CLI
+    # modules reach this registry while they import.
+    doc = config_yaml.load(hierarchy.DATA_ASSET_YAML) or {}
     by_collection: dict[str, list[hierarchy.Dataset]] = {}
     for d in hierarchy.all_datasets():
         by_collection.setdefault(d.collection_id, []).append(d)

@@ -922,6 +922,16 @@ Rough layout:
   this sandbox's suite now runs against a database bootstrapped from the
   grown Child Protection history (REQ-GEN-207). Not profiled yet.
 
+  -> **~988s/5619 tests (2026-10-18, REQ-PIPE-243)**. Down ~456s on the
+  entry above with two fewer tests: the shared orchestrator runs a
+  bootstrap 675s faster (after-242 1920s against after-243 1245s), and
+  the suite's own bootstrapped fixtures feel the same gain. Full
+  `mothman check` 18m31s, of which pytest 16m28s and `npm test` 88s
+  (830 tests). One failure in that run, a defect of the change itself
+  caught by the gate before the push (a config slip read as `<unicode
+  string>`); fixed and the affected modules re-run rather than the whole
+  suite, under commit rule C.
+
   Whenever a full local run happens anyway (not a reason to run one
   that selective testing above would otherwise skip), note the real
   number here.

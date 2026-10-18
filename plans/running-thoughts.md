@@ -5477,3 +5477,41 @@ could never have computed it), and it belongs with batch 5's check work.
      `DATA_ASSET_YAML` constant, so a test that patches one still reads the
      real file through the other two. Separate from REQ-PIPE-254, which it
      does not change; not yet scoped or put to Keith.
+
+104. **[in-progress, 2026-10-18]** **[Dashboard UI]** **[Pipeline & publishing]**
+    **Private hosting for the dashboard, then a private repository -
+    Keith's answers, 2026-10-18.** Answering the weekend reminder about
+    plans/dashboard.md #2 and #4, over four rounds of questions. His
+    words and choices: no paid GitHub plan and he does not want one
+    (Copilot does not give private Pages); he already uses Cloudflare
+    and is open to Cloudflare Access; access is for a handful of named
+    people in his team at work, ideally against corporate identity
+    (GitHub or Microsoft), worst case one shared credential. Settled:
+    Cloudflare Access with a ONE-TIME CODE to allow-listed work email
+    addresses (over Entra ID, which needs his agency's tenant admin, and
+    GitHub identity, which needs everyone to have an account, and a
+    shared credential); CLOUDFLARE PAGES BY DIRECT UPLOAD from the
+    environment that builds the dashboard (nothing on GitHub Actions
+    can, it needs the database); the repository goes private only AFTER
+    the private host is live and a teammate has signed in; publishing is
+    BOTH the existing `mothman dashboard publish` (its transport swapped
+    from gh-pages to wrangler) AND automatic at the end of `mothman
+    pipeline run` and `pipeline process`, never a bootstrap, with an
+    opt-out - which knowingly reverses REQ-PIPE-092 criterion 16's
+    opt-in rule of 2026-09-27; the Cloudflare token is an environment
+    variable alongside the DSNs, refused plainly when missing; the
+    SANDBOX environment is the one publisher until production exists;
+    the private site carries the current dashboard AND every snapshot;
+    ONE SNAPSHOT PER PUBLISH, but a publish (and so a snapshot) only
+    happens when the built site has CHANGED - his own suggestion, compare
+    the current and new file hashes; Access is configured by hand in
+    the Cloudflare console from a committed runbook and its outcome
+    checked by the publisher; CI minutes (a private free repo gets 2,000
+    Actions minutes a month against roughly 5,000-15,000 a week used
+    now) are CUT FIRST, as a precondition of the flip; the dashboard's
+    GitHub links 404ing for non-collaborators is accepted. delivery-scoper
+    drafted REQ-PIPE-255 to REQ-DOCS-259 the same day (draft in the
+    session scratchpad, to be amended with the last two rounds and put
+    to him for sign-off); nothing built. Hosts a session cannot reach,
+    for CLAUDE.md's blocked list: api.cloudflare.com, *.pages.dev,
+    cloudflareaccess.com, dash.cloudflare.com, developers.cloudflare.com.

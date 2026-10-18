@@ -176,7 +176,7 @@ class PinnedClockRefused(RuntimeError):
 def declared_synthetic() -> bool:
     """Whether contract/data-asset.yaml declares the asset synthetic - read
     here, as the replay clock reads it, rather than through the reset module."""
-    raw = config_yaml.parse(DATA_ASSET_YAML.read_text()) or {}
+    raw = config_yaml.load(DATA_ASSET_YAML) or {}
     return raw.get("synthetic") is True
 
 
