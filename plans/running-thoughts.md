@@ -5684,7 +5684,7 @@ could never have computed it), and it belongs with batch 5's check work.
     grown more surface than the model needs. Ask Keith which he wants
     looked at, and when, after item 6's chain.
 
-108. **[todo, 2026-10-19]** **[Pipeline & publishing]** **A calendar is a
+108. **[superseded, 2026-10-19]** **[Pipeline & publishing]** **A calendar is a
     template each collection takes its own copy of.** Keith, 2026-10-19,
     answering post-build-review #245 (Emergency Department and Child
     Protection corrupting each other's inheritances in the parallel
@@ -5700,3 +5700,51 @@ could never have computed it), and it belongs with batch 5's check work.
     built. The Emergency Department push waits on it. Same day, for TS-62:
     "Grow BR's end", so Birth Registrations' history gets days at its end
     and TS-62 lands after 2026-09-08.
+     SUPERSEDED THE SAME MORNING (Keith, 2026-10-19): once it was clear the
+     race is only the bootstrap's, he kept the model as built - one opening
+     per period, inheriting for every owe-nothing dataset in the asset - and
+     chose post-build-review #245's option (a), replaying shared-calendar
+     collections together (REQ-PIPE-262). The "copy" was meant
+     metaphorically: every collection's datasets in the same schema.
+
+109. **[todo, 2026-10-19]** **[Pipeline & publishing]** **What a period
+     schema IS: a release of the asset, or a supply's cadence? Two new
+     datasets to stress-test it, and maybe two asset configurations.**
+     Keith, 2026-10-19 morning, prompted by the Emergency Department work
+     and #245/#108. His words: "I've kind of been designing this so at the
+     data asset level, there is one schema for each quote unquote release
+     of the asset. Rather than multiple schemas that depend exactly on the
+     cadence of particular data sets and data collections." He suspects it
+     is not built that way: a monthly dataset on a quarterly asset would
+     land in its own monthly schemas. "Maybe that's the best way. Maybe we
+     don't monkey with that and we put a layer on top, which is about the
+     release of the data asset." Two shapes to work through:
+     - **A quarterly asset with a monthly dataset.** Today this means
+       separate monthly schemas. The alternatives: keep that and add a
+       release layer on top that shows the latest of everything, or land
+       the monthly supplies in the asset's quarter.
+     - **A daily asset with a weekly dataset.** Keith thinks automatic
+       inheritance already covers this (the weekly dataset is owed on its
+       delivery days and inherits on the rest).
+     He wants to talk it through conceptually first, then build **two new
+     datasets** to test it in practice:
+     - a monthly dataset in a quarterly asset;
+     - a weekly dataset in a daily asset.
+     Also raised: "This is possibly also the point that we want to split
+     this repository into two separate data asset configurations, one for
+     the daily asset and one for the quarterly asset" (see CLAUDE.md's
+     two-assets target). Not scoped. Talk it through first.
+
+110. **[done, 2026-10-19]** **[Pipeline & publishing]** **Which datasets the
+     inheritance rule fills automatically - Keith's own rule, 2026-10-19.**
+     "A data set not expected would be automatically inherited. One not
+     participating would be automatically inherited, but one turned off
+     would not be automatically inherited. The one that is participating
+     and hasn't arrived yet should not be automatically inherited." The
+     turned-off part differs from signed REQ-PIPE-179 criterion 22 and
+     REQ-PIPE-098 criterion 1 (amended), which inherit for a turned-off
+     dataset. RECONCILED THE SAME MORNING: shown REQ-PIPE-179 criterion 22
+     and his own 2026-10-10 decision behind it (Q-G option A, "for a
+     temporary turn-off we probably do want to inherit it"), Keith kept it
+     as signed - a turned-off period inherits. Nothing changes; #77 still
+     holds the larger question of a dataset removed for good.

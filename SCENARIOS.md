@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**55 of 66 scenarios marked for injection have data behind them today.** 103 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**56 of 66 scenarios marked for injection have data behind them today.** 103 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -969,7 +969,12 @@ PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray te
 
 **What it would look like if the rule were wrong.** The backstop's "configuration problem on our side" red; or the arrival judged against the old date.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | birth-registrations |
+| Supplies | `birth_registrations__202609250900000800` |
+| Period | 2026-09-25 |
+| Set the in-place-on date to | 2026-09-25 |
 
 ### TS-63a - A dataset turned off for a while: the turn-off
 
@@ -2538,7 +2543,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-173",
     "REQ-PIPE-170"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "birth-registrations",
+    "supplies": [
+     "birth_registrations__202609250900000800"
+    ],
+    "period": "2026-09-25",
+    "inPlaceOn": "2026-09-25",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-63a",

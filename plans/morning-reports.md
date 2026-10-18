@@ -2310,3 +2310,43 @@ one or more component tags, and a date.
       of code (running-thoughts #107) and the test-duplication report
       (now docs/drafts/item-6/test-duplication.md), plus anything else left
       for him overnight.
+    - **KEITH'S ANSWERS, MORNING 2026-10-19.**
+      - #245: "A calendar is just a place for each collection / dataset to
+        place its things, they should NOT compete for space in the
+        calendar." Own opening, shared schema. Drafted by delivery-scoper
+        as REQ-PIPE-261, and Keith answered its four questions:
+        - opening is automatic at a collection's first arrival after the
+          claim window opens;
+        - a new `mothman supply open-period` command opens one collection's
+          copy;
+        - the evidence is one parallel bootstrap plus a two-collection
+          equivalence test;
+        - an inherit into an unopened copy is refused.
+        Signed, then sent to delivery-architect and delivery-cli-ux before
+        building (Keith's ask). Not yet in requirements.yaml, in case the
+        reviews change it.
+      - TS-62: "Grow BR's end", by moving the anchor. Built (ed-wt
+        checkpoint 99fb1cb):
+        - The anchor is 2026-09-25, with three end days on their own seeds.
+          Every Birth Registrations scenario is re-counted, so no date
+          moved.
+        - TS-62 is on the last day, with a version from 2026-09-25 and a
+          correction dated 2026-09-24. Placing the version on 2026-09-24
+          clashed with TS-46's 2026-09-22.
+        - Criterion 25's refusal is built test-first. The last REQ-GEN-199
+          link day is 2026-09-01.
+      - A scratch bootstrap of the grown history is running, to check TS-62
+        and TS-63 before REQ-PIPE-261 lands. Child Protection's inheritances
+        will still be wrong in it until then.
+      - **REVISED, LATER THE SAME MORNING.** Talking #245 through, Keith
+        concluded:
+        - the race is an artifact of the parallel bootstrap (the live pass
+          is one receipt-ordered stream);
+        - per-collection opening is too fiddly against his model.
+        REQ-PIPE-261 was withdrawn before it reached the register, and
+        option (a), replaying shared-calendar collections as one stream, is
+        being drafted as REQ-PIPE-262. REQ-PIPE-179 criterion 22 (a
+        turned-off period inherits) stays as signed. Also logged:
+        running-thoughts #109 (what a period schema is - a release, or a
+        cadence; a monthly dataset in a quarterly asset; a weekly dataset in
+        a daily asset; maybe two asset configurations) and #110.

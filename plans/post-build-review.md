@@ -10653,12 +10653,26 @@ twice. It deliberately did not re-find the `TypeError`.
        where ... is filed"), and the first fix removed the symptom's input
        rather than the check's mistake.
 
-245. **[todo, 2026-10-19]** **[Pipeline & publishing]** **A third collection on
+245. **[in-progress, 2026-10-19]** **[Pipeline & publishing]** **A third collection on
      the quarterly calendar makes the parallel bootstrap's history depend on
      timing - KEITH'S CALL.** Found verifying TS-63 on the Emergency
      Department tree's bootstrap (edboot6, ed_probe). Both of cp-carers' gap
      quarters, 2022-Q1 and 2022-Q2, inherit **cp-carers@2016-05-01**, 2016-Q2's
      supply, when 2021-Q4's promoted supply was the one current.
+     - KEITH'S CALL, 2026-10-19, REVISED THE SAME MORNING: option (a).
+       He first chose per-collection opening ("own opening, shared
+       schema", drafted as REQ-PIPE-261, signed, then reviewed by
+       delivery-architect and delivery-cli-ux). Talking it through showed
+       two things:
+       - the race is the bootstrap's alone, since the live pass works in
+         one global receipt order under one pass lock;
+       - per-collection opening is "really fiddly" against his model, in
+         which every owe-nothing dataset across the asset inherits when
+         the next period opens.
+       So REQ-PIPE-261 was withdrawn before it reached the register, and
+       the bootstrap is to replay collections that share a calendar as one
+       receipt-ordered stream (REQ-PIPE-262, being drafted). When that is
+       built, this entry and running-thoughts #108 go.
      - CAUSE. A period is opened once, for the whole asset
        (`period_schema.open_period`), and `inheritance.inherit_into` then
        fills it for EVERY dataset that owes it nothing, from that dataset's
