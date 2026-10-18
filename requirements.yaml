@@ -37502,7 +37502,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As Keith, I want a test that adds a collection the way the next real one will be added - configuration, check files, an adapter and a provider, no other edit - and follows it all the way to the page, so that 'adding a collection is a small adapter' is a fact the suite keeps proving rather than a claim made once."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night: 'small adapter per collection' as the definition of done). Added by delivery-scoper 2026-10-15; mechanism per main session position.md call 26. A PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL keep, under tests/, a fake collection's files - a hierarchy entry, a contract, Soda and Evidently check files, dbt files for its own folders, a QA adapter and a generator provider - for one agency, one collection and one one-table dataset with at least one check in each of the four tools."
@@ -37539,6 +37539,33 @@ requirements:
       - "ONE TABLE, NOT N: the next real collection (Emergency Department) is one table, and Child Protection's corpus already exercises N tables."
       - "CRITERION 3 AMENDED WITH KEITH (2026-10-18): a new collection also edits contract/calendar.yaml (a dataset with no calendar entry is refused outright) and contract/presentation.yaml (REQ-DASH-244 put every collection's words there), so both may differ too, by the collection's own entries inserted whole, as data-asset.yaml may. Found building the fake Widget Register; criterion 10 already allowed the calendar edit for Emergency Department."
     open_questions: []
+    unmet_criteria:
+      - criterion: "Criteria 7, 8 and 9 - the before-240 against after-248 equivalence series, REQ-PIPE-240's migration allowlist held empty, and the gate on temporary pointers."
+        why: "All three are about the END of item 6's chain, and REQ-QAC-247 and REQ-PIPE-248 have not been built: one file still waits on the allowlist today (the collections gate says so), and the series cannot be compared before its last capture exists."
+        owner: REQ-QAC-247 and REQ-PIPE-248, item 6's last two pieces
+        blocked_by:
+          requirements:
+            - REQ-QAC-247
+            - REQ-PIPE-248
+      - criterion: "Criterion 10 - the Emergency Department collection's own diff shows it added only its own files."
+        why: "Met by the Emergency Department build itself (Keith's 'Both' decision above), which has no requirement of its own yet."
+        owner: the Emergency Department dataset (plans/data-generation.md)
+        blocked_by:
+          unowned: true
+    evidence:
+      - "2026-10-18, CRITERIA 1 TO 4 AND 6: tests/test_a_collection_is_a_small_adapter.py (on_demand, 12 tests, 12 passed on commit 172adba) copies every tracked file, adds the Widget Register from tests/fake_collection_files/ (its contract and check files under contract/widget-agency/, dbt models under dbt_project/models/widget-register/, a QA adapter and a generator provider), asserts the copy differs by additions only, bootstraps it into its own scratch database (17s), runs `mothman wreg qa --file widgets.csv --commit` (9.3s), rebuilds results, builds and embeds the dashboard, and compares every rendered status against its recorded verdict in a real browser. The collections and providers gates pass in the copy, and the repository's own data/ and reports/ are unchanged afterwards."
+      - "2026-10-18, CRITERION 5: `mothman check`'s collections gate prints each adapter's logic lines against the soft budget of 150 and each provider's separately, never failing on them - today civil-registration 111 (provider 441) and child-protection 72 (provider 369)."
+      - "2026-10-18, CRITERION 3 AS AMENDED (Keith, the same evening): three configuration files take a block inserted whole - contract/data-asset.yaml, contract/calendar.yaml and contract/presentation.yaml - and additions_only() fails any other change to a tracked file."
+    linked_tests:
+      - tests/test_a_collection_is_a_small_adapter.py
+      - tests/fake_collection.py
+      - tests/fake_collection_files/qa_tools/collections/widget_register.py
+      - tests/fake_collection_files/generator/collections/widget_register.py
+      - tests/tree_copy.py
+      - tests/test_collections_registry.py
+    implemented_by:
+      - qa_tools/common/validate_collections.py::logic_lines
+      - qa_tools/common/validate_collections.py::line_report
   - id: REQ-PIPE-254
     title: "A cache built from a configuration file always answers for what the file says now"
     date_written: "2026-10-16"

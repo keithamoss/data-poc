@@ -14,9 +14,9 @@ criterion's check, and holds for any copy, not only this one's.
 THREE CONFIGURATION FILES TAKE AN INSERT, not one. Criterion 3 names only
 contract/data-asset.yaml, but a dataset with no entry in contract/calendar.yaml
 is refused outright, and REQ-DASH-244 put every collection's words in
-contract/presentation.yaml, whose gate fails a collection with no entry. Built
-on the assumption that the criterion means all three, by the same rule;
-put to Keith (plans/running-thoughts.md #106) and not yet agreed.
+contract/presentation.yaml, whose gate fails a collection with no entry. So the
+criterion covers all three, by the same rule (Keith, 2026-10-18, amending it;
+plans/running-thoughts.md #106).
 """
 from __future__ import annotations
 

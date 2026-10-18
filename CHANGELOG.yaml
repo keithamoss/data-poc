@@ -179,6 +179,13 @@ releases:
               briefer wording when the contracts became their source. They now
               carry the contract's own fuller text, on the page and in the
               contract alike.
+          - headline: A test that adds a collection from scratch
+            components: ["Testing & dev tooling"]
+            description: >
+              A new test adds a made-up collection to a copy of the repository
+              using only its own files, then follows it to a rendered page. You
+              also see each collection's adapter size against a budget of 150
+              lines when you run `mothman check`.
   - date: "2026-10-16"
     summary: >
       Birth Registrations' history now opens with twelve days when each

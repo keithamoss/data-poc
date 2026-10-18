@@ -910,6 +910,7 @@ one when this line suggests it matters.
 - **#232** `done` 2026-10-18 - Gaps only a new collection would hit, closed as gate checks at Keith's call (the REQ-GEN-246 critic's G2-G4 and T4, the REQ-TEST-245 critic's G2)...
 - **#233** `done` 2026-10-18 - A missing results file was read as "no recorded runs" (the REQ-DASH-244 critic's G1; Keith's call to refuse it).
 - **#234** `todo` 2026-10-18 - What the five post-build critics on REQ-GEN-246, REQ-TEST-245, REQ-DASH-244 and REQ-TEST-252 found that is NOT yet...
+  - *touches:* `generator/presentation.py`
 
 ## plans/road-testing.md
 
