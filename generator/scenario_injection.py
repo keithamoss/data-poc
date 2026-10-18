@@ -181,6 +181,34 @@ class Link:
     subject: str = scenario_map.SUPPLY_HISTORY_ROW
 
 
+#: THE HISTORY'S END as a link's bounding event (REQ-GEN-205 criterion 12):
+#: the first instant after its last day, so a link on that day stands.
+HISTORY_END = "end of the history"
+_CORRECTION = "correction "
+
+
+def correction_event(change_reference: str) -> str:
+    """A declared correction's date as a link's bounding event, named by its
+    change_reference (REQ-GEN-205 criterion 12)."""
+    return f"{_CORRECTION}{change_reference}"
+
+
+def _correction_date(change_reference: str) -> date | None:
+    """The date a declared correction counts from, or None if undeclared."""
+    from qa_tools.common import correction_apply, correction_trial
+
+    for p in correction_apply._declared(*correction_trial.working()):
+        if p.reference == change_reference:
+            return date.fromisoformat(p.date[:10])
+    return None
+
+
+def _history_last_day() -> date:
+    from generator.anchor_date import get_anchor_date
+
+    return get_anchor_date()
+
+
 @dataclass(frozen=True)
 class LinkDate:
     """A link resolved: its date, its two events' instants, and why it
@@ -714,6 +742,15 @@ def link_dates(injection: Injection, placement: Placement,
                                f"{label} does not exist - the injection has "
                                f"{len(supplies)} carrying {placement.dataset}'s file; "
                                f"name one of 0 to {len(supplies) - 1}")
+        if ref == HISTORY_END:
+            return ref, asset_time.start_of_day(_history_last_day() + timedelta(days=1)), None
+        if ref.startswith(_CORRECTION):
+            reference = ref[len(_CORRECTION):]
+            on = _correction_date(reference)
+            return ref, (None if on is None else asset_time.start_of_day(on)), (
+                None if on is not None else
+                f"{reference!r} is not a declared correction - declare it in "
+                f"contract/calendar.yaml, or fix the link")
         label = f"decision {ref!r}"
         named = [s for s in mine if s.name == ref]
         if not named:
@@ -757,7 +794,10 @@ def link_dates(injection: Injection, placement: Placement,
         on = asset_time.local_date(first[1]) + timedelta(days=link.days)
         end = asset_time.end_of_day(on)
         problem = None
-        if not first[1] < end < second[1]:
+        if second[0] == HISTORY_END and not end < second[1]:
+            problem = (f"{where}: {on.isoformat()} is after the end of the history "
+                       f"({_history_last_day().isoformat()}) - move the link's date")
+        elif not first[1] < end < second[1]:
             problem = (f"{where}: the end of {on.isoformat()} ({end.isoformat()}) does not "
                        f"fall strictly between {first[0]} at {first[1].isoformat()} and "
                        f"{second[0]} at {second[1].isoformat()} - move the link's date, "

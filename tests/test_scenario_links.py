@@ -7,6 +7,7 @@ tests hold the resolver to exactly that.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -341,3 +342,40 @@ class TestALinkTimesADecisionWhereTheReplayPlaysIt:
                             scripts=[script])
         timed, _ = sd._timed_by_period(script, SimpleNamespace(period=placed.period))
         assert d.first[1] == timed.at
+
+
+class TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd:
+    """REQ-GEN-205 criterion 12: a declared correction's date, named by its
+    change_reference, and the end of the history are events too."""
+
+    @pytest.fixture(autouse=True)
+    def dated(self, monkeypatch):
+        monkeypatch.setattr(si, "_correction_date",
+                            lambda ref: {"CAB-1": ANCHOR + timedelta(days=8)}.get(ref))
+        monkeypatch.setattr(si, "_history_last_day", lambda: ANCHOR + timedelta(days=9))
+
+    def _resolve(self, link):
+        inj = _injection(link, also=("TS-75b",))
+        placement = si.resolve(dataclasses.replace(inj, links=()), _periods())
+        [got] = si.link_dates(inj, placement, scripts=[])
+        return got
+
+    def test_a_link_between_its_arrival_and_its_correction(self):
+        got = self._resolve(si.Link("TS-75a", 7, 0, si.correction_event("CAB-1")))
+        assert got.problem is None and got.on == ANCHOR + timedelta(days=7)
+        assert got.second == ("correction CAB-1", asset_time.start_of_day(
+            ANCHOR + timedelta(days=8)))
+
+    def test_a_link_on_the_historys_last_day(self):
+        got = self._resolve(si.Link("TS-75b", 1, si.correction_event("CAB-1"),
+                                    si.HISTORY_END))
+        assert got.problem is None and got.on == ANCHOR + timedelta(days=9)
+
+    def test_a_link_after_the_history_is_refused(self):
+        got = self._resolve(si.Link("TS-75b", 2, si.correction_event("CAB-1"),
+                                    si.HISTORY_END))
+        assert got.problem and "end of the history" in got.problem
+
+    def test_an_undeclared_correction_is_refused_naming_it(self):
+        got = self._resolve(si.Link("TS-75a", 1, 0, si.correction_event("CAB-9")))
+        assert got.problem and "CAB-9" in got.problem and "not a declared correction" in got.problem
