@@ -50,7 +50,6 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
     spec = adapter.soda
     tables = [d.table for d in coll.datasets]
     path = checks_path(collection_id)
-    reads_unreadable = "soda.reads_unreadable_tables" in adapter.legacy
     # WHAT THIS TOOL IS ASKED FOR, on record before it runs (REQ-PIPE-188).
     asked = asked_for.ask(run_id, run_timestamp, coll.agency_id, coll.id, "soda")
     # ONLY THE ASKED-FOR CHECKS ARE HANDED (REQ-PIPE-191), removed by check
@@ -74,7 +73,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
         # ONLY WHAT THIS RUN CAN READ - see soda_common.readable_checks_yaml().
         # Asked of the run's OWN SCHEMA rather than the recorded resolution:
         # what Soda can query is exactly what has a view.
-        unreadable = set() if reads_unreadable else set(tables) - supply_db.readable_in(conn, run_id)
+        unreadable = set(tables) - supply_db.readable_in(conn, run_id)
         n_total_by_table = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                             for t in tables if t not in unreadable}
 
@@ -87,8 +86,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
             spec.data_source, supply_db.run_schema(run_id)))
         handed = readable_checks_yaml(path, unreadable, keep=keep)
         scan.add_sodacl_yaml_str(handed)
-        if not reads_unreadable:
-            left_out.note(run_id, "soda", left_out_checks(path, unreadable, keep=keep))
+        left_out.note(run_id, "soda", left_out_checks(path, unreadable, keep=keep))
         sampler = CaptureSampler()
         scan.sampler = sampler
         scan.disable_telemetry()

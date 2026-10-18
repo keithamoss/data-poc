@@ -580,19 +580,18 @@ class TestTheSharedToolModules:
         flagged[check][key] = plain[check][key]
         assert flagged == plain
 
-    def test_soda_reads_unreadable_tables_hands_every_check(self, third_collection,
-                                                            monkeypatch, tmp_path):
+    def test_soda_is_never_handed_a_check_over_an_unreadable_table(self, third_collection,
+                                                                    monkeypatch, tmp_path):
         from qa_tools.tools import run_soda
 
         handed = []
         monkeypatch.setattr(run_soda, "readable_checks_yaml",
                             lambda path, unreadable, keep=None: handed.append(set(unreadable)) or "")
-        for legacy in (frozenset(), frozenset({"soda.reads_unreadable_tables"})):
-            try:
-                self._soda(monkeypatch, tmp_path, legacy=legacy, readable=())
-            except KeyError:
-                pass  # nothing readable, so no row count for the stub's checks
-        assert handed == [{FAKE_TABLE}, set()]
+        try:
+            self._soda(monkeypatch, tmp_path, readable=())
+        except KeyError:
+            pass  # nothing readable, so no row count for the stub's checks
+        assert handed == [{FAKE_TABLE}]
 
     def _evidently(self, monkeypatch, legacy=frozenset(), readable=True):
         """The shared Evidently runner for the third collection, the tool and

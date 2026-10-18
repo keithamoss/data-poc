@@ -15,9 +15,6 @@ from __future__ import annotations
 
 #: name -> what it preserves.
 KNOWN: dict[str, str] = {
-    "soda.reads_unreadable_tables": (
-        "Soda is handed every check whatever the run can read, and nothing is noted "
-        "as left out - REQ-PIPE-078's handling, as for datacontract-cli above."),
     "soda.scope_suffix": (
         "a generically named Soda check is recorded as `<metric>[<filter or all>]` "
         "rather than `<metric>` - the name Birth Registrations' checks have always "
