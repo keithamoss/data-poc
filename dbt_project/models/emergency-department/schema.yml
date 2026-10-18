@@ -1,0 +1,54 @@
+# Emergency Department's dbt checks (REQ-QAC-231). The prose follows
+# docs/check-authoring-rules.md.
+version: 2
+
+models:
+  - name: stg_ed_presentations
+    description: One row per presentation to an emergency department, per quarterly supply.
+    columns:
+      - name: arrival_datetime
+        tests:
+          - not_null:
+              meta:
+                check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.arrival_datetime.not_null_dbt
+                category: completeness
+                introduced_date: "2023-01-01"
+                description: >
+                  This value must never be empty.
+                failure_indicates: >
+                  self-evident
+                changelog: []
+      - name: age_group
+        tests:
+          - accepted_values:
+              values: ['0-4', '5-14', '15-24', '25-34', '35-44', '45-54', '55-64', '65-74', '75-84', '85+']
+              meta:
+                check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.age_group.accepted_values_dbt
+                category: conformity
+                introduced_date: "2023-01-01"
+                description: >
+                  A single unrecognised value fails.
+                failure_indicates: >
+                  The source system has started emitting a value that was never agreed
+                  in the contract, usually a new age banding introduced upstream without notice.
+                changelog: []
+      - name: length_of_stay_minutes
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 4320
+              meta:
+                check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.length_of_stay_minutes.accepted_range_dbt
+                name: Plausible length of stay
+                category: conformity
+                introduced_date: "2023-01-01"
+                description: >
+                  A stay must be no shorter than nothing and no longer than a plausible
+                  ceiling; a few outliers warn, more fail.
+                failure_indicates: >
+                  A departure time was recorded before the arrival, or a presentation
+                  was never closed off, so its stay keeps running.
+                changelog: []
+              config:
+                warn_if: ">0"
+                error_if: ">5"

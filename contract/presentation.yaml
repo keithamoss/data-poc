@@ -18,6 +18,8 @@ agencies:
     blurb: "Civil registration of life events for the whole state."
   child-protection-family-support:
     blurb: "Casework for children and families needing protection or support services."
+  department-of-health:
+    blurb: "Hospital and emergency care across the state's public health system."
 
 collections:
   civil-registration:
@@ -33,3 +35,7 @@ collections:
     provider: "Department for Child Protection and Family Support — Casework Management System"
     delivery_format: "CSV (S3 drop)"
     provenance: "Computed by qa_tools/cp/orchestrate_cp.py from real generated CSVs, the real child-protection-contract.yaml, the real child-protection-soda-checks.yml, a real dbt schema.yml, and real Evidently AI drift on concern_type — see README.md. ({table_description})"
+  emergency-department:
+    provider: "Department of Health - Emergency Department Information System"
+    delivery_format: "CSV (S3 drop)"
+    provenance: "Computed from the synthetic Emergency Department CSVs by the real dbt-core, Soda Core, datacontract-cli and Evidently runs. ({table_description})"

@@ -370,3 +370,20 @@ hierarchy:
               table: cp_case_workers
               # REQ-PIPE-058 - see birth-registrations above.
               arrival_pattern: 'cp_case_workers\.csv'
+
+    - id: department-of-health
+      name: Department of Health
+      short: doh                 # REQ-PIPE-248 - see registry-services above.
+      collections:
+        - id: emergency-department
+          name: Emergency Department
+          short: ed                # REQ-PIPE-240 - see civil-registration above.
+          run_prefix: ed_run_
+          contract: department-of-health/emergency-department-contract.yaml
+          delivery_boundary: directory   # REQ-PIPE-057 - see above.
+          datasets:
+            - id: ed-presentations
+              name: ED Presentations
+              table: ed_presentations
+              # REQ-PIPE-058 - see birth-registrations above.
+              arrival_pattern: 'ed_presentations\.csv'

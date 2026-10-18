@@ -1,0 +1,182 @@
+# Open Data Contract Standard (ODCS) v3.2.0 contract for the Emergency
+# Department collection (REQ-QAC-231): one table, one CSV per quarterly supply.
+# A SYNTHETIC dataset standing in for an emergency department collection - it
+# holds no real patient data. Written to docs/check-authoring-rules.md.
+apiVersion: v3.2.0
+kind: DataContract
+# `id`, `name` and `domain` are held to the hierarchy in contract/data-asset.yaml
+# (REQ-QAC-039): the collection, its display name and its agency.
+id: emergency-department
+status: draft
+version: 1.0.0
+name: Emergency Department
+domain: department-of-health
+description:
+  purpose: >
+    A synthetic dataset standing in for an emergency department collection:
+    one row per presentation to an emergency department, supplied quarterly.
+    It holds no real patient data. In real emergency department data, postcode,
+    sex, age group and an arrival instant together can identify a patient, which
+    is why the age is held as a group rather than a date of birth.
+servers:
+  - server: production
+    type: s3
+    location: s3://gov-data-exchange/emergency-department/
+    format: csv
+    delimiter: comma
+    description: A quarterly extract of the collection's presentations, dropped into this bucket.
+schema:
+  - name: ed_presentations
+    physicalType: table
+    description: "One row per presentation to an emergency department, per quarterly supply."
+    properties:
+      - name: presentation_id
+        logicalType: string
+        physicalType: varchar(20)
+        required: true
+        unique: true
+        description: "The collection's own presentation identifier - primary key of this table."
+        quality:
+          - id: data-asset-1:department-of-health:emergency-department:ed-presentations:presentation_id:nullValues_datacontract
+            metric: nullValues
+            dimension: completeness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.department-of-health.emergency-department.ed-presentations.presentation_id.nullValues_datacontract
+              - property: introduced_date
+                value: "2023-01-01"
+              - property: description
+                value: >
+                  This value must never be empty.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  self-evident
+          - id: data-asset-1:department-of-health:emergency-department:ed-presentations:presentation_id:duplicateValues_datacontract
+            metric: duplicateValues
+            dimension: uniqueness
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.department-of-health.emergency-department.ed-presentations.presentation_id.duplicateValues_datacontract
+              - property: introduced_date
+                value: "2023-01-01"
+              - property: description
+                value: >
+                  This value must be unique.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The same presentation was sent twice, most often because a supply was assembled from overlapping extracts.
+      - name: arrival_datetime
+        logicalType: timestamp
+        physicalType: timestamp
+        required: true
+        description: "When the patient arrived at the department."
+      - name: triage_category
+        logicalType: integer
+        physicalType: integer
+        required: true
+        description: "The triage category assigned on arrival, 1 (most urgent) to 5."
+        quality:
+          - id: data-asset-1:department-of-health:emergency-department:ed-presentations:triage_category:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: [1, 2, 3, 4, 5]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.department-of-health.emergency-department.ed-presentations.triage_category.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: age_group
+        logicalType: string
+        physicalType: varchar(10)
+        required: true
+        description: "The patient's age band on arrival."
+      - name: sex
+        logicalType: string
+        physicalType: varchar(1)
+        required: true
+        description: "Closed value set (M / F / X)."
+        quality:
+          - id: data-asset-1:department-of-health:emergency-department:ed-presentations:sex:invalidValues_datacontract
+            metric: invalidValues
+            dimension: conformity
+            arguments:
+              validValues: ["M", "F", "X"]
+            mustBe: 0
+            severity: error
+            customProperties:
+              - property: check_id
+                value: data-asset-1.department-of-health.emergency-department.ed-presentations.sex.invalidValues_datacontract
+              - property: introduced_date
+                value: "2023-01-01"
+              - property: description
+                value: >
+                  A single unrecognised value fails.
+              - property: changelog
+                value: "[]"
+              - property: failure_indicates
+                value: >
+                  The source system has started emitting a value that was never agreed in the contract, usually a new code introduced upstream without notice.
+      - name: postcode
+        logicalType: string
+        physicalType: varchar(4)
+        required: false
+        description: "The patient's residential postcode, where recorded."
+      - name: departure_status
+        logicalType: string
+        physicalType: varchar(30)
+        required: true
+        description: "How the presentation ended."
+      - name: length_of_stay_minutes
+        logicalType: integer
+        physicalType: integer
+        required: true
+        description: "Minutes from arrival to departure."
+    quality:
+      - id: data-asset-1:department-of-health:emergency-department:ed-presentations:rowCount_datacontract
+        metric: rowCount
+        dimension: completeness
+        mustBeBetween: [1000, 4000]
+        severity: warning
+        customProperties:
+          - property: check_id
+            value: data-asset-1.department-of-health.emergency-department.ed-presentations.rowCount_datacontract
+          - property: introduced_date
+            value: "2023-01-01"
+          - property: description
+            value: >
+              The number of rows in the supply must fall inside the expected band.
+          - property: changelog
+            value: "[]"
+          - property: failure_indicates
+            value: >
+              self-evident
+customProperties:
+  - property: currentDeliveryFormat
+    value: csv
+  - property: piiClassification
+    value: "Synthetic. In a real deployment this is health information about identifiable patients; confirm and record its handling classification before this leaves draft status."
+  - property: arrivalPattern
+    value:
+      - type: nested_folder
+        keyPattern: "ed/{slot_id}/ed_presentations.csv"
+        dataset_id: ed-presentations
+        extractTo: ed_presentations

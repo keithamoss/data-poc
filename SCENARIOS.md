@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**38 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**0 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -42,12 +42,7 @@ for injection and has not been placed yet.
 
 *Config: daily, due 12:00.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
-| Period | 2026-09-15 |
-| Set the in-place-on date to | 2026-09-15 |
+**not injected - nothing to look at yet**
 
 ### TS-2 - Backward cascade
 
@@ -57,12 +52,7 @@ for injection and has not been placed yet.
 
 *Config: daily, due ~22:00.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609111400000800` |
-| Period | 2026-09-11 |
-| Set the in-place-on date to | 2026-09-11 |
+**not injected - nothing to look at yet**
 
 ### TS-3 - Arrival just OUTSIDE the claim window - four sub-tests
 
@@ -90,34 +80,19 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: daily evening-before - the supply for day D is due 22:00 on D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday. Monday's slot filled. Arrival 17:00 Monday, one hour outside.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202606212100000800`, `birth_registrations__202606221700000800` |
-| Period | 2026-06-22 |
-| Set the in-place-on date to | 2026-06-22 |
+**not injected - nothing to look at yet**
 
 ### TS-3d - Daily, prior slot UNFILLED
 
 **What it demonstrates.** Monday is still the open period -> fills **Monday, 19 hours late**.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202606251700000800` |
-| Period | 2026-06-25 |
-| Set the in-place-on date to | 2026-06-25 |
+**not injected - nothing to look at yet**
 
 ### TS-4 - Arrival into an already-filled slot
 
 **What it demonstrates.** Does not auto-promote unless the replacement setting in force permits its status (REQ-PIPE-123 - `never` as shipped, so it waits); where it permits, it replaces the promoted supply, which is superseded, never rejected. Warns; the message names the context ("a supply arrived for Monday, which was already accepted at 16:00", plus the boundary detail where relevant); and the three genuinely different actions are reachable - **accept** as a correction (promoting it supersedes the one in place, REQ-PIPE-128), **re-file** to another slot, **reject** as a duplicate. *Used to expect* "never auto-promotes whatever its status" - REQ-PIPE-123 made that a setting (REQ-GEN-138).
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
-| Period | 2026-09-15 |
-| Set the in-place-on date to | 2026-09-15 |
+**not injected - nothing to look at yet**
 
 ### TS-5 - A missed slot must not absorb a later resupply
 
@@ -169,12 +144,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** `cycle_start()` only looks backwards, so it resolves to the 1 May anchor and reports the supply ~12 weeks LATE for a quarter that was filled months ago.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202404221000000800` |
-| Period | 2024-Q2 |
-| Set the in-place-on date to | 2024-05-01 |
+**not injected - nothing to look at yet**
 
 ### TS-10a - Evening-before daily arrival, Monday filled
 
@@ -182,23 +152,13 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202606192200000800` |
-| Period | 2026-06-20 |
-| Set the in-place-on date to | 2026-06-20 |
+**not injected - nothing to look at yet**
 
 ### TS-10b - Evening-before daily arrival, Monday unfilled
 
 **What it demonstrates.** The 22:00 arrival ALSO fills **Tuesday, on time**, and Monday closes with no supply. **Changed 2026-10-04 by REQ-PIPE-131**: this variant used to file Monday, late - slot state decided between two answers. Keith's worked consequence: Monday's file arriving after Tuesday's claim window opened is filed as Tuesday's; Monday closes empty, visibly, and Tuesday's real file then supersedes it (REQ-PIPE-118), replaces it (REQ-PIPE-123), or waits for a person. The cutoff still lives in `due_at` and the claim window, not in code.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202606272200000800` |
-| Period | 2026-06-28 |
-| Set the in-place-on date to | 2026-06-28 |
+**not injected - nothing to look at yet**
 
 ### TS-11 - A re-filed supply reclassifies
 
@@ -214,12 +174,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: as TS-9 - Child Protection, quarterly, due 09:00 on the 1st, claim window 14 days. 2025-Q3 (1 August) arrives 19 July at 10:00, thirteen days early, a day after its window opened at 09:00 on 18 July.*
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202507191000000800` |
-| Period | 2025-Q3 |
-| Set the in-place-on date to | 2025-08-01 |
+**not injected - nothing to look at yet**
 
 ### TS-66 - A couple of days early - the everyday case
 
@@ -229,12 +184,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.*
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202510301000000800` |
-| Period | 2025-Q4 |
-| Set the in-place-on date to | 2025-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-67 - A quarterly supply sent too early
 
@@ -244,12 +194,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: as TS-9. 2023-Q4 (1 November) is due 09:00 that day and its window opens 09:00 on 18 October; the supply arrives 12 October at 10:00, twenty days early and six days before the window. 2023-Q3, before it, is an ordinary quarter whose own supply has arrived.*
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202310121000000800` |
-| Period | 2023-Q4 |
-| Set the in-place-on date to | 2023-11-01 |
+**not injected - nothing to look at yet**
 
 ### TS-68 - A duplicate send
 
@@ -257,13 +202,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** The duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202607281340000800` |
-| Period | 2026-07-28 |
-| Set the in-place-on date to | 2026-07-28 |
-| Built to | green, the 2026-07-28 13:40 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-69 - Tomorrow's file sent early with today's
 
@@ -271,14 +210,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** D+1 left with no supply, or the re-filed file checked against D.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608021330000800` |
-| Period | 2026-08-02 |
-| Set the in-place-on date to | 2026-08-02 |
-| Built to | green, the 2026-08-02 13:30 arrival |
-| Built to | green, the 2026-08-02 13:45 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-70 - A faulty file and its corrected re-export
 
@@ -286,13 +218,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** D read early from file one's receipt.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608071340000800` |
-| Period | 2026-08-07 |
-| Set the in-place-on date to | 2026-08-07 |
-| Built to | green, the 2026-08-07 16:30 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-71 - A stray test file that loads
 
@@ -300,13 +226,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** The test rows checked as D's supply.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608121320000800` |
-| Period | 2026-08-12 |
-| Set the in-place-on date to | 2026-08-12 |
-| Built to | green, the 2026-08-12 13:40 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-72 - A stray test file the load refuses
 
@@ -314,13 +234,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** The real file named as the one that never loaded.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608171330000800` |
-| Period | 2026-08-17 |
-| Set the in-place-on date to | 2026-08-17 |
-| Built to | green, the 2026-08-17 13:30 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-73 - Reject both
 
@@ -328,12 +242,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** D read as supplied, or not-supplied by a person.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608211320000800` |
-| Period | 2026-08-21 |
-| Set the in-place-on date to | 2026-08-21 |
+**not injected - nothing to look at yet**
 
 ### TS-74 - Re-file one, reject the other
 
@@ -341,13 +250,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it would look like if the rule were wrong.** The early file checked against D.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608251330000800` |
-| Period | 2026-08-25 |
-| Set the in-place-on date to | 2026-08-25 |
-| Built to | green, the 2026-08-25 13:30 arrival |
+**not injected - nothing to look at yet**
 
 ## Delivery and multi-table
 
@@ -355,12 +258,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it demonstrates.** - The five are staged, QA'd, green, and auto-promoted. Their August slots are **filled**, and their own checks are unaffected - they are not dragged down. - `cp_clients` is **red** (a supply that cannot be loaded is a red QA finding), rejected, and its August slot stays **unfilled**. - Every check declaring `depends_on: [cp_clients]` - including "Client reference", which is DEFINED on `cp_notifications` - **cannot run**, and reads **red with a qualifying chip naming `cp_clients` as the blocker**. - That red lands at **collection** level, since cross-table checks are lifted there. `cp_notifications` keeps its own green status and carries only an informational pointer: fully verified against its own data, unverified against its relationships.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
-| Period | 2025-Q2 |
-| Set the in-place-on date to | 2025-05-02 |
+**not injected - nothing to look at yet**
 
 ### TS-13 - Six tables landing seconds apart
 
@@ -374,12 +272,7 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it demonstrates.** It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no "resupply of table X within delivery Y" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If green, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database. *In the data since 2026-10-15 (REQ-GEN-044 criterion 1)*, riding TS-12's placement: TS-12's cp_clients is refused in 2025-Q2, and the corrected cp_clients arrives alone 28 days later, 10:00 on 2025-05-29, filed to 2025-Q2's still-empty slot. TS-12's link sits between the two; TS-14's lands on the correction's day.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
-| Period | 2025-Q2 |
-| Set the in-place-on date to | 2025-05-29 |
+**not injected - nothing to look at yet**
 
 ### TS-15a - An UNEXPECTED TABLE - recognised, but not owed
 
@@ -551,12 +444,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 **What it demonstrates.** The matched files are attributed and processed; the unmatched ones are reported as unrecognised artefacts at **warning** level. Critically, the supply is **NOT** silently treated as complete - the warning is the only thing standing between this and a promoted, green, HALF supply. Had the resupplies matched, this would instead be the duplicate-match hold of TS-34, which is louder still.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202602010900000800` |
-| Period | 2026-Q1 |
-| Set the in-place-on date to | 2026-02-01 |
+**not injected - nothing to look at yet**
 
 ### TS-39 - A split extract, once patterns are regexes
 
@@ -594,12 +482,7 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 *Config: daily, due 14:00 AWST - TS-1's own placement. Settings in force where it lands (2026-09-15): amber setting promote-and-acknowledge, replacement setting never.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609151400000800`, `birth_registrations__202609151600000800`, `birth_registrations__202609152000000800` |
-| Period | 2026-09-15 |
-| Set the in-place-on date to | 2026-09-15 |
+**not injected - nothing to look at yet**
 
 ### TS-42 - A contested pair of one Child Protection table, resolved by a later file
 
@@ -615,13 +498,7 @@ NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 20
 
 *Config: daily; the amber setting is HOLD from 2026-08-30 (TS-78's version, REQ-GEN-199); a scripted promotion at 10:00 the next morning.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609051400000800` |
-| Period | 2026-09-05 |
-| Set the in-place-on date to | 2026-09-05 |
-| Built to | amber on place_of_birth_facility.completeness (445 of 1,933), the 2026-09-05 14:00 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-44 - An amber supply promoted and awaiting acknowledgement
 
@@ -631,13 +508,7 @@ NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 20
 
 *Config: daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609131400000800` |
-| Period | 2026-09-13 |
-| Set the in-place-on date to | 2026-09-13 |
-| Built to | amber on registering_parent_1_name.completeness (145 of 1,993), the 2026-09-13 14:00 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-45 - The same, acknowledged by a person
 
@@ -647,13 +518,7 @@ NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 20
 
 *Config: as TS-44; a scripted acknowledgement five hours after receipt, once the rule has promoted it.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609171400000800` |
-| Period | 2026-09-17 |
-| Set the in-place-on date to | 2026-09-17 |
-| Built to | amber on registering_parent_2_name.completeness (625 of 2,119), the 2026-09-17 14:00 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-46 - A green resupply replaces the promoted supply
 
@@ -663,14 +528,7 @@ NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 20
 
 *Config: daily; the replacement setting is GREEN from 2026-09-18 to 2026-09-21.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609211400000800`, `birth_registrations__202609211600000800` |
-| Period | 2026-09-21 |
-| Set the in-place-on date to | 2026-09-21 |
-| Built to | green, the 2026-09-21 14:00 arrival |
-| Built to | green, the 2026-09-21 16:00 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-47 - A daily file arriving after the next day's window opened
 
@@ -680,12 +538,7 @@ NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 20
 
 *Config: daily, due 14:00, 4-hour claim window - the next day's window opens at 10:00. Settings in force where it lands (2026-09-07): amber setting hold, replacement setting never.*
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202609081100000800` |
-| Period | 2026-09-07 |
-| Set the in-place-on date to | 2026-09-08 |
+**not injected - nothing to look at yet**
 
 ### TS-48 - A correction arriving before its partner is promoted
 
@@ -727,12 +580,7 @@ NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad 
 
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose cp-placements supply was promoted green - with its own link while the substitution stands. CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the ordinary amber drawn for 2026-Q3 to 2024-Q4 and this entry then said "promoted amber", but that amber dirties only cp_carers and cp_clients, so cp-placements' 2024-Q4 supply is still green and promoted. Whether it should be amber is with Keith. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-placements |
-| Supplies | — |
-| Period | 2025-Q1 |
-| Set the in-place-on date to | 2025-02-17 |
+**not injected - nothing to look at yet**
 
 ### TS-55 - A period whose _manifest lists all three kinds
 
@@ -748,12 +596,7 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 
 *Config: quarterly, Feb/May/Aug/Nov.*
 
-| Where to look | |
-|---|---|
-| Dataset | cp-carers |
-| Supplies | `cp_carers__202608010900000800` |
-| Period | 2026-Q3 |
-| Set the in-place-on date to | 2026-08-01 |
+**not injected - nothing to look at yet**
 
 ## Calendar corrections
 
@@ -835,12 +678,7 @@ Cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with cp_c
 
 *Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22 February; a corrected cp_clients alone arrives at 10:00 on 29 February.*
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
-| Period | 2024-Q1 |
-| Set the in-place-on date to | 2024-02-08 |
+**not injected - nothing to look at yet**
 
 ### TS-75b - A supply rejected after it waited - after it was rejected
 
@@ -848,12 +686,7 @@ The same placement, on 25 February. **Expect** (REQ-DASH-197), in the same panel
 
 **What it would look like if the rule were wrong.** The panel naming the corrected supply, or still "nobody had decided".
 
-| Where to look | |
-|---|---|
-| Dataset | cp-clients |
-| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
-| Period | 2024-Q1 |
-| Set the in-place-on date to | 2024-02-25 |
+**not injected - nothing to look at yet**
 
 ### TS-76 - A substitution later removed
 
@@ -861,12 +694,7 @@ Cp-placements, 2025-Q1: the delivery leaves cp_placements out; a person substitu
 
 **What it would look like if the rule were wrong.** No pill on 17 February; or "Since replaced".
 
-| Where to look | |
-|---|---|
-| Dataset | cp-placements |
-| Supplies | — |
-| Period | 2025-Q1 |
-| Set the in-place-on date to | 2025-02-17 |
+**not injected - nothing to look at yet**
 
 ### TS-77a - A substitution later replaced - while it stood
 
@@ -874,12 +702,7 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 
 **What it would look like if the rule were wrong.** No pill; or "Since removed".
 
-| Where to look | |
-|---|---|
-| Dataset | cp-placements |
-| Supplies | `cp_placements__202306081000000800` |
-| Period | 2023-Q2 |
-| Set the in-place-on date to | 2023-05-17 |
+**not injected - nothing to look at yet**
 
 ### TS-77b - Known wrong today (post-build-review #164): A substitution later replaced - the day the late file waited
 
@@ -887,12 +710,7 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 
 **What it would look like if the rule were wrong.** A different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-placements |
-| Supplies | `cp_placements__202306081000000800` |
-| Period | 2023-Q2 |
-| Set the in-place-on date to | 2023-06-08 |
+**not injected - nothing to look at yet**
 
 ### TS-78a - A supply promoted after a newer one - the day it was promoted
 
@@ -900,15 +718,7 @@ Birth Registrations, 30 August to 2 September 2026, inside the hold era: D's sup
 
 **What it would look like if the rule were wrong.** No panel; or the generic "did not hold the latest file". Depends on the hold era covering 30 August to 1 September; generation refuses, naming TS-78a, if it stops doing so.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608301400000800`, `birth_registrations__202608311400000800`, `birth_registrations__202609011400000800` |
-| Period | 2026-08-30 |
-| Set the in-place-on date to | 2026-08-31 |
-| Built to | amber on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
-| Built to | green, the 2026-08-31 14:00 arrival |
-| Built to | amber on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-78b - A supply promoted after a newer one - the day after
 
@@ -916,15 +726,7 @@ The same placement, on 1 September. **Expect** (REQ-DASH-197 criterion 13), the 
 
 **What it would look like if the rule were wrong.** The verdict line naming 31 August's supply as in place.
 
-| Where to look | |
-|---|---|
-| Dataset | birth-registrations |
-| Supplies | `birth_registrations__202608301400000800`, `birth_registrations__202608311400000800`, `birth_registrations__202609011400000800` |
-| Period | 2026-08-30 |
-| Set the in-place-on date to | 2026-09-01 |
-| Built to | amber on registering_parent_1_name.completeness (145 of 1,933), the 2026-08-30 14:00 arrival |
-| Built to | green, the 2026-08-31 14:00 arrival |
-| Built to | amber on registering_parent_2_name.completeness (625 of 1,933), the 2026-09-01 14:00 arrival |
+**not injected - nothing to look at yet**
 
 ### TS-79a - An inherited quarter - the newest
 
@@ -932,12 +734,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 **What it would look like if the rule were wrong.** No pill; or a stale date after ANCHOR_DATE moves.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-case-workers |
-| Supplies | — |
-| Period | 2026-Q2 |
-| Set the in-place-on date to | 2026-06-16 |
+**not injected - nothing to look at yet**
 
 ### TS-79b - An inherited quarter - the oldest of the original fifteen
 
@@ -945,12 +742,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 **What it would look like if the rule were wrong.** No pill.
 
-| Where to look | |
-|---|---|
-| Dataset | cp-case-workers |
-| Supplies | — |
-| Period | 2023-Q2 |
-| Set the in-place-on date to | 2023-06-16 |
+**not injected - nothing to look at yet**
 
 
 <!-- scenario-map-data
@@ -967,17 +759,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-131"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609151400000800",
-     "birth_registrations__202609151600000800",
-     "birth_registrations__202609152000000800"
-    ],
-    "period": "2026-09-15",
-    "inPlaceOn": "2026-09-15",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-2",
@@ -991,15 +773,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-131",
     "REQ-PIPE-132"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609111400000800"
-    ],
-    "period": "2026-09-11",
-    "inPlaceOn": "2026-09-11",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-3",
@@ -1045,16 +819,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": "Config: daily evening-before - the supply for day D is due 22:00 on D-1 - early window 4 hours, so Tuesday's window opens 18:00 Monday. Monday's slot filled. Arrival 17:00 Monday, one hour outside.",
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202606212100000800",
-     "birth_registrations__202606221700000800"
-    ],
-    "period": "2026-06-22",
-    "inPlaceOn": "2026-06-22",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-3d",
@@ -1065,15 +830,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202606251700000800"
-    ],
-    "period": "2026-06-25",
-    "inPlaceOn": "2026-06-25",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-4",
@@ -1088,17 +845,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-128",
     "REQ-GEN-138"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609151400000800",
-     "birth_registrations__202609151600000800",
-     "birth_registrations__202609152000000800"
-    ],
-    "period": "2026-09-15",
-    "inPlaceOn": "2026-09-15",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-5",
@@ -1191,15 +938,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-131",
     "REQ-GEN-195"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202404221000000800"
-    ],
-    "period": "2024-Q2",
-    "inPlaceOn": "2024-05-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-10a",
@@ -1210,15 +949,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": "Config: daily, Tuesday's supply due 22:00 MONDAY, claim window 4 hours - so Tuesday's window opens 18:00 Monday, and Monday closes then.",
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202606192200000800"
-    ],
-    "period": "2026-06-20",
-    "inPlaceOn": "2026-06-20",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-10b",
@@ -1233,15 +964,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-118",
     "REQ-PIPE-123"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202606272200000800"
-    ],
-    "period": "2026-06-28",
-    "inPlaceOn": "2026-06-28",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-11",
@@ -1271,16 +994,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-148",
     "REQ-DASH-097"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202505010900000800",
-     "cp_clients__202505291000000800"
-    ],
-    "period": "2025-Q2",
-    "inPlaceOn": "2025-05-02",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-13",
@@ -1306,16 +1020,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-089",
     "REQ-GEN-044"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202505010900000800",
-     "cp_clients__202505291000000800"
-    ],
-    "period": "2025-Q2",
-    "inPlaceOn": "2025-05-29",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-15a",
@@ -1648,15 +1353,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202602010900000800"
-    ],
-    "period": "2026-Q1",
-    "inPlaceOn": "2026-02-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-39",
@@ -1694,17 +1391,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-118"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609151400000800",
-     "birth_registrations__202609151600000800",
-     "birth_registrations__202609152000000800"
-    ],
-    "period": "2026-09-15",
-    "inPlaceOn": "2026-09-15",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-42",
@@ -1734,40 +1421,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-184",
     "REQ-GEN-185"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609051400000800"
-    ],
-    "period": "2026-09-05",
-    "inPlaceOn": "2026-09-05",
-    "targets": [
-     {
-      "date": "2026-09-05",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "place_of_birth_facility.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1933
-       },
-       {
-        "rule": "place_of_birth_facility.completeness",
-        "to": "amber",
-        "nulls": 445,
-        "of_rows": 1933,
-        "was": 46
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-44",
@@ -1781,40 +1435,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-122",
     "REQ-GEN-184"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609131400000800"
-    ],
-    "period": "2026-09-13",
-    "inPlaceOn": "2026-09-13",
-    "targets": [
-     {
-      "date": "2026-09-13",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "registering_parent_1_name.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1993
-       },
-       {
-        "rule": "registering_parent_1_name.completeness",
-        "to": "amber",
-        "nulls": 145,
-        "of_rows": 1993,
-        "was": 49
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-45",
@@ -1829,34 +1450,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-137",
     "REQ-GEN-184"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609171400000800"
-    ],
-    "period": "2026-09-17",
-    "inPlaceOn": "2026-09-17",
-    "targets": [
-     {
-      "date": "2026-09-17",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "registering_parent_2_name.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "amber",
-        "nulls": 625,
-        "of_rows": 2119,
-        "was": 576
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-46",
@@ -1872,46 +1466,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-184",
     "REQ-GEN-185"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609211400000800",
-     "birth_registrations__202609211600000800"
-    ],
-    "period": "2026-09-21",
-    "inPlaceOn": "2026-09-21",
-    "targets": [
-     {
-      "date": "2026-09-21",
-      "at": "14:00",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 2119
-       }
-      ]
-     },
-     {
-      "date": "2026-09-21",
-      "at": "16:00",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 2119
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-47",
@@ -1927,15 +1482,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-133",
     "REQ-GEN-137"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202609081100000800"
-    ],
-    "period": "2026-09-07",
-    "inPlaceOn": "2026-09-08",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-48",
@@ -2029,13 +1576,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-207",
     "REQ-GEN-200"
    ],
-   "coordinates": {
-    "dataset": "cp-placements",
-    "supplies": [],
-    "period": "2025-Q1",
-    "inPlaceOn": "2025-02-17",
-    "subject": "substitution-drill-down"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-55",
@@ -2065,15 +1606,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-044",
     "REQ-GEN-207"
    ],
-   "coordinates": {
-    "dataset": "cp-carers",
-    "supplies": [
-     "cp_carers__202608010900000800"
-    ],
-    "period": "2026-Q3",
-    "inPlaceOn": "2026-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-57",
@@ -2193,15 +1726,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-131"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202507191000000800"
-    ],
-    "period": "2025-Q3",
-    "inPlaceOn": "2025-08-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-66",
@@ -2212,15 +1737,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "Shown as anything more alarming than early.",
    "config": "Config: as TS-9. 2025-Q4 (1 November) arrives 30 October at 10:00.",
    "requirements": [],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202510301000000800"
-    ],
-    "period": "2025-Q4",
-    "inPlaceOn": "2025-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-67",
@@ -2235,15 +1752,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-131",
     "REQ-GEN-135"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202310121000000800"
-    ],
-    "period": "2023-Q4",
-    "inPlaceOn": "2023-11-01",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-68",
@@ -2254,27 +1763,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "The duplicate, sorting first, taken as file one - the staged ordinal and the supply ordinal disagreeing.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202607281340000800"
-    ],
-    "period": "2026-07-28",
-    "inPlaceOn": "2026-07-28",
-    "targets": [
-     {
-      "date": "2026-07-28",
-      "at": "13:40",
-      "delivery": "BDM_20260728",
-      "filename": "birth_registrations_2026-07-28.csv",
-      "day": "2026-07-28",
-      "built_to": "green",
-      "rules": [],
-      "moved": []
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-69",
@@ -2285,44 +1774,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "D+1 left with no supply, or the re-filed file checked against D.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608021330000800"
-    ],
-    "period": "2026-08-02",
-    "inPlaceOn": "2026-08-02",
-    "targets": [
-     {
-      "date": "2026-08-02",
-      "at": "13:30",
-      "delivery": "DCP_20260802",
-      "filename": "birth_registrations_2026-08-02.csv",
-      "day": "2026-08-02",
-      "built_to": "green",
-      "rules": [],
-      "moved": []
-     },
-     {
-      "date": "2026-08-02",
-      "at": "13:45",
-      "delivery": "DCP_20260802",
-      "filename": "birth_registrations_2026-08-03.csv",
-      "day": "2026-08-03",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 476,
-        "of_rows": 1764
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-70",
@@ -2333,34 +1785,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "D read early from file one's receipt.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608071340000800"
-    ],
-    "period": "2026-08-07",
-    "inPlaceOn": "2026-08-07",
-    "targets": [
-     {
-      "date": "2026-08-07",
-      "at": "16:30",
-      "delivery": "REG_20260807",
-      "filename": "birth_registrations_2026-08-07-resend.csv",
-      "day": "2026-08-07",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 2053
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-71",
@@ -2371,34 +1796,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "The test rows checked as D's supply.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608121320000800"
-    ],
-    "period": "2026-08-12",
-    "inPlaceOn": "2026-08-12",
-    "targets": [
-     {
-      "date": "2026-08-12",
-      "at": "13:40",
-      "delivery": "daily_extract_aug2026",
-      "filename": "birth_registrations_2026-08-12.csv",
-      "day": "2026-08-12",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 2053
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-72",
@@ -2409,34 +1807,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "The real file named as the one that never loaded.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608171330000800"
-    ],
-    "period": "2026-08-17",
-    "inPlaceOn": "2026-08-17",
-    "targets": [
-     {
-      "date": "2026-08-17",
-      "at": "13:30",
-      "delivery": "send-4449",
-      "filename": "birth_registrations_2026-08-17.csv",
-      "day": "2026-08-17",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 2073
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-73",
@@ -2447,15 +1818,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "D read as supplied, or not-supplied by a person.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608211320000800"
-    ],
-    "period": "2026-08-21",
-    "inPlaceOn": "2026-08-21",
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-74",
@@ -2466,34 +1829,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "The early file checked against D.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608251330000800"
-    ],
-    "period": "2026-08-25",
-    "inPlaceOn": "2026-08-25",
-    "targets": [
-     {
-      "date": "2026-08-25",
-      "at": "13:30",
-      "delivery": "Data Extract 25 Aug 2026",
-      "filename": "birth_registrations_2026-08-26.csv",
-      "day": "2026-08-26",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1933
-       }
-      ]
-     }
-    ],
-    "subject": "supply-history-row"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-75a",
@@ -2506,16 +1842,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-197"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202402010900000800",
-     "cp_clients__202402291000000800"
-    ],
-    "period": "2024-Q1",
-    "inPlaceOn": "2024-02-08",
-    "subject": "as-at-panel"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-75b",
@@ -2528,16 +1855,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-197"
    ],
-   "coordinates": {
-    "dataset": "cp-clients",
-    "supplies": [
-     "cp_clients__202402010900000800",
-     "cp_clients__202402291000000800"
-    ],
-    "period": "2024-Q1",
-    "inPlaceOn": "2024-02-25",
-    "subject": "as-at-panel"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-76",
@@ -2551,13 +1869,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-198",
     "REQ-GEN-199"
    ],
-   "coordinates": {
-    "dataset": "cp-placements",
-    "supplies": [],
-    "period": "2025-Q1",
-    "inPlaceOn": "2025-02-17",
-    "subject": "substitution-drill-down"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-77a",
@@ -2570,15 +1882,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-198"
    ],
-   "coordinates": {
-    "dataset": "cp-placements",
-    "supplies": [
-     "cp_placements__202306081000000800"
-    ],
-    "period": "2023-Q2",
-    "inPlaceOn": "2023-05-17",
-    "subject": "substitution-drill-down"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-77b",
@@ -2589,15 +1893,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "A different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.",
    "config": null,
    "requirements": [],
-   "coordinates": {
-    "dataset": "cp-placements",
-    "supplies": [
-     "cp_placements__202306081000000800"
-    ],
-    "period": "2023-Q2",
-    "inPlaceOn": "2023-06-08",
-    "subject": "as-at-panel"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-78a",
@@ -2610,73 +1906,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-197"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608301400000800",
-     "birth_registrations__202608311400000800",
-     "birth_registrations__202609011400000800"
-    ],
-    "period": "2026-08-30",
-    "inPlaceOn": "2026-08-31",
-    "targets": [
-     {
-      "date": "2026-08-30",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "registering_parent_1_name.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1933
-       },
-       {
-        "rule": "registering_parent_1_name.completeness",
-        "to": "amber",
-        "nulls": 145,
-        "of_rows": 1933,
-        "was": 38
-       }
-      ]
-     },
-     {
-      "date": "2026-08-31",
-      "at": "14:00",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1933
-       }
-      ]
-     },
-     {
-      "date": "2026-09-01",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "registering_parent_2_name.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "amber",
-        "nulls": 625,
-        "of_rows": 1933,
-        "was": 526
-       }
-      ]
-     }
-    ],
-    "subject": "as-at-panel"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-78b",
@@ -2689,73 +1919,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-197"
    ],
-   "coordinates": {
-    "dataset": "birth-registrations",
-    "supplies": [
-     "birth_registrations__202608301400000800",
-     "birth_registrations__202608311400000800",
-     "birth_registrations__202609011400000800"
-    ],
-    "period": "2026-08-30",
-    "inPlaceOn": "2026-09-01",
-    "targets": [
-     {
-      "date": "2026-08-30",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "registering_parent_1_name.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1933
-       },
-       {
-        "rule": "registering_parent_1_name.completeness",
-        "to": "amber",
-        "nulls": 145,
-        "of_rows": 1933,
-        "was": 38
-       }
-      ]
-     },
-     {
-      "date": "2026-08-31",
-      "at": "14:00",
-      "built_to": "green",
-      "rules": [],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "green",
-        "nulls": 495,
-        "of_rows": 1933
-       }
-      ]
-     },
-     {
-      "date": "2026-09-01",
-      "at": "14:00",
-      "built_to": "amber",
-      "rules": [
-       "registering_parent_2_name.completeness"
-      ],
-      "moved": [
-       {
-        "rule": "registering_parent_2_name.completeness",
-        "to": "amber",
-        "nulls": 625,
-        "of_rows": 1933,
-        "was": 526
-       }
-      ]
-     }
-    ],
-    "subject": "verdict-line"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-79a",
@@ -2768,13 +1932,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-198"
    ],
-   "coordinates": {
-    "dataset": "cp-case-workers",
-    "supplies": [],
-    "period": "2026-Q2",
-    "inPlaceOn": "2026-06-16",
-    "subject": "standing-in-pill"
-   }
+   "coordinates": null
   },
   {
    "id": "TS-79b",
@@ -2787,13 +1945,7 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-207"
    ],
-   "coordinates": {
-    "dataset": "cp-case-workers",
-    "supplies": [],
-    "period": "2023-Q2",
-    "inPlaceOn": "2023-06-16",
-    "subject": "standing-in-pill"
-   }
+   "coordinates": null
   }
  ]
 }

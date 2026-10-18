@@ -64,10 +64,12 @@ calendars:
     runway_warning_slots: 4
     description: >
       Four authored delivery dates a year, anchored on the 1st of
-      February, May, August and November. Child Protection's real
-      agreed cadence (Keith, 2026-09-17: "1 February being the expected
-      date of supply, then working forwards in three month
-      increments") - deliberately NOT calendar quarters.
+      February, May, August and November, shared by every quarterly
+      collection - Child Protection and Emergency Department - so a
+      correction to it applies to both (Keith, 2026-10-15). Child
+      Protection's real agreed cadence first (Keith, 2026-09-17: "1
+      February being the expected date of supply, then working forwards
+      in three month increments") - deliberately NOT calendar quarters.
     versions:
       # TEN EARLIER YEARS (REQ-GEN-207, Keith, 2026-10-15): an EARLIER version
       # rather than dates inserted into the 2023-01-01 one, which has governed
@@ -321,6 +323,21 @@ collections:
               change: >-
                 Moved up from each Child Protection dataset's own participation,
                 unchanged - 09:00 with 8 hours' grace, as every one of them stated.
+  - id: emergency-department
+    calendar: quarterly
+    # REQ-QAC-231: owed from the first quarter its synthetic history holds
+    # (REQ-GEN-232), due 09:00 with 8 hours' grace as Child Protection.
+    participation_defaults:
+      versions:
+        - effective_from: "2023-01-01"
+          expected_time: "09:00"
+          grace: 8h
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-QAC-231
+              change: >-
+                Emergency Department owes a supply every quarter from 2023-01-01,
+                due at 09:00 with 8 hours' grace.
 
 # ---------------------------------------------------------------------
 # EACH DATASET'S PARTICIPATION, as effective-dated versions. A version
@@ -552,3 +569,11 @@ datasets:
           - item: dataset cp-case-workers participation 2023-01-01
             old: {participates: [February, August], reason: 'A staffing register rather than casework, so it is resupplied twice a year rather than quarterly.', expected_time: '09:00', grace: 8h}
             new: {participates: [February, August], reason: 'A staffing register rather than casework, so it is resupplied twice a year rather than quarterly.'}
+  - id: ed-presentations
+    participation:
+      versions:
+        - effective_from: "2023-01-01"
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-QAC-231
+              change: Owes supplies from 2023-01-01; due time and grace from Emergency Department's participation_defaults.

@@ -1,0 +1,51 @@
+# Emergency Department's Soda checks (REQ-QAC-231). The prose follows
+# docs/check-authoring-rules.md. A synthetic dataset: no real patient data.
+checks for ed_presentations:
+  - missing_percent(postcode):
+      warn: when > 2
+      fail: when > 5
+      attributes:
+        check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.postcode.missing_percent_soda
+        name: Postcode recorded
+        category: completeness
+        introduced_date: "2023-01-01"
+        description: >
+          A few empty values are tolerated; a sustained rise fails.
+        failure_indicates: >
+          Presentations are being recorded without an address, most often
+          because a triage desk is skipping the field under load.
+        changelog: []
+
+  - invalid_percent(departure_status):
+      valid values: ["Admitted", "Discharged", "Transferred", "Did not wait", "Left at own risk", "Died in department"]
+      warn: when > 0
+      fail: when > 1
+      attributes:
+        check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.departure_status.invalid_percent_soda
+        name: Known departure status
+        category: conformity
+        introduced_date: "2023-01-01"
+        description: >
+          A single unrecognised value warns; a sustained share fails.
+        failure_indicates: >
+          The source system has started emitting a value that was never agreed
+          in the contract, usually a new code introduced upstream without notice.
+        changelog: []
+
+  - invalid_count(length_of_stay_minutes):
+      valid min: 0
+      valid max: 4320
+      warn: when > 0
+      fail: when > 5
+      attributes:
+        check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.length_of_stay_minutes.invalid_count_soda
+        name: Plausible length of stay
+        category: conformity
+        introduced_date: "2023-01-01"
+        description: >
+          A stay must be no shorter than nothing and no longer than a plausible
+          ceiling; a few outliers warn, more fail.
+        failure_indicates: >
+          A departure time was recorded before the arrival, or a presentation
+          was never closed off, so its stay keeps running.
+        changelog: []
