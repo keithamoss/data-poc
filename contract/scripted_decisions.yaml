@@ -6,6 +6,15 @@
 # synthetic person in contract/people.yaml, only on a synthetic asset, and a
 # refusal stops the replay. `mothman scenarios validate` gates it in CI.
 #
+# SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) sit in a separate
+# top-level `corrections:` list, after `decisions:`. Each names a declared
+# correction by `change_reference:` (no dataset of its own) and says either
+# `keep:` - a list of supplies, each `{scenario, dataset, supply}` by the
+# scenario's supply index, never a generated id - with one `keep_reason:`
+# covering them, or `pending: true`, leaving it for the asset manager. No
+# timing field: it is confirmed when the replay confirms the due
+# corrections. A correction with no entry moves everything it proposes.
+#
 decisions:
   - scenario: TS-47
     operation: mark-not-supplied

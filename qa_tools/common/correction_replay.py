@@ -33,7 +33,7 @@ from __future__ import annotations
 import contextlib
 from datetime import date, datetime
 
-from qa_tools.common import asset_time, correction_apply, correction_trial
+from qa_tools.common import asset_time, correction_apply, correction_trial, decision_log
 
 
 def merge_instant(p: correction_apply.Pending) -> datetime:
@@ -92,7 +92,8 @@ def _qa() -> str:
 
 
 def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str | None = None,
-                history_end: datetime | None = None, say=print) -> list[str]:
+                history_end: datetime | None = None, say=print,
+                scripts=None) -> list[str]:
     """Confirm every pending correction merged by `until` (default now), the
     oldest first, as the asset manager during playback. Returns the
     references confirmed. A refusal stops here, loudly: a history silently
@@ -104,8 +105,19 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
     date - the same on every bootstrap, and never before the correction
     existed. Rejected: the wall clock (a different stamp every run), and the
     history's end alone (it confirmed REQ-PIPE-181, dated 2026-10-11, on
-    2026-09-22)."""
-    from qa_tools.common import people, replay_clock, supply_db
+    2026-09-22).
+
+    AS SCRIPTED (REQ-GEN-205 criteria 6-7): a correction with a scripted
+    confirmation (qa_tools/common/scripted_corrections.py; `scripts`, default
+    the committed file) is confirmed with exactly its keeps and reason, or
+    left pending; one with none moves everything, as before. A refused
+    script stops the replay naming the scenario, the reference and the
+    proposed moves - never confirmed without the keep."""
+    from qa_tools.common import people, replay_clock, scripted_corrections, supply_db
+    from qa_tools.common.scripted_decisions import ScriptRefused
+
+    scripted = scripted_corrections.by_reference(
+        scripted_corrections.load() if scripts is None else scripts)
 
     until = until or asset_time.now()
     at = effective_at or (replay_clock.now() if replay_clock.active()
@@ -122,9 +134,29 @@ def confirm_due(conn=None, *, until: datetime | None = None, effective_at: str |
         for p in correction_apply.pending(db):
             if merge_instant(p) > until:
                 continue
+            script = scripted.get(p.reference)
+            if script is not None and script.pending:
+                say(f"Left correction {p.reference} pending, as scripted - its moves wait "
+                    f"for the data asset's manager.")
+                continue
             stamp = at if history_end is None or effective_at else \
                 max(history_end, merge_instant(p)).isoformat()
-            applied = correction_apply.confirm(db, p.reference, actor=actor, effective_at=stamp)
+            keep = scripted_corrections.resolve(script) if script is not None else {}
+            try:
+                applied = correction_apply.confirm(
+                    db, p.reference, actor=actor, effective_at=stamp, keep=set(keep),
+                    keep_reason=script.keep_reason if script is not None else None)
+            except decision_log.DecisionRefused as e:
+                if script is None:
+                    raise
+                _p, t = correction_apply.trial_for(db, p.reference)
+                moves = scripted_corrections.describe_moves(t.moves)
+                scenarios_named = ", ".join(sorted({k.scenario for k in script.keep}))
+                raise ScriptRefused(
+                    f"The scripted confirmation of {p.reference} (keeping {scenarios_named}) "
+                    f"was refused: {e} Its proposed moves: "
+                    f"{'; '.join(moves) or 'none'}. Put the script right in "
+                    f"contract/scripted_decisions.yaml.") from e
             done.append(p.reference)
             say(f"Confirmed correction {p.reference} as the data asset's manager: "
                 f"{len(applied.moved)} moved, {len(applied.placed)} placed, "
