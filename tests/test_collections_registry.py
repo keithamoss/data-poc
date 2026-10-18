@@ -564,12 +564,14 @@ class TestTheSharedToolModules:
             ("missing_count", "completeness", "Null rate")
         assert (named["column_name"], named["label"], named["dimension"]) == \
             ("things", "Pairing", "consistency")
+        # A custom-named check's own value is never taken as its invalid-row
+        # count (REQ-QAC-247 retired Birth Registrations' exemption).
+        assert named["row_count_invalid"] is None
         assert generic["row_count_total"] == 7 and written[0][:2] == ("fake-agency", FAKE_ID)
 
     @pytest.mark.parametrize("flag,field,without,with_", [
         ("soda.scope_suffix", ("missing_count_soda", "check_name"),
          "missing_count", "missing_count[recent]"),
-        ("soda.named_check_value_is_invalid_count", ("pair_soda", "row_count_invalid"), None, 2),
     ])
     def test_each_soda_flag_changes_only_its_own_field(self, third_collection, monkeypatch,
                                                       tmp_path, flag, field, without, with_):

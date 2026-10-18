@@ -129,9 +129,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
                 row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
             elif base_check == "row_count":
                 row_count_invalid = 0
-            elif base_check in spec.invalid_count_metrics or (
-                    "soda.named_check_value_is_invalid_count" in adapter.legacy
-                    and is_custom_name and c["name"] in spec.column_by_name):
+            elif base_check in spec.invalid_count_metrics:
                 row_count_invalid = int(value) if value is not None else None
 
             if is_custom_name:

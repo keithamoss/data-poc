@@ -19,10 +19,6 @@ KNOWN: dict[str, str] = {
         "a generically named Soda check is recorded as `<metric>[<filter or all>]` "
         "rather than `<metric>` - the name Birth Registrations' checks have always "
         "carried, which the dashboard keys a check on."),
-    "soda.named_check_value_is_invalid_count": (
-        "a custom-named check with a routed column records its own value as the "
-        "invalid-row count, as Birth Registrations' copy did and Child Protection's "
-        "never has."),
     "evidently.volume_from_drift_frame": (
         "the one volume check is counted by Evidently's RowCount over the drift "
         "frame, with that snapshot kept in the raw output as `row_count`; a reference "
