@@ -116,9 +116,12 @@ class TestWithinTheClaimWindowInAReplay:
         monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: None)
         monkeypatch.setattr(promotion, "report", lambda *a, **k: None)
         monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: None)
-        arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_x",
-                                  files_by_dataset={"cp-clients": "x"})
-        orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
+        # The arrival carries ITS collection's dataset: the shared orchestrator
+        # takes the window from the files carried (REQ-PIPE-243 criterion 2),
+        # and only the adapter's claim-window dataset where none are named.
         dataset = "birth-registrations" if collection_id == "civil-registration" else "cp-clients"
+        arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_x",
+                                  files_by_dataset={dataset: "x"})
+        orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
         expected = schedule.claim_window(dataset, on=RECEIVED.date())
         assert seen["within"] == expected

@@ -10075,3 +10075,29 @@ twice. It deliberately did not re-find the `TypeError`.
      CI failure locally with `MOTHMAN_DIFF_BASE=b5253dd` before the revert, and
      the same command passes after it. Minor and in a gate, so fixed under
      Keith's polish rule.
+     **Follow-up, 2026-10-18:** CI's validate-config run on f9c2bb7 itself went
+     red on the same check, because the runner compares against
+     `github.event.before` - 7f73165, which carried the edited comment - so the
+     REVERT read as a definition change with no changelog entry. The test-suite
+     run on f9c2bb7 passed. Nothing to fix: the next push is compared against
+     f9c2bb7, whose text is the original, and the check clears on its own.
+
+219. **[done, 2026-10-18]** **[Testing & dev tooling]** **Two `mothman cp qa
+     --commit` tests had a shelf life, and it ran out on 2026-10-18.**
+     `tests/test_cli_cp.py`'s two `--commit` tests file the six-file reference
+     delivery with `--originally-received not-known`, so the receipt instant is
+     "now" on the asset clock. Case Workers owes a supply only in February and
+     August, so from the day 2026-Q3's claim window closed until 2027-Q1's
+     opens, a real "now" files its file to no period, the run holds it, every
+     sibling's cross-table check reads red for the held table, and the command
+     exits 1. That is the lifecycle doing exactly what REQ-PIPE-064 says; the
+     tests are about filing and recording and never meant to assert on the
+     calendar. Confirmed pre-existing rather than REQ-PIPE-243's doing by
+     running both tests on f9c2bb7, the last pushed commit, in a worktree: both
+     fail there identically. Same family as #59 and the 2026-09-26 daily-dataset
+     entry in CLAUDE.md's runtime log - anything asserting on a dataset's
+     current cycle from the real clock is one calendar roll away from red. Fix:
+     both tests set `MOTHMAN_PINNED_NOW` to 5 August 2026, an instant every
+     Child Protection dataset has an open slot for, so the receipt is the same
+     on every day the suite runs. Fixed in the test, since nothing in the code
+     is wrong, under Keith's polish rule.

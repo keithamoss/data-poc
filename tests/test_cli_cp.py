@@ -241,6 +241,14 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
+    # A RECEIPT INSTANT EVERY DATASET HAS AN OPEN SLOT FOR. The receipt is
+    # "now" on the asset clock, and Case Workers owes a supply only in
+    # February and August - so from the day 2026-Q3's claim window closed
+    # until 2027-Q1's opens, a real "now" files its file to no period, the
+    # run holds it, and every sibling's cross-table check reads red. That is
+    # the lifecycle working; it is not what this test is about, and it went
+    # red on 2026-10-18 for no change in the code (post-build-review #219).
+    monkeypatch.setenv("MOTHMAN_PINNED_NOW", "2026-08-05T09:00:00+08:00")
 
     result = _runner.invoke(cp.qa_command, [
         "--commit", "--originally-received", "not-known",
@@ -306,6 +314,14 @@ def test_qa_command_local_folder_commit_records_the_run(
     _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
     monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
+    # A RECEIPT INSTANT EVERY DATASET HAS AN OPEN SLOT FOR. The receipt is
+    # "now" on the asset clock, and Case Workers owes a supply only in
+    # February and August - so from the day 2026-Q3's claim window closed
+    # until 2027-Q1's opens, a real "now" files its file to no period, the
+    # run holds it, and every sibling's cross-table check reads red. That is
+    # the lifecycle working; it is not what this test is about, and it went
+    # red on 2026-10-18 for no change in the code (post-build-review #219).
+    monkeypatch.setenv("MOTHMAN_PINNED_NOW", "2026-08-05T09:00:00+08:00")
 
     result = _runner.invoke(cp.qa_command, [
         "--folder", os.path.join(cp_raw_dir, _REF_RUN_ID),
@@ -560,7 +576,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
 
     captured = {}
 
-    def _fake_run_single(entry, reference_run_id=None, run_by=None, **kwargs):
+    def _fake_run_single(collection_id, entry, reference_run_id=None, run_by=None, **kwargs):
         # **kwargs so this double doesn't have to mirror run_single()'s
         # full signature - it only asserts on the three arguments this
         # test is actually about. Caught for real when run_single() grew
