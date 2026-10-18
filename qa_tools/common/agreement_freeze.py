@@ -830,8 +830,12 @@ def check(old_cal: dict | None, new_cal: dict, old_asset: dict | None, new_asset
         if item.kind == "turn_off":
             item.ctx["flipped_open"] = [f for f in item.ctx.get("flipped", ()) if f[2] <= when]
         added = old is None
+        # A NEW DATASET'S MEMBERSHIP TOO (criterion 9's own words; a real
+        # defect found adding Emergency Department, 2026-10-18): its versions
+        # were exempt and its calendar membership was not, so the push adding a
+        # collection with a past-dated history was refused.
         if added and synthetic and item.kind in ("cal_version", "participation", "tz_version",
-                                                  "defaults"):
+                                                  "defaults", "membership"):
             continue  # criterion 9
         if added and synthetic and item.kind == "cal_date" and \
                 f"calendar {item.ctx['calendar']} version {item.ctx['version']}" not in old_items:

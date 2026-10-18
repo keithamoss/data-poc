@@ -75,6 +75,47 @@ calendars:
       # rather than dates inserted into the 2023-01-01 one, which has governed
       # filings - as the daily calendar grew (REQ-GEN-196). Nothing was judged
       # against these quarters, so adding them changes no verdict.
+      # THREE EARLIER YEARS FOR EMERGENCY DEPARTMENT ALONE (REQ-GEN-205, REQ-GEN-237,
+      # PROVISIONAL 2026-10-18): the quarters REQ-GEN-205's confirmed correction
+      # edits must hold no other collection's supply (REQ-GEN-237 criterion 3),
+      # and Child Protection's history starts in 2013. Five of these dates are
+      # the corrected ones; the correction below on this calendar says what each
+      # was before.
+      - effective_from: "2010-01-01"
+        changelog:
+          - date: "2026-10-18"
+            author: REQ-GEN-205
+            change: >-
+              Twelve quarters of supply before 2013-Q1, for Emergency Department's
+              correction scenarios (TS-57 to TS-61), which no other collection's
+              supplies may share. The same anchor months and claim window as the
+              version after it.
+        claim_window: 14d
+        dates:
+          - period: "2010-Q1"
+            date: "2010-02-01"
+          - period: "2010-Q2"
+            date: "2010-05-01"
+          - period: "2010-Q3"
+            date: "2010-08-01"
+          - period: "2010-Q4"
+            date: "2010-11-01"
+          - period: "2011-Q1"
+            date: "2011-02-01"
+          - period: "2011-Q2"
+            date: "2011-05-01"
+          - period: "2011-Q3"
+            date: "2011-08-01"
+          - period: "2011-Q4"
+            date: "2011-11-01"
+          - period: "2012-Q1"
+            date: "2012-02-01"
+          - period: "2012-Q2"
+            date: "2012-05-01"
+          - period: "2012-Q3"
+            date: "2012-08-01"
+          - period: "2012-Q4"
+            date: "2012-11-01"
       - effective_from: "2013-01-01"
         changelog:
           - date: "2026-10-15"
@@ -329,6 +370,16 @@ collections:
     # (REQ-GEN-232), due 09:00 with 8 hours' grace as Child Protection.
     participation_defaults:
       versions:
+        - effective_from: "2010-01-01"
+          expected_time: "09:00"
+          grace: 8h
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-GEN-205
+              change: >-
+                Emergency Department owes supplies from 2010-01-01, for its correction
+                scenarios (TS-57 to TS-61). The same due time and grace as the
+                version after it.
         - effective_from: "2023-01-01"
           expected_time: "09:00"
           grace: 8h
@@ -616,7 +667,34 @@ datasets:
   - id: ed-presentations
     participation:
       versions:
+        - effective_from: "2010-01-01"
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-GEN-205
+              change: Owes supplies from 2010-01-01, for the correction scenarios TS-57 to TS-61; due time and grace from Emergency Department's participation_defaults.
+        # THE PARTICIPATION GAP (REQ-GEN-251): not owed for 2012-Q4 alone, so
+        # the quarter after it inherits the supply of the quarter before it, and
+        # TS-61's move out of that quarter is blocked. Owed again from 2013-Q1.
+        - effective_from: "2012-10-01"
+          participates: [February, May, August]
+          reason: >-
+            A fictional pause, made to demonstrate a participation gap in this
+            synthetic asset (REQ-GEN-251): Emergency Department is not owed its
+            November 2012 supply.
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-GEN-251
+              change: Not owed for 2012-Q4, a fictional gap for TS-61.
+        - effective_from: "2012-12-01"
+          participates: all
+          reason: Owed every quarter, as before the fictional 2012-Q4 gap.
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-GEN-251
+              change: Owed every quarter again from 2013-Q1, after the fictional 2012-Q4 gap.
         - effective_from: "2023-01-01"
+          participates: all
+          reason: Owed every quarter, as before the fictional 2012-Q4 gap.
           changelog:
             - date: "2026-10-18"
               author: REQ-QAC-231

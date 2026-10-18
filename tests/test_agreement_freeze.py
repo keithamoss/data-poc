@@ -330,6 +330,26 @@ class TestVersions:
         assert state[1].get("synthetic") is True
         assert _check(state, self._add_version("2025-01-01")) == []
 
+    def test_a_synthetic_asset_may_add_a_new_dataset_dated_in_the_past(self, state):
+        """Criterion 9's 'ADDING a new dataset's calendar membership': a new
+        collection whose participation starts in the past - Emergency
+        Department's, from 2010 - needs no correction on a synthetic asset.
+        A real defect: the gate exempted the versions but not the membership,
+        so the push adding the collection was refused."""
+        cal, asset, people = state
+        old_cal, old_asset = copy.deepcopy(cal), copy.deepcopy(asset)
+        old_cal["datasets"] = [d for d in old_cal["datasets"] if d["id"] != "ed-presentations"]
+        old_cal["collections"] = [c for c in old_cal["collections"]
+                                  if c["id"] != "emergency-department"]
+        agencies = old_asset["hierarchy"]["agencies"]
+        old_asset["hierarchy"]["agencies"] = [a for a in agencies
+                                              if a["id"] != "department-of-health"]
+        assert len(old_asset["hierarchy"]["agencies"]) < len(agencies), "precondition"
+        found = freeze.check(old_cal, cal, old_asset, asset, people,
+                             instant_of=lambda key: NOW, today=NOW.date(),
+                             base_codeowners=CODEOWNERS)
+        assert found == [], _text(found)
+
     def test_a_cadence_rule_versions_rule_applies(self, state):
         """Criterion 17: the daily calendar has no dated entries, and its
         version is frozen like any other."""
