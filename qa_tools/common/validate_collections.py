@@ -17,7 +17,7 @@ and singular test sits in a collection's own folder, with no singular test
 name declared by two collections - dbt names a singular test by its file.
 
 THE LITERALS (criteria 8 to 10): no product file names a collection by
-writing it down - a hierarchy id or short as a string, an id as a whole
+writing it down - a hierarchy id as a string, an id as a whole
 segment of one, or an f-string that begins with a run prefix and goes on to
 build a run name. Each such site is a place a thirtieth collection would be
 skipped or handed another collection's behaviour, so each is either rewired
@@ -240,8 +240,12 @@ def _dbt_layout_problems(root: Path, declared) -> list[str]:
 
 # ---- criteria 8 to 10: the literals ---------------------------------------
 
-def _names() -> tuple[set[str], set[str], tuple[str, ...]]:
-    """(hierarchy ids, shorts, run prefixes)."""
+def _names() -> tuple[set[str], tuple[str, ...]]:
+    """(hierarchy ids, run prefixes). NOT SHORTS (post-build-review #235,
+    Keith 2026-10-18): a two- or three-letter short collides with ordinary
+    text - a keyboard-neighbour table's "wr", an agency short "rs" - while an
+    id or run prefix is unambiguous, and a hard-coded short still shows
+    itself as a broken command."""
     from qa_tools import collections
     from qa_tools.common import config_yaml, hierarchy
 
@@ -252,16 +256,15 @@ def _names() -> tuple[set[str], set[str], tuple[str, ...]]:
         for coll in agency.get("collections") or []:
             ids.add(coll["id"])
             ids.update(d["id"] for d in coll.get("datasets") or [])
-    cs = collections.all_collections()
-    return ids, {c.short for c in cs}, tuple(c.run_prefix for c in cs)
+    return ids, tuple(c.run_prefix for c in collections.all_collections())
 
 
 def _segment_patterns(ids: set[str]) -> list[re.Pattern]:
     return [re.compile(r"(?:^|[-./])" + re.escape(i) + r"(?:$|[-./])") for i in sorted(ids)]
 
 
-def _names_a_collection(text: str, ids, shorts, segments) -> bool:
-    return text in ids or text in shorts or any(p.search(text) for p in segments)
+def _names_a_collection(text: str, ids, segments) -> bool:
+    return text in ids or any(p.search(text) for p in segments)
 
 
 def _builds_a_run_name(head: str, next_is_field: bool, prefixes) -> bool:
@@ -297,7 +300,7 @@ def _exempt_scenario_nodes(tree: ast.AST) -> set[int]:
     return found
 
 
-def _python_findings(path: Path, rel: str, ids, shorts, prefixes, segments):
+def _python_findings(path: Path, rel: str, ids, prefixes, segments):
     tree = ast.parse(path.read_text(), filename=rel)
     skip = _docstring_nodes(tree)
     if rel == SCENARIO_REGISTER:
@@ -315,21 +318,21 @@ def _python_findings(path: Path, rel: str, ids, shorts, prefixes, segments):
                     yield node.lineno, first.value
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) \
                 and id(node) not in inside_fstring:
-            if _names_a_collection(node.value, ids, shorts, segments):
+            if _names_a_collection(node.value, ids, segments):
                 yield node.lineno, node.value
 
 
 _JS_STRING = re.compile(r"""(?P<q>["'])(?P<s>(?:\\.|(?!(?P=q)).)*?)(?P=q)|`(?P<t>[^`]*)`""")
 
 
-def _text_findings(path: Path, ids, shorts, prefixes, segments):
+def _text_findings(path: Path, ids, prefixes, segments):
     for lineno, line in enumerate(path.read_text().splitlines(), start=1):
         for m in _JS_STRING.finditer(line):
             if m.group("t") is not None:
                 head, _, _ = m.group("t").partition("${")
                 if _builds_a_run_name(head, "${" in m.group("t"), prefixes):
                     yield lineno, m.group("t")
-            elif _names_a_collection(m.group("s"), ids, shorts, segments):
+            elif _names_a_collection(m.group("s"), ids, segments):
                 yield lineno, m.group("s")
 
 
@@ -340,7 +343,7 @@ def _exempt(rel: str) -> bool:
 def literal_findings(root: Path = ROOT) -> list[tuple[str, int, str]]:
     """Every (file, line, literal) criterion 8 names, allowlisted files
     included - the caller decides what the allowlist covers."""
-    ids, shorts, prefixes = _names()
+    ids, prefixes = _names()
     segments = _segment_patterns(ids)
     found = []
     for top in SCANNED:
@@ -350,9 +353,9 @@ def literal_findings(root: Path = ROOT) -> list[tuple[str, int, str]]:
                     or "/vendor/" in rel or "/snapshots/" in rel:
                 continue
             if path.suffix == ".py":
-                hits = _python_findings(path, rel, ids, shorts, prefixes, segments)
+                hits = _python_findings(path, rel, ids, prefixes, segments)
             elif path.name.endswith(".template.html"):
-                hits = _text_findings(path, ids, shorts, prefixes, segments)
+                hits = _text_findings(path, ids, prefixes, segments)
             else:
                 continue
             found.extend((rel, line, text) for line, text in hits)

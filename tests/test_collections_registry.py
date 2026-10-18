@@ -329,13 +329,21 @@ class TestTheLiteralGate:
     def test_it_finds_each_kind_of_collection_literal(self, tmp_path):
         got = self._found(tmp_path, {"qa_tools/x.py": (
             'A = "child-protection"\n'
-            'B = "cp"\n'
             'C = "contract/bdm-birth-registrations-soda-checks.yml"\n'
             'D = f"cp_run_{n}"\n'
             'E = f"run_7{n}"\n')})
-        assert got == {("qa_tools/x.py", "child-protection"), ("qa_tools/x.py", "cp"),
+        assert got == {("qa_tools/x.py", "child-protection"),
                        ("qa_tools/x.py", "contract/bdm-birth-registrations-soda-checks.yml"),
                        ("qa_tools/x.py", "cp_run_"), ("qa_tools/x.py", "run_7")}
+
+    def test_a_short_alone_is_not_a_collection_literal(self, tmp_path):
+        """post-build-review #235 (Keith, 2026-10-18): a short is too short to
+        be a signal - `"e": "wr"` in a keyboard-neighbour table is not the
+        collection `wr`, and an agency short such as `rs` is ordinary text.
+        Ids and run prefixes are unambiguous, and a hard-coded short still
+        shows itself as a broken command."""
+        assert self._found(tmp_path, {"qa_tools/x.py": 'A = "cp"\nB = "bdm"\nC = {"e": "wr"}\n'}) \
+            == set()
 
     def test_it_leaves_what_names_no_collection(self, tmp_path):
         assert self._found(tmp_path, {"qa_tools/x.py": (
@@ -366,14 +374,14 @@ class TestTheLiteralGate:
             ("dashboard/qa-reporting-dashboard.template.html", "cp_run_${n}")}
 
     def test_an_unlisted_file_fails_naming_file_line_and_literal(self, tmp_path):
-        root = _tree(tmp_path, {"cli/x.py": 'A = 1\nB = "bdm"\n'})
+        root = _tree(tmp_path, {"cli/x.py": 'A = 1\nB = "civil-registration"\n'})
         assert gate.literal_problems(root, allowlist={}) == [
-            "cli/x.py:2: 'bdm' names a collection - read it from the registry "
+            "cli/x.py:2: 'civil-registration' names a collection - read it from the registry "
             "(qa_tools.collections), or list the file on the migration allowlist with the "
             "requirement that rewires it"]
 
     def test_a_listed_file_passes_and_the_list_only_shrinks(self, tmp_path):
-        root = _tree(tmp_path, {"cli/x.py": 'B = "bdm"\n', "cli/y.py": "C = 1\n"})
+        root = _tree(tmp_path, {"cli/x.py": 'B = "civil-registration"\n', "cli/y.py": "C = 1\n"})
         assert gate.literal_problems(root, allowlist={"cli/x.py": "REQ-TEST-245"}) == []
         got = gate.literal_problems(root, allowlist={"cli/x.py": "REQ-TEST-245",
                                                      "cli/y.py": "REQ-TEST-245"})

@@ -10422,7 +10422,7 @@ twice. It deliberately did not re-find the `TypeError`.
        labels, a `<short>` placeholder in hints, capping the picker's height and
        a header on `mothman collections`.
 
-235. **[todo, 2026-10-18 - FOR KEITH]** **[Testing & dev tooling]** **The
+235. **[done, 2026-10-18]** **[Testing & dev tooling]** **The
      collections gate's literal check will misfire on short collection shorts.**
      Found by REQ-TEST-249's own test, which now runs both gates in its copy:
      with the fake collection's short set to `wr`, the gate failed on
@@ -10437,3 +10437,10 @@ twice. It deliberately did not re-find the `TypeError`.
      CHANGED: whether the literal check should match shorts at all, or only ids
      and run prefixes, or require a minimum length, is a change to REQ-PIPE-240's
      gate and Keith's call.
+
+     KEITH'S CALL, ~21:25: IDS AND RUN PREFIXES ONLY. Built test-first:
+     tests/test_collections_registry.py's
+     test_a_short_alone_is_not_a_collection_literal failed against the old
+     gate and passes now, and two tests that used the short `bdm` as their
+     example literal use the id `civil-registration` instead. REQ-PIPE-240's
+     criterion 8 is amended to say so, with the reason in its decisions.
