@@ -2,7 +2,7 @@
 Generic resupply-chain orchestration - the delay/retry/chaining behaviour
 of "a supply that fails QA gets a resupply some working days later,
 which might itself still be broken" (see plans/data-generation.md #5 for the
-original scoping, #13 for why this got pulled out of generate_runs.py).
+original scoping, #13 for why this got pulled out of what is now generator/collections/civil_registration.py).
 
 VOCABULARY, since this module is where the two words meet (REQ-GEN-042,
 2026-09-23). A SLOT is the logical obligation - one (dataset, period)
@@ -21,7 +21,7 @@ Deliberately knows NOTHING about how a dataset's rows are made. It drives
 any dataset through DatasetProvider - three operations (generate the
 initial attempt, dirty it to a severity, churn it forward into the next
 attempt's starting point) that daily_batch.py/dirty.py currently implement
-for Birth Registrations (see generate_runs.py's BirthRegistrationsProvider)
+for Birth Registrations (see civil_registration.py's BirthRegistrationsProvider)
 and that a future replacement generator (per
 docs/synthetic-data-generation-tools-research.md) could implement without
 this module changing at all.
@@ -49,7 +49,7 @@ defaulting to the exact BDM curve below, so BDM's own call site needed
 no changes) rather than hardcoded module constants, so a second provider
 with a genuinely different real-world turnaround (CP's slower full-
 collection re-extract) can supply its own curve without forking this
-module - see generate_cp_runs.py's own `_CP_DELAY_DAYS`/
+module - see child_protection.py's own `_CP_DELAY_DAYS`/
 `_CP_DELAY_WEIGHTS` for that curve and Keith's own calibration call
 behind it.
 """
@@ -82,7 +82,7 @@ STILL_RED_PROB = 0.45  # per-attempt chance a resupply is ALSO red - a chain
 # land either the next day or within three days, with a longish tail
 # going out to around 10 working days" (Keith's own calibration). Birth
 # Registrations' own curve - the default every call site gets unless it
-# passes its own (see generate_cp_runs.py for the one dataset that does).
+# passes its own (see child_protection.py for the one dataset that does).
 _DELAY_DAYS = np.arange(1, 11)
 _DELAY_WEIGHTS = 0.6 ** (_DELAY_DAYS - 1)
 _DELAY_WEIGHTS = _DELAY_WEIGHTS / _DELAY_WEIGHTS.sum()
@@ -186,7 +186,7 @@ def run_slot_chain(provider: DatasetProvider[T], slot_date: date, seed: int,
     owns everything about identity (run_id, manifest/file writing); this
     only knows when each one landed. `delay_days`/`delay_weights`
     default to Birth Registrations' own curve above; a provider whose
-    real-world turnaround differs (see generate_cp_runs.py) passes its
+    real-world turnaround differs (see child_protection.py) passes its
     own.
 
     WHEN AN ARRIVAL LANDS, and why the lever is a plain offset

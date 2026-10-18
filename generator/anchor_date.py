@@ -13,7 +13,7 @@ BOTH HALVES OF THE FIX MATTER, and either alone leaves a real failure.
 A dateless run_id makes a re-run overwrite in place but, with a floating
 anchor, silently rewrites every date in the history. A pinned anchor
 with a dated run_id still doubles the directory count. So the ids lost
-their dates (see generate_runs.py) and the anchor was pinned here.
+their dates (see civil_registration.py) and the anchor was pinned here.
 
 THE COST IS REAL AND WAS CHOSEN. Keith, 2026-09-22, signing this off:
 "I'm happy for demo data to visibly age. That's just how it works." The

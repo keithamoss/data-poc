@@ -121,7 +121,7 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
         the date could not detect them disagreeing.
         """
         from generator.anchor_date import get_anchor_date
-        from generator.generate_runs import GROWN_DAYS, N_DELIVERIES
+        from generator.collections.civil_registration import GROWN_DAYS, N_DELIVERIES
 
         return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS - 1)
 

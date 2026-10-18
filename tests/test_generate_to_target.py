@@ -19,6 +19,7 @@ import pytest
 from generator import targeting
 from generator.daily_batch import generate_daily_batch
 from qa_tools.common import check_bands
+from generator import driver
 
 BDM_ID = "birth-registrations"
 
@@ -117,7 +118,7 @@ class TestOutOfTheHoldEra:
 class TestTheGeneratedHistory:
     @staticmethod
     def _bdm():
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
 
         _r, by_period, suppressed, _q = g._plan_injections(g.generated_periods())
         # The ordinary plan covers the 85 alone (REQ-GEN-044's evening-before
@@ -142,7 +143,7 @@ class TestTheGeneratedHistory:
             assert setting.value != amber_setting.HOLD, p.date
 
     def test_child_protection_ambers_avoid_injected_periods(self):
-        from generator import generate_cp_runs as cp
+        from generator.collections import child_protection as cp
         from generator.anchor_date import get_anchor_date
         from qa_tools.common import schedule
 
@@ -171,22 +172,29 @@ class TestTheGeneratedHistory:
         assert all(sevs[i] == "red" for i, s in enumerate(drawn) if s == "red" and i < stretch)
 
     def test_an_amber_is_never_made_stale(self, monkeypatch):
-        from generator import generate_runs as g
+        from generator import dirty
+        from generator.collections import civil_registration as g
 
-        monkeypatch.setattr(g, "inject_stale_delivery",
+        # The provider imports its presets at call time (REQ-GEN-246
+        # criterion 7), so the one module that defines them is patched.
+        monkeypatch.setattr(dirty, "inject_stale_delivery",
                             lambda df, seed: (_ for _ in ()).throw(AssertionError("stale")))
         day = date(2026, 9, 12)
         g.BirthRegistrationsProvider(amber_dates=frozenset({day})).generate(
             day, seed=1, n_rows=50, id_offset=0)
 
     def test_the_providers_never_reach_the_amber_preset(self, monkeypatch, batch, cat):
-        from generator import generate_cp_runs as cp
-        from generator import generate_runs as g
+        from generator.collections import child_protection as cp
+        from generator.collections import civil_registration as g
 
-        monkeypatch.setattr(g, "apply_birth_registrations_presets",
+        from generator import dirty
+
+        monkeypatch.setattr(dirty, "apply_birth_registrations_presets",
                             lambda *a, **k: (_ for _ in ()).throw(AssertionError("preset")))
         g.BirthRegistrationsProvider().dirty(batch, "amber", seed=1, previous_row_count=None)
-        monkeypatch.setattr(cp.dirty_mod, "apply_cp_clients_presets",
+        from generator import dirty as dirty_mod
+
+        monkeypatch.setattr(dirty_mod, "apply_cp_clients_presets",
                             lambda *a, **k: (_ for _ in ()).throw(AssertionError("preset")))
         cp.ChildProtectionProvider({}).dirty({"cp_clients": _clients()}, "amber", seed=1,
                                              previous_row_count=None)
@@ -405,7 +413,7 @@ class TestAnInjectedTargetEndToEnd:
     def generated(self, tmp_path_factory):
         import json
 
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         from generator import scenario_injection as si
         from generator.output import redirect
 
@@ -414,8 +422,9 @@ class TestAnInjectedTargetEndToEnd:
         # sized for its own scenarios, and a test injection that claims more
         # leaves its ordinary ambers and reds nowhere to go - which the
         # generator refuses, correctly. This tests the injection, not them.
-        drawn = g.RUN_PLAN
-        g.RUN_PLAN = [(n, None) for n, _sev in drawn]
+        drawn = g.run_plan
+        clean = [(n, None) for n, _sev in drawn()]
+        g.run_plan = lambda: clean
         extra = si.Injection(
             scenario_id="TS-TARGET", dataset_id=g.DATASET_ID, anchor=-70,
             config="a test injection",
@@ -423,16 +432,16 @@ class TestAnInjectedTargetEndToEnd:
                                       note="built to amber"),))
         original = si.INJECTIONS
         si.INJECTIONS = (*original, extra)
-        restore = redirect(g, root)
+        restore = redirect(root)
         try:
-            g.main()
-            book = json.loads(g.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
+            driver.generate("civil-registration")
+            book = json.loads(driver.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
             placements = json.loads(si.PLACEMENTS_PATH.read_text())
-            deliveries = g.DELIVERIES_DIR
+            deliveries = driver.DELIVERIES_DIR
         finally:
             restore()
             si.INJECTIONS = original
-            g.RUN_PLAN = drawn
+            g.run_plan = drawn
         return book, placements, deliveries
 
     def _record(self, placements):
@@ -491,7 +500,7 @@ class TestRefusedBeforeAnythingIsWritten:
     that cannot be moved stops generation before the first write."""
 
     def test_an_unmovable_rule_stops_the_generator_with_nothing_written(self, tmp_path):
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         from generator import scenario_injection as si
         from generator.output import redirect
 
@@ -501,23 +510,23 @@ class TestRefusedBeforeAnythingIsWritten:
                 "amber", ("sex.conformity",))),))
         original = si.INJECTIONS
         si.INJECTIONS = (*original, bad)
-        restore = redirect(g, tmp_path)
+        restore = redirect(tmp_path)
         try:
             # A HISTORY ALREADY ON DISK SURVIVES THE REFUSAL: refused before
             # the old one is cleared, not after.
             si.INJECTIONS = original
-            g.main()
+            driver.generate("civil-registration")
             before = sorted(p.name for p in (tmp_path / "deliveries").iterdir())
             si.INJECTIONS = (*original, bad)
             with pytest.raises(targeting.TargetError, match="TS-BAD.*sex.conformity"):
-                g.main()
+                driver.generate("civil-registration")
             assert sorted(p.name for p in (tmp_path / "deliveries").iterdir()) == before
         finally:
             restore()
             si.INJECTIONS = original
 
     def test_child_protection_red_is_refused_up_front_too(self):
-        from generator import generate_cp_runs as cp
+        from generator.collections import child_protection as cp
         from generator import scenario_injection as si
         from generator.anchor_date import get_anchor_date
         from qa_tools.common import schedule
@@ -550,7 +559,7 @@ def _unmatched_twins(df):
 class TestFindings155:
     def test_a_targeted_resend_keeps_every_twin(self):
         """Finding 1: the resend is churned before it is targeted."""
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         from generator import scenario_injection as si
 
         inj = si.Injection(scenario_id="TS-X", dataset_id=g.DATASET_ID, anchor=-20,
@@ -624,19 +633,18 @@ class TestFindings155:
     def test_an_ordinary_amber_refusal_leaves_the_last_history_standing(self, tmp_path,
                                                                         monkeypatch):
         """Finding 5."""
-        from generator import generate_runs as g
         from generator.output import redirect
 
-        restore = redirect(g, tmp_path)
+        restore = redirect(tmp_path)
         try:
-            g.main()
+            driver.generate("civil-registration")
             before = sorted(p.name for p in (tmp_path / "deliveries").iterdir())
 
             def refuse(*a, **k):
                 raise targeting.TargetError("refused")
             monkeypatch.setattr(targeting, "outside_hold", refuse)
             with pytest.raises(targeting.TargetError):
-                g.main()
+                driver.generate("civil-registration")
             assert sorted(p.name for p in (tmp_path / "deliveries").iterdir()) == before
         finally:
             restore()
@@ -705,7 +713,7 @@ class TestLeadInsEndToEnd:
     def generated(self, tmp_path_factory):
         import json
 
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         from generator import scenario_injection as si
         from generator.output import redirect
 
@@ -714,24 +722,25 @@ class TestLeadInsEndToEnd:
         # sized for its own scenarios, and a test injection that claims more
         # leaves its ordinary ambers and reds nowhere to go - which the
         # generator refuses, correctly. This tests the injection, not them.
-        drawn = g.RUN_PLAN
-        g.RUN_PLAN = [(n, None) for n, _sev in drawn]
+        drawn = g.run_plan
+        clean = [(n, None) for n, _sev in drawn()]
+        g.run_plan = lambda: clean
         extra = si.Injection(
             scenario_id="TS-LEAD", dataset_id=g.DATASET_ID, anchor=-70, config="a test",
             arrivals=(si.ExtraArrival(0, "14:00", target=targeting.Target("amber")),
                       si.ExtraArrival(0, "16:00", target=targeting.Target("green"))))
         original = si.INJECTIONS
         si.INJECTIONS = (*original, extra)
-        restore = redirect(g, root)
+        restore = redirect(root)
         try:
-            g.main()
-            book = json.loads(g.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
+            driver.generate("civil-registration")
+            book = json.loads(driver.BOOKKEEPING_PATH.read_text())[g.DATASET_ID]
             records = json.loads(si.PLACEMENTS_PATH.read_text())
-            deliveries = g.DELIVERIES_DIR
+            deliveries = driver.DELIVERIES_DIR
         finally:
             restore()
             si.INJECTIONS = original
-            g.RUN_PLAN = drawn
+            g.run_plan = drawn
         if isinstance(records, dict):
             records = records.get("placements", records)
         if isinstance(records, dict):
@@ -783,20 +792,20 @@ class TestLeadInsEndToEnd:
 
 class TestRefusals156:
     def test_a_red_with_nowhere_before_the_scenarios_is_refused(self):
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         with pytest.raises(targeting.TargetError, match="ordinary red"):
             g._reds_clear_of_scenarios([None, "red", "red", None, None],
                                        frozenset({4}))
 
     def test_with_nothing_claimed_reds_stay_where_drawn(self):
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         drawn = [None, "red", None, "red", None]
         assert g._reds_clear_of_scenarios(drawn, frozenset()) == drawn
 
     def test_a_resend_pushed_past_the_history_is_refused(self):
         from datetime import timedelta
 
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         from generator import scenario_injection as si
         from generator.resupply import Delivery
         last = date(2026, 9, 22)
@@ -824,7 +833,7 @@ class TestRefusals156:
 
     def test_a_child_protection_targeted_injection_is_refused_up_front(self):
         """Lead-ins are built for Birth Registrations only (finding 8)."""
-        from generator import generate_cp_runs as cp
+        from generator.collections import child_protection as cp
         from generator import scenario_injection as si
         from generator.anchor_date import get_anchor_date
         from qa_tools.common import schedule
@@ -853,7 +862,7 @@ class TestEachPlantedScenarioSitsInItsEra:
             "TS-78a": ("amber", "hold")}
 
     def test_each_anchor_falls_under_the_setting_it_needs(self):
-        from generator import generate_runs as g
+        from generator.collections import civil_registration as g
         from generator import scenario_injection as si
         from qa_tools.common import amber_setting, asset_time, replacement_setting
         periods = g.generated_periods()

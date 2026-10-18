@@ -3,7 +3,7 @@ fast, seeded, and this repo's convention throughout has been to verify by
 actually running things rather than mocking) and checks the resulting
 manifest has the shape everything downstream depends on.
 
-The real generation itself (generate_runs.main() - writes BDM's full real
+The real generation itself (driver.generate("civil-registration") - writes BDM's full real
 120-delivery/176-run manifest + every real CSV to a real directory) happens
 ONCE per test session (`manifest` fixture below, module-scoped - deliberately
 NOT a plain module-level call, since pytest needs a real fixture to share
@@ -28,9 +28,10 @@ import json
 import pytest
 
 import generator_isolation
-from generator import generate_runs
+from generator.collections import civil_registration as generate_runs
 from generator import scenario_injection as si
 from qa_tools.common import asset_time
+from generator import driver
 
 
 @pytest.fixture(scope="module")
@@ -45,14 +46,14 @@ def raw_dir(tmp_path_factory):
     as a side effect of testing (harmless in outcome, since generation
     is fully deterministic, but a real coupling between test execution
     and production state that shouldn't exist). Each output is a plain
-    module global generate_runs.main() reads at call time (not captured
+    module global driver.generate("civil-registration") reads at call time (not captured
     into a default arg), so reassigning them here works - module-scoped,
     not the standard function-scoped `monkeypatch` fixture, which can't
     be depended on from a module-scoped fixture (a real ScopeMismatch),
     hence the manual save/restore instead."""
     root = tmp_path_factory.mktemp("bdm_gen")
-    restore = generator_isolation.redirect(generate_runs, root)
-    yield Path(generate_runs.DELIVERIES_DIR)
+    restore = generator_isolation.redirect(root)
+    yield Path(driver.DELIVERIES_DIR)
     restore()
 
 
@@ -60,7 +61,7 @@ def raw_dir(tmp_path_factory):
 def deliveries_dir(raw_dir):
     """Where the generator's one copy actually goes (REQ-PIPE-102).
     Depends on raw_dir so the redirection above is already in place."""
-    return Path(generate_runs.DELIVERIES_DIR)
+    return Path(driver.DELIVERIES_DIR)
 
 
 @pytest.fixture(scope="module")
@@ -78,8 +79,8 @@ def manifest(raw_dir, real_data_before):
     second copy of exactly this list and is retired. Still called
     `manifest` because every test below reads it as "the list of what
     was generated", which is what it is."""
-    generate_runs.main()
-    with open(generate_runs.BOOKKEEPING_PATH) as f:
+    driver.generate("civil-registration")
+    with open(driver.BOOKKEEPING_PATH) as f:
         return json.load(f)[generate_runs.DATASET_ID]
 
 
@@ -328,13 +329,13 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     placements_before = (scenario_injection.PLACEMENTS_PATH.read_bytes()
                           if scenario_injection.PLACEMENTS_PATH.exists() else None)
 
-    monkeypatch.setattr(generate_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
-    monkeypatch.setattr(generate_runs, "RECEIPTS_DIR", tmp_path / "receipts")
-    monkeypatch.setattr(generate_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
+    monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
+    monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
+    monkeypatch.setattr(driver, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
     monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH",
                          tmp_path / "scenario_placements.json")
 
-    generate_runs.main()
+    driver.generate("civil-registration")
 
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
@@ -523,8 +524,8 @@ class TestARefusalNamesTheScenarios:
     def test_it_names_them_and_says_what_to_do(self, monkeypatch, severity):
         from generator import targeting
 
-        monkeypatch.setattr(generate_runs, "RUN_PLAN",
-                            [(n, severity) for n, _ in generate_runs.RUN_PLAN])
+        plan = [(n, severity) for n, _ in generate_runs.RUN_PLAN]
+        monkeypatch.setattr(generate_runs, "run_plan", lambda: plan)
         periods = generate_runs.generated_periods()
         _r, by_period, suppressed, _q = generate_runs._plan_injections(periods)
         with pytest.raises(targeting.TargetError) as refused:

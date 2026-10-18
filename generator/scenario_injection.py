@@ -768,23 +768,36 @@ def link_dates(injection: Injection, placement: Placement,
 
 def generated_periods(dataset_id: str) -> list:
     """The periods the generator writes for this dataset, oldest first -
-    from configuration and the anchor date alone, as each generator's own
-    main() asks it."""
-    from qa_tools.common import hierarchy
+    from configuration and the anchor date alone, as its provider's own plan
+    asks it.
 
-    cp = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")}
-    if dataset_id in cp:
-        from generator import generate_cp_runs
+    THROUGH THE REGISTRY (REQ-GEN-246 criterion 8): the provider of the
+    dataset's collection says, so a new collection's periods come with its
+    provider rather than with a branch here. REFUSED, NOT DEFAULTED
+    (post-build-review #169): a third collection once silently got Birth
+    Registrations' periods."""
+    from generator import collections
 
-        return generate_cp_runs.generated_periods()
-    from generator import generate_runs
+    try:
+        provider = collections.for_dataset(dataset_id)
+    except collections.NoProviderError as exc:
+        raise CannotPlace(f"no generator writes {dataset_id}, so it has no generated periods "
+                          f"to place a scenario in: {exc}") from None
+    return provider.generated_periods()
 
-    if dataset_id == generate_runs.DATASET_ID:
-        return generate_runs.generated_periods()
-    # REFUSED, NOT DEFAULTED (post-build-review #169): a third collection
-    # silently got Birth Registrations' periods.
-    raise CannotPlace(f"no generator writes {dataset_id}, so it has no generated periods to "
-                      f"place a scenario in")
+
+def unprovided_scenarios() -> list[str]:
+    """Every injected scenario naming a dataset no generator provider makes,
+    with why - checked before anything is written (REQ-GEN-246 criterion 8)."""
+    from generator import collections
+
+    out = []
+    for injection in INJECTIONS:
+        try:
+            collections.for_dataset(injection.dataset_id)
+        except collections.NoProviderError as exc:
+            out.append(f"{injection.scenario_id} names {injection.dataset_id}: {exc}")
+    return out
 
 
 def placement_of() -> dict[str, str]:

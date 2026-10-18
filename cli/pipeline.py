@@ -277,6 +277,72 @@ def generated_into(root):
     return _generated_into(root)
 
 
+class TargetTrialUnavailable(click.ClickException):
+    """A target trial asked of a collection whose provider declares none
+    (REQ-GEN-246 criterion 6)."""
+
+
+def generate_collection(collection_id: str, *, trial: bool) -> None:
+    """One collection's synthetic history, through the shared driver
+    (REQ-GEN-246), then its target trial, then the scenario map.
+
+    THE TRIAL RUNS WHERE THE PROVIDER DECLARES ONE, and is REFUSED BY NAME
+    where it does not (criterion 6) - never silently skipped, which is what
+    a Child Protection trial used to be. A collection's trial is its CLI
+    module's own try_targets(), found by the collection's short name the
+    way an adapter is found by its id.
+
+    THE TRIAL FIRST, THE MAP ONCE IT AGREES (post-build-review #157 finding
+    7): the map is committed, and a history the trial refused to emit
+    should not leave it rewritten. A map regenerated separately from the
+    history is a map that disagrees with it (REQ-GEN-045 criterion 3)."""
+    import importlib
+
+    from generator import collections as providers
+    from generator import driver
+    from qa_tools import collections
+    from qa_tools.common import scenario_map
+
+    provider = providers.provider(collection_id)
+    if trial and not provider.target_trial:
+        raise TargetTrialUnavailable(
+            f"{collection_id} has no target trial: its generator provider declares none, so "
+            f"there is nothing to try against the real tools")
+    driver.generate(collection_id)
+    if trial:
+        short = collections.by_id(collection_id).short
+        importlib.import_module(f"cli.{short}").try_targets(collection_id=collection_id)
+    elif provider.target_trial:
+        console.print("Target trial skipped: no injected target was tried against the "
+                      "real tools. The comparison after a replay still runs.",
+                      style="yellow")
+    scenario_map.write_map()
+
+
+def has_target_trial(collection_id: str) -> bool:
+    """Whether the collection's generator provider declares a target trial -
+    for the bootstrap, which lives in qa_tools/ and so may not import the
+    generator package itself (criterion 5)."""
+    from generator import collections as providers
+
+    return providers.provider(collection_id).target_trial
+
+
+def target_datasets(collection_id: str) -> tuple[str, ...]:
+    """The datasets whose built targets the replay's comparison reads for
+    this collection, as its provider declares them (criterion 5)."""
+    from generator import collections as providers
+
+    return providers.provider(collection_id).target_datasets
+
+
+def generated_collections() -> list[str]:
+    """Every collection with a generator provider, in hierarchy order."""
+    from generator import collections as providers
+
+    return [p.collection_id for p in providers.providers()]
+
+
 def generated_targets():
     """What the last generation built each targeted supply to - for the
     comparison after a replay (REQ-GEN-186 criterion 3), which lives in

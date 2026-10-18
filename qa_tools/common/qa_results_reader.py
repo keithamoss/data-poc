@@ -46,7 +46,7 @@ def _natural_sort_key(name: str) -> tuple:
     regardless of how many digits any of their numbers happen to have -
     a plain string sort of these (what both this module's own callers
     used to do) silently breaks the moment a run number crosses a fixed
-    zero-padding width (2026-09-17: generator/generate_runs.py's
+    zero-padding width (2026-09-17: generator/collections/civil_registration.py's
     delivery/run numbering went 60->120 deliveries and immediately hit
     exactly this - "delivery_100" < "delivery_11" as plain strings - a
     real bug a test caught; see that module's own comment). Keith's own

@@ -22,9 +22,6 @@ from pathlib import Path
 
 from qa_tools.common import asset_time, delivery
 
-BDM_DATASET = "birth-registrations"
-CP_AMBER_DATASET = "cp-clients"
-
 
 @dataclass(frozen=True)
 class Built:
@@ -60,6 +57,7 @@ def _read(path: Path) -> dict:
 def written(bookkeeping: Path | None = None, placements: Path | None = None) -> list[Built]:
     """Every supply the last generation built to a target, oldest first
     within each collection."""
+    from generator import collections
     from qa_tools.common import scenario_map
 
     # READ AT CALL TIME, from the modules whose paths a test or a corpus
@@ -68,19 +66,43 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
     book = _read(bookkeeping or delivery.BOOKKEEPING_PATH)
     placed = (_read(placements or scenario_map.PLACEMENTS_PATH).get("placements") or [])
     out: list[Built] = []
-    bdm = book.get(BDM_DATASET, [])
+    # WHOSE BOOKKEEPING IS WHOSE, from the providers (REQ-GEN-246 criterion
+    # 6): a key no provider makes is refused by name, where it used to be
+    # read as Child Protection's. The collections that trial their targets
+    # first, as before, then the rest in the order they were written.
+    owners = {}
+    for key in book:
+        try:
+            owners[key] = collections.for_dataset(key)
+        except collections.NoProviderError as exc:
+            raise ValueError(f"the generator's record holds supplies for {key}, which no "
+                             f"provider makes: {exc}") from None
+    for key in sorted(book, key=lambda k: not owners[k].target_trial):
+        if owners[key].target_trial:
+            out += _trialled(key, book[key], placed)
+        else:
+            out += [Built(f"the ordinary amber for {entry['period']}", owners[key].amber_dataset,
+                          entry["delivery"], "amber")
+                    for entry in book[key] if entry.get("dirty_severity") == "amber"]
+    return out
+
+
+def _trialled(dataset_id: str, entries: list[dict], placed: list[dict]) -> list[Built]:
+    """A target-trial collection's ordinary ambers, then every day its
+    scenarios built green or to a target."""
+    out: list[Built] = []
     by_period: dict[str, list[dict]] = {}
-    for entry in bdm:
+    for entry in entries:
         by_period.setdefault(entry["period"], []).append(entry)
-    for entry in bdm:
+    for entry in entries:
         if entry.get("dirty_severity") == "amber":
-            out.append(Built(f"the ordinary amber for {entry['period']}", BDM_DATASET,
+            out.append(Built(f"the ordinary amber for {entry['period']}", dataset_id,
                              entry["delivery"], "amber", day=entry["period"]))
     for record in placed:
         # EVERY DAY BUILT GREEN, targeted placement or not (post-build-review
         # #172): TS-73's green following day has no target of its own and
         # read red on the page with nothing to say so.
-        if record.get("dataset") != BDM_DATASET or not (
+        if record.get("dataset") != dataset_id or not (
                 record.get("targets") or record.get("lead_in") or record.get("follow")):
             continue
         scenario = record["scenario_id"]
@@ -88,14 +110,14 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
         reference = _only(by_period, lead_in[-1], scenario)["delivery"] if lead_in else None
         for period in (*lead_in, *(record.get("follow") or [])):
             role = "lead-in" if period in lead_in else "following day"
-            out.append(Built(f"{scenario}'s green {role} {period}", BDM_DATASET,
+            out.append(Built(f"{scenario}'s green {role} {period}", dataset_id,
                              _only(by_period, period, scenario)["delivery"], "green",
                              scenario=scenario, day=period))
         for target in record.get("targets") or ():
             if target.get("filename"):
                 # A PAIR'S FILE, keyed by its delivery and filename, on the
                 # day its extract is for (REQ-GEN-196 criterion 19).
-                out.append(Built(f"{scenario}'s {target['filename']}", BDM_DATASET,
+                out.append(Built(f"{scenario}'s {target['filename']}", dataset_id,
                                  target["delivery"], target["built_to"],
                                  rules=tuple(target.get("rules") or ()), scenario=scenario,
                                  reference=reference, injected=True, day=target["day"],
@@ -103,29 +125,22 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
                 continue
             entry = _arriving_at(by_period, target["date"], target["at"], scenario)
             out.append(Built(f"{scenario}'s {target['date']} {target['at']} arrival",
-                             BDM_DATASET, entry["delivery"], target["built_to"],
+                             dataset_id, entry["delivery"], target["built_to"],
                              rules=tuple(target.get("rules") or ()), scenario=scenario,
                              reference=reference, injected=True, day=target["date"]))
-    for dataset_id, entries in book.items():
-        if dataset_id == BDM_DATASET:
-            continue
-        for entry in entries:
-            if entry.get("dirty_severity") == "amber":
-                out.append(Built(f"the ordinary amber for {entry['period']}", CP_AMBER_DATASET,
-                                 entry["delivery"], "amber"))
     return out
 
 
 def just_written() -> tuple[list[Built], Path]:
-    """What the Birth Registrations generator has just written and where:
-    its own path constants - which is what a test redirects - never the
+    """What the generator has just written and where: the shared driver's
+    own path constants - which is what a test redirects - never the
     pipeline's view of data/. For the generation-time trial (REQ-GEN-186
     criterion 1), which lives in cli/ and so may not name the bookkeeping
     itself (REQ-GEN-043 criterion 7)."""
-    from generator import generate_runs, scenario_injection
+    from generator import driver, scenario_injection
 
-    return (written(generate_runs.BOOKKEEPING_PATH, scenario_injection.PLACEMENTS_PATH),
-            Path(generate_runs.DELIVERIES_DIR))
+    return (written(driver.BOOKKEEPING_PATH, scenario_injection.PLACEMENTS_PATH),
+            Path(driver.DELIVERIES_DIR))
 
 
 def _only(by_period: dict, period: str, scenario: str) -> dict:

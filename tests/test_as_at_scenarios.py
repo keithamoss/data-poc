@@ -26,7 +26,7 @@ FILES = {f"{t}.csv": f"{t} rows" for t in
 
 
 def _cp_periods():
-    from generator import generate_cp_runs
+    from generator.collections import child_protection as generate_cp_runs
 
     # THE ORIGINAL FIFTEEN (REQ-GEN-207): what TS-79 and the as-at scenarios
     # are placed over; the grown quarters before them carry no scenario.
@@ -34,7 +34,7 @@ def _cp_periods():
 
 
 def _bdm_periods():
-    from generator import generate_runs
+    from generator.collections import civil_registration as generate_runs
 
     return generate_runs.generated_periods()
 
@@ -88,13 +88,13 @@ class TestAKeptSeverityIsOnlyEverAnAmber:
     keeps an amber; a drawn red would be planned and not written."""
 
     def test_a_drawn_red_on_such_a_quarter_is_refused(self, monkeypatch):
-        from generator import generate_cp_runs
+        from generator.collections import child_protection as generate_cp_runs
 
         periods = _cp_periods()
         index = [p.name for p in periods].index(si.resolve(_injection("TS-76"), periods).period)
         plan = list(generate_cp_runs.RUN_PLAN)
         plan[index] = (plan[index][0], "red")
-        monkeypatch.setattr(generate_cp_runs, "RUN_PLAN", plan)
+        monkeypatch.setattr(generate_cp_runs, "run_plan", lambda: plan)
         with pytest.raises(si.CannotPlace, match="TS-76.*keeps only an amber"):
             generate_cp_runs._plan_injections(periods)
 
@@ -118,7 +118,7 @@ class TestOnePlacementCoversSeveralDays:
                                                {"birth-registrations": periods})
 
     def test_the_generator_writes_no_ordinary_supply_on_a_covered_day(self):
-        from generator import generate_runs
+        from generator.collections import civil_registration as generate_runs
 
         _r, by_period, _s, quiet = generate_runs._plan_injections(_bdm_periods())
         covered = generate_runs._covered(by_period)
@@ -175,14 +175,14 @@ class TestWhereTheNewChildProtectionScenariosSit:
             assert _injection(sid).anchor not in (-1, -2, -15), sid
 
     def test_every_one_is_planned_through_the_per_delivery_check(self):
-        from generator import generate_cp_runs
+        from generator.collections import child_protection as generate_cp_runs
 
         resolved, _ = generate_cp_runs._plan_injections(_cp_periods())
         assert {"TS-75a", "TS-76", "TS-77a"} <= {i.scenario_id for i, _p in resolved}
 
     def test_ts_75_dirties_clients_alone(self):
         """Criterion 1: red by cp_clients' own preset alone (H2)."""
-        from generator import generate_cp_runs
+        from generator.collections import child_protection as generate_cp_runs
 
         seen = []
 

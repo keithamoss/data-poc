@@ -225,7 +225,7 @@ def truncate_to_row_count(df: pd.DataFrame, target_rows: int, seed: int) -> pd.D
     count rather than a self-referential rate - used for the row-count-
     growth check specifically, since that check compares against the
     PREVIOUS run's actual row count, and this dataset's own base row count
-    already varies run to run (see generate_runs.py's RUN_PLAN) enough
+    already varies run to run (see civil_registration.py's RUN_PLAN) enough
     that a fixed drop-rate from THIS run's own count doesn't reliably land
     a specific percentage below whatever the previous run happened to be."""
     if target_rows >= len(df):
@@ -397,7 +397,7 @@ def apply_birth_registrations_presets(df: pd.DataFrame, severity: str, seed: int
     here at all.
 
     previous_row_count: the immediately preceding run's actual row count
-    (generate_runs.py tracks this across its own loop) - when given, this
+    (civil_registration.py tracks this across its own loop) - when given, this
     run gets truncated down to a specific percentage below THAT number
     (10-25% for amber, past 25% for red - matching the row-count-growth
     check's own warn/fail bands) rather than a fixed self-referential
@@ -501,7 +501,7 @@ def apply_cp_notifications_presets(df: pd.DataFrame, clients_df: pd.DataFrame, w
     why this is a different failure mode from everything else in this
     module). `clients_df`/`workers_df` are the REAL (undirtied) parent
     tables the caller passes in specifically to build each dangling
-    injector's `existing_ids` exclusion set from - see generate_cp_runs.
+    injector's `existing_ids` exclusion set from - see child_protection.py.
     py's main() for why it passes base_tables here, not this run's own
     (possibly already-dirtied-elsewhere) copies."""
     rate = 0.01 if severity == "amber" else 0.05
@@ -678,7 +678,7 @@ def apply_cp_investigations_presets(investigations_df: pd.DataFrame, clients_df:
 
 def apply_cp_carers_presets(carers_df: pd.DataFrame, severity: str, seed: int) -> pd.DataFrame:
     """New (plans/qa-pipeline.md #27, 2026-09-15): cp_carers was never
-    touched by any preset before this - generate_cp_runs.py's own
+    touched by any preset before this - child_protection.py's own
     docstring used to describe this as deliberate ("the other two tables
     are clean in every run"), but that was only ever true because nothing
     had scoped closing the gap, not because there was no real check to

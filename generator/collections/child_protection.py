@@ -1,10 +1,20 @@
-"""
+"""Child Protection's generator provider (REQ-GEN-246): the collection's
+rows, seed schedule and period plan. The slot loop, the bookkeeping,
+delivery and receipt writing and injection placement are the shared
+driver's (generator/driver.py); this module was generator/generate_cp_runs.py,
+and everything below that is not the driver's moved here unchanged, so the
+generated history is byte-identical.
+
+IMPORTABLE WITHOUT pandas OR numpy (criterion 7): every tool import is
+deferred to the function that needs it; RUN_PLAN, GROWN_RUN_PLAN and the
+resupply delay curve are computed on first use.
+
 Generates periodic Child Protection collection snapshots as real
-deliveries - the "whole collection" counterpart to generate_runs.py's
+deliveries - the "whole collection" counterpart to civil_registration.py's
 daily birth-registrations feed. Each snapshot is ONE delivery holding
 all six tables, because they arrive together as one extract.
 
-Deliberately a different generation model from generate_runs.py, by design
+Deliberately a different generation model from civil_registration.py, by design
 (see plans/dashboard.md #1 and the AskUserQuestion decisions that shaped
 this): Child Protection isn't a daily event feed, it's a periodic full
 extract of the same underlying casework collection - the population and
@@ -63,7 +73,7 @@ the QA-pipeline scenario, not the core generator.
 RESUPPLY SIMULATION (2026-09-18, item 80/plans/qa-pipeline.md - "CP
 resupply simulation," queued in plans/running-thoughts.md since the
 Phase 7 resupply-chain redesign found CP had zero resupply concept at
-all). Reuses generate_runs.py's own generic chain-orchestration engine
+all). Reuses civil_registration.py's own generic chain-orchestration engine
 (generator/resupply.py) - a scheduled quarterly delivery that rolls red
 now gets a real resupply attempt some working days later, possibly
 still red, exactly like Birth Registrations' daily feed - rather than
@@ -74,7 +84,7 @@ payload is a whole delivery's worth of tables at once. Generalized
 (same 2026-09-18 change) to a generic `T` instead of forking the
 module - see resupply.py's own docstring for the full account.
 ChildProtectionProvider below is the CP-specific plug-in;
-generate_runs.py's BirthRegistrationsProvider remains the BDM one,
+civil_registration.py's BirthRegistrationsProvider remains the BDM one,
 unchanged. The dashboard-side supply-history UI needed NO changes for
 this - Phase 7's own resupply-chain redesign (plans/conceptual-
 design.md Thread A) already derives chain membership purely from real
@@ -85,50 +95,28 @@ before this was actually built).
 from __future__ import annotations
 
 import dataclasses
-import json
-import os
+import functools
 from datetime import date, datetime, timedelta
-
-import numpy as np
-import pandas as pd
+from typing import TYPE_CHECKING
 
 from qa_tools.common import hierarchy
 from generator.anchor_date import get_anchor_date
-from generator import receipt_instants
-from generator import dirty as dirty_mod
-from generator import delivery_names, scenario_injection
-from generator.resupply import MAX_ATTEMPTS, Delivery, DatasetProvider, run_slot_chain
-from qa_tools.common import arrivals, asset_time, delivery, schedule
+from generator.collections.base import Job, Plan, Provider
+from qa_tools.common import asset_time, schedule
+
+if TYPE_CHECKING:  # annotations only - never imported at module level
+    import pandas as pd
+    from generator.resupply import DatasetProvider
 
 # Which dataset's calendar this collection is scheduled against. All six
 # CP tables arrive together as one supply, so any of them names the same
 # quarterly calendar - cp-clients is simply the first.
 DATASET_ID = "cp-clients"
-from synthetic_data_generator.population import generate_population
-from synthetic_data_generator.child_protection import generate_child_protection_collection
-
-ROOT = os.path.join(os.path.dirname(__file__), "..")
-
-
-# WHERE THIS GENERATOR WRITES, all of it, read at call time and never
-# captured into a default arg, so a test can redirect every one.
-#
-# Redirecting a single output directory used to isolate a test run.
-# REQ-GEN-043 gave the generator two more - the delivery tree and the
-# receipts beside it - plus a shared bookkeeping file, and all three
-# defaulted to the real ones under data/. So the module's own
-# isolation, which exists because "tests and production share an
-# output directory" was a real problem once (Keith, 2026-09-18),
-# quietly stopped covering most of what gets written. Named here so
-# there is one place to redirect and one place to notice a fourth.
-DELIVERIES_DIR = delivery.DELIVERIES_DIR
-RECEIPTS_DIR = delivery.RECEIPTS_DIR
-BOOKKEEPING_PATH = delivery.BOOKKEEPING_PATH
 
 
 POPULATION_N = 70_000
 N_CASE_WORKERS = 60
-BASE_SEED = 5000  # distinct range from generate_runs.py's 1000s and generate.py's demo seeds
+BASE_SEED = 5000  # distinct range from civil_registration.py's 1000s and generate.py's demo seeds
 
 # The six CP tables, in the order contract/data-asset.yaml declares
 # them - resolved, not restated (REQ-QAC-039).
@@ -142,9 +130,14 @@ TABLES = [d.table for d in hierarchy.datasets_in_collection("child-protection")]
 # (1-4 week) range lands ~76% of the mass within the first 10 business
 # days (2 weeks), tailing to 20 (4 weeks) - matches that framing without
 # claiming false precision on the exact shape.
-_CP_DELAY_DAYS = np.arange(5, 21)
-_CP_DELAY_WEIGHTS = 0.8 ** (_CP_DELAY_DAYS - 5)
-_CP_DELAY_WEIGHTS = _CP_DELAY_WEIGHTS / _CP_DELAY_WEIGHTS.sum()
+@functools.cache
+def _cp_delay():
+    """(_CP_DELAY_DAYS, _CP_DELAY_WEIGHTS), built on first use."""
+    import numpy as np
+
+    days = np.arange(5, 21)
+    weights = 0.8 ** (days - 5)
+    return days, weights / weights.sum()
 
 # (quarter offset from run 1, dirty severity or None) - 15 quarterly
 # snapshots spanning ~4 years, Feb/May/Aug/Nov-anchored (re-anchored
@@ -161,7 +154,7 @@ _CP_DELAY_WEIGHTS = _CP_DELAY_WEIGHTS / _CP_DELAY_WEIGHTS.sum()
 # quarters ending on the last one at or before "today" (2026-09-17) is
 # 2023-02-01 through 2026-08-01 (2026-11-01 would be the 16th, but that's
 # in the future relative to the fixture's own "today," which this
-# project's real data never extends past - see generate_runs.py's
+# project's real data never extends past - see civil_registration.py's
 # identical BDM-side convention). Ratio/shape below (first run clean,
 # last run red, ~25% amber in between) is unchanged from the calendar-
 # quarter version - only N_QUARTERS and _quarter_start()'s anchor month
@@ -171,11 +164,13 @@ N_QUARTERS = 15
 
 
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
+    import numpy as np
+
     rng = np.random.default_rng(seed)
     n_amber = max(1, round(n * 0.25))  # ~matches the original plan's 2/10 ratio
     # Two RED deliveries at a random position among every NON-FIRST slot
     # (2026-09-18, CP resupply simulation) - matches Birth Registrations'
-    # own precedent (RUN_PLAN's own comment in generate_runs.py: "bumped
+    # own precedent (RUN_PLAN's own comment in civil_registration.py: "bumped
     # from a single red to 2 so the resupply-chain simulation... had more
     # than one independent example to demonstrate variability") - one
     # resupply chain that's already resolved by the time history ends,
@@ -191,7 +186,10 @@ def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
     return list(enumerate([None] + rest))
 
 
-RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
+@functools.cache
+def run_plan() -> list[tuple[int, str | None]]:
+    """RUN_PLAN, drawn on first use (criterion 7)."""
+    return _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
 
 # TEN YEARS MORE AT THE OLD END (REQ-GEN-207, Keith, 2026-10-15): forty
 # quarters before the original fifteen, so the scenarios still to be planted
@@ -204,7 +202,24 @@ RUN_PLAN = _build_run_plan(N_QUARTERS, _RUN_PLAN_SEED)
 GROWN_QUARTERS = 40
 _GROWN_PLAN_SEED = 29000   # disjoint from _RUN_PLAN_SEED and every BASE_SEED offset
 GROWN_BASE_SEED = 30000    # seeds 30001.. and their +500/+800/+900 offsets
-GROWN_RUN_PLAN = _build_run_plan(GROWN_QUARTERS, _GROWN_PLAN_SEED)
+@functools.cache
+def grown_run_plan() -> list[tuple[int, str | None]]:
+    """GROWN_RUN_PLAN, drawn on first use (criterion 7)."""
+    return _build_run_plan(GROWN_QUARTERS, _GROWN_PLAN_SEED)
+
+
+def __getattr__(name: str):
+    """The plans and the delay curve as module attributes, computed when
+    first asked for rather than at import (criterion 7)."""
+    if name == "RUN_PLAN":
+        return run_plan()
+    if name == "GROWN_RUN_PLAN":
+        return grown_run_plan()
+    if name == "_CP_DELAY_DAYS":
+        return _cp_delay()[0]
+    if name == "_CP_DELAY_WEIGHTS":
+        return _cp_delay()[1]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 _CASE_WORKERS = "cp-case-workers"
 
 
@@ -237,7 +252,7 @@ def _add_quarters(d: date, n: int) -> date:
 
 # Rolling window ending on the anchor date ("today" by default, pinnable
 # via GENERATOR_ANCHOR_DATE - see anchor_date.py), same fix and rationale
-# as generate_runs.py's own START_DATE - un-stales the fixture generally
+# as civil_registration.py's own START_DATE - un-stales the fixture generally
 # (plans/qa-pipeline.md #3's follow-up covers both). No wall-clock-
 # relative check depends on CP's dates today, unlike BDM's, but there's
 # no reason to leave CP's snapshots drifting stale either.
@@ -250,6 +265,9 @@ def _add_extract_timestamp(df: pd.DataFrame, snapshot_date: date, date_col: str 
     agency_datasets.py uses for birth_registrations - not tied to any
     per-row date column, since this is a whole-collection re-extract, not
     a per-record event timestamp."""
+    import numpy as np
+    import pandas as pd
+
     out = df.copy()
     rng = np.random.default_rng(seed)
     base = pd.Timestamp(snapshot_date)
@@ -282,6 +300,8 @@ def _pick_dirty_tables(seed: int, available: list[str] | None = None) -> set[str
     Where only one table is being sent, that one is dirtied: "never 1"
     is an invariant about a six-table delivery, not a rule that a
     single-table one must come back clean."""
+    import numpy as np
+
     tables = list(TABLES if available is None else available)
     rng = np.random.default_rng(seed)
     n_dirty = min(int(rng.integers(2, 4)), len(tables))  # 2 or 3, or all of a smaller delivery
@@ -351,6 +371,8 @@ class ChildProtectionProvider:
             return targeting.cp_amber(payload, seed=seed)
         # Scoped to what this delivery actually CONTAINS - a partial
         # resupply has only the tables being resent (REQ-GEN-040).
+        from generator import dirty as dirty_mod
+
         present = [t for t in TABLES if t in payload]
         dirty_tables = _pick_dirty_tables(seed, present)
         tables = dict(payload)
@@ -411,6 +433,8 @@ class ChildProtectionProvider:
         failed = sorted(_pick_dirty_tables(previous_dirty_seed, present))
         if not failed:  # defensive - a chain only resupplies what went red
             return payload
+        import numpy as np
+
         rng = np.random.default_rng(seed)
         n_sent = int(rng.integers(1, len(failed) + 1))
         sent = set(rng.choice(failed, size=n_sent, replace=False))
@@ -431,6 +455,9 @@ class ChildProtectionProvider:
         rule (see _CHURN_TABLES' own comment above) - the modify-only
         version can never do that, since it never changes which rows
         exist, only when they were extracted."""
+        import numpy as np
+        import pandas as pd
+
         rng = np.random.default_rng(seed)
         out = dict(payload)
         # Always the WHOLE collection: run_slot_chain churns the clean
@@ -463,6 +490,8 @@ def _cp_received_at(payload: dict, received_date: date, where: str) -> str:
     Across six tables, the earliest legitimate extract wins - the
     collection arrives as one supply, so it has one receipt instant.
     """
+    import pandas as pd
+
     earliest = None
     for name in TABLES:
         df = payload[name]
@@ -483,7 +512,7 @@ def _cp_received_at(payload: dict, received_date: date, where: str) -> str:
 def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
                                        run_index_start: int, seed: int) -> list[dict]:
     """Pure manifest-entry construction for the deliveries filling ONE
-    SLOT - the CP counterpart to generate_runs.py's own
+    SLOT - the CP counterpart to civil_registration.py's own
     _manifest_entries_for_slot(), same dateless run_id convention, but
     `row_counts` (one count per real table) instead of a single
     `n_rows_generated`/`file`, since CP writes one directory of 6 CSVs
@@ -511,49 +540,11 @@ def _cp_manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
 
 
 
-def _write_bookkeeping(manifest: list[dict]) -> None:
-    """The generator's own record, OUTSIDE every delivery (criterion 6).
-
-    Which slot each delivery was built to fill, which scenario it came
-    from, what severity was injected - real and worth keeping, because
-    it is how a test asserts that recognition got the right answer.
-
-    NO PIPELINE, QA OR DASHBOARD-BUILD MODULE MAY READ IT (criterion 7).
-    One that did would be making filing decisions from a declaration
-    rather than from arrival plus slot state, which is the
-    supplier-declared manifest Thread B rejected wearing our own badge.
-    The generator reads it back for two purposes only: to delete what it
-    wrote last time, so a regeneration overwrites rather than
-    accumulates, and to say what each supply was built to
-    (generator/targets.py, REQ-GEN-186) - which reaches the comparison
-    after a replay as plain values, through cli/, never by the QA
-    module opening this file.
-    """
-    path = BOOKKEEPING_PATH
-    book = {}
-    if path.exists():
-        with open(path) as f:
-            book = json.load(f)
-    book[DATASET_ID] = manifest
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(book, f, indent=2)
-
-
-def _previous_delivery_names() -> list[str]:
-    """What this generator wrote last time, from its own bookkeeping."""
-    path = BOOKKEEPING_PATH
-    if not path.exists():
-        return []
-    with open(path) as f:
-        book = json.load(f)
-    return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
-
 def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
                     placement=None, drawn: str | None = None):
     """The arrivals ONE injected scenario needs, in place of the
     ordinary chain (REQ-GEN-044) - the Child Protection counterpart to
-    generate_runs.py's own, and see that one's docstring for why an
+    civil_registration.py's own, and see that one's docstring for why an
     injected slot does not go through run_slot_chain().
 
     Each arrival after the first is CHURNED from the one before, which
@@ -561,6 +552,8 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     together - a corrected resupply of one table is still taken from a
     collection that did not stand still.
     """
+    from generator.resupply import Delivery
+
     deliveries = []
     payload = provider.generate(period.date, seed=seed, n_rows=0, id_offset=0)
     for n, extra in enumerate(injection.arrivals):
@@ -605,25 +598,26 @@ def generated_periods() -> list:
     """The periods this generator writes, oldest first - one delivery each:
     the grown quarters, then the original fifteen (REQ-GEN-207)."""
     return schedule.periods_for_dataset(
-        DATASET_ID, until=get_anchor_date())[-(len(GROWN_RUN_PLAN) + len(RUN_PLAN)):]
+        DATASET_ID, until=get_anchor_date())[-(len(grown_run_plan()) + len(run_plan())):]
 
 
 def original_periods() -> list:
     """The original fifteen, whose plan, seeds and slots are RUN_PLAN's."""
-    return generated_periods()[-len(RUN_PLAN):]
+    return generated_periods()[-len(run_plan()):]
 
 
 def grown_periods() -> list:
     """The quarters REQ-GEN-207 added before them, oldest first."""
-    return generated_periods()[:-len(RUN_PLAN)]
+    return generated_periods()[:-len(run_plan())]
 
 
 def _drawn_by_period(periods) -> dict:
     """Each period's drawn severity by name, from whichever plan owns it."""
+    plan, grown_plan = run_plan(), grown_run_plan()
     names = [p.name for p in periods]
-    grown, original = names[:-len(RUN_PLAN)], names[-len(RUN_PLAN):]
-    return {**dict(zip(grown[-len(GROWN_RUN_PLAN):], (s for _q, s in GROWN_RUN_PLAN))),
-            **dict(zip(original, (s for _q, s in RUN_PLAN)))}
+    grown, original = names[:-len(plan)], names[-len(plan):]
+    return {**dict(zip(grown[-len(grown_plan):], (s for _q, s in grown_plan))),
+            **dict(zip(original, (s for _q, s in plan)))}
 
 
 def _plan_injections(periods):
@@ -633,7 +627,7 @@ def _plan_injections(periods):
     # carries all six tables, so an injection about any of them is placed
     # against the delivery's periods. Planning cp-clients' only skipped
     # TS-56 (cp-carers) without a word - criterion 4's silent absence.
-    from qa_tools.common import hierarchy
+    from generator import scenario_injection
 
     ours = {d.dataset_id for d in hierarchy.datasets_in_collection("child-protection")}
     mine = [i for i in scenario_injection.INJECTIONS if i.dataset_id in ours]
@@ -691,7 +685,7 @@ def _ordinary_severities(periods, injected_by_period) -> list:
                             if (p.name in injected_by_period
                                 and not injected_by_period[p.name][0].keeps_drawn_severity)
                             or p.name in green)
-    out = targeting.outside_hold([sev for _q, sev in RUN_PLAN[:len(periods)]],
+    out = targeting.outside_hold([sev for _q, sev in run_plan()[:len(periods)]],
                                  [p.date for p in periods], "cp-clients",
                                  keep_clean=frozenset({0}), unavailable=unavailable)
     # A LEAD-IN OR FOLLOWING PERIOD IS A SINGLE CLEAN DELIVERY (REQ-GEN-185):
@@ -710,7 +704,7 @@ def _grown_severities(periods, injected_by_period) -> list:
     quarter or force its lead-ins clean, so a scenario here would silently
     swallow them. Teach it to, as _ordinary_severities does, before planting
     one in a grown quarter."""
-    from generator import targeting
+    from generator import scenario_injection, targeting
 
     names = {p.name for p in periods}
     for period, (injection, _placement) in injected_by_period.items():
@@ -721,174 +715,151 @@ def _grown_severities(periods, injected_by_period) -> list:
                 f"or keep its lead-ins clean - teach _grown_severities to, as "
                 f"_ordinary_severities does, before planting a scenario there")
 
-    return targeting.outside_hold([sev for _q, sev in GROWN_RUN_PLAN[:len(periods)]],
+    return targeting.outside_hold([sev for _q, sev in grown_run_plan()[:len(periods)]],
                                   [p.date for p in periods], "cp-clients",
                                   keep_clean=frozenset({0}), unavailable=frozenset())
 
 
-def main() -> None:
-    print(f"Generating base Child Protection collection (population={POPULATION_N:,}, seed={BASE_SEED})...")
-    pop = generate_population(POPULATION_N, seed=BASE_SEED)
-    base_tables = generate_child_protection_collection(pop, seed=BASE_SEED + 1000, n_case_workers=N_CASE_WORKERS)
-    for name in TABLES:
-        print(f"  {name}: {len(base_tables[name]):,} rows")
+#: The largest offset any derivation adds to a slot's own seed: generate()'s
+#: +5000 for the extract timestamps, above the resupply chain's +900, the
+#: per-table presets' +600 and their own +19.
+SEED_SPAN = 5999
 
-    provider: DatasetProvider = ChildProtectionProvider(base_tables)
-    manifest = []
-    # Arbitrary names can collide, and a collision would merge two
-    # arrivals into one directory. Enforced, not hoped for.
-    # The same quarterly calendar the pipeline judges these supplies
-    # against - not a private copy of the cadence (REQ-GEN-042). A
-    # generator carrying its own would place supplies against one
-    # schedule while the pipeline measured them against another, and the
-    # disagreement would read as a model failure rather than a config
-    # duplication.
-    periods = generated_periods()
-    original, grown = original_periods(), grown_periods()
 
-    # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
-    resolved_injections, injected_by_period = _plan_injections(periods)
-    # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
-    # Each plan over its own periods (REQ-GEN-207 criterion 4).
-    severities = _ordinary_severities(original, injected_by_period)
-    grown_severities = _grown_severities(grown, injected_by_period)
-    # ONLY THEN is the last history cleared: a scenario or target refused
-    # above leaves the one already on disk standing (REQ-GEN-184
-    # criterion 11).
-    # Clear what THIS generator wrote last time, so a regeneration
-    # overwrites its own history rather than accumulating beside it
-    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
-    # generator has on disk so two arrivals can never share a
-    # directory (REQ-GEN-043).
-    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
-    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
+class ChildProtection(Provider):
+    """Child Protection's half of the shared driver (REQ-GEN-246): the old
+    main()'s planning and per-slot decisions, unchanged, split across the
+    driver's hooks."""
 
-    # THE ORIGINAL FIFTEEN FIRST, numbered and seeded exactly as before, then
-    # the grown quarters (REQ-GEN-207 criterion 4).
-    jobs = [(f"cp_slot_{i:02d}", BASE_SEED + i, severity, period)
-            for i, (severity, period) in enumerate(zip(severities, original), start=1)]
-    jobs += [(f"cp_slot_{len(original) + j:02d}", GROWN_BASE_SEED + j, severity, period)
-             for j, (severity, period) in enumerate(zip(grown_severities, grown), start=1)]
-    # A GROWN QUARTER CASE WORKERS OWES NOTHING IN CARRIES FIVE FILES (Keith,
-    # 2026-10-15): as a supplier sending twice a year would. Twenty held
-    # off-month files back to 2013 otherwise filled the outstanding queue. The
-    # original fifteen keep sending all six, so their held shape stays.
-    grown_names = {p.name for p in grown}
-    case_workers_owed = {p.name for p in schedule.periods_for_dataset(_CASE_WORKERS) if p.expected}
-    for slot_id, seed, severity, period in jobs:
-        snapshot_date = period.date
+    collection_id = "child-protection"
+    dataset_id = DATASET_ID
+    seed_ranges = ((5000, 11100), (29000, 36100))
+    # NO TARGET TRIAL: a targeted Child Protection injection is refused at
+    # planning (REQ-GEN-185), and ordinary ambers are compared after the
+    # replay, never trialled (REQ-GEN-186, Keith 2026-10-11).
+    target_trial = False
+    target_datasets = (DATASET_ID,)
+    target_levers = "client-postcodes"
+    amber_dataset = DATASET_ID
 
-        injected = injected_by_period.get(period.name)
+    def seed_schedule(self) -> list[tuple[str, int, int]]:
+        out = [("the population", BASE_SEED, BASE_SEED),
+               ("the collection", BASE_SEED + 1000, BASE_SEED + 1000),
+               ("the run plan", _RUN_PLAN_SEED, _RUN_PLAN_SEED),
+               ("the grown quarters' plan", _GROWN_PLAN_SEED, _GROWN_PLAN_SEED)]
+        out += [(f"cp_slot_{i:02d}", BASE_SEED + i, BASE_SEED + i + SEED_SPAN)
+                for i in range(1, N_QUARTERS + 1)]
+        out += [(f"cp_slot_{N_QUARTERS + j:02d}", GROWN_BASE_SEED + j,
+                 GROWN_BASE_SEED + j + SEED_SPAN) for j in range(1, GROWN_QUARTERS + 1)]
+        return out
+
+    def generated_periods(self) -> list:
+        return generated_periods()
+
+    def plan(self) -> Plan:
+        from synthetic_data_generator.child_protection import generate_child_protection_collection
+        from synthetic_data_generator.population import generate_population
+
+        print(f"Generating base Child Protection collection (population={POPULATION_N:,}, "
+              f"seed={BASE_SEED})...")
+        pop = generate_population(POPULATION_N, seed=BASE_SEED)
+        base_tables = generate_child_protection_collection(pop, seed=BASE_SEED + 1000,
+                                                           n_case_workers=N_CASE_WORKERS)
+        for name in TABLES:
+            print(f"  {name}: {len(base_tables[name]):,} rows")
+        # The same quarterly calendar the pipeline judges these supplies
+        # against - not a private copy of the cadence (REQ-GEN-042).
+        periods = generated_periods()
+        original, grown = original_periods(), grown_periods()
+
+        # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4).
+        resolved_injections, injected_by_period = _plan_injections(periods)
+        # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
+        # Each plan over its own periods (REQ-GEN-207 criterion 4).
+        severities = _ordinary_severities(original, injected_by_period)
+        grown_severities = _grown_severities(grown, injected_by_period)
+
+        # THE ORIGINAL FIFTEEN FIRST, numbered and seeded exactly as before,
+        # then the grown quarters (REQ-GEN-207 criterion 4).
+        jobs = [Job(f"cp_slot_{i:02d}", BASE_SEED + i, severity, period)
+                for i, (severity, period) in enumerate(zip(severities, original), start=1)]
+        jobs += [Job(f"cp_slot_{len(original) + j:02d}", GROWN_BASE_SEED + j, severity, period)
+                 for j, (severity, period) in enumerate(zip(grown_severities, grown), start=1)]
+        return Plan(jobs=jobs, resolved=resolved_injections, injected_by_period=injected_by_period,
+                    state={"provider": ChildProtectionProvider(base_tables), "original": original,
+                           # A GROWN QUARTER CASE WORKERS OWES NOTHING IN CARRIES
+                           # FIVE FILES (Keith, 2026-10-15): as a supplier sending
+                           # twice a year would. The original fifteen keep sending
+                           # all six, so their held shape stays.
+                           "grown_names": {p.name for p in grown},
+                           "case_workers_owed": {p.name for p in schedule.periods_for_dataset(
+                               _CASE_WORKERS) if p.expected}})
+
+    def slot(self, plan: Plan, job: Job) -> list:
+        from generator.resupply import run_slot_chain
+
+        provider = plan.state["provider"]
+        injected = plan.injected_by_period.get(job.period.name)
         if injected is not None:
-            deliveries = _injected_chain(provider, injected[0], period, seed,
-                                          placement=injected[1], drawn=severity)
-        else:
-            deliveries = list(run_slot_chain(
-                provider, snapshot_date, seed, id_offset=0, n_rows=0,
-                first_severity=severity, previous_row_count=None,
-                delay_days=_CP_DELAY_DAYS, delay_weights=_CP_DELAY_WEIGHTS,
-            ))
-        entries = _cp_manifest_entries_for_slot(deliveries, slot_id, period.name, len(manifest), seed)
+            return _injected_chain(provider, injected[0], job.period, job.seed,
+                                   placement=injected[1], drawn=job.severity)
+        delay_days, delay_weights = _cp_delay()
+        return list(run_slot_chain(
+            provider, job.period.date, job.seed, id_offset=0, n_rows=0,
+            first_severity=job.severity, previous_row_count=None,
+            delay_days=delay_days, delay_weights=delay_weights,
+        ))
 
-        for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
-            # ONE WRITE, NOT TWO (REQ-PIPE-102, 2026-09-27). This used
-            # to write each run's six tables to a run directory of its
-            # own AND as a real delivery below - the same rows twice,
-            # in two trees, able to disagree. Only the delivery is an
-            # arrival; the other copy was there because the CP tools
-            # once read CSVs off disk, which they stopped doing in
-            # REQ-QAC-088.
-            csvs = {}
-            for name in TABLES:
-                df = delivery_obj.payload[name]
-                cols = [c for c in df.columns if not c.startswith("_")]
-                csvs[f"{name}.csv"] = df[cols].to_csv(index=False)
-            if period.name in grown_names and period.name not in case_workers_owed:
-                csvs.pop(f"{hierarchy.dataset(_CASE_WORKERS).table}.csv")
-            if injected is not None:
-                # THE SCENARIO'S OWN FILE SET AND ITS OWN INSTANT. Three
-                # of these scenarios ARE a file set - an unreadable
-                # table, a duplicate match, a rename nothing claims - so
-                # shaping the delivery is the whole injection rather
-                # than a detail of it.
-                extra = injected[0].arrivals[n - 1]
-                csvs = scenario_injection.apply_file_shape(extra.file_shape, csvs)
-                entry["received_at"] = asset_time.isoformat(
-                    asset_time.wall_clock(delivery_obj.received_date, extra.at))
-            else:
-                entry["received_at"] = _cp_received_at(
-                    delivery_obj.payload, delivery_obj.received_date,
-                    f"received_at for {entry['run_id']}")
+    def entries(self, plan: Plan, job: Job, deliveries: list, run_index_start: int) -> list[dict]:
+        return _cp_manifest_entries_for_slot(deliveries, job.slot_id, job.period.name,
+                                             run_index_start, job.seed)
 
-            # AND AS A REAL DELIVERY (REQ-GEN-043). All six tables in
-            # ONE directory, because they arrive together as one
-            # extract - six deliveries would be six arrivals that never
-            # happened (criterion 11). Each filename matches its own
-            # dataset's configured arrivalPattern, so which dataset a
-            # file belongs to is derivable from the name alone.
-            dname = delivery_names.delivery_name(snapshot_date, seed, attempt=n, taken=taken_names)
-            taken_names.add(dname)
-            entry["delivery"] = dname
-            if injected is not None:
-                # The delivery NAME, resolved to a real run id from
-                # recognition below - see scenario_injection's own
-                # resolve_run_ids() for why not this manifest's id.
-                injected[1].arrivals[n - 1]["delivery"] = dname
-            first = asset_time.parse_instant(entry["received_at"], entry["run_id"])
-            delivery.write_delivery(
-                dname, csvs,
-                # EACH FILE ITS OWN INSTANT (REQ-GEN-044 criteria 12-14):
-                # mostly all at once, as if unzipped, sometimes trickling
-                # in over ten minutes. An INJECTED scenario keeps the one
-                # instant it states, because that instant is part of what
-                # the scenario demonstrates.
-                received_at=(first if injected is not None
-                             else receipt_instants.instants_for(csvs, first, dname)),
-                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
-                # STORAGE - see generate_runs.py's identical note. The
-                # generator plays the object store here.
-                received_from=delivery.RECEIVED_FROM_STORAGE)
+    def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
+        injected = plan.injected_by_period.get(job.period.name)
+        if injected is not None:
+            # THE SCENARIO'S OWN INSTANT.
+            extra = injected[0].arrivals[n - 1]
+            return asset_time.isoformat(asset_time.wall_clock(delivery_obj.received_date, extra.at))
+        return _cp_received_at(delivery_obj.payload, delivery_obj.received_date,
+                               f"received_at for {entry['run_id']}")
 
-            tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
-            resupply_tag = (f"  [resupply {n - 1}, received "
-                             f"{delivery_obj.received_date.isoformat()}]") if n > 1 else ""
-            print(f"{entry['run_id']}: {entry['row_counts']['cp_notifications']:5d} notifications  "
-                  f"[{tag}]{resupply_tag}  -> {dname}/")
-            if delivery_obj.severity == "red" and n >= MAX_ATTEMPTS:
-                print(f"  -> still red after {n} deliveries - "
-                      f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
+    def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
+        from generator import receipt_instants, scenario_injection
 
-        manifest.extend(entries)
+        # ALL SIX TABLES IN ONE DELIVERY, because they arrive together as one
+        # extract - six deliveries would be six arrivals that never happened
+        # (REQ-GEN-043 criterion 11). Each filename matches its own dataset's
+        # configured arrivalPattern.
+        csvs = {}
+        for table in TABLES:
+            df = delivery_obj.payload[table]
+            cols = [c for c in df.columns if not c.startswith("_")]
+            csvs[f"{table}.csv"] = df[cols].to_csv(index=False)
+        period = job.period.name
+        if period in plan.state["grown_names"] and period not in plan.state["case_workers_owed"]:
+            csvs.pop(f"{hierarchy.dataset(_CASE_WORKERS).table}.csv")
+        first = asset_time.parse_instant(entry["received_at"], entry["run_id"])
+        injected = plan.injected_by_period.get(period)
+        if injected is not None:
+            # THE SCENARIO'S OWN FILE SET AND ITS OWN INSTANT. Three of these
+            # scenarios ARE a file set - an unreadable table, a duplicate
+            # match, a rename nothing claims - so shaping the delivery is the
+            # whole injection rather than a detail of it.
+            csvs = scenario_injection.apply_file_shape(injected[0].arrivals[n - 1].file_shape, csvs)
+            return csvs, first
+        # EACH FILE ITS OWN INSTANT (REQ-GEN-044 criteria 12-14): mostly all
+        # at once, as if unzipped, sometimes trickling in over ten minutes.
+        return csvs, receipt_instants.instants_for(csvs, first, name)
 
-    # NO manifest.json ANY MORE (REQ-GEN-043). It held exactly the
-    # list below, which _write_bookkeeping() also holds - two copies of
-    # the same bookkeeping, in two files, able to disagree. Nothing in
-    # the pipeline had read it since arrivals became recognised rather
-    # than declared, so the only thing it could still do was tempt
-    # somebody to wire it back up.
-    if resolved_injections:
-        placed = [placement for _, placement in resolved_injections]
-        recognised = arrivals.arrivals_for(
-            hierarchy.dataset(DATASET_ID).collection_id, "cp_run_",
-            DELIVERIES_DIR, RECEIPTS_DIR)
-        scenario_injection.check_suppressed_days_are_empty(placed, recognised)
-        scenario_injection.resolve_run_ids(placed, recognised)
-        scenario_injection.check_every_index_has_its_supply(placed)
-        # TS-79 IN THE SAME WRITE (REQ-GEN-199 criterion 20): every Child
-        # Protection regeneration replaces its records rather than merging
-        # past them, so a stale date cannot survive an ANCHOR_DATE bump.
-        # OVER THE ORIGINAL FIFTEEN (REQ-GEN-207 criterion 4): TS-79b stays on
-        # the quarter it names today rather than the new oldest inherited one.
-        placed += scenario_injection.inheritance_placements(original)
-        written = scenario_injection.write_placements(
-            placed, merge=True)
-        print(f"Recorded {len(placed)} injected scenario placement(s) -> {written}")
-    _write_bookkeeping(manifest)
-    n_red_slots = sum(1 for _, sev in RUN_PLAN + GROWN_RUN_PLAN if sev == "red")
-    print(f"\nWrote {len(manifest)} deliveries across {len(jobs)} scheduled slots "
-          f"({n_red_slots} of which went red and triggered a resupply chain) "
-          f"to {os.path.abspath(DELIVERIES_DIR)}")
+    def describe(self, entry: dict, delivery_obj) -> str:
+        return f"{entry['row_counts']['cp_notifications']:5d} notifications"
+
+    def extra_placements(self, plan: Plan) -> list:
+        from generator import scenario_injection
+
+        # TS-79 IN THE SAME WRITE (REQ-GEN-199 criterion 20), over the
+        # original fifteen (REQ-GEN-207 criterion 4).
+        return scenario_injection.inheritance_placements(plan.state["original"])
 
 
-if __name__ == "__main__":
-    main()
+PROVIDER = ChildProtection()

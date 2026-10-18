@@ -175,8 +175,24 @@ class TestAThirdCollectionAtEverySite:
         from qa_tools.common import bootstrap as boot
 
         dispatched, self.ran = [], []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: None)
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: None)
+        import tempfile
+        from pathlib import Path
+
+        from generator import driver, scenario_injection
+
+        # The two real collections generate nothing; the fake's own plan()
+        # records that the shared driver asked for it (REQ-GEN-246), with
+        # everything the driver writes kept out of the real data/.
+        scratch = Path(tempfile.mkdtemp())
+        for name, value in (("DELIVERIES_DIR", scratch / "deliveries"),
+                            ("RECEIPTS_DIR", scratch / "receipts"),
+                            ("BOOKKEEPING_PATH", scratch / "bookkeeping.json")):
+            monkeypatch.setattr(driver, name, value)
+        monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH", scratch / "placements.json")
+        real = driver.generate
+        monkeypatch.setattr(driver, "generate", lambda cid: real(cid) if cid == FAKE_ID else [])
+        monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda: None)
+        monkeypatch.setattr("cli.bdm.try_targets", lambda **_: 0)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, *_, **__: self.ran.append(collection_id))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)

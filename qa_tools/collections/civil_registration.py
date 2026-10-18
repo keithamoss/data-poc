@@ -25,8 +25,6 @@ def _sql_list(values: list[str]) -> str:
 ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
     label="Birth Registrations",
-    generator="cli.bdm:generate_synthetic_data",
-    target_datasets=("birth-registrations",),
     results_json="results_bdm.json",
     dashboard_json="birth_registrations_dashboard.json",
     # One dataset, written as the document itself.

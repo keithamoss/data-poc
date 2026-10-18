@@ -1,24 +1,20 @@
 """What a collection's adapter carries (REQ-PIPE-240).
 
-IDENTITY, WHAT EACH SHARED MODULE READS, AND THE LAST TEMPORARY POINTERS.
+IDENTITY, WHAT EACH SHARED MODULE READS, AND THE LAST TEMPORARY POINTER.
 The per-tool sub-objects (.dbt, .soda, .datacontract, .stats) are what
 qa_tools/tools/* read for this collection (REQ-QAC-242, REQ-PIPE-243), the
-`legacy` flags name the behaviours Birth Registrations kept, and the three
-pointers left - generator, target_datasets, dashboard_json/dashboard_datasets
-- each name the requirement that removes them (REQ-GEN-246, REQ-DASH-244);
-REQ-TEST-249 criterion 9 asserts none is left.
+`legacy` flags name the behaviours Birth Registrations kept, and the one
+pointer left - dashboard_json/dashboard_datasets - names the requirement
+that removes it (REQ-PIPE-248); REQ-TEST-249 criterion 9 asserts none is
+left. The generator entry point and the target-trial datasets went with
+REQ-GEN-246, which put both on the collection's generator provider
+(generator/collections/<id>.py) - a real deployment's collections have no
+synthetic generator, so an adapter is the wrong place for either.
 """
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass, field
 from typing import Callable
-
-
-def _attr(path: str):
-    """`package.module:name` -> the object."""
-    module, _, name = path.partition(":")
-    return getattr(importlib.import_module(module), name)
 
 
 # ---- per-tool sub-objects (REQ-QAC-242 criterion 2) ------------------------
@@ -90,11 +86,6 @@ class CollectionAdapter:
     #: How the bootstrap names this collection's work when it reports it -
     #: the words it has always used, so nothing it prints changes.
     label: str
-    #: TEMPORARY POINTER (4), removed by REQ-GEN-246: the generator entry point.
-    generator: str
-    #: TEMPORARY POINTER (5), removed by REQ-GEN-246, which moves it to the
-    #: provider: which datasets' targets this collection's replay records.
-    target_datasets: tuple[str, ...]
     #: TEMPORARY POINTER (6), found at build and removed by REQ-PIPE-248, which
     #: gives every collection one dashboard JSON shape under a name from its id:
     #: the built dashboard file, and how its datasets are listed in it.
@@ -120,6 +111,3 @@ class CollectionAdapter:
     #: would produce. Every name is in qa_tools/tools/legacy.py, which says
     #: what it preserves; `mothman check` refuses one that is not.
     legacy: frozenset = frozenset()
-
-    def generate(self, *, trial: bool) -> None:
-        _attr(self.generator)(trial=trial)

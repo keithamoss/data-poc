@@ -168,17 +168,19 @@ generator/                   a real package (generator/__init__.py) - invoked vi
   daily_batch.py               generates ONE day's birth-registration batch (an event-flow model,
                                deliberately different from the sibling synthetic_data_generator
                                package's whole-population snapshot model — see the file's docstring)
-  generate_runs.py             orchestrates 120 scheduled daily deliveries (24 amber, 24 red) into
-                               data/raw/ - red ones trigger resupply.py's resupply-chain
-                               simulation, so 176 manifest entries actually land, not 120
+  driver.py                    the one generator driver every collection shares (REQ-GEN-246) -
+                               the slot loop, bookkeeping, delivery and receipt writing, and
+                               injection placement; `mothman check`'s providers gate runs
+                               validate_providers.py over it
+  collections/                 one PROVIDER per collection - its rows, seed schedule and period plan,
+                               importable without pandas or numpy:
+    civil_registration.py      Birth Registrations' daily deliveries - red ones trigger
+                               resupply.py's resupply-chain simulation
+    child_protection.py        Child Protection's quarterly snapshots (Feb/May/Aug/Nov anchor) -
+                               a red one drives the same simulation on a slower delay curve
   resupply.py                  generic resupply-chain orchestration (delay/retry/chaining),
                                driven by a DatasetProvider protocol - knows nothing about how
                                a dataset's rows are actually made, see the file's own docstring
-  generate_cp_runs.py          orchestrates 15 quarterly Child Protection snapshots (Feb/May/Aug/Nov
-                               anchor, ~4 years) into data/cp_raw/ - a red one also drives resupply.py's
-                               resupply-chain simulation, on a slower delay curve than BDM's own (a
-                               full collection re-extract, not a single day's file), so slightly more
-                               than 15 manifest entries actually land
   names_au.py, presentation.py, dirty.py   the canonical copies - synthetic_data_generator/
                                imports these from here rather than keeping its own duplicates
                                (see "Relationship to the synthetic_data_generator package" below)
@@ -422,7 +424,7 @@ what was tried and measured before landing here.
 
 ## The 120 (scheduled) runs — and resupply attempts on top
 
-`generator/generate_runs.py` schedules 120 daily deliveries (a rolling
+`generator/collections/civil_registration.py` (it was `generator/generate_runs.py`) schedules 120 daily deliveries (a rolling
 window ending on the anchor date, ~1,700-2,050 rows each - widened from
 60 to 120 on 2026-09-17, Keith's own call, after `AS_OF_OFFSET_DAYS`
 and the old 60-delivery window turned out to collide: the as-of
@@ -516,7 +518,7 @@ it end to end rather than assumed:
   event feed (a fresh cohort of newborns each day); Child Protection is a
   periodic *snapshot* extract of the same underlying casework collection,
   re-pulled quarterly, anchored to 1 February each year
-  (`generator/generate_cp_runs.py`) — row counts stay roughly stable run
+  (`generator/collections/child_protection.py`) — row counts stay roughly stable run
   to run, matching what a real active-caseload extract looks like.
 - **The 7 FK relationship checks never fail on this fixture** — `dirty.py`'s
   CP presets never touch a foreign-key column, only `concern_type` (the

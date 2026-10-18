@@ -671,7 +671,7 @@ def cp_raw_dir(tmp_path_factory):
     smaller scale, not a hand-rolled copy of CP's real cross-table
     structure."""
     from generator import dirty as dirty_mod
-    from generator.generate_cp_runs import _add_extract_timestamp
+    from generator.collections.child_protection import _add_extract_timestamp
     from synthetic_data_generator.child_protection import generate_child_protection_collection
     from synthetic_data_generator.population import generate_population
 

@@ -82,9 +82,9 @@ def generated_output_dir() -> str:
     (REQ-PIPE-102); BDM's counterpart still has a raw drop alongside
     them, which is why this is a per-dataset accessor rather than one
     shared constant."""
-    from generator import generate_cp_runs
+    from generator import driver
 
-    return str(generate_cp_runs.DELIVERIES_DIR)
+    return str(driver.DELIVERIES_DIR)
 
 
 def has_arrival(run_id: str) -> bool:
@@ -99,30 +99,21 @@ def has_arrival(run_id: str) -> bool:
 
 
 
-def generate_synthetic_data(trial: bool = True) -> None:
-    """Runs the real generator directly - the same shape as cli/bdm.py's
-    own generate_synthetic_data().
+def generate_synthetic_data(trial: bool = False) -> None:
+    """Runs the real generator through the shared driver (REQ-GEN-246) - the
+    same shape as cli/bdm.py's own generate_synthetic_data().
 
-    `trial` is accepted for that shape and has nothing to try: a targeted
+    NO TARGET TRIAL: Child Protection's provider declares none - a targeted
     Child Protection injection is refused at planning (REQ-GEN-185), and
     ordinary ambers are compared after the replay, never trialled
-    (REQ-GEN-186, Keith 2026-10-11).
+    (REQ-GEN-186, Keith 2026-10-11) - so `trial=True` is REFUSED BY NAME
+    (criterion 6), where it used to be accepted and silently do nothing.
 
-    THE TWO USED TO DIFFER. Birth Registrations went through
-    pipeline.orchestrate, which also built a combined DuckDB warehouse of
-    every run; Child Protection never had one. That warehouse is gone
-    (REQ-PIPE-087 criterion 1), so both datasets now do the same thing
-    here: generate, and let staging happen per arrival as QA runs
-    (REQ-PIPE-068)."""
-    from generator import generate_cp_runs
-    generate_cp_runs.main()
-    # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
-    # A map regenerated separately is a map that disagrees with the
-    # history the first time somebody regenerates one and not the
-    # other - and it disagrees silently, because both files look
-    # fine on their own.
-    from qa_tools.common import scenario_map
-    scenario_map.write_map()
+    THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3), by
+    generate_collection()."""
+    from cli.pipeline import generate_collection
+
+    generate_collection(COLLECTION_ID, trial=trial)
 
 
 def load_manifest() -> list[dict]:
@@ -877,9 +868,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
         console.print("Not regenerated.", style="yellow")
         return
     generate_synthetic_data()
-    from generator import generate_cp_runs
-
-    console.print(f"Generated -> {generate_cp_runs.DELIVERIES_DIR}", style="green")
+    console.print(f"Generated -> {generated_output_dir()}", style="green")
 
 
 @cp_group.command("qa")

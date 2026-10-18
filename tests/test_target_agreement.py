@@ -16,6 +16,7 @@ from click.testing import CliRunner
 
 from generator import targets
 from qa_tools.common import target_agreement
+from generator import driver
 
 DS = "birth-registrations"
 PREFIX = "data-asset-1.registry-services.civil-registration.birth-registrations."
@@ -137,11 +138,10 @@ class TestWhatWasBuilt:
 def generated(tmp_path):
     """The real Birth Registrations generator, everything under tmp_path."""
     import generator_isolation
-    from generator import generate_runs
 
-    undo = generator_isolation.redirect(generate_runs, tmp_path)
+    undo = generator_isolation.redirect(tmp_path)
     try:
-        generate_runs.main()
+        driver.generate("civil-registration")
         yield tmp_path
     finally:
         undo()
@@ -190,11 +190,10 @@ class TestTheTrialAtGeneration:
 
     def test_no_lead_in_is_a_disagreement_not_a_crash(self, monkeypatch):
         from cli import bdm
-        from generator import generate_runs
 
         lonely = targets.Built("TS-z's arrival", DS, "d", "amber", injected=True)
         monkeypatch.setattr(targets, "just_written", lambda: ([lonely], None))
-        monkeypatch.setattr(generate_runs, "_previous_delivery_names", lambda: [])
+        monkeypatch.setattr(driver, "previous_delivery_names", lambda key: [])
         with pytest.raises(bdm.TargetTrialFailed, match="no lead-in"):
             bdm.try_targets(say=lambda _m: None)
 
@@ -204,10 +203,9 @@ class TestSkippingTheTrial:
 
     def test_the_generate_command_says_it_skipped(self, monkeypatch):
         from cli import bdm
-        from generator import generate_runs
         from qa_tools.common import scenario_map
 
-        monkeypatch.setattr(generate_runs, "main", lambda: None)
+        monkeypatch.setattr(driver, "generate", lambda collection_id: [])
         monkeypatch.setattr(scenario_map, "write_map", lambda: None)
         monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
         monkeypatch.setattr(bdm, "try_targets", lambda **k: pytest.fail("the trial ran"))
@@ -217,11 +215,10 @@ class TestSkippingTheTrial:
 
     def test_by_default_the_trial_runs(self, monkeypatch):
         from cli import bdm
-        from generator import generate_runs
         from qa_tools.common import scenario_map
 
         ran = []
-        monkeypatch.setattr(generate_runs, "main", lambda: None)
+        monkeypatch.setattr(driver, "generate", lambda collection_id: [])
         monkeypatch.setattr(scenario_map, "write_map", lambda: None)
         monkeypatch.setattr(bdm, "try_targets", lambda **k: ran.append(True))
         bdm.generate_synthetic_data()
@@ -231,8 +228,11 @@ class TestSkippingTheTrial:
         from qa_tools.common import bootstrap as boot
 
         seen = []
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **k: seen.append(k))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **k: seen.append(k))
+        # Every collection is generated through cli/pipeline.py's one
+        # entry point since REQ-GEN-246, its trial asked for only where its
+        # provider declares one.
+        monkeypatch.setattr("cli.pipeline.generate_collection",
+                            lambda collection_id, *, trial: seen.append((collection_id, trial)))
         monkeypatch.setattr(boot, "_run_collection", lambda *a, **k: 0.0)
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
         monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
@@ -240,7 +240,7 @@ class TestSkippingTheTrial:
         monkeypatch.setattr(boot, "holds_history", lambda conn: False)
         monkeypatch.setattr(boot, "targets_agree", lambda names: ())
         boot.bootstrap(sequential=True, skip_target_trial=True)
-        assert seen == [{"trial": False}, {"trial": False}]
+        assert seen == [("civil-registration", False), ("child-protection", False)]
 
 
 # ---- after a replay (criteria 3, 6) ----
@@ -339,13 +339,16 @@ class TestAResumeLeavesTheCallersDatabaseAlone:
         class Stop(Exception):
             pass
 
-        monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **k: seen.append(k))
-        monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **k: seen.append(k))
+        # Every collection is generated through cli/pipeline.py's one
+        # entry point since REQ-GEN-246, its trial asked for only where its
+        # provider declares one.
+        monkeypatch.setattr("cli.pipeline.generate_collection",
+                            lambda collection_id, *, trial: seen.append((collection_id, trial)))
         monkeypatch.setattr(checkpoints, "copy_for_resume",
                             lambda c: (_ for _ in ()).throw(Stop()))
         with pytest.raises(Stop):
             boot.resume("ckpt")
-        assert seen == [{"trial": False}, {"trial": False}]
+        assert seen == [("civil-registration", False), ("child-protection", False)]
 
 
 class TestEveryFailureNamesWhatToLookAt:
@@ -397,22 +400,20 @@ class TestARecordThatDoesNotAddUp:
 
     def test_at_generation_it_fails_the_trial_cleanly(self, monkeypatch):
         from cli import bdm
-        from generator import generate_runs
 
         def broken():
             raise ValueError("TS-43: no supply arriving 2026-09-05 14:00")
         monkeypatch.setattr(targets, "just_written", broken)
-        monkeypatch.setattr(generate_runs, "_previous_delivery_names", lambda: [])
+        monkeypatch.setattr(driver, "previous_delivery_names", lambda key: [])
         with pytest.raises(bdm.TargetTrialFailed, match="TS-43"):
             bdm.try_targets(say=lambda _m: None)
 
     def test_the_scenario_map_is_written_only_once_the_trial_agrees(self, monkeypatch):
         from cli import bdm
-        from generator import generate_runs
         from qa_tools.common import scenario_map
 
         wrote = []
-        monkeypatch.setattr(generate_runs, "main", lambda: None)
+        monkeypatch.setattr(driver, "generate", lambda collection_id: [])
         monkeypatch.setattr(scenario_map, "write_map", lambda: wrote.append(True))
 
         def disagree(**k):

@@ -10,6 +10,7 @@ import pytest
 
 import equiv_support
 from qa_tools.common import asset_time, replay_clock
+from generator import driver
 
 FIRST_TWO = ("run_001", "run_002")
 
@@ -62,12 +63,11 @@ class TestTheClock:
 def corpus(tmp_path_factory):
     """The real Birth Registrations generator's first two deliveries."""
     import generator_isolation
-    from generator import generate_runs
 
     root = tmp_path_factory.mktemp("replay_clock")
-    undo = generator_isolation.redirect(generate_runs, root)
+    undo = generator_isolation.redirect(root)
     try:
-        generate_runs.main()
+        driver.generate("civil-registration")
     finally:
         undo()
     book = json.loads((root / "generator_bookkeeping.json").read_text())

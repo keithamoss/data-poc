@@ -2,8 +2,9 @@
 
 ONE SMALL FIXTURE SHARED ACROSS SITES (the requirement's TEST COST NFR):
 a copy of contract/data-asset.yaml with one more agency and collection,
-and an adapter whose code only records what it was asked to do. Nothing
-here bootstraps anything. `without_adapter` adds a fourth collection that
+an adapter, and a generator provider (REQ-GEN-246) whose plan only records
+that it was asked for and writes no supply. Nothing here bootstraps
+anything. `without_adapter` adds a fourth collection that
 declares no adapter at all, for the refusal half of the criterion.
 """
 from __future__ import annotations
@@ -23,11 +24,13 @@ FAKE_ID, FAKE_SHORT, FAKE_PREFIX = "fake-collection", "fk", "fk_run_"
 FAKE_DATASET, FAKE_TABLE = "fake-things", "fake_things"
 BARE_ID, BARE_SHORT = "bare-collection", "bare"
 
-#: The module the fake adapter's one remaining pointer (its generator)
-#: names; every call is recorded. Since REQ-PIPE-243 the orchestrator,
-#: dataset stats and results rebuild are shared, so a site test records
-#: what the SHARED code was asked for by patching qa_tools.tools.orchestrate.
-CODE = "tests_third_collection_code"
+#: Since REQ-PIPE-243 the orchestrator, dataset stats and results rebuild
+#: are shared, so a site test records what the SHARED code was asked for by
+#: patching qa_tools.tools.orchestrate. Since REQ-GEN-246 generation is
+#: shared too: the fake provider's plan() records each call.
+PROVIDER_MODULE = "generator.collections.fake_collection"
+#: Its declared seeds, well clear of the real providers'.
+FAKE_SEEDS = ((900_000, 901_000),)
 
 
 def _hierarchy(tmp_path, *, bare: bool) -> None:
@@ -64,10 +67,30 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
     (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
 
 
-def _code(calls: list) -> types.ModuleType:
-    code = types.ModuleType(CODE)
-    code.generate = lambda *, trial: calls.append(("generate", trial))
-    return code
+def _provider(calls: list) -> types.ModuleType:
+    """A real Provider subclass the shared driver can run: one slot-free
+    plan over no periods, recorded when asked for."""
+    from generator.collections.base import Plan, Provider
+
+    class Fake(Provider):
+        collection_id = FAKE_ID
+        dataset_id = FAKE_DATASET
+        seed_ranges = FAKE_SEEDS
+        target_datasets = (FAKE_DATASET,)
+
+        def seed_schedule(self):
+            return [("the fake slot", 900_001, 900_010)]
+
+        def generated_periods(self):
+            return []
+
+        def plan(self):
+            calls.append(("generate", self.collection_id))
+            return Plan(jobs=[])
+
+    module = types.ModuleType(PROVIDER_MODULE)
+    module.PROVIDER = Fake()
+    return module
 
 
 def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
@@ -76,11 +99,10 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     hierarchy._load.cache_clear()
     collections._load.cache_clear()
     calls: list = []
-    monkeypatch.setitem(sys.modules, CODE, _code(calls))
+    monkeypatch.setitem(sys.modules, PROVIDER_MODULE, _provider(calls))
     adapter = types.ModuleType("qa_tools.collections.fake_collection")
     adapter.ADAPTER = CollectionAdapter(
         collection_id=FAKE_ID, label="Fake Things",
-        generator=f"{CODE}:generate", target_datasets=(FAKE_DATASET,),
         dashboard_json="fake_collection_dashboard.json", results_json="results_fk.json",
         dashboard_datasets=lambda doc: list(doc["datasets"]),
         datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"}),

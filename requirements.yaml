@@ -5325,9 +5325,9 @@ requirements:
     implemented_by:
       - generator/resupply.py::run_slot_chain
       - generator/resupply.py::DatasetProvider
-      - generator/generate_cp_runs.py::ChildProtectionProvider
-      - generator/generate_cp_runs.py::_pick_dirty_tables
-      - generator/generate_runs.py::BirthRegistrationsProvider
+      - generator/collections/child_protection.py::ChildProtectionProvider
+      - generator/collections/child_protection.py::_pick_dirty_tables
+      - generator/collections/civil_registration.py::BirthRegistrationsProvider
     evidence:
       - >
         2026-09-23: the generator emits all three delivery shapes, shown
@@ -6015,10 +6015,10 @@ requirements:
       - generator/resupply.py::Delivery
       - generator/resupply.py::run_slot_chain
       - generator/anchor_date.py::get_anchor_date
-      - generator/generate_runs.py::_manifest_entries_for_slot
-      - generator/generate_runs.py::_received_at
-      - generator/generate_cp_runs.py::_cp_manifest_entries_for_slot
-      - generator/generate_cp_runs.py::_cp_received_at
+      - generator/collections/civil_registration.py::_manifest_entries_for_slot
+      - generator/collections/civil_registration.py::_received_at
+      - generator/collections/child_protection.py::_cp_manifest_entries_for_slot
+      - generator/collections/child_protection.py::_cp_received_at
       - qa_tools/common/asset_time.py::local_date
       - pipeline/build_dashboard_data.py::_run_date
       - pipeline/build_cp_dashboard_data.py::_run_date
@@ -6402,8 +6402,7 @@ requirements:
       - qa_tools/common/arrivals.py::unplaceable
       - qa_tools/common/arrivals.py::Arrival
       - generator/delivery_names.py::delivery_name
-      - generator/generate_runs.py::_write_bookkeeping
-      - generator/generate_cp_runs.py::_write_bookkeeping
+      - generator/driver.py::write_bookkeeping
       - qa_tools/tools/dataset_stats.py::arrival_record
       - qa_tools/tools/stage.py::build_all
       - cli/bdm.py::load_manifest
@@ -21306,8 +21305,7 @@ requirements:
       - qa_tools/common/supply_db.py::arrival_segment
       - cli/cp.py::arrival_path
       - cli/cp.py::has_arrival
-      - generator/generate_cp_runs.py::main
-      - generator/generate_runs.py::main
+      - generator/driver.py::generate
       - qa_tools/common/supply_db.py::_bounded
       - qa_tools/tools/orchestrate.py::run_single_file
       - cli/bdm.py::run_check_local_file
@@ -30023,7 +30021,7 @@ requirements:
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - generator/scenario_injection.py::resolve
-    - generator/generate_runs.py::_days_to_avoid
+    - generator/collections/civil_registration.py::_days_to_avoid
     - contract/data-asset.yaml
     - plans/supply-model.md
     linked_tests:
@@ -32528,8 +32526,8 @@ requirements:
     - generator/targeting.py::bdm_amber
     - generator/targeting.py::cp_amber
     - generator/targeting.py::outside_hold
-    - generator/generate_runs.py::_ordinary_severities
-    - generator/generate_cp_runs.py::_ordinary_severities
+    - generator/collections/civil_registration.py::_ordinary_severities
+    - generator/collections/child_protection.py::_ordinary_severities
     - generator/scenario_injection.py::ExtraArrival
     - qa_tools/common/scenario_map.py::_target_text
     - generator/resupply.py::run_slot_chain
@@ -32614,11 +32612,11 @@ requirements:
     - generator/scenario_injection.py::Injection
     - generator/scenario_injection.py::resolve
     - generator/scenario_injection.py::no_two_scenarios_share_a_period
-    - generator/generate_runs.py::_built_green
-    - generator/generate_runs.py::_reds_clear_of_scenarios
-    - generator/generate_runs.py::_away_from_suppressed
-    - generator/generate_runs.py::_plan_injections
-    - generator/generate_cp_runs.py::_ordinary_severities
+    - generator/collections/civil_registration.py::_built_green
+    - generator/collections/civil_registration.py::_reds_clear_of_scenarios
+    - generator/collections/civil_registration.py::_away_from_suppressed
+    - generator/collections/civil_registration.py::_plan_injections
+    - generator/collections/child_protection.py::_ordinary_severities
     - qa_tools/common/promotion.py::effective_at_for
     - qa_tools/tools/orchestrate.py::_claim_window
     - qa_tools/tools/orchestrate.py::_claim_window
@@ -33372,8 +33370,8 @@ requirements:
     implemented_by:
     - generator/scenario_injection.py::INJECTIONS
     - generator/scenario_injection.py::PairFile
-    - generator/generate_runs.py::_pair_delivery
-    - generator/generate_runs.py::_ordinary_severities
+    - generator/collections/civil_registration.py::_pair_delivery
+    - generator/collections/civil_registration.py::_ordinary_severities
     - generator/targets.py::written
     - qa_tools/common/target_agreement.py::after_replay
     - qa_tools/common/scripted_decisions.py::answers_for
@@ -33565,9 +33563,9 @@ requirements:
     - generator/scenario_injection.py::carries
     - generator/scenario_injection.py::filed_early_into
     - generator/scenario_injection.py::inheritance_placements
-    - generator/generate_runs.py::_covered
-    - generator/generate_cp_runs.py::_injected_chain
-    - generator/generate_cp_runs.py::_ordinary_severities
+    - generator/collections/civil_registration.py::_covered
+    - generator/collections/child_protection.py::_injected_chain
+    - generator/collections/child_protection.py::_ordinary_severities
     - contract/scripted_decisions.yaml
     - contract/data-asset.yaml
     - plans/supply-model.md
@@ -33932,10 +33930,10 @@ requirements:
       - tests/test_dashboard_e2e.py::TestTheAsAtScenarioChips
       - tests/test_scripted_decisions.py::TestAnOrdinaryChainIsSettledByPeriod
     implemented_by:
-      - generator/generate_cp_runs.py::GROWN_RUN_PLAN
-      - generator/generate_cp_runs.py::grown_periods
-      - generator/generate_cp_runs.py::original_periods
-      - generator/generate_cp_runs.py::_grown_severities
+      - generator/collections/child_protection.py::grown_run_plan
+      - generator/collections/child_protection.py::grown_periods
+      - generator/collections/child_protection.py::original_periods
+      - generator/collections/child_protection.py::_grown_severities
       - generator/scenario_injection.py::stood_on
       - contract/calendar.yaml
       - contract/data-asset.yaml

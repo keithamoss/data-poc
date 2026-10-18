@@ -222,7 +222,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             timings = {}
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
-                _adapter(name).generate(trial=not skip_target_trial)
+                _generate(name, trial=not skip_target_trial)
                 after_each = None
                 if checkpoint_before is not None:
                     after_each = _checkpoint_hook(name, checkpoint_before, held, say,
@@ -240,7 +240,7 @@ def bootstrap(collection: str = "all", force: bool = False,
             # DELIVERIES NEITHER CLAIMED are recorded once both are done.
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
-                _adapter(name).generate(trial=not skip_target_trial)
+                _generate(name, trial=not skip_target_trial)
             say("Running the real checks against every supply - "
                 + " and ".join(_label(n) for n in names) + " side by side")
             timings = _run_concurrently(names, sequential)
@@ -281,6 +281,17 @@ def _adapter(short: str):
     return collections.adapter(_collection(short))
 
 
+def _generate(short: str, *, trial: bool) -> None:
+    """Generate one collection's synthetic history through cli/, which is
+    where the generator is reached from (no QA module may import it). Its
+    target trial runs only where its provider declares one (REQ-GEN-246
+    criterion 5) - asking it of one without would be refused."""
+    from cli.pipeline import generate_collection, has_target_trial
+
+    collection_id = _collection(short).id
+    generate_collection(collection_id, trial=trial and has_target_trial(collection_id))
+
+
 def _label(key: str) -> str:
     """How a collection's work is named when it is reported - or the total."""
     return "in total" if key == "total" else _adapter(key).label
@@ -299,9 +310,11 @@ def targets_agree(names) -> tuple[str, ...]:
     from cli.pipeline import generated_targets
     from qa_tools.common import target_agreement
 
-    # Which datasets' targets each collection's replay records - its
-    # adapter's temporary pointer until REQ-GEN-246 puts it on the provider.
-    wanted = {d for n in names for d in _adapter(n).target_datasets}
+    # Which datasets' targets each collection's replay records - declared
+    # once, on its generator provider (REQ-GEN-246 criterion 5).
+    from cli.pipeline import target_datasets
+
+    wanted = {d for n in names for d in target_datasets(_collection(n).id)}
     try:
         built = [b for b in generated_targets() if b.dataset_id in wanted]
     except ValueError as exc:
@@ -437,8 +450,10 @@ def resume(name: str, sequential: bool = False,
     # resume has a database of its own, so a trial would write - and discard -
     # a run in the database the person was pointed at, which a resume never
     # writes to. The comparison after the replay below still runs.
-    for every in collections.adapters():
-        every.generate(trial=False)
+    from cli.pipeline import generate_collection, generated_collections
+
+    for collection_id in generated_collections():
+        generate_collection(collection_id, trial=False)
     total = len(dict.fromkeys(a.run_id for a in cp.recorded.arrivals))
     # SAID BEFORE THE COPY, so a wrong resume can be stopped early (#133 B9).
     say(f"{first.reason}. Replaying arrivals {cp.before} to {total} of {_label(short)} into "

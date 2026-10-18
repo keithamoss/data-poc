@@ -64,12 +64,6 @@ ALLOWLIST: dict[str, str] = {
     "pipeline/build_dashboard_data.py": "REQ-DASH-244",
     "pipeline/build_cp_dashboard_data.py": "REQ-DASH-244",
     "qa_tools/common/github_links.py": "REQ-DASH-244",
-    # The generator: one driver, a provider per collection.
-    "generator/generate_cp_runs.py": "REQ-GEN-246",
-    "generator/generate_runs.py": "REQ-GEN-246",
-    "generator/scenario_injection.py": "REQ-GEN-246",
-    "generator/targeting.py": "REQ-GEN-246",
-    "generator/targets.py": "REQ-GEN-246",
     # The lifecycle gate's legacy reader, for a base ref from before
     # REQ-QAC-241 moved every check file - deleted with it.
     "qa_tools/common/validate_check_lifecycle.py": "REQ-PIPE-248",

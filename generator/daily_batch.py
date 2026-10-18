@@ -63,7 +63,7 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
     """id_offset: added to the per-row counter used to mint registration_number/
     source_system_record_id, so IDs stay globally unique across multiple
     runs generated in the same pipeline (each run passes a different,
-    non-overlapping offset - see generate_runs.py)."""
+    non-overlapping offset - see civil_registration.py)."""
     rng = np.random.default_rng(seed)
     names = build_name_pools()
     suburb_names, postcodes, _, _ = build_geo_pools()
@@ -183,7 +183,7 @@ def generate_daily_batch(run_date: date, seed: int, n_rows: int, id_offset: int 
     # freshly drawn name/sex/IDs - real twins aren't identical rows, just
     # rows that share the event they were born into. person_seq for
     # siblings continues straight after the base batch's own range (still
-    # well inside this run's id_offset block - see generate_runs.py's
+    # well inside this run's id_offset block - see civil_registration.py's
     # ID_BLOCK), so registration_number/source_system_record_id stay
     # globally unique.
     n_sib = len(twin_idx)

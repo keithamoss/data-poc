@@ -82,16 +82,11 @@ def corpus(tmp_path_factory):
     rewritten, which is the one step of cli's generate_synthetic_data()
     left out.
     """
-    import generator_isolation
-    from generator import generate_cp_runs, generate_runs
+    from generator.output import generated_into
 
     root = tmp_path_factory.mktemp("equiv_corpus")
-    for module in (generate_runs, generate_cp_runs):
-        undo = generator_isolation.redirect(module, root)
-        try:
-            module.main()
-        finally:
-            undo()
+    with generated_into(root):
+        pass
 
     bookkeeping = json.loads((root / "generator_bookkeeping.json").read_text())
     delivery_of = {entry["run_id"]: entry["delivery"]

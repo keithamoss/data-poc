@@ -19,36 +19,37 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
-def redirect(module, root: Path):
-    """Point every one of `module`'s outputs under `root`; returns a restore
-    callable (usable from a module-scoped fixture, which cannot depend on
-    pytest's function-scoped monkeypatch).
+def redirect(root: Path):
+    """Point every generator output under `root`; returns a restore callable
+    (usable from a module-scoped fixture, which cannot depend on pytest's
+    function-scoped monkeypatch).
 
-    THE SCENARIO PLACEMENTS ARE REDIRECTED TOO. Both generators call
+    ONE PLACE SINCE REQ-GEN-246: every collection writes through the shared
+    driver, so redirecting generator/driver.py's three paths redirects every
+    provider's at once - there is no per-collection module left to miss.
+
+    THE SCENARIO PLACEMENTS ARE REDIRECTED TOO. The driver calls
     `scenario_injection.write_placements()` at the end of a run, and it
     defaults to the REAL data/scenario_placements.json - so a generator
     test once rewrote that file with only the collection it had just
     generated, and a CI half reading it failed with `KeyError: 'TS-4'`.
     """
-    from generator import scenario_injection
+    from generator import driver, scenario_injection
 
     root = Path(root)
     names = {"DELIVERIES_DIR": root / "deliveries",
              "RECEIPTS_DIR": root / "receipts",
              "BOOKKEEPING_PATH": root / "generator_bookkeeping.json"}
-    original = {}
+    original = {name: getattr(driver, name) for name in names}
     for name, value in names.items():
-        if not hasattr(module, name):
-            continue
-        original[name] = getattr(module, name)
-        setattr(module, name, value)
+        setattr(driver, name, value)
 
     placements = scenario_injection.PLACEMENTS_PATH
     scenario_injection.PLACEMENTS_PATH = root / "scenario_placements.json"
 
     def restore():
         for name, value in original.items():
-            setattr(module, name, value)
+            setattr(driver, name, value)
         scenario_injection.PLACEMENTS_PATH = placements
 
     return restore
@@ -56,18 +57,22 @@ def redirect(module, root: Path):
 
 @contextmanager
 def generated_into(root: Path):
-    """Run BOTH generators, in the order `mothman pipeline bootstrap` does,
-    with everything they write under `root`. Both, and in that order,
-    because a delivery's NAME depends on what the other generator already
-    has on disk (REQ-GEN-043's uniqueness) - generating one collection
-    alone could name its deliveries differently from the real tree."""
-    from generator import generate_cp_runs, generate_runs
+    """Run EVERY collection's generator, in hierarchy order - the order
+    `mothman pipeline bootstrap` generates them in - with everything they
+    write under `root`. Every one, and in that order, because a delivery's
+    NAME depends on what the other collections already have on disk
+    (REQ-GEN-043's uniqueness) - generating one collection alone could name
+    its deliveries differently from the real tree.
+
+    THROUGH THE REGISTRY (REQ-GEN-246 criterion 8): the collections are the
+    ones with a provider, never a list written here."""
+    from generator import collections, driver
 
     root = Path(root)
-    for module in (generate_runs, generate_cp_runs):
-        undo = redirect(module, root)
-        try:
-            module.main()
-        finally:
-            undo()
+    undo = redirect(root)
+    try:
+        for provider in collections.providers():
+            driver.generate(provider.collection_id)
+    finally:
+        undo()
     yield root

@@ -81,6 +81,10 @@ _GATES: tuple[tuple[str, list[str], str, bool], ...] = (
     # requirement that rewires it.
     ("collections", ["uv", "run", "python3", "-m", "qa_tools.common.validate_collections"],
      "every collection has an adapter and nothing else names one", False),
+    # REQ-GEN-246 criterion 3: two generator providers drawing the same seeds
+    # would draw the same rows.
+    ("providers", ["uv", "run", "python3", "-m", "generator.validate_providers"],
+     "every generator provider's seeds are disjoint from every other's", False),
     # The one gate with a warning state today: REQ-PIPE-053's low
     # runway, which must be visible without failing the build.
     ("schedule", ["uv", "run", "mothman", "schedule", "validate"],

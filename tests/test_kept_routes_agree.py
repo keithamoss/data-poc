@@ -35,6 +35,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import equiv_support
+from generator import driver
 
 RUN_ID = "run_001"
 COMPARED = ("qa.filing", "qa.decision", "qa.check_result")
@@ -45,12 +46,11 @@ def corpus(tmp_path_factory):
     """The real Birth Registrations generator's output, cut to its first
     delivery."""
     import generator_isolation
-    from generator import generate_runs
 
     root = tmp_path_factory.mktemp("kept_routes")
-    undo = generator_isolation.redirect(generate_runs, root)
+    undo = generator_isolation.redirect(root)
     try:
-        generate_runs.main()
+        driver.generate("civil-registration")
     finally:
         undo()
     book = json.loads((root / "generator_bookkeeping.json").read_text())

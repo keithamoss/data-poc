@@ -50,9 +50,10 @@ whichever file happens to need editing.
 real production data in an actual deployment - both the real, wired-in
 generator and the separate, exploratory population-scale one.
 
-**Owns:** `generator/` (Birth Registrations - `daily_batch.py`,
-`generate_runs.py`, `resupply.py`, `dirty.py`, `names_au.py`,
-`presentation.py` - plus Child Protection's own run generation),
+**Owns:** `generator/` (one shared driver, `driver.py`, and a provider per
+collection under `collections/` - Birth Registrations' `civil_registration.py`
+over `daily_batch.py`, `resupply.py`, `dirty.py`, `names_au.py` and
+`presentation.py`, and Child Protection's `child_protection.py`),
 `synthetic_data_generator/` (the separate, population-scale,
 cross-agency-identity-linked generator, `mothman population`, Tier 4/
 exploratory, not currently wired into the real pipeline).

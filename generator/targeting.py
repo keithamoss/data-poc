@@ -37,12 +37,15 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-BDM = "birth-registrations"
 TABLE = "birth_registrations"
 TWIN_FLAG = "is_multiple_birth"
 #: The authored name the three tools' multiple-birth sibling checks share.
 SIBLING_RULE = "Multiple-birth sibling match"
-CP_CLIENTS = "cp-clients"
+#: The two lever sets a provider may declare (generator/collections/base.py's
+#: `target_levers`): null-rate rules on one table, and unrecognised client
+#: postcodes.
+NULL_RATE = "null-rate"
+CLIENT_POSTCODES = "client-postcodes"
 
 #: Four-character postcodes no supplier would send and no reader treats as
 #: missing - and numeric, because the loader stages the column as a number
@@ -54,6 +57,37 @@ class TargetError(ValueError):
     """A target no combination of rules can meet. Loud by design: a supply
     that demonstrates something other than what was asked is worse than
     none (REQ-GEN-044 criterion 4)."""
+
+
+def lever_dataset(levers: str) -> str:
+    """The dataset a lever set builds targets on - read from the provider
+    that declares it (REQ-GEN-246 criterion 6), never written down here.
+    Refused when no provider declares it."""
+    from generator import collections
+
+    for provider in collections.providers():
+        if provider.target_levers == levers:
+            return provider.amber_dataset
+    raise TargetError(f"no collection's generator provider declares the {levers} levers, so "
+                      f"no target can be built with them")
+
+
+def levers_for(dataset_id: str, where: str) -> str:
+    """Which lever set builds `dataset_id`'s targets, from its collection's
+    provider - REFUSED NAMING THE COLLECTION where it has none, which
+    replaced treating every dataset that was not Birth Registrations as
+    Child Protection (REQ-GEN-246 criterion 6)."""
+    from generator import collections
+    from qa_tools.common import hierarchy
+
+    try:
+        provider = collections.for_dataset(dataset_id)
+    except collections.NoProviderError as exc:
+        raise TargetError(f"{where}: {exc}") from None
+    if provider.target_levers is None:
+        raise TargetError(f"{where}: {hierarchy.dataset(dataset_id).collection_id} declares no "
+                          f"target levers, so no target can be built for {dataset_id}")
+    return provider.target_levers
 
 
 def _catalogue():
@@ -79,6 +113,7 @@ def bdm_amber(df: pd.DataFrame, seed: int, catalogue=None, where: str = "",
     matches twins on these very columns, and a value removed from one twin
     and not the other fails it in three tools (criterion 5)."""
     cat = catalogue or _catalogue()
+    bdm = lever_dataset(NULL_RATE)
     rng = np.random.default_rng(seed)
     if rows is not None and len(df) > rows:
         # THE SIZE OF THE SUPPLY BEFORE IT (Keith, 2026-10-11), exactly: a
@@ -90,7 +125,7 @@ def bdm_amber(df: pd.DataFrame, seed: int, catalogue=None, where: str = "",
     singles = df.index[~df["is_multiple_birth"].astype(bool)]
     options = []
     for rule in cat.rules():
-        if (rule.dataset_id, rule.category, rule.measure) != (BDM, "completeness", "rows") \
+        if (rule.dataset_id, rule.category, rule.measure) != (bdm, "completeness", "rows") \
                 or not rule.column or rule.column not in df.columns:
             continue
         for band in rule.amber(rows):
@@ -98,14 +133,14 @@ def bdm_amber(df: pd.DataFrame, seed: int, catalogue=None, where: str = "",
             if want is not None:
                 options.append((rule.column, want))
     if not options:
-        raise TargetError(f"{where or BDM}: amber was asked for, and no null-rate rule has "
+        raise TargetError(f"{where or bdm}: amber was asked for, and no null-rate rule has "
                           f"room left in an amber band at {rows} rows")
     column, want = options[int(rng.integers(len(options)))]
     out = df.copy()
     present = [i for i in singles if pd.notna(out.at[i, column])]
     need = want - int(out[column].isna().sum())
     if need > len(present):
-        raise TargetError(f"{where or BDM}: {column} needs {need} more blanks for amber, and "
+        raise TargetError(f"{where or bdm}: {column} needs {need} more blanks for amber, and "
                           f"only {len(present)} single-birth rows carry a value")
     chosen = rng.choice(np.array(present), size=need, replace=False)
     out.loc[chosen, column] = pd.NA
@@ -159,8 +194,9 @@ def check_target(target: Target, dataset_id: str, where: str, catalogue=None) ->
     supply's size still refuses during generation, which stops it too."""
     from qa_tools.common import check_bands
 
+    levers = levers_for(dataset_id, where)
     cat = catalogue or _catalogue()
-    if dataset_id != BDM:
+    if levers == CLIENT_POSTCODES:
         if target.verdict == "red":
             raise TargetError(f"{where}: red cannot be built for Child Protection - no "
                               f"lever exists yet (TS-48, 49 and 51 are out of "
@@ -172,7 +208,7 @@ def check_target(target: Target, dataset_id: str, where: str, catalogue=None) ->
         return
     levers, refused = _levers(cat, None)
     by_key = {rule_key(r): r for r in levers}
-    rows = check_bands.default_rows(BDM, cat)
+    rows = check_bands.default_rows(dataset_id, cat)
     for key in target.rules:
         rule = by_key.get(key)
         if rule is None:
@@ -199,7 +235,8 @@ def _levers(cat, df: pd.DataFrame | None) -> tuple[list, dict[str, str]]:
 
     THE TWIN FLAG ITSELF IS NEVER A LEVER: twin protection reads it, and
     a blank in a boolean column is not a blank (#155 - it crashed)."""
-    readers = cat.single_tier_readers(BDM)
+    bdm = lever_dataset(NULL_RATE)
+    readers = cat.single_tier_readers(bdm)
     by_id = {c.check_id: c for c in cat.checks}
 
     def harmless(check_id: str, rule) -> bool:
@@ -214,7 +251,7 @@ def _levers(cat, df: pd.DataFrame | None) -> tuple[list, dict[str, str]]:
 
     usable, refused = [], {}
     for rule in cat.rules():
-        if (rule.dataset_id, rule.category, rule.measure) != (BDM, "completeness", "rows") \
+        if (rule.dataset_id, rule.category, rule.measure) != (bdm, "completeness", "rows") \
                 or not rule.column or (df is not None and rule.column not in df.columns):
             continue
         if rule.column == TWIN_FLAG:
@@ -280,7 +317,7 @@ def bdm_target(df: pd.DataFrame, target: Target, seed: int, catalogue=None,
     NO PRESET, EVER (criterion 1), and nothing here decides a verdict:
     the real tools do (Keith, 2026-10-11)."""
     cat = catalogue or _catalogue()
-    where = where or BDM
+    where = where or lever_dataset(NULL_RATE)
     rng = np.random.default_rng(seed)
     if rows is not None and len(df) > rows:
         singles = df.index[~df["is_multiple_birth"].astype(bool)]
@@ -345,7 +382,7 @@ def cp_target(payload: dict[str, pd.DataFrame], target: Target, seed: int, catal
     the delivery as built; amber is the ordinary amber's lever, client
     postcodes; red has no lever yet - the scenarios that need one (TS-48,
     49 and 51) are out of this requirement's scope (Keith, 2026-10-11)."""
-    where = where or CP_CLIENTS
+    where = where or lever_dataset(CLIENT_POSTCODES)
     if target.verdict == "green":
         return payload, []
     if target.verdict == "red":
@@ -367,18 +404,19 @@ def cp_amber(payload: dict[str, pd.DataFrame], seed: int, catalogue=None,
     tolerance gives with Soda's and dbt's, at the middle of it - and nothing
     else of the delivery changed (criteria 7 and 8)."""
     cat = catalogue or _catalogue()
+    clients_dataset = lever_dataset(CLIENT_POSTCODES)
     clients = payload["cp_clients"]
     rows = len(clients)
-    rule = cat.rule(CP_CLIENTS, "postcode", "conformity")
+    rule = cat.rule(clients_dataset, "postcode", "conformity")
     bands = rule.amber(rows)
     if not bands:
-        raise TargetError(f"{where or CP_CLIENTS}: amber was asked for, and client postcodes "
+        raise TargetError(f"{where or clients_dataset}: amber was asked for, and client postcodes "
                           f"have no amber band at {rows} clients")
     want = _target(bands[0], 0)
     rng = np.random.default_rng(seed)
     present = clients.index[clients["postcode"].notna()]
     if want > len(present):
-        raise TargetError(f"{where or CP_CLIENTS}: {want} unrecognised postcodes are needed "
+        raise TargetError(f"{where or clients_dataset}: {want} unrecognised postcodes are needed "
                           f"for amber, and only {len(present)} clients carry a postcode")
     chosen = rng.choice(np.array(present), size=want, replace=False)
     out = clients.copy()

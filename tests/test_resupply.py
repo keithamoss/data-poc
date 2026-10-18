@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 import generator.resupply as resupply
-from generator.generate_runs import _manifest_entries_for_slot
+from generator.collections.civil_registration import _manifest_entries_for_slot
 from generator.resupply import MAX_ATTEMPTS, Delivery, _add_business_days, run_slot_chain
 
 

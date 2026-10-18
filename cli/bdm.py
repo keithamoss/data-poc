@@ -59,9 +59,9 @@ def generated_output_dir() -> str:
     copy of a supply and that is it. This used to return data/raw/,
     which held a second flat copy of every generated run.
     """
-    from generator import generate_runs
+    from generator import driver
 
-    return str(generate_runs.DELIVERIES_DIR)
+    return str(driver.DELIVERIES_DIR)
 
 
 
@@ -87,26 +87,15 @@ def generate_synthetic_data(trial: bool = True) -> None:
     data again.
 
     THEN EACH INJECTED TARGET IS TRIED (REQ-GEN-186 criteria 1, 2 and 5):
-    see try_targets(). `trial=False` skips it, and says so."""
-    from generator import generate_runs
-    generate_runs.main()
-    # THE MAP IS REBUILT IN THE SAME ACT (REQ-GEN-045 criterion 3).
-    # A map regenerated separately is a map that disagrees with the
-    # history the first time somebody regenerates one and not the
-    # other - and it disagrees silently, because both files look
-    # fine on their own.
-    # THE TRIAL FIRST, THE MAP ONCE IT AGREES (post-build-review #157
-    # finding 7): the map is committed, and a history the trial refused to
-    # emit should not leave it rewritten. The trial reads the placements,
-    # never the map.
-    if trial:
-        try_targets()
-    else:
-        console.print("Target trial skipped: no injected target was tried against the "
-                      "real tools. The comparison after a replay still runs.",
-                      style="yellow")
-    from qa_tools.common import scenario_map
-    scenario_map.write_map()
+    see try_targets(). `trial=False` skips it, and says so.
+
+    THROUGH THE SHARED DRIVER since REQ-GEN-246: cli/pipeline.py's
+    generate_collection() generates, runs the trial the provider declares,
+    and rebuilds the scenario map, in that order."""
+    from cli.pipeline import generate_collection
+    from qa_tools.common import hierarchy
+
+    generate_collection(hierarchy.dataset(DATASET_ID).collection_id, trial=trial)
 
 
 class TargetTrialFailed(click.ClickException):
@@ -114,7 +103,7 @@ class TargetTrialFailed(click.ClickException):
     (REQ-GEN-186 criterion 2)."""
 
 
-def try_targets(say=None) -> int:
+def try_targets(collection_id: str | None = None, say=None) -> int:
     """Run the four real tools on every injected Birth Registrations target
     the generator just wrote, against its last lead-in, through the same
     trial path `mothman bdm qa --trial` uses - recording nothing (REQ-GEN-186
@@ -132,9 +121,11 @@ def try_targets(say=None) -> int:
     day, so its freshness checks read it as they will in the replay.
     Measured 2026-10-11: about nine seconds a trial.
     """
-    from generator import generate_runs, targets
-    from qa_tools.common import delivery, target_agreement
+    from generator import collections as providers
+    from generator import driver, targets
+    from qa_tools.common import delivery, hierarchy, target_agreement
 
+    provider = providers.provider(collection_id or hierarchy.dataset(DATASET_ID).collection_id)
     say = say or (lambda msg: console.print(msg, style="dim"))
     # WHERE THE GENERATOR JUST WROTE (targets.just_written) - never the
     # pipeline's view of data/.
@@ -143,12 +134,12 @@ def try_targets(say=None) -> int:
     except ValueError as exc:
         # A RECORD THAT DOES NOT ADD UP fails like any disagreement, not as a
         # traceback (post-build-review #157 finding 7).
-        delivery.remove_deliveries(generate_runs._previous_delivery_names(),
-                                   generate_runs.DELIVERIES_DIR, generate_runs.RECEIPTS_DIR)
+        delivery.remove_deliveries(driver.previous_delivery_names(provider.dataset_id),
+                                   driver.DELIVERIES_DIR, driver.RECEIPTS_DIR)
         raise TargetTrialFailed(f"what the generator built could not be read, so the "
                                 f"deliveries just written were removed: {exc}") from exc
     tried = [b for b in built
-             if b.injected and b.dataset_id == DATASET_ID]
+             if b.injected and b.dataset_id in provider.target_datasets]
     found = []
     for built in tried:
         say(f"Trying {built.label} against the real tools (built to {built.target})")
@@ -166,8 +157,8 @@ def try_targets(say=None) -> int:
         if disagreement:
             found.append(disagreement)
     if found:
-        removed = delivery.remove_deliveries(generate_runs._previous_delivery_names(),
-                                             written_to, generate_runs.RECEIPTS_DIR)
+        removed = delivery.remove_deliveries(driver.previous_delivery_names(provider.dataset_id),
+                                             written_to, driver.RECEIPTS_DIR)
         raise TargetTrialFailed(
             f"{len(found)} of {len(tried)} injected target(s) did not read as built, so "
             f"the {removed} Birth Registrations deliveries just written were removed:\n"

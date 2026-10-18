@@ -39,9 +39,10 @@ import pandas as pd
 import pytest
 
 import generator_isolation
-from generator import generate_cp_runs
-from generator.generate_cp_runs import TABLES, ChildProtectionProvider, _pick_dirty_tables
+from generator.collections import child_protection as generate_cp_runs
+from generator.collections.child_protection import TABLES, ChildProtectionProvider, _pick_dirty_tables
 from qa_tools.common import asset_time
+from generator import driver
 
 
 @pytest.fixture(scope="module")
@@ -56,8 +57,8 @@ def raw_dir(tmp_path_factory):
     not on the shape of what it wrote.
     """
     root = tmp_path_factory.mktemp("cp_gen")
-    restore = generator_isolation.redirect(generate_cp_runs, root)
-    yield Path(generate_cp_runs.DELIVERIES_DIR)
+    restore = generator_isolation.redirect(root)
+    yield Path(driver.DELIVERIES_DIR)
     restore()
 
 
@@ -76,15 +77,20 @@ def manifest(raw_dir, real_data_before):
     second copy of exactly this list and is retired. Still called
     `manifest` because every test below reads it as "the list of what
     was generated", which is what it is."""
-    generate_cp_runs.main()
-    with open(generate_cp_runs.BOOKKEEPING_PATH) as f:
+    driver.generate("child-protection")
+    with open(driver.BOOKKEEPING_PATH) as f:
         return json.load(f)[generate_cp_runs.DATASET_ID]
 
 
 def test_dirty_module_resolves_to_generators_own_copy():
-    dirty_dir = os.path.dirname(generate_cp_runs.dirty_mod.__file__)
-    assert os.path.normpath(dirty_dir) == os.path.normpath(os.path.dirname(generate_cp_runs.__file__))
-    assert hasattr(generate_cp_runs.dirty_mod, "apply_cp_clients_presets")
+    """The provider's presets come from generator/dirty.py, the one copy
+    (2026-09-14: a duplicate once resolved first)."""
+    from generator import dirty as dirty_mod
+
+    dirty_dir = os.path.dirname(dirty_mod.__file__)
+    generator_dir = os.path.dirname(os.path.dirname(generate_cp_runs.__file__))
+    assert os.path.normpath(dirty_dir) == os.path.normpath(generator_dir)
+    assert hasattr(dirty_mod, "apply_cp_clients_presets")
 
 
 def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
@@ -372,11 +378,11 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     # would bring it into existence, which the comparison below catches
     # either way.
 
-    monkeypatch.setattr(generate_cp_runs, "DELIVERIES_DIR", tmp_path / "deliveries")
-    monkeypatch.setattr(generate_cp_runs, "RECEIPTS_DIR", tmp_path / "receipts")
-    monkeypatch.setattr(generate_cp_runs, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
+    monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
+    monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
+    monkeypatch.setattr(driver, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
 
-    generate_cp_runs.main()
+    driver.generate("child-protection")
 
     assert list((tmp_path / "deliveries").iterdir()), "nothing was generated into the redirected tree"
     assert _fingerprint(tmp_path / "deliveries"), "test precondition - the generator must have written somewhere"
@@ -482,7 +488,7 @@ def test_resupply_subset_holds_no_state_between_chains():
 def test_a_birth_registrations_supply_cannot_be_split():
     """One CSV is indivisible, and the provider says so rather than
     leaving the method off."""
-    from generator.generate_runs import BirthRegistrationsProvider
+    from generator.collections.civil_registration import BirthRegistrationsProvider
 
     df = pd.DataFrame({"id": [1, 2, 3]})
     assert BirthRegistrationsProvider().resupply_subset(df, previous_dirty_seed=1, seed=2) is df

@@ -1,8 +1,19 @@
-"""
-Orchestrates multiple daily deliveries of the birth-registrations feed into
-data/raw/ - the "generate a few different runs of synthetic data" part of
-the brief, sized ~10 scheduled deliveries with most clean and a few
-deliberately dirty (the user's chosen default).
+"""Civil Registration's generator provider (REQ-GEN-246): Birth
+Registrations' rows, seed schedule and period plan. The slot loop, the
+bookkeeping, delivery and receipt writing and injection placement are the
+shared driver's (generator/driver.py); this module was
+generator/generate_runs.py, and everything below that is not the driver's
+moved here unchanged, so the generated history is byte-identical.
+
+IMPORTABLE WITHOUT pandas OR numpy (criterion 7): every tool import is
+deferred to the function that needs it, so reading PROVIDER's declarations
+costs nothing. RUN_PLAN, SCHEDULED_DATES and START_DATE are computed on
+first use for the same reason.
+
+Orchestrates multiple daily deliveries of the birth-registrations feed -
+the "generate a few different runs of synthetic data" part of the brief,
+sized ~10 scheduled deliveries with most clean and a few deliberately dirty
+(the user's chosen default).
 
 Each *delivery* is a separate simulated day's extract (see daily_batch.py
 for why this is an event-flow generator, not a resample of a population
@@ -55,42 +66,24 @@ sort by received_at itself, which is the first sign it should not be
 reading it.
 """
 from __future__ import annotations
-import json
-import os
+import functools
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Optional
-
-import numpy as np
-import pandas as pd
+from typing import TYPE_CHECKING, Optional
 
 from generator.anchor_date import get_anchor_date
-from generator.daily_batch import generate_daily_batch
-from generator.dirty import apply_birth_registrations_presets, inject_stale_delivery
-from generator import delivery_names, scenario_injection, targeting
-from generator.resupply import MAX_ATTEMPTS, Delivery, DatasetProvider, run_slot_chain
-from qa_tools.common import arrivals, asset_time, delivery, hierarchy, schedule
+from generator.collections.base import Job, Plan, Provider
+from qa_tools.common import asset_time, schedule
+
+if TYPE_CHECKING:  # annotations only - never imported at module level
+    import pandas as pd
+    from generator.resupply import DatasetProvider
 
 # Which dataset this generator produces - the one literal it needs, so
 # it can look its own calendar up rather than carrying a private copy of
 # the cadence (REQ-GEN-042).
 DATASET_ID = "birth-registrations"
 
-
-# WHERE THIS GENERATOR WRITES, all of it, redirectable the same way
-# (read at call time, never captured into a default arg).
-#
-# Redirecting one output directory used to isolate a test run. REQ-GEN-043
-# gave the generator two more outputs - the delivery tree and the
-# receipts beside it - plus a shared bookkeeping file, and all three
-# defaulted to the real ones under data/. So the module's own
-# isolation, which exists because "tests and production share an
-# output directory" was a real problem once (Keith, 2026-09-18),
-# quietly stopped covering most of what gets written. Named here so
-# there is one place to redirect and one place to notice a fourth.
-DELIVERIES_DIR = delivery.DELIVERIES_DIR
-RECEIPTS_DIR = delivery.RECEIPTS_DIR
-BOOKKEEPING_PATH = delivery.BOOKKEEPING_PATH
 
 ID_BLOCK = 100_000  # per-delivery id_offset spacing - well above any single delivery's row count
 
@@ -176,6 +169,8 @@ RED_SHARE = 0.12  # was 0.2
 
 
 def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
+    import numpy as np
+
     rng = np.random.default_rng(seed)
     n_amber = round(n * AMBER_SHARE)
     n_red = round(n * RED_SHARE)
@@ -191,7 +186,10 @@ def _build_run_plan(n: int, seed: int) -> list[tuple[int, str | None]]:
     return [(int(row_counts[i]), severities[i]) for i in range(n)]
 
 
-RUN_PLAN = _build_run_plan(N_DELIVERIES, _RUN_PLAN_SEED)
+@functools.cache
+def run_plan() -> list[tuple[int, str | None]]:
+    """RUN_PLAN, drawn on first use (criterion 7)."""
+    return _build_run_plan(N_DELIVERIES, _RUN_PLAN_SEED)
 
 # Rolling window ending on the anchor date ("today" by default, pinnable
 # via GENERATOR_ANCHOR_DATE - see anchor_date.py) rather than a fixed
@@ -225,8 +223,21 @@ def _scheduled_dates(n: int) -> list[date]:
     return [p.date for p in periods[-n:]]
 
 
-SCHEDULED_DATES = _scheduled_dates(N_DELIVERIES)
-START_DATE = SCHEDULED_DATES[0]
+def start_date() -> date:
+    """START_DATE: the first of the 85 scheduled dates, read at call time."""
+    return _scheduled_dates(N_DELIVERIES)[0]
+
+
+def __getattr__(name: str):
+    """RUN_PLAN, SCHEDULED_DATES and START_DATE as module attributes,
+    computed when first asked for rather than at import (criterion 7)."""
+    if name == "RUN_PLAN":
+        return run_plan()
+    if name == "SCHEDULED_DATES":
+        return _scheduled_dates(N_DELIVERIES)
+    if name == "START_DATE":
+        return start_date()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
     """GENUINELY AMBER (REQ-GEN-184; Keith, 2026-10-11): each drawn severity,
@@ -239,12 +250,14 @@ def _ordinary_severities(periods, injected_by_period, suppressed) -> list:
     needs the period of, which moves before the scenarios (criterion 10, as
     amended 2026-10-11); cleans as drawn; the bookends stay clean."""
 
+    from generator import targeting
+
     green = _built_green(injected_by_period)
     unavailable = frozenset(i for i, p in enumerate(periods)
                             if p.name in injected_by_period or p.name in suppressed
                             or p.name in green)
     try:
-        drawn = _reds_clear_of_scenarios([s for _n, s in RUN_PLAN[:len(periods)]],
+        drawn = _reds_clear_of_scenarios([s for _n, s in run_plan()[:len(periods)]],
                                          unavailable, names=[p.name for p in periods])
         out = targeting.outside_hold(drawn, [p.date for p in periods], DATASET_ID,
                                      keep_clean=frozenset({0, len(periods) - 1}),
@@ -278,6 +291,8 @@ def _reds_clear_of_scenarios(severities: list, unavailable: frozenset[int],
     TS-1's, TS-45's and TS-46's days and ruined TS-45. Each moves to the
     latest clean period before the stretch, so the count is unchanged and
     the history stays a daily feed with its reds in it."""
+    from generator import targeting
+
     if not unavailable:
         return list(severities)
     start = max(1, min(unavailable) - RED_CLEARANCE)
@@ -323,6 +338,9 @@ class BirthRegistrationsProvider:
         self.amber_dates = amber_dates
 
     def generate(self, run_date: date, seed: int, n_rows: int, id_offset: int) -> pd.DataFrame:
+        from generator.daily_batch import generate_daily_batch
+        from generator.dirty import inject_stale_delivery
+
         df = generate_daily_batch(run_date, seed=seed, n_rows=n_rows, id_offset=id_offset)
         # Phase 5f (plans/qa-pipeline.md #61): occasional whole-run
         # staleness, exempting the same two bookend deliveries severity
@@ -333,7 +351,8 @@ class BirthRegistrationsProvider:
         # rolling window exists). A distinct seed offset (+50) from
         # daily_batch.py's own internal +1/+2 draws, so this coin flip
         # never correlates with the row content it's applied on top of.
-        is_bookend = run_date in (START_DATE, START_DATE + timedelta(days=N_DELIVERIES - 1))
+        first = start_date()
+        is_bookend = run_date in (first, first + timedelta(days=N_DELIVERIES - 1))
         if not is_bookend and run_date not in self.amber_dates:
             df = inject_stale_delivery(df, seed=seed + 50)
         return df
@@ -343,8 +362,10 @@ class BirthRegistrationsProvider:
         # AMBER BY CONSTRUCTION (REQ-GEN-184 criterion 6), never the preset,
         # which trips single-tier checks and reads red. Red keeps the preset
         # (criterion 10).
-        if severity == "amber":
+        from generator import targeting
+        from generator.dirty import apply_birth_registrations_presets
 
+        if severity == "amber":
             return targeting.bdm_amber(df, seed=seed, rows=previous_row_count)
         return apply_birth_registrations_presets(df, severity=severity, seed=seed,
                                                   previous_row_count=previous_row_count)
@@ -375,6 +396,11 @@ class BirthRegistrationsProvider:
         the same rows... but also probably new rows that have been added
         or that had been changed or deleted since the first supply" - the
         resupply is not a fresh random draw of that day's data."""
+        import numpy as np
+        import pandas as pd
+
+        from generator.daily_batch import generate_daily_batch
+
         rng = np.random.default_rng(seed)
         out = df.copy()
 
@@ -434,6 +460,8 @@ def _received_at(payload, received_date: date, where: str) -> str:
     qa_tools/tools/dataset_stats.py's own earliest_extract already
     documents and filters against.
     """
+    import pandas as pd
+
     legitimate = payload["extract_timestamp"] >= pd.to_datetime(payload["date_registered"])
     stamps = payload.loc[legitimate, "extract_timestamp"]
     if stamps.empty:  # every row disordered - defensive, unreachable today
@@ -498,44 +526,6 @@ def _manifest_entries_for_slot(deliveries: list, slot_id: str, period: str,
 
 
 
-def _write_bookkeeping(manifest: list[dict]) -> None:
-    """The generator's own record, OUTSIDE every delivery (criterion 6).
-
-    Which slot each delivery was built to fill, which scenario it came
-    from, what severity was injected - real and worth keeping, because
-    it is how a test asserts that recognition got the right answer.
-
-    NO PIPELINE, QA OR DASHBOARD-BUILD MODULE MAY READ IT (criterion 7).
-    One that did would be making filing decisions from a declaration
-    rather than from arrival plus slot state, which is the
-    supplier-declared manifest Thread B rejected wearing our own badge.
-    The generator reads it back for two purposes only: to delete what it
-    wrote last time, so a regeneration overwrites rather than
-    accumulates, and to say what each supply was built to
-    (generator/targets.py, REQ-GEN-186) - which reaches the comparison
-    after a replay as plain values, through cli/, never by the QA
-    module opening this file.
-    """
-    path = BOOKKEEPING_PATH
-    book = {}
-    if path.exists():
-        with open(path) as f:
-            book = json.load(f)
-    book[DATASET_ID] = manifest
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(book, f, indent=2)
-
-
-def _previous_delivery_names() -> list[str]:
-    """What this generator wrote last time, from its own bookkeeping."""
-    path = BOOKKEEPING_PATH
-    if not path.exists():
-        return []
-    with open(path) as f:
-        book = json.load(f)
-    return [e["delivery"] for e in book.get(DATASET_ID, []) if e.get("delivery")]
-
 def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
                     id_offset: int, n_rows: int, previous_row_count, placement=None):
     """The arrivals ONE injected scenario needs, in place of the ordinary
@@ -557,6 +547,9 @@ def _injected_chain(provider: DatasetProvider, injection, period, seed: int,
     them, and a fresh random draw would make the third file unrelated to
     the first two, which is not what a resupply is.
     """
+    from generator import targeting
+    from generator.resupply import Delivery
+
     deliveries = []
     payload = provider.generate(period.date, seed=seed, n_rows=n_rows, id_offset=id_offset)
     for n, extra in enumerate(injection.arrivals):
@@ -616,6 +609,8 @@ def _pair_delivery(provider, injection, extra, n: int, base, period, seed: int,
     """A pair's two files, built as the injection says (REQ-GEN-196): each
     file's content, then its target or severity, then its named shape. A
     SHAPE, NEVER A VERDICT - the pipeline decides what each file reads as."""
+    from generator import scenario_injection, targeting
+
     day = period.date + timedelta(days=extra.day_offset)
     where = f"{injection.scenario_id}, its {extra.at} delivery"
     files: dict[str, tuple[str, str]] = {}
@@ -690,6 +685,9 @@ def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str]
     names nothing about the real cause. `taken_days` is shared across
     slots because the collision is between them.
     """
+    from generator import scenario_injection
+    from generator.resupply import Delivery
+
     if not suppressed:
         return deliveries
     out = []
@@ -715,27 +713,6 @@ def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str]
     return out
 
 
-def _no_two_arrivals_share_an_instant(manifest: list[dict]) -> None:
-    """Refuse a history where two supplies claim one receipt instant.
-
-    A STAGED TABLE IS NAMED FOR ITS ARRIVAL, so two supplies at the same
-    instant claim one physical table and loading the second DROPs the
-    first - the failure this guard exists for was real, and what it
-    reported was a missing relation several steps downstream rather than
-    anything about a duplicate instant. Loud here, where the cause is
-    still visible.
-    """
-    seen: dict[str, str] = {}
-    for entry in manifest:
-        instant = entry.get("received_at")
-        if instant in seen:
-            raise ValueError(
-                f"{entry['run_id']} and {seen[instant]} both claim receipt instant "
-                f"{instant}. A staged table is named for its arrival, so these two "
-                f"would claim one table and the second would drop the first.")
-        seen[instant] = entry["run_id"]
-
-
 def generated_periods() -> list:
     """The periods this generator writes, oldest first: the evening-before
     era's twelve, then the 85."""
@@ -756,6 +733,8 @@ def grown_periods() -> list:
 def _grown_row_counts() -> list[int]:
     """The era's row counts, from a seed of its own so the 85's plan is
     untouched."""
+    import numpy as np
+
     rng = np.random.default_rng(GROWN_BASE_SEED - 1000)
     return [int(n) for n in rng.integers(1_700, 2_050, size=GROWN_DAYS)]
 
@@ -769,6 +748,8 @@ def _plan_injections(periods):
     because a half-written history is one somebody has to notice is
     half-written.
     """
+    from generator import scenario_injection, targeting
+
     mine = scenario_injection.for_dataset(DATASET_ID)
     scenario_injection.no_two_scenarios_share_a_period(mine, {DATASET_ID: periods})
     resolved = [(injection, scenario_injection.resolve(injection, periods))
@@ -811,108 +792,135 @@ def _days_to_avoid(period_name: str, suppressed: set[str], quiet: set[str]) -> s
     return set(suppressed) | (set(quiet) - {period_name})
 
 
-def main() -> None:
-    provider: DatasetProvider = BirthRegistrationsProvider()
-    manifest = []
-    # Delivery names are arbitrary BY DESIGN, which means they can
-    # collide - and a collision would write two arrivals into one
-    # directory, silently merging deliveries that never arrived
-    # together. Uniqueness is enforced rather than hoped for.
-    previous_row_count = None  # the last RESOLVED delivery's row count, for
-    # the row-count-growth check's dirty preset - deliberately NOT updated
-    # mid-chain: a viewer comparing "is this delivery's row count
-    # reasonable" would check against the last good reference point, not
-    # against an already-failed attempt of the same delivery.
+#: The largest offset any derivation adds to a slot's own seed: the
+#: resupply chain's +900 and its attempt number, the presets' own +19, and a
+#: covered day's +50 a day - inside 999 with room to spare.
+SEED_SPAN = 999
 
-    periods = generated_periods()
-    originals, grown = periods[GROWN_DAYS:], periods[:GROWN_DAYS]
 
-    # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
-    # _plan_injections()'s own docstring.
-    (resolved_injections, injected_by_period, suppressed_periods,
-     quiet_periods) = _plan_injections(periods)
-    # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
-    covered_periods = _covered(injected_by_period)
-    severities = _ordinary_severities(originals, injected_by_period,
-                                      suppressed_periods | covered_periods)
-    # ONLY THEN is the last history cleared: a scenario or target refused
-    # above leaves the one already on disk standing (REQ-GEN-184
-    # criterion 11).
-    # Clear what THIS generator wrote last time, so a regeneration
-    # overwrites its own history rather than accumulating beside it
-    # (REQ-GEN-042), then seed uniqueness from whatever the OTHER
-    # generator has on disk so two arrivals can never share a
-    # directory (REQ-GEN-043).
-    delivery.remove_deliveries(_previous_delivery_names(), DELIVERIES_DIR, RECEIPTS_DIR)
-    taken_names: set[str] = delivery.existing_delivery_names(DELIVERIES_DIR)
-    #: Days a shifted arrival has already claimed - see
-    #: _away_from_suppressed(). Shared across slots, because the
-    #: collision it prevents is between them.
-    shifted_onto: set[str] = set()
-    # NEVER STALE: an ordinary amber, and a period whose injected supply is
-    # built to a target (REQ-GEN-184 criterion 4) - a stale delivery fails
-    # the freshness checks, whatever it was built to.
-    green_periods = _built_green(injected_by_period)
-    provider.amber_dates = frozenset(
-        [p.date for p, sev in zip(originals, severities) if sev == "amber"]
-        + [p.date for p in periods if p.name in green_periods]
-        + [p.date for p in periods if p.name in injected_by_period and any(
-            x.targets for x in injected_by_period[p.name][0].arrivals)]
-        # A COVERED DAY'S OWN SUPPLY is built to a target too (REQ-GEN-199).
-        + [p.date for p in periods if p.name in covered_periods]
-        # THE NEXT DAY'S EXTRACT A PAIR SENDS EARLY is built to a target too
-        # (REQ-GEN-196): never stale either.
-        + [p.date + timedelta(days=1) for p in periods if p.name in injected_by_period
-           and any(f.target is not None and f.content == "next_day"
-                   for x in injected_by_period[p.name][0].arrivals for f in x.files)]
-        # THE EVENING-BEFORE ERA IS NEVER STALE: its supplies are on time by
-        # construction, and a stale one would read red (REQ-GEN-044).
-        + [p.date for p in grown])
+class CivilRegistration(Provider):
+    """Birth Registrations' half of the shared driver (REQ-GEN-246): the old
+    main()'s planning and per-slot decisions, unchanged, split across the
+    driver's hooks."""
 
-    # The 85 first, exactly as before; then the era, with its own seeds and
-    # slot ids after theirs, so nothing the 85 wrote can move.
-    to_write = [(i, drawn_rows, severity, period, False) for i, ((drawn_rows, _drawn), severity, period)
-                in enumerate(zip(RUN_PLAN, severities, originals), start=1)]
-    to_write += [(N_DELIVERIES + j, rows, None, period, True) for j, (rows, period)
-                 in enumerate(zip(_grown_row_counts(), grown), start=1)]
+    collection_id = "civil-registration"
+    dataset_id = DATASET_ID
+    seed_ranges = ((1000, 2100), (39000, 41100))
+    target_trial = True
+    target_datasets = (DATASET_ID,)
+    target_levers = "null-rate"
+    amber_dataset = DATASET_ID
 
-    for i, drawn_rows, severity, period, in_era in to_write:
+    def seed_schedule(self) -> list[tuple[str, int, int]]:
+        out = [("the run plan", _RUN_PLAN_SEED, _RUN_PLAN_SEED),
+               ("the evening-before era's row counts", GROWN_BASE_SEED - 1000,
+                GROWN_BASE_SEED - 1000)]
+        out += [(f"slot_{i:03d}", 1000 + i, 1000 + i + SEED_SPAN)
+                for i in range(1, N_DELIVERIES + 1)]
+        out += [(f"slot_{N_DELIVERIES + j:03d}", GROWN_BASE_SEED + j, GROWN_BASE_SEED + j + SEED_SPAN)
+                for j in range(1, GROWN_DAYS + 1)]
+        return out
+
+    def generated_periods(self) -> list:
+        return generated_periods()
+
+    def plan(self) -> Plan:
+        provider = BirthRegistrationsProvider()
+        periods = generated_periods()
+        originals, grown = periods[GROWN_DAYS:], periods[:GROWN_DAYS]
+
+        # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
+        # _plan_injections()'s own docstring.
+        (resolved_injections, injected_by_period, suppressed_periods,
+         quiet_periods) = _plan_injections(periods)
+        # ORDINARY AMBERS PLANNED BEFORE THE CLEAR TOO (post-build-review #155).
+        covered_periods = _covered(injected_by_period)
+        severities = _ordinary_severities(originals, injected_by_period,
+                                          suppressed_periods | covered_periods)
+        # NEVER STALE: an ordinary amber, and a period whose injected supply is
+        # built to a target (REQ-GEN-184 criterion 4) - a stale delivery fails
+        # the freshness checks, whatever it was built to.
+        green_periods = _built_green(injected_by_period)
+        provider.amber_dates = frozenset(
+            [p.date for p, sev in zip(originals, severities) if sev == "amber"]
+            + [p.date for p in periods if p.name in green_periods]
+            + [p.date for p in periods if p.name in injected_by_period and any(
+                x.targets for x in injected_by_period[p.name][0].arrivals)]
+            # A COVERED DAY'S OWN SUPPLY is built to a target too (REQ-GEN-199).
+            + [p.date for p in periods if p.name in covered_periods]
+            # THE NEXT DAY'S EXTRACT A PAIR SENDS EARLY is built to a target too
+            # (REQ-GEN-196): never stale either.
+            + [p.date + timedelta(days=1) for p in periods if p.name in injected_by_period
+               and any(f.target is not None and f.content == "next_day"
+                       for x in injected_by_period[p.name][0].arrivals for f in x.files)]
+            # THE EVENING-BEFORE ERA IS NEVER STALE: its supplies are on time by
+            # construction, and a stale one would read red (REQ-GEN-044).
+            + [p.date for p in grown])
+
+        # The 85 first, exactly as before; then the era, with its own seeds and
+        # slot ids after theirs, so nothing the 85 wrote can move.
+        jobs = []
+        for i, ((drawn_rows, _drawn), severity, period) in enumerate(
+                zip(run_plan(), severities, originals), start=1):
+            jobs.append(Job(f"slot_{i:03d}", 1000 + i, severity, period,
+                            {"i": i, "rows": drawn_rows, "in_era": False}))
+        for j, (rows, period) in enumerate(zip(_grown_row_counts(), grown), start=1):
+            i = N_DELIVERIES + j
+            jobs.append(Job(f"slot_{i:03d}", GROWN_BASE_SEED + j, None, period,
+                            {"i": i, "rows": rows, "in_era": True}))
+        return Plan(jobs=jobs, resolved=resolved_injections,
+                    injected_by_period=injected_by_period,
+                    state={"provider": provider, "periods": periods,
+                           "suppressed": suppressed_periods, "quiet": quiet_periods,
+                           "covered": covered_periods, "green": green_periods,
+                           #: Days a shifted arrival has already claimed - see
+                           #: _away_from_suppressed(). Shared across slots,
+                           #: because the collision it prevents is between them.
+                           "shifted_onto": set(),
+                           # the last RESOLVED delivery's row count, for the
+                           # row-count-growth check's dirty preset - deliberately
+                           # NOT updated mid-chain.
+                           "previous_row_count": None})
+
+    def slot(self, plan: Plan, job: Job) -> list | None:
+        from generator.resupply import Delivery, run_slot_chain
+        from generator import targeting
+
+        st = plan.state
+        provider = st["provider"]
+        i, in_era, severity, period = job.extra["i"], job.extra["in_era"], job.severity, job.period
         if in_era and i == N_DELIVERIES + 1:
-            previous_row_count = None  # the era is its own run of supplies
+            st["previous_row_count"] = None  # the era is its own run of supplies
+        previous_row_count = st["previous_row_count"]
         # AN ORDINARY AMBER IS THE SIZE OF THE SUPPLY BEFORE IT (Keith,
         # 2026-10-11): its own row-count check reads no change, and the next
-        # supply compares against what it would have anyway. Built at the
-        # top of the draw instead, the clean supply after it dropped 12-16%
-        # and warned (post-build-review #154). Asked for at that size and
-        # trimmed to it exactly in dirty(), since a batch comes out longer.
+        # supply compares against what it would have anyway (post-build-review
+        # #154). Asked for at that size and trimmed to it exactly in dirty().
         n_rows = previous_row_count if severity == "amber" and previous_row_count \
-            else drawn_rows
-        slot_id = f"slot_{i:03d}"
-        slot_date = period.date
-        seed = GROWN_BASE_SEED + (i - N_DELIVERIES) if in_era else 1000 + i
+            else job.extra["rows"]
+        slot_date, seed = period.date, job.seed
         id_offset = i * ID_BLOCK
+        job.extra["id_offset"] = id_offset
 
-        # A SCENARIO MAY NEED A DAY TO CARRY NO SUPPLY AT ALL, which is
-        # an arrival shape like any other - TS-2's supplier outage is
-        # two of them - and the only way to express it is not to write
-        # one. The slot is still owed; nothing fills it.
-        if period.name in suppressed_periods:
+        # A SCENARIO MAY NEED A DAY TO CARRY NO SUPPLY AT ALL, which is an
+        # arrival shape like any other - TS-2's supplier outage is two of them -
+        # and the only way to express it is not to write one. The slot is
+        # still owed; nothing fills it.
+        if period.name in st["suppressed"]:
             print(f"{period.name}: no supply at all (an injected scenario needs this "
                   f"day empty)")
-            continue
-        if period.name in covered_periods:
+            return None
+        if period.name in st["covered"]:
             # ITS SUPPLY IS THE SCENARIO'S (REQ-GEN-199): written with the
             # anchor's arrivals, so nothing more here. The size carries on.
             print(f"{period.name}: its supply is an injected scenario's arrival")
-            continue
+            return None
 
-        injected = injected_by_period.get(period.name)
-        if period.name in green_periods:
+        injected = plan.injected_by_period.get(period.name)
+        if period.name in st["green"]:
             # A GREEN LEAD-IN OR FOLLOWING SUPPLY (REQ-GEN-185 criteria 1 and
-            # 3): once, on its own day, no resupply, built to green at the
-            # size of the supply before it - so the targeted supply's row
-            # count and drift are measured against what was built here.
-
+            # 3): once, on its own day, no resupply, built to green at the size
+            # of the supply before it.
             if previous_row_count:
                 n_rows = previous_row_count
             payload = provider.generate(slot_date, seed=seed, n_rows=n_rows,
@@ -920,167 +928,88 @@ def main() -> None:
             payload, _moved = targeting.bdm_target(
                 payload, targeting.Target("green"), seed=seed + 700,
                 where=f"the green period {period.name}", rows=previous_row_count)
-            deliveries = [Delivery(received_date=slot_date, severity=None, payload=payload)]
-        elif injected is not None:
-            if any(x.targets for x in injected[0].arrivals) \
-                    and previous_row_count:
+            return [Delivery(received_date=slot_date, severity=None, payload=payload)]
+        if injected is not None:
+            if any(x.targets for x in injected[0].arrivals) and previous_row_count:
                 n_rows = previous_row_count  # asked at that size, trimmed exactly
-            deliveries = _injected_chain(provider, injected[0], period, seed,
-                                          id_offset, n_rows, previous_row_count,
-                                          placement=injected[1])
-        elif in_era:
+            return _injected_chain(provider, injected[0], period, seed, id_offset, n_rows,
+                                   previous_row_count, placement=injected[1])
+        if in_era:
             # ONE ON-TIME SUPPLY, THE EVENING BEFORE (REQ-GEN-044): no chain.
             payload = provider.generate(slot_date, seed=seed, n_rows=n_rows,
                                         id_offset=id_offset)
-            deliveries = [Delivery(received_date=slot_date - timedelta(days=1),
-                                   severity=None, payload=payload)]
-        else:
-            deliveries = _away_from_suppressed(
-                list(run_slot_chain(provider, slot_date, seed, id_offset,
-                                     n_rows, severity, previous_row_count)),
-                _days_to_avoid(period.name, suppressed_periods, quiet_periods),
-                shifted_onto, last_day=periods[-1].date)
-        entries = _manifest_entries_for_slot(deliveries, slot_id, period.name,
-                                              len(manifest), id_offset, seed)
+            return [Delivery(received_date=slot_date - timedelta(days=1),
+                             severity=None, payload=payload)]
+        return _away_from_suppressed(
+            list(run_slot_chain(provider, slot_date, seed, id_offset,
+                                n_rows, severity, previous_row_count)),
+            _days_to_avoid(period.name, st["suppressed"], st["quiet"]),
+            st["shifted_onto"], last_day=st["periods"][-1].date)
+
+    def entries(self, plan: Plan, job: Job, deliveries: list, run_index_start: int) -> list[dict]:
+        entries = _manifest_entries_for_slot(deliveries, job.slot_id, job.period.name,
+                                             run_index_start, job.extra["id_offset"], job.seed)
+        injected = plan.injected_by_period.get(job.period.name)
         if injected is not None and injected[0].covers:
             # A COVERED DAY'S SUPPLY IS THAT DAY'S (REQ-GEN-199): recorded
             # under its own period, which is what it is for.
+            periods = plan.state["periods"]
             for delivery_obj, entry in zip(deliveries, entries):
-                offset = (delivery_obj.received_date - slot_date).days
+                offset = (delivery_obj.received_date - job.period.date).days
                 if 0 < offset <= injected[0].covers:
-                    entry["period"] = periods[periods.index(period) + offset].name
-                    entry["slot_id"] = f"slot_{i + offset:03d}"
+                    entry["period"] = periods[periods.index(job.period) + offset].name
+                    entry["slot_id"] = f"slot_{job.extra['i'] + offset:03d}"
+        return entries
 
-        for n, (delivery_obj, entry) in enumerate(zip(deliveries, entries), start=1):
-            # ONE WRITE, NOT TWO (REQ-PIPE-102, extended to Birth
-            # Registrations 2026-09-27 at Keith's ask). This used to
-            # write a flat `data/raw/<run_id>.csv` here AND a real
-            # delivery below - the same rows twice, able to disagree.
-            # Only the delivery is an arrival: the whole QA chain
-            # reads deliveries, and the flat copy had no reader left.
-            # data/raw/ WENT TOO, later the same day: the
-            # `--local-file` path stages the operator's file where it
-            # already is, so nothing needed a drop directory.
-            # THE RECEIPT INSTANT IS THE DATA'S OWN, not a separately
-            # invented one: the earliest extract_timestamp in the file
-            # that just landed. That is the same value
-            # qa_tools/tools/dataset_stats.py computes downstream as
-            # earliest_extract, so the manifest and the warehouse cannot
-            # disagree about when a supply turned up.
-            if injected is not None:
-                # THE SCENARIO'S OWN INSTANT, not the payload's earliest
-                # extract. The whole of TS-1 is that the third file lands
-                # at 20:00 rather than whenever the rows happen to say -
-                # an arrival time derived from the data would put it
-                # wherever the generator's row timestamps fell, which is
-                # the one thing this scenario is not free to vary.
-                extra = injected[0].arrivals[n - 1]
-                entry["received_at"] = asset_time.isoformat(
-                    asset_time.wall_clock(delivery_obj.received_date, extra.at))
-                injected[1].arrivals[n - 1]["delivery"] = None  # set below, with the name
-            elif period.name in green_periods:
-                # ON TIME (REQ-GEN-185 criterion 1; post-build-review #156): a
-                # lead-in or following supply arrives inside its due time and
-                # grace, at the midpoint - from the rows, 09-16's came at 16:55
-                # and was recorded late.
-                from qa_tools.common import slots
+    def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
+        from qa_tools.common import slots
 
-                due = slots.slot_instants(DATASET_ID, period.date)
-                entry["received_at"] = asset_time.isoformat(due.due_at + due.grace / 2)
-            elif in_era:
-                # AN HOUR BEFORE ITS DUE INSTANT, the evening before (REQ-GEN-044):
-                # on time, and inside its own claim window, which opens at 18:00.
-                from qa_tools.common import slots
+        period = job.period
+        injected = plan.injected_by_period.get(period.name)
+        if injected is not None:
+            # THE SCENARIO'S OWN INSTANT, not the payload's earliest extract.
+            # The whole of TS-1 is that the third file lands at 20:00 rather
+            # than whenever the rows happen to say.
+            extra = injected[0].arrivals[n - 1]
+            return asset_time.isoformat(asset_time.wall_clock(delivery_obj.received_date, extra.at))
+        if period.name in plan.state["green"]:
+            # ON TIME (REQ-GEN-185 criterion 1; post-build-review #156): a
+            # lead-in or following supply arrives inside its due time and
+            # grace, at the midpoint.
+            due = slots.slot_instants(DATASET_ID, period.date)
+            return asset_time.isoformat(due.due_at + due.grace / 2)
+        if job.extra["in_era"]:
+            # AN HOUR BEFORE ITS DUE INSTANT, the evening before (REQ-GEN-044):
+            # on time, and inside its own claim window, which opens at 18:00.
+            due = slots.slot_instants(DATASET_ID, period.date)
+            return asset_time.isoformat(due.due_at - timedelta(hours=1))
+        # THE RECEIPT INSTANT IS THE DATA'S OWN: the earliest extract_timestamp
+        # in the file that just landed - the same value
+        # qa_tools/tools/dataset_stats.py computes downstream as
+        # earliest_extract, so the bookkeeping and the warehouse cannot
+        # disagree about when a supply turned up.
+        return _received_at(delivery_obj.payload, delivery_obj.received_date,
+                            f"received_at for {entry['run_id']}")
 
-                due = slots.slot_instants(DATASET_ID, period.date)
-                entry["received_at"] = asset_time.isoformat(due.due_at - timedelta(hours=1))
-            else:
-                entry["received_at"] = _received_at(
-                    delivery_obj.payload, delivery_obj.received_date,
-                    f"received_at for {entry['run_id']}")
+    def files(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict, name: str):
+        if isinstance(delivery_obj, PairDelivery):
+            files = {fn: csv for fn, (csv, _at) in delivery_obj.files.items()}
+            # EACH FILE'S OWN RECEIPT (REQ-GEN-196): the pair is two arrivals'
+            # worth of evidence in one delivery.
+            received = {fn: asset_time.wall_clock(delivery_obj.received_date, at)
+                        for fn, (_csv, at) in delivery_obj.files.items()}
+            return files, received
+        # A filename matching this dataset's own configured arrivalPattern.
+        files = {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
+                 delivery_obj.payload.to_csv(index=False)}
+        return files, asset_time.parse_instant(entry["received_at"], entry["run_id"])
 
-            # AND AS A REAL DELIVERY (REQ-GEN-043): one directory, an
-            # arbitrary supplier-shaped name, a filename matching this
-            # dataset's own configured arrivalPattern, and a receipt
-            # record written OUTSIDE it. See docs/delivery-format.md.
-            name = delivery_names.delivery_name(slot_date, seed, attempt=n, taken=taken_names)
-            taken_names.add(name)
-            entry["delivery"] = name
-            if injected is not None:
-                # THE DELIVERY NAME, NOT THE GENERATOR'S OWN RUN ID, and
-                # this is a correction worth keeping. The first version
-                # recorded `entry["run_id"]` and was wrong on the first
-                # real run: run identity comes from RECEIPT ORDER over
-                # recognised deliveries (REQ-GEN-043), not from this
-                # manifest's numbering, and suppressing two days made the
-                # two disagree by exactly the two slots removed. The
-                # placement said run_036 and the real supply was run_034.
-                # A name is stable under both, and the run ids are
-                # resolved from recognition below - observed rather than
-                # predicted.
-                injected[1].arrivals[n - 1]["delivery"] = name
-            if isinstance(delivery_obj, PairDelivery):
-                files = {fn: csv for fn, (csv, _at) in delivery_obj.files.items()}
-                # EACH FILE'S OWN RECEIPT (REQ-GEN-196): the pair is two
-                # arrivals' worth of evidence in one delivery.
-                received = {fn: asset_time.wall_clock(delivery_obj.received_date, at)
-                            for fn, (_csv, at) in delivery_obj.files.items()}
-            else:
-                files = {f"birth_registrations_{delivery_obj.received_date.isoformat()}.csv":
-                         delivery_obj.payload.to_csv(index=False)}
-                received = asset_time.parse_instant(entry["received_at"], entry["run_id"])
-            delivery.write_delivery(
-                name, files,
-                received_at=received,
-                deliveries_dir=DELIVERIES_DIR, receipts_dir=RECEIPTS_DIR,
-                # STORAGE, because in this PoC the generator IS storage
-                # (REQ-PIPE-105 criterion 4). It is standing in for the
-                # moment our own object store took a supplier's file, the
-                # same way its CSVs stand in for the supplier's extract -
-                # so the receipt says what it is simulating rather than
-                # claiming our clock stamped a 2023 instant this morning.
-                received_from=delivery.RECEIVED_FROM_STORAGE)
+    def describe(self, entry: dict, delivery_obj) -> str:
+        return f"{len(delivery_obj.payload):5d} rows"
 
-            tag = f"DIRTY({delivery_obj.severity})" if delivery_obj.severity else "clean"
-            resupply_tag = (f"  [resupply {n - 1}, received "
-                             f"{delivery_obj.received_date.isoformat()}]") if n > 1 else ""
-            print(f"{entry['run_id']}: {len(delivery_obj.payload):5d} rows  [{tag}]{resupply_tag}"
-                  f"  -> {name}/")
-            if delivery_obj.severity == "red" and n >= MAX_ATTEMPTS:
-                print(f"  -> still red after {n} deliveries - "
-                      f"giving up (hit MAX_ATTEMPTS={MAX_ATTEMPTS})")
-
-        manifest.extend(entries)
-        previous_row_count = len(deliveries[-1].payload)  # this slot's final (resolved-or-abandoned) row count
-
-    # NO manifest.json ANY MORE (REQ-GEN-043). It held exactly the
-    # list below, which _write_bookkeeping() also holds - two copies of
-    # the same bookkeeping, in two files, able to disagree. Nothing in
-    # the pipeline had read it since arrivals became recognised rather
-    # than declared, so the only thing it could still do was tempt
-    # somebody to wire it back up.
-    _no_two_arrivals_share_an_instant(manifest)
-    _write_bookkeeping(manifest)
-    # WHERE EVERY SCENARIO LANDED (criterion 7), written once the run
-    # ids exist - qa_tools/common/scenario_map.py reads exactly this.
-    if resolved_injections:
-        placed = [placement for _, placement in resolved_injections]
-        recognised = arrivals.arrivals_for(
-            hierarchy.dataset(DATASET_ID).collection_id, "run_",
-            DELIVERIES_DIR, RECEIPTS_DIR)
-        # AGAINST WHAT RECOGNITION FOUND, not against what was meant to
-        # be written - see each function's own docstring.
-        scenario_injection.check_suppressed_days_are_empty(placed, recognised)
-        scenario_injection.resolve_run_ids(placed, recognised)
-        scenario_injection.check_every_index_has_its_supply(placed)
-        written = scenario_injection.write_placements(placed, merge=True)
-        print(f"Recorded {len(resolved_injections)} injected scenario placement(s) "
-              f"-> {written}")
-    n_red_chains = sum(1 for _, sev in RUN_PLAN if sev == "red")
-    print(f"\nWrote {len(manifest)} deliveries across {len(RUN_PLAN)} scheduled slots "
-          f"({n_red_chains} of which went red and triggered a resupply chain) "
-          f"to {os.path.abspath(DELIVERIES_DIR)}")
+    def after_slot(self, plan: Plan, job: Job, deliveries: list) -> None:
+        # this slot's final (resolved-or-abandoned) row count
+        plan.state["previous_row_count"] = len(deliveries[-1].payload)
 
 
-if __name__ == "__main__":
-    main()
+PROVIDER = CivilRegistration()
