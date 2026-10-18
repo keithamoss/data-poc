@@ -10254,3 +10254,15 @@ twice. It deliberately did not re-find the `TypeError`.
      THE LESSON is the one this file keeps finding: two halves of one value
      changed shape at different times, and only a run of the narrow path
      would have shown it.
+
+224. **[done, 2026-10-18]** **[CLI/TUI]** **Two `mothman dashboard` help
+     lines still named the two collections' files**, found driving REQ-TEST-249's
+     fake collection through `mothman dashboard` in a copy. `build-data` said it
+     reshapes "results_bdm.json/results_cp.json", and `rebuild-results` said it
+     rebuilds them "purely from committed qa_results/ history" - a folder that
+     REQ-PIPE-089 removed. Both have served every registered collection since
+     REQ-DASH-244 and REQ-PIPE-243. Reworded at Keith's ask: "Reshape every
+     collection's results file into the dashboard's own JSON shape." and
+     "Rebuild every collection's results file under reports/ from its QA history
+     recorded in the database." Wording only, so no failing test first; the next
+     equivalence comparison shows it as an S7 difference, named here.

@@ -29,7 +29,7 @@ def _rebuild_results() -> None:
 
 @dashboard_group.command("rebuild-results")
 def rebuild_results_command() -> None:
-    """Rebuild reports/results_bdm.json and results_cp.json purely from committed qa_results/ history."""
+    """Rebuild every collection's results file under reports/ from its QA history recorded in the database."""
     _rebuild_results()
 
 
@@ -51,7 +51,7 @@ def _build_data() -> None:
 
 @dashboard_group.command("build-data")
 def build_data_command() -> None:
-    """Reshape results_bdm.json/results_cp.json into the dashboard's own JSON shape."""
+    """Reshape every collection's results file into the dashboard's own JSON shape."""
     _build_data()
 
 
