@@ -1750,13 +1750,13 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-62",
         dataset_id="birth-registrations",
-        anchor=-4,
+        anchor=-60,
         config="daily, due 22:00 the evening before with 1 hour's grace; the claim "
-               "window widens from 4 to 6 hours from 2026-09-19 by correction "
+               "window widens from 4 to 6 hours for 2026-07-25 alone by correction "
                "REQ-GEN-205-TS62, merged that day and left awaiting confirmation.",
         arrivals=(
             ExtraArrival(-1, "21:00", None,
-                         "2026-09-19's supply, on time the evening before the correction"),
+                         "2026-07-25's supply, on time the evening before the correction"),
         ),
         correction="REQ-GEN-205-TS62",
         links=(Link("TS-62", 3, correction_event("REQ-GEN-205-TS62"), HISTORY_END),),
