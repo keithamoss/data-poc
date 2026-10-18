@@ -512,7 +512,8 @@ class TestTheSharedToolModules:
 
         assert (len(got), len(notes)) == (0, 1)
 
-    def _soda(self, monkeypatch, tmp_path, legacy=frozenset(), soda=None, readable=(FAKE_TABLE,)):
+    def _soda(self, monkeypatch, tmp_path, legacy=frozenset(), soda=None, readable=(FAKE_TABLE,),
+              extra_checks=()):
         """The shared Soda runner over a stub scan, for the third collection:
         one generic check with a filter, one custom-named `failed rows`."""
         import dataclasses
@@ -540,6 +541,7 @@ class TestTheSharedToolModules:
             {"table": FAKE_TABLE, "column": None, "name": "things pair up", "filter": None,
              "metrics": [], "outcome": "fail", "diagnostics": {"value": 2}, "resourceAttributes": [
                  {"name": "check_id", "value": f"{prefix}.things.pair_soda"}]},
+            *extra_checks,
         ]}
         conn = SimpleNamespace(execute=lambda sql: SimpleNamespace(fetchone=lambda: (7,)),
                                close=lambda: None)
@@ -581,6 +583,21 @@ class TestTheSharedToolModules:
         assert (plain[check][key], flagged[check][key]) == (without, with_)
         flagged[check][key] = plain[check][key]
         assert flagged == plain
+
+    def test_a_failing_failed_rows_check_records_how_many_rows_failed(self, third_collection,
+                                                                       monkeypatch, tmp_path):
+        """post-build-review #226: a custom `failed rows` check's block is a
+        `file` block, which carries its count at file.totalRowCount - the
+        reader looked only for a failedRowsAnalysis block's totalFailingRows,
+        so every failing one recorded no invalid-row count."""
+        prefix = f"a.fake-agency.{FAKE_ID}.{FAKE_DATASET}"
+        rows = {"table": FAKE_TABLE, "column": None, "name": "things pair up", "filter": None,
+                "metrics": [], "outcome": "fail", "diagnostics": {"value": 24, "blocks": [
+                    {"type": "file", "title": "Failed Rows",
+                     "file": {"columns": [], "totalRowCount": 24, "storedRowCount": 0}}]},
+                "resourceAttributes": [{"name": "check_id", "value": f"{prefix}.things.rows_soda"}]}
+        got, _ = self._soda(monkeypatch, tmp_path, extra_checks=(rows,))
+        assert got["rows_soda"]["row_count_invalid"] == 24
 
     def test_soda_is_never_handed_a_check_over_an_unreadable_table(self, third_collection,
                                                                     monkeypatch, tmp_path):

@@ -10288,7 +10288,7 @@ twice. It deliberately did not re-find the `TypeError`.
      real delivery tree but not into the placements file, so a new test could
      make the same mistake unnoticed; extending the guard is a follow-up.
 
-226. **[todo, 2026-10-18 - FOR KEITH]** **[QA checks]** **A failing Soda
+226. **[done, 2026-10-18]** **[QA checks]** **A failing Soda
      "failed rows" check records no invalid-row count, in both collections.**
      Found by the REQ-QAC-247 flag-brief research and verified against the
      recorded raw output: qa_tools/tools/run_soda.py reads the count from the
@@ -10304,6 +10304,18 @@ twice. It deliberately did not re-find the `TypeError`.
      the middle of REQ-QAC-247's flag-by-flag comparisons. Proposed fix: take
      a `file` block's count from the check's own value, test-first, as its own
      change with a capture before and after.
+
+     KEITH'S CALL, the same evening: fix it test-first inside REQ-QAC-247
+     (its decisions record it). FIXED from the block itself rather than the
+     check's value: a `file` block carries the count at file.totalRowCount
+     (24 on the run the brief named, equal to Soda's value), and reading it
+     there keeps the count Soda's own rather than inferred. The test,
+     tests/test_collections_registry.py's
+     test_a_failing_failed_rows_check_records_how_many_rows_failed, failed
+     first (`None == 24`) and passes now. ONE DIFFERENCE BEYOND THE BRIEF'S,
+     to expect in the capture: a PASSING failed-rows check carries a file
+     block too (692 in the first 600 recorded Soda outputs), so its count
+     goes from empty to its totalRowCount, 0 when nothing failed.
 
 227. **[done, 2026-10-18]** **[Dashboard UI]** **REQ-DASH-244's one builder
      wrote each dashboard file in place, not whole or not at all.** Found by

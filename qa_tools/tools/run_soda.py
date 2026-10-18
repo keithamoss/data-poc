@@ -126,7 +126,13 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str) -> list[dict]:
 
             row_count_invalid = None
             if diagnostics.get("blocks"):
-                row_count_invalid = diagnostics["blocks"][0].get("totalFailingRows")
+                # TWO BLOCK SHAPES (post-build-review #226): a metric check's
+                # failedRowsAnalysis carries totalFailingRows, a custom
+                # `failed rows` check's `file` block carries file.totalRowCount.
+                block = diagnostics["blocks"][0]
+                row_count_invalid = (block["file"].get("totalRowCount")
+                                     if block.get("type") == "file"
+                                     else block.get("totalFailingRows"))
             elif base_check == "row_count":
                 row_count_invalid = 0
             elif base_check in spec.invalid_count_metrics:
