@@ -37073,8 +37073,7 @@ requirements:
     - cli/dashboard.py::_rebuild_results
     - cli/pipeline.py::_run_collection
     - cli/one_table.py::OneTableCLI::_run_single
-    - pipeline/build_dashboard_data.py::_AGGREGATES
-    - pipeline/build_dashboard_data.py::_AGGREGATES
+    - pipeline/build_dashboard_data.py::build_one_table
     - qa_tools/common/validate_collections.py::ALLOWLIST
     - qa_tools/tools/orchestrate.py::_reconciles
   - id: REQ-DASH-244
@@ -37240,7 +37239,7 @@ requirements:
       - cli/app.py::_which_collection
       - cli/common.py::short_collection_option
       - cli/common.py::id_collection_option
-      - cli/common.py::_RegistryChoice
+      - cli/common.py::CollectionParam
       - cli/pipeline.py::_run_collection
       - cli/debug.py::_manifest_entry
       - qa_tools/tools/steps.py::RUN_STEPS

@@ -863,3 +863,30 @@ class TestTheSharedOrchestratorStatsAndRebuild:
         arrival = SimpleNamespace(received_at="2026-01-01T01:00:00+00:00", files_by_dataset={})
         assert orchestrate._claim_window(FAKE_ID, arrival) is None
         assert orchestrate._claim_window("child-protection", arrival) is not None
+
+
+class TestTheAdapterLineReport:
+    """REQ-TEST-249 criterion 5: each adapter's lines of logic against a soft
+    budget, each provider's beside it, reported and never enforced."""
+
+    def test_every_collection_is_reported_with_its_provider(self):
+        from qa_tools.common import validate_collections as vc
+
+        lines = vc.line_report()
+        assert len(lines) == len(collections.all_collections()) > 0
+        assert all("against a budget of 150" in line and "generator provider" in line
+                   for line in lines), lines
+
+    def test_an_adapter_over_budget_is_reported_and_the_gate_still_passes(self, tmp_path, capsys):
+        from qa_tools.common import validate_collections as vc
+
+        for coll in collections.all_collections():
+            path = tmp_path / "qa_tools" / "collections" / f"{coll.module_name}.py"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('"""A docstring is not logic."""\n# nor is a comment\n\n'
+                            + "".join(f"x{i} = {i}\n" for i in range(160)))
+        lines = vc.line_report(tmp_path)
+        assert all("adapter 160 lines" in line and "10 over" in line
+                   and "no generator provider" in line for line in lines), lines
+        assert vc.main() == 0
+        assert "against a budget of 150" in capsys.readouterr().out

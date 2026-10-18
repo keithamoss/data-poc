@@ -381,9 +381,52 @@ def presentation_problems() -> list[str]:
     return presentation.problems()
 
 
+#: REQ-TEST-249 criterion 5: what a QA adapter is expected to cost, in lines
+#: of logic. REPORTED, NEVER ENFORCED (position.md call 10) - both real
+#: adapters were expected over it from the start, the overage being their
+#: tool maps and statistics, which a smaller one-table collection lacks.
+ADAPTER_LINE_BUDGET = 150
+
+
+def logic_lines(path: Path) -> int:
+    """The lines of `path` that hold code: every line a statement or
+    expression starts on, never a comment, a blank line or a docstring."""
+    tree = ast.parse(path.read_text())
+    docstrings = set()
+    for node in [tree, *ast.walk(tree)]:
+        body = getattr(node, "body", None)
+        if (isinstance(body, list) and body and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str)):
+            docstrings.update(range(body[0].lineno, body[0].end_lineno + 1))
+    return len({n.lineno for n in ast.walk(tree) if hasattr(n, "lineno")} - docstrings)
+
+
+def line_report(root: Path = ROOT) -> list[str]:
+    """Each registered collection's adapter against the budget, and its
+    generator provider's lines beside it, outside the budget - a real
+    deployment's collections have no synthetic generator at all."""
+    from qa_tools import collections
+
+    out = []
+    for coll in collections.all_collections():
+        adapter = root / "qa_tools" / "collections" / f"{coll.module_name}.py"
+        provider = root / "generator" / "collections" / f"{coll.module_name}.py"
+        if not adapter.is_file():
+            continue  # config_problems() says so
+        n = logic_lines(adapter)
+        over = f", {n - ADAPTER_LINE_BUDGET} over" if n > ADAPTER_LINE_BUDGET else ""
+        made = (f"; its generator provider {logic_lines(provider)}" if provider.is_file()
+                else "; no generator provider")
+        out.append(f"{coll.id}: adapter {n} lines of logic against a budget of "
+                   f"{ADAPTER_LINE_BUDGET}{over}{made}.")
+    return out
+
+
 def main() -> int:
     problems = (config_problems() + check_file_problems() + literal_problems()
                 + presentation_problems())
+    for line in line_report():  # reported whether or not the gate passes
+        print(f"  {line}")
     if problems:
         for p in problems:
             print(f"  {p}")

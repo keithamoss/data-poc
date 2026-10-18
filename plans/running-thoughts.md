@@ -5607,6 +5607,23 @@ could never have computed it), and it belongs with batch 5's check work.
     CLI factory and the one dashboard builder - which tests assert the same
     behaviour twice, and which could go.
 
+    A SIGNED CRITERION THAT CANNOT HOLD, FOR KEITH (found 2026-10-18 evening
+    building REQ-TEST-249): criterion 3 says the copy may differ from the
+    tracked tree in contract/data-asset.yaml only (plus new files), but a
+    dataset with no entry in contract/calendar.yaml is refused outright
+    ("names no `calendar:` and does not declare `no_calendar:` either").
+    So a fake collection cannot be added without editing calendar.yaml,
+    exactly as criterion 10 already allows for Emergency Department.
+    BUILT UNDER THE ASSUMPTION that criterion 3 also allows calendar.yaml to
+    differ by the fake collection's entries inserted whole, every
+    pre-existing line unchanged and in order - the same rule as for
+    data-asset.yaml. The criterion's text is NOT changed until he agrees.
+    THE SAME FOR contract/presentation.yaml: REQ-DASH-244 put every
+    collection's words in that one asset-wide file and `mothman check` fails a
+    collection with no entry, so a new collection edits it too. Built under the
+    same assumption; the alternative is a presentation file per agency folder,
+    which would be a change to REQ-DASH-244's criterion 10.
+
 107. **[todo, 2026-10-18]** **[Docs & process]** **Why is there 77,000 lines
     of product code?** Keith, 2026-10-18: "how the fuck do we have 77,000
     lines of product code? That's ridiculous." Measured the same day: 76,720
