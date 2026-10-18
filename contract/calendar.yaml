@@ -509,8 +509,31 @@ datasets:
             new: {}
   - id: cp-carers
     participation:
+      # SPLIT FROM THE SHARED ALIASES (REQ-GEN-218 criterion 1, TS-63): Carer
+      # Register alone is turned off for 2022-Q1 and 2022-Q2 and turned back
+      # on, so no other dataset is turned off with it. Each version states what
+      # the alias it replaces stated; nothing resolves differently outside the
+      # gap.
       versions:
-        - *cp_grown_participation
+        - effective_from: "2013-01-01"
+          effective_to: "2021-12-31"
+          turned_off_reason: >-
+            A fictional pause, made to demonstrate a dataset turned off and back on
+            in this synthetic asset (TS-63): the supplier stops sending the Carer
+            Register for two quarters while it replaces its carer system.
+          changelog:
+            - date: "2026-10-15"
+              author: REQ-GEN-207
+              change: Owes supplies from 2013-01-01, ten years earlier - the synthetic history grows at its old end. Due time and grace from Child Protection's participation_defaults, as after it.
+            - date: "2021-12-15"
+              author: REQ-GEN-218
+              change: Turned off after 31 December 2021 - a fictional correction for this synthetic asset's TS-63.
+              turns_off: true
+        - effective_from: "2022-06-01"
+          changelog:
+            - date: "2026-10-18"
+              author: REQ-GEN-218
+              change: Turned back on for 2022-Q3 onwards, after the fictional two-quarter pause of TS-63. Due time and grace from Child Protection's participation_defaults, as before it.
         - *cp_participation
     corrections:
       - change_reference: REQ-PIPE-181
@@ -525,6 +548,27 @@ datasets:
           - item: dataset cp-carers participation 2023-01-01
             old: {expected_time: '09:00', grace: 8h}
             new: {}
+      # TS-63's TURN-OFF (REQ-GEN-218 criterion 2), a fictional correction dated
+      # before the gap's first quarter so the gap's arrivals are filed under the
+      # corrected agreement as they arrive. A replay confirms it only at the
+      # history's end, so cp-carers reads awaiting confirmation until then.
+      - change_reference: REQ-GEN-218
+        date: "2021-12-15"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          A fictional correction made to demonstrate turning a dataset off and back
+          on in this synthetic asset (TS-63): Carer Register is not owed for 2022-Q1
+          or 2022-Q2.
+        changes:
+          - item: dataset cp-carers participation 2013-01-01 effective_to
+            old: null
+            new:
+              effective_to: "2021-12-31"
+              turned_off_reason: >-
+                A fictional pause, made to demonstrate a dataset turned off and back on
+                in this synthetic asset (TS-63): the supplier stops sending the Carer
+                Register for two quarters while it replaces its carer system.
   - id: cp-case-workers
     participation:
       versions:

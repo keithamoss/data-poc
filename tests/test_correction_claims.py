@@ -104,3 +104,14 @@ def test_the_driver_refuses_before_it_writes(monkeypatch, tmp_path):
                         lambda *a, **k: pytest.fail("cleared before the claim check"))
     with pytest.raises(si.CannotPlace, match="claimed twice"):
         driver.generate("emergency-department")
+
+
+def test_a_scenario_on_another_dataset_of_the_collection_is_refused_too(docs):
+    """Child Protection is one delivery a quarter: a claim on cp-clients'
+    quarter is a claim on that quarter's delivery, whatever dataset the other
+    scenario names."""
+    with pytest.raises(si.CannotPlace, match=r"TS-9.*CAB-1"):
+        cc.check([_inj("TS-58", "cp-clients", 2, rides="CAB-1"),
+                  _inj("TS-9", "cp-placements", 3)],
+                 {"cp-clients": _quarters(), "cp-placements": _quarters()}, docs=docs,
+                 history_end=date(2026, 8, 1))

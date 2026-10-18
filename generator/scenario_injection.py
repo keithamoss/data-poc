@@ -423,6 +423,14 @@ FILE_SHAPES: dict[str, str] = {
     "missing_table_late":
         "cp_placements.csv arriving on its own, later in the quarter - the table "
         "the delivery left out, sent once the supplier noticed.",
+    # REQ-GEN-218 (TS-63): Carer Register's last owed quarter, delivered
+    # without it, and its file sent on its own.
+    "carers_missing":
+        "the six-file delivery with cp_carers.csv absent - the supplier held the "
+        "Carer Register back - and the other five unchanged.",
+    "carers_alone":
+        "cp_carers.csv arriving on its own - the Carer Register sent separately "
+        "from the quarter's delivery.",
     # PER FILE (REQ-GEN-196's named-shapes NFR): applied to whichever file a
     # pair names, never hardwired to one filename.
     "unreadable_file":
@@ -559,6 +567,10 @@ def apply_file_shape(shape: str | None, files: dict[str, str]) -> dict[str, str]
         out.pop("cp_placements.csv")
     elif shape == "missing_table_late":
         out = {"cp_placements.csv": files["cp_placements.csv"]}
+    elif shape == "carers_missing":
+        out.pop("cp_carers.csv")
+    elif shape == "carers_alone":
+        out = {"cp_carers.csv": files["cp_carers.csv"]}
     return out
 
 
@@ -1783,6 +1795,38 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-75b",),
         links=(Link("TS-75a", 7, 0, "TS-75 reject", scenario_map.AS_AT_PANEL),
                Link("TS-75b", 3, "TS-75 reject", 1, scenario_map.AS_AT_PANEL)),
+    ),
+    # A DATASET TURNED OFF FOR A WHILE (REQ-GEN-218; TS-63): Carer Register
+    # is turned off after 31 December 2021 by correction REQ-GEN-218, dated
+    # 15 December, and back on for 2022-Q3 - a grown quarter (REQ-GEN-207),
+    # so no planted scenario moves. Shapes and instants only: the filing rule
+    # files the late one into 2021-Q4 and holds the gap's as turned off.
+    Injection(
+        scenario_id="TS-63a",
+        dataset_id="cp-carers",
+        anchor=-20,
+        config="quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, 14-day claim window. "
+               "cp-carers is turned off after 31 December 2021 by a correction dated 15 "
+               "December 2021, and owed again from 2022-Q3. 2021-Q4's delivery leaves "
+               "cp_carers out; cp_carers follows on 5 January 2022, after the turn-off but "
+               "while 2021-Q4's slot is open; another arrives on 15 March 2022, in the gap.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "five of the six tables, on time - cp_carers.csv absent",
+                         file_shape="carers_missing"),
+            ExtraArrival(65, "10:00", None,
+                         "cp_carers alone, after the effective_to, while 2021-Q4's slot is "
+                         "still open - filed to 2021-Q4",
+                         file_shape="carers_alone"),
+            ExtraArrival(134, "10:00", None,
+                         "cp_carers alone, inside the gap with no owed slot open - held "
+                         "as turned off",
+                         file_shape="carers_alone"),
+        ),
+        also_demonstrates=("TS-63b",),
+        correction="REQ-GEN-218",
+        links=(Link("TS-63a", 5, correction_event("REQ-GEN-218"), 1),
+               Link("TS-63b", 5, 2, HISTORY_END)),
     ),
     Injection(
         scenario_id="TS-76",

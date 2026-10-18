@@ -34,23 +34,32 @@ def _docs_either_side(reference: str, docs):
             correction_replay.docs_at(at, docs))
 
 
-def _slots(dataset_id: str, cal: dict) -> dict:
+def _slots(dataset_id: str, cal: dict, until: date) -> dict:
     from qa_tools.common import agreement, slots
 
     agr = agreement.from_doc(cal)
     return {s.name: (s.date, s.due_at, s.grace, s.claim_opens_at, s.closes_at)
-            for s in slots.slots_for_dataset(dataset_id, agreement=agr)}
+            for s in slots.slots_for_dataset(dataset_id, until=until, agreement=agr)}
 
 
-def altered(reference: str, datasets: Sequence[str], *, docs=None) -> dict[str, set[str]]:
-    """Each dataset's periods whose slot the correction alters."""
+def _history_end() -> date:
+    from generator.anchor_date import get_anchor_date
+
+    return get_anchor_date()
+
+
+def altered(reference: str, datasets: Sequence[str], *, docs=None,
+            until: date | None = None) -> dict[str, set[str]]:
+    """Each dataset's periods whose slot the correction alters, up to `until`
+    (default the generated history's end)."""
+    until = until or _history_end()
     p, before, after = _docs_either_side(reference, docs)
     if p is None:
         raise CannotPlace(f"{reference!r} is not a declared correction - declare it in "
                           f"contract/calendar.yaml first")
     out: dict[str, set[str]] = {}
     for dataset_id in datasets:
-        old, new = _slots(dataset_id, before[0]), _slots(dataset_id, after[0])
+        old, new = _slots(dataset_id, before[0], until), _slots(dataset_id, after[0], until)
         changed = {name for name in old.keys() | new.keys() if old.get(name) != new.get(name)}
         if changed:
             out[dataset_id] = changed
@@ -107,7 +116,7 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
             raise CannotPlace(f"{names}: correction {reference} is dated {p.date}, after the "
                               f"generated history ends ({history_end}) - move its date "
                               f"inside the history")
-        changed = altered(reference, list(generated), docs=docs)
+        changed = altered(reference, list(generated), docs=docs, until=history_end)
         riding_sets = {i.dataset_id for i in riding}
         riding_collections = {_collection_of(d) for d in riding_sets}
         for inj in riding:
@@ -129,11 +138,18 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
                     f"a correction alters must lie outside that collection's history or have "
                     f"its routine supply suppressed")
         claim = claimed(reference, {d: generated[d] for d in riding_sets}, docs=docs)
+        # BY COLLECTION, NOT DATASET: a collection delivering every table
+        # together has one delivery a period, so a claim on one dataset's
+        # period is a claim on that period's delivery.
+        by_collection: dict[str, set[str]] = {}
+        for dataset_id, names_claimed in claim.items():
+            by_collection.setdefault(_collection_of(dataset_id), set()).update(names_claimed)
         for inj in injections:
-            if inj.correction == reference or inj.dataset_id not in claim:
+            wanted = by_collection.get(_collection_of(inj.dataset_id))
+            if inj.correction == reference or not wanted or inj.dataset_id not in generated:
                 continue
             mine = set(si.claimed_periods(inj, generated[inj.dataset_id]))
-            met = sorted(mine & set(claim[inj.dataset_id]))
+            met = sorted(mine & wanted)
             if met:
                 raise CannotPlace(
                     f"{inj.scenario_id} and correction {reference} (ridden by {names}) both "

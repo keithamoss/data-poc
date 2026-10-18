@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import copy
 import json
-from datetime import timedelta, timezone
+from datetime import date, timedelta, timezone
 
 import pytest
 import yaml
@@ -449,9 +449,28 @@ def _claim_window(days):
 
 
 class TestScenarioRegister:
-    """TS-57 to TS-62 (plans/supply-model.md), each a unit test (criterion
-    23's second half). TS-63 needs REQ-PIPE-179, unsigned; TS-64 is
+    """TS-57 to TS-63 (plans/supply-model.md), each a unit test (criterion
+    23's second half; TS-63's is REQ-GEN-218 criterion 6). TS-64 is
     tests/test_correction_trial.py's."""
+
+    def test_ts63_a_dataset_turned_off_for_a_while(self):
+        """Against the committed calendar: Carer Register is turned off after
+        31 December 2021 and back on for 2022-Q3. Its 2021-Q4 supply arriving
+        on 5 January, after the turn-off, still files to 2021-Q4, whose slot
+        is open; one arriving in March, with no owed slot open, is held as
+        turned off; and 2022-Q3's slot takes its own supply again."""
+        from qa_tools.common import asset_time, turned_off
+
+        late = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 1, 5), "10:00"))
+        assert late.covered_by == "2021-Q4" and late.label == turned_off.PLAIN
+        gap = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 3, 15), "10:00"))
+        assert gap.label == turned_off.TURNED_OFF and gap.covered_by is None
+        assert gap.turned_off.effective_to == date(2021, 12, 31)
+        back = turned_off.label_at("cp-carers", asset_time.wall_clock(date(2022, 8, 1), "09:00"))
+        assert back.covered_by == "2022-Q3"
+        for other in ("cp-clients", "cp-placements"):
+            assert turned_off.gap_at(other, asset_time.wall_clock(date(2022, 3, 15), "10:00")) \
+                is None, other
 
     def test_ts57_a_correction_that_only_re_judges(self, conn, manager):
         from qa_tools.common import verdict
