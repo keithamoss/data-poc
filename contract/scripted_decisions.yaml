@@ -229,12 +229,8 @@ decisions:
   # permanent queue item no scenario is about. A person promotes the resend a
   # day after it arrives. No scenario: each names its period, and `supply: 1`
   # is the period's second supply in receipt order, the resend.
-  - period: 2013-Q3
-    operation: promote
-    dataset: cp-carers
-    supply: 1
-    after_hours: 24
-    reason: "The supplier's corrected carers extract for 2013-Q3; it replaces the version that failed its checks."
+  # (2013-Q3's chain is gone: Child Protection writes nothing in a quarter
+  # REQ-GEN-205's correction alters - REQ-GEN-237 criterion 3, PROVISIONAL.)
   - period: 2014-Q1
     operation: promote
     dataset: cp-carers
@@ -247,3 +243,14 @@ decisions:
     supply: 1
     after_hours: 24
     reason: "The supplier's corrected placements extract for 2014-Q1; it replaces the version that failed its checks."
+
+# SCRIPTED CORRECTION CONFIRMATIONS (REQ-GEN-205) - see the header.
+corrections:
+  # TS-59: of the moves REQ-GEN-205's correction proposes, the asset manager
+  # keeps 2014-Q3's supply where it was filed; every other move goes ahead.
+  - change_reference: REQ-GEN-205
+    keep:
+      - scenario: TS-59a
+        dataset: ed-presentations
+        supply: 0
+    keep_reason: "The supplier confirms this was a late resend of 2014-Q2's extract, not 2014-Q3's supply; it stays in 2014-Q2."
