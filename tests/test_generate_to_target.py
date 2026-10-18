@@ -205,7 +205,8 @@ class TestTheRealToolsAgree:
     uses, recording nothing."""
 
     def test_a_birth_registrations_amber_warns_and_fails_nothing(self, tmp_path, batch, cat):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
 
         ref = generate_daily_batch(date(2026, 9, 19), seed=1233, n_rows=2049, id_offset=0)
         ref_csv, amb_csv = tmp_path / "ref.csv", tmp_path / "amb.csv"
@@ -378,7 +379,8 @@ class TestTargetsAgainstTheRealTools:
     through the trial path `mothman bdm qa --trial` uses, recording nothing."""
 
     def _run(self, tmp_path, df):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
 
         ref = generate_daily_batch(date(2026, 9, 19), seed=1233, n_rows=2049, id_offset=0)
         ref_csv, csv = tmp_path / "ref.csv", tmp_path / "supply.csv"

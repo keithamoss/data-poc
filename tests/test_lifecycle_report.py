@@ -204,25 +204,26 @@ class TestAKeptSyntheticArrivalIsReportedToo:
     @pytest.mark.parametrize("interactive", [False, True])
     def test_it_ends_on_the_lifecycle_summary(self, monkeypatch, module, collection,
                                               interactive):
-        import importlib
-
+        from cli import filing_tui
+        from cli.collection_cli import of as _cli_of
         from qa_tools.common import arrivals
 
-        mod = importlib.import_module(f"cli.{module}")
+        mod = _cli_of(module)
         mine = _arrival()
         monkeypatch.setattr(arrivals, "arrivals_for",
                             lambda c, p: [mine] if c == collection else [])
         shown = []
         monkeypatch.setattr(lr, "report", lambda found: shown.append([a.run_id for a in found]))
         monkeypatch.setattr(mod, "report_table", lambda results, run_id: "")
-        monkeypatch.setattr(mod.filing_tui, "offer_after_run", lambda *a: None)
+        monkeypatch.setattr(filing_tui, "offer_after_run", lambda *a: None)
         monkeypatch.setattr(common, "offer_to_publish", lambda: None)
         monkeypatch.setattr(common, "report_recorded", lambda *a: None)
         mod._report_synthetic([], mine.run_id, True, interactive=interactive)
         assert shown == [[mine.run_id]]
 
     def test_a_trial_has_no_lifecycle_to_report(self, monkeypatch):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
 
         monkeypatch.setattr(lr, "report", lambda *a, **k: pytest.fail("a trial was reported"))
         monkeypatch.setattr(bdm, "report_table", lambda results, run_id: "")

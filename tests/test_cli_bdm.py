@@ -1,4 +1,4 @@
-"""Tests for cli/bdm.py - the mothman CLI's Birth Registrations commands
+"""Tests for cli/one_table.py as Birth Registrations uses it - the mothman CLI's Birth Registrations commands
 (plans/tooling.md #1 Phase 1). Reuses the same real bdm_raw_dir/
 bdm_duckdb_dir fixtures tests/test_check_cli.py already built (real
 generator output, not hand-crafted rows), and drives the Click commands
@@ -13,7 +13,9 @@ from unittest.mock import MagicMock
 
 from click.testing import CliRunner
 
-import cli.bdm as bdm
+from cli.collection_cli import of as _cli_of
+
+bdm = _cli_of('bdm')
 import cli.common as common
 
 _REF_RUN_ID = "pytest_bdm_ref"
@@ -67,7 +69,7 @@ def _patch_delivery_dirs(monkeypatch, root):
 
 
 def test_the_cli_reports_where_the_generator_actually_wrote(monkeypatch):
-    """THE SUCCESSOR to a test of cli/bdm.py's raw_dir(), which is
+    """THE SUCCESSOR to a test of the old cli/bdm.py's raw_dir(), which is
     retired with the directory (REQ-PIPE-102). The generator writes
     one copy of a supply - the delivery - so that is what the command
     reports having written.
@@ -195,7 +197,7 @@ def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
     from qa_tools.common import qa_results_reader as reader
 
     _patch_bdm_dirs(monkeypatch, bdm_raw_dir, bdm_duckdb_dir)
-    monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command,
                              ["--run-id", _ARRIVAL_REF_RUN_ID, "--commit"])
@@ -203,7 +205,7 @@ def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
     assert result.exit_code == 0, result.output
     assert "Recorded" in result.output
     assert "TRIAL" not in result.output
-    provenance = reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
+    provenance = reader.read_run_provenance(bdm.agency_id, bdm.collection_id,
                                              _ARRIVAL_REF_RUN_ID)
     assert provenance is not None, "the kept run recorded nothing"
     assert provenance["run_by"] == "test@example.com"
@@ -317,7 +319,7 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
     raw_dir = tmp_path / "raw"
     (raw_dir).mkdir()
     _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
-    monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", lambda: "test@example.com")
 
     supplied = tmp_path / "birth_registrations_2026-01-01.csv"
     supplied.write_bytes(Path(bdm_raw_dir, f"{_REF_RUN_ID}.csv").read_bytes())
@@ -340,9 +342,9 @@ def test_qa_command_local_file_commit_files_a_real_delivery_and_records_it(
 
     # AND ITS RESULTS ARE RECORDED, under the id recognition gave it -
     # which used to be checked by globbing for a dataset_stats.json.
-    recorded = reader.list_run_ids(bdm.AGENCY_ID, bdm.COLLECTION_ID)
+    recorded = reader.list_run_ids(bdm.agency_id, bdm.collection_id)
     assert len(recorded) == 1 and recorded[0].startswith("birth_registrations__"), recorded
-    assert reader.read_run_provenance(bdm.AGENCY_ID, bdm.COLLECTION_ID,
+    assert reader.read_run_provenance(bdm.agency_id, bdm.collection_id,
                                        recorded[0])["run_by"] == "test@example.com"
 
 
@@ -354,7 +356,7 @@ def test_qa_command_local_file_commit_refuses_a_name_recognition_cannot_place(
     raw_dir = tmp_path / "raw"
     raw_dir.mkdir()
     _patch_bdm_dirs(monkeypatch, str(raw_dir), None)
-    monkeypatch.setattr(bdm, "get_run_by", lambda: "test@example.com")
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
@@ -433,7 +435,7 @@ def test_run_check_local_file_default_path_never_requires_a_real_git_identity(
 
     def _no_git_identity():
         raise MissingGitIdentityError("git config user.email is not set")
-    monkeypatch.setattr(bdm, "get_run_by", _no_git_identity)
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", _no_git_identity)
 
     result = _runner.invoke(bdm.qa_command, [
         "--file", os.path.join(bdm_raw_dir, f"{_REF_RUN_ID}.csv"),
@@ -485,7 +487,7 @@ def test_run_check_s3_downloads_both_keys_then_delegates_to_local_file_mode(monk
         download_calls.append(key)
         return local_path
 
-    monkeypatch.setattr(bdm.s3_source, "download_key", _fake_download_key)
+    monkeypatch.setattr("qa_tools.common.s3_source.download_key", _fake_download_key)
 
     captured = {}
 

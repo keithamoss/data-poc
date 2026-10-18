@@ -26,32 +26,38 @@ from __future__ import annotations
 
 import rich_click as click
 from rich.console import Console
+
+from cli import common
 from qa_tools.common import asset_time
 
 console = Console()
 
 
-def _bdm_manifest_entry(run_id: str) -> dict:
-    from . import bdm
-    entry = next((e for e in bdm.load_manifest() if e["run_id"] == run_id), None)
+def _one_table(short: str) -> bool:
+    """Whether the collection is the one-table shape, whose arrivals carry
+    the csv a run id guards (REQ-TEST-245: by shape, never by name)."""
+    from qa_tools import collections
+
+    return len(collections.by_short(short).datasets) == 1
+
+
+def _manifest_entry(short: str, run_id: str) -> dict:
+    from .collection_cli import of
+    entry = next((e for e in of(short).load_manifest() if e["run_id"] == run_id), None)
     if entry is None:
-        raise click.ClickException(f"No BDM manifest entry for run_id={run_id!r}.")
+        raise click.ClickException(
+            f"No {short.upper()} manifest entry for run_id={run_id!r}.")
     return entry
 
 
-def _bdm_manifest_first_entry() -> dict:
-    from . import bdm
-    return bdm.load_manifest()[0]
+def _manifest_first_entry(short: str) -> dict:
+    from .collection_cli import of
+    return of(short).load_manifest()[0]
 
 
-def _cp_manifest_first_run_id() -> str:
-    from . import cp
-    return cp.load_manifest()[0]["run_id"]
-
-
-def _print_results(results: list[dict], run_id: str) -> None:
-    from . import bdm
-    console.print(bdm.report_table(results, run_id))
+def _print_results(results: list[dict], run_id: str, short: str) -> None:
+    from .collection_cli import of
+    console.print(of(short).report_table(results, run_id))
 
 
 @click.group("debug")
@@ -60,8 +66,7 @@ def debug_group() -> None:
 
 
 @debug_group.command("run-dbt")
-@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
-              help="bdm = civil-registration, cp = child-protection.")
+@common.short_collection_option(required=True, help="{legend}.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_dbt_command(collection: str, run_id: str) -> None:
     """Run real dbt-core in isolation against one run already on disk."""
@@ -69,12 +74,11 @@ def run_dbt_command(collection: str, run_id: str) -> None:
     from qa_tools import collections
     from qa_tools.tools import run_dbt
     results = run_dbt.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
-    _print_results(results, run_id)
+    _print_results(results, run_id, collection)
 
 
 @debug_group.command("run-soda")
-@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
-              help="bdm = civil-registration, cp = child-protection.")
+@common.short_collection_option(required=True, help="{legend}.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_soda_command(collection: str, run_id: str) -> None:
     """Run real Soda Core in isolation against one run already on disk."""
@@ -82,19 +86,18 @@ def run_soda_command(collection: str, run_id: str) -> None:
     from qa_tools import collections
     from qa_tools.tools import run_soda
     results = run_soda.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
-    _print_results(results, run_id)
+    _print_results(results, run_id, collection)
 
 
 @debug_group.command("run-datacontract")
-@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
-              help="bdm = civil-registration, cp = child-protection.")
+@common.short_collection_option(required=True, help="{legend}.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 def run_datacontract_command(collection: str, run_id: str) -> None:
     """Run real datacontract-cli in isolation against one run already on disk."""
     run_timestamp = asset_time.now().isoformat()
     from qa_tools import collections
     from qa_tools.tools import run_datacontract
-    if collection == "bdm":
+    if _one_table(collection):
         # LOOKED UP AS A GUARD, not for a path (REQ-PIPE-102). The
         # tool reads the run's own view schema and never a file, so
         # nothing here needs the arrival's csv_path - but an
@@ -103,14 +106,13 @@ def run_datacontract_command(collection: str, run_id: str) -> None:
         # written partial results into real history. Dropping this
         # call did exactly that, and left two `does_not_exist/`
         # directories in qa_results/ to prove it.
-        _bdm_manifest_entry(run_id)
+        _manifest_entry(collection, run_id)
     results = run_datacontract.evaluate(collections.by_short(collection).id, run_id, run_timestamp)
-    _print_results(results, run_id)
+    _print_results(results, run_id, collection)
 
 
 @debug_group.command("run-evidently")
-@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
-              help="bdm = civil-registration, cp = child-protection.")
+@common.short_collection_option(required=True, help="{legend}.")
 @click.option("--run-id", required=True, help="An existing manifest run_id already on disk.")
 @click.option("--reference-run-id", default=None,
               help="Defaults to the manifest's own first (clean-by-construction) entry.")
@@ -119,20 +121,20 @@ def run_evidently_command(collection: str, run_id: str, reference_run_id: str | 
     run_timestamp = asset_time.now().isoformat()
     from qa_tools import collections
     from qa_tools.tools import run_evidently
-    if collection == "bdm":
-        _bdm_manifest_entry(run_id)  # a guard, as above
-        ref_entry = _bdm_manifest_entry(reference_run_id) if reference_run_id else _bdm_manifest_first_entry()
+    if _one_table(collection):
+        _manifest_entry(collection, run_id)  # a guard, as above
+        ref_entry = (_manifest_entry(collection, reference_run_id) if reference_run_id
+                     else _manifest_first_entry(collection))
         reference_run_id = ref_entry["run_id"]
     else:
-        reference_run_id = reference_run_id or _cp_manifest_first_run_id()
+        reference_run_id = reference_run_id or _manifest_first_entry(collection)["run_id"]
     results = run_evidently.evaluate(collections.by_short(collection).id, run_id, run_timestamp,
                                      reference_run_id=reference_run_id)
-    _print_results(results, run_id)
+    _print_results(results, run_id, collection)
 
 
 @debug_group.command("build-warehouses")
-@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
-              help="bdm = civil-registration, cp = child-protection.")
+@common.short_collection_option(required=True, help="{legend}.")
 def build_warehouses_command(collection: str) -> None:
     """Build every per-run DuckDB warehouse for one dataset's real synthetic manifest."""
     from qa_tools import collections

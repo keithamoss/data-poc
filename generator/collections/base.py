@@ -81,6 +81,9 @@ class Provider:
     target_levers: str | None = None
     #: The dataset an ordinary amber of this collection is measured on.
     amber_dataset: str | None = None
+    #: What the TUI says while generating, in brackets after "Generating
+    #: synthetic data" - empty for nothing (REQ-TEST-245, today's words).
+    generating_note: str = ""
 
     @property
     def run_prefix(self) -> str:

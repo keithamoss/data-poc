@@ -6,7 +6,9 @@ from __future__ import annotations
 import click
 import pytest
 
-import cli.cp as cp
+from cli.collection_cli import of as _cli_of
+
+cp = _cli_of('cp')
 from qa_tools.tools import stage
 
 SIX = {"cp_clients.csv", "cp_notifications.csv", "cp_investigations.csv",
@@ -34,7 +36,7 @@ class TestAFolderIsAttributedByPattern:
         cp._load_delivery_from_folder(_folder(tmp_path, names), "trial_x")
         tables = dict(loaded)
         assert tables["cp_clients"].endswith("cp_clients_resend.csv")
-        assert set(tables) == set(cp.TABLES)
+        assert set(tables) == set(cp.tables)
 
     def test_two_client_register_files_are_refused_and_neither_checked(self, tmp_path, loaded):
         folder = _folder(tmp_path, SIX | {"cp_clients_part2.csv"})
@@ -55,7 +57,7 @@ class TestAFolderIsAttributedByPattern:
 
     def test_a_covering_note_is_not_a_table(self, tmp_path, loaded):
         cp._load_delivery_from_folder(_folder(tmp_path, SIX | {"README.txt"}), "trial_x")
-        assert len(loaded) == len(cp.TABLES)
+        assert len(loaded) == len(cp.tables)
 
 
 class TestThePickerMarksAPair:
@@ -110,7 +112,7 @@ class TestAPickedPairIsRefusedBeforeAnyQuestion:
     def test_the_run_id_flag(self, never_asked):
         from click.testing import CliRunner
 
-        got = CliRunner().invoke(cp.cp_group, ["qa", "--run-id", "cp_run_002", "--trial"])
+        got = CliRunner().invoke(cp.group, ["qa", "--run-id", "cp_run_002", "--trial"])
         assert got.exit_code != 0
         assert not isinstance(got.exception, AssertionError), got.exception
         assert "cp_clients.csv" in got.output and "cp_clients_part2.csv" in got.output

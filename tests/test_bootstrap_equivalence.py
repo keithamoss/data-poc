@@ -138,7 +138,8 @@ def _real_tree_listing():
 
 def _bootstrap_into(corpus: Path, db_name: str, *, sequential: bool) -> tuple[dict, dict]:
     """One real bootstrap of `corpus` into a new database; its snapshot."""
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
     from qa_tools.common import bootstrap as boot
 
     mp = pytest.MonkeyPatch()

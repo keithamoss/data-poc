@@ -55,8 +55,7 @@ class TestThereIsExactlyOnePublishPath:
         monkeypatch.setattr(bootstrap, "holds_history", lambda conn: False)
         monkeypatch.setattr(processing_pass, "pass_lock",
                             lambda *a, **k: contextlib.nullcontext())
-        monkeypatch.setattr(pipeline, "_run_bdm", lambda sequential: None)
-        monkeypatch.setattr(pipeline, "_run_cp", lambda sequential: None)
+        monkeypatch.setattr(pipeline, "_run_collection", lambda coll, sequential: None)
         monkeypatch.setattr(bootstrap, "_confirm_corrections", lambda say: None)
         monkeypatch.setattr(bootstrap, "targets_agree", lambda names: [])
         monkeypatch.setattr(dashboard_cli, "_build_data", lambda: None)

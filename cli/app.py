@@ -41,8 +41,14 @@ def _config_refusal(exc) -> str:
 
 
 try:
-    from . import (bdm, check, common, cp, dashboard, debug, env, filing_tui, github,
+    from . import (check, collection_cli, common, dashboard, debug, env, filing_tui, github,
                    pipeline, plans, population, scenarios, schedule, supply)
+    from qa_tools import collections as _registry
+
+    # EVERY COLLECTION'S GROUP, FROM THE REGISTRY (REQ-TEST-245 criterion 1),
+    # built here inside the YAML guard: building them reads the hierarchy.
+    _COLLECTIONS = _registry.all_collections()
+    _GROUPS = [collection_cli.make_group(c) for c in _COLLECTIONS]
 except yaml.YAMLError as _exc:
     # READ AT IMPORT TIME by several command modules, so this is the only
     # place that can catch it - before any command, `--help` included.
@@ -65,8 +71,6 @@ _MAIN_MENU_BOOTSTRAP = "Set up this environment - generate data and run the chec
 _MAIN_MENU_PROCESS = "Process what has arrived - check and gate it, finish what is owed"
 _MAIN_MENU_EXIT = "Exit"
 
-_DATASET_BDM = "Birth Registrations"
-_DATASET_CP = "Child Protection"
 
 
 def _main_menu_loop() -> None:
@@ -76,10 +80,10 @@ def _main_menu_loop() -> None:
             "What would you like to do?",
             [_MAIN_MENU_QA, _MAIN_MENU_DECIDE, _MAIN_MENU_CALENDAR, _MAIN_MENU_PROCESS,
              _MAIN_MENU_GENERATE, _MAIN_MENU_BOOTSTRAP],
-            flag_hint="mothman bdm qa / mothman supply queue / "
-                       "mothman schedule preview-correction / mothman pipeline process / "
-                       "mothman bdm generate-synthetic-data / "
-                       "mothman pipeline bootstrap",
+            flag_hint=f"mothman {_COLLECTIONS[0].short} qa / mothman supply queue / "
+                      "mothman schedule preview-correction / mothman pipeline process / "
+                      f"mothman {_COLLECTIONS[0].short} generate-synthetic-data / "
+                      "mothman pipeline bootstrap",
         )
         if choice is None:
             console.print("Goodbye.", style="dim")
@@ -135,24 +139,31 @@ def _run_choice(choice: str) -> None:
             pass
 
 
+def _which_collection(flag_hint: str):
+    """The TUI's 'Which dataset?', listed from the registry in hierarchy
+    order and labelled as people know them (REQ-TEST-245 criteria 2 and 5).
+    The choice dispatches to THAT collection's own commands - there is no
+    branch for an unknown answer to fall into."""
+    by_label = {collection_cli.label(c): c for c in _registry.all_collections()}
+    chosen = common.select("Which dataset?", list(by_label), flag_hint=flag_hint)
+    if chosen is None:
+        return None
+    collection_cli.refuse_a_broken_adapter(by_label[chosen])
+    return collection_cli.of(by_label[chosen].id)
+
+
 def _qa_menu() -> None:
-    dataset = common.select(
-        "Which dataset?", [_DATASET_BDM, _DATASET_CP],
-        flag_hint="mothman bdm qa [--run-id/--file] / mothman cp qa [--run-id/--folder]")
-    if dataset is None:
-        return
-    if dataset == _DATASET_BDM:
-        bdm.run_qa_interactive()
-    else:
-        cp.run_qa_interactive()
+    chosen = _which_collection(" / ".join(collection_cli.qa_hint(c)
+                                          for c in _registry.all_collections()))
+    if chosen is not None:
+        chosen.run_qa_interactive()
 
 
 def _generate_menu() -> None:
-    dataset = common.select("Which dataset?", [_DATASET_BDM, _DATASET_CP],
-                             flag_hint="mothman bdm generate-synthetic-data / mothman cp generate-synthetic-data")
-    if dataset is None:
+    mod = _which_collection(" / ".join(f"mothman {c.short} generate-synthetic-data"
+                                       for c in _registry.all_collections()))
+    if mod is None:
         return
-    mod = bdm if dataset == _DATASET_BDM else cp
     if mod.manifest_exists() and not common.confirm(
             f"This will regenerate {mod.generated_output_dir()} "
             f"(deterministic - same content either way). Continue?",
@@ -252,8 +263,8 @@ def _state_the_environment_on_first_connection() -> None:
     supply_db.on_first_connection(state)
 
 
-cli.add_command(bdm.bdm_group)
-cli.add_command(cp.cp_group)
+for _group in _GROUPS:
+    cli.add_command(_group)
 cli.add_command(dashboard.dashboard_group)
 cli.add_command(env.env_group)
 cli.add_command(github.github_group)

@@ -8,7 +8,11 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from cli import bdm, common, cp
+from cli import common
+
+from cli.collection_cli import of as _cli_of
+
+bdm, cp = _cli_of('bdm'), _cli_of('cp')
 from qa_tools.common import hand_filing
 
 _runner = CliRunner()

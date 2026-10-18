@@ -29,24 +29,26 @@ _CP_MANIFEST = [{"run_id": "cp_run_01"}, {"run_id": "cp_run_02"}]
 
 
 def _patch_bdm_manifest(monkeypatch, manifest=_BDM_MANIFEST):
-    from cli import bdm
+    from cli.collection_cli import of as _cli_of
+    bdm = _cli_of('bdm')
     monkeypatch.setattr(bdm, "load_manifest", lambda: manifest)
 
 
 def _patch_cp_manifest(monkeypatch, manifest=_CP_MANIFEST):
-    from cli import cp
+    from cli.collection_cli import of as _cli_of
+    cp = _cli_of('cp')
     monkeypatch.setattr(cp, "load_manifest", lambda: manifest)
 
 
 def test_bdm_manifest_entry_returns_matching_entry(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
-    assert debug_cli._bdm_manifest_entry("run_002") == _BDM_MANIFEST[1]
+    assert debug_cli._manifest_entry("bdm", "run_002") == _BDM_MANIFEST[1]
 
 
 def test_bdm_manifest_entry_raises_click_exception_when_missing(monkeypatch):
     _patch_bdm_manifest(monkeypatch)
     try:
-        debug_cli._bdm_manifest_entry("no_such_run")
+        debug_cli._manifest_entry("bdm", "no_such_run")
         raise AssertionError("expected ClickException")
     except click.ClickException as exc:
         assert "no_such_run" in str(exc.message)

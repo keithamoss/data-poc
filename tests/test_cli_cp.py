@@ -1,4 +1,4 @@
-"""Tests for cli/cp.py - the mothman CLI's Child Protection commands
+"""Tests for cli/many_tables.py as Child Protection uses it - the mothman CLI's Child Protection commands
 (plans/tooling.md #1 Phase 1's own "still open" item, finished). Reuses
 the same real cp_raw_dir/cp_duckdb_dir fixtures tests/test_check_cli.py
 already built (real generator output, not hand-crafted rows), and drives
@@ -14,7 +14,8 @@ from unittest.mock import MagicMock
 from click.testing import CliRunner
 
 import cli.common as common
-import cli.cp as cp
+from cli.collection_cli import of as _cli_of
+cp = _cli_of('cp')
 from qa_tools.tools import stage
 from qa_tools.tools import orchestrate
 
@@ -73,7 +74,7 @@ def test_default_reference_falls_back_to_manifest_first_entry_when_nothing_promo
     monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_01")
     manifest = [{"run_id": "cp_run_01"}, {"run_id": "cp_run_02"}]
 
-    monkeypatch.setattr(cp, "list_run_ids", lambda agency, dataset: [])
+    monkeypatch.setattr("qa_tools.common.qa_results_reader.list_run_ids", lambda agency, dataset: [])
     assert cp.default_reference(manifest) == "cp_run_01"
 
 
@@ -81,7 +82,7 @@ def test_default_reference_uses_last_promoted_run_when_its_data_still_exists(mon
     monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_05")
     manifest = [{"run_id": "cp_run_01"}]
 
-    monkeypatch.setattr(cp, "list_run_ids", lambda agency, dataset: ["cp_run_02", "cp_run_05"])
+    monkeypatch.setattr("qa_tools.common.qa_results_reader.list_run_ids", lambda agency, dataset: ["cp_run_02", "cp_run_05"])
     assert cp.default_reference(manifest) == "cp_run_05"
 
 
@@ -89,7 +90,7 @@ def test_default_reference_falls_back_when_last_promoted_runs_data_no_longer_exi
     monkeypatch.setattr(cp, "has_arrival", lambda run_id: run_id == "cp_run_01")
     manifest = [{"run_id": "cp_run_01"}]
 
-    monkeypatch.setattr(cp, "list_run_ids", lambda agency, dataset: ["cp_run_99_no_longer_generated"])
+    monkeypatch.setattr("qa_tools.common.qa_results_reader.list_run_ids", lambda agency, dataset: ["cp_run_99_no_longer_generated"])
     assert cp.default_reference(manifest) == "cp_run_01"
 
 
@@ -112,7 +113,7 @@ def test_has_failures_true_on_fail_or_error_false_otherwise():
 
 def test_qa_command_flag_mode_without_commit_is_a_trial(
         monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs):
-    """See cli/bdm.py's counterpart: "local-only check" described the
+    """See the one-table counterpart: "local-only check" described the
     absence of a later promote step, and REQ-PIPE-089 made that absence
     impossible - results are recorded as a run completes. Not keeping one
     is a real thing now, a TRIAL identity that records nothing."""
@@ -132,7 +133,7 @@ def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
     from qa_tools.common import qa_results_reader as reader
 
     _patch_cp_dirs(monkeypatch, cp_raw_dir, cp_duckdb_dir, cp_delivery_dirs)
-    monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", lambda: "test@example.com")
 
     result = _runner.invoke(cp.qa_command,
                              ["--run-id", _REF_RUN_ID, "--commit"])
@@ -145,7 +146,7 @@ def test_qa_command_flag_mode_commit_records_the_run_under_its_own_id(
     assert result.exit_code in (0, 1), result.output
     assert "Recorded" in result.output
     assert "TRIAL" not in result.output
-    provenance = reader.read_run_provenance(cp.AGENCY_ID, cp.COLLECTION_ID, _REF_RUN_ID)
+    provenance = reader.read_run_provenance(cp.agency_id, cp.collection_id, _REF_RUN_ID)
     assert provenance is not None, "the kept run recorded nothing"
     assert provenance["run_by"] == "test@example.com"
 
@@ -240,7 +241,7 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     monkeypatch.setattr(drift_reference, "assess_arrival", lambda *a, **k: None)
     _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
-    monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", lambda: "test@example.com")
     # A RECEIPT INSTANT EVERY DATASET HAS AN OPEN SLOT FOR. The receipt is
     # "now" on the asset clock, and Case Workers owes a supply only in
     # February and August - so from the day 2026-Q3's claim window closed
@@ -257,23 +258,23 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
 
     assert result.exit_code == 0, result.output
     # SIX ARRIVALS, EACH NAMED (post-build-review #120 D8), not the first.
-    assert f"was filed as {len(cp.TABLES)} arrivals" in _flat(result.output)
+    assert f"was filed as {len(cp.tables)} arrivals" in _flat(result.output)
     filed = list((tmp_path / "deliveries").iterdir())
     assert len(filed) == 1, f"expected ONE delivery, got {[d.name for d in filed]}"
-    assert len(list(filed[0].iterdir())) == len(cp.TABLES)
+    assert len(list(filed[0].iterdir())) == len(cp.tables)
     # ONE RECEIPT PER FILE, in one directory for the one delivery
     # (REQ-GEN-044 criterion 12).
     assert [p.name for p in (tmp_path / "receipts").iterdir()] == [filed[0].name]
-    assert len(list((tmp_path / "receipts" / filed[0].name).glob("*.json"))) == len(cp.TABLES)
+    assert len(list((tmp_path / "receipts" / filed[0].name).glob("*.json"))) == len(cp.tables)
 
     # SIX RUNS RECORDED, one per table, all at the filed delivery's one
     # receipt instant - the newest key among this worker's runs.
     from qa_tools.common import qa_results_reader as reader
     recorded = [r.split("__", 1) for r in reader.list_run_ids(
-        cp.AGENCY_ID, cp.COLLECTION_ID) if "__" in r]
+        cp.agency_id, cp.collection_id) if "__" in r]
     newest = max(key for _table, key in recorded)
     six = [f"{table}__{key}" for table, key in recorded if key == newest]
-    assert sorted(r.split("__", 1)[0] for r in six) == sorted(cp.TABLES), recorded
+    assert sorted(r.split("__", 1)[0] for r in six) == sorted(cp.tables), recorded
 
 
 def test_qa_command_local_folder_reports_real_cp_failures(monkeypatch, tmp_path, cp_raw_dir, cp_duckdb_dir):
@@ -313,7 +314,7 @@ def test_qa_command_local_folder_commit_records_the_run(
     # Child Protection runs that no clean checkout has.
     _patch_cp_dirs(monkeypatch, cp_raw_dir, private_supply_dsn,
                     (tmp_path / "deliveries", tmp_path / "receipts"))
-    monkeypatch.setattr(cp, "get_run_by", lambda: "test@example.com")
+    monkeypatch.setattr("qa_tools.common.git_identity.get_run_by", lambda: "test@example.com")
     # A RECEIPT INSTANT EVERY DATASET HAS AN OPEN SLOT FOR. The receipt is
     # "now" on the asset clock, and Case Workers owes a supply only in
     # February and August - so from the day 2026-Q3's claim window closed
@@ -330,10 +331,10 @@ def test_qa_command_local_folder_commit_records_the_run(
 
     assert result.exit_code == 0, result.output
     # ONE RUN PER FILE (REQ-PIPE-105 criterion 1), each attributed.
-    recorded = reader.list_run_ids(cp.AGENCY_ID, cp.COLLECTION_ID)
-    assert len(recorded) == len(cp.TABLES), recorded
+    recorded = reader.list_run_ids(cp.agency_id, cp.collection_id)
+    assert len(recorded) == len(cp.tables), recorded
     for run_id in recorded:
-        assert reader.read_run_provenance(cp.AGENCY_ID, cp.COLLECTION_ID,
+        assert reader.read_run_provenance(cp.agency_id, cp.collection_id,
                                            run_id)["run_by"] == "test@example.com"
 
 
@@ -386,7 +387,7 @@ def test_s3_config_reads_the_real_committed_contract():
     assert config["local_source"] == "data/cp_raw"
     arrival = config["arrival_pattern"]
     assert len(arrival) == 6
-    assert {p["extractTo"] for p in arrival} == set(cp.TABLES)
+    assert {p["extractTo"] for p in arrival} == set(cp.tables)
     # Each pattern names ITS OWN dataset, not the collection - a file's
     # dataset has to be derivable from its filename (REQ-GEN-043).
     assert all(p["type"] == "nested_folder" for p in arrival)
@@ -408,9 +409,9 @@ def test_run_check_s3_delivery_downloads_both_prefixes_then_delegates_to_local_f
         assert bucket == "my-bucket"
         assert s3_client is _fake_client
         download_calls.append((prefix, dest_dir))
-        return [os.path.join(dest_dir, f"{t}.csv") for t in cp.TABLES]
+        return [os.path.join(dest_dir, f"{t}.csv") for t in cp.tables]
 
-    monkeypatch.setattr(cp.s3_source, "download_prefix", _fake_download_prefix)
+    monkeypatch.setattr("qa_tools.common.s3_source.download_prefix", _fake_download_prefix)
 
     captured = {}
 
@@ -571,8 +572,8 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
         borrowed.update(run_id=run_id, from_run_id=from_run_id, tables=sorted(tables))
         return list(tables)
 
-    monkeypatch.setattr(cp.supply_db, "borrow_views", _fake_borrow_views)
-    monkeypatch.setattr(cp.supply_db, "connect", lambda **kw: _FakeConn())
+    monkeypatch.setattr("qa_tools.common.supply_db.borrow_views", _fake_borrow_views)
+    monkeypatch.setattr("qa_tools.common.supply_db.connect", lambda **kw: _FakeConn())
 
     captured = {}
 
@@ -604,7 +605,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
         ("table_cp_clients_001", "cp_clients", "/tmp/fresh_cp_clients.csv")]
     assert borrowed["run_id"] == "table_cp_clients_001"
     assert borrowed["from_run_id"] == "cp_run_promoted"
-    assert borrowed["tables"] == sorted(t for t in cp.TABLES if t != "cp_clients")
+    assert borrowed["tables"] == sorted(t for t in cp.tables if t != "cp_clients")
 
     # THE BORROWED TABLES ARE NOT THE DRIFT REFERENCE, and they used to
     # share an answer (REQ-QAC-108 criterion 4). Which run's other five
@@ -628,7 +629,7 @@ def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode
         download_calls.append(key)
         return local_path
 
-    monkeypatch.setattr(cp.s3_source, "download_key", _fake_download_key)
+    monkeypatch.setattr("qa_tools.common.s3_source.download_key", _fake_download_key)
 
     captured = {}
 
@@ -640,7 +641,7 @@ def test_run_check_s3_single_table_downloads_then_delegates_to_single_table_mode
                 hand_filing.Filed("", "trial_x", (file_path,), None))
 
     monkeypatch.setattr(cp, "run_check_single_table", _fake_run_check_single_table)
-    monkeypatch.setattr(cp.s3_source, "last_modified", lambda bucket, keys, s3_client=None: {})
+    monkeypatch.setattr("qa_tools.common.s3_source.last_modified", lambda bucket, keys, s3_client=None: {})
 
     results, _filed = cp.run_check_s3_single_table(
         "my-bucket", "cp_clients", "cp/delivery_005/cp_clients.csv", "test@example.com",

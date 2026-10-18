@@ -27,27 +27,22 @@ from __future__ import annotations
 import rich_click as click
 from rich.console import Console
 
+from cli import common
+
 console = Console()
 
 
-def _run_bdm(sequential: bool) -> None:
-    from . import bdm
+def _run_collection(coll, sequential: bool) -> None:
+    """Generate one collection's synthetic history, then run the real tools
+    over every arrival - for any registered collection (REQ-TEST-245)."""
+    from cli.collection_cli import label, of
     from qa_tools.tools import orchestrate
 
-    console.print("Generating synthetic data (Birth Registrations)...", style="dim")
-    bdm.generate_synthetic_data()
-    console.print("Running the real tools against every BDM run...", style="dim")
-    orchestrate.run_pipeline("civil-registration", sequential=sequential)
-
-
-def _run_cp(sequential: bool) -> None:
-    from . import cp
-    from qa_tools.tools import orchestrate
-
-    console.print("Generating synthetic data (Child Protection)...", style="dim")
-    cp.generate_synthetic_data()
-    console.print("Running the real tools against every CP run...", style="dim")
-    orchestrate.run_pipeline("child-protection", sequential=sequential)
+    console.print(f"Generating synthetic data ({label(coll)})...", style="dim")
+    of(coll.id).generate_synthetic_data()
+    console.print(f"Running the real tools against every {coll.short.upper()} run...",
+                  style="dim")
+    orchestrate.run_pipeline(coll.id, sequential=sequential)
 
 
 @click.group("pipeline")
@@ -56,8 +51,9 @@ def pipeline_group() -> None:
 
 
 @pipeline_group.command("run")
-@click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
-              help="Which collection's full manifest to regenerate and run - bdm = civil-registration, cp = child-protection. Default: both.")
+@common.short_collection_option(
+    all_choice=True,
+    help="Which collection's full manifest to regenerate and run - {legend}. Default: both.")
 @click.option("--sequential", is_flag=True,
               help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted.")
 @click.option("--snapshot", is_flag=True,
@@ -103,10 +99,11 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
 
     try:
         with processing_pass.pass_lock("run"):
-            if collection in ("bdm", "all"):
-                _run_bdm(sequential)
-            if collection in ("cp", "all"):
-                _run_cp(sequential)
+            from qa_tools import collections
+
+            for coll in collections.all_collections():
+                if collection in (coll.short, "all"):
+                    _run_collection(coll, sequential)
             if collection == "all":
                 # EACH DUE CORRECTION CONFIRMED once both are replayed (Keith,
                 # 2026-10-11, (n)), as a bootstrap does.
@@ -122,7 +119,7 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
     console.print("Comparing every targeted supply's recorded verdict with what it was "
                   "built to...", style="dim")
     disagreements = bootstrap_mod.targets_agree(
-        [n for n in ("bdm", "cp") if collection in ("all", n)])
+        [n for n in common.collection_shorts() if collection in ("all", n)])
 
     console.print("Reshaping into dashboard JSON...", style="dim")
     dashboard_cli._build_data()
@@ -288,19 +285,16 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
 
     THE TRIAL RUNS WHERE THE PROVIDER DECLARES ONE, and is REFUSED BY NAME
     where it does not (criterion 6) - never silently skipped, which is what
-    a Child Protection trial used to be. A collection's trial is its CLI
-    module's own try_targets(), found by the collection's short name the
-    way an adapter is found by its id.
+    a Child Protection trial used to be. The trial is the one-table
+    shape's try_targets() (cli/one_table.py), reached through the
+    collection's command object.
 
     THE TRIAL FIRST, THE MAP ONCE IT AGREES (post-build-review #157 finding
     7): the map is committed, and a history the trial refused to emit
     should not leave it rewritten. A map regenerated separately from the
     history is a map that disagrees with it (REQ-GEN-045 criterion 3)."""
-    import importlib
-
     from generator import collections as providers
     from generator import driver
-    from qa_tools import collections
     from qa_tools.common import scenario_map
 
     provider = providers.provider(collection_id)
@@ -310,8 +304,9 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
             f"there is nothing to try against the real tools")
     driver.generate(collection_id)
     if trial:
-        short = collections.by_id(collection_id).short
-        importlib.import_module(f"cli.{short}").try_targets(collection_id=collection_id)
+        from cli.collection_cli import of
+
+        of(collection_id).try_targets(collection_id=collection_id)
     elif provider.target_trial:
         console.print("Target trial skipped: no injected target was tried against the "
                       "real tools. The comparison after a replay still runs.",
@@ -364,9 +359,8 @@ def cache_key_command() -> None:
 
 
 @pipeline_group.command("bootstrap")
-@click.option("--collection", type=click.Choice(["bdm", "cp", "all"]), default="all",
-              help="Which collection to populate - bdm = civil-registration, "
-                   "cp = child-protection. Default: both.")
+@common.short_collection_option(
+    all_choice=True, help="Which collection to populate - {legend}. Default: both.")
 @click.option("--force", is_flag=True,
               help="Run even if staging already holds tables. Never over recorded QA "
                    "history - that is refused; `mothman env reset-synthetic` starts "
@@ -481,8 +475,7 @@ def checkpoint_list_command() -> None:
 
 
 @checkpoint_group.command("arrivals")
-@click.option("--collection", type=click.Choice(["bdm", "cp"]), required=True,
-              help="bdm = civil-registration, cp = child-protection.")
+@common.short_collection_option(required=True, help="{legend}.")
 def checkpoint_arrivals_command(collection: str) -> None:
     """The arrival numbers `--checkpoint-before N` counts, with the delivery
     and receipt instant of each - from a regeneration, never data/."""

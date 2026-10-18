@@ -28,9 +28,10 @@ from rich.text import Text
 from questionary import Style
 
 from qa_tools.common import hand_filing, supply_db, trial
-# The shared orchestrator defines RUN_STEPS; importing it keeps this
-# helper honest about the real step count rather than hardcoding 5.
-from qa_tools.tools.orchestrate import RUN_STEPS
+# The shared orchestrator's own steps, read from the small module it takes
+# them from - honest about the real step count, and cheap to import, so
+# `mothman --help` loads no QA tool (REQ-TEST-245 criterion 7).
+from qa_tools.tools.steps import RUN_STEPS
 
 # S3 QA source mode (plans/tooling.md #1 Phase 3) - the real raw-data
 # bucket to browse. Env-provided, never hardcoded, since CDK
@@ -1019,3 +1020,79 @@ def reference_suffix(result: dict) -> str:
     if result.get("reference_not_evaluated"):
         return f" [dim]({reason})[/dim]"
     return ""
+
+
+# ---- the one --collection option (REQ-TEST-245 criterion 6) -------------------
+#
+# Generated from the registry, so a collection added to the hierarchy is a value
+# every --collection accepts with no edit here. Each command keeps the values,
+# help text and refusal it has always had; making them uniform changes help
+# text, which is REQ-TEST-252's.
+
+def collection_legend() -> str:
+    """`bdm = civil-registration, cp = child-protection` - each short with
+    the collection it names, in hierarchy order."""
+    from qa_tools import collections
+
+    return ", ".join(f"{c.short} = {c.id}" for c in collections.all_collections())
+
+
+def collection_shorts() -> list[str]:
+    from qa_tools import collections
+
+    return [c.short for c in collections.all_collections()]
+
+
+class _RegistryChoice(click.Choice):
+    """The collections' shorts, read from the registry WHEN USED rather than
+    when the command was defined - so a collection registered after import
+    (a test's third) is accepted and refused exactly as the real ones are,
+    without re-importing the command (REQ-TEST-245 criterion 11)."""
+
+    def __init__(self, extra: tuple[str, ...] = ()) -> None:
+        self._extra = tuple(extra)
+        super().__init__(())
+
+    @property
+    def choices(self) -> tuple[str, ...]:
+        return tuple(collection_shorts()) + self._extra
+
+    @choices.setter
+    def choices(self, _value) -> None:
+        """Click's constructor assigns the choices; the registry owns them."""
+
+
+def short_collection_option(*, help: str, all_choice: bool = False, required: bool = False):
+    """`--collection` taking a collection's short name (and `all`, where the
+    command runs every collection by default). `{legend}` in the help is
+    replaced by collection_legend() as the command is defined. Click's own
+    refusal names the choices."""
+    return click.option("--collection", type=_RegistryChoice(("all",) if all_choice else ()),
+                        default="all" if all_choice else None, required=required,
+                        help=help.format(legend=collection_legend()))
+
+
+def _collection_id_or_short(ctx, param, value):
+    """A --collection value - an id or a short - as a collection id, or a usage
+    error naming the known ones (#123 CLI side-find: an unknown name died in
+    a traceback)."""
+    from qa_tools import collections
+
+    if value is None:
+        return None
+    every = collections.all_collections()
+    by_short = {c.short: c.id for c in every}
+    value = by_short.get(value, value)
+    known = sorted(c.id for c in every)
+    if value not in known:
+        raise click.BadParameter(
+            f"{value!r} is not a collection. Known: {', '.join(known)} "
+            f"(or {', '.join(by_short)}).", ctx=ctx, param=param)
+    return value
+
+
+def id_collection_option(*, help: str, required: bool = False):
+    """`--collection` taking an id or a short, handed to the command as the
+    collection id (`collection_id`)."""
+    return click.option("--collection", "collection_id", callback=_collection_id_or_short,
+                        default=None, required=required, help=help)

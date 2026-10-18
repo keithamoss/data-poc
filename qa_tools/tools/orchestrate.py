@@ -44,7 +44,7 @@ from qa_tools.tools import (
 # of truth for both the labels a progress indicator shows and how many there
 # are (plans/tooling.md #13). Very unevenly sized (dbt-core and
 # datacontract-cli dominate), so a bar advances in genuine but lumpy jumps.
-RUN_STEPS = ("dbt-core", "Soda Core", "datacontract-cli", "Evidently", "Dataset statistics")
+from qa_tools.tools.steps import RUN_STEPS  # noqa: E402,F401 - re-exported; defined there so the CLI can read it cheaply
 
 
 class QaRunFailure(RuntimeError):

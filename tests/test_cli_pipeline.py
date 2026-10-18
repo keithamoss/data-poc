@@ -43,8 +43,7 @@ class TestCorrectionsAfterAFullRun:
     def _run(self, monkeypatch, *args):
         import qa_tools.common.bootstrap as boot
         calls = []
-        monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
-        monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+        monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
         monkeypatch.setattr(boot, "_confirm_corrections", lambda say: calls.append("confirm"))
         _patch_dashboard_build_embed(monkeypatch, calls)
         _patch_snapshot(monkeypatch, calls)
@@ -68,8 +67,7 @@ class TestARunOverRecordedHistoryIsRefused:
         import qa_tools.common.bootstrap as boot
         monkeypatch.setattr(boot, "holds_history", lambda conn: True)
         calls = []
-        monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
-        monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+        monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
         result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
         assert result.exit_code != 0 and calls == []
         flat = " ".join(result.output.split())
@@ -89,7 +87,8 @@ def _patch_snapshot(monkeypatch, calls):
 
 
 def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
@@ -111,7 +110,8 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
 
 
 def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: calls.append("bdm-generate"))
@@ -132,7 +132,8 @@ def test_run_dataset_bdm_only_never_touches_cp(monkeypatch):
 
 
 def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
 
@@ -154,7 +155,8 @@ def test_run_dataset_cp_only_never_touches_bdm(monkeypatch):
 
 
 def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     seen = {}
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
@@ -172,7 +174,8 @@ def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
 
 
 def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
@@ -190,7 +193,8 @@ def test_run_snapshot_flag_takes_a_real_snapshot(monkeypatch):
 
 
 def test_run_without_snapshot_flag_only_syncs_local_copies(monkeypatch):
-    from cli import bdm, cp
+    from cli.collection_cli import of as _cli_of
+    bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
     calls = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: None)
@@ -261,8 +265,7 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", tmp_path / "no-deliveries")
 
     calls = []
-    monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
-    monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+    monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
@@ -298,8 +301,7 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
 
     calls = []
-    monkeypatch.setattr(pipeline_cli, "_run_bdm", lambda sequential: calls.append("bdm"))
-    monkeypatch.setattr(pipeline_cli, "_run_cp", lambda sequential: calls.append("cp"))
+    monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 

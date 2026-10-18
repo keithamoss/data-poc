@@ -9,9 +9,10 @@ from __future__ import annotations
 from click.testing import CliRunner
 
 import cli.app as app
-import cli.bdm as bdm
 import cli.common as common
-import cli.cp as cp
+from cli.collection_cli import of as _cli_of
+
+bdm, cp = _cli_of("bdm"), _cli_of("cp")
 
 _runner = CliRunner()
 
@@ -25,7 +26,7 @@ def test_bare_mothman_with_no_real_terminal_fails_with_a_clear_message():
 
 
 def test_qa_menu_picks_bdm_and_calls_its_run_qa_interactive(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
+    monkeypatch.setattr(common, "select", lambda *a, **k: bdm.label)
     called = []
     monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append("bdm"))
     monkeypatch.setattr(cp, "run_qa_interactive", lambda: called.append("cp"))
@@ -36,7 +37,7 @@ def test_qa_menu_picks_bdm_and_calls_its_run_qa_interactive(monkeypatch):
 
 
 def test_qa_menu_picks_cp_and_calls_its_run_qa_interactive(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_CP)
+    monkeypatch.setattr(common, "select", lambda *a, **k: cp.label)
     called = []
     monkeypatch.setattr(bdm, "run_qa_interactive", lambda: called.append("bdm"))
     monkeypatch.setattr(cp, "run_qa_interactive", lambda: called.append("cp"))
@@ -58,7 +59,7 @@ def test_qa_menu_back_choice_does_not_run_anything(monkeypatch):
 
 
 def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
+    monkeypatch.setattr(common, "select", lambda *a, **k: bdm.label)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: False)
     generated = []
     monkeypatch.setattr(bdm, "generate_synthetic_data", lambda **_: generated.append(True))
@@ -73,7 +74,7 @@ def test_generate_menu_first_run_skips_confirmation_and_generates(monkeypatch):
 
 
 def test_generate_menu_existing_manifest_respects_a_declined_confirmation(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_BDM)
+    monkeypatch.setattr(common, "select", lambda *a, **k: bdm.label)
     monkeypatch.setattr(bdm, "manifest_exists", lambda: True)
     monkeypatch.setattr(common, "confirm", lambda *a, **k: False)
 
@@ -85,7 +86,7 @@ def test_generate_menu_existing_manifest_respects_a_declined_confirmation(monkey
 
 
 def test_generate_menu_picks_cp_and_generates_via_the_cp_module(monkeypatch):
-    monkeypatch.setattr(common, "select", lambda *a, **k: app._DATASET_CP)
+    monkeypatch.setattr(common, "select", lambda *a, **k: cp.label)
     monkeypatch.setattr(cp, "manifest_exists", lambda: False)
     generated = []
     monkeypatch.setattr(cp, "generate_synthetic_data", lambda **_: generated.append(True))

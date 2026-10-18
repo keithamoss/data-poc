@@ -53,12 +53,6 @@ SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET")
 #: collection literal when REQ-PIPE-240 landed, with the requirement that
 #: rewires it. It may only shrink.
 ALLOWLIST: dict[str, str] = {
-    # The command groups, built by one factory from the registry.
-    "cli/bdm.py": "REQ-TEST-245",
-    "cli/cp.py": "REQ-TEST-245",
-    "cli/debug.py": "REQ-TEST-245",
-    "cli/pipeline.py": "REQ-TEST-245",
-    "cli/supply.py": "REQ-TEST-245",
     # The dashboard: one builder, one COLLECTION_DATA const, contract links.
     "dashboard/qa-reporting-dashboard.template.html": "REQ-DASH-244",
     "pipeline/build_dashboard_data.py": "REQ-DASH-244",

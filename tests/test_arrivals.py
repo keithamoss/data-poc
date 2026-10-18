@@ -372,7 +372,7 @@ class TestTheGeneratorsBookkeepingIsWalledOff:
     #: Any OTHER walled module reaching it fails below, so the exception
     #: cannot grow by accident.
     SANCTIONED_TARGET_READERS = {"qa_tools/common/bootstrap.py", "cli/pipeline.py",
-                                 "cli/bdm.py"}
+                                 "cli/one_table.py"}
 
     def test_only_the_sanctioned_modules_reach_what_the_generator_built(self):
         reached = []

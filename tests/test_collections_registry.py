@@ -192,7 +192,7 @@ class TestAThirdCollectionAtEverySite:
         real = driver.generate
         monkeypatch.setattr(driver, "generate", lambda cid: real(cid) if cid == FAKE_ID else [])
         monkeypatch.setattr("qa_tools.common.scenario_map.write_map", lambda: None)
-        monkeypatch.setattr("cli.bdm.try_targets", lambda **_: 0)
+        monkeypatch.setattr(__import__("cli.collection_cli", fromlist=["of"]).of("bdm"), "try_targets", lambda **_: 0)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, *_, **__: self.ran.append(collection_id))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)

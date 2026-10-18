@@ -161,7 +161,8 @@ class TestTheTrialAtGeneration:
 
     def test_a_target_the_tools_agree_with_passes_and_records_nothing(self, generated,
                                                                        monkeypatch):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
         from qa_tools.common import supply_db
 
         from qa_tools.common import qa_store
@@ -178,7 +179,8 @@ class TestTheTrialAtGeneration:
 
     def test_a_disagreement_fails_naming_it_and_removes_the_history(self, generated,
                                                                      monkeypatch):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
 
         _only_ts43(monkeypatch, built_to="green")  # it was built amber
         with pytest.raises(bdm.TargetTrialFailed) as raised:
@@ -188,11 +190,13 @@ class TestTheTrialAtGeneration:
         assert "place_of_birth_facility" in message
         assert not any((generated / "deliveries").iterdir()), "criterion 2: not emitted"
 
-    def test_no_lead_in_is_a_disagreement_not_a_crash(self, monkeypatch):
-        from cli import bdm
+    def test_no_lead_in_is_a_disagreement_not_a_crash(self, monkeypatch, tmp_path):
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
 
         lonely = targets.Built("TS-z's arrival", DS, "d", "amber", injected=True)
-        monkeypatch.setattr(targets, "just_written", lambda: ([lonely], None))
+        monkeypatch.setattr(targets, "just_written", lambda: ([lonely], tmp_path / "deliveries"))
+        monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
         monkeypatch.setattr(driver, "previous_delivery_names", lambda key: [])
         with pytest.raises(bdm.TargetTrialFailed, match="no lead-in"):
             bdm.try_targets(say=lambda _m: None)
@@ -202,7 +206,8 @@ class TestSkippingTheTrial:
     """Criterion 5: an explicit flag, said in the output."""
 
     def test_the_generate_command_says_it_skipped(self, monkeypatch):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
         from qa_tools.common import scenario_map
 
         monkeypatch.setattr(driver, "generate", lambda collection_id: [])
@@ -214,7 +219,8 @@ class TestSkippingTheTrial:
         assert "Target trial skipped" in out.output and "still runs" in out.output
 
     def test_by_default_the_trial_runs(self, monkeypatch):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
         from qa_tools.common import scenario_map
 
         ran = []
@@ -398,8 +404,11 @@ class TestARecordThatDoesNotAddUp:
         [said] = boot.targets_agree(["bdm"])
         assert "TS-43" in said and "2026-09-04" in said
 
-    def test_at_generation_it_fails_the_trial_cleanly(self, monkeypatch):
-        from cli import bdm
+    def test_at_generation_it_fails_the_trial_cleanly(self, monkeypatch, tmp_path):
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
+        monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
+        monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
 
         def broken():
             raise ValueError("TS-43: no supply arriving 2026-09-05 14:00")
@@ -409,7 +418,8 @@ class TestARecordThatDoesNotAddUp:
             bdm.try_targets(say=lambda _m: None)
 
     def test_the_scenario_map_is_written_only_once_the_trial_agrees(self, monkeypatch):
-        from cli import bdm
+        from cli.collection_cli import of as _cli_of
+        bdm = _cli_of('bdm')
         from qa_tools.common import scenario_map
 
         wrote = []
@@ -437,8 +447,7 @@ class TestAPipelineRunComparesToo:
 
         calls = {"compared": [], "published": []}
         monkeypatch.setattr(boot, "holds_history", lambda conn: False)
-        monkeypatch.setattr(pipeline, "_run_bdm", lambda s: None)
-        monkeypatch.setattr(pipeline, "_run_cp", lambda s: None)
+        monkeypatch.setattr(pipeline, "_run_collection", lambda coll, s: None)
         monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
         monkeypatch.setattr(boot, "targets_agree",
                             lambda names: calls["compared"].append(list(names)) or disagreements)

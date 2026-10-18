@@ -182,7 +182,8 @@ class TestAContestedClientRegister:
     def test_the_real_picker_marks_it(self, cp_pair_shared, monkeypatch):
         """Criterion 13 through the real load_manifest (post-build-review #203
         F1a), not a hand-built entry."""
-        import cli.cp as cp
+        from cli.collection_cli import of as _cli_of
+        cp = _cli_of('cp')
         from qa_tools.common import arrivals
 
         real = arrivals.arrivals_for

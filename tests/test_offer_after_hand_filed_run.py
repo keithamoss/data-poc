@@ -15,7 +15,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from cli import bdm, cp, filing_tui
+from cli import filing_tui
+
+from cli.collection_cli import of as _cli_of
+
+bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
 
 @pytest.fixture
@@ -33,7 +37,7 @@ def test_a_kept_hand_filed_run_offers_the_decision(module, offers, monkeypatch):
 
     module._finish_supply([], filed)
 
-    assert offers == [(module.COLLECTION_ID, "handfiled_abc")]
+    assert offers == [(module.collection_id, "handfiled_abc")]
 
 
 @pytest.mark.parametrize("module", [bdm, cp], ids=["bdm", "cp"])

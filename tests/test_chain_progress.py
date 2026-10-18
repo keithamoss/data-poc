@@ -14,6 +14,7 @@ and that the labels and the count come from ONE source of truth so a
 progress bar built on them can't drift from what actually runs."""
 from __future__ import annotations
 
+import re
 import sys
 from unittest.mock import patch
 
@@ -89,20 +90,35 @@ def test_no_check_chain_call_site_is_left_without_a_progress_indicator():
     `common.chain_progress(...)` block. If a future call site genuinely
     shouldn't show a bar, that's a real decision worth making explicitly
     here rather than by omission."""
+    import ast
     import pathlib
-    import re
 
-    bare = []
-    for name in ("cli/bdm.py", "cli/cp.py"):
-        lines = pathlib.Path(name).read_text().splitlines()
+    #: THE ONE DELIBERATE EXCEPTION: the target trial runs while generating,
+    #: where each target's own "Trying ..." line is the progress (REQ-GEN-186).
+    exempt = {"try_targets"}
+    bare, seen = [], 0
+    for name in ("cli/one_table.py", "cli/many_tables.py"):
+        source = pathlib.Path(name).read_text()
+        lines = source.splitlines()
+        owner = {}
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.FunctionDef):
+                for n in range(node.lineno, node.end_lineno + 1):
+                    owner.setdefault(n, []).append(node.name)
         for i, line in enumerate(lines):
-            if not re.search(r"results, tmp_dir = run_check", line):
+            if not re.search(r"results, \w+ = (?:self|cli_)\.run_check", line):
+                continue
+            seen += 1
+            if exempt & set(owner.get(i + 1, ())):
                 continue
             # the `with common.chain_progress(...) as on_step:` opening
             # the block sits within a couple of lines above the call
             if not any("chain_progress" in lines[j] for j in range(max(0, i - 3), i)):
                 bare.append(f"{name}:{i + 1}: {line.strip()}")
 
+    # A PATTERN THAT MATCHES NOTHING PROVES NOTHING - which is what this
+    # test did from the day its call sites were renamed until REQ-TEST-245.
+    assert seen >= 16, f"only {seen} check-chain call sites found - has the call form changed?"
     assert bare == [], (
         "these start the real check chain with no progress indicator, so a "
         "human waits ~13.5s at a frozen screen:\n" + "\n".join(bare))

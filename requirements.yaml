@@ -6405,8 +6405,8 @@ requirements:
       - generator/driver.py::write_bookkeeping
       - qa_tools/tools/dataset_stats.py::arrival_record
       - qa_tools/tools/stage.py::build_all
-      - cli/bdm.py::load_manifest
-      - cli/cp.py::load_manifest
+      - cli/one_table.py::OneTableCLI::load_manifest
+      - cli/many_tables.py::ManyTablesCLI::load_manifest
       - cli/debug.py::capture_arrival_golden_command
     evidence:
       - >
@@ -17270,13 +17270,13 @@ requirements:
     - cli/common.py::decide_record
     - cli/common.py::recorded_runs
     - cli/common.py::record_delivery_of
-    - cli/cp.py::run_check_local_folder
-    - cli/cp.py::run_check_single_table
-    - cli/cp.py::run_check_s3_delivery
-    - cli/cp.py::run_check
-    - cli/bdm.py::run_check
-    - cli/bdm.py::run_check_local_file
-    - cli/bdm.py::run_check_s3
+    - cli/many_tables.py::ManyTablesCLI::run_check_local_folder
+    - cli/many_tables.py::ManyTablesCLI::run_check_single_table
+    - cli/many_tables.py::ManyTablesCLI::run_check_s3_delivery
+    - cli/many_tables.py::ManyTablesCLI::run_check
+    - cli/one_table.py::OneTableCLI::run_check
+    - cli/one_table.py::OneTableCLI::run_check_local_file
+    - cli/one_table.py::OneTableCLI::run_check_s3
     - qa_tools/common/trial.py::require_trial
     - qa_tools/common/trial.py::NotATrial
     - qa_tools/tools/orchestrate.py::run_single_file
@@ -21303,12 +21303,12 @@ requirements:
       - qa_tools/tools/run_evidently.py::_current_frame
       - qa_tools/tools/run_evidently.py::_reference_frame
       - qa_tools/common/supply_db.py::arrival_segment
-      - cli/cp.py::arrival_path
-      - cli/cp.py::has_arrival
+      - cli/many_tables.py::ManyTablesCLI::arrival_path
+      - cli/many_tables.py::ManyTablesCLI::has_arrival
       - generator/driver.py::generate
       - qa_tools/common/supply_db.py::_bounded
       - qa_tools/tools/orchestrate.py::run_single_file
-      - cli/bdm.py::run_check_local_file
+      - cli/one_table.py::OneTableCLI::run_check_local_file
     evidence:
       - >
         2026-09-27: a full `mothman pipeline run` (both collections)
@@ -21595,9 +21595,9 @@ requirements:
     - cli/common.py::decide_keep
     - cli/common.py::keep_from_flags
     - cli/common.py::say_what_it_did
-    - cli/bdm.py::run_check_local_file
-    - cli/cp.py::run_check_local_folder
-    - cli/cp.py::run_check_single_table
+    - cli/one_table.py::OneTableCLI::run_check_local_file
+    - cli/many_tables.py::ManyTablesCLI::run_check_local_folder
+    - cli/many_tables.py::ManyTablesCLI::run_check_single_table
     - qa_tools/tools/orchestrate.py::discard_run_schemas
     - qa_tools/tools/orchestrate.py::discard_run_schemas
     - qa_tools/tools/stage.py::stage_table
@@ -32682,8 +32682,8 @@ requirements:
     - generator/targets.py::just_written
     - qa_tools/common/target_agreement.py::compare
     - qa_tools/common/target_agreement.py::after_replay
-    - cli/bdm.py::try_targets
-    - cli/bdm.py::generate_synthetic_data
+    - cli/one_table.py::OneTableCLI::try_targets
+    - cli/collection_cli.py::CollectionCLI::generate_synthetic_data
     - cli/pipeline.py::generated_targets
     - cli/pipeline.py::disagreement_message
     - cli/pipeline.py::run_command
@@ -34191,12 +34191,12 @@ requirements:
     - tests/test_asset_time_semantics.py
     implemented_by:
     - contract/data-asset.yaml
-    - cli/cp.py::_six_by_pattern
-    - cli/cp.py::_require_all_six
-    - cli/cp.py::_load_delivery_from_folder
-    - cli/cp.py::_refuse_a_contested_arrival
-    - cli/cp.py::load_manifest
-    - cli/cp.py::picker_choices
+    - cli/many_tables.py::ManyTablesCLI::_all_by_pattern
+    - cli/many_tables.py::ManyTablesCLI::_require_all
+    - cli/many_tables.py::ManyTablesCLI::_load_delivery_from_folder
+    - cli/many_tables.py::ManyTablesCLI::_refuse_a_contested_arrival
+    - cli/many_tables.py::ManyTablesCLI::load_manifest
+    - cli/many_tables.py::ManyTablesCLI::picker_choices
     evidence:
     - 'tests/test_cp_pair.py drives the real Child Protection orchestrator over a seven-file delivery: one contested arrival of cp-clients, the outstanding item naming both files, each reader''s cp_clients check recorded once as contested, file checks under each filename (criteria 3-5); settled as supply plus spare copy and as supply plus re-file, each run''s own supply id and period, readers re-evaluated (criterion 7); a later file supersedes the pair and the knock-on re-evaluates the readers (criterion 6).'
     - 'tests/test_cp_load_by_pattern.py: every folder route attributes by pattern, refuses a missing or contested table naming the files and where it is settled (criterion 8); the picker marks and refuses a pair (criterion 13). tests/test_cp_clients_pattern.py: the pattern, TS-38''s names unrecognised, every other pattern unchanged, the comment, the ODCS keyPattern unchanged (criteria 1, 2, 11). tests/test_holds.py: the reachable shape and TS-39 (criterion 9). tests/test_asset_time_semantics.py reproduces the characterization pin unchanged (criterion 10).'
@@ -37071,9 +37071,8 @@ requirements:
     - qa_tools/common/processing_pass.py::_steps
     - qa_tools/common/recheck.py::execute
     - cli/dashboard.py::_rebuild_results
-    - cli/pipeline.py::_run_bdm
-    - cli/pipeline.py::_run_cp
-    - cli/bdm.py::_run_single_preserving_manifest
+    - cli/pipeline.py::_run_collection
+    - cli/one_table.py::OneTableCLI::_run_single
     - pipeline/build_dashboard_data.py::_AGGREGATES
     - pipeline/build_cp_dashboard_data.py::_AGGREGATES
     - qa_tools/common/validate_collections.py::ALLOWLIST

@@ -222,7 +222,8 @@ class TestARefusalChangesNothing:
 
     @pytest.fixture
     def no_generating(self, monkeypatch):
-        from cli import bdm, cp
+        from cli.collection_cli import of as _cli_of
+        bdm, cp = _cli_of('bdm'), _cli_of('cp')
 
         def refuse():
             raise AssertionError("the synthetic data was regenerated before the refusal")

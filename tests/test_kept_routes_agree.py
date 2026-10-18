@@ -2,7 +2,7 @@
 criterion 11).
 
 THE THREE ROUTES. The pipeline's batch (`orchestrate.run_pipeline`),
-the terminal keeping it (`cli.bdm.run_check(..., keep=True)`), and the
+the terminal keeping it (`of("bdm").run_check(..., keep=True)`), and the
 Lambda route (`s3_arrival.handle_event`, REQ-PIPE-152) - each into an
 empty database of its own, over the same real generated file. Every
 route now calls the same per-arrival function (criterion 1), so this
@@ -70,7 +70,8 @@ def _batch():
 def _terminal():
     """`mothman bdm qa --run-id <id> --commit`'s body, for the one arrival
     recognition finds."""
-    from cli import bdm
+    from cli.collection_cli import of as _cli_of
+    bdm = _cli_of('bdm')
     from qa_tools.common import arrivals
     [arrival] = arrivals.arrivals_for("civil-registration", "run_")
     bdm.run_check(arrival.run_id, "person@example.com", keep=True)
