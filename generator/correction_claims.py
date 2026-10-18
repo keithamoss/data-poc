@@ -73,11 +73,16 @@ def altered(reference: str, datasets: Sequence[str], *, docs=None,
 
 
 def claimed(reference: str, generated: Mapping[str, Sequence], *,
-            docs=None) -> dict[str, list[str]]:
-    """Each dataset's claimed periods: every altered one with its neighbours,
-    among the periods generated for it, oldest first."""
+            docs=None, changed: Mapping[str, set[str]] | None = None) -> dict[str, list[str]]:
+    """Each dataset's claimed periods: every altered one (or, given
+    `changed`, every one named there) with its neighbours, among the periods
+    generated for it, oldest first."""
     out: dict[str, list[str]] = {}
-    for dataset_id, names in altered(reference, list(generated), docs=docs).items():
+    if changed is None:
+        changed = altered(reference, list(generated), docs=docs)
+    for dataset_id, names in changed.items():
+        if dataset_id not in generated:
+            continue
         order = [p.name for p in generated[dataset_id]]
         keep = set()
         for i, name in enumerate(order):
@@ -122,7 +127,16 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
             raise CannotPlace(f"{names}: correction {reference} is dated {p.date}, after the "
                               f"generated history ends ({history_end}) - move its date "
                               f"inside the history")
-        changed = altered(reference, list(generated), docs=docs, until=history_end)
+        if is_version_level(reference, docs=docs):
+            # ONLY THE FILINGS IT CHANGES (criterion 10's narrowing): every
+            # injected arrival's instant, by the filing rule's own function.
+            # Ordinary arrivals are checked once written (check_written).
+            instants = _injected_instants(injections, generated)
+            changed = {d: filing_changes(reference, d, at, docs=docs, until=history_end)
+                       for d, at in instants.items()}
+            changed = {d: v for d, v in changed.items() if v}
+        else:
+            changed = altered(reference, list(generated), docs=docs, until=history_end)
         riding_sets = {i.dataset_id for i in riding}
         riding_collections = {_collection_of(d) for d in riding_sets}
         for inj in riding:
@@ -143,7 +157,8 @@ def check(injections: Sequence, generated: Mapping[str, Sequence], *, docs=None,
                     f"{_collection_of(dataset_id)} ({dataset_id}) holds a supply - a quarter "
                     f"a correction alters must lie outside that collection's history or have "
                     f"its routine supply suppressed")
-        claim = claimed(reference, {d: generated[d] for d in riding_sets}, docs=docs)
+        claim = claimed(reference, {d: generated[d] for d in riding_sets}, docs=docs,
+                        changed=changed)
         # BY COLLECTION, NOT DATASET: a collection delivering every table
         # together has one delivery a period, so a claim on one dataset's
         # period is a claim on that period's delivery.
@@ -209,3 +224,86 @@ def foreign_altered(collection_id: str, *, docs=None) -> set[str]:
         for names in altered(reference, sorted(mine), docs=docs).values():
             out |= names
     return out
+
+
+def is_version_level(reference: str, *, docs=None) -> bool:
+    """Whether every change a correction declares is to a whole calendar or
+    participation version (a claim window, a due time) rather than to one
+    period's date - TS-62's kind, which claims only the filings it changes."""
+    p, _before, _after = _docs_either_side(reference, docs)
+    if p is None:
+        raise CannotPlace(f"{reference!r} is not a declared correction")
+    return bool(p.changes) and all(" period " not in item for item, _o, _n in p.changes)
+
+
+def filing_changes(reference: str, dataset_id: str, instants, *, docs=None,
+                   until: date | None = None) -> set[str]:
+    """The periods whose filing the correction changes for arrivals at
+    `instants`: each instant's open slot before and after it, by the filing
+    rule's own function (assignment.open_slot, as the impact trial uses -
+    REQ-PIPE-169 criterion 6), both named where they differ."""
+    from qa_tools.common import agreement, assignment, slots
+
+    p, before, after = _docs_either_side(reference, docs)
+    if p is None:
+        raise CannotPlace(f"{reference!r} is not a declared correction")
+    instants = list(instants)
+    if not instants:
+        return set()
+    horizon = until or max(i.date() for i in instants) + timedelta(days=2)
+    old = slots.slots_for_dataset(dataset_id, until=horizon,
+                                  agreement=agreement.from_doc(before[0]))
+    new = slots.slots_for_dataset(dataset_id, until=horizon,
+                                  agreement=agreement.from_doc(after[0]))
+    out: set[str] = set()
+    for at in instants:
+        was, now = assignment.open_slot(old, at), assignment.open_slot(new, at)
+        was_name, now_name = (was.name if was else None), (now.name if now else None)
+        if was_name != now_name:
+            out |= {n for n in (was_name, now_name) if n}
+    return out
+
+
+def _injected_instants(injections, generated) -> dict[str, list]:
+    """Each dataset's injected arrival instants, from configuration."""
+    from generator import scenario_injection as si
+    from qa_tools.common import asset_time
+
+    out: dict[str, list] = {}
+    for inj in injections:
+        if inj.dataset_id not in generated:
+            continue
+        placement = si.resolve(si.dataclasses.replace(inj, links=()), generated[inj.dataset_id])
+        out.setdefault(inj.dataset_id, []).extend(
+            asset_time.wall_clock(date.fromisoformat(a["date"]), a["at"])
+            for a in placement.arrivals)
+    return out
+
+
+def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=None) -> None:
+    """After the deliveries are written: no ORDINARY arrival's filing may be
+    changed by a version-level correction (REQ-GEN-205 criterion 10, REQ-GEN-237
+    criterion 4) - only a scenario's may, and those are its riders' own,
+    already checked from configuration. Refused naming the run."""
+    from generator import scenario_injection
+    from qa_tools.common import asset_time
+
+    riders = {}
+    for inj in scenario_injection.INJECTIONS:
+        if inj.correction:
+            riders.setdefault(inj.correction, set()).add(inj.dataset_id)
+    for reference, datasets in riders.items():
+        if not is_version_level(reference, docs=docs):
+            continue
+        for e in entries:
+            if e.get("period") in injected_periods or not e.get("received_at"):
+                continue
+            for dataset_id in dataset_ids:
+                at = asset_time.parse_instant(e["received_at"], e["run_id"])
+                moved = filing_changes(reference, dataset_id, [at], docs=docs)
+                if moved:
+                    raise CannotPlace(
+                        f"correction {reference} would change where {e['run_id']} "
+                        f"({dataset_id}, an ordinary supply no scenario names) is filed - "
+                        f"{', '.join(sorted(moved))}; move the correction's effective date "
+                        f"or the change")

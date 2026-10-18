@@ -165,6 +165,13 @@ def generate(collection_id: str) -> list[dict]:
 
     # 4. and 5.
     no_two_arrivals_share_an_instant(manifest)
+    # NO ORDINARY ARRIVAL REFILED BY A VERSION-LEVEL CORRECTION (REQ-GEN-205
+    # criterion 10): its instants exist only once written.
+    from qa_tools.common import hierarchy
+
+    correction_claims.check_written(
+        [d.dataset_id for d in hierarchy.datasets_in_collection(collection_id)], manifest,
+        frozenset(plan.injected_by_period))
     write_bookkeeping(provider.dataset_id, manifest)
     if plan.resolved:
         placed = [placement for _, placement in plan.resolved]

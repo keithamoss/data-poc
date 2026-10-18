@@ -1717,6 +1717,27 @@ INJECTIONS: tuple[Injection, ...] = (
         links=(Link("TS-61a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
                Link("TS-61b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
+    # A CORRECTION MERGED AND NOT YET CONFIRMED (REQ-GEN-205, TS-62): Birth
+    # Registrations' claim window widens to six hours from 2026-09-19 by a
+    # declared correction the scripted manager leaves pending. 2026-09-19's
+    # own supply arrives the evening before, under the old version; every
+    # supply after it is filed and judged against the corrected one. Its claim
+    # is only the filings the wider window changes (correction_claims), which
+    # for these arrival times is none.
+    Injection(
+        scenario_id="TS-62",
+        dataset_id="birth-registrations",
+        anchor=-4,
+        config="daily, due 22:00 the evening before with 1 hour's grace; the claim "
+               "window widens from 4 to 6 hours from 2026-09-19 by correction "
+               "REQ-GEN-205-TS62, merged that day and left awaiting confirmation.",
+        arrivals=(
+            ExtraArrival(-1, "21:00", None,
+                         "2026-09-19's supply, on time the evening before the correction"),
+        ),
+        correction="REQ-GEN-205-TS62",
+        links=(Link("TS-62", 3, correction_event("REQ-GEN-205-TS62"), HISTORY_END),),
+    ),
     # TWO FILES FOR ONE TABLE (REQ-GEN-196), one pair per way a person can
     # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two
     # files carry their own receipts, settled by a scripted person at 11:00

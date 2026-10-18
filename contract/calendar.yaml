@@ -325,6 +325,34 @@ calendars:
         claim_window: 4h
         cadence:
           rule: daily
+      # TS-62 (REQ-GEN-205): a fictional new version three days before the
+      # history ends, widening the claim window to six hours - declared as a
+      # correction below and left awaiting the asset manager's confirmation.
+      - effective_from: "2026-09-19"
+        changelog:
+          - date: "2026-10-18"
+            author: REQ-GEN-205
+            change: >-
+              A fictional six-hour claim window from 2026-09-19, made to
+              demonstrate a correction merged and not yet confirmed on this
+              synthetic asset (TS-62). The same rule as before it.
+        claim_window: 6h
+        cadence:
+          rule: daily
+    corrections:
+      - change_reference: REQ-GEN-205-TS62
+        date: "2026-09-19"
+        author: Claude (for Keith)
+        approver: fpycnkgvmt@privaterelay.appleid.com
+        reason: >-
+          A fictional correction made to demonstrate a correction merged and left
+          awaiting confirmation on this synthetic asset (TS-62): Birth
+          Registrations' claim window widens from four hours to six from
+          2026-09-19.
+        changes:
+          - item: calendar daily version 2026-09-19
+            old: null
+            new: {claim_window: 6h, cadence: {rule: daily}}
 
 # ---------------------------------------------------------------------
 # WHICH CALENDAR EACH COLLECTION IS ON. A dataset that names none takes

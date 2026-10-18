@@ -137,3 +137,38 @@ class TestAnotherCollectionsCorrectionEmptiesItsQuarters:
         plan = cp.PROVIDER.plan()
         empty = {job.period.name for job in plan.jobs if cp.PROVIDER.slot(plan, job) is None}
         assert cc.foreign_altered("child-protection") <= empty
+
+
+def _widen_daily(cal, asset):
+    daily = next(c for c in cal["calendars"] if c["name"] == "daily")
+    last = daily["versions"][-1]
+    daily["versions"].append({**last, "effective_from": "2026-09-19", "claim_window": "6h",
+                              "changelog": [{"date": "2026-10-18", "author": "a test",
+                                             "change": "wider"}]})
+
+
+class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
+    """REQ-GEN-205 criterion 10's narrowing for a version-level change
+    (TS-62's): only the days whose filing it would change, by the impact
+    trial's own rule (assignment.open_slot), with the day before and after."""
+
+    @pytest.fixture
+    def widened(self):
+        return _declare(_docs(), _widen_daily, "CAB-W", "2026-09-19")
+
+    def test_an_arrival_the_wider_window_takes_changes_its_filing(self, widened):
+        from qa_tools.common import asset_time
+
+        at = asset_time.wall_clock(date(2026, 9, 20), "09:00")
+        assert cc.filing_changes("CAB-W", "birth-registrations", [at], docs=widened) \
+            == {"2026-09-19", "2026-09-20"}
+
+    def test_an_ordinary_arrival_changes_nothing(self, widened):
+        from qa_tools.common import asset_time
+
+        at = asset_time.wall_clock(date(2026, 9, 20), "12:00")
+        assert cc.filing_changes("CAB-W", "birth-registrations", [at], docs=widened) == set()
+
+    def test_it_is_a_version_level_change(self, widened, docs):
+        assert cc.is_version_level("CAB-W", docs=widened)
+        assert not cc.is_version_level("CAB-1", docs=docs)
