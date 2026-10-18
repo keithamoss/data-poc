@@ -831,8 +831,31 @@ def _diff_s1(a: dict, b: dict, limit: int) -> list[str]:
     return out
 
 
-def compare(a: dict, b: dict, surfaces: list[str], *, limit: int = 5) -> dict[str, list[str]]:
-    """Differences surface by surface; an empty list where equal (criterion 3)."""
+#: REPORT FILES A REQUIREMENT RENAMED, old name -> new, mapped on A's side
+#: before S5 is compared. REQ-PIPE-248 criterion 8 makes this available to
+#: that requirement ONLY: a rename that any comparison could map would let
+#: any change hide a file disappearing behind a new one.
+RENAMED_REPORTS = {
+    "REQ-PIPE-248": {
+        "results_bdm.json": "results_rs_civil-registration.json",
+        "results_cp.json": "results_cpfs_child-protection.json",
+        "birth_registrations_dashboard.json": "rs_civil-registration_dashboard.json",
+        "child_protection_dashboard.json": "cpfs_child-protection_dashboard.json",
+    },
+}
+
+
+def compare(a: dict, b: dict, surfaces: list[str], *, limit: int = 5,
+            renamed_by: str | None = None) -> dict[str, list[str]]:
+    """Differences surface by surface; an empty list where equal (criterion 3).
+    `renamed_by` names the requirement whose report renames to map."""
+    if renamed_by is not None:
+        if renamed_by not in RENAMED_REPORTS:
+            raise Refused(f"no report renames are recorded for {renamed_by!r} - only for "
+                          f"{', '.join(RENAMED_REPORTS)}")
+        renames = RENAMED_REPORTS[renamed_by]
+        a = {**a, "surfaces": {**a["surfaces"], "S5": {
+            renames.get(k, k): v for k, v in (a["surfaces"].get("S5") or {}).items()}}}
     if a.get("pinned_now") != b.get("pinned_now"):
         raise Refused(f"the two baselines were built with the clock pinned to different "
                       f"instants ({a.get('label')}: {a.get('pinned_now')}, {b.get('label')}: "

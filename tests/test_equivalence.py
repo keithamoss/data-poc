@@ -72,6 +72,23 @@ def baselines(tmp_path, monkeypatch):
 class TestCompare:
     """Criteria 2 and 3."""
 
+    def test_reports_renamed_by_req_pipe_248_compare_under_their_new_names(self, baselines):
+        """REQ-PIPE-248 criterion 8: its S5 comparison maps each old report
+        name to its new one, and the mapping is available to that requirement
+        only - any other name is refused."""
+        baselines("a", s5={"results_bdm.json": {"a": 1}, "results_cp.json": {"b": 2}})
+        baselines("b", s5={"results_rs_civil-registration.json": {"a": 1},
+                           "results_cpfs_child-protection.json": {"b": 2}})
+        plain = _runner.invoke(cli, ["debug", "equivalence", "compare", "a", "b",
+                                     "--surfaces", "S5"])
+        assert plain.exit_code == 1
+        mapped = _runner.invoke(cli, ["debug", "equivalence", "compare", "a", "b",
+                                      "--surfaces", "S5", "--renamed-by", "REQ-PIPE-248"])
+        assert mapped.exit_code == 0, mapped.output
+        other = _runner.invoke(cli, ["debug", "equivalence", "compare", "a", "b",
+                                     "--renamed-by", "REQ-PIPE-249"])
+        assert other.exit_code != 0 and "REQ-PIPE-248" in _words(other)
+
     def test_equal_baselines_compare_equal_and_exit_zero(self, baselines):
         baselines("a")
         baselines("b")

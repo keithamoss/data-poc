@@ -252,7 +252,11 @@ def equivalence_capture_command(ref: str, label: str, yes: bool) -> None:
               help="Compare only these, by code or name (S1 recorded-results, S4 "
                    "generated-files, S5 reports, S7 help-and-menus). Repeatable; all "
                    "four when absent.")
-def equivalence_compare_command(a: str, b: str, surfaces: tuple[str, ...]) -> None:
+@click.option("--renamed-by", default=None, metavar="REQUIREMENT",
+              help="Map the report files this requirement renamed, old name to new, before "
+                   "comparing S5. Only REQ-PIPE-248 has any.")
+def equivalence_compare_command(a: str, b: str, surfaces: tuple[str, ...],
+                                renamed_by: str | None) -> None:
     """Compare baselines A and B (labels or paths) surface by surface. Exits
     non-zero if any compared surface differs."""
     from qa_tools.common import equivalence
@@ -260,7 +264,7 @@ def equivalence_compare_command(a: str, b: str, surfaces: tuple[str, ...]) -> No
     try:
         codes = equivalence.surface_codes(surfaces)
         ba, bb = equivalence.load(a), equivalence.load(b)
-        diffs = equivalence.compare(ba, bb, codes)
+        diffs = equivalence.compare(ba, bb, codes, renamed_by=renamed_by)
     except equivalence.Refused as exc:
         raise click.ClickException(str(exc)) from None
     between = equivalence.commits_between(ba["commit"], bb["commit"])
