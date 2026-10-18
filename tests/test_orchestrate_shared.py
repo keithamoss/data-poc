@@ -16,29 +16,25 @@ import pytest
 
 from qa_tools import collections
 from qa_tools.collections.base import StatsSpec
-from qa_tools.tools import legacy, orchestrate
+from qa_tools.tools import orchestrate
 from third_collection import FAKE_ID, FAKE_PREFIX, FAKE_TABLE
 
 
-class TestTheTenthBirthRegistrationsDifference:
-    """The old Birth Registrations orchestrator ALWAYS reconciled what the
-    tools left out and always ran the full nothing-missing guard, even for a
-    supply filed to no period; Child Protection's skips both for a run with
-    no period. Keith, 2026-10-18: keep the old behaviour behind a flag."""
+class TestARunWithNoPeriodIsExcused:
+    """A supply filed to no period records no could-not-run records, so
+    there is nothing to reconcile what the tools left out against (Keith,
+    2026-10-12) - for every collection since REQ-QAC-247 retired Birth
+    Registrations' old always-reconcile behaviour."""
 
-    def test_the_flag_is_known_and_declared_on_birth_registrations(self):
-        assert "orchestrate.always_reconciles" in legacy.KNOWN
-        bdm = collections.adapter(collections.by_id("civil-registration"))
-        assert "orchestrate.always_reconciles" in bdm.legacy
-        cp = collections.adapter(collections.by_id("child-protection"))
-        assert "orchestrate.always_reconciles" not in cp.legacy
-
-    def test_a_run_with_no_period_still_reconciles_under_the_flag(self, monkeypatch):
+    def test_a_run_with_no_period_does_not_reconcile(self, monkeypatch):
         monkeypatch.setattr(orchestrate, "_has_scope", lambda entry, run_id: False)
         entry = {"run_id": "run_x", "received_at": "2026-01-01T01:00:00+00:00"}
-        assert orchestrate._reconciles(entry, "run_x", legacy=frozenset()) is False
-        assert orchestrate._reconciles(entry, "run_x",
-                                       legacy=frozenset({"orchestrate.always_reconciles"})) is True
+        assert orchestrate._reconciles(entry, "run_x") is False
+
+    def test_a_run_with_a_period_does(self, monkeypatch):
+        monkeypatch.setattr(orchestrate, "_has_scope", lambda entry, run_id: True)
+        entry = {"run_id": "run_x", "received_at": "2026-01-01T01:00:00+00:00"}
+        assert orchestrate._reconciles(entry, "run_x") is True
 
 
 class TestTheRefusalOutlivesTheRegistry:

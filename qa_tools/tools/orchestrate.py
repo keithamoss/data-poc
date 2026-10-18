@@ -126,7 +126,6 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
                    run_by: str, reference_run_id: str | None,
                    on_step: Callable[[str], None] | None) -> list[dict]:
     coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
     # BEFORE ANY TOOL WRITES, so the run exists with the identity only this
     # layer knows (REQ-PIPE-089 criterion 6).
     open_run(coll.agency_id, coll.id, run_id, run_timestamp, run_by, purpose=entry.get("purpose"))
@@ -228,7 +227,7 @@ def _run_one_inner(collection_id: str, entry: dict, run_id: str, run_timestamp: 
     # finished. Each tool's in-scope left-out set is recorded where non-empty.
     noted = left_out.take(run_id)
     in_scope = scope_of_run(run_id)
-    reconciles = _reconciles(entry, run_id, adapter.legacy)
+    reconciles = _reconciles(entry, run_id)
     if reconciles:
         compared = left_out.reconcile(run_id, noted, [*blast, *missing], in_scope)
         if compared:
@@ -268,13 +267,10 @@ def _excusing_unreadable(in_scope, resolution, noted: dict[str, set[str]]):
     return guarded
 
 
-def _reconciles(entry: dict, run_id: str, legacy: frozenset = frozenset()) -> bool:
+def _reconciles(entry: dict, run_id: str) -> bool:
     """A run with a scope, and a TRIAL (Keith, 2026-10-05), whose id names no
-    table, so its scope is the whole collection - or every run, under
-    `orchestrate.always_reconciles` (Birth Registrations' old behaviour,
-    kept; post-build-review #220)."""
-    if "orchestrate.always_reconciles" in legacy:
-        return True
+    table, so its scope is the whole collection. A supply filed to no period
+    is excused (Keith, 2026-10-12) - for every collection since REQ-QAC-247."""
     return trial.is_trial(run_id) or _has_scope(entry, run_id)
 
 

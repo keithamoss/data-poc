@@ -134,7 +134,6 @@ ADAPTER = CollectionAdapter(
         "stats.arrival_after_registration",
         "results.single_dataset_header",
         "orchestrate.entry_carries_csv_path",
-        "orchestrate.always_reconciles",
         "dashboard.single_dataset_document",
         "dashboard.supply_section_first",
         "dashboard.drops_empty_sections",
