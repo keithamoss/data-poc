@@ -37606,6 +37606,9 @@ requirements:
   - id: REQ-PIPE-257
     title: Every address the dashboard is served at needs a one-time code sent to a named work email, and
       the publisher checks that before and after it uploads
+    signed_off:
+      by: Keith
+      date: '2026-10-18'
     date_written: '2026-10-18'
     story: As Keith, I want every address the published dashboard can be reached at to ask for a one-time
       code sent to an allow-listed work email, and the publisher to refuse to upload where that is not true,
@@ -37720,7 +37723,6 @@ requirements:
       so the first real publish cannot happen until Access is in place, and there is never a moment when
       the new site is public. This is why REQ-PIPE-255's first live publish waits on this requirement.
     open_questions: []
-
   - id: REQ-GHUB-258
     title: Links to the dashboard are built from a configured address, not a hardcoded github.io URL
     date_written: '2026-10-18'
