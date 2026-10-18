@@ -10232,7 +10232,7 @@ twice. It deliberately did not re-find the `TypeError`.
      Neither is a product defect, so neither got a failing product test
      first; both are tests corrected to test what they say.
 
-223. **[done, 2026-10-18]** **[CLI/TUI]** **`mothman supply load
+223. **[done, 2026-10-18]** **[Testing & dev tooling]** **`mothman supply load
      --collection` refused every collection, found while REQ-TEST-252 made
      the option uniform.**
 
@@ -10255,7 +10255,7 @@ twice. It deliberately did not re-find the `TypeError`.
      changed shape at different times, and only a run of the narrow path
      would have shown it.
 
-224. **[done, 2026-10-18]** **[CLI/TUI]** **Two `mothman dashboard` help
+224. **[done, 2026-10-18]** **[Testing & dev tooling]** **Two `mothman dashboard` help
      lines still named the two collections' files**, found driving REQ-TEST-249's
      fake collection through `mothman dashboard` in a copy. `build-data` said it
      reshapes "results_bdm.json/results_cp.json", and `rebuild-results` said it
@@ -10321,3 +10321,84 @@ twice. It deliberately did not re-find the `TypeError`.
      ("Expecting value: line 1 column 15") and passes now `write()` goes
      through `atomic_file.write_json`, whose indent and default match what was
      there, so the bytes written are unchanged.
+
+228. **[done, 2026-10-18]** **[Testing & dev tooling]** **Command-line tests
+     passed or failed by run order** (the REQ-TEST-245 critic's D1, reproduced:
+     tests/test_collection_cli.py then tests/test_cli_app.py, serially, failed
+     four). The first file's fixture cleared the whole command-object cache, so
+     the second's stubs, applied to objects captured at import, no longer reached
+     the code and the REAL flows ran. The cache is now a plain dict
+     (`collection_cli.COMMANDS`) and the fixture evicts only the collections the
+     test registered. The same order now passes, 31 of 31.
+
+229. **[done, 2026-10-18]** **[Testing & dev tooling]** **A broken collection
+     ended in a traceback outside its own commands** (the REQ-TEST-245 critic's
+     D2 and G1). A `--collection` option accepted a registered collection whose
+     adapter would not load, and generating one with no provider raised
+     NoProviderError. Both now refuse by name - the option type tries the
+     adapter, generation names the missing generator - and an unknown value on
+     an option that takes `all` says so (the REQ-TEST-252 critic's G4). Three
+     tests in tests/test_collection_cli.py, each failing first.
+
+230. **[done, 2026-10-18]** **[Testing & dev tooling]** **Two collections with
+     one label would dispatch to the wrong one** (both REQ-TEST-252 critics and
+     the REQ-TEST-245 critic's G3; latent, nothing today shares a label). Every
+     picker shows a collection by its label and dispatches on it. The label rule
+     moved onto the collection record and the collections gate refuses a
+     shared label; a case in tests/test_collections_registry.py failed first.
+
+231. **[done, 2026-10-18]** **[Testing & dev tooling]** **A top entry in the
+     grouped picker could be highlighted and not chosen** (the REQ-TEST-252
+     critic's D2, driven in a pty): a filter matching nothing but "Pending
+     corrections" said "Nothing matches" and Enter did nothing. Top entries are
+     filtered by their own text now, and - Keith's call the same evening - typed
+     text also matches a collection's short, id and datasets' names. The picker
+     is now driven in-process by tests/test_grouped_picker.py (nine tests, four
+     failing first), so the code a pty session alone covered has a fast test.
+
+232. **[done, 2026-10-18]** **[Data generation]** **Gaps only a new collection
+     would hit, closed as gate checks at Keith's call** (the REQ-GEN-246 critic's
+     G2-G4 and T4, the REQ-TEST-245 critic's G2): a target trial on a
+     multi-table collection crashed after writing its whole history; an unknown
+     or shared lever set was taken silently; a provider filed under the wrong
+     collection or naming a dataset it does not own, and a stray provider module,
+     went unnoticed; and the real-tree guard missed a clear that redirected only
+     the deliveries. The providers gate refuses each, the trial is refused
+     before anything is written, and the guard checks receipts too, each with a
+     failing test first. Plus Keith's answer to the critic's question on
+     criterion 2: a test records every seed actually drawn in a real generation
+     of each collection (shown failing on a narrowed declaration).
+
+233. **[done, 2026-10-18]** **[Dashboard UI]** **A missing results file was read
+     as "no recorded runs"** (the REQ-DASH-244 critic's G1; Keith's call to
+     refuse it). `build-data` before `rebuild-results` published a collection
+     with real history as never supplied. It now refuses, naming the collection
+     and `mothman dashboard rebuild-results`; the third-collection fixture writes
+     an empty results file as the real rebuild does. Same evening, Keith's J1
+     call: four contract descriptions the build had replaced with the dashboard's
+     shorter wording carry the contract's own text again.
+
+234. **[todo, 2026-10-18]** **[Testing & dev tooling]** **What the five
+     post-build critics on REQ-GEN-246, REQ-TEST-245, REQ-DASH-244 and
+     REQ-TEST-252 found that is NOT yet done**, kept whole so nothing is lost:
+     - TEST WEAKNESSES still open: the render gate and `build-data` tests delete
+       a real collection rather than registering a third (244 G3); two
+       dashboard legacy flags with no test that fails without them (244 T1); a
+       zero-run collection's notice checked only at the data level (244 T3);
+       the third collection's GitHub anchor checked only for `#L` (244 T4);
+       criterion 8 of 245 never exercised through the real root CLI (245 T2);
+       the bootstrap's own read of the trial declaration (246 T3); several
+       252 criteria with no test of their own (calendar picker at thirty,
+       the generic hint text, Tools in today's order, the three-closest cap).
+     - POLISH still open: stale references to the deleted per-collection
+       modules in test docstrings and aliases, README's 120 scheduled deliveries
+       (85 + 12 now), Child Protection's "15 quarterly snapshots" note (55),
+       "This will regenerate data/raw/", "a Emergency" and "all 2 tables"
+       grammar, the dataset-anchor substring match and an anchor-less tooltip,
+       repeated check-file parsing per dataset, the presentation provenance
+       naming deleted modules (REQ-PIPE-248's to reword), embed docstrings
+       naming the two builders, lowercase `{legend}` text, `source:` fields
+       still saying "a PROPOSAL, not signed".
+     - DECLINED by Keith for now (2026-10-18): ranking "Closest:" by prefix with
+       labels, a `<short>` placeholder in hints, capping the picker's height and
+       a header on `mothman collections`.

@@ -636,14 +636,7 @@ schema:
         logicalType: boolean
         physicalType: boolean
         required: true
-        # What this description said before REQ-DASH-244 moved the page's
-        # note here - kept for whoever maintains the contract:
-        #   A boolean's only two non-null states are both valid values by
-        #   definition - the nullValues rule below is already the complete "strict
-        #   values" check this column needs; there's no separate "invalid code"
-        #   state a boolean column can land in the way a string column like sex
-        #   can.
-        description: "Required."
+        description: "A boolean's only two non-null states are both valid values by definition - the nullValues rule below is already the complete \"strict values\" check this column needs; there's no separate \"invalid code\" state a boolean column can land in the way a string column like sex can."
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:is_multiple_birth:nullValues_datacontract
             metric: nullValues
@@ -719,11 +712,7 @@ schema:
         logicalType: string
         physicalType: varchar(50)
         required: true
-        # What this description said before REQ-DASH-244 moved the page's
-        # note here - kept for whoever maintains the contract:
-        #   BDM's internal record ID. Kept alongside registration_number to help
-        #   trace re-extractions.
-        description: "BDM's internal record ID, kept for re-extraction tracing."
+        description: "BDM's internal record ID. Kept alongside registration_number to help trace re-extractions."
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:source_system_record_id:duplicateValues_datacontract
             metric: duplicateValues
@@ -766,11 +755,7 @@ schema:
         logicalType: date
         physicalType: timestamp
         required: true
-        # What this description said before REQ-DASH-244 moved the page's
-        # note here - kept for whoever maintains the contract:
-        #   When this record was extracted from BDM's source system, not when the
-        #   file landed in S3.
-        description: "When the record was extracted at BDM's source system."
+        description: "When this record was extracted from BDM's source system, not when the file landed in S3."
         quality:
           - id: data-asset-1:registry-services:civil-registration:birth-registrations:extract_timestamp:nullValues_datacontract
             metric: nullValues

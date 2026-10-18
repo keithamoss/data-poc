@@ -76,7 +76,9 @@ class TestTheFixture:
         assert len({c["agency_id"] for c in thirty_collections.added()}) >= 5
 
     def test_it_writes_nothing_to_the_repository(self, thirty):
-        assert "fake" not in (ROOT / "contract" / "data-asset.yaml").read_text()
+        real = (ROOT / "contract" / "data-asset.yaml").read_text()
+        added = thirty_collections.added()
+        assert added and not [c["id"] for c in added if c["id"] in real]
         for c in thirty_collections.added():
             assert not (ROOT / "qa_tools" / "collections" /
                         f"{c['id'].replace('-', '_')}.py").exists()
@@ -141,9 +143,17 @@ class TestTheCollectionOptionAtThirty:
         assert "Known:" not in flat, "every collection is never listed above N_LIST"
 
     def test_a_short_and_an_id_mean_the_same_collection(self, thirty):
-        for value in ("edp", "emergency-department-presentations"):
-            out = _run(thirty, "debug", "run-dbt", "--collection", value, "--help")
-            assert out.returncode == 0, (value, out.stderr)
+        """Through the option type every --collection uses, not --help, which
+        returns before any value is converted (the REQ-TEST-252 critic's T1)."""
+        probe = ("import sys\nfrom cli import common\n"
+                 "for to in ('short', 'id'):\n"
+                 "    print(to, *(common.CollectionParam(to=to).convert(v, None, None) "
+                 "for v in sys.argv[1:]))\n")
+        done = subprocess.run([sys.executable, "-c", probe, "edp", "emergency-department-presentations"],
+                              cwd=thirty, capture_output=True, text=True, timeout=120)
+        assert done.returncode == 0, done.stderr
+        assert done.stdout.split("\n")[:2] == [
+            "short edp edp", "id emergency-department-presentations emergency-department-presentations"]
 
 
 class TestTheThresholdAtTwo:
@@ -213,9 +223,10 @@ class TestTheMenusAtThirty:
                 session.send("backspace")
             session.send("enter")
             shown = self._screen(session)
-            # ITS OWN NEXT PROMPT: the N-table collection asks where the
-            # supply comes from, under its own name.
+            # ITS OWN NEXT PROMPT, not the picker's echo (the critic's T2): the
+            # N-table collection asks whether it is a full delivery.
             assert re.search(r"Which dataset\? Emergency Department Waiting Times", shown), shown
+            assert session.wait_for("Full delivery or single table?", 15), session.screen_lines()
         finally:
             session.close()
 
@@ -235,6 +246,9 @@ class TestTheMenusAtThirty:
             session.send("enter")
             shown = self._screen(session)
             assert re.search(r"Which dataset\? School Enrolments", shown), shown
+            # THE COLLECTION'S OWN GENERATION RAN, in the copy: its provider
+            # plans no slots, so it writes nothing and says so.
+            assert session.wait_for("Wrote 0 deliveries", 30), session.screen_lines()
         finally:
             session.close()
 

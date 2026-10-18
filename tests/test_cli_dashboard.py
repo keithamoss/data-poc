@@ -220,3 +220,20 @@ def test_rebuild_stops_and_fails_when_a_gate_raises(monkeypatch):
 
     assert result.exit_code != 0
     assert "check-lifecycle validation failed" in result.output
+
+
+def test_build_data_refuses_a_missing_results_file_by_name(tmp_path, monkeypatch):
+    """post-build-review #233: refused as a message naming the command, not a
+    traceback."""
+    from click.testing import CliRunner
+
+    from cli import dashboard as dashboard_cli
+    from pipeline import build_dashboard_data as bdd
+
+    monkeypatch.setattr(bdd, "results_path", lambda cid: str(tmp_path / f"absent-{cid}.json"))
+    monkeypatch.setattr(bdd, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
+    out = CliRunner().invoke(dashboard_cli.dashboard_group, ["build-data"])
+    assert out.exit_code == 1 and isinstance(out.exception, SystemExit), out.exception
+    import re
+
+    assert "mothman dashboard rebuild-results" in " ".join(re.sub(r"[│╭╮╰╯─]", " ", out.output).split())

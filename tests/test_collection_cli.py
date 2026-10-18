@@ -53,8 +53,8 @@ class TestOneFactory:
         group = collection_cli.make_group(_coll(FAKE_ID))
         assert group.name == FAKE_SHORT
         assert set(group.commands) == {"qa", "generate-synthetic-data"}
-        qa = {p.name for p in group.commands["qa"].params}
-        assert "file_path" in qa and "folder" not in qa, "one table means --file (criterion 3)"
+        qa = {opt for p in group.commands["qa"].params for opt in getattr(p, "opts", [])}
+        assert "--file" in qa and "--folder" not in qa, "one table means --file (criterion 3)"
         assert isinstance(collection_cli.of(FAKE_SHORT), collection_cli.CollectionCLI)
 
     def test_it_is_labelled_by_its_one_dataset(self, third_collection):

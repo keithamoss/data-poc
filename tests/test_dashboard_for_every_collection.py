@@ -58,7 +58,12 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
     calendar = tmp_path / "calendar.yaml"
     calendar.write_text(yaml.safe_dump(cal, sort_keys=False))
     monkeypatch.setattr(agreement, "CALENDAR_YAML", calendar)
-    monkeypatch.setattr(bdd, "results_path", lambda cid: str(tmp_path / f"no-results-{cid}.json"))
+    # AN EMPTY RESULTS FILE, as the real rebuild writes for a collection with
+    # no recorded runs - a MISSING file is refused (Keith, 2026-10-18; see
+    # TestAMissingResultsFileIsRefused below), not read as no runs.
+    results = tmp_path / f"results-{FAKE_ID}.json"
+    results.write_text(json.dumps({"runs": [], "results": [], "dataset_stats": {}}))
+    monkeypatch.setattr(bdd, "results_path", lambda cid: str(results))
     # The recorded history the build reads, empty for the fake collection.
     from qa_tools.common import qa_store, supply_db
 
@@ -91,6 +96,22 @@ class TestAThirdCollectionIsBuilt:
         monkeypatch.setattr(bdd, "out_path", lambda cid: str(tmp_path / f"{cid}.json"))
         doc = json.loads(open(bdd.write(FAKE_ID)).read())
         assert [d["id"] for d in doc["datasets"]] == [FAKE_DATASET]
+
+
+class TestAMissingResultsFileIsRefused:
+    """Keith, 2026-10-18 (post-build-review #233, from the REQ-DASH-244
+    critic's G1): a collection whose results file is missing is refused,
+    naming it and the command that writes the file. It used to be read as
+    'no recorded runs', so `build-data` run before `rebuild-results` published
+    a collection with real history as never supplied, without a word."""
+
+    def test_the_build_names_the_collection_and_the_command(self, described, tmp_path,
+                                                            monkeypatch):
+        monkeypatch.setattr(bdd, "results_path", lambda cid: str(tmp_path / "absent.json"))
+        with pytest.raises(bdd.MissingResultsFile) as raised:
+            bdd.build_datasets(FAKE_ID)
+        said = str(raised.value)
+        assert FAKE_ID in said and "mothman dashboard rebuild-results" in said
 
 
 class TestTheEmbed:

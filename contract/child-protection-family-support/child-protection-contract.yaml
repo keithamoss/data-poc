@@ -625,12 +625,7 @@ schema:
         logicalType: string
         physicalType: varchar(50)
         required: true
-        # What this description said before REQ-DASH-244 moved the page's
-        # note here - kept for whoever maintains the contract:
-        #   Closed value set. The dirty(amber/red) presets inject unknown codes
-        #   here - the deliberate traffic-light demo column for this collection,
-        #   same role sex plays for Birth Registrations.
-        description: "Closed value set — the traffic-light demo column for this collection, same role sex plays for Birth Registrations."
+        description: "Closed value set. The dirty(amber/red) presets inject unknown codes here - the deliberate traffic-light demo column for this collection, same role sex plays for Birth Registrations."
         quality:
           - id: data-asset-1:child-protection-family-support:child-protection:cp-notifications:concern_type:invalidValues_datacontract
             metric: invalidValues

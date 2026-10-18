@@ -40,7 +40,11 @@ def _build_data() -> None:
     # EVERY REGISTERED COLLECTION, through the one builder (REQ-DASH-244
     # criteria 1 and 9).
     for coll in collections.all_collections():
-        console.print(f"Wrote {build_dashboard_data.write(coll.id)}", style="green")
+        try:
+            written = build_dashboard_data.write(coll.id)
+        except build_dashboard_data.MissingResultsFile as exc:
+            raise click.ClickException(str(exc)) from None  # post-build-review #233
+        console.print(f"Wrote {written}", style="green")
     # THE CENSUS WARNING ON THE SANCTIONED PATH (REQ-PIPE-081 criterion 16,
     # #113): a WARNING, and the build still publishes.
     from qa_tools.common import census

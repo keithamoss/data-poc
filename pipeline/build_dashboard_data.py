@@ -632,12 +632,24 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
 
 # ---- one collection ---------------------------------------------------------
 
+class MissingResultsFile(FileNotFoundError):
+    """A collection's results file is not there to build from - refused,
+    naming the collection and the command that writes it."""
+
+
 def _payload(collection_id: str) -> dict:
-    """The collection's results file, or an empty one where it has none yet -
-    a collection with no recorded runs is built, not refused (criterion 6)."""
+    """The collection's results file. A collection with no recorded runs has
+    one too - the rebuild always writes it, empty - so it is built with an
+    empty history (criterion 6). A MISSING file is refused (Keith,
+    2026-10-18; post-build-review #233): read as 'no runs', it published a
+    collection with real history as never supplied whenever `build-data`
+    ran before `rebuild-results`."""
     path = results_path(collection_id)
     if not os.path.exists(path):
-        return {"runs": [], "results": [], "dataset_stats": {}}
+        raise MissingResultsFile(
+            f"{collection_id} has no results file at {path} to build its dashboard from - "
+            f"run `mothman dashboard rebuild-results` first, which writes one for every "
+            f"collection, an empty one where nothing is recorded")
     with open(path) as f:
         return json.load(f)
 
