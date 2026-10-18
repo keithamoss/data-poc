@@ -1,12 +1,12 @@
 """Smoke test for pipeline/build_dashboard_data.py's reshaping logic,
-against a small fixture rather than a real (slow) qa_tools/bdm/
-orchestrate_bdm.py run - this is meant to catch the kind of silent
+against a small fixture rather than a real (slow) qa_tools/tools/
+orchestrate.py run - this is meant to catch the kind of silent
 shape/crash regression a full pipeline run wouldn't surface quickly, not
 to duplicate qa_tools' own integration coverage.
 
 No real DuckDB warehouse here since Phase 3 (plans/publishing-and-
 history.md) - value-counts/arrival/check-aggregate data comes from
-results_bdm.json's own "dataset_stats" key now (qa_tools/bdm/
+results_bdm.json's own "dataset_stats" key now (qa_tools/tools/
 dataset_stats.py's precomputed output), not a live query."""
 from __future__ import annotations
 

@@ -46,10 +46,10 @@ def owed_one(cp_duckdb_dir, monkeypatch):
 
 class TestAnOwedReCheckWaits:
     def test_it_is_left_owed_and_not_run(self, owed_one, monkeypatch):
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
         ran = []
-        monkeypatch.setattr(orchestrate_cp, "_run_one", lambda *a, **k: ran.append(1))
+        monkeypatch.setattr(orchestrate, "run_one", lambda *a, **k: ran.append(1))
         _refuse(monkeypatch, DATASET)
         got = recheck.run(owed_one, run_by="pytest@example.org")
         assert not got.completed and got.frozen, got
@@ -197,7 +197,7 @@ class TestAFrozenArrivalIsNotAFailure:
         monkeypatch.setattr(pp, "recorded", lambda conn: None)
         monkeypatch.setattr(pp, "state_of", lambda a, rec: pp.UNGATED)
         steps = SimpleNamespace(promote_after=lambda *a, **k: None)
-        monkeypatch.setattr(pp, "_orchestrator", lambda c: SimpleNamespace(STEPS=steps))
+        monkeypatch.setattr(pp, "_steps", lambda c: steps)
         _refuse(monkeypatch, *refused)
         report = pp.PassReport()
         pp._one(arrival, [arrival], "ts", "me", report, say=lambda m: None)

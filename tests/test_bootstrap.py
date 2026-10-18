@@ -20,6 +20,8 @@ import pytest
 from qa_tools.common import bootstrap as boot
 from qa_tools.common import supply_db
 
+_SHORT = {"civil-registration": "bdm", "child-protection": "cp"}
+
 
 @pytest.fixture(autouse=True)
 def _no_target_comparison(monkeypatch):
@@ -76,8 +78,7 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
 
         def _fail(*a, **k):
             raise AssertionError("bootstrap ran the pipeline against a populated database")
-        monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline", _fail)
-        monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp", _fail)
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline", _fail)
 
         result = boot.bootstrap()
         assert result.populated is False
@@ -92,10 +93,8 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
         called = []
         monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
         monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
-        monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
-                            lambda **k: called.append(("bdm", k)))
-        monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
-                            lambda **k: called.append(("cp", k)))
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
+                            lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
         _in_process(monkeypatch)
 
         result = boot.bootstrap(force=True)
@@ -110,10 +109,8 @@ class TestWhatItRuns:
         called = []
         monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
         monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
-        monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
-                            lambda **k: called.append("bdm"))
-        monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
-                            lambda **k: called.append("cp"))
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
+                            lambda collection_id, **k: called.append(_SHORT[collection_id]))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
@@ -176,10 +173,8 @@ class TestCollectionsRunSideBySide:
         called = []
         monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: called.append("gen-bdm"))
         monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: called.append("gen-cp"))
-        monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline",
-                            lambda **k: called.append(("bdm", k)))
-        monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp",
-                            lambda **k: called.append(("cp", k)))
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
+                            lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",

@@ -1,7 +1,7 @@
 """One delivery, kept three ways, records the same history (REQ-PIPE-086
 criterion 11).
 
-THE THREE ROUTES. The pipeline's batch (`orchestrate_bdm.run_pipeline`),
+THE THREE ROUTES. The pipeline's batch (`orchestrate.run_pipeline`),
 the terminal keeping it (`cli.bdm.run_check(..., keep=True)`), and the
 Lambda route (`s3_arrival.handle_event`, REQ-PIPE-152) - each into an
 empty database of its own, over the same real generated file. Every
@@ -63,8 +63,8 @@ def corpus(tmp_path_factory):
 
 
 def _batch():
-    from qa_tools.bdm import orchestrate_bdm
-    orchestrate_bdm.run_pipeline(sequential=True)
+    from qa_tools.tools import orchestrate
+    orchestrate.run_pipeline("civil-registration", sequential=True)
 
 
 def _terminal():

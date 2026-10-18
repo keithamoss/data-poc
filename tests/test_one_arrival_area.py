@@ -52,7 +52,7 @@ def test_a_bdm_single_arrival_is_staged_from_where_it_is(tmp_path, supply_dsn, m
     and they run in test_orchestrate_single_run.py - but staging is the
     real stage_table(), against this worker's own database.
     """
-    from qa_tools.bdm import orchestrate_bdm
+    from qa_tools.tools import orchestrate
     from qa_tools.common import supply_db, trial
 
     staged_from = []
@@ -65,7 +65,7 @@ def test_a_bdm_single_arrival_is_staged_from_where_it_is(tmp_path, supply_dsn, m
         return real_stage_table(collection_id, run_id, table, csv_path, *args, **kwargs)
 
     monkeypatch.setattr(stage, "stage_table", recording_stage_table)
-    monkeypatch.setattr(orchestrate_bdm, "_run_one", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate, "run_one", lambda *a, **k: [])
 
     arrived = tmp_path / "incoming.csv"
     arrived.write_text("registration_id,child_family_name\nBR0001,SMITH\n")
@@ -73,8 +73,9 @@ def test_a_bdm_single_arrival_is_staged_from_where_it_is(tmp_path, supply_dsn, m
     run_id = trial.trial_run_id()
     before = _supply_files()
     try:
-        orchestrate_bdm.run_single(run_id, str(arrived), "2026-01-02",
-                                   reference_run_id=None, run_by="test@example.com")
+        orchestrate.run_single_file("civil-registration", run_id, "birth_registrations",
+                                    str(arrived), "2026-01-02",
+                                    reference_run_id=None, run_by="test@example.com")
     finally:
         with supply_db.connect(label="test-one-arrival-area") as conn:
             trial.discard(conn, run_id)

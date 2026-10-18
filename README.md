@@ -195,8 +195,8 @@ qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently
   dbt_profiles/profiles.yml     dbt-duckdb connection profile (no secrets - just a path) - shared by both
                                datasets, since there's one dbt_project/
   common/
-    parallel_orchestrate.py       generic parallel-or-sequential dispatch across a manifest, shared by
-                                 orchestrate_bdm.py and orchestrate_cp.py - see "Speed" below
+    parallel_orchestrate.py       runs one run's four tools beside each other, for the orchestrator in
+                                 tools/ - see "Speed" below
     dbt_common.py, soda_common.py, datacontract_common.py, evidently_common.py
                                    tool-generic subprocess/API invocation + parsing, shared by the
                                  runners in tools/ - see "Code layout" below
@@ -206,19 +206,18 @@ qa_tools/                    runs the actual dbt/soda/datacontract-cli/evidently
     run_soda.py               runs the real soda-core Scan API
     run_datacontract.py       runs the real datacontract-cli Python API
     run_evidently.py          runs the real evidently.Report + DataDriftPreset
+    orchestrate.py            one run, one arrival, or a whole collection's batch, for any collection
+                              by its id (REQ-PIPE-243) -> reports/results_<short>.json
+    dataset_stats.py          each run's presentation statistics, recorded at run time
+    results_history.py        a collection's results file rebuilt from recorded history alone
     legacy.py                 the named flags that keep each collection's recorded output unchanged
   collections/               the collection registry, and each collection's adapter (what the tools read)
-  bdm/
-    orchestrate_bdm.py        all four tools, across every run -> reports/results_bdm.json
-  cp/
-    cp_common.py              shared agency/collection/dataset id constants for Child Protection
-    orchestrate_cp.py         all four tools, across every CP run -> reports/results_cp.json
 pipeline/                    a real package (pipeline/__init__.py) - invoked via `mothman pipeline
                                run`/`mothman dashboard build-data` (`cli/`, never bare `python3 -m pipeline.<module>`)
   load.py                       loads every generated run into one combined DuckDB table (still needed -
                                build_dashboard_data.py's own direct queries, e.g. the sex value-count
                                chart, run against it; qa_tools/ stages supplies into data/supply.duckdb)
-  orchestrate.py                generate -> load the combined warehouse (qa_tools/bdm/orchestrate_bdm.py
+  orchestrate.py                generate -> load the combined warehouse (qa_tools/tools/orchestrate.py
                                is the next step, run separately - see `mothman pipeline run`)
   build_dashboard_data.py       reshapes results_bdm.json into the dashboard's data shape
   build_cp_dashboard_data.py    reshapes results_cp.json into 6 datasets' worth of dashboard data
@@ -311,7 +310,7 @@ and it is named in the Development section above rather than discovered.
 ## On-demand checks against a file you already have
 
 The manifest-driven batch pipeline above (`mothman pipeline run`,
-`orchestrate_bdm.py`/`orchestrate_cp.py`) is this repo's own synthetic-data
+`qa_tools/tools/orchestrate.py`) is this repo's own synthetic-data
 demo harness. `mothman`'s **Local files QA source mode** (`plans/tooling.md`
 #1 Phase 2 — originally scoped as a separate CLI pair with Keith 2026-09-19,
 `plans/running-thoughts.md` #5 Thread A, since folded into `mothman` itself)
@@ -400,8 +399,8 @@ by-default/`--commit` semantics as every other source mode.
 
 ## Speed
 
-`qa_tools/bdm/orchestrate_bdm.py`/`qa_tools/cp/orchestrate_cp.py`
-run their manifest's runs **in parallel by default** (`qa_tools/common/
+`qa_tools/tools/orchestrate.py` used to
+run a manifest's runs **in parallel by default** (`qa_tools/common/
 parallel_orchestrate.py`, one process per CPU core via `os.cpu_count()`)
 — measured, not estimated, against the original manifest sizes (15/10
 runs, before the 2026-09-16 history deepening to 85/16 - not re-measured

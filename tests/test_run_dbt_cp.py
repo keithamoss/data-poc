@@ -3,7 +3,7 @@ evaluate() - the CP counterpart to tests/test_run_dbt_bdm.py,
 covering the same real "parse dbt's real output, re-verify via the
 audit-table workaround" logic, plus CP-specific routing (which of the
 6 real tables a test result belongs to, via dbt's own attached_node /
-cp_common.BUSINESS_RULE_HOME_TABLE)."""
+the adapter's dbt.business_rule_home_table)."""
 from __future__ import annotations
 
 import pytest

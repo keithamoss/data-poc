@@ -11,45 +11,46 @@ history first. The rebuild's output file is always redirected into
 """
 from __future__ import annotations
 
-import importlib
+import pathlib
 
-#: The two rebuild paths, one per collection.
-REBUILDS = ("qa_tools.cp.build_results_from_history",
-            "qa_tools.bdm.build_results_from_history")
+from qa_tools import collections
+from qa_tools.tools import results_history
+
+#: The one rebuild, run for each collection (REQ-PIPE-243): a test
+#: parametrised over these drives `results_history.build_results_from_history`
+#: with each collection id in turn.
+REBUILDS = ("child-protection", "civil-registration")
 
 _WHEN = "2026-09-26T10:00:00+08:00"
 _BY = "tests@example.gov.au"
 
 
-def ids(module_name: str) -> tuple[str, str]:
-    """(agency, collection) the given rebuild reads."""
-    if ".cp." in module_name:
-        from qa_tools.cp import cp_common as common
-    else:
-        from qa_tools.bdm import bdm_common as common
-    return common.AGENCY_ID, common.COLLECTION_ID
+def ids(collection_id: str) -> tuple[str, str]:
+    """(agency, collection) the rebuild of the given collection reads."""
+    coll = collections.by_id(collection_id)
+    return coll.agency_id, coll.id
 
 
-def dataset_of(module_name: str) -> str:
+def dataset_of(collection_id: str) -> str:
     """A real dataset of that collection, for check ids and records."""
-    return "cp-placements" if ".cp." in module_name else "birth-registrations"
+    return "cp-placements" if collection_id == "child-protection" else "birth-registrations"
 
 
-def check(module_name: str, name: str, tool: str, dataset: str | None = None) -> dict:
+def check(collection_id: str, name: str, tool: str, dataset: str | None = None) -> dict:
     """One verified record, in the shape a tool's evaluation returns."""
-    agency, collection = ids(module_name)
-    dataset = dataset or dataset_of(module_name)
+    agency, collection = ids(collection_id)
+    dataset = dataset or dataset_of(collection_id)
     return {"check_id": f"data-asset-1.{agency}.{collection}.{dataset}.col.{name}_{tool}",
             "dataset_id": dataset, "status": "pass", "engine": tool}
 
 
-def record_run(module_name: str, run_id: str, run_index: int,
+def record_run(collection_id: str, run_id: str, run_index: int,
                by_tool: dict[str, list[dict]]) -> None:
     """Record one finished run: its dataset_stats (which is what puts a
     run into the rebuild's manifest) and each tool's verified records."""
     from qa_tools.common.qa_results_writer import finish_run, open_run, write_qa_result
 
-    agency, collection = ids(module_name)
+    agency, collection = ids(collection_id)
     open_run(agency, collection, run_id, _WHEN, _BY)
     write_qa_result(agency, collection, run_id, _WHEN, "dataset_stats",
                     {"arrival_record": {"run_id": run_id, "run_index": run_index}},
@@ -60,8 +61,14 @@ def record_run(module_name: str, run_id: str, run_index: int,
     finish_run(run_id)
 
 
-def rebuild(module_name: str, tmp_path, monkeypatch) -> dict:
-    """Run the real rebuild, writing into tmp_path rather than reports/."""
-    module = importlib.import_module(module_name)
-    monkeypatch.setattr(module, "RESULTS_PATH", str(tmp_path / "results.json"))
-    return module.build_results_from_history()
+def output_path(collection_id: str, tmp_path) -> pathlib.Path:
+    """Where `rebuild(collection_id, tmp_path, ...)` writes the results file."""
+    return pathlib.Path(tmp_path) / "reports" / collections.adapter(
+        collections.by_id(collection_id)).results_json
+
+
+def rebuild(collection_id: str, tmp_path, monkeypatch) -> dict:
+    """Run the real rebuild, writing into tmp_path/reports/ rather than
+    the repo's own reports/ (results_history.ROOT is the repo root)."""
+    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
+    return results_history.build_results_from_history(collection_id)

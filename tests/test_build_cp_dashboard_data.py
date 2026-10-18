@@ -1,6 +1,6 @@
 """Smoke test for pipeline/build_cp_dashboard_data.py's reshaping logic,
-against a small fixture rather than a real (slow) qa_tools/cp/
-orchestrate_cp.py run - the Child Protection counterpart to
+against a small fixture rather than a real (slow) qa_tools/tools/
+orchestrate.py run - the Child Protection counterpart to
 tests/test_build_dashboard_data.py. Calls build_one_table() directly
 (no results_cp.json file needed) since that's the actual per-table
 reshaping function under test."""

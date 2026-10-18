@@ -23,7 +23,10 @@ FAKE_ID, FAKE_SHORT, FAKE_PREFIX = "fake-collection", "fk", "fk_run_"
 FAKE_DATASET, FAKE_TABLE = "fake-things", "fake_things"
 BARE_ID, BARE_SHORT = "bare-collection", "bare"
 
-#: The module the fake adapter's pointers name; every call is recorded.
+#: The module the fake adapter's one remaining pointer (its generator)
+#: names; every call is recorded. Since REQ-PIPE-243 the orchestrator,
+#: dataset stats and results rebuild are shared, so a site test records
+#: what the SHARED code was asked for by patching qa_tools.tools.orchestrate.
 CODE = "tests_third_collection_code"
 
 
@@ -63,11 +66,7 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
 
 def _code(calls: list) -> types.ModuleType:
     code = types.ModuleType(CODE)
-    code.run_pipeline = lambda **kw: calls.append(("run_pipeline", kw))
-    code.build_results_from_history = lambda: calls.append(("rebuild",))
     code.generate = lambda *, trial: calls.append(("generate", trial))
-    code._run_one = lambda entry, now, run_by, on_step=None: calls.append(("run_one", entry)) or []
-    code._discard_this_runs_schemas = lambda run_key: calls.append(("discard", run_key))
     return code
 
 
@@ -80,10 +79,9 @@ def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     monkeypatch.setitem(sys.modules, CODE, _code(calls))
     adapter = types.ModuleType("qa_tools.collections.fake_collection")
     adapter.ADAPTER = CollectionAdapter(
-        collection_id=FAKE_ID, label="Fake Things", orchestrator=CODE,
-        run_pipeline_function="run_pipeline",
-        results_rebuild=CODE, generator=f"{CODE}:generate", target_datasets=(FAKE_DATASET,),
-        dashboard_json="fake_collection_dashboard.json",
+        collection_id=FAKE_ID, label="Fake Things",
+        generator=f"{CODE}:generate", target_datasets=(FAKE_DATASET,),
+        dashboard_json="fake_collection_dashboard.json", results_json="results_fk.json",
         dashboard_datasets=lambda doc: list(doc["datasets"]),
         datacontract=DatacontractSpec(labels_by_check_tail={"pair_datacontract": "Fake pair"}),
         sample_key={FAKE_TABLE: "fake_id"})

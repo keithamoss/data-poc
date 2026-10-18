@@ -18,31 +18,30 @@ import sys
 from unittest.mock import patch
 
 from cli import common
-from qa_tools.bdm import orchestrate_bdm
-from qa_tools.cp import orchestrate_cp
+from qa_tools.tools import orchestrate
 
 
 def test_both_orchestrators_agree_on_the_real_steps():
     """cli/common.chain_progress() sizes its bar off BDM's RUN_STEPS; if
     CP's ever diverged, a CP run would over- or under-fill it."""
-    assert orchestrate_bdm.RUN_STEPS == orchestrate_cp.RUN_STEPS
-    assert common.RUN_STEPS == orchestrate_bdm.RUN_STEPS
+    assert orchestrate.RUN_STEPS == orchestrate.RUN_STEPS
+    assert common.RUN_STEPS == orchestrate.RUN_STEPS
     # The 4 real tools plus the dataset_stats computation - the genuinely
     # known steps that make this a real progress measure, not a fake one.
-    assert orchestrate_bdm.RUN_STEPS == (
+    assert orchestrate.RUN_STEPS == (
         "dbt-core", "Soda Core", "datacontract-cli", "Evidently", "Dataset statistics")
 
 
 def test_announce_is_a_no_op_without_a_callback():
     """The contract every existing caller relies on: pass nothing, get
     exactly the old behaviour."""
-    orchestrate_bdm._announce(None, "dbt-core")  # must not raise
-    orchestrate_cp._announce(None, "dbt-core")
+    orchestrate._announce(None, "dbt-core")  # must not raise
+    orchestrate._announce(None, "dbt-core")
 
 
 def test_announce_reports_the_label_when_a_callback_is_given():
     seen = []
-    orchestrate_bdm._announce(seen.append, "Soda Core")
+    orchestrate._announce(seen.append, "Soda Core")
     assert seen == ["Soda Core"]
 
 

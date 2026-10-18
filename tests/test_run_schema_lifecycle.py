@@ -154,12 +154,12 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     from pathlib import Path
 
     from fixture_ids import BDM_REF_RUN_ID
-    from qa_tools.bdm import orchestrate_bdm
+    from qa_tools.tools import orchestrate
 
     # NOTHING TO REDIRECT ON DISK (REQ-PIPE-102): run_single() stages
     # the file where it is rather than copying it into a raw
     # directory, so there is no longer one to point elsewhere.
-    monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "write_qa_result", lambda *a, **k: None)
     for module_name in ("tools.run_dbt", "tools.run_soda", "tools.run_datacontract",
                         "tools.run_evidently"):
         module = __import__(f"qa_tools.{module_name}", fromlist=[module_name])
@@ -181,8 +181,9 @@ def test_a_finished_run_leaves_no_schema_behind(monkeypatch, tmp_path, bdm_raw_d
     # A TRIAL ID: run_single runs trials only (REQ-PIPE-086 criterion 10).
     from qa_tools.common import trial
     run_id = trial.trial_run_id()
-    orchestrate_bdm.run_single(
-        run_id, str(arrived), "2026-01-02", BDM_REF_RUN_ID, run_by="test@example.com")
+    orchestrate.run_single_file(
+        "civil-registration", run_id, "birth_registrations", str(arrived), "2026-01-02",
+        BDM_REF_RUN_ID, run_by="test@example.com")
 
     with supply_db.connect(read_only=True, label="test-after") as conn:
         after = _schemas(conn)
@@ -322,7 +323,7 @@ class TestARunGivesBackItsDiskSpaceToo:
 
     SAFE TO REMOVE AT THIS POINT because dbt's artefacts are read
     DURING evaluation - run_results.json and manifest.json are parsed
-    by evaluate_dbt_*() - and this tidy-up runs in _run_one's finally,
+    by evaluate_dbt_*() - and this tidy-up runs in run_one's finally,
     after the results are already recorded.
     """
 
@@ -330,19 +331,16 @@ class TestARunGivesBackItsDiskSpaceToo:
         from qa_tools.common import supply_db as db_mod
         return db_mod.dbt_target_path(run_id)
 
-    @pytest.mark.parametrize("module_name", ["bdm", "cp"])
-    def test_a_finished_run_removes_its_own_dbt_target_directory(self, db, module_name):
-        import importlib
+    def test_a_finished_run_removes_its_own_dbt_target_directory(self, db):
+        from qa_tools.tools import orchestrate
 
-        orchestrate = importlib.import_module(
-            f"qa_tools.{module_name}.orchestrate_{module_name}")
-        run_id = f"leak_probe_{module_name}"
+        run_id = "leak_probe_shared"
         target = self._target(run_id)
         target.mkdir(parents=True, exist_ok=True)
         (target / "run_results.json").write_text("{}")
         assert target.is_dir(), "test precondition - the directory must exist to be removed"
 
-        orchestrate._discard_this_runs_schemas(run_id)
+        orchestrate.discard_run_schemas(run_id)
 
         assert not target.exists(), (
             f"{target} survived the run's own tidy-up - a per-run directory "
@@ -352,8 +350,8 @@ class TestARunGivesBackItsDiskSpaceToo:
         """The results are already recorded by the time this happens, so
         a tidy-up that cannot complete is a thing to report and move
         past - the same rule the schema half already follows."""
-        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import orchestrate
 
         # A run that never created one: the ordinary case for a run that
         # failed before dbt, and it must not turn one failure into two.
-        orchestrate_bdm._discard_this_runs_schemas("leak_probe_never_existed")
+        orchestrate.discard_run_schemas("leak_probe_never_existed")

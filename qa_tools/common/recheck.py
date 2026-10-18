@@ -205,7 +205,11 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
 
     from qa_tools.tools import orchestrate
 
-    tables = [d.table for d in collections.by_id(entry_ds.collection_id).datasets]
+    coll = collections.by_id(entry_ds.collection_id)
+    # REFUSED BY NAME BEFORE ANYTHING IS STAGED OR OVERLAID (REQ-PIPE-240
+    # criterion 6): a collection with no adapter raises NoAdapterError here.
+    collections.adapter(coll)
+    tables = [d.table for d in coll.datasets]
     from qa_tools.common import supply_files
 
     arrival = SimpleNamespace(

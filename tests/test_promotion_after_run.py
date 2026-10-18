@@ -46,10 +46,7 @@ class TestTheRunItselfDoesNotPromote:
     a comment mentioning promotion is not a call to it, and this file's
     sibling learned that the hard way."""
 
-    @pytest.mark.parametrize("module,func", [
-        ("qa_tools.cp.orchestrate_cp", "_run_one_inner"),
-        ("qa_tools.bdm.orchestrate_bdm", "_run_one_inner"),
-    ])
+    @pytest.mark.parametrize("module,func", [("qa_tools.tools.orchestrate", "_run_one_inner")])
     def test_the_run_function_calls_no_promotion(self, module, func):
         # The whole MODULE is parsed and the function found in the tree,
         # rather than dedenting inspect.getsource() - a function body

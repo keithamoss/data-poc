@@ -438,7 +438,9 @@ def entry_for(collection_id: str, arrival) -> dict:
 def steps(collection_id: str) -> arrival_lifecycle.Steps:
     """A collection's half of the one per-arrival lifecycle (REQ-PIPE-086
     criterion 2). `among` is every arrival the caller knows of: a zip is
-    filed whole."""
+    filed whole. A collection with no adapter is refused here, by name,
+    before any step runs (REQ-PIPE-240 criterion 6)."""
+    collections.adapter(collections.by_id(collection_id))
     return arrival_lifecycle.Steps(
         file_and_overlay=lambda arrival, among: file_and_overlay(collection_id, arrival, among),
         entry_for=lambda arrival: entry_for(collection_id, arrival),

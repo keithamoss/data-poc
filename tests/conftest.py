@@ -1,8 +1,8 @@
 """Shared pytest fixtures for real-tool integration tests (Phase 6,
-plans/publishing-and-history.md): qa_tools/{bdm,cp}/run_{dbt,soda,
-datacontract,evidently}_*.py's actual output-PARSING logic had zero
-test coverage before this - the one test that touches orchestrate_
-bdm.py/orchestrate_cp.py (tests/test_orchestrate_reference_run.py)
+plans/publishing-and-history.md): qa_tools/tools/run_{dbt,soda,
+datacontract,evidently}.py's actual output-PARSING logic had zero
+test coverage before this - the one test that touches the
+orchestrator (tests/test_orchestrate_reference_run.py)
 deliberately monkeypatches every one of these functions out, correctly
 for that test's own narrow purpose (checking reference-run forwarding),
 but with the side effect that the real "turn this tool's actual output
@@ -650,8 +650,8 @@ def bdm_duckdb_dir(supply_dsn, bdm_raw_dir):
 
 # The run_ids recognition will assign these two deliveries - see
 # tests/fixture_ids.py. The flat data/cp_raw/<run_id>/ copy below has to
-# be named for them because qa_tools/cp/run_datacontract_cp.py and
-# run_evidently_cp.py still read their CSVs from that path, exactly as
+# be named for them because the datacontract-cli and Evidently
+# runners used to read their CSVs from that path, exactly as
 # the real generator writes it. That coupling is real and outlives this
 # fixture; it is logged as a follow-up rather than papered over here.
 _CP_REF_RUN_ID = fixture_ids.CP_REF_RUN_ID
@@ -790,7 +790,8 @@ def _file_and_overlay_cp(deliveries_dir, receipts_dir) -> None:
 
     from qa_tools.common import arrivals, decision_log, filing, period_overlay, promotion
     from qa_tools.common import asset_time, qa_store, supply_db
-    from qa_tools.cp.cp_common import TABLES
+    from qa_tools import collections as _collections
+    TABLES = [d.table for d in _collections.by_id("child-protection").datasets]
 
     from qa_tools.common import delivery as delivery_mod
     from qa_tools.common import delivery_log

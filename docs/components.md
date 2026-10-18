@@ -77,9 +77,9 @@ good."
 **Owns:** `contract/` (each agency's folder `contract/<agency-id>/` of
 real ODCS contracts, SodaCL and Evidently checks - `data-asset.yaml`,
 `people.yaml`'s own role definitions aside),
-`dbt_project/`, `qa_tools/bdm/` and `qa_tools/cp/` (the real dbt-core/
-Soda Core/datacontract-cli/Evidently AI run + evaluate logic and each
-one's own `dataset_stats.py`), `qa_tools/common/check_lifecycle.py`
+`dbt_project/`, `qa_tools/tools/` (the real dbt-core/Soda Core/
+datacontract-cli/Evidently AI run + evaluate logic, one module per tool
+for every collection, and `dataset_stats.py`), `qa_tools/common/check_lifecycle.py`
 and `validate_check_lifecycle.py` (check definition/retirement rules),
 `qa_tools/common/dataset_status.py` and the resupply-chain-identification
 logic it implements (`plans/conceptual-design.md`'s own real decisions
@@ -109,8 +109,9 @@ common/qa_results_writer.py`/`qa_results_reader.py`/`git_identity.py`/
 `changelog.py`/`cadence.py`/`parallel_orchestrate.py`, `qa_tools/
 collections/` (the collection registry and each collection's adapter,
 REQ-PIPE-240) and `qa_tools/common/validate_collections.py` (its gate),
-`qa_tools/bdm/build_results_from_history.py`/`orchestrate_bdm.py` and
-their Child Protection equivalents, `.github/workflows/deploy-pages.yml`, `aws/`
+`qa_tools/tools/orchestrate.py` and `results_history.py` (one orchestrator
+and one results rebuild for every collection, REQ-PIPE-243),
+`.github/workflows/deploy-pages.yml`, `aws/`
 (the event-driven MVP design, real code + doc, not yet the live
 pipeline).
 

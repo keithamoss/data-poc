@@ -38,7 +38,9 @@ def test_an_interrupted_rebuild_leaves_the_previous_results_whole(
     previous one, whole. A writer that truncated and streamed in place
     would leave half a file - the shape CI parsed on d6dce26."""
     previous = {"results": ["the previous build"]}
-    (tmp_path / "results.json").write_text(json.dumps(previous))
+    out = rebuild_support.output_path(module, tmp_path)
+    out.parent.mkdir()
+    out.write_text(json.dumps(previous))
     real_dump = json.dump
 
     def interrupted(obj, f, **kwargs):
@@ -50,4 +52,4 @@ def test_an_interrupted_rebuild_leaves_the_previous_results_whole(
         rebuild_support.rebuild(module, tmp_path, monkeypatch)
     monkeypatch.setattr(json, "dump", real_dump)
 
-    assert json.loads((tmp_path / "results.json").read_text()) == previous
+    assert json.loads(out.read_text()) == previous

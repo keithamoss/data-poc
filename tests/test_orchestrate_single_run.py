@@ -1,7 +1,7 @@
-"""Real integration tests for orchestrate_bdm.run_single()/orchestrate_
-cp.run_single() - the AWS event-driven MVP's single-arrival entry points
+"""Real integration tests for the shared orchestrator's run_single_file()
+and run_single() - the AWS event-driven MVP's single-arrival entry points
 (plans/running-thoughts.md #5 Thread B / docs/aws-event-driven-mvp-
-design.md), built to reuse _run_one() unchanged rather than duplicate it.
+design.md), built to reuse run_one() unchanged rather than duplicate it.
 
 Runs the REAL 4-tool chain (dbt-core/Soda Core/datacontract-cli/
 Evidently) against the same small, real, session-scoped fixtures
@@ -11,18 +11,19 @@ reason to stub any of them out here."""
 from __future__ import annotations
 import os
 
+from qa_tools import collections
 from qa_tools.common import supply_db, trial
-import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
+from qa_tools.tools import orchestrate
 import qa_tools.tools.run_datacontract as run_datacontract
 import qa_tools.tools.run_dbt as run_dbt
 import qa_tools.tools.run_evidently as run_evidently
 import qa_tools.tools.run_soda as run_soda
-import qa_tools.cp.orchestrate_cp as orchestrate_cp
 
 from fixture_ids import (BDM_REF_RUN_ID as _REF_RUN_ID,
                           CP_DIRTY_RUN_ID as _CP_DIRTY_RUN_ID, CP_REF_RUN_ID as _CP_REF_RUN_ID)
 from staging_support import stage_bdm, stage_cp
-from qa_tools.cp import cp_common
+
+CP_TABLES = [d.table for d in collections.by_id("child-protection").datasets]
 
 # The flat CSVs tests/conftest.py writes alongside its deliveries - the
 # "a human downloaded this file" shape run_single() exists for, which is
@@ -41,7 +42,7 @@ def _patch_bdm_dirs(monkeypatch, raw_dir, duckdb_dir):
     monkeypatch.setattr(run_dbt, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_soda, "write_qa_result", lambda *a, **k: None)
     monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "write_qa_result", lambda *a, **k: None)
 
 
 def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monkeypatch, tmp_path, bdm_raw_dir):
@@ -80,8 +81,8 @@ def test_run_single_bdm_produces_real_results_without_touching_the_manifest(monk
     # A TRIAL ID: run_single runs trials only (REQ-PIPE-086 criterion 10).
     run_id = trial.trial_run_id()
     try:
-        results = orchestrate_bdm.run_single(
-            run_id, str(arrived_csv), "2026-01-02",
+        results = orchestrate.run_single_file(
+            "civil-registration", run_id, "birth_registrations", str(arrived_csv), "2026-01-02",
             reference_run_id=_REF_RUN_ID, run_by="test@example.com")
     finally:
         with supply_db.connect(label="test-bdm-trial") as conn:
@@ -129,21 +130,21 @@ def test_run_single_cp_produces_real_cross_table_results_once_all_6_tables_prese
     # carry is gone rather than pointed somewhere else.
     for mod in (run_dbt, run_soda, run_datacontract, run_evidently):
         monkeypatch.setattr(mod, "write_qa_result", lambda *a, **k: None)
-    monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "write_qa_result", lambda *a, **k: None)
 
     # An ARRIVAL RECORD, not a manifest entry: what we observed, and
     # nothing the generator knew (REQ-GEN-043).
     # A TRIAL ID, staged the way the terminal's trial route stages one:
     # run_single runs trials only (REQ-PIPE-086 criterion 10).
     run_id = trial.trial_run_id()
-    for table in cp_common.TABLES:
+    for table in CP_TABLES:
         stage_cp(
             run_id, table, os.path.join(cp_raw_dir, _CP_DIRTY_RUN_ID, f"{table}.csv"))
     entry = {"run_id": run_id, "run_index": 2,
              "received_at": "2026-04-01T09:00:00+08:00",
              "delivery": "cp-drop-9104"}
     try:
-        results = orchestrate_cp.run_single(entry, reference_run_id=_CP_REF_RUN_ID,
+        results = orchestrate.run_single("child-protection", entry, reference_run_id=_CP_REF_RUN_ID,
                                             run_by="test@example.com")
     finally:
         with supply_db.connect(label="test-cp-trial") as conn:
@@ -182,14 +183,14 @@ class TestABirthRegistrationsRunWithNothingItMayRead:
         from qa_tools.common import supply_db
 
         written = []
-        monkeypatch.setattr(orchestrate_bdm, "write_qa_result",
+        monkeypatch.setattr(orchestrate, "write_qa_result",
                             lambda *a, **k: written.append(a[4]))
         mine = f"bdm_unreadable_{uuid.uuid4().hex[:8]}"
         with supply_db.connect(label="test-bdm-unreadable") as conn:
             clone_run_views(conn, BDM_REF_RUN_ID, mine, held=held, contested=contested)
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",
                  "received_at": "2026-01-01T06:00:00+00:00", "delivery": "d"}
-        results = orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+        results = orchestrate.run_one("civil-registration", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                            reference_run_id=None)
         with supply_db.connect(read_only=True, label="test-bdm-unreadable") as conn:
             recorded = conn.execute(

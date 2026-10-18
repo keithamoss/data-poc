@@ -28,7 +28,7 @@ REAL_PERSON = "fpycnkgvmt@privaterelay.appleid.com"
 @pytest.fixture
 def pair(supply_dsn, tmp_path, monkeypatch):
     from generator.daily_batch import generate_daily_batch
-    from qa_tools.bdm import orchestrate_bdm
+    from qa_tools.tools import orchestrate
     from qa_tools.common import arrivals, delivery, delivery_log, promotion
 
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
@@ -55,7 +55,7 @@ def pair(supply_dsn, tmp_path, monkeypatch):
                                                    deliveries, receipts)
                   if a.delivery_name == name]
     stage.stage_arrival("civil-registration", arrival)
-    orchestrate_bdm.run_arrivals([arrival], "pytest@example.org")
+    orchestrate.run_arrivals("civil-registration", [arrival], "pytest@example.org")
     pair_id = f"{DS}@{supply_db.arrival_segment(arrival.received_at)}#1"
     return pair_id, day.isoformat(), chosen, spare
 

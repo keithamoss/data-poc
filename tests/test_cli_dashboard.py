@@ -12,18 +12,17 @@ import cli.dashboard as dashboard_cli
 _runner = CliRunner()
 
 
-def test_rebuild_results_calls_both_datasets_build_results_from_history(monkeypatch):
-    import qa_tools.bdm.build_results_from_history as bdm_history
-    import qa_tools.cp.build_results_from_history as cp_history
+def test_rebuild_results_rebuilds_every_registered_collection(monkeypatch):
+    from qa_tools.tools import results_history
 
     called = []
-    monkeypatch.setattr(bdm_history, "build_results_from_history", lambda: called.append("bdm"))
-    monkeypatch.setattr(cp_history, "build_results_from_history", lambda: called.append("cp"))
+    monkeypatch.setattr(results_history, "build_results_from_history",
+                        lambda collection_id: called.append(collection_id))
 
     result = _runner.invoke(dashboard_cli.dashboard_group, ["rebuild-results"])
 
     assert result.exit_code == 0, result.output
-    assert called == ["bdm", "cp"]
+    assert called == ["civil-registration", "child-protection"]
 
 
 def test_build_data_writes_both_datasets_output(monkeypatch, tmp_path):

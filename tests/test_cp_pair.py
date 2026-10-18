@@ -74,7 +74,7 @@ def cp_pair_one_unloadable(supply_dsn, cp_raw_dir, tmp_path, monkeypatch):
 def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
     import fixture_ids
     from qa_tools.common import arrivals, delivery, delivery_log, promotion
-    from qa_tools.cp import orchestrate_cp
+    from qa_tools.tools import orchestrate
 
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "pytest@example.org")
     monkeypatch.setattr(promotion, "report", lambda outcome: None)
@@ -97,7 +97,7 @@ def _make_pair(cp_raw_dir, tmp_path, monkeypatch, part2=None):
                                               receipts) if a.delivery_name == name]
     for arrival in found:
         stage.stage_arrival("child-protection", arrival)
-    orchestrate_cp.run_arrivals(found, "pytest@example.org")
+    orchestrate.run_arrivals("child-protection", found, "pytest@example.org")
     (clients,) = [a for a in found if DS in a.files_by_dataset]
     yield {"slot": slot, "arrivals": found, "clients": clients,
            "deliveries": deliveries, "receipts": receipts,
@@ -311,7 +311,7 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
     both files, and the contest is resolved."""
     import fixture_ids
     from qa_tools.common import arrivals, delivery, delivery_log, knock_on, supersession
-    from qa_tools.cp import orchestrate_cp
+    from qa_tools.tools import orchestrate
 
     later_at = cp_pair["clients"].received_at + timedelta(hours=6)
     source = Path(cp_raw_dir) / fixture_ids.CP_REF_RUN_ID
@@ -326,7 +326,7 @@ def test_a_later_file_supersedes_both_and_resolves_the_contest(cp_pair, cp_raw_d
                                               receipts) if a.delivery_name == name]
     for arrival in found:
         stage.stage_arrival("child-protection", arrival)
-    orchestrate_cp.run_arrivals(found, "pytest@example.org")
+    orchestrate.run_arrivals("child-protection", found, "pytest@example.org")
     # An open pair is ONE filed supply - its '#1' - so superseding that
     # supply is the supersession of both files (REQ-PIPE-194 criterion 9).
     with supply_db.connect(label="test-cp-pair") as conn:

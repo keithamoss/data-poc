@@ -378,10 +378,7 @@ class TestACheckIsEvaluatedOnce:
     them - so the thing to hold is that the replay path does not try.
     """
 
-    @pytest.mark.parametrize("path", [
-        "qa_tools/bdm/build_results_from_history.py",
-        "qa_tools/cp/build_results_from_history.py",
-    ])
+    @pytest.mark.parametrize("path", ["qa_tools/tools/results_history.py"])
     def test_the_replay_path_re_runs_no_tool(self, path):
         """Re-deriving a verdict is not a privilege question - a tool's
         evaluation parses its own artefacts - so it stays here. That the

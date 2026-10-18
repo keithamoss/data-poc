@@ -137,12 +137,13 @@ class TestItFollowsAReFile:
         early, is promoted the better part of a year later, and still
         reads early - while the promotion itself is visibly recorded."""
         from qa_tools.common import decision_log
-        from qa_tools.cp import cp_common as cp_common_ids
+        from qa_tools import collections
 
+        cp = collections.by_id("child-protection")
         _file(supply_id="promoted-late")
         promoted = datetime(2024, 6, 3, 9, tzinfo=PERTH)
         with decision_log.apply_decision(clean, decision_log.Decision(
-                agency_id=cp_common_ids.AGENCY_ID, collection_id=cp_common_ids.COLLECTION_ID,
+                agency_id=cp.agency_id, collection_id=cp.id,
                 dataset_id=DATASET, action=decision_log.PROMOTE, supply="promoted-late",
                 actor="somebody", actor_kind=decision_log.PERSON,
                 effective_at=promoted.isoformat(), to_slot=EARLY_SLOT, reason="late to it")):

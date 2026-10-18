@@ -202,10 +202,10 @@ class TestThroughTheRealOrchestrator:
     four real tools, the same path Child Protection takes."""
 
     def test_every_tool_invoked_has_what_it_was_asked_for_on_record(self, bdm_duckdb_dir):
-        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import orchestrate
 
         run_id, entry = _bdm_run()
-        orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+        orchestrate.run_one("civil-registration", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                  reference_run_id=None)
         assert _completed(run_id)
         assert _asked(run_id) == {tool: asked_for.collection_checks(BDM, tool)
@@ -216,7 +216,7 @@ class TestThroughTheRealOrchestrator:
         shape a wrong selection takes - refuses the run before it is
         finished, naming the check, and the batch stops (nothing catches
         it)."""
-        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import orchestrate
         from qa_tools.tools import run_soda
 
         real = run_soda.evaluate
@@ -230,7 +230,7 @@ class TestThroughTheRealOrchestrator:
 
         run_id, entry = _bdm_run()
         with pytest.raises(asked_for.MissingCheck) as caught:
-            orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+            orchestrate.run_one("civil-registration", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                      reference_run_id=None)
         assert dropped and dropped[0] in str(caught.value) and "soda" in str(caught.value)
         assert not _completed(run_id)
@@ -243,14 +243,14 @@ class TestThroughTheRealOrchestrator:
 
         from conftest import clone_run_views
         from fixture_ids import BDM_REF_RUN_ID
-        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import orchestrate
 
         mine = f"bdm_asked_held_{uuid.uuid4().hex[:8]}"
         with supply_db.connect(label="test-asked-for") as conn:
             clone_run_views(conn, BDM_REF_RUN_ID, mine, held={"birth_registrations"})
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",
                  "received_at": "2026-01-01T06:00:00+00:00", "delivery": "d"}
-        orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+        orchestrate.run_one("civil-registration", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                  reference_run_id=None)
         assert _completed(mine) and _asked(mine) == {}
 
@@ -274,11 +274,11 @@ class TestARunWithNoPeriodIsGuardedToo:
                         "received_at": "2031-01-05T03:00:00+00:00"}
 
     def test_it_passes_with_an_unreadable_sibling(self, cp_duckdb_dir):
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
         run_id, entry = self._run(absent={"cp_carers"})
-        assert not orchestrate_cp._reconciles(entry, run_id), "precondition: no period"
-        orchestrate_cp._run_one(entry, entry["received_at"], "t@example.com",
+        assert not orchestrate._reconciles(entry, run_id), "precondition: no period"
+        orchestrate.run_one("child-protection", entry, entry["received_at"], "t@example.com",
                                 reference_run_id=None)
         assert _completed(run_id)
         # THE SCOPED PATH, end to end: each scoped tool was asked for this
@@ -292,7 +292,7 @@ class TestARunWithNoPeriodIsGuardedToo:
         assert asked["evidently"] == asked_for.collection_checks(CP, "evidently")
 
     def test_a_dropped_check_refuses_it(self, cp_duckdb_dir, monkeypatch):
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
         from qa_tools.tools import run_soda
 
         real = run_soda.evaluate
@@ -305,7 +305,7 @@ class TestARunWithNoPeriodIsGuardedToo:
         monkeypatch.setattr(run_soda, "evaluate", loses_one)
         run_id, entry = self._run()
         with pytest.raises(asked_for.MissingCheck) as caught:
-            orchestrate_cp._run_one(entry, entry["received_at"], "t@example.com",
+            orchestrate.run_one("child-protection", entry, entry["received_at"], "t@example.com",
                                     reference_run_id=None)
         assert dropped[0] in str(caught.value)
         assert not _completed(run_id)

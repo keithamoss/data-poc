@@ -52,7 +52,7 @@ def _call_lines(module_name: str, func_name: str, dotted: str) -> list[int]:
 
 
 class TestTheFilingCallComesBeforeTheToolRuns:
-    """THE CALL MOVED, 2026-10-02 (REQ-PIPE-105). Filing now lives in each
+    """THE CALL MOVED, 2026-10-02 (REQ-PIPE-105). Filing now lives in the
     orchestrator's file_and_overlay(), which the batch's before-each hook
     calls and `mothman bdm/cp qa --commit` calls too - so a hand-filed
     supply and a batch one cannot be filed differently. What is pinned
@@ -63,8 +63,7 @@ class TestTheFilingCallComesBeforeTheToolRuns:
 
 
     def test_both_batches_go_through_the_lifecycle(self):
-        for module, function in (("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
-                                 ("qa_tools.bdm.orchestrate_bdm", "run_pipeline")):
+        for module, function in (("qa_tools.tools.orchestrate", "run_pipeline"),):
             assert _call_lines(module, function, "arrival_lifecycle.process_all"), module
             assert not _call_lines(module, function, "parallel_orchestrate.run_manifest"), \
                 f"{module} composes a second copy of the lifecycle"
@@ -74,18 +73,16 @@ class TestTheFilingCallComesBeforeTheToolRuns:
         written as a plain inline loop would pass the test above, so the
         step functions must not be called directly outside the lifecycle
         (delivery-critic, sprint 1)."""
-        for module, function in (("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
-                                 ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
-                                 ("qa_tools.cp.orchestrate_cp", "run_arrivals"),
-                                 ("qa_tools.bdm.orchestrate_bdm", "run_arrivals")):
+        for module, function in (("qa_tools.tools.orchestrate", "run_pipeline"),
+                                 ("qa_tools.tools.orchestrate", "run_arrivals")):
             assert _call_lines(module, function, "arrival_lifecycle.process_all"), \
                 f"{module}.{function} does not go through the lifecycle"
-            for step in ("file_and_overlay", "promote_after", "_run_one"):
+            for step in ("file_and_overlay", "promote_after", "run_one"):
                 assert not _call_lines(module, function, step), \
                     f"{module}.{function} calls {step} itself - a second composition"
 
     def test_both_file_before_they_build_the_overlay(self):
-        for module in ("qa_tools.cp.orchestrate_cp", "qa_tools.bdm.orchestrate_bdm"):
+        for module in ("qa_tools.tools.orchestrate",):
             filed = _call_lines(module, "file_and_overlay", "filing.file_arrivals")
             overlaid = _call_lines(module, "file_and_overlay",
                                    "period_overlay.rebuild_for_arrival")
@@ -122,12 +119,22 @@ class TestFilingIsInterleavedRatherThanDoneUpFront:
     filing precedes the checks OF THAT ARRIVAL rather than of the batch.
     """
 
-    def test_bdm_does_not_file_the_whole_batch_at_once(self):
-        args = _file_arrivals_arguments("qa_tools.bdm.orchestrate_bdm", "file_and_overlay")
+    def test_no_collection_files_the_whole_batch_at_once(self):
+        """One shared file_and_overlay() (REQ-PIPE-243): under Birth
+        Registrations' `orchestrate.files_one_arrival` flag the one arrival
+        is filed, otherwise the arrivals sharing its receipt instant - and
+        on neither branch is `among`, the whole pass, handed to filing."""
+        args = _file_arrivals_arguments("qa_tools.tools.orchestrate", "file_and_overlay")
         assert args, "filing is never actually called"
         for arg in args:
-            assert isinstance(arg, ast.List) and len(arg.elts) == 1, \
-                "filing the whole batch up front puts every supply in the first slot"
+            branches = [arg.body, arg.orelse] if isinstance(arg, ast.IfExp) else [arg]
+            for branch in branches:
+                assert not (isinstance(branch, ast.Name) and branch.id == "among"), \
+                    "filing the whole batch up front puts every supply in the first slot"
+                if isinstance(branch, ast.List):
+                    assert len(branch.elts) == 1
+                else:
+                    assert isinstance(branch, ast.Call) and branch.func.id == "simultaneous_with"
 
 
 class TestSimultaneousArrivalsAreFiledTogether:
@@ -163,9 +170,9 @@ class TestSimultaneousArrivalsAreFiledTogether:
         monkeypatch.setattr(filing, "file_arrivals",
                             lambda arrivals: calls.append([a.run_id for a in arrivals]))
         monkeypatch.setattr(period_overlay, "rebuild_for_arrival", lambda *a, **k: None)
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
-        orchestrate_cp.file_and_overlay(target, among=among)
+        orchestrate.file_and_overlay("child-protection", target, among=among)
         return [r for call in calls for r in call]
 
     def test_the_first_file_of_a_zip_files_its_siblings_too(self, monkeypatch):

@@ -66,8 +66,8 @@ SLOT = "2023-Q3"
 SUPPLY = "readers-s"
 RECEIVED = datetime(2023, 8, 1, 12, tzinfo=PERTH)
 AT = datetime(2026, 10, 11, tzinfo=timezone.utc)
-BDM = "qa_tools.bdm.build_results_from_history"
-CP = "qa_tools.cp.build_results_from_history"
+BDM = "civil-registration"
+CP = "child-protection"
 
 
 def _record_history() -> None:
@@ -78,10 +78,11 @@ def _record_history() -> None:
 
     when = "2023-08-01T12:00:00+08:00"
     by = "tests@example.gov.au"
-    for module, table in ((BDM, "birth_registrations"), (CP, "cp_clients")):
-        agency, collection = rebuild_support.ids(module)
-        run_id = f"readers_{module.split('.')[1]}_run_1"
-        record = dict(rebuild_support.check(module, "id", "dbt"), **{
+    for collection_id, short, table in ((BDM, "bdm", "birth_registrations"),
+                                        (CP, "cp", "cp_clients")):
+        agency, collection = rebuild_support.ids(collection_id)
+        run_id = f"readers_{short}_run_1"
+        record = dict(rebuild_support.check(collection_id, "id", "dbt"), **{
             "column_name": "(table)", "check_name": "dbt:row_count", "dimension": "volume",
             "label": "Row count", "metric_value": 1, "unit": "count",
             "warn_threshold": None, "fail_threshold": None, "row_count_total": 1,
@@ -193,12 +194,10 @@ class TestTheDashboardBuild:
         from pipeline import build_cp_dashboard_data, build_dashboard_data
 
         role, _ = publisher
-        for module_name, builder, reads in ((BDM, build_dashboard_data, "REAL_RESULTS_PATH"),
-                                            (CP, build_cp_dashboard_data, "RESULTS_PATH")):
-            module = __import__(module_name, fromlist=["_"])
-            results = tmp_path / f"{module_name.split('.')[1]}.json"
-            monkeypatch.setattr(module, "RESULTS_PATH", str(results))
-            module.build_results_from_history()
+        for collection_id, builder, reads in ((BDM, build_dashboard_data, "REAL_RESULTS_PATH"),
+                                              (CP, build_cp_dashboard_data, "RESULTS_PATH")):
+            rebuild_support.rebuild(collection_id, tmp_path, monkeypatch)
+            results = rebuild_support.output_path(collection_id, tmp_path)
             monkeypatch.setattr(builder, reads, str(results))
             assert builder.build(), f"{builder.__name__} built nothing"
         _assert_only_the_publisher_read(role, statements)

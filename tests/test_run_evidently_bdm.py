@@ -1,4 +1,4 @@
-"""Real Evidently AI integration test for qa_tools/bdm/
+"""Real Evidently AI integration test for
 qa_tools/tools/run_evidently.py's evaluate() - the actual "compute a
 real PSI drift metric and a real row-count-growth comparison, then
 shape them into our check-result records" logic, not previously

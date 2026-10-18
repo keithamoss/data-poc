@@ -14,10 +14,11 @@ import pytest
 
 import dbsupport
 
-from qa_tools.bdm import bdm_common
+from qa_tools import collections
 from qa_tools.common import load_log, qa_store, supply_db
 from staging_support import stage_bdm
 
+BDM_TABLE = collections.by_id("civil-registration").datasets[0].table
 _RECEIPT = "2026-09-25T09:00:00+08:00"
 _LATER = "2026-11-01T09:00:00+08:00"
 
@@ -170,7 +171,7 @@ class TestAFileThatCannotBeLoaded:
         left a table behind with no record; the load then fails. What
         must not happen is the stale table being readable as this
         arrival's supply."""
-        physical = supply_db.staged_table(bdm_common.TABLE, _RECEIPT)
+        physical = supply_db.staged_table(BDM_TABLE, _RECEIPT)
         conn = supply_db.connect()
         try:
             supply_db.ensure_schemas(conn)
@@ -194,7 +195,7 @@ class TestOnlyLoadedTablesAreReadable:
         conn = supply_db.connect(read_only=True)
         try:
             assert conn.execute(
-                f'SELECT count(*) FROM "{schema}"."{bdm_common.TABLE}"').fetchone()[0] == 3
+                f'SELECT count(*) FROM "{schema}"."{BDM_TABLE}"').fetchone()[0] == 3
         finally:
             conn.close()
 
@@ -207,12 +208,12 @@ class TestOnlyLoadedTablesAreReadable:
         conn = supply_db.connect()
         try:
             res = supply_db.create_run_views(conn, "run_001", supply_db.candidates_in(
-                conn, supply_db.STAGING_SCHEMA, [bdm_common.TABLE],
+                conn, supply_db.STAGING_SCHEMA, [BDM_TABLE],
                 arrival=supply_db.arrival_key(_RECEIPT),
                 loaded=load_log.loaded_tables()))
-            assert res.resolved == {} and res.absent == [bdm_common.TABLE]
+            assert res.resolved == {} and res.absent == [BDM_TABLE]
             with pytest.raises(psycopg.errors.UndefinedTable):
-                conn.execute(f'SELECT * FROM "{res.schema}"."{bdm_common.TABLE}"')
+                conn.execute(f'SELECT * FROM "{res.schema}"."{BDM_TABLE}"')
         finally:
             conn.close()
         assert physical in _tables(), (

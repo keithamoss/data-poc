@@ -7,7 +7,7 @@ about the handler, since the pass has its own tests
 (tests/test_processing_pass.py).
 
 WHAT WENT, AND WHY. The tests this module used to carry pinned the handlers
-calling orchestrate_bdm.run_single/orchestrate_cp.run_single with a run id
+calling the orchestrator's run_single_file/run_single with a run id
 taken from the key - the stage-and-check shortcut REQ-PIPE-152 removes - and
 stubbed run_single loosely enough that the handler's `reference_csv=`
 TypeError went unnoticed. Asserting that retired behaviour would only

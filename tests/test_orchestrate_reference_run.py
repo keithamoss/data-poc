@@ -1,6 +1,6 @@
 """Regression test for a real, silent bug found while verifying
 generator/generate_cp_runs.py's dirty.py import-resolution fix (2026-09-14):
-qa_tools/bdm/orchestrate_bdm.py and qa_tools/cp/orchestrate_cp.py's
+the two orchestrators' (now qa_tools/tools/orchestrate.py's)
 _run_one() called their Evidently evaluators with no reference_run_id/
 reference_csv, so they always fell back to run_evidently_bdm.py's and
 run_evidently_cp.py's own module-level REFERENCE_RUN_ID - a hardcoded
@@ -42,8 +42,7 @@ real bug this test itself introduced and caught - see the "verify a
 regression test actually fails first" convention, CLAUDE.md)."""
 from __future__ import annotations
 
-import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
-import qa_tools.cp.orchestrate_cp as orchestrate_cp
+from qa_tools.tools import orchestrate
 
 
 class _FakeConn:
@@ -83,31 +82,31 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
         captured["reference_run_id"] = reference_run_id
         return []
 
-    monkeypatch.setattr(orchestrate_bdm.run_dbt, "evaluate", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_bdm.run_soda, "evaluate", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_bdm.run_datacontract, "evaluate", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_bdm.run_evidently, "evaluate", fake_evaluate_evidently_bdm)
-    monkeypatch.setattr(orchestrate_bdm.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
-    monkeypatch.setattr(orchestrate_bdm, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
+    monkeypatch.setattr(orchestrate.run_dbt, "evaluate", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate.run_soda, "evaluate", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate.run_datacontract, "evaluate", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate.run_evidently, "evaluate", fake_evaluate_evidently_bdm)
+    monkeypatch.setattr(orchestrate.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
+    monkeypatch.setattr(orchestrate, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
     # REQ-PIPE-089 brackets a run with these two. Stubbed on the same
     # terms as write_qa_result above: this test is about which reference
     # run gets forwarded, and a real run row would need a real database.
-    monkeypatch.setattr(orchestrate_bdm, "open_run", lambda *a, **k: None)
-    monkeypatch.setattr(orchestrate_bdm, "finish_run", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "open_run", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "finish_run", lambda *a, **k: None)
     # Every tool above returns nothing, which REQ-PIPE-188's guard rightly
     # refuses - stubbed on the same terms, since this test is about the
     # reference forwarded, not about what came back.
-    monkeypatch.setattr(orchestrate_bdm.asked_for, "check_nothing_missing",
+    monkeypatch.setattr(orchestrate.asked_for, "check_nothing_missing",
                         lambda *a, **k: None)
     # The orchestrators no longer import duckdb directly - they open
     # the supply database through supply_db.connect() and set the
     # run's view schema on it (REQ-PIPE-068).
-    monkeypatch.setattr(orchestrate_bdm.supply_db, "connect", lambda *a, **k: _FakeConn())
+    monkeypatch.setattr(orchestrate.supply_db, "connect", lambda *a, **k: _FakeConn())
     # THE TABLE IS READABLE, said outright (2026-10-02). A Birth
     # Registrations run that cannot read its one table skips its tools
     # (REQ-PIPE-105, a contested resupply), and the fake connection's
     # empty catalogue would read as exactly that.
-    monkeypatch.setattr(orchestrate_bdm.supply_db, "readable_in",
+    monkeypatch.setattr(orchestrate.supply_db, "readable_in",
                         lambda conn, run_id: frozenset({"birth_registrations"}))
 
     # An arrival record's own shape (REQ-GEN-043) - `csv_path` is the
@@ -124,7 +123,7 @@ def test_bdm_run_one_forwards_manifest_reference_not_the_stale_default(monkeypat
     # An explicit reference, which is what an operator naming one by
     # hand produces - the whole point being that _run_one forwards
     # exactly what it is given.
-    orchestrate_bdm._run_one(entry, "2099-01-05T00:00:00Z", "test@example.com",
+    orchestrate.run_one("civil-registration", entry, "2099-01-05T00:00:00Z", "test@example.com",
                               "run_01_2099-01-01")
 
     # IT USED TO ASSERT "not the module's own stale default". There is
@@ -146,28 +145,28 @@ def test_cp_run_one_forwards_manifest_reference_not_the_stale_default(monkeypatc
         captured["reference_run_id"] = reference_run_id
         return []
 
-    monkeypatch.setattr(orchestrate_cp.run_dbt, "evaluate", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_cp.run_soda, "evaluate", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_cp.run_datacontract, "evaluate", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrate_cp.run_evidently, "evaluate", fake_evaluate_evidently_cp)
-    monkeypatch.setattr(orchestrate_cp.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
-    monkeypatch.setattr(orchestrate_cp, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
+    monkeypatch.setattr(orchestrate.run_dbt, "evaluate", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate.run_soda, "evaluate", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate.run_datacontract, "evaluate", lambda *a, **k: [])
+    monkeypatch.setattr(orchestrate.run_evidently, "evaluate", fake_evaluate_evidently_cp)
+    monkeypatch.setattr(orchestrate.dataset_stats, "compute_dataset_stats", lambda *a, **k: {})
+    monkeypatch.setattr(orchestrate, "write_qa_result", lambda *a, **k: tmp_path / "unused.json")
     # REQ-PIPE-089 brackets a run with these two. Stubbed on the same
     # terms as write_qa_result above: this test is about which reference
     # run gets forwarded, and a real run row would need a real database.
-    monkeypatch.setattr(orchestrate_cp, "open_run", lambda *a, **k: None)
-    monkeypatch.setattr(orchestrate_cp, "finish_run", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "open_run", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrate, "finish_run", lambda *a, **k: None)
     # Stubbed as in the BDM test above: every tool returns nothing, which
     # REQ-PIPE-188's guard rightly refuses.
-    monkeypatch.setattr(orchestrate_cp.asked_for, "check_nothing_missing",
+    monkeypatch.setattr(orchestrate.asked_for, "check_nothing_missing",
                         lambda *a, **k: None)
     # The orchestrators no longer import duckdb directly - they open
     # the supply database through supply_db.connect() and set the
     # run's view schema on it (REQ-PIPE-068).
-    monkeypatch.setattr(orchestrate_cp.supply_db, "connect", lambda *a, **k: _FakeConn())
+    monkeypatch.setattr(orchestrate.supply_db, "connect", lambda *a, **k: _FakeConn())
 
     entry = {"run_id": "cp_run_005"}  # see the BDM fixture above on the hyphen
-    orchestrate_cp._run_one(entry, "2099-02-02T00:00:00Z", "test@example.com", "cp_run_01_2099-01-01")
+    orchestrate.run_one("child-protection", entry, "2099-02-02T00:00:00Z", "test@example.com", "cp_run_01_2099-01-01")
 
     # IT USED TO ASSERT "not the module's own stale default". There is
     # no default any more (REQ-QAC-108 criterion 4): the constant was

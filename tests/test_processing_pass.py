@@ -187,9 +187,9 @@ class TestTheGateOnlyPathFeedsTheGateItsResults:
         seen = {}
         states = iter([pp.UNGATED, pp.PROCESSED])
         monkeypatch.setattr(pp, "state_of", lambda arrival, rec: next(states))
-        fake = SimpleNamespace(STEPS=SimpleNamespace(
-            promote_after=lambda arrival, got, run_by: seen.setdefault("got", got)))
-        monkeypatch.setattr(pp, "_orchestrator", lambda collection: fake)
+        fake = SimpleNamespace(
+            promote_after=lambda arrival, got, run_by: seen.setdefault("got", got))
+        monkeypatch.setattr(pp, "_steps", lambda collection: fake)
         report = pp.PassReport()
         pp._one(a, [a], WHEN, "a@b.c", report, say=lambda m: None)
         assert seen["got"] and all(r["run_id"] == a.run_id for r in seen["got"])
@@ -301,53 +301,50 @@ class TestATerminalKeepTakesTheArrivalLock:
             entry_for=lambda arrival: {}, run_one=lambda *a, **k: called.append("ran") or [],
             promote_after=lambda *a: called.append("gated"))
 
-    @pytest.mark.parametrize("module", ["qa_tools.bdm.orchestrate_bdm",
-                                        "qa_tools.cp.orchestrate_cp"])
+    @pytest.mark.parametrize("collection_id", ["civil-registration", "child-protection"])
     def test_an_arrival_another_process_holds_is_refused_untouched(self, supply_dsn,
-                                                                   monkeypatch, module):
-        import importlib
-
+                                                                   monkeypatch, collection_id):
         from qa_tools.common import arrival_lifecycle
+        from qa_tools.tools import orchestrate
 
-        orchestrator = importlib.import_module(module)
         called = []
-        monkeypatch.setattr(orchestrator, "STEPS", self._fake_steps(called))
+        monkeypatch.setattr(orchestrate, "steps", lambda cid: self._fake_steps(called))
         a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")
         a.run_index = 0
         with supply_db.connect(label="the-pass") as other:
             with pp.arrival_lock(other, a.run_id) as held:
                 assert held
                 with pytest.raises(arrival_lifecycle.StageFailed) as caught:
-                    orchestrator.run_arrivals([a], run_by="me")
+                    orchestrate.run_arrivals(collection_id, [a], run_by="me")
         assert called == [], "nothing was filed, checked or gated"
         assert caught.value.completed == ()
         assert "another process" in str(caught.value.cause)
 
     def test_an_arrival_it_holds_runs_and_the_lock_is_given_back(self, supply_dsn,
                                                                  monkeypatch):
-        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import orchestrate
 
         called = []
-        monkeypatch.setattr(orchestrate_bdm, "STEPS", self._fake_steps(called))
+        monkeypatch.setattr(orchestrate, "steps", lambda cid: self._fake_steps(called))
         a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")
         a.run_index = 0
-        orchestrate_bdm.run_arrivals([a], run_by="me")
+        orchestrate.run_arrivals("civil-registration", [a], run_by="me")
         assert called == ["filed", "ran", "gated"]
         with supply_db.connect(label="after") as conn, pp.arrival_lock(conn, a.run_id) as got:
             assert got
 
     def test_one_another_process_finished_meanwhile_is_not_processed_twice(
             self, supply_dsn, monkeypatch, clean_qa_history, finish_runs):
-        from qa_tools.bdm import orchestrate_bdm
+        from qa_tools.tools import orchestrate
         from qa_tools.common import arrival_lifecycle
 
         called = []
-        monkeypatch.setattr(orchestrate_bdm, "STEPS", self._fake_steps(called))
+        monkeypatch.setattr(orchestrate, "steps", lambda cid: self._fake_steps(called))
         a = _arrival(run_id=f"cp_clients__{uuid.uuid4().int % 10**16:016d}")
         a.run_index = 0
         finish_runs(a.run_id, agency=AGENCY, collection=COLLECTION, when=WHEN, run_by="x")
         with pytest.raises(arrival_lifecycle.StageFailed) as caught:
-            orchestrate_bdm.run_arrivals([a], run_by="me")
+            orchestrate.run_arrivals("civil-registration", [a], run_by="me")
         assert called == [] and "already" in str(caught.value.cause)
 
 

@@ -7,7 +7,7 @@ from qa_tools.collections.base import (
 #: The valid values the real checks enforce (dbt_project/models/
 #: civil-registration/schema.yml), so the statistics' notion of "invalid"
 #: cannot drift from what the checks flag (REQ-PIPE-243, moved from
-#: qa_tools/bdm/dataset_stats.py).
+#: the old qa_tools/bdm/dataset_stats.py).
 _SEX_VALID = ["M", "F", "X"]
 _SUBURB_VALID = ["Fremantle", "Subiaco", "Joondalup", "Rockingham", "Mandurah", "Midland", "Armadale", "Cannington",
                  "Morley", "Cockburn Central", "Scarborough", "Victoria Park", "Bunbury", "Albany", "Geraldton",

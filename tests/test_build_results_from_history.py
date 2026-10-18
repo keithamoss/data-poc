@@ -1,4 +1,4 @@
-"""Tests for qa_tools/{bdm,cp}/build_results_from_history.py - the
+"""Tests for qa_tools/tools/results_history.py - the
 CI-safe "rebuild reports/*.json from committed qa_results/ history, no
 real tool re-run, no live data access" path (plans/publishing-and-
 history.md Phase 2/3). Runs against the REAL committed qa_results/
@@ -7,15 +7,14 @@ what CI itself reads, and exactly the "must never touch data/" rule
 this module exists to satisfy, so there's nothing to fake here."""
 from __future__ import annotations
 
-import qa_tools.bdm.build_results_from_history as bdm_history
-import qa_tools.cp.build_results_from_history as cp_history
+from qa_tools.tools import results_history
 
 
 def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
-    results_path = tmp_path / "results_bdm.json"
-    monkeypatch.setattr(bdm_history, "RESULTS_PATH", str(results_path))
+    results_path = tmp_path / "reports" / "results_bdm.json"
+    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
 
-    output = bdm_history.build_results_from_history()
+    output = results_history.build_results_from_history("civil-registration")
 
     assert results_path.exists(), "should write reports/results_bdm.json (redirected to tmp here)"
     assert output["runs"], "the real committed qa_results/registry-services/civil-registration/ history is empty"
@@ -44,10 +43,10 @@ def test_bdm_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deploym
 
 
 def test_cp_rebuilds_from_real_committed_history(tmp_path, monkeypatch, deployment_history):
-    results_path = tmp_path / "results_cp.json"
-    monkeypatch.setattr(cp_history, "RESULTS_PATH", str(results_path))
+    results_path = tmp_path / "reports" / "results_cp.json"
+    monkeypatch.setattr(results_history, "ROOT", str(tmp_path))
 
-    output = cp_history.build_results_from_history()
+    output = results_history.build_results_from_history("child-protection")
 
     assert results_path.exists()
     assert output["runs"], "the real committed qa_results/child-protection-family-support/child-protection/ history is empty"

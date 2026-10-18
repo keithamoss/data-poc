@@ -1,4 +1,4 @@
-"""Real datacontract-cli integration test for qa_tools/bdm/
+"""Real datacontract-cli integration test for
 qa_tools/tools/run_datacontract.py's evaluate() - the actual
 "parse datacontract-cli's real DataContract.test() result into our
 check-result shape" logic, not previously exercised under pytest at

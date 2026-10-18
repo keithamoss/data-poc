@@ -120,11 +120,11 @@ class TestWhatIsOwed:
 
     def test_a_run_that_breaks_stays_owed_and_says_so(self, owed_one, monkeypatch):
         """Criterion 8: the decision stays, the earlier verdict stands."""
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
         def boom(*a, **k):
             raise RuntimeError("the tool fell over")
-        monkeypatch.setattr(orchestrate_cp, "_run_one", boom)
+        monkeypatch.setattr(orchestrate, "run_one", boom)
         owed_id, _ = owed_one
         got = recheck.run(owed_id, run_by="pytest@example.org")
         assert not got.completed and "still owed" in got.message
@@ -136,11 +136,11 @@ class TestWhatIsOwed:
         """REQ-PIPE-188 criterion 6 for a re-check too (Keith, 2026-10-12, 'stop
         everything'): left owed, AND raised so the batch stops."""
         from qa_tools.common import asked_for
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
         def missing(*a, **k):
             raise asked_for.MissingCheck("a check went missing")
-        monkeypatch.setattr(orchestrate_cp, "_run_one", missing)
+        monkeypatch.setattr(orchestrate, "run_one", missing)
         owed_id, _ = owed_one
         with pytest.raises(asked_for.MissingCheck):
             recheck.run(owed_id, run_by="pytest@example.org")

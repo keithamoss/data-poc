@@ -41,7 +41,7 @@ def raw_dir(tmp_path_factory):
     and data/generator_bookkeeping.json - see tests/generator_isolation.py
     and the regression test at the bottom of this file) - running
     this test file used to mutate the SAME directory ./run_pipeline.sh
-    and qa_tools.bdm.orchestrate_bdm read from/write to for real, purely
+    and qa_tools.tools.orchestrate read from/write to for real, purely
     as a side effect of testing (harmless in outcome, since generation
     is fully deterministic, but a real coupling between test execution
     and production state that shouldn't exist). Each output is a plain

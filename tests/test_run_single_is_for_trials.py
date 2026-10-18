@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from qa_tools.bdm import orchestrate_bdm
+from qa_tools.tools import orchestrate
 from qa_tools.common import qa_store, supply_db, trial
-from qa_tools.cp import orchestrate_cp
 
 
 def _counts():
@@ -38,22 +37,23 @@ class TestARealIdentityIsRefused:
         csv.write_text("not,read\n")
         before = _counts()
         with pytest.raises(trial.NotATrial, match="run_042"):
-            orchestrate_bdm.run_single("run_042", str(csv), "2026-01-02",
-                                       reference_run_id=None, run_by="t@example.com")
+            orchestrate.run_single_file("civil-registration", "run_042", "birth_registrations",
+                                        str(csv), "2026-01-02",
+                                        reference_run_id=None, run_by="t@example.com")
         assert _counts() == before
 
     def test_cp_refuses_and_records_nothing(self, ensured):
         before = _counts()
         with pytest.raises(trial.NotATrial, match="cp_run_042"):
-            orchestrate_cp.run_single({"run_id": "cp_run_042", "received_at": None},
+            orchestrate.run_single("child-protection", {"run_id": "cp_run_042", "received_at": None},
                                       reference_run_id=None, run_by="t@example.com")
         assert _counts() == before
 
     def test_the_refusal_says_what_to_use_instead(self):
         with pytest.raises(trial.NotATrial) as caught:
-            trial.require_trial("run_042", "orchestrate_bdm.run_single")
+            trial.require_trial("run_042", "orchestrate.run_single_file")
         message = str(caught.value)
         assert "trial" in message and "per-arrival" in message
 
     def test_a_trial_identity_passes(self):
-        trial.require_trial(trial.trial_run_id(), "orchestrate_bdm.run_single")
+        trial.require_trial(trial.trial_run_id(), "orchestrate.run_single_file")

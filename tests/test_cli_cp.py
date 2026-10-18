@@ -16,7 +16,7 @@ from click.testing import CliRunner
 import cli.common as common
 import cli.cp as cp
 from qa_tools.tools import stage
-import qa_tools.cp.orchestrate_cp as orchestrate_cp
+from qa_tools.tools import orchestrate
 
 from fixture_ids import CP_DIRTY_RUN_ID as _DIRTY_RUN_ID, CP_REF_RUN_ID as _REF_RUN_ID
 
@@ -211,7 +211,7 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 
 
 # Local files QA source mode (plans/tooling.md #1 Phase 2) - migrated
-# from the now-deleted tests/test_check_cli.py once qa_tools/cp/
+# from the now-deleted tests/test_check_cli.py once the old qa_tools/cp/
 # check_delivery.py's own standalone CLI logic folded into qa_command's
 # --folder/--reference-folder flags (mothman is the only entry point
 # now).
@@ -262,7 +262,7 @@ def test_qa_command_local_folder_commit_files_ONE_delivery_of_six_files(
     # receipt instant - the newest key among this worker's runs.
     from qa_tools.common import qa_results_reader as reader
     recorded = [r.split("__", 1) for r in reader.list_run_ids(
-        cp.cp_common.AGENCY_ID, cp.cp_common.COLLECTION_ID) if "__" in r]
+        cp.AGENCY_ID, cp.COLLECTION_ID) if "__" in r]
     newest = max(key for _table, key in recorded)
     six = [f"{table}__{key}" for table, key in recorded if key == newest]
     assert sorted(r.split("__", 1)[0] for r in six) == sorted(cp.TABLES), recorded
@@ -522,7 +522,7 @@ class _FakeConn:
 
 def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(monkeypatch, tmp_path):
     """The core Phase 3.5 mechanic - verified here at the unit level
-    (monkeypatched _load_delivery/add_table_to_run/orchestrate_cp.
+    (monkeypatched _load_delivery/add_table_to_run/orchestrate.
     run_single), since the real per-tool correctness for whatever lands
     in the warehouse is already covered by the existing full-delivery
     integration tests; this test is about proving the RIGHT 6 tables
@@ -570,7 +570,7 @@ def test_run_check_single_table_loads_other_5_tables_from_the_last_promoted_run(
         captured.update(entry=entry, reference_run_id=reference_run_id, run_by=run_by)
         return [{"status": "pass"}]
 
-    monkeypatch.setattr(orchestrate_cp, "run_single", _fake_run_single)
+    monkeypatch.setattr(orchestrate, "run_single", _fake_run_single)
 
     results, filed = cp.run_check_single_table(
         "cp_clients", "/tmp/fresh_cp_clients.csv", "test@example.com",

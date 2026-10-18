@@ -17,9 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from qa_tools.bdm import orchestrate_bdm
 from qa_tools.common import decision_log, promotion
-from qa_tools.cp import orchestrate_cp
 
 
 @pytest.fixture
@@ -38,12 +36,14 @@ def captured(monkeypatch):
 ARRIVAL = SimpleNamespace(received_at=None, run_id="run_001")
 
 
-@pytest.mark.parametrize("module", [orchestrate_bdm, orchestrate_cp],
+@pytest.mark.parametrize("collection_id", ["civil-registration", "child-protection"],
                          ids=["bdm", "cp"])
-def test_the_rule_not_the_operator_is_the_actor(module, captured, monkeypatch):
+def test_the_rule_not_the_operator_is_the_actor(collection_id, captured, monkeypatch):
+    from qa_tools.tools import orchestrate
+
     monkeypatch.setattr(promotion, "effective_at_for",
                         lambda *a, **k: SimpleNamespace(isoformat=lambda: "2026-10-04T00:00:00+08:00"))
-    module.promote_after(ARRIVAL, [], "someone@example.org")
+    orchestrate.promote_after(collection_id, ARRIVAL, [], "someone@example.org")
 
     assert captured["actor_kind"] == decision_log.RULE
     assert captured["actor"] == promotion.RULE_ACTOR

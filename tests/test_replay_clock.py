@@ -106,12 +106,12 @@ def _stamps(dsn: str) -> dict:
 
 @pytest.fixture(scope="module")
 def replayed(corpus, worker_id):
-    from qa_tools.bdm import orchestrate_bdm
+    from qa_tools.tools import orchestrate
 
     root, latest = corpus
     snap = equiv_support.run_into_fresh_database(
         root, f"replay_clock_{worker_id}",
-        lambda: orchestrate_bdm.run_pipeline(sequential=True), inspect=_stamps)
+        lambda: orchestrate.run_pipeline("civil-registration", sequential=True), inspect=_stamps)
     return snap["inspected"], latest
 
 

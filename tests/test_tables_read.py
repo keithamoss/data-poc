@@ -308,12 +308,8 @@ class TestTheFailureNamesTheDatasetAndTheTool:
     """Criterion 12's other half: "datacontract-cli exited 1" sends
     somebody to the logs to work out whose run it was."""
 
-    @pytest.mark.parametrize("module", ["qa_tools.bdm.orchestrate_bdm",
-                                         "qa_tools.cp.orchestrate_cp"])
-    def test_a_tool_failure_is_re_raised_naming_both(self, module):
-        import importlib
-
-        mod = importlib.import_module(module)
+    def test_a_tool_failure_is_re_raised_naming_both(self):
+        from qa_tools.tools import orchestrate as mod
 
         def boom():
             raise ValueError("exit code 1")
@@ -329,12 +325,8 @@ class TestTheFailureNamesTheDatasetAndTheTool:
         # The original diagnosis is chained, never replaced.
         assert isinstance(caught.value.__cause__, ValueError)
 
-    @pytest.mark.parametrize("module", ["qa_tools.bdm.orchestrate_bdm",
-                                         "qa_tools.cp.orchestrate_cp"])
-    def test_a_succeeding_step_is_returned_untouched(self, module):
-        import importlib
-
-        mod = importlib.import_module(module)
+    def test_a_succeeding_step_is_returned_untouched(self):
+        from qa_tools.tools import orchestrate as mod
         assert mod._run_step("c", "t", "r", lambda: ["a result"]) == ["a result"]
 
 

@@ -39,9 +39,8 @@ def apply_redirects(root: Path) -> dict:
     Returns {(module, attribute): original} so a caller in the test
     process can restore them; a spawned child simply exits.
     """
-    from qa_tools.bdm import orchestrate_bdm
     from qa_tools.common import delivery, in_flight_log, scenario_map, scripted_decisions
-    from qa_tools.cp import orchestrate_cp
+    from qa_tools.tools import results_history
 
     root = Path(root)
     targets = {
@@ -56,10 +55,10 @@ def apply_redirects(root: Path) -> dict:
         # run_into_fresh_database, so a SPAWNED collection gets it too - the
         # on-demand equivalence test failed on every run without it.
         (scripted_decisions, "SCRIPT_PATH"): root / "no_scripted_decisions.yaml",
-        # run_pipeline()/run_pipeline_cp() END by writing these, and the
-        # real ones are what the dashboard build and its e2e tests read.
-        (orchestrate_bdm, "RESULTS_PATH"): str(root / "reports" / "results_bdm.json"),
-        (orchestrate_cp, "RESULTS_PATH"): str(root / "reports" / "results_cp.json"),
+        # run_pipeline() ENDS by writing `<ROOT>/reports/<results_json>`,
+        # and the real ones are what the dashboard build and its e2e tests
+        # read.
+        (results_history, "ROOT"): str(root),
     }
     original = {}
     for (module, name), value in targets.items():

@@ -17,8 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
-import qa_tools.cp.orchestrate_cp as orchestrate_cp
+from qa_tools.tools import orchestrate
 from qa_tools.common import own_table, supply_db
 
 OWN = "cp_case_workers"
@@ -49,7 +48,7 @@ class TestAChildProtectionRunWhoseOwnTableIsUnreadable:
     @pytest.mark.parametrize("how", ["held", "contested"])
     def test_no_tool_runs_and_no_per_check_result_is_recorded(self, how, cp_duckdb_dir):
         mine, entry = _cp_run(**{how: {OWN}})
-        results = orchestrate_cp._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+        results = orchestrate.run_one("child-protection", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                           reference_run_id=None)
         assert results == []
         recorded = _recorded(mine)
@@ -60,7 +59,7 @@ class TestAChildProtectionRunWhoseOwnTableIsUnreadable:
     def test_a_readable_own_table_is_still_checked(self, cp_duckdb_dir):
         """The guard must not switch checking off for an ordinary run."""
         mine, entry = _cp_run()
-        orchestrate_cp._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+        orchestrate.run_one("child-protection", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                 reference_run_id=None)
         assert set(_recorded(mine)) >= {"dbt", "soda"}
 
@@ -79,7 +78,7 @@ class TestAnyOtherReasonIsAFailedRun:
         entry = {"run_id": mine, "run_index": 1, "csv_path": "unused.csv",
                  "received_at": "2026-01-01T06:00:00+00:00", "delivery": "d"}
         with pytest.raises(own_table.UnreadableOwnTable, match="birth_registrations"):
-            orchestrate_bdm._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+            orchestrate.run_one("civil-registration", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                      reference_run_id=None)
 
     def test_a_refused_load_is_not_a_failed_run(self, monkeypatch):
@@ -215,7 +214,7 @@ class TestARunWhoseOwnTableCouldNotBeLoaded:
                             load_log.FAILED, received, reason="the file is empty", conn=conn)
         entry = {"run_id": mine, "run_index": 1, "received_at": received,
                  "delivery": "refused-drop", "files": {}}
-        results = orchestrate_cp._run_one(entry, received, "t@example.com",
+        results = orchestrate.run_one("child-protection", entry, received, "t@example.com",
                                           reference_run_id=None)
         assert results == [] and _recorded(mine) == {}
 
@@ -239,7 +238,7 @@ class TestARunWhoseOwnTableCouldNotBeLoaded:
                             load_log.FAILED, received, reason="ragged row", conn=conn)
         entry = {"run_id": mine, "run_index": 1, "received_at": received,
                  "delivery": "refused-through", "files": {}}
-        results = orchestrate_cp._run_one(entry, received, "t@example.com",
+        results = orchestrate.run_one("child-protection", entry, received, "t@example.com",
                                           reference_run_id=None)
         assert results == [] and _recorded(mine) == {}
 
@@ -338,7 +337,7 @@ class TestAHeldSiblingDoesNotTakeAnyToolDown:
             clone_run_views(conn, CP_REF_RUN_ID, mine, held={"cp_clients"})
         entry = {"run_id": mine, "run_index": 1, "received_at": "2026-01-01T06:00:00+00:00",
                  "delivery": "d", "files": {}}
-        results = orchestrate_cp._run_one(entry, "2026-01-01T09:00:00Z", "t@example.com",
+        results = orchestrate.run_one("child-protection", entry, "2026-01-01T09:00:00Z", "t@example.com",
                                           reference_run_id=None)
         recorded = _recorded(mine)
         assert {"dbt", "soda"} <= set(recorded), (

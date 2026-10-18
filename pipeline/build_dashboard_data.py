@@ -10,7 +10,7 @@ This does NOT touch the dashboard's rendering code or its other 14
 datasets (Death/Marriage Registrations and everything outside Registry
 Services) - those stay the existing illustrative mock, clearly labeled as
 such. Only Birth Registrations' columns/checks/stats are replaced, with
-every number traceable back to a real tool run in qa_tools/bdm/*.py.
+every number traceable back to a real tool run in qa_tools/tools/*.py.
 
 Previously merged this with reports/results.json, the output of a set of
 four hand-written equivalent check engines (engines/*.py) built when the

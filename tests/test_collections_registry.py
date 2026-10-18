@@ -16,7 +16,7 @@ from qa_tools.common import hierarchy
 from qa_tools.common import validate_collections as gate
 # The fixtures `third_collection` and `without_adapter` come from
 # tests/third_collection.py, made available by tests/conftest.py.
-from third_collection import BARE_ID, CODE, FAKE_DATASET, FAKE_ID, FAKE_PREFIX, FAKE_SHORT, FAKE_TABLE
+from third_collection import BARE_ID, FAKE_DATASET, FAKE_ID, FAKE_PREFIX, FAKE_SHORT, FAKE_TABLE
 
 
 class TestTheRegistry:
@@ -89,18 +89,27 @@ class TestAThirdCollectionAtEverySite:
         processing_pass.all_arrivals()
         assert asked == ["civil-registration", "child-protection", FAKE_ID]
 
-    def test_the_processing_pass_runs_it_with_its_own_code(self, third_collection):
+    def test_the_processing_pass_runs_it_through_the_shared_orchestrator(
+            self, third_collection, monkeypatch):
+        """Staging, the run, filing and promotion are all shared code now
+        (REQ-QAC-242, REQ-PIPE-243): the pass asks the one orchestrator for
+        the collection's lifecycle steps, and each step carries ITS id."""
         from qa_tools.common import processing_pass
+        from qa_tools.tools import orchestrate
 
-        # Staging is no longer the collection's own code: the shared stager
-        # takes the collection id (TestTheSharedStagingModule).
-        assert processing_pass._orchestrator(FAKE_ID) is sys.modules[CODE]
+        ran = []
+        monkeypatch.setattr(orchestrate, "run_one",
+                            lambda collection_id, entry, *a, **k: ran.append((collection_id, entry)) or [])
+        orchestrate.steps.cache_clear()
+        steps = processing_pass._steps(FAKE_ID)
+        steps.run_one({"run_id": "fk_run_001"}, "now", "pytest")
+        assert ran == [(FAKE_ID, {"run_id": "fk_run_001"})]
 
     def test_the_processing_pass_refuses_one_with_no_adapter(self, without_adapter):
         from qa_tools.common import processing_pass
 
         with pytest.raises(collections.NoAdapterError, match=BARE_ID):
-            processing_pass._orchestrator(BARE_ID)
+            processing_pass._steps(BARE_ID)
 
     @pytest.fixture
     def filed(self, supply_dsn):
@@ -116,9 +125,15 @@ class TestAThirdCollectionAtEverySite:
             return supply
         return file
 
-    def test_a_recheck_runs_it_with_its_own_code(self, third_collection, filed, monkeypatch):
+    def test_a_recheck_runs_it_through_the_shared_orchestrator(self, third_collection, filed,
+                                                               monkeypatch):
         from qa_tools.common import period_overlay, recheck, supply_files
+        from qa_tools.tools import orchestrate
 
+        ran = []
+        monkeypatch.setattr(orchestrate, "run_one",
+                            lambda collection_id, entry, *a, **k: ran.append(collection_id) or [])
+        monkeypatch.setattr(orchestrate, "discard_run_schemas", lambda run_key: None)
         supply = filed(FAKE_DATASET)
         monkeypatch.setattr(supply_files, "arrival_run_id_of",
                             lambda *_: "fake_things__202601010100000000")
@@ -126,7 +141,7 @@ class TestAThirdCollectionAtEverySite:
         recheck.execute(dataset_id=FAKE_DATASET, supply_id=supply,
                         run_key="fake_things__202601010100000000__r1", purpose={},
                         run_by="pytest")
-        assert [c[0] for c in third_collection] == ["run_one"]
+        assert ran == [FAKE_ID]
 
     def test_a_recheck_refuses_one_with_no_adapter(self, without_adapter, filed):
         from qa_tools.common import recheck
@@ -160,11 +175,11 @@ class TestAThirdCollectionAtEverySite:
     def _stub_the_real_collections(self, monkeypatch):
         from qa_tools.common import bootstrap as boot
 
-        dispatched = []
+        dispatched, self.ran = [], []
         monkeypatch.setattr("cli.bdm.generate_synthetic_data", lambda **_: None)
         monkeypatch.setattr("cli.cp.generate_synthetic_data", lambda **_: None)
-        monkeypatch.setattr("qa_tools.bdm.orchestrate_bdm.run_pipeline", lambda **_: None)
-        monkeypatch.setattr("qa_tools.cp.orchestrate_cp.run_pipeline_cp", lambda **_: None)
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
+                            lambda collection_id, *_, **__: self.ran.append(collection_id))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
         monkeypatch.setattr(boot, "targets_agree", lambda names: ())
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due", lambda **k: [])
@@ -185,7 +200,8 @@ class TestAThirdCollectionAtEverySite:
         result = boot.bootstrap(collection="all")
         assert result.populated
         assert dispatched == [["bdm", "cp", FAKE_SHORT]]
-        assert [c[0] for c in third_collection] == ["generate", "run_pipeline"]
+        assert [c[0] for c in third_collection] == ["generate"]
+        assert self.ran == ["civil-registration", "child-protection", FAKE_ID]
 
     def test_a_bootstrap_refuses_one_with_no_adapter_before_anything_runs(
             self, without_adapter, empty_db, monkeypatch):
@@ -777,3 +793,58 @@ class TestTheSharedStagingModule:
         _, cols, _ = self._stage(tmp_path, monkeypatch, legacy)
         assert ("run_id" in cols and "run_date" in cols) is stamped
         assert cols[:2] == ["fake_id", "things"]
+
+
+class TestTheSharedOrchestratorStatsAndRebuild:
+    """REQ-PIPE-243 criterion 8's third-collection tests for the three
+    modules it shares: the dataset statistics, the results rebuild and the
+    orchestrator's claim window, each driven for the fake collection with
+    nothing of its own but an adapter."""
+
+    def test_dataset_stats_count_a_third_collections_tables_from_the_registry(
+            self, third_collection):
+        import duckdb
+
+        from qa_tools.tools import dataset_stats
+
+        conn = duckdb.connect(":memory:")
+        conn.execute(f"CREATE TABLE {FAKE_TABLE} (fake_id VARCHAR, extract_timestamp TIMESTAMP)")
+        conn.execute(f"INSERT INTO {FAKE_TABLE} VALUES ('F1', '2026-01-01 09:00:00'), "
+                     "('F2', '2026-01-01 08:00:00')")
+        entry = {"run_id": f"{FAKE_PREFIX}001", "run_index": 1, "delivery": "fk-1",
+                 "received_at": "2026-01-01T01:00:00+00:00", "seed": 7}
+
+        stats = dataset_stats.compute_dataset_stats(FAKE_ID, conn, entry)
+
+        # The shared shape, not Birth Registrations' single-table one; the
+        # generator's seed does not survive into the record.
+        assert stats["row_counts"] == {FAKE_TABLE: 2}
+        assert stats["arrival"][FAKE_TABLE]["earliest_extract"].startswith("2026-01-01T08:00:00")
+        assert stats["arrival_record"] == {k: entry[k] for k in
+                                           ("run_id", "run_index", "received_at", "delivery")}
+        assert stats["value_counts"] == {} and stats["check_aggregates"] == {}
+
+    def test_the_rebuild_writes_a_third_collections_results_file(
+            self, third_collection, clean_qa_history, tmp_path, monkeypatch):
+        import rebuild_support
+
+        rebuild_support.record_run(FAKE_ID, f"{FAKE_PREFIX}001", 1, {
+            "dbt": [rebuild_support.check(FAKE_ID, "row_count", "dbt", dataset=FAKE_DATASET)]})
+
+        output = rebuild_support.rebuild(FAKE_ID, tmp_path, monkeypatch)
+
+        assert output["collection"] == f"fake-agency.{FAKE_ID}"
+        assert output["datasets"] == [FAKE_DATASET]
+        assert [r["run_id"] for r in output["runs"]] == [f"{FAKE_PREFIX}001"]
+        assert len(output["results"]) == 1
+        written = rebuild_support.output_path(FAKE_ID, tmp_path)
+        assert written.name == "results_fk.json" and written.is_file()
+
+    def test_a_third_collection_claims_under_no_borrowed_window(self, third_collection):
+        """Criterion 2: an adapter that names no claim-window dataset and an
+        arrival that names no files gets NO window - never cp-clients'."""
+        from qa_tools.tools import orchestrate
+
+        arrival = SimpleNamespace(received_at="2026-01-01T01:00:00+00:00", files_by_dataset={})
+        assert orchestrate._claim_window(FAKE_ID, arrival) is None
+        assert orchestrate._claim_window("child-protection", arrival) is not None

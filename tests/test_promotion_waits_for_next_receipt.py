@@ -12,16 +12,17 @@ from types import SimpleNamespace
 
 import pytest
 
-import qa_tools.bdm.orchestrate_bdm as orchestrate_bdm
-import qa_tools.cp.orchestrate_cp as orchestrate_cp
 from qa_tools.common import knock_on, promotion
+from qa_tools.tools import orchestrate
+
+COLLECTIONS = ["civil-registration", "child-protection"]
 
 RECEIVED = datetime(2023, 4, 3, 9, 0, tzinfo=timezone.utc)
 NEXT = RECEIVED + timedelta(seconds=30)
 
 
-@pytest.mark.parametrize("module", [orchestrate_bdm, orchestrate_cp], ids=["bdm", "cp"])
-def test_the_promotion_lands_before_the_next_receipt(module, monkeypatch):
+@pytest.mark.parametrize("collection_id", COLLECTIONS, ids=["bdm", "cp"])
+def test_the_promotion_lands_before_the_next_receipt(collection_id, monkeypatch):
     stamped = []
     monkeypatch.setattr(promotion, "next_receipt", lambda arrival: NEXT)
     monkeypatch.setattr(promotion, "after_runs",
@@ -33,7 +34,7 @@ def test_the_promotion_lands_before_the_next_receipt(module, monkeypatch):
     arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_lag_probe")
     assert promotion.effective_at_for(RECEIVED, seed="run_lag_probe") > NEXT, (
         "test precondition - the uncapped lag must reach past the next receipt")
-    module.promote_after(arrival, [], "t@example.com")
+    orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
     [effective] = stamped
     at = datetime.fromisoformat(effective)
     assert RECEIVED <= at < NEXT
@@ -97,10 +98,10 @@ class TestWithinTheClaimWindowInAReplay:
         assert promotion.effective_at_for(received, seed="run_lag_probe") == \
             promotion.effective_at_for(received, seed="run_lag_probe", within=None)
 
-    @pytest.mark.parametrize("module", [orchestrate_bdm, orchestrate_cp], ids=["bdm", "cp"])
+    @pytest.mark.parametrize("collection_id", COLLECTIONS, ids=["bdm", "cp"])
     @pytest.mark.parametrize("replaying", [True, False], ids=["replay", "live"])
-    def test_both_orchestrators_pass_it_on_every_route(self, module, replaying,
-                                                        monkeypatch):
+    def test_both_collections_pass_it_on_every_route(self, collection_id, replaying,
+                                                      monkeypatch):
         from qa_tools.common import replay_clock, schedule
 
         seen = {}
@@ -117,7 +118,7 @@ class TestWithinTheClaimWindowInAReplay:
         monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: None)
         arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_x",
                                   files_by_dataset={"cp-clients": "x"})
-        module.promote_after(arrival, [], "t@example.com")
-        dataset = "birth-registrations" if module is orchestrate_bdm else "cp-clients"
+        orchestrate.promote_after(collection_id, arrival, [], "t@example.com")
+        dataset = "birth-registrations" if collection_id == "civil-registration" else "cp-clients"
         expected = schedule.claim_window(dataset, on=RECEIVED.date())
         assert seen["within"] == expected

@@ -68,8 +68,8 @@ def test_a_foreground_failure_waits_for_the_background_to_finish():
     assert finished == [True]
 
 
-@pytest.mark.parametrize("module", ["qa_tools.bdm.orchestrate_bdm", "qa_tools.cp.orchestrate_cp"])
-def test_each_orchestrator_runs_dbt_beside_the_rest(module):
+@pytest.mark.parametrize("module", ["qa_tools.tools.orchestrate"])
+def test_the_orchestrator_runs_dbt_beside_the_rest(module):
     mod = __import__(module, fromlist=["_run_one_inner"])
     tree = ast.parse(inspect.getsource(mod._run_one_inner))
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)

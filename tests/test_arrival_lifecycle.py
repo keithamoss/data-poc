@@ -10,9 +10,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from qa_tools.bdm import orchestrate_bdm
+from qa_tools.tools import orchestrate
 from qa_tools.common import arrival_lifecycle
-from qa_tools.cp import orchestrate_cp
 
 
 def _recording_steps(log):
@@ -64,9 +63,11 @@ class TestTimestamps:
 
 
 class TestBothCollectionsSupplyTheirHalf:
-    def test_each_orchestrator_declares_its_steps(self):
-        for module in (orchestrate_bdm, orchestrate_cp):
-            assert isinstance(module.STEPS, arrival_lifecycle.Steps), module.__name__
+    def test_the_shared_orchestrator_gives_every_collection_its_steps(self):
+        from qa_tools import collections
+
+        for coll in collections.all_collections():
+            assert isinstance(orchestrate.steps(coll.id), arrival_lifecycle.Steps), coll.id
 
     def test_a_contested_birth_registrations_file_is_checked_not_refused(self):
         """One of the drifts the extraction removed: the hand-filed path
@@ -74,7 +75,7 @@ class TestBothCollectionsSupplyTheirHalf:
         check (REQ-PIPE-105 criterion 6). Both now use entry_for()."""
         class Contested:
             run_id = "run_x"
-            contested = {orchestrate_bdm.DATASET_ID}
+            contested = {"birth-registrations"}
             path = "/deliveries/run_x"
 
             def path_for(self, dataset_id):
@@ -83,7 +84,7 @@ class TestBothCollectionsSupplyTheirHalf:
             def as_entry(self):
                 return {"run_id": self.run_id}
 
-        assert orchestrate_bdm.entry_for(Contested())["csv_path"] == "/deliveries/run_x"
+        assert orchestrate.entry_for("civil-registration", Contested())["csv_path"] == "/deliveries/run_x"
 
 
 class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
@@ -92,18 +93,21 @@ class TestTheCollectionsHalvesForwardWhatTheyAreGiven:
         half passes `among` through - nothing else would notice if it
         stopped (delivery-critic, sprint 1)."""
         seen = {}
-        monkeypatch.setattr(orchestrate_cp, "file_and_overlay",
-                            lambda arrival, among=None: seen.update(among=among))
-        orchestrate_cp.STEPS.file_and_overlay(A, [A, B])
+        monkeypatch.setattr(orchestrate, "file_and_overlay",
+                            lambda collection_id, arrival, among=None: seen.update(among=among))
+        orchestrate.steps.cache_clear()
+        orchestrate.steps("child-protection").file_and_overlay(A, [A, B])
         assert seen["among"] == [A, B]
 
-    def test_each_half_reaches_its_own_orchestrators_functions(self, monkeypatch):
-        for module in (orchestrate_bdm, orchestrate_cp):
+    def test_each_collections_steps_carry_its_own_id(self, monkeypatch):
+        for collection_id in ("civil-registration", "child-protection"):
             calls = []
-            monkeypatch.setattr(module, "_run_one",
-                                lambda *a, **k: calls.append("run") or [])
-            monkeypatch.setattr(module, "promote_after",
-                                lambda *a, **k: calls.append("gate"))
-            module.STEPS.run_one({"run_id": "r"}, "T", "x", on_step=None)
-            module.STEPS.promote_after(A, [], "x")
-            assert calls == ["run", "gate"], module.__name__
+            monkeypatch.setattr(orchestrate, "run_one",
+                                lambda cid, *a, **k: calls.append(("run", cid)) or [])
+            monkeypatch.setattr(orchestrate, "promote_after",
+                                lambda cid, *a, **k: calls.append(("gate", cid)))
+            orchestrate.steps.cache_clear()
+            steps = orchestrate.steps(collection_id)
+            steps.run_one({"run_id": "r"}, "T", "x", on_step=None)
+            steps.promote_after(A, [], "x")
+            assert calls == [("run", collection_id), ("gate", collection_id)], collection_id

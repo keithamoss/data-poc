@@ -107,10 +107,10 @@ class TestEachSlotStateRecordsItsOwnReason:
     ])
     def test_the_sibling_check_records_its_reason(self, received, carers_filed, code,
                                                   status, cp_duckdb_dir, clean_q3):
-        import qa_tools.cp.orchestrate_cp as orchestrate_cp
+        from qa_tools.tools import orchestrate
 
         run_id, entry = _placements_run(received, carers_filed=carers_filed)
-        orchestrate_cp._run_one(entry, received, "t@example.com", reference_run_id=None)
+        orchestrate.run_one("child-protection", entry, received, "t@example.com", reference_run_id=None)
         rows = _recorded(run_id)
         unrunnable = {(c, s, why) for tool, c, s, why in rows if tool == "unrunnable"}
         assert unrunnable, "the check reading the unreadable sibling must be recorded"
@@ -138,12 +138,12 @@ class TestATrialIsReconciledToo:
 
     def test_a_trial_is_reconciled(self):
         from qa_tools.common import trial
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
         run_id = trial.trial_run_id()
-        assert orchestrate_cp._reconciles({"received_at": None}, run_id)
+        assert orchestrate._reconciles({"received_at": None}, run_id)
 
     def test_a_run_naming_no_table_and_no_trial_is_not(self):
-        from qa_tools.cp import orchestrate_cp
+        from qa_tools.tools import orchestrate
 
-        assert not orchestrate_cp._reconciles({"received_at": None}, "run_001")
+        assert not orchestrate._reconciles({"received_at": None}, "run_001")

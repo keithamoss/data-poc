@@ -26,7 +26,7 @@ BUSINESS_RULE_HOME_TABLE = {
 }
 
 #: The valid values the real checks enforce, moved from
-#: qa_tools/cp/dataset_stats.py (REQ-PIPE-243).
+#: the old qa_tools/cp/dataset_stats.py (REQ-PIPE-243).
 _POSTCODE_VALID = ["6007", "6008", "6014", "6018", "6019", "6027", "6028", "6030", "6035", "6036", "6050", "6056",
                     "6061", "6062", "6064", "6069", "6100", "6102", "6107", "6109", "6110", "6112", "6122", "6148",
                     "6151", "6155", "6160", "6162", "6163", "6164", "6167", "6168", "6171", "6210", "6215", "6225",

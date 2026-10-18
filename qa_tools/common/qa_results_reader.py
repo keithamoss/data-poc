@@ -59,7 +59,7 @@ def _natural_sort_key(name: str) -> tuple:
     count to eventually outgrow."""
     return tuple(int(part) if part.isdigit() else part for part in _DIGIT_RUN.split(name))
 
-# Matches orchestrate_bdm.py's/orchestrate_cp.py's own _run_one()
+# Matches qa_tools/tools/orchestrate.py's own run_one()
 # construction order - keeps a history-rebuilt results list in the same
 # run-then-tool order a live orchestrator run always produced, so a diff
 # against a live run's own reports/*.json output is a real equivalence
@@ -79,7 +79,7 @@ TOOL_ORDER = ["dbt", "soda", "datacontract", "evidently"]
 EXPECTED_TOOLS = tuple(TOOL_ORDER) + ("dataset_stats", "tables_read")
 
 
-# Matches orchestrate_bdm.py's/orchestrate_cp.py's own _run_one()
+# Matches qa_tools/tools/orchestrate.py's own run_one()
 # construction order - keeps a history-rebuilt results list in the same
 # run-then-tool order a live orchestrator run always produced, so a diff
 # against a live run's own reports/*.json output is a real equivalence

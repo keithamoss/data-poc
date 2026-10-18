@@ -330,18 +330,12 @@ class TestTheReconcilerIsInvokedAfterEveryRun:
             out.append((".".join(reversed(parts)), node.lineno))
         return out
 
-    @pytest.mark.parametrize("module,func", [
-        ("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
-        ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
-    ])
+    @pytest.mark.parametrize("module,func", [("qa_tools.tools.orchestrate", "run_pipeline")])
     def test_it_is_called(self, module, func):
         names = [n for n, _ in self._calls(module, func)]
         assert "ticket_reconciler.after_runs" in names, names
 
-    @pytest.mark.parametrize("module,func", [
-        ("qa_tools.cp.orchestrate_cp", "run_pipeline_cp"),
-        ("qa_tools.bdm.orchestrate_bdm", "run_pipeline"),
-    ])
+    @pytest.mark.parametrize("module,func", [("qa_tools.tools.orchestrate", "run_pipeline")])
     def test_it_is_called_AFTER_the_runs(self, module, func):
         """Criterion 16: only after the change is durably recorded, so a
         ticket can never say something the decision log does not."""

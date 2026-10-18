@@ -48,8 +48,7 @@ DASHBOARD_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.html"
 TEMPLATE_HTML = ROOT / "dashboard" / "qa-reporting-dashboard.template.html"
 
 _BUILD_STEPS = [
-    ["qa_tools.bdm.build_results_from_history"],
-    ["qa_tools.cp.build_results_from_history"],
+    ["cli.app", "dashboard", "rebuild-results"],
     ["pipeline.build_dashboard_data"],
     ["pipeline.build_cp_dashboard_data"],
     ["dashboard.embed_dashboard_data"],

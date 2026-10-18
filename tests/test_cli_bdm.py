@@ -110,7 +110,7 @@ def test_run_check_leaves_the_arrival_record_on_disk_exactly_as_it_found_it(
     manifest` test (REQ-GEN-043), which is worth spelling out rather than
     quietly deleting. The original guarded a real bug found live - a
     manual smoke test corrupted the real data/raw/manifest.json from 176
-    entries down to 1, because orchestrate_bdm.run_single()
+    entries down to 1, because orchestrate.run_single_file()
     unconditionally overwrote it with its own synthetic 1-or-2-entry
     manifest. REQ-GEN-043 removed the cause: run_single() writes no
     manifest at all now, and the run picker recognises arrivals from the
@@ -271,7 +271,7 @@ def test_generate_synthetic_data_command_no_prompt_needed_on_first_run(monkeypat
 
 
 # Local files QA source mode (plans/tooling.md #1 Phase 2) - migrated
-# from the now-deleted tests/test_check_cli.py once qa_tools/bdm/
+# from the now-deleted tests/test_check_cli.py once the old qa_tools/bdm/
 # check_file.py's own standalone CLI logic folded into qa_command's
 # --file/--reference-file flags (mothman is the only entry point now).
 
@@ -417,7 +417,7 @@ def test_run_check_local_file_default_path_never_requires_a_real_git_identity(
     """Real regression test for a real red CI run (test.yml, 2026-09-19,
     originally against the now-retired qa_tools/bdm/check_file.py, ported
     here since the same logic now lives in run_check_local_file()):
-    orchestrate_bdm.run_single() calls git_identity.get_run_by() whenever
+    orchestrate.run_single_file() calls git_identity.get_run_by() whenever
     run_by isn't passed explicitly - correct for a --commit run, wrong
     for the default throwaway path, which discards the result before
     anything ever reads run_by. qa_command's own flag-mode body already

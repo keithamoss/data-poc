@@ -1,7 +1,7 @@
 """Regression test for a real bug fixed 2026-09-16: run_evidently_cp.py
 wrote its qa_results/ output under its own table-scoped dataset id
 (hierarchy.dataset_for_table("cp_notifications").dataset_id) instead of the
-collection id (cp_common.COLLECTION_ID) every other CP tool writes
+collection id every other CP tool writes
 under - see that file's own comment on the fix, and
 plans/publishing-and-history.md's Thread B entry for the restructuring
 this was found during. Given correct inputs the code wrote its output
@@ -14,7 +14,6 @@ from __future__ import annotations
 import pandas as pd
 
 from qa_tools.common import hierarchy
-from qa_tools.cp import cp_common
 from qa_tools.tools import run_evidently
 
 
@@ -38,7 +37,7 @@ def test_evaluate_evidently_cp_writes_under_the_collection_id_not_the_table_id(m
 
     run_evidently.evaluate("child-protection", "cp_run_02", "2026-01-01T00:00:00Z", reference_run_id="cp_run_01")
 
-    assert captured["dataset"] == cp_common.COLLECTION_ID
+    assert captured["dataset"] == "child-protection"
     assert captured["dataset"] != hierarchy.dataset_for_table("cp_notifications").dataset_id
 
 
