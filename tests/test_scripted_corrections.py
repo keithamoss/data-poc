@@ -6,13 +6,16 @@ correction_replay.confirm_due. Written first and seen to fail.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 
 import pytest
 
 from qa_tools.common import (correction_apply, correction_replay, decision_log, scenario_map,
                              scripted_corrections, scripted_decisions)
-from test_correction_replay import conn, two  # noqa: F401 - fixtures
+import test_correction_replay as _replay
+
+#: The replay tests' fixtures: CAB-1 and CAB-2 declared, one supply filed.
+two, conn = _replay.two, _replay.conn
 
 PERTH = timezone(timedelta(hours=8))
 SC = scripted_corrections.Confirmation
