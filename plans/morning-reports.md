@@ -2136,6 +2136,68 @@ one or more component tags, and a date.
       - **A SECOND PUSH after Emergency Department**, on the same three
         conditions as 248's (fresh bootstrap, green full gate, predicted
         capture). 248 goes up first, on its own.
+    - **KEITH, ~22:36 Perth**: "Build the three unbuilt generator
+      requirements you need to deliver the Emergency Department dataset
+      overnight" - REQ-GEN-205, REQ-GEN-203 and REQ-GEN-218 - "and don't
+      forget to also finish up the chain leading through to req 248", with a
+      10-minute scheduled check-in to keep the night moving.
+    - **248 PUSHED, 23:51 Perth (1ee4926).** The first full gate on the
+      fresh-bootstrap tree went red: four failures and a stale plans index.
+      Post-build-review #238 has them: a real Soda defect (a FILTERED section
+      over an unreadable table was handed to the scan), the settle pointer
+      naming the collection rather than the label the filing menu now lists,
+      and two tests 247/248 should have moved. Fixed, then the full gate
+      again on exactly 1ee4926: green, 5,727 passed and 835 JS, every gate,
+      a clean tree. The fresh bootstrap was 44d59e1's (1508s); nothing after
+      it changes a recorded result. CI: the configuration workflow is green;
+      the test suite was still running at this entry.
+    - **EMERGENCY DEPARTMENT, BUILT IN /home/user/ed-wt (branch ed-build),
+      not yet pushed.** The ten requirements are in the register, signed.
+      Built so far:
+      - REQ-GEN-205's machinery, each piece test-first:
+        - scripted correction confirmations (`corrections:` in
+          contract/scripted_decisions.yaml, read only by confirm_due);
+        - the bootstrap and resume running what confirmations owe;
+        - link events at a correction's date and the history's end;
+        - correction claims: a claim is the altered periods plus their
+          neighbours, refused against another scenario, against a supply
+          another collection holds in an altered quarter, or outside the
+          history.
+      - REQ-GEN-218: TS-63, cp-carers turned off for 2022-Q1 and 2022-Q2 by
+        a declared correction.
+      - REQ-GEN-251: Emergency Department's 2015-Q4 participation gap.
+      - TS-57 to TS-61 placed in Emergency Department, each with two
+        lettered links.
+      - REQ-GEN-203 (TS-42 and TS-80) is with a build agent in its own
+        worktree.
+    - **PROVISIONAL CHOICES FOR KEITH:**
+      - **Where TS-57 to TS-61's quarters live.** REQ-GEN-237 criterion 3
+        allows two ways: lie outside Child Protection's history, or suppress
+        its routine supply there. Lying outside would mean dates before 2013,
+        which needs a new, earlier version of the quarterly calendar. The
+        freeze gate then refuses the correction, because on the push its
+        "old" dates do not exist in the base. So the five edited dates are in
+        the existing 2013 version (2013-Q1, 2013-Q4, 2014-Q3, 2015-Q1,
+        2015-Q3), and Child Protection writes no routine supply in the nine
+        quarters those edits alter. This is generic: a provider flag plus
+        `correction_claims.foreign_altered`. When REQ-GEN-238 shrinks Child
+        Protection, those years leave its history and the suppression stops
+        mattering. A drawn red in grown quarter 2013-Q3 goes with the emptied
+        quarter, and so does its scripted resend promote. The planner moves
+        ambers only.
+      - **Child Protection is not shrunk tonight (REQ-GEN-238).** Its dry run
+        includes REQ-GEN-206's TS-50, TS-55 and TS-81, which are still
+        unsigned drafts, so the fewest years cannot be sized yet.
+      - **TS-42 at 2019-Q4 and TS-80 at 2020-Q4**, each with one lead-in
+        quarter and a green following one. TS-63 is at 2021-Q4 to 2022-Q3.
+        All are grown quarters drawn clean.
+    - **TWO MORE DEFECTS FOUND IN ED'S FIRST CUT, both fixed test-first:**
+      - Inheritance read the newest participation version, not the one in
+        force on the period's date (#238 in the ED branch).
+      - The freeze gate refused a new dataset dated in the past on a
+        synthetic asset. REQ-PIPE-111 criterion 9 allows "adding a new
+        dataset's calendar membership", and the code exempted the versions
+        but not the membership. CI would have refused the ED push.
     - **FOR THE MORNING, Keith's own list**: talk through the 77,000 lines
       of code (running-thoughts #107) and the test-duplication report
       (now docs/drafts/item-6/test-duplication.md), plus anything else left
