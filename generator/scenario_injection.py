@@ -1324,7 +1324,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-1",
         dataset_id="birth-registrations",
-        anchor=-8,
+        anchor=-11,
         config="daily, due 14:00 AWST, 60 minutes' grace, 4-hour claim window - the "
                "configuration in force. The 20:00 arrival is outside the next day's "
                "window, which opens at 10:00 the following morning.",
@@ -1351,7 +1351,7 @@ INJECTIONS: tuple[Injection, ...] = (
         # enough from TS-1 that neither scenario's days touch the other's,
         # which no_two_scenarios_share_a_period() enforces rather than
         # trusting this comment.
-        anchor=-12,
+        anchor=-15,
         config="daily, due 14:00 AWST, 60 minutes' grace - the configuration in force. "
                "The supplier is down for two days and the next supply arrives on time "
                "for its OWN day rather than catching up.",
@@ -1371,7 +1371,7 @@ INJECTIONS: tuple[Injection, ...] = (
         scenario_id="TS-3c",
         dataset_id="birth-registrations",
         # MONDAY 2026-06-22, so its 17:00 resupply lands on a weekday.
-        anchor=-93,
+        anchor=-96,
         config="daily evening-before: the supply for a day is due 22:00 the evening "
                "before, claim window 4 hours. The day's own supply is filled; an arrival "
                "at 17:00 that day is one hour before the NEXT day's window opens at 18:00.",
@@ -1388,7 +1388,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-3d",
         dataset_id="birth-registrations",
-        anchor=-90,
+        anchor=-93,
         config="daily evening-before: due 22:00 the evening before, claim window 4 "
                "hours. The day's own supply never came; an arrival at 17:00 that day "
                "is an hour before the next day's window opens.",
@@ -1401,7 +1401,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-10a",
         dataset_id="birth-registrations",
-        anchor=-95,
+        anchor=-98,
         config="daily evening-before: this day's supply is due 22:00 the evening "
                "before, claim window 4 hours, so its window opens at 18:00 and the day "
                "before closes then. The day before is filled.",
@@ -1416,7 +1416,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-10b",
         dataset_id="birth-registrations",
-        anchor=-87,
+        anchor=-90,
         config="daily evening-before, as TS-10a, but the day before never got a "
                "supply. Since REQ-PIPE-131 the 22:00 arrival still fills this day, on "
                "time, and the day before closes with nothing.",
@@ -1444,7 +1444,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-43",
         dataset_id="birth-registrations",
-        anchor=-18,
+        anchor=-21,
         config="daily; the amber setting is HOLD from 2026-08-30 (REQ-GEN-199). A scripted person "
                "promotes the held supply the next morning, twenty hours after it arrives "
                "and before that day's supply (REQ-GEN-185 criterion 7).",
@@ -1456,7 +1456,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-44",
         dataset_id="birth-registrations",
-        anchor=-10,
+        anchor=-13,
         lead_in=1,
         config="daily; PROMOTE-AND-ACKNOWLEDGE from 2026-09-10.",
         arrivals=(
@@ -1467,7 +1467,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-45",
         dataset_id="birth-registrations",
-        anchor=-6,
+        anchor=-9,
         lead_in=1,
         config="as TS-44; a scripted acknowledgement five hours after receipt, once the "
                "rule has promoted it.",
@@ -1483,7 +1483,7 @@ INJECTIONS: tuple[Injection, ...] = (
         # arrives on a weekday (tests/test_generate_runs.py). 2026-09-21 is the
         # replacement era's Monday; its lead-in is the Sunday, and the day
         # after is the history's last.
-        anchor=-2,
+        anchor=-5,
         lead_in=1,
         config="daily; the replacement setting is GREEN from 2026-09-18 to 2026-09-21. "
                "Two green supplies for one day, at 14:00 and 16:00.",
@@ -1497,7 +1497,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-47",
         dataset_id="birth-registrations",
-        anchor=-16,
+        anchor=-19,
         # QUIET ON ITS OWN DAY AND THE NEXT, so no earlier day's resend
         # fills either before the late file comes (found by the first
         # scripted replay, which refused the mark-not-supplied because a
@@ -1740,6 +1740,30 @@ INJECTIONS: tuple[Injection, ...] = (
         links=(Link("TS-61a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
                Link("TS-61b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
+    # A CORRECTION MERGED AND NOT YET CONFIRMED (REQ-GEN-205, TS-62): Birth
+    # Registrations' claim window widens to six hours from 2026-09-25 - a new
+    # version on the history's last day, after 2026-09-08 (criteria 24 and
+    # 25) - by a correction dated 2026-09-24 that the scripted manager leaves
+    # pending. 2026-09-25's own supply arrives at 09:00, which only the
+    # corrected window lets claim it: judged against the merged configuration
+    # while the correction waits (REQ-PIPE-170 criteria 20-21). Room for it
+    # came from three days grown at the history's end (Keith, 2026-10-19).
+    Injection(
+        scenario_id="TS-62",
+        dataset_id="birth-registrations",
+        anchor=-1,
+        config="daily, due 14:00 with 1 hour's grace; the claim window widens from 4 "
+               "to 6 hours from 2026-09-25 by correction REQ-GEN-205-TS62, dated "
+               "2026-09-24 and left awaiting confirmation. That day's supply arrives "
+               "at 09:00 - inside the corrected window, which opens at 08:00, and "
+               "outside the old one, which opened at 10:00.",
+        arrivals=(
+            ExtraArrival(0, "09:00", None,
+                         "2026-09-25's supply, inside the six-hour window only"),
+        ),
+        correction="REQ-GEN-205-TS62",
+        links=(Link("TS-62", 1, correction_event("REQ-GEN-205-TS62"), HISTORY_END),),
+    ),
     # TWO FILES FOR ONE TABLE (REQ-GEN-196), one pair per way a person can
     # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two
     # files carry their own receipts, settled by a scripted person at 11:00
@@ -1754,7 +1778,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-68",
         dataset_id="birth-registrations",
-        anchor=-57,
+        anchor=-60,
         config=_PAIR_CONFIG + " A duplicate send: the same extract twice, ten minutes "
                "apart, the duplicate's name sorting before the original's.",
         arrivals=(
@@ -1771,7 +1795,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-69",
         dataset_id="birth-registrations",
-        anchor=-52,
+        anchor=-55,
         config=_PAIR_CONFIG + " The next day's extract is sent early, in the same "
                "delivery as today's; the next day has no supply of its own.",
         arrivals=(
@@ -1790,7 +1814,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-70",
         dataset_id="birth-registrations",
-        anchor=-47,
+        anchor=-50,
         config=_PAIR_CONFIG + " The day's extract arrives on time with a fault, and a "
                "corrected re-export follows at 16:30 - after the grace, before the next "
                "day's window - named to sort first.",
@@ -1809,7 +1833,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-71",
         dataset_id="birth-registrations",
-        anchor=-42,
+        anchor=-45,
         config=_PAIR_CONFIG + " A stray test file that loads arrives before the day's "
                "real extract.",
         arrivals=(
@@ -1827,7 +1851,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-72",
         dataset_id="birth-registrations",
-        anchor=-37,
+        anchor=-40,
         config=_PAIR_CONFIG + " The day's extract, then a stray test file the load "
                "refuses - named to sort first by bytes, second by the database's "
                "collation.",
@@ -1846,7 +1870,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-73",
         dataset_id="birth-registrations",
-        anchor=-33,
+        anchor=-36,
         config=_PAIR_CONFIG + " A faulty extract and a stray test file; a person "
                "rejects both, and the day stays owed.",
         arrivals=(
@@ -1864,7 +1888,7 @@ INJECTIONS: tuple[Injection, ...] = (
     Injection(
         scenario_id="TS-74",
         dataset_id="birth-registrations",
-        anchor=-29,
+        anchor=-32,
         config=_PAIR_CONFIG + " Tomorrow's extract sent early beside a stray test file, "
                "and nothing for today: the early file is re-filed, the test file "
                "rejected, and today stays owed.",
@@ -2072,7 +2096,7 @@ INJECTIONS: tuple[Injection, ...] = (
         # D = 30 AUGUST, inside the hold era that now starts that day
         # (contract/data-asset.yaml; Keith, 2026-10-13). Refused, never
         # shifted, if the era stops covering D to D+2 (criterion 15).
-        anchor=-24,
+        anchor=-27,
         covers=2,
         hold_days=(0, 1, 2),
         quiet=(0, 1, 2, 3),

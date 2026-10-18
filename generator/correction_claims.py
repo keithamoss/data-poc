@@ -16,6 +16,7 @@ correction's date and as it stood from it (correction_replay.docs_at).
 """
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from typing import Mapping, Sequence
 
@@ -197,6 +198,72 @@ def check_all() -> None:
             suppressed[d.dataset_id] = foreign_altered(d.collection_id)
     check(scenario_injection.INJECTIONS, generated, history_end=get_anchor_date(),
           suppressed=suppressed)
+    check_version_after(scenario_injection.INJECTIONS,
+                        last_link_day=last_req_gen_199_link_day())
+
+
+#: REQ-GEN-205 criterion 25: TS-47's following day, the last day its
+#: four-hour claim window has to stand under the version before TS-62's.
+TS47_FOLLOWING_DAY = date(2026, 9, 8)
+#: The scenarios REQ-GEN-199 planted, whose quoted texts stand under that
+#: version too (TS-75 to TS-79, lettered or not).
+_REQ_GEN_199 = re.compile(r"TS-7[5-9][a-z]?$")
+
+
+def added_versions(reference: str, *, docs=None) -> list[date]:
+    """The effective dates of every calendar version the correction adds -
+    those present just after its date and not just before it."""
+    p, before, after = _docs_either_side(reference, docs)
+    if p is None:
+        raise CannotPlace(f"{reference!r} is not a declared correction")
+
+    def versions(cal):
+        return {(c.get("name"), str(v.get("effective_from")))
+                for c in cal.get("calendars") or [] for v in c.get("versions") or []}
+
+    return sorted(date.fromisoformat(day[:10])
+                  for _name, day in versions(after[0]) - versions(before[0]))
+
+
+def last_req_gen_199_link_day() -> date | None:
+    """The last day any REQ-GEN-199 scenario link names, through the one
+    link resolver the generator writes with (REQ-GEN-201 criterion 9)."""
+    from generator import scenario_injection as si
+
+    days = []
+    for inj in si.INJECTIONS:
+        if not inj.links:
+            continue
+        placement = si.resolve(si.dataclasses.replace(inj, links=()),
+                               si.generated_periods(inj.dataset_id))
+        days += [d.on for d in si.link_dates(inj, placement)
+                 if d.on and _REQ_GEN_199.match(d.scenario_id)]
+    return max(days, default=None)
+
+
+def check_version_after(injections: Sequence, *, docs=None,
+                        last_link_day: date | None) -> None:
+    """REQ-GEN-205 criterion 25: TS-62's version takes effect after
+    2026-09-08 and after the last day a REQ-GEN-199 link names, so that
+    TS-47's window and every text REQ-GEN-199 quotes stand under the version
+    before it. Refused naming TS-62, never shifted."""
+    ts62 = next((i for i in injections if i.scenario_id == "TS-62"), None)
+    if ts62 is None or not ts62.correction:
+        return
+    added = added_versions(ts62.correction, docs=docs)
+    if not added:
+        raise CannotPlace(f"TS-62: correction {ts62.correction} adds no calendar version - "
+                          f"it must add the wider claim window as a new version")
+    bounds = [(TS47_FOLLOWING_DAY, "TS-47's following day")]
+    if last_link_day is not None:
+        bounds.append((last_link_day, "the last day a REQ-GEN-199 link names"))
+    for day in added:
+        for bound, what in bounds:
+            if day <= bound:
+                raise CannotPlace(
+                    f"TS-62: correction {ts62.correction}'s version takes effect on "
+                    f"{day.isoformat()}, on or before {bound.isoformat()} ({what}) - "
+                    f"move the version later; it is never shifted")
 
 
 def _datasets_of(collection_id: str) -> list[str]:

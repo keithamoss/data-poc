@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**38 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**55 of 66 scenarios marked for injection have data behind them today.** 103 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -72,17 +72,31 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 ### TS-3a - Quarterly, prior slot FILLED
 
-**What it demonstrates.** August's window has not opened, so May is still the OPEN period (REQ-PIPE-131), and it is filled -> **resupply of May**. Being a filled slot it does **not auto-promote**; it holds and warns (TS-4).
+*Config: Emergency Department, the quarterly calendar - the 1st of February, May, August and November, due 09:00, a 14-day claim window, so May 2025's window opens 09:00 on 17 April. February 2025's supply arrived as usual; this one arrives 10:00 on 16 April 2025, a day before May's window opens (REQ-GEN-236).* **Expect** (the first bootstrapped build, 2026-10-18): filed to **2025-Q1** by the branch `resupply-of-open-slot`, classified `late` - May's window has not opened, so February is still the open period, and it is filled. Being a resupply of a filled slot it is **not promoted**: 2025-Q2 is left with no supply, and the next quarter's drift checks fail by the gap rule (REQ-QAC-108), measured against February's supply. **Breaks as**: files to May because it is "nearly" May's - the window would then mean nothing. Keeps the family's note: the filled branch is a contained imperfection - a supplier one day early leaves a quarter to be put right by a person - not a defect.
 
-*Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 19 July - one day outside August's window, which opens 20 July.*
+**What it would look like if the rule were wrong.** Files to May because it is "nearly" May's - the window would then mean nothing. Keeps the family's note: the filled branch is a contained imperfection - a supplier one day early leaves a quarter to be put right by a person - not a defect.
 
-**not injected - nothing to look at yet**
+*Config: Emergency Department, the quarterly calendar - the 1st of February, May, August and November, due 09:00, a 14-day claim window, so May 2025's window opens 09:00 on 17 April. February 2025's supply arrived as usual; this one arrives 10:00 on 16 April 2025, a day before May's window opens (REQ-GEN-236).*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202504161000000800` |
+| Period | 2025-Q2 |
+| Set the in-place-on date to | 2025-05-01 |
 
 ### TS-3b - Quarterly, prior slot UNFILLED
 
-**What it demonstrates.** May is still the open period -> fills **May, ~79 days late**.
+*Same config, on Emergency Department, a year later: February 2026's supply never came (suppressed), and May's arrives 10:00 on 16 April 2026, a day before its window opens.* **Expect** (the first bootstrapped build, 2026-10-18): filed to **2026-Q1** by the branch `open-slot-unfilled`, classified `late` - about 74 days - because February is still the open period and nothing filled it. 2026-Q2 is left with no supply. **Breaks as**: files to May and leaves February owed for ever.
 
-**not injected - nothing to look at yet**
+**What it would look like if the rule were wrong.** Files to May and leaves February owed for ever.
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202604161000000800` |
+| Period | 2026-Q2 |
+| Set the in-place-on date to | 2026-05-01 |
 
 ### TS-3c - Daily, prior slot FILLED
 
@@ -601,11 +615,37 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 | Period | 2026-09-15 |
 | Set the in-place-on date to | 2026-09-15 |
 
-### TS-42 - A contested pair of one Child Protection table, resolved by a later file
+### TS-42a - A contested pair of one Child Protection table, while it is contested
 
-NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 2026-10-13) widened `cp_clients`' pattern so two of its files in one delivery contest the table, and REQ-GEN-203 plants it. `tests/test_cp_pair.py` drives the shape through the real orchestrator.
+PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its files in one delivery contest the table; `tests/test_cp_pair.py` drives the shape through the real orchestrator. Two lettered siblings share the one placement (REQ-GEN-201): this one's link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).* **Breaks as**: one of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.
 
-**not injected - nothing to look at yet**
+**What it would look like if the rule were wrong.** One of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201911010830000800`, `cp_clients__201911291000000800` |
+| Period | 2019-Q4 |
+| Set the in-place-on date to | 2019-11-01 |
+| Built to | green, the 2019-11-29 10:00 arrival |
+
+### TS-42b - A contested pair of one Child Protection table, resolved by a later file
+
+TS-42a's placement; this link opens on the later file's asset day. *Config: as TS-42a.* **Breaks as**: the pair still contested after the later file, or the later file filed as a resupply rather than ending the contest.
+
+**What it would look like if the rule were wrong.** The pair still contested after the later file, or the later file filed as a resupply rather than ending the contest.
+
+*Config: as TS-42a.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__201911010830000800`, `cp_clients__201911291000000800` |
+| Period | 2019-Q4 |
+| Set the in-place-on date to | 2019-11-29 |
+| Built to | green, the 2019-11-29 10:00 arrival |
 
 ### TS-43 - An amber supply held under hold
 
@@ -755,51 +795,173 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 | Period | 2026-Q3 |
 | Set the in-place-on date to | 2026-08-01 |
 
+### TS-80 - A contested pair of one Child Protection table, settled by a person
+
+PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client Register, so a settlement can be seen clearing the cross-table readers the contest held, which only Child Protection has. Its link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.* **Breaks as**: the test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.
+
+**What it would look like if the rule were wrong.** The test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.
+
+*Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, "TS-80 settle"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202011010820000800` |
+| Period | 2020-Q4 |
+| Set the in-place-on date to | 2020-11-01 |
+| Built to | green, the 2020-11-01 08:30 arrival |
+
 ## Calendar corrections
 
-### TS-57 - A correction that only re-judges
+### TS-57a - A correction that only re-judges, before it is confirmed
 
-**What it demonstrates.** After merge, the dataset reads awaiting confirmation and nothing else changes. In the terminal the correction shows one verdict change (late -> on time) and NO moves, and still needs confirming. On confirmation a new verdict is recorded naming the change reference; the late verdict stays readable as history (REQ-PIPE-168 criteria 3-6).
+**What it demonstrates.** The quarter reads late, and the correction awaits confirmation with one verdict change (late -> on time) and no moves (REQ-PIPE-168 criteria 3-6).
 
-**What it would look like if the rule were wrong.** Applied on merge with nobody confirming because there were no moves; or the late verdict overwritten.
+**What it would look like if the rule were wrong.** Applied on merge with nobody confirming because there were no moves.
 
-**not injected - nothing to look at yet**
+*Config: 2015-Q1's date is corrected from 1 to 2 February 2015; its one supply arrives at 12:00 on 2 February - late against the old date, on time against the corrected one.*
 
-### TS-58 - A correction that moves supplies, all confirmed
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201502021200000800` |
+| Period | 2015-Q1 |
+| Set the in-place-on date to | 2026-09-08 |
 
-**What it demonstrates.** The terminal proposes moving it May -> August with its re-judged verdict; on confirmation it is re-filed as a person's re-file naming the correction, re-QA'd and re-gated automatically, and judged against August (REQ-PIPE-170 criteria 2, 7).
+### TS-57b - A correction that only re-judges, once confirmed
 
-**What it would look like if the rule were wrong.** Moved with the verdict computed against May; or not re-QA'd.
+**What it demonstrates.** A new verdict naming the change reference, on time; the late verdict still readable as history.
 
-*Config: the August period's claim window opens two weeks earlier.*
+**What it would look like if the rule were wrong.** The late verdict overwritten, or no verdict naming the correction.
 
-**not injected - nothing to look at yet**
+*Config: as TS-57a.*
 
-### TS-59 - The asset manager keeps a supply
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201502021200000800` |
+| Period | 2015-Q1 |
+| Set the in-place-on date to | 2026-09-22 |
 
-**What it demonstrates.** The kept supply stays filed where it is, with a KEPT decision-log entry naming it, its period, the change reference, the actor and the reason, and its verdict judged against the period it stays in; the other moves as in TS-58. The applied-summary lists both (REQ-PIPE-170 criteria 5, 6, 22).
+### TS-58a - A correction that moves a supply, before it is confirmed
 
-**What it would look like if the rule were wrong.** The kept supply moved anyway, kept silently with no reason, or re-judged against the period it did not go to.
+**What it demonstrates.** The correction proposes moving it 2013-Q3 -> 2013-Q4 with its re-judged verdict, and awaits confirmation.
 
-**not injected - nothing to look at yet**
+**What it would look like if the rule were wrong.** Moved on merge, or proposed with the verdict computed against 2013-Q3.
 
-### TS-60 - A correction that leaves a supply with no period
+*Config: 2013-Q4's date is corrected from 1 November to 20 October 2013. Its supply arrives on 10 October, before the old window opened, so it is filed as a resupply of 2013-Q3; the corrected window covers it.*
 
-**What it demonstrates.** Proposed as "would be held"; on confirmation it is held (REQ-PIPE-064), the hold's reason naming the correction.
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201310101000000800` |
+| Period | 2013-Q4 |
+| Set the in-place-on date to | 2026-09-08 |
 
-**What it would look like if the rule were wrong.** Left filed in a period the corrected agreement does not give it; or dropped.
+### TS-58b - A correction that moves a supply, once confirmed
 
-*Config: the period's claim window is shortened so an early supply no longer falls in any window.*
+**What it demonstrates.** Re-filed to 2013-Q4 as a re-file naming the correction, re-QA'd and re-gated, judged against 2013-Q4 (REQ-PIPE-170 criteria 2, 7).
 
-**not injected - nothing to look at yet**
+**What it would look like if the rule were wrong.** Left in 2013-Q3, or moved and not re-QA'd.
 
-### TS-61 - A move that is blocked
+*Config: as TS-58a.*
 
-**What it demonstrates.** Listed as blocked, naming the decision that would unblock it; not moved, not dropped; the correction stays among the states needing action until it is moved or kept (REQ-PIPE-170 criteria 9, 19).
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201310101000000800` |
+| Period | 2013-Q4 |
+| Set the in-place-on date to | 2026-09-22 |
 
-**What it would look like if the rule were wrong.** Moved out from under the inheriting period; or the correction marked done with the supply silently left.
+### TS-59a - A supply the asset manager will keep, before the correction is confirmed
 
-**not injected - nothing to look at yet**
+**What it demonstrates.** The move is proposed like TS-58a's.
+
+**What it would look like if the rule were wrong.** Kept or moved before anyone confirmed.
+
+*Config: as TS-58 for 2014-Q3, corrected from 1 August to 20 July 2014; its supply arrives on 10 July, filed as a resupply of 2014-Q2, which the corrected agreement would move. A scripted confirmation keeps it (contract/scripted_decisions.yaml).*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201407101000000800` |
+| Period | 2014-Q3 |
+| Set the in-place-on date to | 2026-09-08 |
+
+### TS-59b - A supply the asset manager kept
+
+**What it demonstrates.** The supply stays filed where it is, with a KEPT decision-log entry naming it, its period, the change reference, the actor and the reason, and its verdict judged against the period it stays in (REQ-PIPE-170 criteria 5, 6, 22).
+
+**What it would look like if the rule were wrong.** Moved anyway, kept silently with no reason, or re-judged against the period it did not go to.
+
+*Config: as TS-59a.*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201407101000000800` |
+| Period | 2014-Q3 |
+| Set the in-place-on date to | 2026-09-22 |
+
+### TS-60a - A correction that leaves a supply with no period, before it is confirmed
+
+**What it demonstrates.** Proposed as "would be held".
+
+**What it would look like if the rule were wrong.** Held, or dropped, before confirmation.
+
+*Config: Emergency Department's first quarter, 2013-Q1, has its date corrected from 1 to 11 February 2013. Its supply arrived on 22 January, inside the old window, before the corrected one opens and with no quarter before it.*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201301221000000800` |
+| Period | 2013-Q1 |
+| Set the in-place-on date to | 2026-09-08 |
+
+### TS-60b - A supply left with no period, once confirmed
+
+**What it demonstrates.** Held (REQ-PIPE-064), the hold's reason naming the correction.
+
+**What it would look like if the rule were wrong.** Left filed in a period the corrected agreement does not give it, or dropped.
+
+*Config: as TS-60a.*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201301221000000800` |
+| Period | 2013-Q1 |
+| Set the in-place-on date to | 2026-09-22 |
+
+### TS-61a - A move that will be blocked, before the correction is confirmed
+
+**What it demonstrates.** The move is proposed, naming the period that stands on it.
+
+**What it would look like if the rule were wrong.** Moved out from under the inheriting period.
+
+*Config: 2015-Q3's date is corrected from 1 to 11 August 2015. Its supply arrived on 22 July, which the corrected agreement files to 2015-Q2 - a move blocked because 2015-Q4, the participation gap (REQ-GEN-251), stands on it.*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201507221000000800` |
+| Period | 2015-Q3 |
+| Set the in-place-on date to | 2026-09-08 |
+
+### TS-61b - A move that is blocked, once confirmed
+
+**What it demonstrates.** Parked as blocked, naming the decision that would unblock it - not moved, not dropped; the correction stays among the states needing action (REQ-PIPE-170 criteria 9, 19).
+
+**What it would look like if the rule were wrong.** Moved, or the correction marked done with the supply silently left.
+
+*Config: as TS-61a.*
+
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__201507221000000800` |
+| Period | 2015-Q3 |
+| Set the in-place-on date to | 2026-09-22 |
 
 ### TS-62 - A correction merged and not yet confirmed
 
@@ -809,15 +971,35 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 
 **not injected - nothing to look at yet**
 
-### TS-63 - A dataset turned off for a while
+### TS-63a - A dataset turned off for a while: the turn-off
 
-*Config: quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim window 30 days before due, 2 days' grace; a participation version with `effective_to: 2026-03-31` and a `turned_off_reason`, then a later version from 2026-10-01 turning it back on.* **Expect** (Keith's worked example, 2026-10-10, REQ-PIPE-179 and REQ-DASH-180): February 2026 is still owed and its slot closes 15 April, when May's window would have opened; May and August owe nothing. A February supply arriving 10 March files to February, late; one arriving 5 April (dataset off, February still open) also files to February, late - or as a resupply if February is filled; one arriving 20 April finds no open owed slot and is held as turned off. The dataset keeps its real verdict with a 'Turning off - last supply owed: February, open until 15 Apr' marker until 15 April, then 'Turned off since 1 Apr'; gap periods read as owed-nothing rows and inherit the last promoted supply. After 1 October it reads as any dataset between deliveries, not 'No data'. **Breaks as**: the gap reads as missed supplies; the 5 April supply held instead of filed late; February going quiet before 15 April; a red verdict hidden behind the turn-off; or a gap arrival filed into a gap period.
+**What it demonstrates.** The late cp_carers files to 2021-Q4, late; 2021-Q4 stays owed until its slot closes (REQ-PIPE-179, REQ-DASH-180).
 
-**What it would look like if the rule were wrong.** The gap reads as missed supplies; the 5 April supply held instead of filed late; February going quiet before 15 April; a red verdict hidden behind the turn-off; or a gap arrival filed into a gap period.
+**What it would look like if the rule were wrong.** The 5 January supply held instead of filed late, or 2021-Q4 going quiet before its slot closes.
 
-*Config: quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim window 30 days before due, 2 days' grace; a participation version with `effective_to: 2026-03-31` and a `turned_off_reason`, then a later version from 2026-10-01 turning it back on.*
+*Config: Child Protection, quarterly Feb/May/Aug/Nov, due 09:00 on the 1st, 14-day claim window. cp-carers is turned off after 31 December 2021 by correction REQ-GEN-218 dated 15 December 2021, and owed again from 2022-Q3. 2021-Q4's delivery leaves cp_carers out; cp_carers follows on 5 January 2022, after the turn-off but while 2021-Q4's slot is open.*
 
-*unit test - no generated data, nothing to navigate to*
+| Where to look | |
+|---|---|
+| Dataset | cp-carers |
+| Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
+| Period | 2021-Q4 |
+| Set the in-place-on date to | 2021-12-20 |
+
+### TS-63b - A dataset turned off for a while: the gap
+
+**What it demonstrates.** The 15 March supply, and each ordinary gap delivery's cp_carers, finds no open owed slot and is held as turned off; 2022-Q1 and 2022-Q2 read owed-nothing and inherit the last promoted supply; from 2022-Q3 it reads as any dataset between deliveries.
+
+**What it would look like if the rule were wrong.** The gap read as missed supplies, or a gap arrival filed into a gap period.
+
+*Config: as TS-63a, with a further cp_carers arriving on 15 March 2022, in the gap. The ordinary deliveries inside the gap still carry the dataset's file, as a supplier still sending files would (REQ-GEN-218 criterion 5).*
+
+| Where to look | |
+|---|---|
+| Dataset | cp-carers |
+| Supplies | `cp_carers__202201051000000800`, `cp_carers__202203151000000800` |
+| Period | 2021-Q4 |
+| Set the in-place-on date to | 2022-03-20 |
 
 ### TS-64 - An undeclared change to a frozen date
 
@@ -1017,24 +1199,41 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "mode": "INJECT",
    "title": "Quarterly, prior slot FILLED",
    "section": "Slot assignment",
-   "demonstrates": "August's window has not opened, so May is still the OPEN period (REQ-PIPE-131), and it is filled -> **resupply of May**. Being a filled slot it does **not auto-promote**; it holds and warns (TS-4).",
-   "breaksAs": null,
-   "config": "Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 19 July - one day outside August's window, which opens 20 July.",
+   "demonstrates": "*Config: Emergency Department, the quarterly calendar - the 1st of February, May, August and November, due 09:00, a 14-day claim window, so May 2025's window opens 09:00 on 17 April. February 2025's supply arrived as usual; this one arrives 10:00 on 16 April 2025, a day before May's window opens (REQ-GEN-236).* **Expect** (the first bootstrapped build, 2026-10-18): filed to **2025-Q1** by the branch `resupply-of-open-slot`, classified `late` - May's window has not opened, so February is still the open period, and it is filled. Being a resupply of a filled slot it is **not promoted**: 2025-Q2 is left with no supply, and the next quarter's drift checks fail by the gap rule (REQ-QAC-108), measured against February's supply. **Breaks as**: files to May because it is \"nearly\" May's - the window would then mean nothing. Keeps the family's note: the filled branch is a contained imperfection - a supplier one day early leaves a quarter to be put right by a person - not a defect.",
+   "breaksAs": "Files to May because it is \"nearly\" May's - the window would then mean nothing. Keeps the family's note: the filled branch is a contained imperfection - a supplier one day early leaves a quarter to be put right by a person - not a defect.",
+   "config": "Config: Emergency Department, the quarterly calendar - the 1st of February, May, August and November, due 09:00, a 14-day claim window, so May 2025's window opens 09:00 on 17 April. February 2025's supply arrived as usual; this one arrives 10:00 on 16 April 2025, a day before May's window opens (REQ-GEN-236).",
    "requirements": [
-    "REQ-PIPE-131"
+    "REQ-GEN-236",
+    "REQ-QAC-108"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__202504161000000800"
+    ],
+    "period": "2025-Q2",
+    "inPlaceOn": "2025-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-3b",
    "mode": "INJECT",
    "title": "Quarterly, prior slot UNFILLED",
    "section": "Slot assignment",
-   "demonstrates": "May is still the open period -> fills **May, ~79 days late**.",
-   "breaksAs": null,
+   "demonstrates": "*Same config, on Emergency Department, a year later: February 2026's supply never came (suppressed), and May's arrives 10:00 on 16 April 2026, a day before its window opens.* **Expect** (the first bootstrapped build, 2026-10-18): filed to **2026-Q1** by the branch `open-slot-unfilled`, classified `late` - about 74 days - because February is still the open period and nothing filled it. 2026-Q2 is left with no supply. **Breaks as**: files to May and leaves February owed for ever.",
+   "breaksAs": "Files to May and leaves February owed for ever.",
    "config": null,
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__202604161000000800"
+    ],
+    "period": "2026-Q2",
+    "inPlaceOn": "2026-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-3c",
@@ -1707,18 +1906,68 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-42",
+   "id": "TS-42a",
+   "mode": "INJECT",
+   "title": "A contested pair of one Child Protection table, while it is contested",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207), after REQ-PIPE-202 widened `cp_clients`' pattern so two of its files in one delivery contest the table; `tests/test_cp_pair.py` drives the shape through the real orchestrator. Two lettered siblings share the one placement (REQ-GEN-201): this one's link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).* **Breaks as**: one of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.",
+   "breaksAs": "One of the two files taken as the quarter's supply, or the three readers' cross-table checks evaluated against either.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2019-Q4's delivery carries the usual files and two Client Registers - cp_clients.csv at 08:30 and a re-export, cp_clients_v2.csv, at 08:40 whose rows differ (each re-pulled an hour later) - both before due; a clean cp_clients.csv follows alone on 29 November at 10:00, after due and before 2020-Q1's window opens, built green (REQ-GEN-184) after one green lead-in quarter (2019-Q3) and before a green one (2020-Q1).",
+   "requirements": [
+    "REQ-GEN-184",
+    "REQ-GEN-203",
+    "REQ-GEN-207",
+    "REQ-PIPE-202",
+    "REQ-GEN-201"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201911010830000800",
+     "cp_clients__201911291000000800"
+    ],
+    "period": "2019-Q4",
+    "inPlaceOn": "2019-11-01",
+    "targets": [
+     {
+      "date": "2019-11-29",
+      "at": "10:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": []
+     }
+    ],
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-42b",
    "mode": "INJECT",
    "title": "A contested pair of one Child Protection table, resolved by a later file",
    "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
-   "demonstrates": "NOT IN THE DATA YET, but reachable: REQ-PIPE-202 (2026-10-15, Keith's call of 2026-10-13) widened `cp_clients`' pattern so two of its files in one delivery contest the table, and REQ-GEN-203 plants it. `tests/test_cp_pair.py` drives the shape through the real orchestrator.",
-   "breaksAs": null,
-   "config": null,
-   "requirements": [
-    "REQ-PIPE-202",
-    "REQ-GEN-203"
-   ],
-   "coordinates": null
+   "demonstrates": "TS-42a's placement; this link opens on the later file's asset day. *Config: as TS-42a.* **Breaks as**: the pair still contested after the later file, or the later file filed as a resupply rather than ending the contest.",
+   "breaksAs": "The pair still contested after the later file, or the later file filed as a resupply rather than ending the contest.",
+   "config": "Config: as TS-42a.",
+   "requirements": [],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__201911010830000800",
+     "cp_clients__201911291000000800"
+    ],
+    "period": "2019-Q4",
+    "inPlaceOn": "2019-11-29",
+    "targets": [
+     {
+      "date": "2019-11-29",
+      "at": "10:00",
+      "built_to": "green",
+      "rules": [],
+      "moved": []
+     }
+    ],
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-43",
@@ -2076,69 +2325,206 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    }
   },
   {
-   "id": "TS-57",
+   "id": "TS-57a",
    "mode": "INJECT",
-   "title": "A correction that only re-judges",
+   "title": "A correction that only re-judges, before it is confirmed",
    "section": "Calendar corrections",
-   "demonstrates": "After merge, the dataset reads awaiting confirmation and nothing else changes. In the terminal the correction shows one verdict change (late -> on time) and NO moves, and still needs confirming. On confirmation a new verdict is recorded naming the change reference; the late verdict stays readable as history (REQ-PIPE-168 criteria 3-6).",
-   "breaksAs": "Applied on merge with nobody confirming because there were no moves; or the late verdict overwritten.",
-   "config": null,
+   "demonstrates": "The quarter reads late, and the correction awaits confirmation with one verdict change (late -> on time) and no moves (REQ-PIPE-168 criteria 3-6).",
+   "breaksAs": "Applied on merge with nobody confirming because there were no moves.",
+   "config": "Config: 2015-Q1's date is corrected from 1 to 2 February 2015; its one supply arrives at 12:00 on 2 February - late against the old date, on time against the corrected one.",
    "requirements": [
     "REQ-PIPE-168"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201502021200000800"
+    ],
+    "period": "2015-Q1",
+    "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
+   }
   },
   {
-   "id": "TS-58",
+   "id": "TS-57b",
    "mode": "INJECT",
-   "title": "A correction that moves supplies, all confirmed",
+   "title": "A correction that only re-judges, once confirmed",
    "section": "Calendar corrections",
-   "demonstrates": "The terminal proposes moving it May -> August with its re-judged verdict; on confirmation it is re-filed as a person's re-file naming the correction, re-QA'd and re-gated automatically, and judged against August (REQ-PIPE-170 criteria 2, 7).",
-   "breaksAs": "Moved with the verdict computed against May; or not re-QA'd.",
-   "config": "Config: the August period's claim window opens two weeks earlier.",
+   "demonstrates": "A new verdict naming the change reference, on time; the late verdict still readable as history.",
+   "breaksAs": "The late verdict overwritten, or no verdict naming the correction.",
+   "config": "Config: as TS-57a.",
+   "requirements": [],
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201502021200000800"
+    ],
+    "period": "2015-Q1",
+    "inPlaceOn": "2026-09-22",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-58a",
+   "mode": "INJECT",
+   "title": "A correction that moves a supply, before it is confirmed",
+   "section": "Calendar corrections",
+   "demonstrates": "The correction proposes moving it 2013-Q3 -> 2013-Q4 with its re-judged verdict, and awaits confirmation.",
+   "breaksAs": "Moved on merge, or proposed with the verdict computed against 2013-Q3.",
+   "config": "Config: 2013-Q4's date is corrected from 1 November to 20 October 2013. Its supply arrives on 10 October, before the old window opened, so it is filed as a resupply of 2013-Q3; the corrected window covers it.",
+   "requirements": [],
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201310101000000800"
+    ],
+    "period": "2013-Q4",
+    "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-58b",
+   "mode": "INJECT",
+   "title": "A correction that moves a supply, once confirmed",
+   "section": "Calendar corrections",
+   "demonstrates": "Re-filed to 2013-Q4 as a re-file naming the correction, re-QA'd and re-gated, judged against 2013-Q4 (REQ-PIPE-170 criteria 2, 7).",
+   "breaksAs": "Left in 2013-Q3, or moved and not re-QA'd.",
+   "config": "Config: as TS-58a.",
    "requirements": [
     "REQ-PIPE-170"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201310101000000800"
+    ],
+    "period": "2013-Q4",
+    "inPlaceOn": "2026-09-22",
+    "subject": "supply-history-row"
+   }
   },
   {
-   "id": "TS-59",
+   "id": "TS-59a",
    "mode": "INJECT",
-   "title": "The asset manager keeps a supply",
+   "title": "A supply the asset manager will keep, before the correction is confirmed",
    "section": "Calendar corrections",
-   "demonstrates": "The kept supply stays filed where it is, with a KEPT decision-log entry naming it, its period, the change reference, the actor and the reason, and its verdict judged against the period it stays in; the other moves as in TS-58. The applied-summary lists both (REQ-PIPE-170 criteria 5, 6, 22).",
-   "breaksAs": "The kept supply moved anyway, kept silently with no reason, or re-judged against the period it did not go to.",
-   "config": null,
+   "demonstrates": "The move is proposed like TS-58a's.",
+   "breaksAs": "Kept or moved before anyone confirmed.",
+   "config": "Config: as TS-58 for 2014-Q3, corrected from 1 August to 20 July 2014; its supply arrives on 10 July, filed as a resupply of 2014-Q2, which the corrected agreement would move. A scripted confirmation keeps it (contract/scripted_decisions.yaml).",
+   "requirements": [],
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201407101000000800"
+    ],
+    "period": "2014-Q3",
+    "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-59b",
+   "mode": "INJECT",
+   "title": "A supply the asset manager kept",
+   "section": "Calendar corrections",
+   "demonstrates": "The supply stays filed where it is, with a KEPT decision-log entry naming it, its period, the change reference, the actor and the reason, and its verdict judged against the period it stays in (REQ-PIPE-170 criteria 5, 6, 22).",
+   "breaksAs": "Moved anyway, kept silently with no reason, or re-judged against the period it did not go to.",
+   "config": "Config: as TS-59a.",
    "requirements": [
     "REQ-PIPE-170"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201407101000000800"
+    ],
+    "period": "2014-Q3",
+    "inPlaceOn": "2026-09-22",
+    "subject": "supply-history-row"
+   }
   },
   {
-   "id": "TS-60",
+   "id": "TS-60a",
    "mode": "INJECT",
-   "title": "A correction that leaves a supply with no period",
+   "title": "A correction that leaves a supply with no period, before it is confirmed",
    "section": "Calendar corrections",
-   "demonstrates": "Proposed as \"would be held\"; on confirmation it is held (REQ-PIPE-064), the hold's reason naming the correction.",
-   "breaksAs": "Left filed in a period the corrected agreement does not give it; or dropped.",
-   "config": "Config: the period's claim window is shortened so an early supply no longer falls in any window.",
+   "demonstrates": "Proposed as \"would be held\".",
+   "breaksAs": "Held, or dropped, before confirmation.",
+   "config": "Config: Emergency Department's first quarter, 2013-Q1, has its date corrected from 1 to 11 February 2013. Its supply arrived on 22 January, inside the old window, before the corrected one opens and with no quarter before it.",
+   "requirements": [],
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201301221000000800"
+    ],
+    "period": "2013-Q1",
+    "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-60b",
+   "mode": "INJECT",
+   "title": "A supply left with no period, once confirmed",
+   "section": "Calendar corrections",
+   "demonstrates": "Held (REQ-PIPE-064), the hold's reason naming the correction.",
+   "breaksAs": "Left filed in a period the corrected agreement does not give it, or dropped.",
+   "config": "Config: as TS-60a.",
    "requirements": [
     "REQ-PIPE-064"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201301221000000800"
+    ],
+    "period": "2013-Q1",
+    "inPlaceOn": "2026-09-22",
+    "subject": "supply-history-row"
+   }
   },
   {
-   "id": "TS-61",
+   "id": "TS-61a",
    "mode": "INJECT",
-   "title": "A move that is blocked",
+   "title": "A move that will be blocked, before the correction is confirmed",
    "section": "Calendar corrections",
-   "demonstrates": "Listed as blocked, naming the decision that would unblock it; not moved, not dropped; the correction stays among the states needing action until it is moved or kept (REQ-PIPE-170 criteria 9, 19).",
-   "breaksAs": "Moved out from under the inheriting period; or the correction marked done with the supply silently left.",
-   "config": null,
+   "demonstrates": "The move is proposed, naming the period that stands on it.",
+   "breaksAs": "Moved out from under the inheriting period.",
+   "config": "Config: 2015-Q3's date is corrected from 1 to 11 August 2015. Its supply arrived on 22 July, which the corrected agreement files to 2015-Q2 - a move blocked because 2015-Q4, the participation gap (REQ-GEN-251), stands on it.",
+   "requirements": [
+    "REQ-GEN-251"
+   ],
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201507221000000800"
+    ],
+    "period": "2015-Q3",
+    "inPlaceOn": "2026-09-08",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-61b",
+   "mode": "INJECT",
+   "title": "A move that is blocked, once confirmed",
+   "section": "Calendar corrections",
+   "demonstrates": "Parked as blocked, naming the decision that would unblock it - not moved, not dropped; the correction stays among the states needing action (REQ-PIPE-170 criteria 9, 19).",
+   "breaksAs": "Moved, or the correction marked done with the supply silently left.",
+   "config": "Config: as TS-61a.",
    "requirements": [
     "REQ-PIPE-170"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__201507221000000800"
+    ],
+    "period": "2015-Q3",
+    "inPlaceOn": "2026-09-22",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-62",
@@ -2155,18 +2541,50 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "coordinates": null
   },
   {
-   "id": "TS-63",
-   "mode": "both",
-   "title": "A dataset turned off for a while",
+   "id": "TS-63a",
+   "mode": "INJECT",
+   "title": "A dataset turned off for a while: the turn-off",
    "section": "Calendar corrections",
-   "demonstrates": "*Config: quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim window 30 days before due, 2 days' grace; a participation version with `effective_to: 2026-03-31` and a `turned_off_reason`, then a later version from 2026-10-01 turning it back on.* **Expect** (Keith's worked example, 2026-10-10, REQ-PIPE-179 and REQ-DASH-180): February 2026 is still owed and its slot closes 15 April, when May's window would have opened; May and August owe nothing. A February supply arriving 10 March files to February, late; one arriving 5 April (dataset off, February still open) also files to February, late - or as a resupply if February is filled; one arriving 20 April finds no open owed slot and is held as turned off. The dataset keeps its real verdict with a 'Turning off - last supply owed: February, open until 15 Apr' marker until 15 April, then 'Turned off since 1 Apr'; gap periods read as owed-nothing rows and inherit the last promoted supply. After 1 October it reads as any dataset between deliveries, not 'No data'. **Breaks as**: the gap reads as missed supplies; the 5 April supply held instead of filed late; February going quiet before 15 April; a red verdict hidden behind the turn-off; or a gap arrival filed into a gap period.",
-   "breaksAs": "The gap reads as missed supplies; the 5 April supply held instead of filed late; February going quiet before 15 April; a red verdict hidden behind the turn-off; or a gap arrival filed into a gap period.",
-   "config": "Config: quarterly, period dates on the 15th of Feb/May/Aug/Nov, claim window 30 days before due, 2 days' grace; a participation version with `effective_to: 2026-03-31` and a `turned_off_reason`, then a later version from 2026-10-01 turning it back on.",
+   "demonstrates": "The late cp_carers files to 2021-Q4, late; 2021-Q4 stays owed until its slot closes (REQ-PIPE-179, REQ-DASH-180).",
+   "breaksAs": "The 5 January supply held instead of filed late, or 2021-Q4 going quiet before its slot closes.",
+   "config": "Config: Child Protection, quarterly Feb/May/Aug/Nov, due 09:00 on the 1st, 14-day claim window. cp-carers is turned off after 31 December 2021 by correction REQ-GEN-218 dated 15 December 2021, and owed again from 2022-Q3. 2021-Q4's delivery leaves cp_carers out; cp_carers follows on 5 January 2022, after the turn-off but while 2021-Q4's slot is open.",
    "requirements": [
+    "REQ-GEN-218",
     "REQ-PIPE-179",
     "REQ-DASH-180"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-carers",
+    "supplies": [
+     "cp_carers__202201051000000800",
+     "cp_carers__202203151000000800"
+    ],
+    "period": "2021-Q4",
+    "inPlaceOn": "2021-12-20",
+    "subject": "supply-history-row"
+   }
+  },
+  {
+   "id": "TS-63b",
+   "mode": "INJECT",
+   "title": "A dataset turned off for a while: the gap",
+   "section": "Calendar corrections",
+   "demonstrates": "The 15 March supply, and each ordinary gap delivery's cp_carers, finds no open owed slot and is held as turned off; 2022-Q1 and 2022-Q2 read owed-nothing and inherit the last promoted supply; from 2022-Q3 it reads as any dataset between deliveries.",
+   "breaksAs": "The gap read as missed supplies, or a gap arrival filed into a gap period.",
+   "config": "Config: as TS-63a, with a further cp_carers arriving on 15 March 2022, in the gap. The ordinary deliveries inside the gap still carry the dataset's file, as a supplier still sending files would (REQ-GEN-218 criterion 5).",
+   "requirements": [
+    "REQ-GEN-218"
+   ],
+   "coordinates": {
+    "dataset": "cp-carers",
+    "supplies": [
+     "cp_carers__202201051000000800",
+     "cp_carers__202203151000000800"
+    ],
+    "period": "2021-Q4",
+    "inPlaceOn": "2022-03-20",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-64",
@@ -2793,6 +3211,40 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "period": "2023-Q2",
     "inPlaceOn": "2023-06-16",
     "subject": "standing-in-pill"
+   }
+  },
+  {
+   "id": "TS-80",
+   "mode": "INJECT",
+   "title": "A contested pair of one Child Protection table, settled by a person",
+   "section": "The option A and period-closing batch, planted (REQ-GEN-136, REQ-GEN-137)",
+   "demonstrates": "PLANTED by REQ-GEN-203 (2026-10-18) in a grown quarter (REQ-GEN-207): a stray test file (TS-71's shape) beside the real Client Register, so a settlement can be seen clearing the cross-table readers the contest held, which only Child Protection has. Its link opens on the pair's arrival day. *Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, \"TS-80 settle\"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.* **Breaks as**: the test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.",
+   "breaksAs": "The test rows checked as the quarter's supply, the readers left contested after the settlement, or the file named by sorted name rather than by receipt position.",
+   "config": "Config: quarterly, Feb/May/Aug/Nov, due 09:00 on the 1st, claim window 14 days. 2020-Q4's delivery carries the usual files and two Client Registers - a stray test file, cp_clients_TEST.csv, every client named TEST, at 08:20 on the due day and the real cp_clients.csv at 08:30, both before 09:00 - after one green lead-in quarter (2020-Q3) and before a green one (2021-Q1), the real extract built green. A scripted person settles the pair at 11:00 the next day (contract/scripted_decisions.yaml, \"TS-80 settle\"): file one by receipt, the test file, rejected; file two, the real extract, the quarter's supply.",
+   "requirements": [
+    "REQ-GEN-203",
+    "REQ-GEN-207"
+   ],
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202011010820000800"
+    ],
+    "period": "2020-Q4",
+    "inPlaceOn": "2020-11-01",
+    "targets": [
+     {
+      "date": "2020-11-01",
+      "at": "08:30",
+      "delivery": "Data Extract 01 Nov 2020",
+      "filename": "cp_clients.csv",
+      "day": "2020-11-01",
+      "built_to": "green",
+      "rules": [],
+      "moved": []
+     }
+    ],
+    "subject": "supply-history-row"
    }
   }
  ]

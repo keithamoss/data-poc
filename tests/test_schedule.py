@@ -115,15 +115,15 @@ class TestTheDailyCalendarStartsWhereTheFeedDoes:
     def _generator_first_period(self):
         """The first day the generator actually plans a supply for.
 
-        Derived from the generator's own two constants rather than
+        Derived from the generator's own three constants rather than
         restated here - the point of the test is that the calendar and
         the generator agree, and a test carrying its own third copy of
         the date could not detect them disagreeing.
         """
         from generator.anchor_date import get_anchor_date
-        from generator.collections.civil_registration import GROWN_DAYS, N_DELIVERIES
+        from generator.collections.civil_registration import END_DAYS, GROWN_DAYS, N_DELIVERIES
 
-        return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS - 1)
+        return get_anchor_date() - timedelta(days=N_DELIVERIES + GROWN_DAYS + END_DAYS - 1)
 
     def test_the_calendar_starts_no_earlier_than_the_generator_supplies(self):
         """THE GUARD THAT SURVIVES A RE-ANCHOR. Pinning ANCHOR_DATE made
@@ -267,9 +267,12 @@ class TestClaimWindow:
     def test_the_default_tracks_the_calendars_own_scale(self):
         """The reason the default sits on the CALENDAR and not on the
         asset root: an asset-root default would hand Birth
-        Registrations a 14-day claim window on a daily feed."""
-        assert schedule.claim_window("cp-clients") == timedelta(days=14)
-        assert schedule.claim_window("birth-registrations") == timedelta(hours=4)
+        Registrations a 14-day claim window on a daily feed. Asked as at
+        2026-09-01: TS-62's fictional version widens Birth Registrations'
+        to six hours from 2026-09-25 (REQ-GEN-205)."""
+        on = date(2026, 9, 1)
+        assert schedule.claim_window("cp-clients", on=on) == timedelta(days=14)
+        assert schedule.claim_window("birth-registrations", on=on) == timedelta(hours=4)
 
     def test_a_dataset_may_override_it_in_its_own_contract(self):
         assert schedule.claim_window("cp-clients", "3d") == timedelta(days=3)

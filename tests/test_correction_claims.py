@@ -174,6 +174,53 @@ class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
         assert not cc.is_version_level("CAB-1", docs=docs)
 
 
+def _widen_daily_from(day):
+    def widen(cal, asset):
+        daily = next(c for c in cal["calendars"] if c["name"] == "daily")
+        last = daily["versions"][-1]
+        daily["versions"].append({**last, "effective_from": day, "claim_window": "6h",
+                                  "changelog": [{"date": "2026-10-19", "author": "a test",
+                                                 "change": "wider"}]})
+    return widen
+
+
+class TestTS62sVersionStandsAfterTheHistoryREQGEN199Quotes:
+    """REQ-GEN-205 criterion 25: TS-62's version takes effect after
+    2026-09-08, TS-47's following day, and after the last day any REQ-GEN-199
+    link names; on or before either, generation refuses naming TS-62 and
+    never shifts it."""
+
+    def _check(self, effective, last_link_day=None):
+        docs = _declare(_docs(), _widen_daily_from(effective), "CAB-62", "2026-09-07")
+        cc.check_version_after([_inj("TS-62", "birth-registrations", -1, rides="CAB-62")],
+                               docs=docs, last_link_day=last_link_day)
+
+    def test_a_version_after_ts47s_following_day_stands(self):
+        self._check("2026-09-09", last_link_day=date(2026, 9, 1))
+
+    def test_a_version_on_ts47s_following_day_is_refused_naming_ts62(self):
+        with pytest.raises(si.CannotPlace, match=r"TS-62.*2026-09-08"):
+            self._check("2026-09-08")
+
+    def test_a_version_on_the_last_link_day_is_refused(self):
+        with pytest.raises(si.CannotPlace, match=r"TS-62.*2026-09-12"):
+            self._check("2026-09-12", last_link_day=date(2026, 9, 12))
+
+    def test_it_is_refused_not_shifted(self):
+        docs = _declare(_docs(), _widen_daily_from("2026-09-05"), "CAB-62", "2026-09-04")
+        with pytest.raises(si.CannotPlace):
+            cc.check_version_after([_inj("TS-62", "birth-registrations", -1, rides="CAB-62")],
+                                   docs=docs, last_link_day=None)
+        assert cc.added_versions("CAB-62", docs=docs) == [date(2026, 9, 5)]
+
+    def test_the_committed_ts62_stands(self):
+        cc.check_version_after(si.INJECTIONS, last_link_day=cc.last_req_gen_199_link_day())
+
+    def test_the_last_req_gen_199_link_day_is_found(self):
+        day = cc.last_req_gen_199_link_day()
+        assert day is not None and day >= date(2026, 9, 1)
+
+
 class TestAWrittenArrivalIsAskedOnlyWhatAConfirmationCouldMove:
     """correction_claims.check_written asks a version-level correction about
     an ordinary arrival only where its confirmation could re-file it: an

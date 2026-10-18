@@ -37,7 +37,13 @@ from datetime import date
 # generated - kept deliberately, so pinning the anchor changed no date
 # and the commit that introduced it shows the vocabulary change alone
 # rather than burying it under a whole-history date shift.
-ANCHOR_DATE = date(2026, 9, 22)
+#
+# 2026-09-25 SINCE 2026-10-19 (Keith, "Grow BR's end"): three days added after
+# the old end so TS-62 has room after 2026-09-08 (REQ-GEN-205 criteria 11, 24
+# and 25). Birth Registrations' scenarios were re-anchored three days further
+# back in the same change, so none of their dates moved; the quarterly
+# collections gain no quarter.
+ANCHOR_DATE = date(2026, 9, 25)
 
 
 def get_anchor_date() -> date:

@@ -26,9 +26,33 @@ def test_every_dataset_computes_what_it_did_before_the_move():
         assert after.get("periods") == before.get("periods"), (
             f"{dataset_id}: its periods changed - "
             f"{_first_difference(before.get('periods'), after.get('periods'))}")
-        assert after.get("slots") == before.get("slots"), (
+        before_slots, after_slots = before.get("slots"), after.get("slots")
+        if dataset_id in _LATER_VERSION_ADDED:
+            before_slots, after_slots = (_before_the_later_version(x, dataset_id)
+                                         for x in (before_slots, after_slots))
+        assert after_slots == before_slots, (
             f"{dataset_id}: its slots changed - "
-            f"{_first_difference(before.get('slots'), after.get('slots'))}")
+            f"{_first_difference(before_slots, after_slots)}")
+
+
+# A LATER VERSION ADDED SINCE, as a declared correction: TS-62's six-hour
+# claim window for Birth Registrations from 2026-09-25 (REQ-GEN-205 criteria
+# 24 and 25, which require a new version near the history's end). It moves
+# that day's claim opening, and so the closing of the slot before it, which
+# ends where the next claim window opens (REQ-PIPE-131). Every slot before
+# that one is compared as pinned; the version itself is a new configuration,
+# not the move rewriting the past.
+_LATER_VERSION_ADDED = {"birth-registrations": "2026-09-25"}
+
+
+def _before_the_later_version(entries, dataset_id):
+    """The slots before the one whose closing the later version moves."""
+    if not entries:
+        return entries
+    names = [e[0] for e in entries]
+    cut = next((i for i, n in enumerate(names) if n >= _LATER_VERSION_ADDED[dataset_id]),
+               len(names))
+    return entries[:max(0, cut - 1)]
 
 
 # The datasets whose history was lengthened backwards: Birth Registrations

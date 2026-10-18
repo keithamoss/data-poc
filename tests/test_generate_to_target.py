@@ -934,9 +934,23 @@ class TestEachPlantedScenarioSitsInItsEra:
 
     def test_every_scripted_decision_comes_after_the_rule_has_decided(self):
         """Finding 11: the scripted promotion and acknowledgement only follow
-        the rule because the rule decides within the claim window."""
+        the rule because the rule decides within the claim window - the
+        window IN FORCE ON THE SCENARIO'S OWN DAY, since TS-62's version
+        widens it on the history's last day only."""
+        import dataclasses
+
+        from generator import scenario_injection as si
+        from generator.collections import civil_registration
         from qa_tools.common import schedule, scripted_decisions
-        window = schedule.claim_window(BDM_ID).total_seconds() / 3600
+        periods = civil_registration.generated_periods()
+        day = {i.scenario_id: date.fromisoformat(
+                   si.resolve(dataclasses.replace(i, links=()), periods).period)
+               for i in si.INJECTIONS if i.dataset_id == BDM_ID}
+        checked = 0
         for s in scripted_decisions.load():
             if s.dataset_id == BDM_ID and s.operation in ("promote", "acknowledge"):
+                on = day[si.placement_of()[s.scenario]]
+                window = schedule.claim_window(BDM_ID, on=on).total_seconds() / 3600
                 assert s.after_hours > window, (s.scenario, s.after_hours, window)
+                checked += 1
+        assert checked, "no scripted promotion or acknowledgement to check"

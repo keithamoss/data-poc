@@ -35430,6 +35430,18 @@ requirements:
     - REQ-DASH-208
     - REQ-PIPE-134
     decisions:
+    - 'ROOM FOR TS-62 CAME FROM GROWING BIRTH REGISTRATIONS'' END (Keith, 2026-10-19, "Grow BR''s end", "Move the anchor"):
+      ANCHOR_DATE moved from 2026-09-22 to 2026-09-25 and three end days generated with their own seeds (END_BASE_SEED,
+      civil_registration.end_periods), every Birth Registrations anchor re-counted by -3 so no planted scenario''s date moved.
+      TS-62 sits on the history''s last day, its version from 2026-09-25 and its correction dated 2026-09-24 - one day
+      before, read as criterion 11''s ''a few days'' - because a version from 2026-09-24 claimed 2026-09-22, which TS-46
+      holds. REJECTED moving TS-62 into the history before 2026-09-08 (2026-07-25 was tried): criterion 25 refuses it.
+      REJECTED amending criteria 11, 24 and 25.'
+    - 'CRITERION 25''S REFUSAL READS THE VERSION THE CORRECTION ADDS, NOT ITS CHANGE ITEM''S TEXT (main session, 2026-10-19):
+      correction_claims.added_versions compares the calendars just before and from the correction''s date, and
+      last_req_gen_199_link_day resolves TS-75 to TS-79''s links through link_dates (2026-09-01, TS-78b). The calendar
+      move pin compares Birth Registrations'' slots only before the one whose closing the new version moves
+      (tests/test_calendar_move_pin.py _LATER_VERSION_ADDED), as REQ-GEN-185''s earlier days were allowed; never re-captured.'
     - 'DECLARED IN contract/calendar.yaml ITSELF (Keith, 2026-10-13): ''this asset is a synthetic data asset for demo purposes,
       so that is fine''. REJECTED a synthetic-only overlay file.'
     - 'THE MECHANISM IS BUILT AND NOT REOPENED (Keith, 2026-10-11, answer (n); REQ-PIPE-170 criteria 30 and 31): a replay stages
@@ -35612,6 +35624,10 @@ requirements:
       - "generator/correction_claims.py::check"
       - "generator/correction_claims.py::filing_changes"
       - "generator/correction_claims.py::check_written"
+      - "generator/correction_claims.py::check_version_after"
+      - "generator/correction_claims.py::added_versions"
+      - "generator/correction_claims.py::last_req_gen_199_link_day"
+      - "generator/collections/civil_registration.py::end_periods"
       - "generator/scenario_injection.py::correction_event"
       - "generator/scenario_injection.py::INJECTIONS"
       - "cli/scenarios.py::validate_command"
@@ -35627,13 +35643,13 @@ requirements:
         owner: "the main session"
         blocked_by:
           unowned: true
-      - criterion: "Criteria 11, 21, 24 and 25 - TS-62's correction dated a few days before the history's end, its version taking effect near the end and after 2026-09-08, and generation refusing a version taking effect on or before 2026-09-08 naming TS-62."
-        why: "TS-62 IS NOT PLANTED (2026-10-19; plans/morning-reports.md #6). Its correction claims the day its version governs and the day before, and every day of Birth Registrations' history after 2026-09-08 is claimed by TS-1, TS-2, TS-43 to TS-47 or their lead-ins, except 2026-09-19 alone - so criteria 11, 24 and 25 cannot all hold. A move to 2026-07-25 was tried and taken out again, because criterion 25 says generation SHALL refuse a version on or before 2026-09-08 and SHALL NOT shift it. Keith's call: give Birth Registrations room at its end, move an existing scenario, or amend criteria 11, 24 and 25."
-        owner: "Keith"
+      - criterion: "Criteria 11, 21 and 24, on the bootstrapped history - TS-62's 09:00 supply on 2026-09-25 claiming its day only under the pending correction, judged against the merged configuration while it waits."
+        why: "TS-62 IS PLANTED (2026-10-19, after Birth Registrations grew three end days) and criterion 25's refusal is built, but no bootstrap has run on this tree: the Emergency Department bootstrap waits on REQ-PIPE-261 (post-build-review #245), unsigned."
+        owner: "the main session, from the final Emergency Department bootstrap"
         blocked_by:
           unowned: true
       - criterion: "Criteria 13, 14 and 15 - the register entries of TS-57 to TS-62 rewritten to the quarterly calendar's real values and their corrections, with Config, Expect from the first bootstrapped build and Breaks as; TS-61's Expect to the parking; what each leaves standing."
-        why: "TS-57a to TS-61b are rewritten to Emergency Department's calendar and the correction (plans/supply-model.md, Calendar corrections); TS-62's entry stays as it was, the scenario not planted (criteria 11, 24 and 25). Their Expect lines are to be re-read against the final bootstrapped build."
+        why: "TS-57a to TS-61b are rewritten to Emergency Department's calendar and the correction (plans/supply-model.md, Calendar corrections); TS-62's entry is to be written from the bootstrapped build, the scenario now planted (criteria 11, 24 and 25). Their Expect lines are to be re-read against the final bootstrapped build."
         owner: "the main session, from the final Emergency Department bootstrap"
         blocked_by:
           unowned: true

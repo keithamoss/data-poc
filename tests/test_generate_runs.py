@@ -145,7 +145,7 @@ def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     _, suppressed = _injected_periods()
     slot_ids = {e["slot_id"] for e in manifest}
     assert len(slot_ids) == (len(generate_runs.RUN_PLAN) + generate_runs.GROWN_DAYS
-                             - len(suppressed))
+                             + generate_runs.END_DAYS - len(suppressed))
     assert not ({e["period"] for e in manifest} & suppressed), (
         "a period an injected scenario needs empty carries a supply")
 

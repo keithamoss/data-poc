@@ -157,6 +157,15 @@ N_DELIVERIES = 85
 GROWN_DAYS = 12
 GROWN_BASE_SEED = 40000
 
+# THREE DAYS AT THE NEW END (Keith, 2026-10-19, "Grow BR's end"): room for
+# TS-62 after 2026-09-08, near the history's end (REQ-GEN-205 criteria 11, 24
+# and 25), where every day was already claimed. Grown as the era above was:
+# the 85 and the era keep their bytes, slot ids and seeds, these three come
+# after them with seeds of their own, and they carry no ordinary reds or
+# ambers - their days are TS-62's.
+END_DAYS = 3
+END_BASE_SEED = 42000
+
 
 # The clean/amber/red mix across the scheduled deliveries. Named rather
 # than left as magic numbers in the function below because the RED share
@@ -714,14 +723,19 @@ def _away_from_suppressed(deliveries, suppressed: set[str], taken_days: set[str]
 
 def generated_periods() -> list:
     """The periods this generator writes, oldest first: the evening-before
-    era's twelve, then the 85."""
+    era's twelve, then the 85, then the three at the new end."""
     return schedule.periods_for_dataset(
-        DATASET_ID, until=get_anchor_date())[-(N_DELIVERIES + GROWN_DAYS):]
+        DATASET_ID, until=get_anchor_date())[-(N_DELIVERIES + GROWN_DAYS + END_DAYS):]
 
 
 def original_periods() -> list:
     """The 85 periods generated before the evening-before era existed."""
-    return generated_periods()[GROWN_DAYS:]
+    return generated_periods()[GROWN_DAYS:GROWN_DAYS + N_DELIVERIES]
+
+
+def end_periods() -> list:
+    """The three periods grown at the new end, oldest first (TS-62's)."""
+    return generated_periods()[GROWN_DAYS + N_DELIVERIES:]
 
 
 def grown_periods() -> list:
@@ -736,6 +750,14 @@ def _grown_row_counts() -> list[int]:
 
     rng = np.random.default_rng(GROWN_BASE_SEED - 1000)
     return [int(n) for n in rng.integers(1_700, 2_050, size=GROWN_DAYS)]
+
+
+def _end_row_counts() -> list[int]:
+    """The new end's row counts, from a seed of its own."""
+    import numpy as np
+
+    rng = np.random.default_rng(END_BASE_SEED - 500)
+    return [int(n) for n in rng.integers(1_700, 2_050, size=END_DAYS)]
 
 
 def _plan_injections(periods):
@@ -804,7 +826,7 @@ class CivilRegistration(Provider):
 
     collection_id = "civil-registration"
     dataset_id = DATASET_ID
-    seed_ranges = ((1000, 2100), (39000, 41100))
+    seed_ranges = ((1000, 2100), (39000, 41100), (41400, 43100))
     target_trial = True
     target_datasets = (DATASET_ID,)
     target_levers = "null-rate"
@@ -818,6 +840,9 @@ class CivilRegistration(Provider):
                 for i in range(1, N_DELIVERIES + 1)]
         out += [(f"slot_{N_DELIVERIES + j:03d}", GROWN_BASE_SEED + j, GROWN_BASE_SEED + j + SEED_SPAN)
                 for j in range(1, GROWN_DAYS + 1)]
+        out += [("the new end's row counts", END_BASE_SEED - 500, END_BASE_SEED - 500)]
+        out += [(f"slot_{N_DELIVERIES + GROWN_DAYS + k:03d}", END_BASE_SEED + k,
+                 END_BASE_SEED + k + SEED_SPAN) for k in range(1, END_DAYS + 1)]
         return out
 
     def generated_periods(self) -> list:
@@ -826,7 +851,8 @@ class CivilRegistration(Provider):
     def plan(self) -> Plan:
         provider = BirthRegistrationsProvider()
         periods = generated_periods()
-        originals, grown = periods[GROWN_DAYS:], periods[:GROWN_DAYS]
+        originals = periods[GROWN_DAYS:GROWN_DAYS + N_DELIVERIES]
+        grown, ends = periods[:GROWN_DAYS], periods[GROWN_DAYS + N_DELIVERIES:]
 
         # BEFORE THE FIRST WRITE (REQ-GEN-044 criterion 4) - see
         # _plan_injections()'s own docstring.
@@ -867,6 +893,10 @@ class CivilRegistration(Provider):
             i = N_DELIVERIES + j
             jobs.append(Job(f"slot_{i:03d}", GROWN_BASE_SEED + j, None, period,
                             {"i": i, "rows": rows, "in_era": True}))
+        for k, (rows, period) in enumerate(zip(_end_row_counts(), ends), start=1):
+            i = N_DELIVERIES + GROWN_DAYS + k
+            jobs.append(Job(f"slot_{i:03d}", END_BASE_SEED + k, None, period,
+                            {"i": i, "rows": rows, "in_era": False}))
         return Plan(jobs=jobs, resolved=resolved_injections,
                     injected_by_period=injected_by_period,
                     state={"provider": provider, "periods": periods,
