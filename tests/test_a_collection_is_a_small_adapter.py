@@ -191,6 +191,25 @@ class TestItGoesAllTheWay:
         assert found["wrong"] == []
 
 
+class TestTheGatesTakeItAsItIs:
+    """Criterion 5 for the new collection, and the collections and providers
+    gates accepting a collection added this way."""
+
+    def test_the_collections_gate_passes_and_reports_its_adapter(self, copy):
+        done = subprocess.run([sys.executable, "-m", "qa_tools.common.validate_collections"],
+                              cwd=copy.tree, env=copy.env, capture_output=True, text=True,
+                              timeout=300)
+        assert done.returncode == 0, done.stdout + done.stderr
+        line = next(x for x in done.stdout.splitlines() if fake_collection.COLLECTION_ID in x)
+        assert "against a budget of 150" in line and "generator provider" in line, line
+
+    def test_the_providers_gate_passes(self, copy):
+        done = subprocess.run([sys.executable, "-m", "generator.validate_providers"],
+                              cwd=copy.tree, env=copy.env, capture_output=True, text=True,
+                              timeout=300)
+        assert done.returncode == 0, done.stdout + done.stderr
+
+
 class TestNothingReachesTheRepository:
     """Criterion 6."""
 

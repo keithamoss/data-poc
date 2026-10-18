@@ -31,7 +31,7 @@ from tree_copy import ROOT, tracked_files
 FILES = Path(__file__).resolve().parent / "fake_collection_files"
 INSERTS = FILES / "inserts"
 
-COLLECTION_ID, SHORT, AGENCY_ID = "widget-register", "wr", "widget-agency"
+COLLECTION_ID, SHORT, AGENCY_ID = "widget-register", "wreg", "widget-agency"
 DATASET_ID, TABLE = "widgets", "widgets"
 
 #: Where a collection's own new files may go (criterion 3).

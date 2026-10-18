@@ -4,8 +4,8 @@
       collections:
         - id: widget-register
           name: Widget Register
-          short: wr
-          run_prefix: wr_run_
+          short: wreg   # not "wr": see post-build-review #235
+          run_prefix: wreg_run_
           contract: widget-agency/widget-register-contract.yaml
           delivery_boundary: directory
           datasets:

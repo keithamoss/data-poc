@@ -60,7 +60,7 @@ class WidgetRegister(Provider):
         return [_Delivery(rows, job.severity, job.period.date)]
 
     def entries(self, plan: Plan, job: Job, deliveries: list, run_index_start: int) -> list[dict]:
-        return [{"run_id": f"wr_run_{run_index_start + n:03d}", "run_index": run_index_start + n,
+        return [{"run_id": f"wreg_run_{run_index_start + n:03d}", "run_index": run_index_start + n,
                  "slot_id": job.slot_id, "period": job.period.name, "received_at": None,
                  "dirty_severity": d.severity, "seed": job.seed,
                  "row_counts": {"widgets": len(d.payload)}}

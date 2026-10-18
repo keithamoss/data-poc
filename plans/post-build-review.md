@@ -10402,3 +10402,19 @@ twice. It deliberately did not re-find the `TypeError`.
      - DECLINED by Keith for now (2026-10-18): ranking "Closest:" by prefix with
        labels, a `<short>` placeholder in hints, capping the picker's height and
        a header on `mothman collections`.
+
+235. **[todo, 2026-10-18 - FOR KEITH]** **[Testing & dev tooling]** **The
+     collections gate's literal check will misfire on short collection shorts.**
+     Found by REQ-TEST-249's own test, which now runs both gates in its copy:
+     with the fake collection's short set to `wr`, the gate failed on
+     generator/presentation.py's keyboard-neighbour table (`"e": "wr"`), which
+     has nothing to do with any collection. The check flags every string
+     literal equal to a registered short, id or run prefix outside its exempt
+     places. At two collections with the shorts `bdm` and `cp` it has never
+     misfired; at about thirty, with two- and three-letter shorts (an Emergency
+     Department `ed`, say), ordinary literals will collide, and the only remedy
+     today is the shrink-only allowlist, which is meant for files awaiting a
+     rewire. The fake's short is `wreg` so its test proves the rest. NOT
+     CHANGED: whether the literal check should match shorts at all, or only ids
+     and run prefixes, or require a minimum length, is a change to REQ-PIPE-240's
+     gate and Keith's call.
