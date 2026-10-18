@@ -5657,6 +5657,16 @@ could never have computed it), and it belongs with batch 5's check work.
     12. FILING MENU LABELS: use the QA menu's label rule (Birth Registrations,
         Child Protection), so the same word finds a collection in every menu.
 
+    REQ-QAC-247's FLAG CALLS, the same evening (~20:20): every brief went
+    with its recommendation - the twelve no-change flags unified on Child
+    Protection's behaviour with one capture pair for the batch, the Soda
+    '[all]' suffix dropped, zero counts kept everywhere (REQ-PIPE-248
+    criterion 1 amended), Table-level always and Cross-table only above one
+    table, earliest_extract no longer recorded, Soda dimensions read from
+    each check's category, the Evidently volume check moved in from 248 and
+    unified on Child Protection's, and the Soda count fixed test-first.
+    Recorded in full in REQ-QAC-247's decisions.
+
 107. **[todo, 2026-10-18]** **[Docs & process]** **Why is there 77,000 lines
     of product code?** Keith, 2026-10-18: "how the fuck do we have 77,000
     lines of product code? That's ridiculous." Measured the same day: 76,720
