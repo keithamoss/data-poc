@@ -77,7 +77,7 @@ class TestTheRealCalendars:
             assert schedule.calendar_for_dataset(entry.dataset_id).name in {"quarterly", "daily"}
 
     def test_the_quarterly_dates_match_the_cadence_the_data_is_generated_against(self):
-        """The authored dates and generator/generate_cp_runs.py's own
+        """The authored dates and generator/collections/child_protection.py's own
         Feb/May/Aug/Nov anchor must agree, or the schedule judges
         supplies against dates nothing ever delivered on."""
         months = {p.date.month for p in schedule.calendar("quarterly").current.periods}

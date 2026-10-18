@@ -143,10 +143,10 @@ class TestAStoodOnPeriodIsClaimed:
     def test_the_real_child_protection_plan_passes(self):
         """TS-76 stands on 2024-Q4 and TS-77a on 2023-Q1; TS-56 moved to the
         newest quarter so neither is another scenario's (Keith, 2026-10-15)."""
-        from generator.collections import child_protection as generate_cp_runs
+        from generator.collections import child_protection as cp_provider
 
-        periods = generate_cp_runs.generated_periods()
-        resolved, _ = generate_cp_runs._plan_injections(periods)
+        periods = cp_provider.generated_periods()
+        resolved, _ = cp_provider._plan_injections(periods)
         stood = {inj.scenario_id: si.stood_on(inj, periods) for inj, _p in resolved
                  if inj.stands_on is not None}
         assert stood == {"TS-76": periods[-8].name, "TS-77a": periods[-15].name}
@@ -726,9 +726,9 @@ class TestTheLaterSingleTableResupplyAndTheStoodOnPeriod:
         assert "TS-54" in self._of("TS-76").also_demonstrates
 
     def test_their_links_resolve_on_the_real_calendar(self):
-        from generator.collections import child_protection as generate_cp_runs
+        from generator.collections import child_protection as cp_provider
 
-        periods = generate_cp_runs.generated_periods()
+        periods = cp_provider.generated_periods()
         for sid in ("TS-12", "TS-76"):
             injection = self._of(sid)
             dates = si.link_dates(injection, si.resolve(injection, periods))

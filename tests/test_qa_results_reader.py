@@ -112,7 +112,7 @@ def test_list_run_ids_and_read_qa_results_sort_numerically_not_lexicographically
     # names as plain strings, which is only correct as long as every
     # run number has the same digit width - "run_100" < "run_20" <
     # "run_3" lexicographically, wrong once BDM's real run count grew
-    # past a fixed zero-padding width (see generator/generate_runs.py's
+    # past a fixed zero-padding width (see generator/collections/civil_registration.py's
     # own comment on the same bug). Written deliberately out of numeric
     # order so a no-op "sort" couldn't accidentally still pass.
     write_qa_result("agency", "dataset", "run_100", "2026-04-10T00:00:00Z", "dbt", {},

@@ -311,10 +311,10 @@ class TestTheGeneratedPeriodsAreEachGenerators:
     test above monkeypatches."""
 
     def test_each_collection_gets_its_own_generators_periods(self):
-        from generator.collections import child_protection as generate_cp_runs
+        from generator.collections import child_protection as cp_provider
         from generator.collections import civil_registration as generate_runs
 
-        assert si.generated_periods("cp-carers") == generate_cp_runs.generated_periods()
+        assert si.generated_periods("cp-carers") == cp_provider.generated_periods()
         assert si.generated_periods("birth-registrations") == generate_runs.generated_periods()
         assert si.generated_periods("cp-carers") != si.generated_periods("birth-registrations")
 

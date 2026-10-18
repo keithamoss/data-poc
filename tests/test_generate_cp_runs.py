@@ -1,4 +1,4 @@
-"""Smoke test for generator/generate_cp_runs.py: runs the real generator
+"""Smoke test for generator/collections/child_protection.py: runs the real generator
 (fast, seeded, this repo's convention throughout) and checks the
 resulting manifest has the shape everything downstream depends on -
 same pattern as tests/test_generate_runs.py (BDM's own counterpart),
@@ -39,7 +39,7 @@ import pandas as pd
 import pytest
 
 import generator_isolation
-from generator.collections import child_protection as generate_cp_runs
+from generator.collections import child_protection as cp_provider
 from generator.collections.child_protection import TABLES, ChildProtectionProvider, _pick_dirty_tables
 from qa_tools.common import asset_time
 from generator import driver
@@ -47,7 +47,7 @@ from generator import driver
 
 @pytest.fixture(scope="module")
 def raw_dir(tmp_path_factory):
-    """Every one of generate_cp_runs' outputs - see
+    """Every one of cp_provider' outputs - see
     tests/generator_isolation.py and BDM's own counterpart.
 
     YIELDS THE DELIVERY TREE since REQ-PIPE-102: Child Protection no
@@ -79,7 +79,7 @@ def manifest(raw_dir, real_data_before):
     was generated", which is what it is."""
     driver.generate("child-protection")
     with open(driver.BOOKKEEPING_PATH) as f:
-        return json.load(f)[generate_cp_runs.DATASET_ID]
+        return json.load(f)[cp_provider.DATASET_ID]
 
 
 def test_dirty_module_resolves_to_generators_own_copy():
@@ -88,7 +88,7 @@ def test_dirty_module_resolves_to_generators_own_copy():
     from generator import dirty as dirty_mod
 
     dirty_dir = os.path.dirname(dirty_mod.__file__)
-    generator_dir = os.path.dirname(os.path.dirname(generate_cp_runs.__file__))
+    generator_dir = os.path.dirname(os.path.dirname(cp_provider.__file__))
     assert os.path.normpath(dirty_dir) == os.path.normpath(generator_dir)
     assert hasattr(dirty_mod, "apply_cp_clients_presets")
 
@@ -96,7 +96,7 @@ def test_dirty_module_resolves_to_generators_own_copy():
 def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     delivery_ids = {e["slot_id"] for e in manifest}
     # THE GROWN QUARTERS TOO (REQ-GEN-207): one slot per generated period.
-    assert len(delivery_ids) == len(generate_cp_runs.RUN_PLAN) + len(generate_cp_runs.GROWN_RUN_PLAN)
+    assert len(delivery_ids) == len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
 
 
 def _delivery_dir(raw_dir, entry):
@@ -117,9 +117,9 @@ def _shape_of(entry, manifest) -> str | None:
     table out, or carry one alone, ON PURPOSE)."""
     from generator.anchor_date import get_anchor_date
 
-    periods = generate_cp_runs.schedule.periods_for_dataset(
-        generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
-    _, injected = generate_cp_runs._plan_injections(periods)
+    periods = cp_provider.schedule.periods_for_dataset(
+        cp_provider.DATASET_ID, until=get_anchor_date())[-len(cp_provider.RUN_PLAN):]
+    _, injected = cp_provider._plan_injections(periods)
     if entry["period"] not in injected:
         return None
     slot = sorted((e for e in manifest if e["slot_id"] == entry["slot_id"]),
@@ -131,14 +131,14 @@ def test_every_manifest_entry_has_real_files_on_disk(manifest, raw_dir):
     from generator import scenario_injection as si
 
     # A GROWN QUARTER CASE WORKERS OWES NOTHING IN CARRIES FIVE FILES (REQ-GEN-207).
-    owed = {p.name for p in generate_cp_runs.schedule.periods_for_dataset("cp-case-workers")
+    owed = {p.name for p in cp_provider.schedule.periods_for_dataset("cp-case-workers")
             if p.expected}
-    grown = {p.name for p in generate_cp_runs.grown_periods()}
+    grown = {p.name for p in cp_provider.grown_periods()}
     for entry in manifest:
         run_dir = _delivery_dir(raw_dir, entry)
         shape = _shape_of(entry, manifest)
         five = entry["period"] in grown - owed
-        for table in (t for t in generate_cp_runs.TABLES if si.carries(shape, t)
+        for table in (t for t in cp_provider.TABLES if si.carries(shape, t)
                       and not (five and t == "cp_case_workers")):
             path = run_dir / f"{table}.csv"
             assert path.exists(), f"{entry['run_id']}: {path} missing"
@@ -155,25 +155,25 @@ def test_severity_counts_match_run_plan(manifest):
     first_by_slot = {}
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first_by_slot.setdefault(e["slot_id"], e)
-    assert len(first_by_slot) == len(generate_cp_runs.RUN_PLAN) + len(generate_cp_runs.GROWN_RUN_PLAN)
+    assert len(first_by_slot) == len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
 
     # AN INJECTED SLOT FOLLOWS ITS INJECTION, not the run plan (REQ-GEN-044):
     # the scenario replaces that period's chain with the arrivals it names.
     # Found when TS-12 landed on a slot the plan had as red (2026-10-05);
     # TS-38 had only agreed with the plan by coincidence.
     from generator.anchor_date import get_anchor_date
-    schedule = generate_cp_runs.schedule
+    schedule = cp_provider.schedule
 
     del schedule, get_anchor_date
     # GENERATION ORDER (REQ-GEN-207 criterion 4): the original fifteen, then
     # the grown quarters oldest first, each from its own plan.
-    original, grown = generate_cp_runs.original_periods(), generate_cp_runs.grown_periods()
-    _, injected = generate_cp_runs._plan_injections(generate_cp_runs.generated_periods())
+    original, grown = cp_provider.original_periods(), cp_provider.grown_periods()
+    _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
     # THE PLANNED SEVERITY, ambers moved off periods that cannot take them
     # (REQ-GEN-184 criterion 9) - and a scenario that keeps its period's
     # drawn amber carries it (REQ-GEN-199).
-    planned = (generate_cp_runs._ordinary_severities(original, injected)
-               + generate_cp_runs._grown_severities(grown, injected))
+    planned = (cp_provider._ordinary_severities(original, injected)
+               + cp_provider._grown_severities(grown, injected))
     periods = original + grown
 
     def first_of(name, severity):
@@ -202,9 +202,9 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
 
     from generator.anchor_date import get_anchor_date
 
-    periods = generate_cp_runs.schedule.periods_for_dataset(
-        generate_cp_runs.DATASET_ID, until=get_anchor_date())[-len(generate_cp_runs.RUN_PLAN):]
-    _, injected = generate_cp_runs._plan_injections(periods)
+    periods = cp_provider.schedule.periods_for_dataset(
+        cp_provider.DATASET_ID, until=get_anchor_date())[-len(cp_provider.RUN_PLAN):]
+    _, injected = cp_provider._plan_injections(periods)
     for slot_id, deliveries in by_slot.items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
         # A SCENARIO WHOSE FIRST DELIVERY KEEPS ITS QUARTER'S DRAWN AMBER is
@@ -568,9 +568,9 @@ def test_the_original_fifteen_keep_their_slots_and_come_first(manifest):
     the original fifteen's as it was - slot ids 01 to 15 in their order and the
     first run indices - and the grown quarters are numbered after them, oldest
     first, from a seed range of their own."""
-    original = [p.name for p in generate_cp_runs.original_periods()]
-    grown = [p.name for p in generate_cp_runs.grown_periods()]
-    assert len(grown) == generate_cp_runs.GROWN_QUARTERS
+    original = [p.name for p in cp_provider.original_periods()]
+    grown = [p.name for p in cp_provider.grown_periods()]
+    assert len(grown) == cp_provider.GROWN_QUARTERS
     first = {}
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first.setdefault(e["slot_id"], e)
@@ -581,8 +581,8 @@ def test_the_original_fifteen_keep_their_slots_and_come_first(manifest):
     assert all(e["run_index"] > last_original for e in manifest if e["period"] in grown)
     # SEEDS: the original fifteen's plus every offset they take (+500 to +1000)
     # never reach the grown range.
-    assert generate_cp_runs.BASE_SEED + 15 + 1000 < generate_cp_runs._GROWN_PLAN_SEED
-    assert generate_cp_runs._GROWN_PLAN_SEED < generate_cp_runs.GROWN_BASE_SEED
+    assert cp_provider.BASE_SEED + 15 + 1000 < cp_provider._GROWN_PLAN_SEED
+    assert cp_provider._GROWN_PLAN_SEED < cp_provider.GROWN_BASE_SEED
 
 
 def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, raw_dir):
@@ -590,10 +590,10 @@ def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, ra
     cp-case-workers does not take part in carries five files, as a supplier
     sending twice a year would - the original fifteen keep sending all six,
     and their off-month Case Workers files stay held as before."""
-    owed = {p.name for p in generate_cp_runs.schedule.periods_for_dataset("cp-case-workers")
+    owed = {p.name for p in cp_provider.schedule.periods_for_dataset("cp-case-workers")
             if p.expected}
-    grown = {p.name for p in generate_cp_runs.grown_periods()}
-    original = {p.name for p in generate_cp_runs.original_periods()}
+    grown = {p.name for p in cp_provider.grown_periods()}
+    original = {p.name for p in cp_provider.original_periods()}
     off_grown = [e for e in manifest if e["period"] in grown and e["period"] not in owed]
     on_grown = [e for e in manifest if e["period"] in grown and e["period"] in owed]
     off_original = [e for e in manifest if e["period"] in original - owed
@@ -616,14 +616,14 @@ class TestAScenarioInAGrownQuarterIsRefused:
     def test_it_names_the_scenario(self):
         from generator import scenario_injection as si
 
-        grown = generate_cp_runs.grown_periods()
+        grown = cp_provider.grown_periods()
         injection = si.Injection("TS-99", "cp-clients", 0, "a test")
         placed = si.resolve(injection, grown)
         with pytest.raises(si.CannotPlace) as refused:
-            generate_cp_runs._grown_severities(grown, {placed.period: (injection, placed)})
+            cp_provider._grown_severities(grown, {placed.period: (injection, placed)})
         assert "TS-99" in str(refused.value) and placed.period in str(refused.value)
 
     def test_the_real_plan_has_none_and_passes(self):
-        _, injected = generate_cp_runs._plan_injections(generate_cp_runs.generated_periods())
-        grown = generate_cp_runs.grown_periods()
-        assert len(generate_cp_runs._grown_severities(grown, injected)) == len(grown)
+        _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
+        grown = cp_provider.grown_periods()
+        assert len(cp_provider._grown_severities(grown, injected)) == len(grown)

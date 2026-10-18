@@ -26,11 +26,11 @@ FILES = {f"{t}.csv": f"{t} rows" for t in
 
 
 def _cp_periods():
-    from generator.collections import child_protection as generate_cp_runs
+    from generator.collections import child_protection as cp_provider
 
     # THE ORIGINAL FIFTEEN (REQ-GEN-207): what TS-79 and the as-at scenarios
     # are placed over; the grown quarters before them carry no scenario.
-    return generate_cp_runs.original_periods()
+    return cp_provider.original_periods()
 
 
 def _bdm_periods():
@@ -88,15 +88,15 @@ class TestAKeptSeverityIsOnlyEverAnAmber:
     keeps an amber; a drawn red would be planned and not written."""
 
     def test_a_drawn_red_on_such_a_quarter_is_refused(self, monkeypatch):
-        from generator.collections import child_protection as generate_cp_runs
+        from generator.collections import child_protection as cp_provider
 
         periods = _cp_periods()
         index = [p.name for p in periods].index(si.resolve(_injection("TS-76"), periods).period)
-        plan = list(generate_cp_runs.RUN_PLAN)
+        plan = list(cp_provider.RUN_PLAN)
         plan[index] = (plan[index][0], "red")
-        monkeypatch.setattr(generate_cp_runs, "run_plan", lambda: plan)
+        monkeypatch.setattr(cp_provider, "run_plan", lambda: plan)
         with pytest.raises(si.CannotPlace, match="TS-76.*keeps only an amber"):
-            generate_cp_runs._plan_injections(periods)
+            cp_provider._plan_injections(periods)
 
 
 class TestOnePlacementCoversSeveralDays:
@@ -175,14 +175,14 @@ class TestWhereTheNewChildProtectionScenariosSit:
             assert _injection(sid).anchor not in (-1, -2, -15), sid
 
     def test_every_one_is_planned_through_the_per_delivery_check(self):
-        from generator.collections import child_protection as generate_cp_runs
+        from generator.collections import child_protection as cp_provider
 
-        resolved, _ = generate_cp_runs._plan_injections(_cp_periods())
+        resolved, _ = cp_provider._plan_injections(_cp_periods())
         assert {"TS-75a", "TS-76", "TS-77a"} <= {i.scenario_id for i, _p in resolved}
 
     def test_ts_75_dirties_clients_alone(self):
         """Criterion 1: red by cp_clients' own preset alone (H2)."""
-        from generator.collections import child_protection as generate_cp_runs
+        from generator.collections import child_protection as cp_provider
 
         seen = []
 
@@ -198,7 +198,7 @@ class TestWhereTheNewChildProtectionScenariosSit:
                 return {t: f"dirty {t}" for t in payload}
 
         period = _cp_periods()[-11]
-        got = generate_cp_runs._injected_chain(Provider(), _injection("TS-75a"), period,
+        got = cp_provider._injected_chain(Provider(), _injection("TS-75a"), period,
                                                 seed=1)
         assert seen == [(["cp_clients"], "red")]
         assert got[0].payload["cp_clients"] == "dirty cp_clients"

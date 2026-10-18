@@ -10409,8 +10409,11 @@ twice. It deliberately did not re-find the `TypeError`.
        regenerate data/raw/" (now "the synthetic deliveries"), and "a
        Emergency" and "all 2 tables" (cli/wording.py's a_or_an and all_of,
        kept out of cli/common.py so `--help` imports nothing new).
-     - POLISH still open: stale references to the deleted per-collection
-       modules in test docstrings and aliases, the README section above, the dataset-anchor substring match and an anchor-less tooltip,
+     - ALSO DONE the same evening: the `generate_cp_runs` alias in four test
+       modules is `cp_provider`, and present-tense docstrings name the
+       provider modules; historical incident notes keep the old names, which
+       is what they were called at the time.
+     - POLISH still open: the README section above, the dataset-anchor substring match and an anchor-less tooltip,
        repeated check-file parsing per dataset, the presentation provenance
        naming deleted modules (REQ-PIPE-248's to reword), embed docstrings
        naming the two builders, lowercase `{legend}` text, `source:` fields

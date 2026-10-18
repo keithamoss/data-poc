@@ -1,4 +1,4 @@
-"""Smoke test for generator/generate_runs.py: runs the real generator (it's
+"""Smoke test for generator/collections/civil_registration.py: runs the real generator (it's
 fast, seeded, and this repo's convention throughout has been to verify by
 actually running things rather than mocking) and checks the resulting
 manifest has the shape everything downstream depends on.
