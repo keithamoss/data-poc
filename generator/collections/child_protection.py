@@ -682,10 +682,13 @@ def _severities(plan, periods, injected_by_period) -> list:
                       for name in placement.built_green)
     # A SCENARIO THAT KEEPS ITS PERIOD'S DRAWN SEVERITY (REQ-GEN-199) can
     # carry an ordinary amber like any clean period.
+    # A QUARTER ANOTHER COLLECTION'S CORRECTION EMPTIES (REQ-GEN-237
+    # criterion 3) carries no supply, so no ordinary amber either.
+    emptied = _foreign_altered()
     unavailable = frozenset(i for i, p in enumerate(periods)
                             if (p.name in injected_by_period
                                 and not injected_by_period[p.name][0].keeps_drawn_severity)
-                            or p.name in green)
+                            or p.name in green or p.name in emptied)
     out = targeting.outside_hold([sev for _q, sev in plan[:len(periods)]],
                                  [p.date for p in periods], "cp-clients",
                                  keep_clean=frozenset({0}), unavailable=unavailable)
@@ -728,6 +731,12 @@ def _grown_severities(periods, injected_by_period) -> list:
 SEED_SPAN = 5999
 
 
+def _foreign_altered() -> frozenset:
+    from generator import correction_claims
+
+    return frozenset(correction_claims.foreign_altered("child-protection"))
+
+
 class ChildProtection(Provider):
     """Child Protection's half of the shared driver (REQ-GEN-246): the old
     main()'s planning and per-slot decisions, unchanged, split across the
@@ -744,6 +753,7 @@ class ChildProtection(Provider):
     target_levers = "client-postcodes"
     amber_dataset = DATASET_ID
     generating_note = f"population=70,000, {N_QUARTERS + GROWN_QUARTERS} quarterly snapshots"
+    suppresses_others_corrections = True
 
     def seed_schedule(self) -> list[tuple[str, int, int]]:
         out = [("the population", BASE_SEED, BASE_SEED),
@@ -802,6 +812,10 @@ class ChildProtection(Provider):
         from generator.resupply import run_slot_chain
 
         provider = plan.state["provider"]
+        if job.period.name in plan.state.setdefault("foreign_altered", _foreign_altered()):
+            # ANOTHER COLLECTION'S CORRECTION ALTERS THIS QUARTER (REQ-GEN-237
+            # criterion 3): no routine supply of Child Protection's here.
+            return None
         injected = plan.injected_by_period.get(job.period.name)
         if injected is not None:
             return _injected_chain(provider, injected[0], job.period, job.seed,

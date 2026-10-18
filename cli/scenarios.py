@@ -111,7 +111,8 @@ def validate_command() -> None:
 
     confirmations = scripted_corrections.load()
     found += scripted_corrections.problems(confirmations, declared={
-        p.reference for p in correction_apply._declared(*correction_trial.working())})
+        p.reference for p in correction_apply._declared(*correction_trial.working())},
+        injections=scenario_injection.INJECTIONS)
     if found:
         for problem in found:
             console.print(f"  - {problem}", style="red")

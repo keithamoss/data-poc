@@ -12,15 +12,19 @@ re-indexing a hundred call sites.
 from __future__ import annotations
 
 GROWN_FROM = "2013-01-01"
+#: Where the history started before the growth: every version effective
+#: before it is the grown history's - the 2013 ones, and the turn-off and gap
+#: versions REQ-GEN-218 and REQ-GEN-251 plant in grown quarters.
+ORIGINAL_FROM = "2023-01-01"
 
 
 def calendar(doc: dict) -> dict:
-    """`doc` (a parsed calendar.yaml) with every version effective from the
-    grown history's first day removed, in place; returns it."""
+    """`doc` (a parsed calendar.yaml) with every version effective before the
+    original history's first day removed, in place; returns it."""
     stripped = []
 
     def keep(versions):
-        kept = [v for v in versions if str(v.get("effective_from")) != GROWN_FROM]
+        kept = [v for v in versions if str(v.get("effective_from")) >= ORIGINAL_FROM]
         stripped.append(len(versions) - len(kept))
         return kept
 

@@ -77,15 +77,12 @@ def load(path: Path | str | None = None) -> list[Confirmation]:
 
 
 def problems(confirmations: list[Confirmation], *, declared: set[str],
-             injections=None) -> list[str]:
+             injections) -> list[str]:
     """Criterion 5, from configuration alone. Each names the entry and the
-    fault. `injections` defaults to the generator's injection table."""
+    fault. `injections` is the generator's injection table, handed in by the
+    caller (cli/), since no QA module may import the generator."""
     from qa_tools.common import hierarchy
 
-    if injections is None:
-        from generator import scenario_injection
-
-        injections = scenario_injection.INJECTIONS
     by_scenario = {}
     for inj in injections:
         for sid in (inj.scenario_id, *inj.also_demonstrates):

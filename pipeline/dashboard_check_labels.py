@@ -237,6 +237,7 @@ MEASURES: dict[str, str] = {
     # Rows with no value
     "dbt:not_null": "Rows with no value",
     "soda:missing_count": "Rows with no value",
+    "soda:invalid_count": "Invalid values",
     "soda:missing_percent": "Rows with no value",
     "datacontract:nullValues": "Rows with no value",
     # Values outside what is allowed

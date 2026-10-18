@@ -1627,6 +1627,96 @@ INJECTIONS: tuple[Injection, ...] = (
         ),
         suppress=(-1,),
     ),
+    # WHAT A CONFIRMED CORRECTION DOES TO SUPPLIES ALREADY FILED (REQ-GEN-205,
+    # REQ-GEN-237): five Emergency Department quarters of 2013-2015, each
+    # riding the one correction REQ-GEN-205 declares on the quarterly calendar
+    # (dated 2026-09-01, confirmed at the history's end as scripted). Offsets
+    # count from each quarter's CORRECTED date, which is what the generator
+    # reads; each arrival was filed against the agreement as it stood at its
+    # receipt, before the correction. Shapes and instants only - the pipeline
+    # files, judges, moves, holds and parks.
+    Injection(
+        scenario_id="TS-57a",
+        dataset_id="ed-presentations",
+        anchor=8,
+        config="quarterly, due 09:00 with 8 hours' grace. 2015-Q1's date is corrected from 1 to 2 February 2015; its one supply arrives at 12:00 on 2 February - late against the old date, on time against the corrected one.",
+        arrivals=(
+            ExtraArrival(0, "12:00", None,
+                         "the quarter's supply, at noon the day after the old date"),
+        ),
+        also_demonstrates=("TS-57b",),
+        correction="REQ-GEN-205",
+        # 'a' while the correction awaits confirmation, 'b' on the history's
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        links=(Link("TS-57a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
+               Link("TS-57b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+    ),
+    Injection(
+        scenario_id="TS-58a",
+        dataset_id="ed-presentations",
+        anchor=3,
+        config="quarterly, 14-day claim window. 2013-Q4's date is corrected from 1 November to 20 October 2013; its supply arrives on 10 October, before the old window opened, so it was filed as a resupply of 2013-Q3 - and the corrected window covers it.",
+        arrivals=(
+            ExtraArrival(-10, "10:00", None,
+                         "2013-Q4's supply, ten days before the corrected date"),
+        ),
+        also_demonstrates=("TS-58b",),
+        correction="REQ-GEN-205",
+        # 'a' while the correction awaits confirmation, 'b' on the history's
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        links=(Link("TS-58a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
+               Link("TS-58b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+    ),
+    Injection(
+        scenario_id="TS-59a",
+        dataset_id="ed-presentations",
+        anchor=6,
+        config="quarterly, as TS-58: 2014-Q3's date is corrected from 1 August to 20 July 2014, its supply arriving on 10 July - filed as a resupply of 2014-Q2, which the corrected agreement would move, and which the asset manager keeps.",
+        arrivals=(
+            ExtraArrival(-10, "10:00", None,
+                         "2014-Q3's supply, ten days before the corrected date"),
+        ),
+        also_demonstrates=("TS-59b",),
+        correction="REQ-GEN-205",
+        # 'a' while the correction awaits confirmation, 'b' on the history's
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        links=(Link("TS-59a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
+               Link("TS-59b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+    ),
+    Injection(
+        scenario_id="TS-60a",
+        dataset_id="ed-presentations",
+        anchor=0,
+        config="quarterly, 14-day claim window. Emergency Department's first quarter, 2013-Q1, has its date corrected from 1 to 11 February 2013; its supply arrived on 22 January, inside the old window, before the corrected one opens and with no quarter before it - held, naming the correction.",
+        arrivals=(
+            ExtraArrival(-20, "10:00", None,
+                         "the first quarter's supply, inside the old window only"),
+        ),
+        also_demonstrates=("TS-60b",),
+        correction="REQ-GEN-205",
+        # 'a' while the correction awaits confirmation, 'b' on the history's
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        links=(Link("TS-60a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
+               Link("TS-60b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+    ),
+    Injection(
+        scenario_id="TS-61a",
+        dataset_id="ed-presentations",
+        anchor=10,
+        config="quarterly, 14-day claim window. 2015-Q3's date is corrected from 1 to 11 August 2015; its supply arrived on 22 July, which the corrected agreement files to 2015-Q2 - a move blocked because 2015-Q4, the participation gap (REQ-GEN-251), stands on it, so it is parked.",
+        arrivals=(
+            ExtraArrival(-20, "10:00", None,
+                         "2015-Q3's supply, inside the old window only"),
+        ),
+        # 2015-Q4 owes nothing (REQ-GEN-251's gap) and is not one of the
+        # generated periods, so nothing is suppressed here.
+        also_demonstrates=("TS-61b",),
+        correction="REQ-GEN-205",
+        # 'a' while the correction awaits confirmation, 'b' on the history's
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        links=(Link("TS-61a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
+               Link("TS-61b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+    ),
     # TWO FILES FOR ONE TABLE (REQ-GEN-196), one pair per way a person can
     # settle it (REQ-PIPE-193's choose-file). Each is ONE delivery whose two
     # files carry their own receipts, settled by a scripted person at 11:00

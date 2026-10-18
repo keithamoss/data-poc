@@ -5,11 +5,12 @@
 apiVersion: v3.2.0
 kind: DataContract
 # `id`, `name` and `domain` are held to the hierarchy in contract/data-asset.yaml
-# (REQ-QAC-039): the collection, its display name and its agency.
-id: emergency-department
+# (REQ-QAC-039): a one-table collection's contract carries its dataset's id and
+# display name, as Birth Registrations' does, and its agency.
+id: ed-presentations
 status: draft
 version: 1.0.0
-name: Emergency Department
+name: ED Presentations
 domain: department-of-health
 description:
   purpose: >

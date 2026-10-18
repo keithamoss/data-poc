@@ -99,8 +99,10 @@ class TestValidationRefusesEachFault:
         from qa_tools.common import correction_trial
 
         declared = {p.reference for p in correction_apply._declared(*correction_trial.working())}
-        assert scripted_corrections.problems(scripted_corrections.load(),
-                                             declared=declared) == []
+        from generator import scenario_injection
+
+        assert scripted_corrections.problems(scripted_corrections.load(), declared=declared,
+                                             injections=scenario_injection.INJECTIONS) == []
 
 
 def _say():

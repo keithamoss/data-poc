@@ -115,3 +115,25 @@ def test_a_scenario_on_another_dataset_of_the_collection_is_refused_too(docs):
                   _inj("TS-9", "cp-placements", 3)],
                  {"cp-clients": _quarters(), "cp-placements": _quarters()}, docs=docs,
                  history_end=date(2026, 8, 1))
+
+
+class TestAnotherCollectionsCorrectionEmptiesItsQuarters:
+    """REQ-GEN-237 criterion 3's 'or by suppressing its routine supply there':
+    Child Protection writes no routine supply in a quarter that a correction
+    ridden by another collection's scenarios alters, and the claim check
+    counts those quarters as suppressed."""
+
+    def test_the_quarters_are_the_correction_s_altered_ones(self):
+        got = cc.foreign_altered("child-protection")
+        assert {"2013-Q1", "2013-Q4", "2014-Q3", "2015-Q1", "2015-Q3"} <= got
+        assert "2016-Q1" not in got and not any(q.startswith("2021") for q in got)
+
+    def test_a_collection_riding_the_correction_suppresses_nothing_for_it(self):
+        assert cc.foreign_altered("emergency-department") == set()
+
+    def test_child_protection_writes_nothing_there(self):
+        from generator.collections import child_protection as cp
+
+        plan = cp.PROVIDER.plan()
+        empty = {job.period.name for job in plan.jobs if cp.PROVIDER.slot(plan, job) is None}
+        assert cc.foreign_altered("child-protection") <= empty

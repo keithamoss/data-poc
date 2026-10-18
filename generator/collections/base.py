@@ -91,6 +91,10 @@ class Provider:
     #: What the TUI says while generating, in brackets after "Generating
     #: synthetic data" - empty for nothing (REQ-TEST-245, today's words).
     generating_note: str = ""
+    #: Whether the provider writes no routine supply in a period another
+    #: collection's correction alters (REQ-GEN-237 criterion 3) - one asked
+    #: by generator/correction_claims.py, so its claim check knows.
+    suppresses_others_corrections: bool = False
 
     @property
     def run_prefix(self) -> str:

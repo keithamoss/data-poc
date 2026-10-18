@@ -93,10 +93,22 @@ def test_dirty_module_resolves_to_generators_own_copy():
     assert hasattr(dirty_mod, "apply_cp_clients_presets")
 
 
+def _emptied() -> set[str]:
+    """The quarters another collection's correction alters, where Child
+    Protection writes nothing (REQ-GEN-237 criterion 3)."""
+    from generator import correction_claims
+
+    emptied = correction_claims.foreign_altered("child-protection")
+    assert emptied, "precondition: REQ-GEN-205's correction empties some quarters"
+    return emptied
+
+
 def test_manifest_has_one_entry_per_scheduled_slot_at_minimum(manifest):
     delivery_ids = {e["slot_id"] for e in manifest}
-    # THE GROWN QUARTERS TOO (REQ-GEN-207): one slot per generated period.
-    assert len(delivery_ids) == len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
+    # THE GROWN QUARTERS TOO (REQ-GEN-207): one slot per generated period,
+    # less the quarters another collection's correction empties.
+    assert len(delivery_ids) == (len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
+                                 - len(_emptied()))
 
 
 def _delivery_dir(raw_dir, entry):
@@ -118,7 +130,7 @@ def _shape_of(entry, manifest) -> str | None:
     from generator.anchor_date import get_anchor_date
 
     periods = cp_provider.schedule.periods_for_dataset(
-        cp_provider.DATASET_ID, until=get_anchor_date())[-len(cp_provider.RUN_PLAN):]
+        cp_provider.DATASET_ID, until=get_anchor_date())
     _, injected = cp_provider._plan_injections(periods)
     if entry["period"] not in injected:
         return None
@@ -155,7 +167,9 @@ def test_severity_counts_match_run_plan(manifest):
     first_by_slot = {}
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first_by_slot.setdefault(e["slot_id"], e)
-    assert len(first_by_slot) == len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
+    emptied = _emptied()
+    assert len(first_by_slot) == (len(cp_provider.RUN_PLAN) + len(cp_provider.GROWN_RUN_PLAN)
+                                  - len(emptied))
 
     # AN INJECTED SLOT FOLLOWS ITS INJECTION, not the run plan (REQ-GEN-044):
     # the scenario replaces that period's chain with the arrivals it names.
@@ -184,7 +198,7 @@ def test_severity_counts_match_run_plan(manifest):
         return own
 
     expected = [first_of(p.name, severity) if p.name in injected else severity
-                for severity, p in zip(planned, periods)]
+                for severity, p in zip(planned, periods) if p.name not in emptied]
     # Sort by run_index (a real int, matching RUN_PLAN's own generation
     # order), not slot_id (a zero-padded string) - a plain string sort
     # broke for real once the count crossed a fixed padding width
@@ -203,7 +217,7 @@ def test_a_resupply_only_ever_follows_a_red_delivery(manifest):
     from generator.anchor_date import get_anchor_date
 
     periods = cp_provider.schedule.periods_for_dataset(
-        cp_provider.DATASET_ID, until=get_anchor_date())[-len(cp_provider.RUN_PLAN):]
+        cp_provider.DATASET_ID, until=get_anchor_date())
     _, injected = cp_provider._plan_injections(periods)
     for slot_id, deliveries in by_slot.items():
         deliveries = sorted(deliveries, key=lambda e: e["run_index"])
@@ -575,7 +589,8 @@ def test_the_original_fifteen_keep_their_slots_and_come_first(manifest):
     for e in sorted(manifest, key=lambda e: e["run_index"]):
         first.setdefault(e["slot_id"], e)
     by_slot = sorted(first.values(), key=lambda e: e["run_index"])
-    assert [e["period"] for e in by_slot] == original + grown
+    emptied = _emptied()
+    assert [e["period"] for e in by_slot] == [n for n in original + grown if n not in emptied]
     assert [e["slot_id"] for e in by_slot][:15] == [f"cp_slot_{i:02d}" for i in range(1, 16)]
     last_original = max(e["run_index"] for e in manifest if e["period"] in original)
     assert all(e["run_index"] > last_original for e in manifest if e["period"] in grown)
@@ -619,7 +634,9 @@ class TestAScenarioInAGrownQuarter:
         grown = cp_provider.grown_periods()
         injection = si.Injection("TS-99", "cp-clients", anchor, "a test", **kw)
         placed = si.resolve(injection, grown)
-        before = [sev for _q, sev in cp_provider.grown_run_plan()[:len(grown)]]
+        # BEFORE IS THE PLAN WITH NO SCENARIO OF ITS OWN: the quarters another
+        # collection's correction empties have moved their ambers already.
+        before = cp_provider._grown_severities(grown, {})
         after = cp_provider._grown_severities(grown, {placed.period: (injection, placed)})
         return grown, placed, before, after
 
@@ -634,8 +651,9 @@ class TestAScenarioInAGrownQuarter:
         assert after.count("amber") == before.count("amber")
 
     def test_a_clean_quarter_changes_nothing_else(self):
-        clean = [i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan())
-                 if sev is None and i > 0]
+        clean = [i for i, sev in enumerate(cp_provider._grown_severities(
+                     cp_provider.grown_periods(), {})) if sev is None and i > 0
+                 and cp_provider.grown_periods()[i].name not in _emptied()]
         _grown, _placed, before, after = self._plan(clean[3])
         assert after == before
 

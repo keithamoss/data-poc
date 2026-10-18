@@ -37,9 +37,15 @@ def _docs_either_side(reference: str, docs):
 def _slots(dataset_id: str, cal: dict, until: date) -> dict:
     from qa_tools.common import agreement, slots
 
+    from qa_tools.common import schedule
+
     agr = agreement.from_doc(cal)
-    return {s.name: (s.date, s.due_at, s.grace, s.claim_opens_at, s.closes_at)
-            for s in slots.slots_for_dataset(dataset_id, until=until, agreement=agr)}
+    try:
+        found = slots.slots_for_dataset(dataset_id, until=until, agreement=agr)
+    except (schedule.ScheduleConfigError, LookupError):
+        # A DATASET ON NO CALENDAR has no slot a correction could alter.
+        return {}
+    return {s.name: (s.date, s.due_at, s.grace, s.claim_opens_at, s.closes_at) for s in found}
 
 
 def _history_end() -> date:
@@ -165,10 +171,41 @@ def check_all() -> None:
 
     if not any(i.correction for i in scenario_injection.INJECTIONS):
         return
-    generated = {}
+    generated, suppressed = {}, {}
     for d in hierarchy.all_datasets():
         try:
-            generated[d.dataset_id] = collections.for_dataset(d.dataset_id).generated_periods()
+            provider = collections.for_dataset(d.dataset_id)
         except collections.NoProviderError:
             continue
-    check(scenario_injection.INJECTIONS, generated, history_end=get_anchor_date())
+        generated[d.dataset_id] = provider.generated_periods()
+        if provider.suppresses_others_corrections:
+            suppressed[d.dataset_id] = foreign_altered(d.collection_id)
+    check(scenario_injection.INJECTIONS, generated, history_end=get_anchor_date(),
+          suppressed=suppressed)
+
+
+def _datasets_of(collection_id: str) -> list[str]:
+    from qa_tools.common import hierarchy
+
+    return [d.dataset_id for d in hierarchy.all_datasets() if d.collection_id == collection_id]
+
+
+def foreign_altered(collection_id: str, *, docs=None) -> set[str]:
+    """The periods of `collection_id` that a correction ridden only by OTHER
+    collections' scenarios alters (REQ-GEN-237 criterion 3) - where its
+    routine supply is suppressed, so the corrected quarters hold no supply of
+    its own."""
+    from generator import scenario_injection
+
+    mine = set(_datasets_of(collection_id))
+    riders: dict[str, set[str]] = {}
+    for inj in scenario_injection.INJECTIONS:
+        if inj.correction:
+            riders.setdefault(inj.correction, set()).add(inj.dataset_id)
+    out: set[str] = set()
+    for reference, datasets in riders.items():
+        if datasets & mine:
+            continue
+        for names in altered(reference, sorted(mine), docs=docs).values():
+            out |= names
+    return out
