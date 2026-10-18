@@ -4810,21 +4810,6 @@ requirements:
       carrying a different half of the truth.
     moscow: must
     status: built
-    unmet_criteria:
-      - criterion: >-
-          THE SYSTEM SHALL define each dataset's place in the hierarchy in
-          exactly one place, and SHALL resolve every consumer's need for
-          those identifiers through it.
-        why: >-
-          The tree IS stated once and hierarchy.py IS the one resolver, but
-          17 inline hierarchy literals across 10 modules still restate ids
-          rather than resolving them - counted by a post-build critic,
-          2026-09-24, none of them the two named constants. The
-          hand-maintained contract-filename map that was the same shape has
-          gone (post-build-review #36, 2026-09-25); the literals have not.
-        owner: "post-build-review #36"
-        blocked_by:
-          unowned: true
     source: >
       Keith's own question, 2026-09-20 - "what is it that actually
       groups Child Protection data together as a collection?" - and the
@@ -4917,6 +4902,7 @@ requirements:
       - dashboard/qa-reporting-dashboard.template.html
       - cli/dashboard.py::_validate_hierarchy
     evidence:
+      - "2026-10-18, CRITERION 1, recorded as met by REQ-TEST-249 criterion 8: the inline hierarchy literals the 2026-09-24 critic counted are gone - REQ-PIPE-240's collections gate fails any product file naming a collection id or run prefix outside the registry, and its migration allowlist is empty since 7ef2684 (REQ-TEST-249's evidence)."
       - >
         2026-09-23: the tree is stated once in contract/data-asset.yaml
         and resolved through one module. Twelve Python files carried
@@ -37461,6 +37447,7 @@ requirements:
       - REQ-QAC-242
       - REQ-DASH-244
     evidence:
+      - "2026-10-18, CRITERION 2 FOR THE TWO MOVED FLAGS AND CRITERION 5: both resolved in REQ-PIPE-248's stats step (d7ba899 volume per table, baaf401 earliest_extract) and compared there - after-247b against after-248, the 111 changed Birth Registrations volume results differ in column_name alone. legacy.KNOWN is empty since c0503e6, so the collections gate fails any adapter declaring a legacy flag (tests/test_collections_registry.py's test_an_unknown_legacy_flag_fails_the_gate_naming_it)."
       - "2026-10-18, CRITERION 3 FOR THE TWELVE NO-CHANGE FLAGS (one capture pair, Keith's call): `mothman debug equivalence compare after-252 after-247a` (254d060 against 0298824, 16 commits, twelve of them one retirement each; bootstraps 1506s and 1359s) - S1 recorded results, S4 generated files, S5 reports and S7 help and menus all the same, which is what every one of the twelve briefs predicted. Criterion 4 therefore has nothing to report for these twelve."
       - "2026-10-18, CRITERIA 3 AND 4 FOR THE FIVE THAT CHANGED THINGS (one capture, Keith's call): `mothman debug equivalence compare after-247a after-247b` (0298824 against 7c2913a; bootstraps 1359s and 1460s). S4 and S7 the same. S1: 6,335 recorded results changed, matched row for row, every one in exactly one predicted field - 3,357 dimensions (52 Child Protection Soda checks taking their category), 2,220 check names (20 Birth Registrations Soda checks losing `[all]`), 758 failed-rows counts (692 passes empty -> 0; 65 fails and 1 warn empty -> their count, post-build-review #226's 66). No status, value or threshold changed. S5: the same three in both results files, Child Protection's cards gaining their dimension, and Birth Registrations' dataset gaining its grey Table-level column (14 -> 15). Zero counts changed nothing, as predicted. The by-check list criterion 4 asks for is docs/drafts/item-6/247-changed-results.md, reported to Keith in the morning report."
     decisions:
@@ -37482,13 +37469,6 @@ requirements:
       - "TWO OF THE SEVEN MOVE TO REQ-PIPE-248'S STATS STEP (Keith, 2026-10-18 ~21:15): the Evidently volume check and stopping earliest_extract both live in the dataset-stats record, and Birth Registrations' still has the single-table shape (`row_count`, not `row_counts` by table) that REQ-PIPE-248 owns. Retiring the volume check first would leave all 111 Birth Registrations volume results with no reference - 'not evaluated' - until 248 landed. So both land in the same change that gives Birth Registrations `row_counts`, each still its own commit, and their decisions above stand unchanged. REJECTED a temporary singular-to-plural fallback in recorded_row_counts: a shim written to be deleted one requirement later."
       - "ONE CAPTURE FOR THE SEVEN THAT CHANGE THINGS (Keith, 2026-10-18 ~20:40): the Soda suffix, zero counts, empty sections, earliest_extract, Soda dimensions, the volume check and the Soda count are each their own commit, compared together by one capture after all seven against the capture after the twelve. Each touches different fields, so every difference can still be traced to the change that predicted it. REJECTED a pair per change: about three hours of captures for no extra attribution."
     open_questions: []
-    unmet_criteria:
-      - criterion: "Criterion 2, for two flags, and criterion 5 - evidently.volume_from_drift_frame and stats.arrival_after_registration resolved as decided above, and `mothman check` failing any adapter that still declares a legacy flag."
-        why: "Keith moved the two flags into REQ-PIPE-248's stats step (2026-10-18), so no Birth Registrations volume result goes un-evaluated in between; and the gate cannot fail on a legacy flag while REQ-PIPE-248's shape flags are still declared. REQ-PIPE-248 criterion 6 is the same gate for every kind of flag."
-        owner: REQ-PIPE-248
-        blocked_by:
-          requirements:
-            - REQ-PIPE-248
     linked_tests:
       - tests/test_collections_registry.py
       - tests/test_orchestrate_shared.py
@@ -37513,7 +37493,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As whoever maintains the pipeline, I want every collection's recorded and published shapes to be the N-table forms, so that nothing downstream reads one collection differently from another and a single-table collection is simply N equal to one."
     moscow: should
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); main session position.md call 3 and its round-2 and round-4 calls. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL record Birth Registrations' dataset stats in Child Protection's form - row_counts per table, aggregates keyed table.column, zero counts kept as REQ-QAC-247 decided (Keith, 2026-10-18; it said 'treated as Child Protection treats them' until then)."
@@ -37555,6 +37535,9 @@ requirements:
       - qa_tools/common/validate_collections.py::config_problems
       - qa_tools/common/equivalence.py::compare
       - dbt_project/models/civil-registration/stg_birth_registrations.sql
+    evidence:
+      - "2026-10-18, CRITERION 5: `mothman debug equivalence compare after-247b after-248 --renamed-by REQ-PIPE-248` (7c2913a against 578b2d5, 20 commits; bootstraps 1371s and 1465s). S4 generated files the same. S1: 111 recorded results differ, every one Birth Registrations' row-count-growth check and every one in `column_name` alone (registration_number -> (table)) - status, value and reference identical, so the per-table count read from the record equals the count the old path made; and all 482 dataset_stats records differ in shape only (row_count -> row_counts by table, aggregates keyed table.column, no arrival/earliest_extract). S5, with the four files mapped to their new names: Child Protection's dashboard file identical; its results file loses each record's `arrival`; Birth Registrations' results file gains the collection header and the stats shape above; Birth Registrations' dashboard file moves under `datasets`, where its one dataset equals the old document except that the volume check sits in Supply-level checks rather than registration_number and the Table-level and Supply-level pseudo-columns take Child Protection's order. S7: one line, `mothman debug equivalence compare`'s help gaining --renamed-by, which criterion 8 adds. Every difference is one this requirement or REQ-QAC-247's two moved calls names."
+      - "2026-10-18, CRITERIA 1-4, 6-8: built in 80b6027 (agency shorts), a5a7ace (rename map), dbb3c6c (registry file names), 96b12d4 and b56c671 (dashboard and results shapes), 5ac0906 (run entry), 3ce13c7 (stats shape), d7ba899 (volume per table; criterion 3's snapshot, read by nothing), baaf401 (earliest_extract), 3bc9f00 (view-only scoping), c0503e6 (stamping, the last legacy flag; legacy.KNOWN empty so the collections gate fails any declared flag), 7ef2684 (the legacy Evidently reader and the allowlist's last entry). The full `mothman check` result on the pushed tree is in that push's commit message."
     decisions:
       - "AGENCY SHORTS IN THE FILE NAMES (Keith, 2026-10-16, 'Add agency shorts'): agencies get a short of their own, since bdm and cp are collection shorts. PROPOSED values, to confirm at build: registry-services -> rs, child-protection-family-support -> cpfs, department-of-health -> doh."
       - "SIGNIFICANT, FOR KEITH TO SENSE-CHECK - UNIFY ON CHILD PROTECTION'S N-TABLE FORMS (main session, position.md call 3): Birth Registrations' history is regenerated. REJECTED keeping two shapes behind a per-collection switch: every reader would carry both forever."
@@ -37617,19 +37600,13 @@ requirements:
       - "CRITERION 3 AMENDED WITH KEITH (2026-10-18): a new collection also edits contract/calendar.yaml (a dataset with no calendar entry is refused outright) and contract/presentation.yaml (REQ-DASH-244 put every collection's words there), so both may differ too, by the collection's own entries inserted whole, as data-asset.yaml may. Found building the fake Widget Register; criterion 10 already allowed the calendar edit for Emergency Department."
     open_questions: []
     unmet_criteria:
-      - criterion: "Criteria 7, 8 and 9 - the before-240 against after-248 equivalence series, REQ-PIPE-240's migration allowlist held empty, and the gate on temporary pointers."
-        why: "All three are about the END of item 6's chain, and REQ-QAC-247 and REQ-PIPE-248 have not been built: one file still waits on the allowlist today (the collections gate says so), and the series cannot be compared before its last capture exists."
-        owner: REQ-QAC-247 and REQ-PIPE-248, item 6's last two pieces
-        blocked_by:
-          requirements:
-            - REQ-QAC-247
-            - REQ-PIPE-248
       - criterion: "Criterion 10 - the Emergency Department collection's own diff shows it added only its own files."
         why: "Met by the Emergency Department build itself (Keith's 'Both' decision above), which has no requirement of its own yet."
         owner: the Emergency Department dataset (plans/data-generation.md)
         blocked_by:
           unowned: true
     evidence:
+      - "2026-10-18, CRITERIA 7, 8 AND 9: criterion 7 as a SERIES of captures, each pair compared and evidenced on its own requirement - self-check (before REQ-PIPE-240) -> after-240 -> after-241 -> after-242 -> after-243 -> after-246 -> after-245 -> after-244 -> after-252 -> after-247a -> after-247b -> after-248 - with no difference outside the named ones (the last pair is on REQ-PIPE-248). Criterion 8: REQ-PIPE-240's ALLOWLIST is {} since 7ef2684 and the collections gate reports '0 file(s) still wait'. Criterion 9: built test-first in 578b2d5 (tests/test_collections_registry.py, the temporary-pointer tests)."
       - "2026-10-18, CRITERIA 1 TO 4 AND 6: tests/test_a_collection_is_a_small_adapter.py (on_demand, 12 tests, 12 passed on commit 172adba) copies every tracked file, adds the Widget Register from tests/fake_collection_files/ (its contract and check files under contract/widget-agency/, dbt models under dbt_project/models/widget-register/, a QA adapter and a generator provider), asserts the copy differs by additions only, bootstraps it into its own scratch database (17s), runs `mothman wreg qa --file widgets.csv --commit` (9.3s), rebuilds results, builds and embeds the dashboard, and compares every rendered status against its recorded verdict in a real browser. The collections and providers gates pass in the copy, and the repository's own data/ and reports/ are unchanged afterwards."
       - "2026-10-18, CRITERION 5: `mothman check`'s collections gate prints each adapter's logic lines against the soft budget of 150 and each provider's separately, never failing on them - today civil-registration 111 (provider 441) and child-protection 72 (provider 369)."
       - "2026-10-18, CRITERION 3 AS AMENDED (Keith, the same evening): three configuration files take a block inserted whole - contract/data-asset.yaml, contract/calendar.yaml and contract/presentation.yaml - and additions_only() fails any other change to a tracked file."
