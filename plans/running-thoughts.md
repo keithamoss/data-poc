@@ -5526,3 +5526,18 @@ could never have computed it), and it belongs with batch 5's check work.
     local checkpoint commits, and keep validate-config on every push" -
     test.yml keeps its push trigger, the lever is fewer pushes, and the
     flip still waits on a measured week fitting 2,000 minutes a month.
+
+105. **[todo, 2026-10-18]** **[Dashboard UI]** **A thin, designed environment
+    banner, instead of words in the build stamp.** Keith, 2026-10-18,
+    while signing REQ-PIPE-255 ("make sure the notice that shows about
+    the environment in the UI is like a nicely designed thin banner of
+    some sort"). Today REQ-DASH-094's marker is the words "not production"
+    appended to the masthead's build stamp plus a dimmed live dot; once
+    the sandbox is the publishing environment (REQ-PIPE-255) those words
+    leave the published page and a reader has nothing but the stamp.
+    Wanted: a thin banner naming the environment on every page, designed
+    rather than bolted on, words not colour alone (REQ-DASH-094's rule).
+    Not scoped; send to delivery-scoper and delivery-dashboard-ux before
+    building. Same conversation: watch the built page's size during
+    development and flag it at 20 MiB (REQ-PIPE-255 now does, every
+    build), and talk about optimising or splitting the file when it fires.

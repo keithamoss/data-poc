@@ -37332,6 +37332,9 @@ requirements:
   - id: REQ-PIPE-255
     title: The one publish path uploads the gated site to a Cloudflare Pages project by direct upload, and
       only when its content has changed
+    signed_off:
+      by: Keith
+      date: '2026-10-18'
     date_written: '2026-10-18'
     story: As Keith, I want `mothman dashboard publish` to upload the built, gated dashboard site to a Cloudflare
       Pages project from the sandbox when I ask it to, and to do nothing when nothing has changed, so that
@@ -37386,9 +37389,9 @@ requirements:
       so that Cloudflare's own deployment list names it beside the artifact's build stamp (REQ-PIPE-092
       criterion 17).
     - WHERE --dry-run is given, THE SYSTEM SHALL build, gate and prepare the site, say whether the content
-      has changed since the last publish, report the file count, the total size, the largest file and the
-      wrangler arguments it would use with every credential elided, and SHALL NOT invoke wrangler, archive
-      a snapshot or record a publish.
+      has changed since the newest archived snapshot, report the file count, the total size, the largest
+      file and the wrangler arguments it would use with every credential elided, and SHALL NOT invoke wrangler
+      or archive a snapshot.
     - THE SYSTEM SHALL build what it uploads from recorded QA results and committed configuration only,
       and SHALL NOT read supply rows.
     - 'IF the stated environment''s entry in contract/environments.yaml does not declare `publishes: true`,
@@ -37404,17 +37407,17 @@ requirements:
     - WHEN the dashboard is built twice in a row from unchanged recorded results, unchanged configuration
       and an unchanged template, THE SYSTEM SHALL produce the same fingerprint both times, and the test
       suite SHALL prove it.
-    - WHEN the fingerprint of a gated build equals the fingerprint of the last successful publish recorded
-      for the stated environment, THE SYSTEM SHALL archive no snapshot, upload nothing, record nothing,
-      print one line saying the dashboard is unchanged since that publish and when it happened, and exit
-      zero.
-    - WHEN the fingerprint differs, or no successful publish is recorded for the stated environment, THE
-      SYSTEM SHALL archive one snapshot, prepare the site and upload it, in that order, and SHALL compare
-      before archiving so that an unchanged build never leaves a snapshot behind.
-    - WHEN an upload succeeds, THE SYSTEM SHALL record the publish as a row in a qa.publish table in the
-      metadata database - time, stated environment, git identity of whoever ran it, commit, fingerprint,
-      deployment URL and outcome - and SHALL record a failed upload with its outcome, never as the last
-      successful publish.
+    - WHEN the fingerprint of a gated build equals the fingerprint of the newest archived snapshot in dashboard/snapshots/,
+      computed the same way from that snapshot's decompressed page, THE SYSTEM SHALL archive no snapshot,
+      upload nothing, print one line saying the dashboard is unchanged since that snapshot's publish and
+      when it happened, and exit zero.
+    - WHEN the fingerprint differs, or no snapshot is archived yet, THE SYSTEM SHALL archive one snapshot,
+      prepare the site and upload it, in that order, and SHALL compare before archiving so that an unchanged
+      build never leaves a snapshot behind.
+    - WHEN every dashboard build finishes (`mothman dashboard embed`, `mothman dashboard rebuild`, `mothman
+      pipeline run` and the publish itself), THE SYSTEM SHALL print the built page's size, and WHEN it is
+      20 MiB or more THE SYSTEM SHALL warn, naming the size and the 25 MiB limit, so that the ceiling is
+      watched during development and not first met at a publish (Keith, 2026-10-18).
     - THE SYSTEM SHALL offer no flag, variable or setting that publishes, or archives a snapshot for, a
       build whose fingerprint is unchanged.
     - 'THE SYSTEM SHALL keep publishing opt-in, as REQ-PIPE-092 criterion 16 requires: a pipeline run or
@@ -37441,8 +37444,8 @@ requirements:
       address and Access sign-in domain are configuration and are committed in contract/data-asset.yaml;
       the token is a secret and is not; the account id is deployment-local like MOTHMAN_SUPPLY_DSN and lives
       beside it (Keith's call).
-    - SECURITY - ONE NEW WRITE GRANT. REQ-PIPE-089 gives the publisher a read-only role on the metadata
-      schema. Recording a publish needs INSERT on qa.publish and on nothing else; the grant is that narrow.
+    - SECURITY - NO NEW WRITE GRANT. The last publish is read from the archived snapshot on disk, so the
+      publisher keeps REQ-PIPE-089's read-only role on the metadata schema and writes nothing to the database.
     - PORTABILITY - NODE BECOMES A PUBLISHING DEPENDENCY. Until now Node was only needed to run the JS tests;
       the publishing environment now needs Node and `npm ci` as well as `uv sync`. The one-time setup in
       README and CLAUDE.md says so, beside `playwright install chromium`.
@@ -37457,8 +37460,8 @@ requirements:
       files are not re-sent after the first publish. Proposed budget for the upload step after the first:
       under two minutes. Measure on the first real publish and record the figure on the requirement.'
     - PERFORMANCE - THE UNCHANGED CASE IS CHEAP. Computing the fingerprint is one read of a 15 MB file and
-      a few hundred KB of fonts and vendor files, plus one query; the build and render gate still run first,
-      because the fingerprint is of the gated artifact.
+      a few hundred KB of fonts and vendor files, and the comparison is the same computation over the newest
+      snapshot's decompressed page; both are well under a second.
     - IDEMPOTENCY - NO CHANGE, NO PUBLISH (Keith, 2026-10-18, his own suggestion). Publishing the same content
       twice makes no new deployment and no new snapshot, so the archive grows only when what people can
       see has changed. This replaces the earlier draft's 'every publish makes a new deployment, accepted'
@@ -37467,11 +37470,9 @@ requirements:
       embedded 'today', a random id), every build counts as changed and the guard quietly does nothing.
       Criterion 23 tests for exactly that, and any newly found volatile field is added to the named placeholder
       list in code, not worked around.
-    - RELIABILITY - THE SANDBOX FORGETS ITS PUBLISHES. The sandbox database does not survive the container,
-      so a fresh session has no qa.publish row and its first publish always uploads, even if the content
-      matches what is live. One extra deployment and snapshot per fresh container is accepted; reading the
-      live site back to avoid it is rejected (see decisions). This is also the only route by which identical
-      content is ever published twice, since there is no --force.
+    - RELIABILITY - A FRESH CHECKOUT REMEMBERS ITS PUBLISHES. The snapshot archive is committed, so a fresh
+      sandbox compares against the newest committed snapshot and does not re-upload unchanged content; only
+      a snapshot archived and not yet committed by a previous session is invisible to it.
     - RELIABILITY - RECORD FIRST, PUBLISH SECOND, FAIL LOUDLY. Where a publish follows a QA run (the post-QA
       prompt, `mothman pipeline run --publish`), the results are recorded and the local dashboard built
       before anything is uploaded, and a failed upload exits non-zero with the retry named. Retrying a publish
@@ -37492,9 +37493,8 @@ requirements:
     - MAINTAINABILITY. wrangler is a large package with a native binary (workerd) and releases often. Pinned
       exactly, upgraded deliberately, and the js-tests CI job's `npm ci` gets heavier because the same package.json
       now carries it.
-    - OBSERVABILITY. qa.publish answers 'what was published, when, by whom, from which commit' in the database
-      the dashboard already reads; Cloudflare's deployment list is a second view; the committed snapshot
-      archive remains the durable, browser-only record, as REQ-PIPE-092 decided.
+    - OBSERVABILITY. 'What was published, when and from which commit' is the snapshot archive's manifest,
+      as REQ-PIPE-092 already decided, plus Cloudflare's own deployment list; nothing new is recorded.
     - COST. Cloudflare Pages' free plan covers this. Its documented 500-builds-a-month limit is worded for
       Git-integrated builds; whether direct-upload deployments count against it was NOT verified (the docs
       page is blocked here and the docs' source does not say). Opt-in publishing, and only on change, makes
@@ -37538,13 +37538,15 @@ requirements:
       see without changing the data, and has to publish. Chosen: the gated index.html with the build stamp
       and generated_at blanked, plus fonts/ and vendor/. A code-only commit that renders identically therefore
       does not publish, which is right - the commit in the stamp only says which code rendered it.'
-    - 'THE LAST PUBLISH IS A ROW IN qa.publish, NOT A FILE AND NOT READ BACK FROM CLOUDFLARE. A publish
-      is a recorded fact, like a run, and the repository holds configuration, not state, so a committed
-      marker file is out. Rejected: reading the fingerprint back from the live deployment. Fetching the
-      site goes through Access, so the publisher would need an Access service token - a second credential
-      that can read the private site. Reading Cloudflare''s deployment metadata ties the record to one vendor''s
-      API and to wrangler''s JSON output format. The one cost of the database answer, a fresh sandbox forgetting
-      its last publish, is an extra deployment, not a wrong one.'
+    - 'THE LAST PUBLISH IS THE NEWEST ARCHIVED SNAPSHOT (Keith, 2026-10-18: ''we already have the file sitting
+      in the repository, so why are we storing it in the database? why not just rehash both files''). Every
+      publish archives a snapshot, so the newest snapshot IS the last published page, and rehashing it answers
+      ''has anything changed'' with nothing new stored. REJECTED: a qa.publish row in the metadata database
+      (the scoper''s draft - a second record of a fact the archive already holds, and a write grant the
+      publisher does not otherwise need); a committed hash file (state in git, which the repository does
+      not hold); reading the last fingerprint back from the live site (needs an Access service token, a
+      second credential that can read the private site); reading it from Cloudflare''s deployment list (ties
+      the record to one vendor''s API format).'
     - COMPARE BEFORE ARCHIVING. publish() today takes the snapshot before preparing the site. The fingerprint
       has to be computed and compared before that, or an unchanged build would leave a committed snapshot
       behind for a publish that never happened.
@@ -37594,12 +37596,13 @@ requirements:
       and mid-upload, with its own wording. Checking first costs a directory walk and names the file in
       this project's terms.
     open_questions:
-    - THE 25 MIB CEILING. index.html is 14.7 MB with two collections. Splitting the build, moving embedded
-      data to sibling files, or serving large files from R2 are all possible; none is in scope here, but
-      the warning in criterion 14 will fire well before thirty collections, and this needs an owner.
+    - 'THE 25 MIB CEILING, WATCHED RATHER THAN SOLVED (Keith, 2026-10-18): index.html is 14.7 MB with two
+      collections and grows with the data embedded, so it will not fit at roughly thirty. Every build now
+      prints the size and warns from 20 MiB; when the warning fires, Keith and the session talk about splitting
+      the embedded data into sibling files or serving the page from somewhere without the limit. Not owned
+      by any requirement yet, on purpose.'
     - WHETHER DIRECT-UPLOAD DEPLOYMENTS COUNT AGAINST THE FREE PLAN'S 500 A MONTH. Not verifiable from this
       sandbox. Check in the Cloudflare dashboard after the first week of publishing.
-
   - id: REQ-PIPE-257
     title: Every address the dashboard is served at needs a one-time code sent to a named work email, and
       the publisher checks that before and after it uploads
