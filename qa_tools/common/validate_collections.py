@@ -52,11 +52,7 @@ SCENARIO_EXEMPT_NAMES = ("INJECTIONS", "INHERITING_DATASET")
 #: THE MIGRATION ALLOWLIST (criterion 10): every file still holding a
 #: collection literal when REQ-PIPE-240 landed, with the requirement that
 #: rewires it. It may only shrink.
-ALLOWLIST: dict[str, str] = {
-    # The lifecycle gate's legacy reader, for a base ref from before
-    # REQ-QAC-241 moved every check file - deleted with it.
-    "qa_tools/common/validate_check_lifecycle.py": "REQ-PIPE-248",
-}
+ALLOWLIST: dict[str, str] = {}
 
 #: The longest run name a run prefix is part of: the per-run view schema
 #: (supply_db.RUN_SCHEMA_PREFIX, `qa_`) over a trial reference's

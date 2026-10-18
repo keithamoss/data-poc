@@ -405,14 +405,14 @@ class TestTheLiteralGate:
                        "holds a collection literal - take it off, so the allowlist only "
                        "shrinks"]
 
-    def test_the_real_tree_passes_with_its_allowlist(self):
-        assert gate.literal_findings(), "the real tree must hold something to check"
+    def test_the_real_tree_names_no_collection_and_needs_no_allowlist(self):
+        """REQ-TEST-249 criterion 8: every file the migration allowlist held
+        has been rewired onto the registry, so the list is empty and the real
+        tree passes without it. (The kinds-of-literal tests above are what
+        prove the scan can still find one.)"""
+        assert gate.ALLOWLIST == {}
+        assert gate.literal_findings() == []
         assert gate.literal_problems() == []
-
-    def test_every_allowlisted_file_names_a_requirement_of_this_set(self):
-        signed = {"REQ-QAC-241", "REQ-QAC-242", "REQ-PIPE-243", "REQ-DASH-244",
-                  "REQ-TEST-245", "REQ-GEN-246", "REQ-PIPE-248"}
-        assert gate.ALLOWLIST and set(gate.ALLOWLIST.values()) <= signed
 
 
 

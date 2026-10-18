@@ -58,8 +58,6 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     rel_asset = asset.relative_to(ROOT).as_posix() if asset.is_relative_to(ROOT) else None
     text = asset.read_text() if ref is None or rel_asset is None else _old_file_content(rel_asset, ref)
     colls = collections.collections_in(config_yaml.parse(text or "") or {})
-    if any("/" not in c.contract for c in colls):
-        return _legacy_sources(colls)
     yaml_sources = [(c.dbt_schema, _PARSERS["dbt"]) for c in colls]
     yaml_sources += [(c.dbt_retired_schema, _PARSERS["dbt"]) for c in colls]
     for kind in ("soda", "contract"):
@@ -72,52 +70,7 @@ def _sources(ref: str | None) -> tuple[list[tuple[str, object]], list[str]]:
     return yaml_sources, evidently
 
 
-# ---- LEGACY: a base ref from before REQ-QAC-241 --------------------------
-#
-# REMOVE WITH REQ-PIPE-248. Before REQ-QAC-241 every check file sat flat in
-# contract/, dbt's in one models/staging/schema.yml, and Evidently's checks
-# were Python dicts under qa_tools/<short>/. The gate reads a base ref's
-# checks AT that ref, so until no diff base predates the move it has to read
-# the old layout too. Dead the day that is true - REQ-PIPE-248 deletes it.
-
-#: The Python packages Evidently's dicts lived in, for refs that predate
-#: REQ-PIPE-240's `short` on each collection.
-_LEGACY_PACKAGE = {"civil-registration": "bdm", "child-protection": "cp"}
-
-
-def _legacy_sources(colls) -> tuple[list[tuple[str, object]], list[str]]:
-    yaml_sources = [("dbt_project/models/staging/schema.yml", _PARSERS["dbt"]),
-                    ("dbt_project/schema-retired.yml", _PARSERS["dbt"])]
-    for kind, suffix in (("soda", "soda-checks{r}.yml"), ("contract", "contract{r}.yaml")):
-        for c in colls:
-            stem = c.contract.removesuffix("-contract.yaml")
-            yaml_sources += [(f"contract/{stem}-" + suffix.format(r=r), _PARSERS[kind])
-                             for r in ("", "-retired")]
-    yaml_sources.append(("contract/file-checks.yaml", cl.parse_file_check_metadata))
-    evidently = []
-    for c in colls:
-        package = c.short or _LEGACY_PACKAGE.get(c.id, c.id)
-        evidently += [f"qa_tools/{package}/evidently_check_lifecycle{r}.py" for r in ("", "_retired")]
-    return yaml_sources, evidently
-
-
-def _legacy_evidently_dict(source: str, filename: str) -> dict:
-    """A pre-REQ-QAC-241 module's CHECK_LIFECYCLE dict, by exec of its own
-    source at that ref (trusted - this repository's own content). REMOVE
-    WITH REQ-PIPE-248."""
-    namespace: dict = {}
-    # Compiled under a `<...>` name, never the repo path it came from: that
-    # path no longer exists, and coverage, which records any code object
-    # filed under a path in the tree, then fails its report (#216).
-    exec(compile(source, f"<legacy {filename}>", "exec"), namespace)
-    return namespace.get("CHECK_LIFECYCLE", {})
-
-# ---- end of LEGACY --------------------------------------------------------
-
-
 def _evidently_checks(source: str, rel_path: str) -> dict:
-    if rel_path.endswith(".py"):
-        return _legacy_evidently_dict(source, rel_path)
     return cl.evidently_checks_from_text(source, rel_path)
 
 
