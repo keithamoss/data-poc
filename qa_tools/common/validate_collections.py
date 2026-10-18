@@ -67,6 +67,21 @@ AGENCY_SHORT_PATTERN = re.compile(r"[a-z0-9]+")
 
 # ---- criterion 7: the configuration ---------------------------------------
 
+#: REQ-PIPE-240's temporary pointers, all removed by REQ-PIPE-248 (REQ-TEST-249
+#: criterion 9): an adapter still declaring one is named, not a traceback.
+TEMPORARY_POINTERS = ("dashboard_json", "dashboard_datasets", "results_json")
+
+
+def _pointer_problem(c, exc: TypeError) -> str:
+    where = f"qa_tools/collections/{c.module_name}.py"
+    pointer = next((p for p in TEMPORARY_POINTERS if f"'{p}'" in str(exc)), None)
+    if pointer is None:
+        return f"{where} cannot build its adapter: {exc}"
+    return (f"{where} declares {pointer!r}, a temporary pointer REQ-PIPE-248 removed - a "
+            f"collection's report files are named by the registry, and every dashboard file "
+            f"lists its datasets under `datasets`")
+
+
 def config_problems(package: Path | None = None) -> list[str]:
     """`package` is the adapter package's directory - the real one unless a
     test names another."""
@@ -83,20 +98,26 @@ def config_problems(package: Path | None = None) -> list[str]:
     package = package or ROOT / "qa_tools" / "collections"
     modules = {p.stem for p in package.glob("*.py") if p.stem not in ("__init__", "base")}
     wanted = {c.module_name: c for c in declared}
+    loaded = {}
     for c in declared:
         if c.module_name not in modules:
             problems.append(f"collection {c.id!r} has no adapter "
                             f"(qa_tools/collections/{c.module_name}.py)")
         else:
-            adapter = collections.adapter(c)
+            try:
+                adapter = collections.adapter(c)
+            except TypeError as exc:
+                problems.append(_pointer_problem(c, exc))
+                continue
+            loaded[c.id] = adapter
             if adapter.collection_id != c.id:
                 problems.append(f"qa_tools/collections/{c.module_name}.py is the adapter of "
                                 f"{adapter.collection_id!r}, not {c.id!r}")
     # REQ-QAC-242 criterion 5: a legacy flag only the shared modules know.
     from qa_tools.tools import legacy
     for c in declared:
-        if c.module_name in modules:
-            for flag in sorted(collections.adapter(c).legacy - set(legacy.KNOWN)):
+        if c.id in loaded:
+            for flag in sorted(loaded[c.id].legacy - set(legacy.KNOWN)):
                 problems.append(f"qa_tools/collections/{c.module_name}.py declares legacy flag "
                                 f"{flag!r}, which no shared module knows (qa_tools/tools/legacy.py)")
     for orphan in sorted(modules - set(wanted)):

@@ -758,6 +758,29 @@ class TestTheSharedToolModules:
                                    asked=["fake.not_null_dbt"], ran=False)
         assert notes == ["fake.not_null_dbt"]
 
+    def test_an_adapter_still_carrying_a_temporary_pointer_fails_naming_it(
+            self, third_collection, tmp_path, monkeypatch):
+        """REQ-TEST-249 criterion 9: REQ-PIPE-240's temporary pointers
+        (dashboard_json, dashboard_datasets, results_json) are gone from the
+        adapter, so one that still declares one fails the gate naming the
+        file and the pointer - not with a traceback out of the import."""
+        from qa_tools import collections as registry
+
+        importable = tmp_path / "importable"
+        importable.mkdir()
+        (importable / "fake_collection.py").write_text(
+            "from qa_tools.collections.base import CollectionAdapter\n"
+            f"ADAPTER = CollectionAdapter(collection_id={FAKE_ID!r}, label='Fake',\n"
+            "                            dashboard_json='fake.json')\n")
+        monkeypatch.delitem(sys.modules, "qa_tools.collections.fake_collection")
+        monkeypatch.setattr(registry, "__path__", [*registry.__path__, str(importable)])
+        got = gate.config_problems(_package(tmp_path, *TestTheConfigurationGate.REAL,
+                                            "fake_collection"))
+        assert got == ["qa_tools/collections/fake_collection.py declares 'dashboard_json', "
+                       "a temporary pointer REQ-PIPE-248 removed - a collection's report files "
+                       "are named by the registry, and every dashboard file lists its datasets "
+                       "under `datasets`"]
+
     def test_an_unknown_legacy_flag_fails_the_gate_naming_it(self, third_collection, tmp_path):
         import dataclasses
 

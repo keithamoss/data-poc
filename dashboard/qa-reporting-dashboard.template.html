@@ -2540,13 +2540,12 @@ function coveredDateRange(){
 }
 
 // stats.byRun's own "total" is already the dataset-wide row count at
-// that run (qa_tools' dataset_stats.py/pipeline's build_*_dashboard_
-// data.py - every column shares the same value) - reused here rather
-// than re-deriving row counts from the raw manifest, which for Child
-// Protection would need a table-name lookup (row_counts is keyed by
-// real table name, e.g. cp_notifications, not this dataset's own
-// hyphenated id, e.g. cp-notifications) this layer shouldn't have to
-// know about. Checked more than one column in case the first one's own
+// that run (qa_tools/tools/dataset_stats.py, then
+// pipeline/build_dashboard_data.py - every column shares the same value) -
+// reused here rather than re-deriving row counts from the raw manifest,
+// which would need a table-name lookup (row_counts is keyed by real table
+// name, e.g. cp_notifications, not the dataset's hyphenated id, e.g.
+// cp-notifications) this layer shouldn't have to know about. Checked more than one column in case the first one's own
 // byRun doesn't happen to cover every run (a column/check introduced
 // partway through history) - returns null if truly none of them do,
 // left to each caller's own fallback. Extracted out of
