@@ -157,6 +157,14 @@ releases:
               collection gets its commands and its menu entry without code of
               its own. Every command reads and behaves as before, and
               `mothman --help` opens in about half the time.
+          - headline: Help that still reads at thirty collections
+            components: ["Testing & dev tooling"]
+            description: >
+              `mothman --help` now lists the collections in a panel of their
+              own, above the tools, and the new `mothman collections` command
+              lists every one with its agency. Every `--collection` option
+              takes a short or an id, and an unknown one is refused with the
+              closest names.
   - date: "2026-10-16"
     summary: >
       Birth Registrations' history now opens with twelve days when each

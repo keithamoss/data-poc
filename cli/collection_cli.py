@@ -250,7 +250,13 @@ def make_group(coll) -> click.Group:
     shape = one_table if len(coll.datasets) == 1 else many_tables
     name = label(coll)
 
-    @click.group(coll.short, help=f"{name} - Tier 1 commands.")
+    # ABOVE N_LIST EACH LINE NAMES ITS AGENCY TOO (REQ-TEST-252 criterion 3),
+    # so two similarly named collections can be told apart from the list.
+    from cli import common
+
+    about = f"{name} ({coll.agency_name})" if common.many_collections() else name
+
+    @click.group(coll.short, help=f"{about} - Tier 1 commands.")
     def group() -> None:
         pass
 

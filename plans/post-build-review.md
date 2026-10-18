@@ -10231,3 +10231,26 @@ twice. It deliberately did not re-find the `TypeError`.
 
      Neither is a product defect, so neither got a failing product test
      first; both are tests corrected to test what they say.
+
+223. **[done, 2026-10-18]** **[CLI/TUI]** **`mothman supply load
+     --collection` refused every collection, found while REQ-TEST-252 made
+     the option uniform.**
+
+     THE DEFECT. Since REQ-QAC-242 (commit ec78089) the option converted
+     its value to a collection id, and the command then looked that id up
+     among the SHORTS. So `--collection bdm` reached the command as
+     `civil-registration` and was refused as "unknown collection
+     'civil-registration' - one of bdm, cp". Only the bare command, which
+     stages every collection, still worked, which is why neither a
+     bootstrap nor CI noticed: both stage everything.
+
+     FIXED TEST-FIRST. tests/test_cli_supply.py's
+     `TestLoadStagesTheCollectionItIsGiven` gives the command a short and an
+     id and asserts it stages that collection. It failed against the old
+     code on both and passes after. The command now stages the collection
+     the option hands it, by id, and an unknown value is refused by the
+     option itself, as on every other command (REQ-TEST-252 criterion 9).
+
+     THE LESSON is the one this file keeps finding: two halves of one value
+     changed shape at different times, and only a run of the narrow path
+     would have shown it.

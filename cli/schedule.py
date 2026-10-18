@@ -654,9 +654,15 @@ def calendar_menu() -> None:
     from qa_tools.common import agreement, asset_time, correction_trial, hierarchy, supply_db
 
     while True:
-        ids = [d.dataset_id for d in hierarchy.all_datasets()]
-        dataset_id = common.select("Which dataset?", ids,
-                                   flag_hint="mothman schedule show --dataset <id>")
+        every = hierarchy.all_datasets()
+        # GROUPED BY COLLECTION AND FILTERED BY TYPING above N_LIST datasets
+        # (REQ-TEST-252 criterion 6); today's list at or below it.
+        by_collection: dict[str, list[str]] = {}
+        for d in every:
+            by_collection.setdefault(d.collection_name, []).append(d.dataset_id)
+        dataset_id = common.grouped_select("Which dataset?", list(by_collection.items()),
+                                           flag_hint="mothman schedule show --dataset <id>",
+                                           many=len(every) > common.N_LIST)
         if dataset_id is None:
             return
         today = asset_time.local_date(asset_time.now())

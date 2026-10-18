@@ -53,7 +53,7 @@ def pipeline_group() -> None:
 @pipeline_group.command("run")
 @common.short_collection_option(
     all_choice=True,
-    help="Which collection's full manifest to regenerate and run - {legend}. Default: both.")
+    help="Which collection's full manifest to regenerate and run - {legend}. Default: {every}.")
 @click.option("--sequential", is_flag=True,
               help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted.")
 @click.option("--snapshot", is_flag=True,
@@ -360,7 +360,7 @@ def cache_key_command() -> None:
 
 @pipeline_group.command("bootstrap")
 @common.short_collection_option(
-    all_choice=True, help="Which collection to populate - {legend}. Default: both.")
+    all_choice=True, help="Which collection to populate - {legend}. Default: {every}.")
 @click.option("--force", is_flag=True,
               help="Run even if staging already holds tables. Never over recorded QA "
                    "history - that is refused; `mothman env reset-synthetic` starts "

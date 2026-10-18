@@ -378,9 +378,10 @@ class TestACollectionIsNamedOrRefusedInWords:
             result.exception, SystemExit)
 
     def test_the_short_names_pipeline_run_takes_are_taken_here(self):
-        assert common._collection_id_or_short(None, None, "cp") == "child-protection"
-        assert common._collection_id_or_short(None, None, "bdm") == "civil-registration"
-        assert common._collection_id_or_short(None, None, None) is None
+        to_id = common.CollectionParam("id")
+        assert to_id.convert("cp", None, None) == "child-protection"
+        assert to_id.convert("bdm", None, None) == "civil-registration"
+        assert to_id.convert(None, None, None) is None
 
 
 def test_discard_sample_names_an_unknown_dataset_without_a_repr():
@@ -390,3 +391,23 @@ def test_discard_sample_names_an_unknown_dataset_without_a_repr():
     assert result.exit_code == 1
     assert "\"'nope'" not in result.output and "\"'" not in result.output
     assert "nope" in result.output
+
+
+class TestLoadStagesTheCollectionItIsGiven:
+    """post-build-review #223: `supply load --collection bdm` refused with
+    "unknown collection 'civil-registration'" - the option hands the command
+    an id, which the command then looked up among the shorts."""
+
+    @pytest.mark.parametrize("value", ["bdm", "civil-registration"])
+    def test_by_short_or_id(self, monkeypatch, value):
+        from qa_tools.common import load_log
+        from qa_tools.tools import stage
+
+        staged = []
+        monkeypatch.setattr(stage, "build_all", lambda cid: staged.append(cid))
+        monkeypatch.setattr(load_log, "loaded_tables", lambda: [])
+        monkeypatch.setattr(load_log, "failures", lambda: [])
+        monkeypatch.setattr(load_log, "records", lambda: [])
+        result = CliRunner().invoke(supply_group, ["load", "--collection", value])
+        assert result.exit_code == 0, result.output
+        assert staged == ["civil-registration"]

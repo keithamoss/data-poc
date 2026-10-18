@@ -308,7 +308,7 @@ def log_command(as_sql: bool) -> None:
 
 @supply_group.command("load")
 @common.id_collection_option(
-               help="One collection only. Both are staged when this is left out.")
+               help="One collection only - {legend}. Left out, it stages {every}.")
 def load_command(collection_id: str | None) -> None:
     """Stage every recognised delivery into the supply database.
 
@@ -330,18 +330,19 @@ def load_command(collection_id: str | None) -> None:
     from qa_tools import collections
     from qa_tools.tools import stage
 
-    known = {c.short: c.id for c in collections.all_collections()}
-    if collection_id is not None and collection_id not in known:
-        raise click.ClickException(
-            f"unknown collection {collection_id!r} - one of {', '.join(sorted(known))}")
+    # THE OPTION HAS ALREADY TURNED A SHORT INTO ITS ID and refused anything
+    # else (post-build-review #223: this used to look the id up among the
+    # shorts, and so refused every collection it was given).
+    every = collections.all_collections()
+    chosen = every if collection_id is None else [c for c in every if c.id == collection_id]
 
     before = set(load_log.loaded_tables())
     failed_before = {r.physical for r in load_log.failures()}
     records_before = len(load_log.records())
 
-    for key in sorted(known) if collection_id is None else [collection_id]:
-        console.print(f"[bold]{key}[/bold] - staging every recognised delivery")
-        stage.build_all(known[key])
+    for coll in chosen:
+        console.print(f"[bold]{coll.short}[/bold] - staging every recognised delivery")
+        stage.build_all(coll.id)
 
     staged = sorted(set(load_log.loaded_tables()) - before)
     changed = len(load_log.records()) - records_before
@@ -834,7 +835,7 @@ def grant_publisher_command(role: str, password: str | None) -> None:
 
 @supply_group.command("queue")
 @common.id_collection_option(required=True,
-               help="Which collection's queue to show.")
+               help="Which collection's queue to show - {legend}.")
 def queue_command(collection_id: str) -> None:
     """Supplies waiting on a person (REQ-GHUB-082 criterion 16).
 
@@ -887,7 +888,7 @@ def _say_owed(owed_now: list) -> None:
 
 @supply_group.command("slots")
 @common.id_collection_option(required=True,
-               help="Which collection's periods to show.")
+               help="Which collection's periods to show - {legend}.")
 @click.option("--dataset", "dataset_id", default=None,
                help="Narrow to one dataset.")
 def slots_command(collection_id: str, dataset_id: str | None) -> None:
@@ -905,7 +906,7 @@ def slots_command(collection_id: str, dataset_id: str | None) -> None:
 
 @supply_group.command("amber-setting")
 @common.id_collection_option(
-               help="Narrow to one collection.")
+               help="Narrow to one collection - {legend}.")
 def amber_setting_command(collection_id: str | None) -> None:
     """The amber setting in force for each dataset, and where it was set
     (REQ-PIPE-122 NFR 1) - so a value nobody remembers setting can be found.
@@ -927,7 +928,7 @@ def amber_setting_command(collection_id: str | None) -> None:
 
 @supply_group.command("superseded")
 @common.id_collection_option(required=True,
-               help="Which collection's superseded supplies to list.")
+               help="Which collection's superseded supplies to list - {legend}.")
 @click.option("--dataset", "dataset_id", default=None, help="Narrow to one dataset.")
 @click.option("--period", default=None, help="Narrow to one period.")
 def superseded_command(collection_id: str, dataset_id: str | None, period: str | None) -> None:

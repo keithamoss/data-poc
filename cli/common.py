@@ -165,6 +165,151 @@ def select(message: str, choices: list[str], flag_hint: str,
     return answer
 
 
+def grouped_select(message: str, groups: list[tuple[str, list[str]]], flag_hint: str, *,
+                   many: bool, top: tuple[str, ...] = ()) -> str | None:
+    """A picker over choices in named groups (REQ-TEST-252 criteria 4 to 8).
+
+    `many` is the caller's own count against N_LIST - collections for a
+    collection picker, datasets for a dataset picker. NOT many: exactly
+    select() over every choice in order, headings unseen, so the picker
+    reads as it always has. MANY: each group under a heading that cannot
+    be chosen, and typing narrows the list to the choices whose own text or
+    whose group's heading contains what was typed, case-insensitively, the
+    prompt saying so. `top` choices sit above every group and are never
+    filtered out. Back and Ctrl-C return None, as from select()."""
+    if not many:
+        return select(message, [*top, *(c for _, cs in groups for c in cs)], flag_hint)
+    require_tty(flag_hint)
+    answer = _ask(_filtered_question(message, groups, top))
+    if answer is None or answer == BACK:
+        return None
+    return answer
+
+
+def _filtered_question(message: str, groups: list[tuple[str, list[str]]],
+                       top: tuple[str, ...]):
+    """The filtered, grouped picker as a questionary Question, built on
+    prompt_toolkit directly.
+
+    NOT questionary's own use_search_filter, which was tried first and
+    fails criteria 7 and 8 in questionary 2.1.1 (checked 2026-10-18 with
+    scripts/dev/tui_drive.py): a filter matching nothing shows EVERY choice
+    again, the cursor can rest on a group heading, and Enter there returns
+    the heading's text as though it were a choice."""
+    import questionary
+    from prompt_toolkit.application import Application, get_app
+    from prompt_toolkit.filters import IsDone
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
+    from prompt_toolkit.layout import ConditionalContainer, HSplit, Layout, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+    from prompt_toolkit.layout.dimension import Dimension
+
+    state = {"text": "", "at": 0, "answer": None}
+
+    def rows() -> list[tuple[str, str]]:
+        """(kind, text) in display order - kind is 'choice' or 'heading'."""
+        typed = state["text"].lower()
+        out = [("choice", t) for t in top]
+        for heading, choices in groups:
+            shown = [c for c in choices if not typed or typed in c.lower() or typed in heading.lower()]
+            if shown:
+                out.append(("heading", heading))
+                out.extend(("choice", c) for c in shown)
+        if not typed or any(k == "choice" and t not in top for k, t in out):
+            out.append(("choice", BACK))
+        return out
+
+    def choices() -> list[str]:
+        return [t for k, t in rows() if k == "choice"]
+
+    def clamp() -> None:
+        n = len(choices())
+        state["at"] = min(state["at"], n - 1) if n else 0
+
+    def head():
+        tokens = [("class:qmark", "?"), ("", " "), ("class:question", message), ("", " ")]
+        if state["answer"] is not None:
+            return tokens + [("class:answer", state["answer"])]
+        return tokens + [("class:instruction", "(type to filter, arrows to move)")]
+
+    def body():
+        clamp()
+        tokens, i = [], 0
+        typed = state["text"]
+        if typed and not [c for c in choices() if c != BACK and c not in top]:
+            tokens.append(("class:text", f"  Nothing matches {typed!r} - delete to widen, "
+                                         "or Ctrl-C to go back.\n"))
+        for kind, text in rows():
+            if kind == "heading":
+                tokens.append(("class:separator", f"  {text}\n"))
+                continue
+            if i == state["at"]:
+                tokens += [("[SetCursorPosition]", ""), ("class:pointer", "  » "),
+                           ("class:highlighted", text), ("", "\n")]
+            else:
+                tokens.append(("class:text", f"    {text}\n"))
+            i += 1
+        if typed:
+            tokens += [("class:question-mark", "/ "), ("class:search_success", typed),
+                       ("class:question-mark", "...")]
+        return tokens
+
+    bindings = KeyBindings()
+
+    @bindings.add(Keys.ControlC, eager=True)
+    @bindings.add(Keys.ControlQ, eager=True)
+    def _abort(event):
+        event.app.exit(exception=KeyboardInterrupt, style="class:aborting")
+
+    @bindings.add(Keys.Down, eager=True)
+    @bindings.add(Keys.ControlN, eager=True)
+    def _down(event):
+        n = len(choices())
+        state["at"] = (state["at"] + 1) % n if n else 0
+
+    @bindings.add(Keys.Up, eager=True)
+    @bindings.add(Keys.ControlP, eager=True)
+    def _up(event):
+        n = len(choices())
+        state["at"] = (state["at"] - 1) % n if n else 0
+
+    @bindings.add(Keys.Backspace, eager=True)
+    def _widen(event):
+        state["text"] = state["text"][:-1]
+        state["at"] = 0
+
+    @bindings.add(Keys.ControlM, eager=True)
+    def _answer(event):
+        found = choices()
+        typed = state["text"]
+        # NOTHING MATCHES: Enter chooses nothing - least of all a choice the
+        # filter is hiding (criterion 8) - and the prompt stays open.
+        if not found or (typed and not [c for c in found if c != BACK and c not in top]):
+            return
+        state["answer"] = found[min(state["at"], len(found) - 1)]
+        event.app.exit(result=state["answer"])
+
+    @bindings.add(Keys.Any)
+    def _type(event):
+        char = event.data
+        if char and char.isprintable():
+            state["text"] += char
+            state["at"] = 0
+
+    def list_height():
+        return Dimension(max=max(5, get_app().output.get_size().rows - 3))
+
+    layout = Layout(HSplit([
+        Window(FormattedTextControl(head), height=1),
+        ConditionalContainer(Window(FormattedTextControl(body, show_cursor=False),
+                                    height=list_height, always_hide_cursor=True),
+                             filter=~IsDone()),
+    ]))
+    return questionary.Question(Application(layout=layout, key_bindings=bindings,
+                                            style=_QMARK_STYLE, full_screen=False))
+
+
 def path_prompt(message: str, flag_hint: str) -> str | None:
     """A questionary.path() prompt (real tab-completion filesystem
     browsing, no hand-built file picker needed - plans/tooling.md #1's
@@ -1022,77 +1167,122 @@ def reference_suffix(result: dict) -> str:
     return ""
 
 
-# ---- the one --collection option (REQ-TEST-245 criterion 6) -------------------
+# ---- the one --collection option (REQ-TEST-245, REQ-TEST-252) ----------------
 #
 # Generated from the registry, so a collection added to the hierarchy is a value
-# every --collection accepts with no edit here. Each command keeps the values,
-# help text and refusal it has always had; making them uniform changes help
-# text, which is REQ-TEST-252's.
+# every --collection accepts with no edit here, and it means the same thing on
+# every command: a collection's short or its id, and `all` where a command runs
+# every collection (REQ-TEST-252 criterion 9).
+
+#: THE ONE COLLECTION-LIST THRESHOLD (REQ-TEST-252 criterion 1, Keith
+#: 2026-10-16): at this many collections or fewer, help, pickers, hints and
+#: refusals read exactly as they do at two; above it they group, filter and
+#: point at `mothman collections` rather than listing everything.
+N_LIST = 9
+
+
+def _registered():
+    from qa_tools import collections
+
+    return collections.all_collections()
+
+
+def many_collections() -> bool:
+    """Whether the registry holds more collections than N_LIST."""
+    return len(_registered()) > N_LIST
+
 
 def collection_legend() -> str:
     """`bdm = civil-registration, cp = child-protection` - each short with
     the collection it names, in hierarchy order."""
-    from qa_tools import collections
-
-    return ", ".join(f"{c.short} = {c.id}" for c in collections.all_collections())
+    return ", ".join(f"{c.short} = {c.id}" for c in _registered())
 
 
 def collection_shorts() -> list[str]:
-    from qa_tools import collections
-
-    return [c.short for c in collections.all_collections()]
+    return [c.short for c in _registered()]
 
 
-class _RegistryChoice(click.Choice):
-    """The collections' shorts, read from the registry WHEN USED rather than
-    when the command was defined - so a collection registered after import
-    (a test's third) is accepted and refused exactly as the real ones are,
-    without re-importing the command (REQ-TEST-245 criterion 11)."""
+def _every_word() -> str:
+    """What a default of every collection is called in help: `both` at two,
+    as it has always read."""
+    return "both" if len(_registered()) == 2 else "every collection"
 
-    def __init__(self, extra: tuple[str, ...] = ()) -> None:
-        self._extra = tuple(extra)
-        super().__init__(())
 
-    @property
-    def choices(self) -> tuple[str, ...]:
-        return tuple(collection_shorts()) + self._extra
+class CollectionParam(click.ParamType):
+    """A --collection value: a registered collection's short or id, or `all`
+    where `all_choice` - read from the registry WHEN USED, so a collection
+    registered after import is accepted and refused as the real ones are.
+    Hands the command its short (`to="short"`) or its id (`to="id"`), which
+    is what each command has always received."""
 
-    @choices.setter
-    def choices(self, _value) -> None:
-        """Click's constructor assigns the choices; the registry owns them."""
+    name = "collection"
+
+    def __init__(self, to: str, all_choice: bool = False) -> None:
+        self.to = to
+        self.all_choice = all_choice
+
+    def _values(self) -> list[str]:
+        return collection_shorts() + (["all"] if self.all_choice else [])
+
+    def get_metavar(self, param, ctx) -> str:
+        if many_collections():
+            return "COLLECTION"
+        return "[" + "|".join(self._values()) + "]"
+
+    def shell_complete(self, ctx, param, incomplete):
+        from click.shell_completion import CompletionItem
+
+        return [CompletionItem(v) for v in self._values() if v.startswith(incomplete)]
+
+    def convert(self, value, param, ctx):
+        if value is None:
+            return None
+        if self.all_choice and value == "all":
+            return "all"
+        found = next((c for c in _registered() if value in (c.short, c.id)), None)
+        if found is None:
+            self.fail(unknown_collection_message(value), param, ctx)
+        return found.short if self.to == "short" else found.id
+
+
+def unknown_collection_message(value: str) -> str:
+    """REQ-TEST-252 criterion 13: the value, up to three registered shorts or
+    ids closest to it, and where every collection is listed - with every one
+    listed here too only while there are N_LIST or fewer."""
+    import difflib
+
+    every = _registered()
+    names = [n for c in every for n in (c.short, c.id)]
+    close = difflib.get_close_matches(str(value), names, n=3, cutoff=0.4)
+    said = f"{value!r} is not a collection."
+    if close:
+        said += f" Closest: {', '.join(close)}."
+    if not many_collections():
+        said += " Known: " + ", ".join(f"{c.short} ({c.id})" for c in every) + "."
+    return said + " `mothman collections` lists every collection."
+
+
+def _collection_help(text: str) -> str:
+    """`{legend}` becomes the legend of every short and id while there are
+    N_LIST or fewer collections (criterion 10), and above it a pointer at
+    `mothman collections` (criterion 11); `{every}` names a default of all."""
+    if many_collections():
+        legend = "a collection's short or id (`mothman collections` lists every one)"
+    else:
+        legend = collection_legend()
+    return text.format(legend=legend, every=_every_word())
 
 
 def short_collection_option(*, help: str, all_choice: bool = False, required: bool = False):
-    """`--collection` taking a collection's short name (and `all`, where the
-    command runs every collection by default). `{legend}` in the help is
-    replaced by collection_legend() as the command is defined. Click's own
-    refusal names the choices."""
-    return click.option("--collection", type=_RegistryChoice(("all",) if all_choice else ()),
+    """`--collection`, handed to the command as the collection's short (and
+    `all`, where the command runs every collection by default)."""
+    return click.option("--collection", type=CollectionParam("short", all_choice),
                         default="all" if all_choice else None, required=required,
-                        help=help.format(legend=collection_legend()))
-
-
-def _collection_id_or_short(ctx, param, value):
-    """A --collection value - an id or a short - as a collection id, or a usage
-    error naming the known ones (#123 CLI side-find: an unknown name died in
-    a traceback)."""
-    from qa_tools import collections
-
-    if value is None:
-        return None
-    every = collections.all_collections()
-    by_short = {c.short: c.id for c in every}
-    value = by_short.get(value, value)
-    known = sorted(c.id for c in every)
-    if value not in known:
-        raise click.BadParameter(
-            f"{value!r} is not a collection. Known: {', '.join(known)} "
-            f"(or {', '.join(by_short)}).", ctx=ctx, param=param)
-    return value
+                        help=_collection_help(help))
 
 
 def id_collection_option(*, help: str, required: bool = False):
-    """`--collection` taking an id or a short, handed to the command as the
-    collection id (`collection_id`)."""
-    return click.option("--collection", "collection_id", callback=_collection_id_or_short,
-                        default=None, required=required, help=help)
+    """`--collection`, handed to the command as the collection id
+    (`collection_id`)."""
+    return click.option("--collection", "collection_id", type=CollectionParam("id"),
+                        default=None, required=required, help=_collection_help(help))

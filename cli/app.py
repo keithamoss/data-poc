@@ -144,24 +144,43 @@ def _which_collection(flag_hint: str):
     order and labelled as people know them (REQ-TEST-245 criteria 2 and 5).
     The choice dispatches to THAT collection's own commands - there is no
     branch for an unknown answer to fall into."""
-    by_label = {collection_cli.label(c): c for c in _registry.all_collections()}
-    chosen = common.select("Which dataset?", list(by_label), flag_hint=flag_hint)
+    every = _registry.all_collections()
+    by_label = {collection_cli.label(c): c for c in every}
+    # GROUPED BY AGENCY AND FILTERED BY TYPING ABOVE N_LIST, today's list
+    # at or below it (REQ-TEST-252 criteria 4 and 5).
+    groups: dict[str, list[str]] = {}
+    for c in every:
+        groups.setdefault(c.agency_name, []).append(collection_cli.label(c))
+    chosen = common.grouped_select("Which dataset?", list(groups.items()), flag_hint=flag_hint,
+                                   many=common.many_collections())
     if chosen is None:
         return None
     collection_cli.refuse_a_broken_adapter(by_label[chosen])
     return collection_cli.of(by_label[chosen].id)
 
 
+def _every_collections_hint(hint, generic: str | None = None) -> str:
+    """A flag hint naming each collection's own command at N_LIST or fewer,
+    as today; above it the generic form with one real example, never one
+    entry per collection (REQ-TEST-252 criterion 14)."""
+    every = _registry.all_collections()
+    if not common.many_collections():
+        return " / ".join(hint(c) for c in every)
+    example = hint(every[0])
+    generic = generic or example.replace(f"mothman {every[0].short} ", "mothman <collection> ", 1)
+    return f"{generic} (for example `{example}`; `mothman collections` lists every one)"
+
+
 def _qa_menu() -> None:
-    chosen = _which_collection(" / ".join(collection_cli.qa_hint(c)
-                                          for c in _registry.all_collections()))
+    chosen = _which_collection(_every_collections_hint(
+        collection_cli.qa_hint, "mothman <collection> qa [--run-id/--file or --folder]"))
     if chosen is not None:
         chosen.run_qa_interactive()
 
 
 def _generate_menu() -> None:
-    mod = _which_collection(" / ".join(f"mothman {c.short} generate-synthetic-data"
-                                       for c in _registry.all_collections()))
+    mod = _which_collection(_every_collections_hint(
+        lambda c: f"mothman {c.short} generate-synthetic-data"))
     if mod is None:
         return
     if mod.manifest_exists() and not common.confirm(
@@ -263,8 +282,21 @@ def _state_the_environment_on_first_connection() -> None:
     supply_db.on_first_connection(state)
 
 
+@click.command("collections")
+def collections_command() -> None:
+    """Every registered collection: its short, id, label and agency."""
+    # PLAIN TEXT, ONE PER LINE, so it reads the same through a pipe or with
+    # NO_COLOR=1 as on a terminal (criterion 12). Reads the hierarchy only.
+    every = _registry.all_collections()
+    rows = [(c.short, c.id, collection_cli.label(c), c.agency_name) for c in every]
+    widths = [max(len(r[i]) for r in rows) for i in range(3)] if rows else [0, 0, 0]
+    for r in rows:
+        click.echo("  ".join(v.ljust(w) for v, w in zip(r[:3], widths)) + "  " + r[3])
+
+
 for _group in _GROUPS:
     cli.add_command(_group)
+cli.add_command(collections_command)
 cli.add_command(dashboard.dashboard_group)
 cli.add_command(env.env_group)
 cli.add_command(github.github_group)
@@ -276,6 +308,17 @@ cli.add_command(scenarios.scenarios_group)
 cli.add_command(supply.supply_group)
 cli.add_command(population.population_command)
 cli.add_command(check.check_command)
+
+# TWO PANELS IN `mothman --help`, AT EVERY SIZE (REQ-TEST-252 criterion 2,
+# Keith 2026-10-16): every collection group in hierarchy order, then every
+# other group and command in Click's own order - so no tool sits between two
+# collections, today's two included.
+from rich_click.rich_panel import RichCommandPanel  # noqa: E402
+
+_COLLECTION_NAMES = [g.name for g in _GROUPS]
+cli.add_panel(RichCommandPanel("Collections", commands=_COLLECTION_NAMES))
+cli.add_panel(RichCommandPanel("Tools", commands=[n for n in sorted(cli.commands)
+                                                  if n not in _COLLECTION_NAMES]))
 
 
 def main() -> None:

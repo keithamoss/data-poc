@@ -1343,6 +1343,15 @@ def filing_menu() -> None:
     # 2026-10-13, post-build-review #170); the id is what the code keeps.
     by_name = {_collection_name(c): c for c in _collections()}
     collections = list(by_name)
+    # GROUPED BY AGENCY AND FILTERED BY TYPING ABOVE N_LIST (REQ-TEST-252
+    # criteria 4 and 5); today's list at or below it.
+    from qa_tools import collections as registry
+
+    by_agency: dict[str, list[str]] = {}
+    for coll in registry.all_collections():  # hierarchy order, for the headings
+        if coll.id in by_name.values():
+            by_agency.setdefault(coll.agency_name, []).append(_collection_name(coll.id))
+    grouped = list(by_agency.items()) if common.many_collections() else [("", collections)]
     # PENDING CORRECTIONS ABOVE THE CHOICE OF COLLECTION (REQ-PIPE-170
     # criterion 13): a correction is asset-wide, so it cannot wait inside one.
     # Its PARKED moves likewise (Keith, 2026-10-11, (p)).
@@ -1355,8 +1364,9 @@ def filing_menu() -> None:
                           style="yellow", markup=False)
         entries = ([f"{_MENU_CORRECTIONS} ({len(waiting)})"] if waiting else []) \
             + ([f"{_MENU_PARKED} ({len(parked)})"] if parked else [])
-        picked = common.select("Which collection - or the corrections?",
-                               entries + collections, flag_hint=_FLAG_HINT)
+        picked = common.grouped_select("Which collection - or the corrections?", grouped,
+                                       flag_hint=_FLAG_HINT, many=common.many_collections(),
+                                       top=tuple(entries))
         if picked and picked.startswith(_MENU_CORRECTIONS):
             corrections_flow(waiting)
             return
@@ -1366,7 +1376,8 @@ def filing_menu() -> None:
         collection_id = by_name.get(picked)
     else:
         picked = (collections[0] if len(collections) == 1 else
-                  common.select("Which collection?", collections, flag_hint=_FLAG_HINT))
+                  common.grouped_select("Which collection?", grouped, flag_hint=_FLAG_HINT,
+                                        many=common.many_collections()))
         collection_id = by_name.get(picked)
     if collection_id is None:
         return
