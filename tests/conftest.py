@@ -418,11 +418,20 @@ def _no_test_files_a_real_delivery():
     real_remove = delivery.remove_deliveries
     remove_signature = inspect.signature(real_remove)
 
+    real_receipts = Path(delivery.RECEIPTS_DIR).resolve()
+
     @functools.wraps(real_remove)
     def guarded_remove(*args, **kwargs):
         bound = remove_signature.bind(*args, **kwargs)
         bound.apply_defaults()
         target = Path(bound.arguments.get("deliveries_dir") or delivery.DELIVERIES_DIR).resolve()
+        # THE RECEIPTS TOO (post-build-review #232): a clear redirecting only
+        # the deliveries would still delete real receipts.
+        receipts = Path(bound.arguments.get("receipts_dir") or delivery.RECEIPTS_DIR).resolve()
+        if receipts == real_receipts:
+            raise AssertionError(
+                f"a test tried to clear receipts from this repo's real {real_receipts} - point "
+                f"receipts_dir at tmp_path as well as deliveries_dir")
         if target == real_tree:
             raise AssertionError(
                 f"a test tried to clear deliveries from this repo's real {real_tree} - "

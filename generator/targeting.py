@@ -44,8 +44,7 @@ SIBLING_RULE = "Multiple-birth sibling match"
 #: The two lever sets a provider may declare (generator/collections/base.py's
 #: `target_levers`): null-rate rules on one table, and unrecognised client
 #: postcodes.
-NULL_RATE = "null-rate"
-CLIENT_POSTCODES = "client-postcodes"
+from generator.collections.base import CLIENT_POSTCODES, NULL_RATE  # noqa: E402,F401 - re-exported
 
 #: Four-character postcodes no supplier would send and no reader treats as
 #: missing - and numeric, because the loader stages the column as a number

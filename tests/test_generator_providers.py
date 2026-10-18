@@ -277,3 +277,109 @@ class TestNoTestClearsTheRealDeliveryTree:
 
         with pytest.raises(AssertionError, match="real"):
             delivery.remove_deliveries(["no-such-delivery"])
+
+    def test_redirecting_only_the_deliveries_still_refuses_the_real_receipts(self, tmp_path):
+        """post-build-review #232 (the REQ-GEN-246 critic's T4): the guard read
+        only `deliveries_dir`, so a clear that redirected the deliveries and
+        left the receipts at their default would delete real receipts. The
+        delivery named does not exist, so nothing real is at risk here."""
+        from qa_tools.common import delivery
+
+        with pytest.raises(AssertionError, match="receipts"):
+            delivery.remove_deliveries(["no-such-delivery"], tmp_path / "deliveries")
+
+
+class TestTheProvidersGateKnowsWhatAProviderMayDeclare:
+    """post-build-review #232 (the REQ-GEN-246 and REQ-TEST-245 critics; Keith,
+    2026-10-18: fix now, as gate checks): what would only bite a new
+    collection - a provider filed under the wrong collection, a dataset it
+    does not own, a target trial on a multi-table collection, a lever set
+    nothing knows or two collections sharing one, a stray provider module."""
+
+    @pytest.mark.parametrize("attr,value,expected", [
+        ("collection_id", "child-protection", "names collection 'child-protection'"),
+        ("dataset_id", "cp-clients", "dataset 'cp-clients' is not one of fake-collection's"),
+        ("target_levers", "nonsense", "lever set 'nonsense'"),
+        ("target_levers", "null-rate", "lever set 'null-rate' is declared by both"),
+    ])
+    def test_a_bad_declaration_fails_naming_it(self, third_collection, monkeypatch, attr, value,
+                                               expected):
+        from generator import validate_providers
+
+        monkeypatch.setattr(sys.modules[PROVIDER_MODULE].PROVIDER, attr, value)
+        problems = validate_providers.problems()
+        assert any(expected in p for p in problems), problems
+
+    def test_a_target_trial_on_a_multi_table_collection_fails(self, monkeypatch):
+        from generator import validate_providers
+
+        monkeypatch.setattr(providers.provider("child-protection"), "target_trial", True)
+        problems = validate_providers.problems()
+        assert any("child-protection declares a target trial" in p for p in problems), problems
+
+    def test_a_provider_module_naming_no_collection_fails(self, tmp_path):
+        from generator import validate_providers
+
+        for name in ("civil_registration", "child_protection", "emergency_departmnet"):
+            (tmp_path / f"{name}.py").write_text("")
+        problems = validate_providers.orphan_problems(tmp_path)
+        assert problems == ["generator/collections/emergency_departmnet.py names no declared "
+                            "collection"]
+
+    def test_the_real_providers_pass(self):
+        from generator import validate_providers
+
+        assert validate_providers.problems() == []
+
+
+class TestATrialIsRefusedBeforeAnythingIsWritten:
+    def test_a_multi_table_collection_cannot_be_asked_for_a_trial(self, monkeypatch):
+        import click
+
+        from cli import pipeline as pipeline_cli
+
+        written = []
+        monkeypatch.setattr(providers.provider("child-protection"), "target_trial", True)
+        monkeypatch.setattr(driver, "generate", lambda cid: written.append(cid))
+        with pytest.raises(click.ClickException, match="only a one-table collection"):
+            pipeline_cli.generate_collection("child-protection", trial=True)
+        assert written == []
+
+
+class TestEverySeedDrawnIsOneItsProviderDeclares:
+    """REQ-GEN-246 criterion 2, measured as well as declared (Keith,
+    2026-10-18, after the critic found the seed check reads each provider's
+    DECLARED schedule): a real generation of each collection, with every
+    seed the generator's own code hands numpy recorded, and each one inside a
+    window the provider's seed_schedule() declares. A derivation past the
+    declared span would otherwise go unnoticed until two ranges collided.
+
+    delivery_names.py is left out: it seeds from the delivery's name, not
+    from the collection's seeds, and a collision there is refused at write."""
+
+    @pytest.mark.parametrize("collection_id", ["civil-registration", "child-protection"])
+    def test_a_real_generation_draws_only_declared_seeds(self, collection_id, tmp_path,
+                                                         monkeypatch, capsys):
+        import numpy as np
+
+        real_rng = np.random.default_rng
+        drawn: set[int] = set()
+
+        def recording(seed=None, *args, **kwargs):
+            where = sys._getframe(1).f_code.co_filename
+            if ("/generator/" in where and not where.endswith("delivery_names.py")
+                    and isinstance(seed, (int, np.integer))):
+                drawn.add(int(seed))
+            return real_rng(seed, *args, **kwargs)
+
+        monkeypatch.setattr(np.random, "default_rng", recording)
+        undo = redirect(tmp_path)
+        try:
+            driver.generate(collection_id)
+        finally:
+            undo()
+        capsys.readouterr()
+        assert drawn, "no seed was recorded - the probe would prove nothing"
+        windows = providers.provider(collection_id).seed_schedule()
+        outside = sorted(s for s in drawn if not any(lo <= s <= hi for _, lo, hi in windows))
+        assert outside == [], f"{collection_id} drew seeds no window declares: {outside[:20]}"

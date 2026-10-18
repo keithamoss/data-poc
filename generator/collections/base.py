@@ -18,6 +18,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+#: The lever sets generator/targeting.py builds targets with, by name - here,
+#: in the light module, so `mothman check`'s providers gate can name an
+#: unknown one without importing pandas (post-build-review #232).
+NULL_RATE = "null-rate"
+CLIENT_POSTCODES = "client-postcodes"
+
+
 class NoProviderError(LookupError):
     """A collection or dataset no generator provider makes - refused by name
     rather than generated with another collection's behaviour."""

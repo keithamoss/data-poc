@@ -309,6 +309,13 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
         raise TargetTrialUnavailable(
             f"{collection_id} has no target trial: its generator provider declares none, so "
             f"there is nothing to try against the real tools")
+    if trial and len(provider_collection(collection_id).datasets) > 1:
+        # BEFORE ANYTHING IS WRITTEN (post-build-review #232): the trial is a
+        # one-table collection's, and generating first left a whole history
+        # on disk behind an AttributeError.
+        raise click.ClickException(
+            f"{collection_id} cannot run a target trial: only a one-table collection has one, "
+            f"and its provider should not declare it")
     driver.generate(collection_id)
     if trial:
         from cli.collection_cli import of
@@ -319,6 +326,12 @@ def generate_collection(collection_id: str, *, trial: bool) -> None:
                       "real tools. The comparison after a replay still runs.",
                       style="yellow")
     scenario_map.write_map()
+
+
+def provider_collection(collection_id: str):
+    from qa_tools import collections
+
+    return collections.by_id(collection_id)
 
 
 def has_target_trial(collection_id: str) -> bool:
@@ -447,7 +460,7 @@ def _step(msg: str) -> None:
 @pipeline_group.group("checkpoint")
 def checkpoint_group() -> None:
     """Checkpoints of a replay, to resume from (REQ-TEST-159). Taken with
-    `mothman pipeline bootstrap --collection bdm|cp --checkpoint-before N`."""
+    `mothman pipeline bootstrap --collection cp --checkpoint-before N`, for any collection."""
 
 
 @checkpoint_group.command("list")
