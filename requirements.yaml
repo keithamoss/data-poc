@@ -37308,6 +37308,36 @@ requirements:
       - "THE --collection OPTION BECOMES UNIFORM HERE, NOT IN REQ-TEST-245: accepting an id or a short everywhere only adds (no invocation that works today stops working), but it changes pipeline's and debug's help text, so it belongs to the step whose S7 diff is expected."
       - "PICKERS INSIDE ONE COLLECTION ARE OUT OF SCOPE (delivery-scoper, 2026-10-16): cli/filing_tui.py's per-collection 'Which dataset?' is bounded by one collection's tables, not by the number of collections; Keith's decision is about thirty collections."
       - "ONE GROUP PER COLLECTION STANDS (proposal.md significant call 9's first half, which Keith left standing): this requirement makes thirty groups readable rather than replacing them with one `--collection`-taking group."
+      - "ONE THRESHOLD, N_LIST = 9, IN cli/common.py (criterion 1), read through `many_collections()` by every site that changes with the number of collections, so no site counts for itself."
+      - "A PICKER OF OUR OWN RATHER THAN QUESTIONARY'S FILTER (criteria 5 and 7): questionary 2.1.1's `use_search_filter` shows every choice again when nothing matches, lets the cursor rest on a group heading, and returns that heading's text on Enter - so a filtered picker could dispatch something that is not a collection, which criterion 8 forbids. `grouped_select()` is a small prompt_toolkit application with non-selectable headings, a case-insensitive filter over label and agency name, 'Nothing matches' that keeps the prompt open, and Ctrl-C returning None as `select()` does. REJECTED patching questionary in place: a vendored fix to a third-party prompt is a fork nobody tracks."
+      - "AT OR BELOW N_LIST THE GROUPED PICKER IS `select()` (criterion 4): `grouped_select(..., many=False)` flattens the groups and calls today's `select()` with today's message, so every menu at two collections is the code path REQ-TEST-245's capture recorded, not a lookalike of it."
+      - "THE FILING MENU KEEPS TODAY'S ORDER AT TWO, WHICH IS ALPHABETICAL BY ID RATHER THAN HIERARCHY ORDER: criterion 4 says 'today's choices and text, in hierarchy order', and today's filing menu lists Child Protection before Birth Registrations. Criterion 21 requires the text exactly as REQ-TEST-245 recorded it, so the order is kept at two and hierarchy order applies above N_LIST. Flagged to Keith rather than decided silently."
+      - "ONE CLICK PARAMETER TYPE FOR --collection (criterion 9): `CollectionParam(to=...)` accepts a short or an id on every command and converts to whichever the command reads, with `all` only where `all_choice` says so. It replaced two helpers (`_RegistryChoice`, `_collection_id_or_short`) whose behaviour differed by command."
+      - "THE REFUSAL NAMES UP TO THREE CLOSEST MATCHES BY difflib (criterion 13), over shorts and ids together, and the full list only at or below N_LIST."
+      - "HELP TEXT FILLS {legend} AND {every} FROM THE REGISTRY (criteria 10, 11 and 14): a command's help string carries the placeholder and `_collection_help` renders today's legend at two and the pointer to `mothman collections` above N_LIST, so no command composes its own."
+      - "ROOT HELP PANELS BY rich-click's RichCommandPanel (criterion 2): 'Collections' lists the registered groups in hierarchy order and 'Tools' every other command, sorted, at every size including two. A group's help line names its agency only above N_LIST (criterion 3), so today's lines are unchanged."
+      - "`mothman collections` IS A PLAIN TABLE, ONE COLLECTION PER LINE (criterion 12): short, id, label and agency, columns padded with spaces and no colour under NO_COLOR, so `grep` and `cut` work on it; it reads only the hierarchy and imports no tool."
+      - "THE THIRTY-COLLECTION FIXTURE IS A COPY OF THE TRACKED TREE (criterion 15): tests/tree_copy.py copies every tracked file into a temporary directory and tests/thirty_collections.py adds twenty-eight collections across five more agencies there, with adapters and providers that import no tool. REJECTED an environment variable pointing the registry elsewhere: REQ-PIPE-240 criterion 4 says nothing tells the registry where adapters load from. REQ-TEST-249 reuses the same copy helper."
+      - "A PRE-EXISTING DEFECT FIXED TEST-FIRST ON THE WAY (post-build-review #223): `mothman supply load --collection` refused every collection since REQ-QAC-242, looking an id up among the shorts."
+      - "NO PLANS PROSE DELETED: plans/publishing-and-history.md item 6 feeds this series and goes whole when REQ-PIPE-248 is built (CLAUDE.md's batch rule 4)."
+    linked_tests:
+      - tests/test_cli_at_thirty_collections.py
+      - tests/thirty_collections.py
+      - tests/tree_copy.py
+      - tests/test_collection_cli.py
+      - tests/test_cli_supply.py
+      - tests/test_cli_app.py
+    implemented_by:
+      - cli/common.py::many_collections
+      - cli/common.py::CollectionParam
+      - cli/common.py::unknown_collection_message
+      - cli/common.py::grouped_select
+      - cli/app.py::collections_command
+      - cli/app.py::_which_collection
+      - cli/app.py::_every_collections_hint
+      - cli/collection_cli.py::make_group
+      - cli/filing_tui.py::filing_menu
+      - cli/supply.py::load_command
     open_questions:
       - "ANSWERED (Keith, 2026-10-16): N_LIST is 9; the Collections/Tools help split applies at every size; a --collection hint above N_LIST points at a new `mothman collections` command."
       - "CHECK AT BUILD (not for Keith): how questionary 2.1.1's search filter treats Separator headings (it matches on each choice's title, so a heading may survive or vanish with the filter) and an empty filtered list on Enter; criteria 5, 7 and 8 fix the behaviour, the build finds the mechanism, and a gap there is a defect found with a failing test first."
