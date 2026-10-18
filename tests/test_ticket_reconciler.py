@@ -288,7 +288,7 @@ class TestWhatTheTicketSays:
         assert "`birth_registrations_2026-11-02.csv`" in body
         assert "`birth_registrations_2026-11-02-1.csv`" in body
         assert "several choices" in body and "terminal" in body
-        assert ("mothman > Filing decisions > Civil Registration > Supplies waiting on a "
+        assert ("mothman > Filing decisions > Birth Registrations > Supplies waiting on a "
                 "decision") in body
         assert "\n/" not in body and "choose-file" not in body
 

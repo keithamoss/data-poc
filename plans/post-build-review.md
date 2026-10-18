@@ -10501,7 +10501,106 @@ twice. It deliberately did not re-find the `TypeError`.
      test_the_committed_configuration_is_valid (red before, green after, with
      the schedule family's 390 tests).
 
-238. **[done, 2026-10-18]** **[Pipeline & publishing]** **Inheritance read a
+238. **[done, 2026-10-18]** **[Pipeline & publishing]** **The full gate before
+     REQ-PIPE-248's push found four failures.** The first gate run on exactly
+     the 248 tree (after a fresh bootstrap) went red on four tests and a stale
+     plans/INDEX.md. Two are real defects that the retired legacy flags were
+     hiding. The other two are tests that 247/248 should have changed and didn't.
+     - DEFECT, FIXED TEST-FIRST: a FILTERED Soda section (`filter
+       birth_registrations [recent]` and `checks for birth_registrations
+       [recent]`) was not recognised as reading its table. So when the table
+       could not be read, Soda was handed checks over a relation that did not
+       exist, and the run failed with `KeyError: 'birth_registrations'`.
+       Birth Registrations' retired `soda.reads_unreadable_tables` flag had
+       kept it from ever arising. `soda_common._split` now reads a section's
+       table through `_section_table`, which knows both filtered forms. New
+       test: tests/test_soda_scoped.py
+       test_an_unreadable_tables_filtered_section_and_filter_go_too, red
+       before and green after.
+     - DEFECT, FIXED: the settle pointer (`supply_files.where_to_settle`)
+       named a collection by its hierarchy name ("Civil Registration").
+       Since Keith's call the same day, the filing menu lists collections by
+       their QA label ("Birth Registrations"), so the pointer led to a
+       menu entry that did not exist. It now names the registry's label. The
+       failing test was the existing tests/test_settle_tui.py
+       test_the_collection_picker_shows_names_and_the_pointer_walks_it. The
+       hard-coded pointer in tests/test_ticket_reconciler.py moved with it.
+     - TEST, FIXED: tests/test_asked_for.py's held-table fixture still used
+       a run id that names no table. 88ee77c retired
+       `orchestrate.single_table_guard` and renamed two such fixtures, but
+       missed this third one.
+     - TEST, FIXED: the empty-Table-level-section e2e test (written for
+       REQ-QAC-247) read Birth Registrations, which is daily, on today's
+       date. Its history ends 2026-09-22, so every section correctly read
+       "No data". It now navigates in place on the newest supply's day,
+       read from the built data - CLAUDE.md's shelf-life note, met again.
+
+239. **[done, 2026-10-19]** **[Testing & dev tooling]** **The 248 push's
+     on-demand CI job went red; a local full gate does not run it.**
+     Eight on-demand tests failed (1ee4926, run 39142366483) for two causes:
+     - TEST, FIXED: tests/test_bootstrap_equivalence.py stubbed generation on
+       the two old per-collection CLIs. The bootstrap now reaches the
+       generator through `cli.pipeline.generate_collection`, so it
+       regenerated the cut-down corpus. That regeneration ran under
+       equiv_support's redirect, which points the scripts at an empty file,
+       and the scenario-link check then refused TS-78's links. All six
+       errors were this. The partial run also left dbt scratch under the real
+       `data/` tree, which failed the adapter test's "nothing written under
+       the real tree" check. The fix stubs `bootstrap._generate` itself.
+       Run locally with `--run-on-demand`: 6 passed.
+     - CI, FIXED: the on-demand job never installed Playwright's Chromium,
+       and tests/test_a_collection_is_a_small_adapter.py (REQ-TEST-252)
+       drives a dataset page in a real browser. The step is added. Locally
+       that module passes (12).
+     The lesson for the gate: `mothman check` deselects on_demand tests, so
+     a full local gate cannot prove this job. A push touching the bootstrap,
+     the generator or the adapter tests should run
+     `pytest --run-on-demand -m on_demand` first.
+
+240. **[done, 2026-10-19]** **[Testing & dev tooling]** **The 248 push's
+     fast test half went red on six tests that pass everywhere but a GitHub
+     runner.** Run 39142366483, 6 failed / 5,313 passed, all reproduced
+     locally by setting `GITHUB_ACTIONS=true` and fixed once in the tests:
+     - TEST, FIXED (five tests): Typer and rich-click each read
+       `GITHUB_ACTIONS` at import and force a terminal. Rich then writes
+       ANSI-coded output into a CliRunner's buffer, so a phrase a test
+       looks for ("Known: bdm (civil-registration)...", "mothman dashboard
+       rebuild-results", "COLLECTION" in help) is split by colour codes.
+       tests/conftest.py now sets Typer's own `_TYPER_FORCE_DISABLE_TERMINAL`
+       and `PY_COLORS=0`, before either library is imported. rich-click
+       reads `PY_COLORS` before `GITHUB_ACTIONS`, and Rich itself ignores
+       it. The settings reach every CLI subprocess a test starts.
+       `FORCE_COLOR=0` was rejected: Rich treats any non-empty
+       `FORCE_COLOR` as forcing colour on.
+     - TEST, FIXED (one test): the thirty-collection filing menu test gives
+       its decider as a git identity, but `git_identity.get_run_by` puts the
+       runner's `github-actions:...` identity ahead of git. On a runner the
+       menu therefore never reached "Which collection". The test now removes
+       `GITHUB_ACTIONS`, as tests/test_git_identity.py already does.
+     The product was left alone: forced colour in the real CLI's Actions
+     logs is wanted. Local check: `GITHUB_ACTIONS=true uv run pytest` over
+     the CLI modules is the cheap way to reproduce a runner before pushing.
+
+241. **[done, 2026-10-19]** **[Testing & dev tooling]** **The on-demand job
+     was still red after #239, on one test.** Run 39145044503 (9d9def0): 19
+     passed and 1 failed - tests/test_a_collection_is_a_small_adapter.py's
+     "nothing is written under the real tree [data]", which found dbt
+     targets under the real `data/dbt_scratch/`.
+     - TEST, FIXED: the equivalence harness redirected the delivery tree,
+       the receipts and the results, but not `supply_db.scratch_dir()`. Its
+       real bootstraps therefore wrote dbt's per-run targets and the
+       staging CSVs under the REAL `data/dbt_scratch/`, and removed them
+       only in teardown. The adapter module runs beside it on the same
+       xdist run and saw them mid-flight. A run of #239's two modules one
+       at a time could not show this. `equiv_support.apply_redirects` now
+       points `scratch_dir` into the corpus, keyed as before. Like every
+       other redirect it is reapplied in each spawned child.
+     - Proved by watching the real tree while the equivalence module ran:
+       40 new files under `data/dbt_scratch/` with the committed harness,
+       none with the fix. Then the whole on-demand set together, as the
+       job runs it: 20 passed.
+
+242. **[done, 2026-10-18]** **[Pipeline & publishing]** **Inheritance read a
      dataset's newest participation, not the one in force for the period.**
      Found planning REQ-GEN-205 (Emergency Department's participation gap,
      REQ-GEN-251): `inheritance._does_not_participate` asked
@@ -10512,3 +10611,37 @@ twice. It deliberately did not re-find the `TypeError`.
      all say the same months. FIXED TEST-FIRST: tests/test_participation_gap.py
      (the gap quarter failed as owed before, passes now, and the quarters either
      side stay owed); the period's own date is passed.
+
+243. **[done, 2026-10-18]** **[Pipeline & publishing]** **The freeze gate
+     refused a new dataset dated in the past, on a synthetic asset.** Found
+     adding Emergency Department, whose history starts in 2013. REQ-PIPE-111
+     criterion 9 lets a synthetic asset add past-dated versions, "adding a new
+     dataset's calendar membership" included. The gate exempted the dataset's
+     past-dated participation versions, but not its membership item. So the
+     new dataset's first appearance in contract/calendar.yaml read as an
+     undeclared change to a frozen calendar, and CI would have refused the
+     Emergency Department push. FIXED TEST-FIRST
+     (tests/test_agreement_freeze.py): on a synthetic asset, a dataset absent
+     from the base is exempt as a whole, membership included. A real asset
+     still refuses it.
+
+244. **[done, 2026-10-19]** **[Data generation]** **Child
+     Protection's ordinary deliveries still sent a dataset turned off for
+     their quarter.** Found by the first fresh bootstrap of the Emergency
+     Department tree. cp-carers is turned off for 2022-Q1 and 2022-Q2 (TS-63,
+     REQ-GEN-218), yet the provider wrote cp_carers.csv into every ordinary
+     2022-Q1 and 2022-Q2 delivery. A supplier does not send a dataset it is
+     not supplying. The declared correction would also have re-filed those
+     supplies, and `correction_claims.check_written` refused the generation
+     ("would change where cp_run_053 ... is filed").
+     - DEFECT, FIXED test-first (tests/test_generate_cp_runs.py): a dataset
+       turned off for a quarter is left out of the provider's ordinary
+       delivery for it, and out of the entry's `row_counts`, which now say
+       what the delivery carries. Only a scenario's own arrival carries one
+       (TS-63a's gap supply). Case Workers' off months already worked this
+       way.
+     - DEFECT, FIXED test-first (tests/test_correction_claims.py):
+       `check_written` asked a correction about every dataset in the
+       collection, for every ordinary arrival. It now asks only about the
+       datasets the arrival's entry counts, or every dataset where the
+       entry counts none.

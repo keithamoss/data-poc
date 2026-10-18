@@ -160,6 +160,11 @@ def _bootstrap_into(corpus: Path, db_name: str, *, sequential: bool) -> tuple[di
         # Generated once, by the corpus fixture - both modes read it as is.
         mp.setattr(bdm, "generate_synthetic_data", lambda **_: None)
         mp.setattr(cp, "generate_synthetic_data", lambda **_: None)
+        # AND THE BOOTSTRAP'S OWN GENERATION STEP, which reaches the generator
+        # through cli.pipeline rather than these: regenerating here would
+        # rewrite the cut-down corpus, under the redirected (empty) scripts
+        # every scenario link is checked against.
+        mp.setattr(boot, "_generate", lambda name, *, trial: None)
         # BOTH MODES through the same wrapper - see its docstring.
         mp.setattr(boot, "_run_collection", equiv_support.redirected_run_collection)
         # bootstrap() sets this per process from `sequential`; put it back.

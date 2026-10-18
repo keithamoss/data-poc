@@ -59,6 +59,16 @@ class TestTheHandedText:
         left = soda_common.left_out_checks(cp.checks_path("child-protection"), {"cp_carers"}, keep=keep)
         assert left and set(left) <= keep
 
+    def test_an_unreadable_tables_filtered_section_and_filter_go_too(self):
+        """A FILTERED SECTION READS ITS TABLE (post-build-review #239):
+        `checks for birth_registrations [recent]` and its `filter` entry were
+        handed over an unreadable table, and the scan failed the run."""
+        import qa_tools.tools.run_soda as cp
+
+        handed = yaml.safe_load(soda_common.readable_checks_yaml(
+            cp.checks_path("civil-registration"), {"birth_registrations"}) or "{}") or {}
+        assert not [k for k in handed if "birth_registrations" in k], list(handed)
+
     def test_nothing_kept_back_hands_the_file_verbatim(self):
         import qa_tools.tools.run_soda as cp
 

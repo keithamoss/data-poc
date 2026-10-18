@@ -2193,9 +2193,9 @@ one or more component tags, and a date.
         All are grown quarters drawn clean.
     - **TWO MORE DEFECTS FOUND IN ED'S FIRST CUT, both fixed test-first:**
       - Inheritance read the newest participation version, not the one in
-        force on the period's date (#238 in the ED branch).
+        force on the period's date (#242).
       - The freeze gate refused a new dataset dated in the past on a
-        synthetic asset. REQ-PIPE-111 criterion 9 allows "adding a new
+        synthetic asset (#243). REQ-PIPE-111 criterion 9 allows "adding a new
         dataset's calendar membership", and the code exempted the versions
         but not the membership. CI would have refused the ED push.
     - **248'S CI RED, AND WHY A GREEN LOCAL GATE MISSED IT** (run

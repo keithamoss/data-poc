@@ -1676,8 +1676,17 @@ class TestSupplyAndTableLevelSections:
         and no table-level ones. It used to leave the empty section out;
         since REQ-QAC-247 (Keith, 2026-10-18) a missing rule is shown, as it
         always was for Child Protection, but a collection with one table
-        never shows a Cross-table section it could not fill."""
-        _goto(clean_page, built_dashboard_html, _BDM)
+        never shows a Cross-table section it could not fill.
+
+        IN PLACE ON ITS NEWEST SUPPLY'S DAY, read from the data: a daily
+        dataset read on today's date has no current supply once its history
+        ends, and every section reads "No data" (CLAUDE.md's shelf-life note)."""
+        from qa_tools import collections
+
+        built = json.loads((Path("reports") / collections.by_id(
+            "civil-registration").dashboard_file).read_text())
+        newest = max(r["run_date"] for r in built["datasets"][0]["runs"])
+        _goto(clean_page, built_dashboard_html, _BDM, in_place_on=newest)
 
         sections = self._sections(clean_page)
         assert [s["scope"] for s in sections] == ["supply", "table"]

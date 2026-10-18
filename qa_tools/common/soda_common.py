@@ -334,6 +334,17 @@ def _check_id_of(item) -> str | None:
     return None
 
 
+def _section_table(key: str) -> str | None:
+    """The table a top-level SodaCL key reads: `checks for <t>`, a FILTERED
+    section `checks for <t> [<filter>]` and the `filter <t> [<filter>]` that
+    defines it (post-build-review #239 - the filtered two were handed over an
+    unreadable table, and the scan failed the run)."""
+    for prefix in ("checks for ", "filter "):
+        if key.startswith(prefix):
+            return key[len(prefix):].split("[", 1)[0].strip()
+    return None
+
+
 def _split(doc: dict, gone: set, declared: dict,
            keep=None) -> tuple[dict, list[str]]:
     """(the document less every unreadable check and - given `keep` - every
@@ -344,7 +355,7 @@ def _split(doc: dict, gone: set, declared: dict,
 
     out, removed = {}, []
     for key, checks in doc.items():
-        if key.startswith("checks for ") and key[len("checks for "):].strip() in gone:
+        if _section_table(key) in gone:
             if isinstance(checks, list):
                 removed.extend(c for c in map(_check_id_of, checks) if c and wanted(c))
             continue

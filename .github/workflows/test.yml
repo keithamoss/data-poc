@@ -347,6 +347,11 @@ jobs:
       - name: Mark the warehouse database as CI's
         run: uv run mothman env mark --confirm ci
 
+      # tests/test_a_collection_is_a_small_adapter.py drives a third
+      # collection's dataset page in a real browser (REQ-TEST-252).
+      - name: Install Playwright's Chromium
+        run: uv run playwright install --with-deps chromium
+
       - name: Run the tests marked on_demand
         run: uv run pytest --run-on-demand -m on_demand
 

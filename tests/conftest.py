@@ -36,6 +36,17 @@ from qa_tools.common.local_env import load_local_env  # noqa: E402
 
 load_local_env()
 
+# TYPER AND RICH-CLICK FORCE A TERMINAL ON A GITHUB RUNNER: both read
+# GITHUB_ACTIONS at import and, if set, have Rich draw ANSI-coded output
+# into a CliRunner's buffer - so a phrase a test looks for is split by
+# colour codes there and nowhere else (post-build-review #240). Each has
+# its own off switch: Typer's escape hatch, and PY_COLORS, which
+# rich-click reads before GITHUB_ACTIONS and Rich itself ignores. Set for
+# this process and every CLI subprocess a test starts, before either is
+# imported.
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+os.environ["PY_COLORS"] = "0"
+
 import fixture_ids
 from generator.daily_batch import generate_daily_batch
 from qa_tools.common import asset_time, delivery

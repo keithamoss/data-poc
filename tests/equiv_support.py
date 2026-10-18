@@ -19,6 +19,7 @@ than in the test file's fixtures:
 """
 from __future__ import annotations
 
+import functools
 import os
 from pathlib import Path
 
@@ -39,7 +40,8 @@ def apply_redirects(root: Path) -> dict:
     Returns {(module, attribute): original} so a caller in the test
     process can restore them; a spawned child simply exits.
     """
-    from qa_tools.common import delivery, in_flight_log, scenario_map, scripted_decisions
+    from qa_tools.common import (delivery, in_flight_log, scenario_map, scripted_decisions,
+                                 supply_db)
     from qa_tools.tools import results_history
 
     root = Path(root)
@@ -59,12 +61,24 @@ def apply_redirects(root: Path) -> dict:
         # and the real ones are what the dashboard build and its e2e tests
         # read.
         (results_history, "ROOT"): str(root),
+        # DBT'S TARGETS AND THE STAGING CSVs, which would otherwise sit under
+        # the REAL data/dbt_scratch/ for as long as the bootstrap runs - and a
+        # module beside this one on the same xdist run (REQ-TEST-252's "nothing
+        # is written under the real tree") saw them there (post-build-review
+        # #241).
+        (supply_db, "scratch_dir"): functools.partial(_corpus_scratch_dir, root,
+                                                      supply_db.scratch_dir),
     }
     original = {}
     for (module, name), value in targets.items():
         original[(module, name)] = getattr(module, name)
         setattr(module, name, value)
     return original
+
+
+def _corpus_scratch_dir(root: Path, real) -> Path:
+    """The real scratch directory's own key, under the corpus."""
+    return root / "dbt_scratch" / real().name
 
 
 def restore(original: dict) -> None:
