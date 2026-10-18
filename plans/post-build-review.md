@@ -10304,3 +10304,20 @@ twice. It deliberately did not re-find the `TypeError`.
      the middle of REQ-QAC-247's flag-by-flag comparisons. Proposed fix: take
      a `file` block's count from the check's own value, test-first, as its own
      change with a capture before and after.
+
+227. **[done, 2026-10-18]** **[Dashboard UI]** **REQ-DASH-244's one builder
+     wrote each dashboard file in place, not whole or not at all.** Found by
+     the delivery-critic on REQ-DASH-244 (D1) and confirmed in the code:
+     `pipeline/build_dashboard_data.py`'s `write()` said "whole or not at all
+     (another process may be reading it - CI, 2026-10-11)" and then truncated
+     and streamed with `open(path, "w")`. Both builders it replaced wrote
+     through `qa_tools/common/atomic_file.write_json`, which exists because CI
+     once parsed half a file (d6dce26). A regression of this chain's own
+     making, and nothing caught it because tests/test_atomic_file.py covered
+     only the results rebuilds.
+
+     FIXED TEST-FIRST: `test_an_interrupted_dashboard_build_leaves_the_previous_file_whole`
+     interrupts the real `write()` part-way; it failed with half a file left
+     ("Expecting value: line 1 column 15") and passes now `write()` goes
+     through `atomic_file.write_json`, whose indent and default match what was
+     there, so the bytes written are unchanged.

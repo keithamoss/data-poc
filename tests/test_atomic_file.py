@@ -53,3 +53,31 @@ def test_an_interrupted_rebuild_leaves_the_previous_results_whole(
     monkeypatch.setattr(json, "dump", real_dump)
 
     assert json.loads(out.read_text()) == previous
+
+
+def test_an_interrupted_dashboard_build_leaves_the_previous_file_whole(tmp_path, monkeypatch):
+    """REQ-DASH-244's one builder, interrupted part-way through writing a
+    collection's dashboard file (post-build-review #227): the file a reader
+    would open is still the previous one, whole, as the two builders it
+    replaced guaranteed."""
+    from pipeline import build_dashboard_data as bdd
+
+    out = tmp_path / "reports" / "a_dashboard.json"
+    out.parent.mkdir()
+    previous = {"datasets": ["the previous build"]}
+    out.write_text(json.dumps(previous))
+    monkeypatch.setattr(bdd, "out_path", lambda collection_id: str(out))
+    monkeypatch.setattr(bdd, "build", lambda collection_id: {"datasets": ["the new build"]})
+    real_dump = json.dump
+
+    def interrupted(obj, f, **kwargs):
+        f.write('{"datasets": [')
+        raise RuntimeError("interrupted part-way")
+
+    monkeypatch.setattr(json, "dump", interrupted)
+    with pytest.raises(RuntimeError, match="interrupted"):
+        bdd.write("civil-registration")
+    monkeypatch.setattr(json, "dump", real_dump)
+
+    assert json.loads(out.read_text()) == previous
+    assert [p.name for p in out.parent.iterdir()] == ["a_dashboard.json"], "no temp file left"

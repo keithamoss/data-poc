@@ -677,9 +677,10 @@ def write(collection_id: str) -> str:
     (another process may be reading it - CI, 2026-10-11)."""
     path = out_path(collection_id)
     data = build(collection_id)
+    from qa_tools.common import atomic_file
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, default=str)
+    atomic_file.write_json(path, data)
     return path
 
 
