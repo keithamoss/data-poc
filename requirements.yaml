@@ -6511,48 +6511,75 @@ requirements:
   - id: REQ-GEN-044
     title: Every injected scenario exists in the generated history
     date_written: '2026-09-22'
-    story: 'As Keith, I want the awkward supply shapes we spent two days designing for to be present in the real generated data, so that I can see the model working on the real dashboard rather than take a green test run''s word for it.
-  
+    story: 'As Keith, I want the awkward supply shapes we spent two days designing for to be present in the real generated data,
+      so that I can see the model working on the real dashboard rather than take a green test run''s word for it.
+
       '
     moscow: must
     status: in_progress
-    source: 'Keith''s second standing obligation on the test scenario register, 2026-09-22 - "the scenarios KEITH PROPOSED get INJECTED into generated deliveries, so they are visible in the real dashboard rather than only green in a test run". plans/supply-model.md delivery sprint 2. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
-  
+    source: 'Keith''s second standing obligation on the test scenario register, 2026-09-22 - "the scenarios KEITH PROPOSED get
+      INJECTED into generated deliveries, so they are visible in the real dashboard rather than only green in a test run". plans/supply-model.md
+      delivery sprint 2. Scoped by delivery-scoper, batch 1+2 pass, 2026-09-22.
+
       '
     signed_off:
       by: Keith
       date: '2026-10-02'
     acceptance_criteria:
-    - THE SYSTEM SHALL generate, into the generated supply history and its recorded QA results, a real instance of every scenario the test scenario register marks for injection.
-    - THE SYSTEM SHALL generate each one under a schedule configuration that makes that scenario's stated outcome the correct one, and SHALL state that configuration alongside it.
-    - THE SYSTEM SHALL place injected scenarios deterministically, so that the same seed and the same configuration place the same scenario in the same dataset and the same period.
-    - IF an injected scenario cannot be placed under the configured schedule, THEN THE SYSTEM SHALL fail loudly naming that scenario, and SHALL NOT emit a history silently missing it.
+    - THE SYSTEM SHALL generate, into the generated supply history and its recorded QA results, a real instance of every scenario
+      the test scenario register marks for injection.
+    - THE SYSTEM SHALL generate each one under a schedule configuration that makes that scenario's stated outcome the correct
+      one, and SHALL state that configuration alongside it.
+    - THE SYSTEM SHALL place injected scenarios deterministically, so that the same seed and the same configuration place the
+      same scenario in the same dataset and the same period.
+    - IF an injected scenario cannot be placed under the configured schedule, THEN THE SYSTEM SHALL fail loudly naming that
+      scenario, and SHALL NOT emit a history silently missing it.
     - THE SYSTEM SHALL NOT mark an injected scenario as a scenario anywhere in the rendered dashboard.
-    - THE SYSTEM SHALL generate only the arrival shapes each scenario needs, and SHALL NOT generate the verdict that scenario expects.
-    - THE SYSTEM SHALL record, for each injected scenario, the dataset, the period and the supplies it produced, for the scenario map to read.
-    - THE SYSTEM SHALL express the differing schedule configurations its scenarios require as effective-dated versions of the same calendar, each in force over the part of the history its scenarios occupy.
-    - THE SYSTEM SHALL generate at least one schedule version change within the generated history, so that the evaluate-each-period-against-the-version-in-force rule is exercised against real data.
+    - THE SYSTEM SHALL generate only the arrival shapes each scenario needs, and SHALL NOT generate the verdict that scenario
+      expects.
+    - THE SYSTEM SHALL record, for each injected scenario, the dataset, the period and the supplies it produced, for the scenario
+      map to read.
+    - THE SYSTEM SHALL express the differing schedule configurations its scenarios require as effective-dated versions of the
+      same calendar, each in force over the part of the history its scenarios occupy.
+    - THE SYSTEM SHALL generate at least one schedule version change within the generated history, so that the evaluate-each-period-against-the-version-in-force
+      rule is exercised against real data.
     - WHEN a schedule version changes, THE SYSTEM SHALL leave every earlier generated supply's verdict unchanged.
-    - THE SYSTEM SHALL NOT generate two scenarios requiring incompatible schedule configurations within the same version's period of effect.
-    - 'THE SYSTEM SHALL give every file it generates its own receipt instant, rather than one instant shared by every file in a delivery.
-  
+    - THE SYSTEM SHALL NOT generate two scenarios requiring incompatible schedule configurations within the same version's period
+      of effect.
+    - 'THE SYSTEM SHALL give every file it generates its own receipt instant, rather than one instant shared by every file in
+      a delivery.
+
       '
-    - 'THE SYSTEM SHALL generate about 80% of multi-file deliveries with every file at precisely the same receipt instant, as if unpacked from one archive, and the rest with each file at its own instant, all within 10 minutes of the delivery''s first file, deterministically from the seed.
-  
+    - 'THE SYSTEM SHALL generate about 80% of multi-file deliveries with every file at precisely the same receipt instant, as
+      if unpacked from one archive, and the rest with each file at its own instant, all within 10 minutes of the delivery''s
+      first file, deterministically from the seed.
+
       '
     - 'WHERE a delivery''s files arrive at different instants, THE SYSTEM SHALL vary the order in which its datasets arrive.
-  
+
       '
-    - THE SYSTEM SHALL inject TS-12 - one Child Protection table in a delivery carrying a ragged row, refused by the fields-per-row file check - once REQ-QAC-096 and REQ-DASH-148 are built.
-    - THE SYSTEM SHALL register, and inject once REQ-QAC-096 is built, a new [INJECT] scenario in which one supply's columns arrive in an order other than the contract's, loading with a column-order warning and an unchanged dataset status.
-    - THE SYSTEM SHALL land the two injections of criteria 15 and 16 in a change of their own, with its own regenerate, and SHALL NOT land them in the same change as REQ-PIPE-144 or REQ-PIPE-086 criterion 2's extraction.
+    - THE SYSTEM SHALL inject TS-12 - one Child Protection table in a delivery carrying a ragged row, refused by the fields-per-row
+      file check - once REQ-QAC-096 and REQ-DASH-148 are built.
+    - THE SYSTEM SHALL register, and inject once REQ-QAC-096 is built, a new [INJECT] scenario in which one supply's columns
+      arrive in an order other than the contract's, loading with a column-order warning and an unchanged dataset status.
+    - THE SYSTEM SHALL land the two injections of criteria 15 and 16 in a change of their own, with its own regenerate, and
+      SHALL NOT land them in the same change as REQ-PIPE-144 or REQ-PIPE-086 criterion 2's extraction.
     non_functional_requirements:
-    - Injected scenarios add deliveries to a history whose generation already builds a 70,000-person population per run. Derive the injected deliveries from the base population rather than rebuilding it, and measure generation runtime before and after.
-    - At 30 datasets this set of permanent red would be noise. At two it is the point. The requirement is honest about being a PoC demonstration device, and it should not be generalised into a production deployment where the data is real.
-    - Injected scenarios must not make the normal history unreadable. The bulk of the generated history should still look like an ordinary, healthy feed, or the dashboard stops demonstrating what a healthy feed looks like.
+    - Injected scenarios add deliveries to a history whose generation already builds a 70,000-person population per run. Derive
+      the injected deliveries from the base population rather than rebuilding it, and measure generation runtime before and
+      after.
+    - At 30 datasets this set of permanent red would be noise. At two it is the point. The requirement is honest about being
+      a PoC demonstration device, and it should not be generalised into a production deployment where the data is real.
+    - Injected scenarios must not make the normal history unreadable. The bulk of the generated history should still look like
+      an ordinary, healthy feed, or the dashboard stops demonstrating what a healthy feed looks like.
     - Seeded and deterministic, so a regenerate-and-diff stays a real correctness check.
-    - The generated history now contains schedule changes, which makes the daily feed's story busier than a textbook one. That is realistic, but it should not make the ordinary healthy feed hard to recognise - a reader should still be able to see what normal looks like.
-    - Regenerating the synthetic history rewrites past-dated calendar versions, which is exactly the act Thread E says must never happen quietly. Nothing automated stops it - REQ-PIPE-050's A4 decision rejected building any such guard - so this is governed by review, like every other retrospective config edit. A regeneration that moves a past date should say so in its commit message.
+    - The generated history now contains schedule changes, which makes the daily feed's story busier than a textbook one. That
+      is realistic, but it should not make the ordinary healthy feed hard to recognise - a reader should still be able to see
+      what normal looks like.
+    - Regenerating the synthetic history rewrites past-dated calendar versions, which is exactly the act Thread E says must
+      never happen quietly. Nothing automated stops it - REQ-PIPE-050's A4 decision rejected building any such guard - so this
+      is governed by review, like every other retrospective config edit. A regeneration that moves a past date should say so
+      in its commit message.
     dependencies:
     - REQ-GEN-040
     - REQ-GEN-042
@@ -6560,141 +6587,342 @@ requirements:
     - REQ-PIPE-049
     - REQ-PIPE-051
     decisions:
-    - 'THE EVENING-BEFORE ERA BUILT 2026-10-16 (criteria 8 to 11''s TS-3c, TS-3d and TS-10; wording approved by the session under Keith''s 2026-10-15 delegation). Birth Registrations grows twelve days at its old end (2026-06-18 to 2026-06-29), generated after the 85 with seeds of their own (GROWN_DAYS 12, GROWN_BASE_SEED 40000), as REQ-GEN-207 grew Child Protection; byte proof from empty, all 449 existing delivery files identical and 12 new. A daily calendar version and a Birth Registrations participation version effective 2026-06-18 make each day due 22:00 the evening before (days_before 1), 1h grace, 4h claim window, and every later version restates days_before 0 under REQ-PIPE-111 criterion 9''s 2026-10-16 amendment. The register''s TS-10 splits into TS-10a (the day before filled) and TS-10b (the day before empty). The era''s ordinary days are clean, one on-time supply at 21:00 the evening before (PROVISIONAL: a red''s resends would land on a scenario''s day). check_suppressed_days_are_empty judges a daily dataset''s suppressed day by its claim window rather than the calendar day of receipt, since an evening-before supply arrives the previous calendar day. First built 2026-10-15 and shelved (post-build-review #208) because the restatement rule and the freeze together refused it; rejected then: teaching both rules a default equals an omission, moving the era to the newest days, unit tests only. MEASURED 2026-10-16 on a bootstrap from empty (29m28s): the arrival golden re-captured from that history, 441 arrivals in both captures with zero verdicts moved and the 12 era arrivals added (8 early, 2 on time, 2 late, each checked by hand); the full gate''s five era failures re-pinned or fixed (post-build-review #209).'
-    - 'TS-14 AND TS-54 PLANTED 2026-10-15, on placements that already existed: TS-14 is TS-12''s refused cp_clients corrected 28 days later by a delivery carrying it alone (a run now takes its siblings from the period, REQ-PIPE-105 criterion 5, so decision 6''s blocker is gone), and TS-54 is TS-76''s substitution onto an earlier promoted supply (Keith, Q13). WHAT STILL HAS NO DATA AND WHY, from a read-only inventory the same day: TS-3c, TS-3d and TS-10 need the evening-before era (criteria 8 to 11) and a growth of Birth Registrations'' history, put to Keith; TS-3a and TS-3b would spend the last free recent Child Protection quarters and TS-3b needs Child Protection suppression, put to Keith; TS-13''s Expect (''one QA run over the delivery'') contradicts REQ-PIPE-105 as built, put to Keith; TS-48, TS-49, TS-51 and TS-53 wait on Keith signing the drafted REQ-GEN-206; TS-34, TS-42, TS-50, TS-52, TS-55 and TS-57 to TS-62 have owners of their own.'
-    - 'CRITERIA 12 TO 14 BUILT 2026-10-02, the evening they were signed. `generator/receipt_instants.py` decides each multi-file delivery''s instants - one for all of them about 80% of the time, otherwise a shuffled order with strictly increasing offsets inside ten minutes of the first - seeded from the delivery''s own name. Receipts are one per FILE at `data/receipts/<delivery>/<file>.json`, written by the single `delivery.write_receipts()` (four tests had hand-copied the old format; they call it now). A delivery''s own instant is its FIRST file''s; each arrival - one file since REQ-PIPE-105 - takes its own, and arrivals are processed in the order storage took the files rather than in dataset-name order. An old one-per-delivery receipt is refused with the regenerate instruction, the same clear-and-rebuild call REQ-PIPE-061 made.
-  
-      AN INJECTED SCENARIO KEEPS ONE INSTANT, deliberately: its stated time is part of what it demonstrates, and spreading its files would make the scenario say something else.
-  
-      MEASURED on a regenerate from empty: 18 multi-file deliveries, 16 together (89%) and 2 trickled, spanning 534s and 491s with a different dataset first in each. 89% is one sample of 18 around an 80% target; the proportion itself is pinned over 500 deliveries in tests/test_receipt_instants.py (74-86%). The arrival golden moved on exactly 10 arrivals - the trickled files - with zero verdicts moved; promotions 88 where the single-instant corpus gave 90, because filing follows the order files really landed.
-  
+    - 'THE EVENING-BEFORE ERA BUILT 2026-10-16 (criteria 8 to 11''s TS-3c, TS-3d and TS-10; wording approved by the session
+      under Keith''s 2026-10-15 delegation). Birth Registrations grows twelve days at its old end (2026-06-18 to 2026-06-29),
+      generated after the 85 with seeds of their own (GROWN_DAYS 12, GROWN_BASE_SEED 40000), as REQ-GEN-207 grew Child Protection;
+      byte proof from empty, all 449 existing delivery files identical and 12 new. A daily calendar version and a Birth Registrations
+      participation version effective 2026-06-18 make each day due 22:00 the evening before (days_before 1), 1h grace, 4h claim
+      window, and every later version restates days_before 0 under REQ-PIPE-111 criterion 9''s 2026-10-16 amendment. The register''s
+      TS-10 splits into TS-10a (the day before filled) and TS-10b (the day before empty). The era''s ordinary days are clean,
+      one on-time supply at 21:00 the evening before (PROVISIONAL: a red''s resends would land on a scenario''s day). check_suppressed_days_are_empty
+      judges a daily dataset''s suppressed day by its claim window rather than the calendar day of receipt, since an evening-before
+      supply arrives the previous calendar day. First built 2026-10-15 and shelved (post-build-review #208) because the restatement
+      rule and the freeze together refused it; rejected then: teaching both rules a default equals an omission, moving the era
+      to the newest days, unit tests only. MEASURED 2026-10-16 on a bootstrap from empty (29m28s): the arrival golden re-captured
+      from that history, 441 arrivals in both captures with zero verdicts moved and the 12 era arrivals added (8 early, 2 on
+      time, 2 late, each checked by hand); the full gate''s five era failures re-pinned or fixed (post-build-review #209).'
+    - 'TS-14 AND TS-54 PLANTED 2026-10-15, on placements that already existed: TS-14 is TS-12''s refused cp_clients corrected
+      28 days later by a delivery carrying it alone (a run now takes its siblings from the period, REQ-PIPE-105 criterion 5,
+      so decision 6''s blocker is gone), and TS-54 is TS-76''s substitution onto an earlier promoted supply (Keith, Q13). WHAT
+      STILL HAS NO DATA AND WHY, from a read-only inventory the same day: TS-3c, TS-3d and TS-10 need the evening-before era
+      (criteria 8 to 11) and a growth of Birth Registrations'' history, put to Keith; TS-3a and TS-3b would spend the last free
+      recent Child Protection quarters and TS-3b needs Child Protection suppression, put to Keith; TS-13''s Expect (''one QA
+      run over the delivery'') contradicts REQ-PIPE-105 as built, put to Keith; TS-48, TS-49, TS-51 and TS-53 wait on Keith
+      signing the drafted REQ-GEN-206; TS-34, TS-42, TS-50, TS-52, TS-55 and TS-57 to TS-62 have owners of their own.'
+    - 'CRITERIA 12 TO 14 BUILT 2026-10-02, the evening they were signed. `generator/receipt_instants.py` decides each multi-file
+      delivery''s instants - one for all of them about 80% of the time, otherwise a shuffled order with strictly increasing
+      offsets inside ten minutes of the first - seeded from the delivery''s own name. Receipts are one per FILE at `data/receipts/<delivery>/<file>.json`,
+      written by the single `delivery.write_receipts()` (four tests had hand-copied the old format; they call it now). A delivery''s
+      own instant is its FIRST file''s; each arrival - one file since REQ-PIPE-105 - takes its own, and arrivals are processed
+      in the order storage took the files rather than in dataset-name order. An old one-per-delivery receipt is refused with
+      the regenerate instruction, the same clear-and-rebuild call REQ-PIPE-061 made.
+
+      AN INJECTED SCENARIO KEEPS ONE INSTANT, deliberately: its stated time is part of what it demonstrates, and spreading its
+      files would make the scenario say something else.
+
+      MEASURED on a regenerate from empty: 18 multi-file deliveries, 16 together (89%) and 2 trickled, spanning 534s and 491s
+      with a different dataset first in each. 89% is one sample of 18 around an 80% target; the proportion itself is pinned
+      over 500 deliveries in tests/test_receipt_instants.py (74-86%). The arrival golden moved on exactly 10 arrivals - the
+      trickled files - with zero verdicts moved; promotions 88 where the single-instant corpus gave 90, because filing follows
+      the order files really landed.
+
       '
-    - 'CRITERIA 12 TO 14 ADDED AND SIGNED 2026-10-02 (Keith), wording approved as put, so the signed_off date moved from 2026-09-22 - the earlier signature covers criteria 1-11 and is not withdrawn. Hand-drafted rather than through delivery-scoper, and said so when presented. Scoped into this requirement rather than a new one by Keith''s own call earlier the same day: this is where "the generated history contains the shapes the model needs" lives.
-  
-      WHY. REQ-PIPE-105 made every file its own arrival, so a file''s receipt instant identifies its run and orders the pipeline - and until now every file in a generated delivery shared one instant (all six CP files of the 1 May 2023 drop at 01:00:00), which exercises none of that. A real S3 drop gives every object its own LastModified.
-  
-      THE MIX IS KEITH''S AND IS A DESIGN IDEA, not just fidelity: ~80% of multi-file deliveries arrive at ONE instant, standing in for a future zip or bundle so the model meets that shape before any archive support exists; ~20% trickle in, each file within 10 minutes of the delivery''s first. Same-instant collisions need no new mechanism - the dataset is part of every run and supply id, and two files for ONE dataset at one instant already get `#1` and an ordinal, which is REQ-PIPE-105 criterion 6''s contested case.
-  
-      ONE RECEIPT PER FILE (Keith, 2026-10-02), over one receipt per delivery carrying a per-file map. It matches production, where storage gives each object its own instant and REQ-PIPE-105 criterion 3 takes the receipt from storage; a zip-style delivery is then just several receipts sharing an instant. REJECTED the per-delivery map because it keeps the delivery as a unit the receipt layer depends on, which criterion 1 of REQ-PIPE-105 moved away from. The cost, accepted: the receipt format and its readers change, and the transport questions in plans/supply-thoughts.md items 1-3 are adjacent to this without being settled by it.
-  
+    - 'CRITERIA 12 TO 14 ADDED AND SIGNED 2026-10-02 (Keith), wording approved as put, so the signed_off date moved from 2026-09-22
+      - the earlier signature covers criteria 1-11 and is not withdrawn. Hand-drafted rather than through delivery-scoper, and
+      said so when presented. Scoped into this requirement rather than a new one by Keith''s own call earlier the same day:
+      this is where "the generated history contains the shapes the model needs" lives.
+
+      WHY. REQ-PIPE-105 made every file its own arrival, so a file''s receipt instant identifies its run and orders the pipeline
+      - and until now every file in a generated delivery shared one instant (all six CP files of the 1 May 2023 drop at 01:00:00),
+      which exercises none of that. A real S3 drop gives every object its own LastModified.
+
+      THE MIX IS KEITH''S AND IS A DESIGN IDEA, not just fidelity: ~80% of multi-file deliveries arrive at ONE instant, standing
+      in for a future zip or bundle so the model meets that shape before any archive support exists; ~20% trickle in, each file
+      within 10 minutes of the delivery''s first. Same-instant collisions need no new mechanism - the dataset is part of every
+      run and supply id, and two files for ONE dataset at one instant already get `#1` and an ordinal, which is REQ-PIPE-105
+      criterion 6''s contested case.
+
+      ONE RECEIPT PER FILE (Keith, 2026-10-02), over one receipt per delivery carrying a per-file map. It matches production,
+      where storage gives each object its own instant and REQ-PIPE-105 criterion 3 takes the receipt from storage; a zip-style
+      delivery is then just several receipts sharing an instant. REJECTED the per-delivery map because it keeps the delivery
+      as a unit the receipt layer depends on, which criterion 1 of REQ-PIPE-105 moved away from. The cost, accepted: the receipt
+      format and its readers change, and the transport questions in plans/supply-thoughts.md items 1-3 are adjacent to this
+      without being settled by it.
+
       '
-    - 'BUILT IN PART ON 2026-09-28, and this records exactly which part so nobody infers it from the code. `in_progress` rather than `built`, because the register''s gate forbids evidence on anything not built and a status that overclaims is worse than one that cannot carry the detail.
-  
-      THE FIELDS THAT WOULD NAME THE CODE ARE ABSENT ON PURPOSE: the gate refuses `implemented_by` and `linked_tests` on anything not `built`, so they land with the rest of the work rather than half-filled now. What exists today is `generator/scenario_injection.py`, its wiring in `generator/generate_runs.py` (`_plan_injections`, `_injected_chain`, `_away_from_suppressed`) and `tests/test_scenario_injection.py`.
-  
-      DONE - the PLACEMENT ENGINE and the two Birth Registrations cascades. `generator/scenario_injection.py` resolves each injection to a real period, refuses a history that cannot host one, records where everything landed, and `generator/generate_runs.py` writes the arrivals. TS-1 lands as three files on one day at 14:00, 16:00 and 20:00; TS-2 as two consecutive days carrying nothing at all followed by an on-time arrival; TS-4 shares TS-1''s third file, which IS an arrival into an already-filled slot. Criteria 1 (for those three), 2, 3, 4, 5, 6 and 7.
-  
-      DONE ALSO - one Child Protection scenario, TS-38, which is a FILE SET rather than an arrival time: a catch-up delivery whose renamed resupplies match no pattern at all. It already produces the real system''s own warning - "a renamed extract is a supply on the floor" - which is the whole point of injecting it rather than unit-testing it, since Keith calls it the most dangerous shape in the register precisely because the failure is one of ATTENTION.
-  
-      NOT DONE - TS-12, TS-14 and TS-34, each with its own decision below and none of them an oversight; TS-13 (six tables landing seconds apart, which a directory delivery cannot express: it carries one receipt for the whole directory); the quarterly TS-3a, TS-3b and TS-9; and criteria 8 to 11 with the three scenarios that depend on them.
-  
-      THE THREE THAT WERE TRIED AND WITHDRAWN ARE THE RETURN ON THIS WORK, not a shortfall in it. Each was injected, run against the real pipeline, and taken out again because it demonstrated something other than what it claims - and two of them turned out to be one unbuilt capability seen from two directions. That is the evidence Keith wanted from injecting rather than unit-testing, arriving in the first session of it.
-  
-      TWO DEFECTS OF MY OWN, both found by running the real generator rather than by reading, and both worth keeping because each is a shape that will recur. The placement first recorded the GENERATOR''S OWN run id, and run identity comes from RECEIPT ORDER over recognised deliveries - so suppressing two periods shifted every later id and the placement claimed run_036 for a supply that was run_034, a coordinate pointing at somebody else''s data. It records the delivery NAME now and reads the run id back from recognition. And suppressing a period stopped that period''s own chain while leaving a RESUPPLY of an earlier one to land the same day, which made TS-2 demonstrate something else; the supplier is DOWN in that scenario, so nothing of theirs arrives at all and a resupply that would have is shifted forward.
-  
+    - 'BUILT IN PART ON 2026-09-28, and this records exactly which part so nobody infers it from the code. `in_progress` rather
+      than `built`, because the register''s gate forbids evidence on anything not built and a status that overclaims is worse
+      than one that cannot carry the detail.
+
+      THE FIELDS THAT WOULD NAME THE CODE ARE ABSENT ON PURPOSE: the gate refuses `implemented_by` and `linked_tests` on anything
+      not `built`, so they land with the rest of the work rather than half-filled now. What exists today is `generator/scenario_injection.py`,
+      its wiring in `generator/generate_runs.py` (`_plan_injections`, `_injected_chain`, `_away_from_suppressed`) and `tests/test_scenario_injection.py`.
+
+      DONE - the PLACEMENT ENGINE and the two Birth Registrations cascades. `generator/scenario_injection.py` resolves each
+      injection to a real period, refuses a history that cannot host one, records where everything landed, and `generator/generate_runs.py`
+      writes the arrivals. TS-1 lands as three files on one day at 14:00, 16:00 and 20:00; TS-2 as two consecutive days carrying
+      nothing at all followed by an on-time arrival; TS-4 shares TS-1''s third file, which IS an arrival into an already-filled
+      slot. Criteria 1 (for those three), 2, 3, 4, 5, 6 and 7.
+
+      DONE ALSO - one Child Protection scenario, TS-38, which is a FILE SET rather than an arrival time: a catch-up delivery
+      whose renamed resupplies match no pattern at all. It already produces the real system''s own warning - "a renamed extract
+      is a supply on the floor" - which is the whole point of injecting it rather than unit-testing it, since Keith calls it
+      the most dangerous shape in the register precisely because the failure is one of ATTENTION.
+
+      NOT DONE - TS-12, TS-14 and TS-34, each with its own decision below and none of them an oversight; TS-13 (six tables landing
+      seconds apart, which a directory delivery cannot express: it carries one receipt for the whole directory); the quarterly
+      TS-3a, TS-3b and TS-9; and criteria 8 to 11 with the three scenarios that depend on them.
+
+      THE THREE THAT WERE TRIED AND WITHDRAWN ARE THE RETURN ON THIS WORK, not a shortfall in it. Each was injected, run against
+      the real pipeline, and taken out again because it demonstrated something other than what it claims - and two of them turned
+      out to be one unbuilt capability seen from two directions. That is the evidence Keith wanted from injecting rather than
+      unit-testing, arriving in the first session of it.
+
+      TWO DEFECTS OF MY OWN, both found by running the real generator rather than by reading, and both worth keeping because
+      each is a shape that will recur. The placement first recorded the GENERATOR''S OWN run id, and run identity comes from
+      RECEIPT ORDER over recognised deliveries - so suppressing two periods shifted every later id and the placement claimed
+      run_036 for a supply that was run_034, a coordinate pointing at somebody else''s data. It records the delivery NAME now
+      and reads the run id back from recognition. And suppressing a period stopped that period''s own chain while leaving a
+      RESUPPLY of an earlier one to land the same day, which made TS-2 demonstrate something else; the supplier is DOWN in that
+      scenario, so nothing of theirs arrives at all and a resupply that would have is shifted forward.
+
       '
-    - 'THE FIRST INJECTION ALREADY EARNED ITS KEEP, which is the argument for this requirement stated as a fact rather than as a hope. TS-1 is three files landing at 14:00, 16:00 and 20:00 on one day, and the dashboard shows none of those times: both builders set `arrivedAt` from `earliest_extract`, the earliest row in the staged file, rather than from the receipt instant REQ-PIPE-105 made authoritative. Nobody had noticed because the two agreed BY CONSTRUCTION for every supply ever generated - `generate_runs.py` derives the receipt instant from the payload''s own earliest extract so the manifest and the warehouse cannot disagree. An injected arrival sets its own instant, and they came apart on the first run. Logged as plans/road-testing.md #14 and not fixed here: `arrivedAt` is pinned by the arrival golden and read by the classification display, so changing what it means is a shape change with several consumers.
-  
+    - 'THE FIRST INJECTION ALREADY EARNED ITS KEEP, which is the argument for this requirement stated as a fact rather than
+      as a hope. TS-1 is three files landing at 14:00, 16:00 and 20:00 on one day, and the dashboard shows none of those times:
+      both builders set `arrivedAt` from `earliest_extract`, the earliest row in the staged file, rather than from the receipt
+      instant REQ-PIPE-105 made authoritative. Nobody had noticed because the two agreed BY CONSTRUCTION for every supply ever
+      generated - `generate_runs.py` derives the receipt instant from the payload''s own earliest extract so the manifest and
+      the warehouse cannot disagree. An injected arrival sets its own instant, and they came apart on the first run. Logged
+      as plans/road-testing.md #14 and not fixed here: `arrivedAt` is pinned by the arrival golden and read by the classification
+      display, so changing what it means is a shape change with several consumers.
+
       '
-    - 'AND TS-38 FOUND TWO REAL DEFECTS ON THE PAGE ITSELF, both fixed here, and both of the same shape: a code path that had never run because the generated history had never contained an outstanding item. THE TIMESTAMP ON AN OUTSTANDING ITEM WAS RAW. `outstandingItemHtml()` rendered `item.observedAt` verbatim - `2026-09-28T06:10:22+08:00` - where REQ-DASH-071 made `fmtInstant()` the page''s one way of writing a date. It goes through it now, and the display-standard test caught it the moment an item appeared. AND THE AGENCY CARDS STOPPED LINING UP. `.card-meta` pins to the bottom with `margin-top:auto`, which only works while it is the LAST child, and the two markers were rendered after it - so the card carrying an outstanding marker put its meta row 73px above its bottom edge against its neighbour''s 19px. The markers are rendered before it now, which also reads better: a note saying something needs a person belongs above the counts. NEITHER WAS REACHABLE BEFORE, which is the argument for injecting rather than unit-testing, made twice more.
-  
+    - 'AND TS-38 FOUND TWO REAL DEFECTS ON THE PAGE ITSELF, both fixed here, and both of the same shape: a code path that had
+      never run because the generated history had never contained an outstanding item. THE TIMESTAMP ON AN OUTSTANDING ITEM
+      WAS RAW. `outstandingItemHtml()` rendered `item.observedAt` verbatim - `2026-09-28T06:10:22+08:00` - where REQ-DASH-071
+      made `fmtInstant()` the page''s one way of writing a date. It goes through it now, and the display-standard test caught
+      it the moment an item appeared. AND THE AGENCY CARDS STOPPED LINING UP. `.card-meta` pins to the bottom with `margin-top:auto`,
+      which only works while it is the LAST child, and the two markers were rendered after it - so the card carrying an outstanding
+      marker put its meta row 73px above its bottom edge against its neighbour''s 19px. The markers are rendered before it now,
+      which also reads better: a note saying something needs a person belongs above the counts. NEITHER WAS REACHABLE BEFORE,
+      which is the argument for injecting rather than unit-testing, made twice more.
+
       '
-    - 'TS-14 IS THE SAME GAP AS TS-12 SEEN FROM THE OTHER SIDE, which is what makes the pair worth reading together rather than as two misses. Its shape is a corrected `cp_clients` arriving ALONE weeks later, and the delivery was written correctly - one file, its own receipt, recognised as clients'' own supply arriving late. The run then died on `cp_placements`: a run resolves its views from the tables THIS ARRIVAL carried, so five of six are absent and dbt''s models ref() all six. `supply_db.borrow_views()` exists for precisely this - "a delivery carrying one re-sent table cannot be checked on its own... the run''s schema simply gets a VIEW onto each table the earlier run already resolved" - and nothing calls it from the ordinary path. So, stated once for both: A DELIVERY THAT DOES NOT CARRY ALL SIX TABLES CANNOT BE QA''D AT ALL TODAY, whether a table is missing because it never came or because it could not be read. Both shapes stay, tested, for the sprint that wires that up.
-  
+    - 'TS-14 IS THE SAME GAP AS TS-12 SEEN FROM THE OTHER SIDE, which is what makes the pair worth reading together rather than
+      as two misses. Its shape is a corrected `cp_clients` arriving ALONE weeks later, and the delivery was written correctly
+      - one file, its own receipt, recognised as clients'' own supply arriving late. The run then died on `cp_placements`: a
+      run resolves its views from the tables THIS ARRIVAL carried, so five of six are absent and dbt''s models ref() all six.
+      `supply_db.borrow_views()` exists for precisely this - "a delivery carrying one re-sent table cannot be checked on its
+      own... the run''s schema simply gets a VIEW onto each table the earlier run already resolved" - and nothing calls it from
+      the ordinary path. So, stated once for both: A DELIVERY THAT DOES NOT CARRY ALL SIX TABLES CANNOT BE QA''D AT ALL TODAY,
+      whether a table is missing because it never came or because it could not be read. Both shapes stay, tested, for the sprint
+      that wires that up.
+
       '
-    - 'TS-12 IS THE MOST USEFUL THING THIS REQUIREMENT HAS FOUND, and it found it by being injected and then taken out again. The shape worked exactly as written at the arrival layer - a real Child Protection extract going ragged partway, `cp_clients FAILED to load (ParserError: Expected 10 fields in line 265, saw 12)`, recorded for human action, no table staged. Then the RUN died: dbt could not find `qa_cp_run_011.cp_clients`, the run was recorded INCOMPLETE, and the five tables that HAD loaded produced no results at all. THE REGISTER EXPECTS THE OPPOSITE - five staged, QA''d and green, `cp_clients` red, and every check depending on it red with a chip naming the blocker. REQ-PIPE-035 already defers red-for-unrun to the promotion sprint, saying no check''s verdict is produced through it yet. What that deferral does NOT say, and what this found, is that one unloadable table takes the whole delivery''s QA down with it - so a supplier sending one bad file today loses the QA on five good ones. Keith called TS-12 "a really important one" from real operational experience, and it is. NOT INJECTED until that is built, because a history containing an INCOMPLETE run is one the dashboard cannot be built from: the scenario would break the thing it exists to be visible on. The SHAPE stays, with its own tests, so injecting it is one line the day the pipeline can survive it.
-  
+    - 'TS-12 IS THE MOST USEFUL THING THIS REQUIREMENT HAS FOUND, and it found it by being injected and then taken out again.
+      The shape worked exactly as written at the arrival layer - a real Child Protection extract going ragged partway, `cp_clients
+      FAILED to load (ParserError: Expected 10 fields in line 265, saw 12)`, recorded for human action, no table staged. Then
+      the RUN died: dbt could not find `qa_cp_run_011.cp_clients`, the run was recorded INCOMPLETE, and the five tables that
+      HAD loaded produced no results at all. THE REGISTER EXPECTS THE OPPOSITE - five staged, QA''d and green, `cp_clients`
+      red, and every check depending on it red with a chip naming the blocker. REQ-PIPE-035 already defers red-for-unrun to
+      the promotion sprint, saying no check''s verdict is produced through it yet. What that deferral does NOT say, and what
+      this found, is that one unloadable table takes the whole delivery''s QA down with it - so a supplier sending one bad file
+      today loses the QA on five good ones. Keith called TS-12 "a really important one" from real operational experience, and
+      it is. NOT INJECTED until that is built, because a history containing an INCOMPLETE run is one the dashboard cannot be
+      built from: the scenario would break the thing it exists to be visible on. The SHAPE stays, with its own tests, so injecting
+      it is one line the day the pipeline can survive it.
+
       '
-    - 'TS-34 CANNOT BE INJECTED AS THE REGISTER WRITES IT, and finding that out is itself worth the exercise. It wants eight files where six are expected - a second `cp_clients` and a second `cp_placements`, each matching its dataset''s own pattern, so neither can be placed. Child Protection''s arrival patterns are EXACT filenames (`cp_clients\.csv`), so two files in one directory can never both match one of them: the duplicate-match hold this scenario is about cannot arise for this collection as configured. ATTEMPTED ANYWAY, which is how it was found: the two extra files were reported as matching NO pattern, which is TS-38''s scenario wearing TS-34''s name. A shape that demonstrates the wrong thing is worse than one not yet injected, so the injection was removed rather than left looking done. Widening a pattern is a real behaviour change - `mothman check`''s `patterns` gate exists for exactly this ambiguity - so it is Keith''s call. Asserted rather than only written down: a test walks every delivery and fails if two files ever claim one dataset, so the day a pattern widens, TS-34 becomes injectable and something says so.
-  
+    - 'TS-34 CANNOT BE INJECTED AS THE REGISTER WRITES IT, and finding that out is itself worth the exercise. It wants eight
+      files where six are expected - a second `cp_clients` and a second `cp_placements`, each matching its dataset''s own pattern,
+      so neither can be placed. Child Protection''s arrival patterns are EXACT filenames (`cp_clients\.csv`), so two files in
+      one directory can never both match one of them: the duplicate-match hold this scenario is about cannot arise for this
+      collection as configured. ATTEMPTED ANYWAY, which is how it was found: the two extra files were reported as matching NO
+      pattern, which is TS-38''s scenario wearing TS-34''s name. A shape that demonstrates the wrong thing is worse than one
+      not yet injected, so the injection was removed rather than left looking done. Widening a pattern is a real behaviour change
+      - `mothman check`''s `patterns` gate exists for exactly this ambiguity - so it is Keith''s call. Asserted rather than
+      only written down: a test walks every delivery and fails if two files ever claim one dataset, so the day a pattern widens,
+      TS-34 becomes injectable and something says so.
+
       '
-    - 'THE "UNREADABLE" FILE WAS READABLE ON THE FIRST ATTEMPT, and the correction is the same shape as the rest of this requirement''s defects: a shape has to be checked against the real reader, not reasoned about. An unterminated quote looks like obvious rubbish and `read_csv_explicit_nulls()` parses it quite happily into an empty two-column table - so TS-12 would have demonstrated an empty supply with nonsense columns rather than a supply that cannot be loaded at all. What actually fails is a RAGGED file: the real header, the real first rows, and then a row carrying more fields than the header does, which raises `Expected 10 fields in line 265, saw 12`. That is also what a truncated or mis-delimited export really looks like, where a file of obvious rubbish would be caught by anyone glancing at it.
-  
+    - 'THE "UNREADABLE" FILE WAS READABLE ON THE FIRST ATTEMPT, and the correction is the same shape as the rest of this requirement''s
+      defects: a shape has to be checked against the real reader, not reasoned about. An unterminated quote looks like obvious
+      rubbish and `read_csv_explicit_nulls()` parses it quite happily into an empty two-column table - so TS-12 would have demonstrated
+      an empty supply with nonsense columns rather than a supply that cannot be loaded at all. What actually fails is a RAGGED
+      file: the real header, the real first rows, and then a row carrying more fields than the header does, which raises `Expected
+      10 fields in line 265, saw 12`. That is also what a truncated or mis-delimited export really looks like, where a file
+      of obvious rubbish would be caught by anyone glancing at it.
+
       '
-    - 'THE REGISTER''S OWN CONFIG LINE FOR TS-1 SAYS "daily, due 12:00" AND THE INJECTION USES 14:00, which is this requirement''s own earlier correction landing in the data and is flagged rather than quietly reconciled. That correction established that TS-1 and TS-2 already produce their stated outcomes under the configuration in force - checked against the real assignment rule rather than reasoned about - so the 12:00 line predates it. The placement records the configuration actually used, which is what criterion 2 asks for, so SCENARIOS.md now carries both statements for TS-1. NOT EDITED HERE, because the register is prose Keith reviewed as prose and that review is what makes it authoritative; a session rewriting a config line to match its own build is how a reviewed document stops meaning anything. It is his line to change or to leave.
-  
+    - 'THE REGISTER''S OWN CONFIG LINE FOR TS-1 SAYS "daily, due 12:00" AND THE INJECTION USES 14:00, which is this requirement''s
+      own earlier correction landing in the data and is flagged rather than quietly reconciled. That correction established
+      that TS-1 and TS-2 already produce their stated outcomes under the configuration in force - checked against the real assignment
+      rule rather than reasoned about - so the 12:00 line predates it. The placement records the configuration actually used,
+      which is what criterion 2 asks for, so SCENARIOS.md now carries both statements for TS-1. NOT EDITED HERE, because the
+      register is prose Keith reviewed as prose and that review is what makes it authoritative; a session rewriting a config
+      line to match its own build is how a reviewed document stops meaning anything. It is his line to change or to leave.
+
       '
-    - 'CRITERIA 8 TO 11 HAVE AN OWNER NOW, AND IT IS NOT THIS REQUIREMENT. Repointed 2026-09-29 at Keith''s own ask, because the decision below says the fork is his and unowned, and that stopped being true the evening it was written. REQ-PIPE-110 makes `contract/calendar.yaml` the one place a delivery agreement lives and DELETES `slaProperties` outright, so the due time leaves the ODCS contract; REQ-PIPE-113''s criterion 14 exists for this requirement by name - "give REQ-GEN-044''s generated history somewhere effective-dated to state a due time, so that its criteria 8 to 11 can be built". The underlying question - whether the due time is a versioned property of the CALENDAR or of the DATASET''S PARTICIPATION - Keith answered 2026-09-29: the participation, sited within the calendar file. So nothing here waits on a decision any more; it waits on 110 and 113 being signed and built, and both are `not_started` and unsigned.
-  
+    - 'CRITERIA 8 TO 11 HAVE AN OWNER NOW, AND IT IS NOT THIS REQUIREMENT. Repointed 2026-09-29 at Keith''s own ask, because
+      the decision below says the fork is his and unowned, and that stopped being true the evening it was written. REQ-PIPE-110
+      makes `contract/calendar.yaml` the one place a delivery agreement lives and DELETES `slaProperties` outright, so the due
+      time leaves the ODCS contract; REQ-PIPE-113''s criterion 14 exists for this requirement by name - "give REQ-GEN-044''s
+      generated history somewhere effective-dated to state a due time, so that its criteria 8 to 11 can be built". The underlying
+      question - whether the due time is a versioned property of the CALENDAR or of the DATASET''S PARTICIPATION - Keith answered
+      2026-09-29: the participation, sited within the calendar file. So nothing here waits on a decision any more; it waits
+      on 110 and 113 being signed and built, and both are `not_started` and unsigned.
+
       '
-    - 'THE ANALYSIS BELOW IS LEFT AS IT WAS, because only its conclusion about ownership went stale. The shape it describes - a calendar version carries the claim window and the dates and NOT the due time, so there is nowhere to put an effective-dated one - is exactly the gap REQ-PIPE-110 was scoped to close.
-  
+    - 'THE ANALYSIS BELOW IS LEFT AS IT WAS, because only its conclusion about ownership went stale. The shape it describes
+      - a calendar version carries the claim window and the dates and NOT the due time, so there is nowhere to put an effective-dated
+      one - is exactly the gap REQ-PIPE-110 was scoped to close.
+
       '
-    - 'AND THE WAY IT WENT STALE IS THIS REQUIREMENT''S OWN RECORDED LESSON HAPPENING AGAIN, in the other direction. It already says "an NFR referring to another requirement BY NAME is a cross-reference nothing validates... when a decision on one requirement changes, every other requirement naming it has to be re-read by hand". Here a NEW requirement took ownership of an OLD one''s fork, and nothing told the old one. Keith caught it by remembering the calendar move when a summary said the fork was unowned.
-  
+    - 'AND THE WAY IT WENT STALE IS THIS REQUIREMENT''S OWN RECORDED LESSON HAPPENING AGAIN, in the other direction. It already
+      says "an NFR referring to another requirement BY NAME is a cross-reference nothing validates... when a decision on one
+      requirement changes, every other requirement naming it has to be re-read by hand". Here a NEW requirement took ownership
+      of an OLD one''s fork, and nothing told the old one. Keith caught it by remembering the calendar move when a summary said
+      the fork was unowned.
+
       '
-    - 'CRITERIA 8 TO 11 NEED A DECISION FROM KEITH BEFORE THEY CAN BE BUILT, and it is a real fork rather than an implementation detail. Criterion 8 asks for the differing schedule configurations to be expressed as effective-dated versions of the same calendar. TS-3c, TS-3d and TS-10 need the supply for day D due 22:00 on D-1. A calendar version today carries the claim window, the dates or the cadence rule - and NOT the due time, which lives unversioned in each ODCS contract''s `slaProperties` (`expectedTime: 14:00`, `latency: 60`), read by pipeline/cadence.py. So there is nowhere to put an effective-dated due time, and the choice is what becomes authoritative: move the due time onto the calendar version, duplicate it there, or express the evening-before shape some third way. Moving it changes what the ODCS contract means, which is a decision about the contract rather than about the generator - and this project''s own standing rule on shape changes says enumerate every consumer first. Recorded rather than guessed, so nothing gets built against the wrong answer.
-  
+    - 'CRITERIA 8 TO 11 NEED A DECISION FROM KEITH BEFORE THEY CAN BE BUILT, and it is a real fork rather than an implementation
+      detail. Criterion 8 asks for the differing schedule configurations to be expressed as effective-dated versions of the
+      same calendar. TS-3c, TS-3d and TS-10 need the supply for day D due 22:00 on D-1. A calendar version today carries the
+      claim window, the dates or the cadence rule - and NOT the due time, which lives unversioned in each ODCS contract''s `slaProperties`
+      (`expectedTime: 14:00`, `latency: 60`), read by pipeline/cadence.py. So there is nowhere to put an effective-dated due
+      time, and the choice is what becomes authoritative: move the due time onto the calendar version, duplicate it there, or
+      express the evening-before shape some third way. Moving it changes what the ODCS contract means, which is a decision about
+      the contract rather than about the generator - and this project''s own standing rule on shape changes says enumerate every
+      consumer first. Recorded rather than guessed, so nothing gets built against the wrong answer.
+
       '
-    - 'THE SCENARIOS ARE PLACED BY CHOOSING THEIR ARRIVAL INSTANT, NOT BY RECONFIGURING THE SCHEDULE, and this correction is worth keeping because the first version of it overstated the problem badly. That version said the register''s daily scenarios need three different due times, so hosting them meant splitting Birth Registrations'' history into eras. Checked against the real assignment rule rather than reasoned about: TS-1 and TS-2 - the two cascades, and the highest-value scenarios in the register - already produce their stated outcomes under the CURRENT config, due 14:00 with sixty minutes'' grace and a four-hour window. TS-1''s 20:00 arrival files as a resupply of Monday; TS-2''s on-time Thursday arrival takes Thursday and leaves Tuesday and Wednesday unfilled. Their stated configs differ from ours and the outcomes those configs exist to produce do not. The same holds for the quarterly family: TS-3a''s "one day outside August''s window" is a property of the arrival relative to the window, not of the authored dates. So only the evening-before trio needs a schedule version of its own.
-  
+    - 'THE SCENARIOS ARE PLACED BY CHOOSING THEIR ARRIVAL INSTANT, NOT BY RECONFIGURING THE SCHEDULE, and this correction is
+      worth keeping because the first version of it overstated the problem badly. That version said the register''s daily scenarios
+      need three different due times, so hosting them meant splitting Birth Registrations'' history into eras. Checked against
+      the real assignment rule rather than reasoned about: TS-1 and TS-2 - the two cascades, and the highest-value scenarios
+      in the register - already produce their stated outcomes under the CURRENT config, due 14:00 with sixty minutes'' grace
+      and a four-hour window. TS-1''s 20:00 arrival files as a resupply of Monday; TS-2''s on-time Thursday arrival takes Thursday
+      and leaves Tuesday and Wednesday unfilled. Their stated configs differ from ours and the outcomes those configs exist
+      to produce do not. The same holds for the quarterly family: TS-3a''s "one day outside August''s window" is a property
+      of the arrival relative to the window, not of the authored dates. So only the evening-before trio needs a schedule version
+      of its own.
+
       '
-    - 'A BLOCKER UNDERNEATH THIS WAS FOUND AND FIXED FIRST, 2026-09-26 (Keith''s call), and it is recorded because no scenario placement could have worked until it was. The daily calendar started 2023-01-01 against a history beginning 2026-08-24, so it owed 1,365 slots against 32 real supply days - and because "oldest claimable unfilled slot" is a real branch of the assignment rule, a supply meant for a Monday in August 2026 filed to 2023-01-01.
-  
+    - 'A BLOCKER UNDERNEATH THIS WAS FOUND AND FIXED FIRST, 2026-09-26 (Keith''s call), and it is recorded because no scenario
+      placement could have worked until it was. The daily calendar started 2023-01-01 against a history beginning 2026-08-24,
+      so it owed 1,365 slots against 32 real supply days - and because "oldest claimable unfilled slot" is a real branch of
+      the assignment rule, a supply meant for a Monday in August 2026 filed to 2023-01-01.
+
       '
-    - 'THE HOLD IS CLEARED (Keith, 2026-09-27), and what cleared it was restating two criteria rather than waiting for a date. The hold existed because criteria 1 and 9 named "the committed history" - the qa_results/ tree REQ-PIPE-089 retires - so building against them would have populated a store about to stop existing, and the injection IS the work here rather than a migration. Both now name the generated history and its recorded QA results, which is the same claim about the same thing without naming the mechanism. ORDERING THAT SURVIVES THE CLEARANCE: REQ-PIPE-089''s last phase deletes the tree, and until it does `write_qa_result` still writes files beside rows, so finishing 089 first keeps an injection from writing into a tree that is about to go. That is sequencing, not a dependency.
-  
+    - 'THE HOLD IS CLEARED (Keith, 2026-09-27), and what cleared it was restating two criteria rather than waiting for a date.
+      The hold existed because criteria 1 and 9 named "the committed history" - the qa_results/ tree REQ-PIPE-089 retires -
+      so building against them would have populated a store about to stop existing, and the injection IS the work here rather
+      than a migration. Both now name the generated history and its recorded QA results, which is the same claim about the same
+      thing without naming the mechanism. ORDERING THAT SURVIVES THE CLEARANCE: REQ-PIPE-089''s last phase deletes the tree,
+      and until it does `write_qa_result` still writes files beside rows, so finishing 089 first keeps an injection from writing
+      into a tree that is about to go. That is sequencing, not a dependency.
+
       '
-    - 'THE EVENING-BEFORE VERSION TAKES THE EARLIEST STRETCH OF THE HISTORY (Keith, 2026-09-27, agreeing with the recommendation). TS-3c, TS-3d and TS-10 need the supply for day D due 22:00 on D-1, which is structurally different from moving an arrival because the due instant falls on the previous calendar day - so they need their own effective-dated version of the daily calendar, which criterion 8 asks for anyway. Putting that version FIRST and letting the current configuration take over from there means the version change lands mid-history, so criterion 9''s "at least one schedule version change" is satisfied by the same act rather than needing a second, contrived one. Criterion 11''s no-incompatible-configurations-within-one-version rule then places the boundary at the end of that stretch.
-  
+    - 'THE EVENING-BEFORE VERSION TAKES THE EARLIEST STRETCH OF THE HISTORY (Keith, 2026-09-27, agreeing with the recommendation).
+      TS-3c, TS-3d and TS-10 need the supply for day D due 22:00 on D-1, which is structurally different from moving an arrival
+      because the due instant falls on the previous calendar day - so they need their own effective-dated version of the daily
+      calendar, which criterion 8 asks for anyway. Putting that version FIRST and letting the current configuration take over
+      from there means the version change lands mid-history, so criterion 9''s "at least one schedule version change" is satisfied
+      by the same act rather than needing a second, contrived one. Criterion 11''s no-incompatible-configurations-within-one-version
+      rule then places the boundary at the end of that stretch.
+
       '
-    - Decided against a scenario label on the injected runs (Keith, 2026-09-22 - "this is still just a proof of concept remember"). A first draft argued for one, to stop the dashboard growing permanent red that looks like a defect. For a PoC that is over-building - the red IS the point and the audience knows the data is synthetic. The scenario map carries the "which one is this" information instead.
-    - 'Decided every scenario must state its CONFIG. Found during Keith''s own review of the register, and it invalidated two expected results as first written (TS-3, TS-5): an outcome like "files as a resupply of Wednesday" is meaningless without the cadence, the due time and the claim-window size, because a different window gives a different and equally correct answer.'
-    - Decided the generator emits shapes, not verdicts. TS-3b's expected answer ("fills May, 79 days late") is a claim about slot assignment, which is batch 3. Generating the verdict here would make batch 3's own tests assert that the pipeline agrees with the generator rather than with the rule.
-    - 'Recorded because it is what makes this sprint urgent rather than merely useful: most of the injected set cannot be generated at all today. The generator emits whole deliveries only and never partial, produces ZERO early supplies (measured 0 early / 240 on time / 112 late), and run_id still carries dates. This is why the sprint moved from 6 to 2.'
-    - '[B4] Decided the three incompatible daily configurations TS-1, TS-2 and TS-3c require - due 12:00, due ~22:00, and due 22:00 the evening before - are hosted by EFFECTIVE-DATED SCHEDULE VERSIONS across the generated history, each scenario sitting in the version that makes its stated outcome correct (Keith, 2026-09-22). It exercises TS-26 for free and demonstrates a real capability rather than working around a limitation.'
-    - '[B4] Rejected relaxing the scenarios to whatever one configured due time allows. Keith''s own review of the register established that a scenario''s outcome is meaningless without its config - files as a resupply of Wednesday depends entirely on the cadence, the due time and the window size - so changing the config changes what each scenario proves, silently.'
-    - '[B4] Rejected adding a third synthetic daily dataset purely to host the other configurations. Adding datasets is explicitly sequenced AFTER this work (plans/running-thoughts.md #23), because it is what makes the file-architecture question answerable and it needs this model to be real first.'
-    - CORRECTED 2026-09-22, after delivery-architect found a direct contradiction between two SIGNED requirements. This requirement carried an NFR requiring REQ-PIPE-050's retrospective-edit guard by name - recorded content records plus a changelog entry, or every regeneration fails the gate. REQ-PIPE-050's [A4] decision rejects building that mechanism outright, naming it as rejected option (1). The NFR was written before Keith answered A4 and was never revisited when the answer landed. The NFR gives way, because A4 is the later and explicit decision; regenerating the synthetic calendar is governed by review like any other retrospective config edit.
-    - 'Recorded because the shape will recur: the contradiction was introduced by the main session, not by scoping. An NFR referring to another requirement BY NAME is a cross-reference nothing validates - requirements.yaml''s own gate checks that a dependencies: entry names a real requirement, and checks nothing about prose that cites one. When a decision on one requirement changes, every other requirement naming it has to be re-read by hand, and this one was not.'
-    - 'HELD UNTIL AFTER THE POSTGRESQL SWITCH (Keith, 2026-09-26), and this is a sequencing decision rather than a change of mind about the work. This requirement''s whole deliverable is injecting the scenarios into the committed qa_results/ history, and REQ-PIPE-089 retires that store - so building it now would populate a tree that is about to stop existing, and the injection itself is what would be done twice. Criterion 9 is the clearest case: "within the committed history" needs restating against the database before anyone builds it. Nothing is LOST by waiting, because REQ-GEN-042''s own NFR 1 already records Keith''s position on this history - "I don''t care. This is all just fake data. We can nuke it from orbit". What waiting COSTS was accepted with eyes open: this requirement blocks deferred criteria in REQ-GEN-045 and REQ-DASH-046, so those wait on the switch too, and with batch 5 unsigned there is now nothing at all ready to build. REJECTED: building it now and accepting the redo, on the argument that the scenarios are the point and the store is incidental - true as far as it goes, but the work here IS the injection, so the redo is the whole job rather than a migration. FOLLOW-UP nobody owns yet: REQ-GEN-045''s and REQ-DASH-046''s own blocked_by entries name REQ-GEN-044 alone, and now transitively wait on REQ-PIPE-089, which their data does not say.
-  
+    - Decided against a scenario label on the injected runs (Keith, 2026-09-22 - "this is still just a proof of concept remember").
+      A first draft argued for one, to stop the dashboard growing permanent red that looks like a defect. For a PoC that is
+      over-building - the red IS the point and the audience knows the data is synthetic. The scenario map carries the "which
+      one is this" information instead.
+    - 'Decided every scenario must state its CONFIG. Found during Keith''s own review of the register, and it invalidated two
+      expected results as first written (TS-3, TS-5): an outcome like "files as a resupply of Wednesday" is meaningless without
+      the cadence, the due time and the claim-window size, because a different window gives a different and equally correct
+      answer.'
+    - Decided the generator emits shapes, not verdicts. TS-3b's expected answer ("fills May, 79 days late") is a claim about
+      slot assignment, which is batch 3. Generating the verdict here would make batch 3's own tests assert that the pipeline
+      agrees with the generator rather than with the rule.
+    - 'Recorded because it is what makes this sprint urgent rather than merely useful: most of the injected set cannot be generated
+      at all today. The generator emits whole deliveries only and never partial, produces ZERO early supplies (measured 0 early
+      / 240 on time / 112 late), and run_id still carries dates. This is why the sprint moved from 6 to 2.'
+    - '[B4] Decided the three incompatible daily configurations TS-1, TS-2 and TS-3c require - due 12:00, due ~22:00, and due
+      22:00 the evening before - are hosted by EFFECTIVE-DATED SCHEDULE VERSIONS across the generated history, each scenario
+      sitting in the version that makes its stated outcome correct (Keith, 2026-09-22). It exercises TS-26 for free and demonstrates
+      a real capability rather than working around a limitation.'
+    - '[B4] Rejected relaxing the scenarios to whatever one configured due time allows. Keith''s own review of the register
+      established that a scenario''s outcome is meaningless without its config - files as a resupply of Wednesday depends entirely
+      on the cadence, the due time and the window size - so changing the config changes what each scenario proves, silently.'
+    - '[B4] Rejected adding a third synthetic daily dataset purely to host the other configurations. Adding datasets is explicitly
+      sequenced AFTER this work (plans/running-thoughts.md #23), because it is what makes the file-architecture question answerable
+      and it needs this model to be real first.'
+    - CORRECTED 2026-09-22, after delivery-architect found a direct contradiction between two SIGNED requirements. This requirement
+      carried an NFR requiring REQ-PIPE-050's retrospective-edit guard by name - recorded content records plus a changelog entry,
+      or every regeneration fails the gate. REQ-PIPE-050's [A4] decision rejects building that mechanism outright, naming it
+      as rejected option (1). The NFR was written before Keith answered A4 and was never revisited when the answer landed. The
+      NFR gives way, because A4 is the later and explicit decision; regenerating the synthetic calendar is governed by review
+      like any other retrospective config edit.
+    - 'Recorded because the shape will recur: the contradiction was introduced by the main session, not by scoping. An NFR referring
+      to another requirement BY NAME is a cross-reference nothing validates - requirements.yaml''s own gate checks that a dependencies:
+      entry names a real requirement, and checks nothing about prose that cites one. When a decision on one requirement changes,
+      every other requirement naming it has to be re-read by hand, and this one was not.'
+    - 'HELD UNTIL AFTER THE POSTGRESQL SWITCH (Keith, 2026-09-26), and this is a sequencing decision rather than a change of
+      mind about the work. This requirement''s whole deliverable is injecting the scenarios into the committed qa_results/ history,
+      and REQ-PIPE-089 retires that store - so building it now would populate a tree that is about to stop existing, and the
+      injection itself is what would be done twice. Criterion 9 is the clearest case: "within the committed history" needs restating
+      against the database before anyone builds it. Nothing is LOST by waiting, because REQ-GEN-042''s own NFR 1 already records
+      Keith''s position on this history - "I don''t care. This is all just fake data. We can nuke it from orbit". What waiting
+      COSTS was accepted with eyes open: this requirement blocks deferred criteria in REQ-GEN-045 and REQ-DASH-046, so those
+      wait on the switch too, and with batch 5 unsigned there is now nothing at all ready to build. REJECTED: building it now
+      and accepting the redo, on the argument that the scenarios are the point and the store is incidental - true as far as
+      it goes, but the work here IS the injection, so the redo is the whole job rather than a migration. FOLLOW-UP nobody owns
+      yet: REQ-GEN-045''s and REQ-DASH-046''s own blocked_by entries name REQ-GEN-044 alone, and now transitively wait on REQ-PIPE-089,
+      which their data does not say.
+
       '
-    - 'THE SYNTHETIC HISTORY IS INJECTED WITH A REFUSED FILE (Keith, 2026-10-04), ending decision 7''s deferral, whose reason was that one unloadable table took the whole delivery''s QA down. REQ-DASH-148 criterion 5 and REQ-QAC-096 criterion 11 make it survivable. REJECTED test-only fixtures: the published dashboard would never show the case Keith called ''a really important one''.'
+    - 'THE SYNTHETIC HISTORY IS INJECTED WITH A REFUSED FILE (Keith, 2026-10-04), ending decision 7''s deferral, whose reason
+      was that one unloadable table took the whole delivery''s QA down. REQ-DASH-148 criterion 5 and REQ-QAC-096 criterion 11
+      make it survivable. REJECTED test-only fixtures: the published dashboard would never show the case Keith called ''a really
+      important one''.'
     - AND WITH A COLUMN-ORDER WARNING (Keith, 2026-10-04), the only WARNING-level file check (REQ-QAC-096 criterion 18).
-    - 'ITS OWN REGENERATE (Keith, 2026-10-04): the injections change every bootstrap''s output, and both REQ-PIPE-144''s and REQ-PIPE-086''s before-and-after proofs need a corpus that only their own change moves.'
-    - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice between readings went to him separately.'
-    - 'QUIET DAYS, beside suppressed ones (2026-10-05, found by the first scripted
-      replay). TS-47 says the day''s own supply never comes, and an earlier day''s
-      resend landed on that day at 10:11 and filled it, so REQ-GEN-135''s playback
-      rightly refused the scripted mark-not-supplied and stopped the replay. An
-      injection can now name `quiet` periods: no OTHER period''s arrival may land
-      on them (it is shifted to the next free weekday, as for a suppressed day),
-      while each keeps its own supply. REJECTED suppressing the day after, because
-      the next day''s own supply is part of what TS-47 shows; REJECTED moving
-      the anchor until a lucky draw left the days empty, which is a placement
-      that holds only until the seed or the chain logic changes.'
-    - 'A SCENARIO NEEDING A PRECISE VERDICT CANNOT YET BE PLANTED, SO TS-43, TS-44, TS-45 AND TS-46 ARE PARKED (Keith,
-      2026-10-05, found by the scripted replay). They need an AMBER supply - warnings
-      and no failure - and the generator has no dial that makes one reliably. The ''amber''
-      dirtying preset trips single-tier checks (dbt''s not_null and unique fail on any
-      bad value, as generator/dirty.py''s own docstring says), so a supply generated at
-      ''amber'' reads RED as a whole: 36 failing checks on TS-45''s, and its scripted
-      acknowledgement was refused because nothing had been promoted. A second rebuild
-      tried a truncation into the row-count warn band, which still read red: it splits
-      multiple-birth groups (the three sibling checks fail) and, on consecutive days,
-      compounds into a row-count and drift failure. Planting them needs a truncation that
-      keeps whole multiple-birth groups, on a day whose previous supply was clean. REJECTED
-      relying on a clean supply''s natural warnings, which are amber on some days and
-      green on others by the draw.'
-    - 'TS-46 PARKED WITH THEM (Keith, 2026-10-05), on the clean rebuild after:
-      its ''green'' resend is churned from the supply before it, which moved its
-      row count and its distribution of sex far enough that both checks read it
-      red against the supply it was to replace, so it waited for a person instead
-      of replacing it. Same root cause - the generator cannot aim for a verdict
-      - and the same fix is wanted: plans/running-thoughts.md #63, generate to
-      the check rules (built as REQ-GEN-183 to 186, 2026-10-11).'
-    - 'CRITERIA 15 AND 16 LANDED 2026-10-05 in a change of their own with its
-      own rebuild (criterion 17): TS-12 - cp_clients ragged partway, refused by
-      the fields-per-row file check in 2025-Q2 while the other five load - and
-      TS-56, newly registered, cp_carers with its first two columns swapped in
-      2024-Q3, loading with a column-order warning.'
-    - EVERY CHILD PROTECTION INJECTION IS PLANNED, NOT ONLY cp-clients' (2026-10-05,
-      found by that rebuild). The generator planned only injections whose dataset
-      was cp-clients, so TS-56 (cp-carers) was skipped without a word - criterion
-      4's silent absence. One delivery carries all six tables, so an injection
-      for any of them is placed against the delivery's periods, and two may not
-      share one whatever their datasets (tests written failing first).
+    - 'ITS OWN REGENERATE (Keith, 2026-10-04): the injections change every bootstrap''s output, and both REQ-PIPE-144''s and
+      REQ-PIPE-086''s before-and-after proofs need a corpus that only their own change moves.'
+    - 'ROUTINE AMENDMENTS FROM THE 2026-10-04 PRE-BUILD REVIEWS, applied on Keith''s blanket approval (''I''m happy for you
+      to turn it into exact amendment wording, but I don''t feel a need to review all of it. Only bring me the really high value
+      stuff.''). Each is a faithful transcription of an answer he gave (plans/road-testing.md #16, rounds 1-7); its wording
+      was not individually reviewed. Amendments that changed a built claim, touched privacy or security, or needed a choice
+      between readings went to him separately.'
+    - 'QUIET DAYS, beside suppressed ones (2026-10-05, found by the first scripted replay). TS-47 says the day''s own supply
+      never comes, and an earlier day''s resend landed on that day at 10:11 and filled it, so REQ-GEN-135''s playback rightly
+      refused the scripted mark-not-supplied and stopped the replay. An injection can now name `quiet` periods: no OTHER period''s
+      arrival may land on them (it is shifted to the next free weekday, as for a suppressed day), while each keeps its own supply.
+      REJECTED suppressing the day after, because the next day''s own supply is part of what TS-47 shows; REJECTED moving the
+      anchor until a lucky draw left the days empty, which is a placement that holds only until the seed or the chain logic
+      changes.'
+    - 'A SCENARIO NEEDING A PRECISE VERDICT CANNOT YET BE PLANTED, SO TS-43, TS-44, TS-45 AND TS-46 ARE PARKED (Keith, 2026-10-05,
+      found by the scripted replay). They need an AMBER supply - warnings and no failure - and the generator has no dial that
+      makes one reliably. The ''amber'' dirtying preset trips single-tier checks (dbt''s not_null and unique fail on any bad
+      value, as generator/dirty.py''s own docstring says), so a supply generated at ''amber'' reads RED as a whole: 36 failing
+      checks on TS-45''s, and its scripted acknowledgement was refused because nothing had been promoted. A second rebuild tried
+      a truncation into the row-count warn band, which still read red: it splits multiple-birth groups (the three sibling checks
+      fail) and, on consecutive days, compounds into a row-count and drift failure. Planting them needs a truncation that keeps
+      whole multiple-birth groups, on a day whose previous supply was clean. REJECTED relying on a clean supply''s natural warnings,
+      which are amber on some days and green on others by the draw.'
+    - 'TS-46 PARKED WITH THEM (Keith, 2026-10-05), on the clean rebuild after: its ''green'' resend is churned from the supply
+      before it, which moved its row count and its distribution of sex far enough that both checks read it red against the supply
+      it was to replace, so it waited for a person instead of replacing it. Same root cause - the generator cannot aim for a
+      verdict - and the same fix is wanted: plans/running-thoughts.md #63, generate to the check rules (built as REQ-GEN-183
+      to 186, 2026-10-11).'
+    - 'CRITERIA 15 AND 16 LANDED 2026-10-05 in a change of their own with its own rebuild (criterion 17): TS-12 - cp_clients
+      ragged partway, refused by the fields-per-row file check in 2025-Q2 while the other five load - and TS-56, newly registered,
+      cp_carers with its first two columns swapped in 2024-Q3, loading with a column-order warning.'
+    - EVERY CHILD PROTECTION INJECTION IS PLANNED, NOT ONLY cp-clients' (2026-10-05, found by that rebuild). The generator planned
+      only injections whose dataset was cp-clients, so TS-56 (cp-carers) was skipped without a word - criterion 4's silent absence.
+      One delivery carries all six tables, so an injection for any of them is placed against the delivery's periods, and two
+      may not share one whatever their datasets (tests written failing first).
+    - 'TS-3a AND TS-3b MOVE TO EMERGENCY DEPARTMENT (Keith, 2026-10-15, plans/running-thoughts.md #99), superseding his answer
+      of the same day that put them in REQ-GEN-207''s grown quarters; REQ-GEN-236 plants them. Suppression there means only
+      that the routine supply is not generated. AMENDED 2026-10-18 by REQ-GEN-237.'
   - id: REQ-GEN-045
     title: A generated scenario map says where each scenario can be seen
     date_written: "2026-09-22"
@@ -35037,40 +35265,49 @@ requirements:
       keeps, a confirmation with no keeps (which says nothing the default does not), any timing field (after_hours, at, day_offset),
       or a change reference another confirmation already names, THEN `mothman scenarios validate` SHALL refuse it, naming the
       entry and the fault; and THE SYSTEM SHALL describe the new entry in the file's own header.
-    - 'WHEN a replay of both collections confirms the due corrections (REQ-PIPE-170 criterion 31) - on every route that does
-      so: a bootstrap, a resumed bootstrap or `mothman pipeline run` over both - THE SYSTEM SHALL confirm a correction that
-      has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script names, SHALL
-      leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with none as it
-      does today.'
+    - 'WHEN a replay of every collection confirms the due corrections (REQ-PIPE-170 criterion 31) - on every route that does
+      so: a bootstrap, a resumed bootstrap or `mothman pipeline run` over every collection - THE SYSTEM SHALL confirm a correction
+      that has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script names,
+      SHALL leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with none
+      as it does today. AMENDED 2026-10-18 by REQ-GEN-237.'
     - IF a scripted keep names a supply its correction does not propose to move, or a scripted confirmation is refused for any
       other reason, THEN THE SYSTEM SHALL stop the replay naming the scenario and the change reference, SHALL NOT drop the keep
       or confirm without it, and SHALL list in that message the correction's proposed moves by scenario, dataset and supply
       index where a scenario names them, so that the script can be put right.
     - WHEN a bootstrap has confirmed corrections, THE SYSTEM SHALL run every QA run the confirmations owe - each moved or placed
       supply's re-check and gate, and the knock-on re-evaluation of each period a move left or reached (REQ-PIPE-121) - through
-      recheck.run_all_owed inside the bootstrap's own pass lock and under the replay clock, before it rebuilds both collections'
+      recheck.run_all_owed inside the bootstrap's own pass lock and under the replay clock, before it rebuilds every collection's
       results; SHALL say, before starting, how many runs are owed and that each takes about a minute; and IF any does not complete,
-      THEN SHALL stop the bootstrap naming it, as a refused scripted decision does.
+      THEN SHALL stop the bootstrap naming it, as a refused scripted decision does. AMENDED 2026-10-18 by REQ-GEN-237.
     - 'THE SYSTEM SHALL generate, as registered scenarios: TS-57, a supply re-judged by a confirmed correction with no move;
       TS-58, a supply moved by it, re-checked and judged against the period it moved to; TS-59, a supply it would move that
       the scripted asset manager keeps, with a reason; TS-60, a supply the corrected agreement gives no period, held on confirmation
-      with a hold naming the correction; TS-61, a cp-case-workers supply whose move is blocked because a later quarter inherits
-      it, parked on confirmation (REQ-PIPE-170 criterion 25); and TS-62, a correction merged and left awaiting confirmation
-      - a new Birth Registrations daily calendar version with a different claim window - with an arrival for a dataset it affects
-      received after its date.'
-    - 'THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared change alters together with the period before and the period after it - except that for a version-level change (TS-62''s), only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received before its effective date and for every arrival received on or after it, together with the day before and the day after each; SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a, TS-79b) and TS-63''s correction (REQ-GEN-218) where it is already planted; and IF it meets a period another claims, THEN generation SHALL refuse naming both, and SHALL NOT shift either or relax the rule. AMENDED 2026-10-14 by REQ-GEN-218 criterion 7.'
-    - THE SYSTEM SHALL place TS-57 to TS-61 in Child Protection quarters REQ-GEN-207 adds by growing the history earlier, so
-      that no existing scenario moves, and TS-62 on Birth Registrations, its correction dated a few days before the end of the
-      history and its later arrival the next daily supply.
+      with a hold naming the correction; TS-61, an ED Presentations supply whose move is blocked because the quarter after Emergency
+      Department''s participation gap inherits it (REQ-GEN-251), parked on confirmation (REQ-PIPE-170 criterion 25); and TS-62,
+      a correction merged and left awaiting confirmation - a new Birth Registrations daily calendar version with a different
+      claim window - with an arrival for a dataset it affects received after its date. AMENDED 2026-10-18 by REQ-GEN-237.'
+    - THE SYSTEM SHALL count as claimed by each correction, once however many scenarios ride it, every period whose slot a declared
+      change alters together with the period before and the period after it - except that for a version-level change (TS-62's),
+      only the days whose filing it would change, as its impact preview (REQ-PIPE-169) computes them, for supplies received
+      before its effective date and for every arrival received on or after it, together with the day before and the day after
+      each; every period whose slot a declared change alters SHALL hold no supply in any other collection on the changed calendar
+      (REQ-GEN-237 criterion 3); SHALL check that claim against every injection, every post-generation placement (TS-52, TS-79a,
+      TS-79b) and TS-63's correction (REQ-GEN-218) where it is already planted; and IF it meets a period another claims, THEN
+      generation SHALL refuse naming both, and SHALL NOT shift either or relax the rule. AMENDED 2026-10-14 by REQ-GEN-218 criterion
+      7. AMENDED 2026-10-18 by REQ-GEN-237.
+    - THE SYSTEM SHALL place TS-57 to TS-61 in Emergency Department quarters (REQ-GEN-232, REQ-GEN-237), TS-61's before Emergency
+      Department's participation gap (REQ-GEN-251), so that no existing scenario moves, and TS-62 on Birth Registrations, its
+      correction dated a few days before the end of the history and its later arrival the next daily supply. AMENDED 2026-10-18
+      by REQ-GEN-237.
     - THE SYSTEM SHALL give TS-57 to TS-61 each two lettered-sibling links (REQ-GEN-201) - 'a' on a date after their correction's
       date and before its confirmation, where the affected datasets read awaiting confirmation (REQ-DASH-172 criterion 4), and
       'b' on the history's last day, after the confirmation - and TS-62 one link on the history's last day; and SHALL extend
       REQ-GEN-201's event vocabulary so that a link may be bounded by a declared correction's date, named by its change_reference,
       and by the end of the history.
-    - THE SYSTEM SHALL update the register entries of TS-57 to TS-62 in plans/supply-model.md to the Child Protection calendar's
-      real values - the 1st of February, May, August and November, due 09:00 with 8 hours' grace, a 14-day claim window - and
-      to the correction each rides, each with a Config line, an Expect quoting what the page and the terminal say as observed
-      on the first bootstrapped build, and a Breaks as line.
+    - THE SYSTEM SHALL update the register entries of TS-57 to TS-62 in plans/supply-model.md to the quarterly calendar's real
+      values - the 1st of February, May, August and November, due 09:00 with 8 hours' grace, a 14-day claim window - and to
+      the correction each rides, each with a Config line, an Expect quoting what the page and the terminal say as observed on
+      the first bootstrapped build, and a Breaks as line. AMENDED 2026-10-18 by REQ-GEN-237.
     - THE SYSTEM SHALL rewrite TS-61's Expect to the parking REQ-PIPE-170 criterion 25 built (Keith, 2026-10-11, answer (p))
       - parked on confirmation, an outstanding item naming what blocks it and both ways it ends - in place of 'listed as blocked
       ... the correction stays among the states needing action until it is moved or kept'.
@@ -35094,10 +35331,11 @@ requirements:
       says pending.'
     - THE SYSTEM SHALL date every correction declared here late in the synthetic history - within weeks of its end - including
       a correction that edits an old quarter, so that 'awaiting confirmation' lasts weeks on the page rather than years.
-    - 'THE SYSTEM SHALL make each change the confirmed correction declares an edit to one grown quarter''s date in the quarterly
-      calendar''s dates: list, one such edit per shape, and SHALL NOT change a claim window or any other version-level value.'
+    - 'THE SYSTEM SHALL make each change the confirmed correction declares an edit to one Emergency Department quarter''s date
+      in the quarterly calendar''s dates: list, one such edit per shape, each quarter empty in Child Protection (REQ-GEN-237
+      criterion 3), and SHALL NOT change a claim window or any other version-level value. AMENDED 2026-10-18 by REQ-GEN-237.'
     - THE SYSTEM SHALL leave TS-61's parked move parked to the end of the history, with no scripted keep of it, so that its
-      'Correction move waiting' item on cp-case-workers stands, as criterion 15 records.
+      'Correction move waiting' item on ed-presentations stands, as criterion 15 records. AMENDED 2026-10-18 by REQ-GEN-237.
     - THE SYSTEM SHALL make TS-62's correction add a new version of Birth Registrations' daily calendar, taking effect on a
       day near the end of the history, whose claim window is wider than the version before it - about six hours against today's
       four (Keith, round 4 R1) - a version-level change, unlike the confirmed correction's dated edits (criterion 22), and SHALL
@@ -35296,7 +35534,8 @@ requirements:
       the FAIL SAFE NFR replaced; amendment 44 dropped; open question 1 removed as answered, the two build-time checks renumbered
       1 and 2.'
     - SIGNED OFF by Keith, 2026-10-14. Its two build-time checks stay with the architect (open questions 1 and 2).
-    - 'TS-63 RE-POINTED (Keith, 2026-10-14, REQ-PIPE-179 own pass Q1): TS-63 is planted by REQ-GEN-218, built after REQ-DASH-180; criterion 10 checks against its correction where it is already planted. Recorded 2026-10-14 by REQ-GEN-218 criterion 7.'
+    - 'TS-63 RE-POINTED (Keith, 2026-10-14, REQ-PIPE-179 own pass Q1): TS-63 is planted by REQ-GEN-218, built after REQ-DASH-180;
+      criterion 10 checks against its correction where it is already planted. Recorded 2026-10-14 by REQ-GEN-218 criterion 7.'
     open_questions:
     - '1. CHECK AT BUILD (architect, not a question for Keith): on a synthetic asset, adding a past-dated calendar version needs
       no correction (REQ-PIPE-111 criterion 9; agreement_freeze skips it). Read 2026-10-14, a declared correction naming the
@@ -38336,4 +38575,348 @@ requirements:
     - 'BUILD ORDER: REQ-PIPE-255, then REQ-PIPE-257 before any real upload, then REQ-GHUB-258; REQ-TEST-260
       in parallel with any of them, and measured for a week; then this. Automatic publishing (once REQ-PIPE-256)
       was dropped by Keith on 2026-10-18 and is not part of this set.'
+    open_questions: []
+
+  - id: REQ-QAC-231
+    title: "A Department of Health > Emergency Department > ED Presentations collection is declared in configuration, with a contract and 10 to 15 checks across all four tools, under item 6's conventions"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As Keith adding test scenarios, I want a small one-table quarterly dataset under its own agency with a real contract and a few checks in each tool, so that a scenario that needs no Child Protection shape can be planted where a quarter costs about five seconds rather than about thirty."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, scoping conversation 2026-10-15 evening (plans/running-thoughts.md #99) and his answers recorded in plans/data-generation.md #12. Drafted by delivery-scoper 2026-10-15, re-drafted 2026-10-16 on item 6's final drafts. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare, in contract/data-asset.yaml's hierarchy, an agency department-of-health named 'Department of Health' with short doh, holding one collection emergency-department named 'Emergency Department' with short ed and run_prefix ed_run_, holding one dataset ed-presentations named 'ED Presentations', table ed_presentations, with an exact arrival pattern for one file, ed_presentations.csv."
+      - "THE SYSTEM SHALL place the dataset on the existing quarterly calendar in contract/calendar.yaml, with its own participation_defaults due at 09:00 with 8 hours' grace, taking effect from the first quarter its generated history holds (REQ-GEN-232), and SHALL reword the quarterly calendar's description so that it no longer names Child Protection as its only user."
+      - "THE SYSTEM SHALL declare the dataset in contract/department-of-health/emergency-department-contract.yaml with eight columns - presentation_id, arrival_datetime, triage_category, age_group, sex, postcode, departure_status, length_of_stay_minutes - each with its type and whether it is required."
+      - "THE SYSTEM SHALL define between 10 and 15 active checks, at least two in each tool, in the files item 6 finds by convention - contract/department-of-health/emergency-department-soda-checks.yml, contract/department-of-health/emergency-department-evidently-checks.yml and the contract, each with its -retired sibling, and dbt files under dbt_project/models/emergency-department/, dbt_project/tests/emergency-department/ and dbt_project/retired/emergency-department/ - every one carrying check_id, category, introduced_date and changelog."
+      - "THE SYSTEM SHALL give every check an introduced_date on or before the claim-window opening of the dataset's first generated period, so that no recorded result is for a supply received before its check existed (plans/running-thoughts.md #98)."
+      - "THE SYSTEM SHALL write each check's description, failure_indicates and technical_note to docs/check-authoring-rules.md as it stands, with no change to those rules."
+      - "THE SYSTEM SHALL say, in the contract's own description, that it describes a synthetic dataset standing in for an emergency department collection and holds no real patient data."
+      - "THE SYSTEM SHALL add an agency description for Department of Health to contract/presentation.yaml, where REQ-DASH-244 moved AGENCY_BLURB."
+      - "WHEN `mothman check` runs, THE SYSTEM SHALL pass every configuration gate with the new agency, collection and dataset present - the registry gate (REQ-PIPE-240), the check-source and dbt-folder gates (REQ-QAC-241), the patterns, zero-active-checks and check-lifecycle gates and the agreement freeze - with no exemption added for them."
+    non_functional_requirements:
+      - "CONFIGURATION ONLY: hierarchy, calendar, contract, check and dbt files; nothing here reads data or the database. The adapter and provider are REQ-PIPE-233's and REQ-GEN-232's."
+      - "PRIVACY, FOR A REAL DEPLOYMENT: age group rather than date of birth is deliberate; postcode, sex, age group and an arrival instant together are a quasi-identifier in real emergency department data, so the contract's description says so. Checks on those columns record row-level failing values, as others do (Keith, 2026-10-16)."
+      - "NO NEW DEPENDENCY: the four tools already installed."
+      - "AGREEMENT FREEZE: adding a new dataset's calendar membership on a synthetic asset needs no declared correction - REQ-PIPE-111 criterion 9 as amended."
+    dependencies:
+      - REQ-PIPE-240
+      - REQ-QAC-241
+      - REQ-PIPE-111
+    decisions:
+      - "WHY THIS DATASET EXISTS (Keith, 2026-10-15): to SHRINK Child Protection. Since REQ-GEN-207 grew it ten years the bootstrap went 8m08s to 31m52s (Child Protection 1792s against Birth Registrations 550s), and Child Protection's cost is its run count, not its table count."
+      - "GENERALISE FIRST (Keith, 2026-10-15, Q1, confirmed after the architect's pass): plans/publishing-and-history.md item 6 lands before this dataset, which is its first user. REJECTED a third copy of the per-collection modules, and the architect's registry-plus-copied-runners middle path."
+      - "ITEM 6'S CONVENTIONS (docs/drafts/item6): short ed and run_prefix ed_run_ declared, not derived (item 6 call 4); Evidently checks in contract YAML (REQ-QAC-241); dbt files in the collection's own folders (REQ-QAC-241, round-4 call 28); a blurb in presentation configuration (REQ-DASH-244). Kept by Keith 2026-10-16: ed and ed_run_."
+      - "ONE TABLE, ABOUT EIGHT COLUMNS, ONE CSV PER SUPPLY; ITS OWN AGENCY; ALL FOUR TOOLS, 10 TO 15 CHECKS; QUARTERLY ON THE SHARED CALENDAR (Keith, 2026-10-15). REJECTED joining an existing agency or collection."
+      - "ONE SHARED QUARTERLY CALENDAR (Keith, Q2): a correction to it applies to both Child Protection and Emergency Department; the empty-elsewhere rule that follows is REQ-GEN-237's."
+      - "SUPERSEDES AN OLDER REJECTION: REQ-GEN-044 decision [B4] rejected 'a third synthetic daily dataset purely to host the other configurations'. Keith's #99 call is the later decision."
+      - "DEPENDS ON REQ-PIPE-111 CRITERION 9 AS AMENDED (Keith, Q7, applied to the register 2026-10-15): the synthetic exemption covers adding a new dataset's calendar membership, so the architect's finding that membership is itself a frozen item no longer bites. Not restated here."
+      - "KEPT BY KEITH 2026-10-16 - IDS AND NAMES: department-of-health, emergency-department, ed-presentations, table ed_presentations, file ed_presentations.csv. plans/running-thoughts.md #100 (mix up dataset names) is separate and unscoped."
+      - "KEPT BY KEITH 2026-10-16 - DUE 09:00 WITH 8 HOURS' GRACE, AS CHILD PROTECTION: the moved scenarios' quoted instants hold unchanged only if the due time does."
+      - "SIGNED OFF BY KEITH 2026-10-16 - THE CHECK SET (13): datacontract-cli - presentation_id not null, presentation_id unique, triage_category in 1-5, sex in its valid values, row count in band; Soda - postcode missing percentage, departure_status in its valid values, length of stay non-negative and below a plausible ceiling; dbt - arrival_datetime not null, age_group accepted values, length of stay accepted range; Evidently - drift in triage_category and in age_group."
+      - "ANSWERED (Keith, 2026-10-16): the check set (13) signed off as listed, and the ids, names and due time kept as proposed."
+      - "ANSWERED (Keith, 2026-10-16): Emergency Department checks on postcode, sex, age group and arrival time RECORD FAILING ROWS, as other checks do (architect finding A8) - his call, knowing those four together re-identify a patient in real data."
+      - "WORDING UPDATED TO THE REGISTRY WHEN MOVED IN (2026-10-18, under Keith's sign-off of the drafts as they stood): criterion 1 gives the agency its short, doh, which REQ-PIPE-248 criterion 7 made every agency declare (the value proposed at 248's scoping); criterion 3's contract path is in the agency's folder, as REQ-QAC-241 put every collection's check files; criterion 4's check files are in the agency's folder with their -retired siblings, as REQ-QAC-241's convention requires; criterion 8 names the file, contract/presentation.yaml; criterion 4 adds the collection's dbt retired folder, the third of REQ-QAC-241's per-collection dbt folders. No change to what is built."
+    open_questions: []
+
+  - id: REQ-GEN-232
+    title: "An Emergency Department generator provider writes one quarterly CSV per supply with Child Protection's severity mix, for as many quarters as its scenarios need"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As Keith planting scenarios, I want an Emergency Department provider under the shared generator driver that writes ordinary quarterly supplies with the same kind of mix Child Protection has, so that the scenarios that move off Child Protection have somewhere cheap to live."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, scoping conversation 2026-10-15 evening (plans/running-thoughts.md #99) and his answers in plans/data-generation.md #12. Re-drafted 2026-10-16 on item 6's final drafts. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL generate Emergency Department's history through REQ-GEN-246's shared driver, from a provider at generator/collections/emergency_department.py, each period one delivery carrying one file, ed_presentations.csv, with the contract's eight columns."
+      - "THE SYSTEM SHALL declare the provider's seed range disjoint from Birth Registrations' and Child Protection's, so that REQ-GEN-246's overlap gate passes and adding it changes no byte either of them writes."
+      - "THE SYSTEM SHALL draw Emergency Department's ordinary quarters with Child Protection's severity mix - about a quarter amber, two reds with resupply chains, the oldest supply clean - from Emergency Department's own seed."
+      - "THE SYSTEM SHALL size the history by a dry run of REQ-GEN-044's collision refusal over every scenario planned for Emergency Department (REQ-GEN-235, REQ-GEN-236, REQ-GEN-237 and the participation gap of REQ-GEN-251), with every period each claims, ending at Child Protection's newest quarter and adding the fewest whole years that leave the dry run with no refusal, and SHALL record the count and the output in this requirement's evidence."
+      - "THE SYSTEM SHALL draw postcodes from generator/names_au.py's existing WA postcode pool."
+      - "WHEN an Emergency Department injection suppresses a period's routine supply, places an arrival days before or after a period's date at a stated time, or carries scripted decisions (REQ-GEN-135), THE SYSTEM SHALL generate it through the shared driver with no Emergency Department-specific code outside the provider."
+      - "IF an Emergency Department scenario cannot be placed, THEN generation SHALL refuse before writing anything, naming the scenario, and SHALL NOT shift, drop or relax it."
+      - "WHEN `mothman ed generate-synthetic-data` runs twice with the same seed and configuration, THE SYSTEM SHALL write byte-identical deliveries and receipts both times."
+    non_functional_requirements:
+      - "COST: about five seconds of bootstrap per supply is the reason this dataset exists - rows per supply kept small (proposed a few thousand), the measured per-supply cost in evidence."
+      - "BYTE-IDENTICAL NEIGHBOURS: Birth Registrations' and Child Protection's generated files unchanged by this requirement alone - REQ-TEST-239's S4 compare."
+      - "SYNTHETIC ONLY: no real record, list or extract; postcodes from the existing WA pool, NOT a licensed Australia Post list."
+      - "LINE BUDGET: the provider's lines reported by REQ-TEST-249's report, outside the 150-line QA adapter budget."
+    dependencies:
+      - REQ-QAC-231
+      - REQ-GEN-246
+      - REQ-TEST-245
+      - REQ-GEN-044
+    decisions:
+      - "HISTORY AS LONG AS ITS SCENARIOS NEED, BY DRY RUN, THE REQ-GEN-207 RULE (Keith, 2026-10-15)."
+      - "CHILD PROTECTION'S SEVERITY MIX, FROM ITS OWN SEED (Keith, Q8). REJECTED all-clean ordinary quarters: a scenario moved here should sit among the same kind of history it sat among on Child Protection."
+      - "A PROVIDER, NOT A COPY (item 6, REQ-GEN-246): the old criteria routing scenario_injection.generated_periods() to this generator and adding a `mothman ed` command are DROPPED as covered by REQ-GEN-246 and REQ-TEST-245."
+      - "WA POSTCODES FROM generator/names_au.py (delivery-architect, 2026-10-15). REJECTED a licensed Australia Post list."
+      - "SUPPRESSION IS GENERIC (main session, 2026-10-15): the routine supply for a period a scenario needs empty is not generated."
+      - "PROPOSED, NOT KEITH'S - ENDS WHERE CHILD PROTECTION ENDS: the moved scenarios keep their quarters only if this history covers 2023-Q3 to 2026-Q3 on the same anchor."
+    open_questions: []
+
+  - id: REQ-PIPE-233
+    title: "Emergency Department runs end to end as a third collection through its QA adapter - what item 6 does not already make true"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As whoever maintains the pipeline, I want Emergency Department QA'd, recorded, bootstrapped and replayed exactly as the other two collections are, through one short adapter, so that a scenario moved onto it is judged by the same tools and rules it was on Child Protection."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/running-thoughts.md #99 and plans/data-generation.md #12. Re-drafted 2026-10-16: most of the 2026-10-15 draft is now item 6's (REQ-PIPE-240 to REQ-TEST-249). A PROPOSAL, not signed. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL provide Emergency Department's QA adapter at qa_tools/collections/emergency_department.py, carrying no legacy flag and no temporary pointer, with its logic reported against REQ-TEST-249's 150-line soft budget."
+      - "WHEN an Emergency Department supply arrives, THE SYSTEM SHALL file, stage, check with all four tools, record and gate it through the shared modules, with no Emergency Department name in any file outside its configuration, check files, adapter and provider."
+      - "WHEN `mothman pipeline bootstrap` runs over an empty database, THE SYSTEM SHALL generate and replay all three collections, each in its own process, and log each collection's time in CLAUDE.md's running log."
+      - "WHEN a replay of every collection finishes, THE SYSTEM SHALL confirm the due corrections across all three, as REQ-PIPE-170 criterion 31 does (amended 2026-10-16 by REQ-PIPE-240)."
+      - "THE SYSTEM SHALL run CI's deployment half of .github/workflows/test.yml against a bootstrap holding all three collections, and record its duration."
+    non_functional_requirements:
+      - "A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING ELSE (Keith, 2026-09-27): carried by REQ-DASH-244's shared builder; nothing here widens the publisher's grant."
+      - "BOOTSTRAP TIME: Emergency Department must not be the critical path; the whole is REQ-PIPE-250's hard 12 minutes."
+      - "CI COST: the deployment half's new duration recorded."
+    dependencies:
+      - REQ-QAC-231
+      - REQ-GEN-232
+      - REQ-TEST-249
+      - REQ-PIPE-240
+    decisions:
+      - "MOSTLY COLLAPSED INTO ITEM 6 (Keith's generalise-first answer). DROPPED as covered: `mothman ed qa` and --collection accepting ed (REQ-TEST-245); refusing an unknown collection rather than falling back (REQ-PIPE-240 criteria 3 and 6, and the allowlist hand-offs); the fixed two-entry maps in processing_pass and checkpoints (REQ-PIPE-240); dashboard data built only from recorded results (REQ-DASH-244); the third-copy-or-generalise question (answered). What remains is ED's own adapter and the end-to-end facts only a real third collection makes true."
+      - "CRITERION 2 IS ITEM 6'S PROMISE CHECKED ON A REAL COLLECTION: REQ-TEST-249 proves it on a fake one."
+      - "CRITERION 4 RIDES ON REQ-PIPE-170 CRITERION 31'S AMENDMENT, which is Keith's to approve in REQ-PIPE-240; without it the code says every collection and the built criterion's text lags."
+      - "WORDING UPDATED TO THE REGISTRY WHEN MOVED IN (2026-10-18, under Keith's sign-off of the drafts as they stood): criterion 4: REQ-PIPE-170 criterion 31's amendment has since been applied. No change to what is built."
+    open_questions: []
+
+  - id: REQ-DASH-234
+    title: "The dashboard shows Department of Health as a third real agency, from the executive view down to its dataset page"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As a data team leader glancing at the register, I want the Department of Health to appear as a real agency beside the other two, so that the page shows what is actually checked, and the moved scenarios' links land on a real page."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/running-thoughts.md #99 ('so the executive view shows a third agency'). Re-drafted 2026-10-16 on item 6's final drafts. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "WHEN the dashboard is built from recorded results holding Emergency Department, THE SYSTEM SHALL show Department of Health as an agency card on the executive view, its collection and its dataset page, with the same status, as-at and supply-history behaviour the other agencies have."
+      - "THE SYSTEM SHALL count the third agency in every executive-view counter and legend, so that each still sums to the number of agencies shown."
+      - "THE SYSTEM SHALL word the page's footer so that it names every real collection, read from the registry, or none."
+      - "WHEN a scenario link names the Emergency Department dataset, THE SYSTEM SHALL open its page on the link's date, as for any other dataset."
+      - "THE SYSTEM SHALL NOT assert, in any test, a fixed number of agencies, collections or real datasets - each is read from the hierarchy."
+    non_functional_requirements:
+      - "RENDER BUDGET: page size and tests/test_dashboard_e2e.py's duration measured before and after; growth beyond about 10% reported to Keith."
+      - "NO MOCK DATA: every figure for the new agency traces to a recorded result."
+      - "POLISH BAR: the third card lines up with the other two (REQ-GEN-044's card-alignment finding)."
+    dependencies:
+      - REQ-PIPE-233
+      - REQ-DASH-244
+    decisions:
+      - "A THIRD AGENCY ON THE EXECUTIVE VIEW (Keith, 2026-10-15)."
+      - "DROPPED as covered by REQ-DASH-244: the third data const (one COLLECTION_DATA const now); rendering with no Emergency Department data (a zero-run collection renders the never-supplied notice, REQ-DASH-244 criterion 5); the agency's GitHub pill (removed for every agency, round-3 call 17)."
+      - "ALREADY SAFE, VERIFIED 2026-10-15: TestExecutiveLegend reads the total from the page; the gap test needs 'at least two' real agency cards."
+    open_questions: []
+
+  - id: REQ-GEN-235
+    title: "The built early-arrival scenarios TS-9, TS-65, TS-66 and TS-67 move to Emergency Department, keeping their TS numbers and quarters"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As Keith, I want the early-arrival scenarios, which need nothing Child Protection has, re-planted on Emergency Department in the same quarters with the same instants, so that they stop costing Child Protection runs while every quoted date stays true."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/running-thoughts.md #99, naming TS-9, TS-65, TS-66 and TS-67 as moving. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL re-key the injections TS-9, TS-65, TS-66 and TS-67 to ed-presentations, each keeping its scenario id, its quarter (2024-Q2, 2025-Q3, 2025-Q4 and 2023-Q4) and its arrival instant relative to the quarter's date."
+      - "THE SYSTEM SHALL replace TS-67's six Child Protection scripted decisions in contract/scripted_decisions.yaml - five re-files and the cp-case-workers rejection - with one re-file of the Emergency Department supply to 2023-Q4 at the same instant and with the same reason."
+      - "THE SYSTEM SHALL generate the four Child Protection quarters these leave, and 2023-Q3 which TS-67 filed into, as ordinary deliveries, and SHALL leave every other Child Protection and every Birth Registrations delivery and receipt byte-identical, by REQ-TEST-239's S4 compare."
+      - "THE SYSTEM SHALL rewrite the four register entries in plans/supply-model.md to name the Emergency Department dataset and one file in place of 'the whole collection', each Expect re-quoted from the first bootstrapped build, and SHALL report to Keith any quoted text that changed beyond the dataset's name."
+      - "THE SYSTEM SHALL re-capture tests/fixtures/arrival_semantics_golden.json and SHALL report every verdict that changed on a Child Protection arrival, rather than accept it."
+      - "WHEN the synthetic history is bootstrapped, THE SYSTEM SHALL open each of the four scenarios' links on the Emergency Department dataset's page."
+    non_functional_requirements:
+      - "BYTE-IDENTICAL WHAT DOES NOT MOVE: criterion 3, REQ-TEST-239's S4."
+      - "CHANGELOG: one CHANGELOG.yaml entry for the dataset and the moves together, in the push that ships them."
+    dependencies:
+      - REQ-GEN-232
+      - REQ-PIPE-233
+      - REQ-DASH-234
+    decisions:
+      - "EVERYTHING THAT DOES NOT NEED CHILD PROTECTION MOVES AND KEEPS ITS TS NUMBER (Keith, 2026-10-15): a scenario stays only if it needs a supply of several files, a cross-table check, or several datasets in one collection."
+      - "WHAT THE MOVE LOSES, ACCEPTED BY KEITH'S NAMING: TS-67 on Child Protection also showed cp-case-workers rejected in a quarter it is not delivered in, and each early scenario a whole six-table delivery. TS-52 and TS-79 keep the partial-participation shapes."
+      - "PROPOSED, NOT KEITH'S - SAME QUARTERS: keeps TS-9's '22 April, nine days early' and TS-67's 12 and 21 October quotes true."
+    open_questions: []
+
+  - id: REQ-GEN-236
+    title: "TS-3a and TS-3b are planted on Emergency Department - a quarterly arrival one day outside the claim window, with the prior slot filled and unfilled"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As Keith, I want the quarterly half of the claim-window family planted on Emergency Department, so that the window is seen gating at its own boundary on a real page without spending Child Protection quarters."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/running-thoughts.md #99, superseding his answer of 2026-10-15 ~12:15 that put TS-3a and TS-3b in REQ-GEN-207's grown quarters. Delivers REQ-GEN-044 criterion 1 for these two. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL generate, as TS-3a, an Emergency Department supply received one day before the next quarter's claim window opens, while the current quarter's slot is filled."
+      - "THE SYSTEM SHALL generate, as TS-3b, the same arrival in another quarter whose routine supply is suppressed, so that the current quarter's slot was never filled."
+      - "THE SYSTEM SHALL generate only those arrival shapes, and SHALL NOT generate the resupply, the late filing or any verdict the scenarios expect (REQ-GEN-044 criterion 6)."
+      - "THE SYSTEM SHALL rewrite the TS-3a and TS-3b register entries to the quarterly calendar's real values - the 1st of February, May, August and November, due 09:00, a 14-day claim window - in place of 'Feb 2 / May 1 / Aug 3 / Nov 2', each with an Expect quoted from the first bootstrapped build and a Breaks as line, keeping the family's note that the filled branch is a contained imperfection, not a defect."
+      - "IF either cannot be placed, THEN generation SHALL refuse naming it, and SHALL NOT shift it."
+    non_functional_requirements:
+      - "DETERMINISM: placed by anchor and seed, as every injection is."
+    dependencies:
+      - REQ-GEN-232
+      - REQ-PIPE-233
+      - REQ-GEN-044
+    decisions:
+      - "TS-3a AND TS-3b MOVE (Keith, 2026-10-15, #99)."
+      - "SUPPRESSION IS GENERIC (main session, 2026-10-15)."
+      - "THE REGISTER'S CONFIG LINE IS NOT THE CALENDAR: it says Feb 2 / May 1 / Aug 3 / Nov 2; the calendar is the 1st of each month. Criterion 4, the same correction REQ-GEN-195 made for TS-9."
+    open_questions: []
+
+  - id: REQ-GEN-251
+    title: "Emergency Department has a participation gap, so a later quarter inherits an earlier supply as Child Protection's case workers do"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-16"
+    story: "As Keith, I want the Emergency Department dataset not owed one quarter of its history, so that the quarter after inherits the supply before it and TS-61's blocked move has an inheritance of its own to be blocked by."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/data-generation.md #12 Q3 (2026-10-15): 'Emergency Department gets a participation gap so it has an inheritance of its own; TS-61 moves.' Drafted by delivery-scoper 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL declare in contract/calendar.yaml a participation version for ed-presentations under which it is not owed one quarter of its generated history, and a later version from the next quarter under which it is owed again, so that the dataset's resolved participation changes on no date outside that gap."
+      - "THE SYSTEM SHALL suppress Emergency Department's routine supply for the gap quarter."
+      - "WHEN the synthetic history is bootstrapped, THE SYSTEM SHALL record the quarter after the gap inheriting the supply of the quarter before it (REQ-PIPE-179), as cp-case-workers' quarters do today."
+      - "THE SYSTEM SHALL place the gap where REQ-GEN-237's TS-61 needs it, through REQ-GEN-232's dry run, and IF it meets a period another scenario claims, THEN generation SHALL refuse naming both."
+    non_functional_requirements:
+      - "AGREEMENT FREEZE: adding past-dated participation versions on a synthetic asset needs no declared correction - REQ-PIPE-111 criterion 9 as amended."
+      - "DETERMINISM: placed by anchor and seed."
+    dependencies:
+      - REQ-QAC-231
+      - REQ-GEN-232
+      - REQ-PIPE-111
+    decisions:
+      - "A GAP OF ITS OWN, SO TS-61 CAN MOVE (Keith, Q3). REJECTED keeping TS-61 on Child Protection riding the same correction (delivery-scoper's 2026-10-15 recommendation): Keith chose to give Emergency Department the inheritance it lacked."
+      - "A REQUIREMENT OF ITS OWN, not a criterion of REQ-GEN-237: it is configuration plus suppression with a fact of its own (an inheritance), and REQ-GEN-237 is the scenarios that use it."
+      - "PROPOSED, NOT KEITH'S - ONE QUARTER: the least that gives a following quarter something to inherit."
+    open_questions: []
+
+  - id: REQ-GEN-237
+    title: "The correction scenarios TS-57 to TS-61 are re-pointed at Emergency Department, with each corrected quarter empty in Child Protection"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As Keith, I want the calendar-correction scenarios planted on Emergency Department, every quarter a correction touches holding nothing in Child Protection, so that the correction's quarters stop costing Child Protection runs and the shared calendar's edit re-judges only what the scenarios name."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/running-thoughts.md #99 and his answers in plans/data-generation.md #12 (Q2 empty-elsewhere, Q3 TS-61 moves, Q6 TS-63 stays). Amendment wording on REQ-GEN-044 and REQ-GEN-205 delegated by Keith to the main session. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL apply, in the change that adds this requirement to requirements.yaml, the amendments to REQ-GEN-044 and REQ-GEN-205 recorded in this requirement's decisions, each marked 'AMENDED <date applied> by REQ-GEN-237'."
+      - "THE SYSTEM SHALL place TS-57 to TS-61 in Emergency Department quarters, TS-61's supply in the quarter before REQ-GEN-251's gap so that the quarter after inherits it."
+      - "THE SYSTEM SHALL ensure that every quarter whose slot a declared change to the shared quarterly calendar alters holds no supply in any other collection on that calendar - by lying outside that collection's generated history or by suppressing its routine supply there - and IF any does, THEN generation SHALL refuse naming the change reference, the collection and the quarter."
+      - "IF the correction's impact preview (REQ-PIPE-169), run over every collection on the calendar, shows a move or re-judgement of any supply no scenario names, THEN generation SHALL refuse naming the change reference and the supply."
+      - "THE SYSTEM SHALL leave TS-63 (REQ-GEN-218), TS-42 and TS-80 (REQ-GEN-203) on Child Protection unchanged."
+    non_functional_requirements:
+      - "AMENDMENTS ARE TEXT; the building is REQ-GEN-205's. Criteria 2 to 4 are what this requirement builds."
+    dependencies:
+      - REQ-GEN-232
+      - REQ-GEN-251
+      - REQ-GEN-205
+      - REQ-GEN-044
+    decisions:
+      - "TS-57 TO TS-61 MOVE (Keith, 2026-10-15, #99 and Q3); TS-62 IS ON BIRTH REGISTRATIONS AND STAYS (Keith, 2026-10-14, F11)."
+      - "TS-63 STAYS ON CHILD PROTECTION (Keith, Q6), REVERSING the 2026-10-15 draft that moved it: REQ-GEN-218 is NOT amended; its quarters are among those REQ-GEN-238's dry run keeps."
+      - "EMPTY-ELSEWHERE (Keith, Q2): a correction to the shared calendar re-judges every supply in its quarter in BOTH collections, so each corrected quarter holds none in the other collection, by placement or suppression. REJECTED the 2026-10-15 draft's 'claimed in every collection' rule alone, which refused a collision but did not say how to avoid one."
+      - "NO AMENDMENT - REQ-GEN-203: TS-42 and TS-80 stay, and Child Protection keeps the original fifteen (Keith, Q4), so its criterion 5's 'quarters REQ-GEN-207 adds' stays true."
+      - "NO AMENDMENT - REQ-GEN-218: TS-63 stays (above)."
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-044, appended decision: 'TS-3a AND TS-3b MOVE TO EMERGENCY DEPARTMENT (Keith, 2026-10-15, plans/running-thoughts.md #99), superseding his answer of the same day that put them in REQ-GEN-207's grown quarters; REQ-GEN-236 plants them. Suppression there means only that the routine supply is not generated. AMENDED <date applied> by REQ-GEN-237.'"
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 6: 'WHEN a replay of every collection confirms the due corrections (REQ-PIPE-170 criterion 31) - on every route that does so: a bootstrap, a resumed bootstrap or `mothman pipeline run` over every collection - THE SYSTEM SHALL confirm a correction that has a scripted confirmation through correction_apply.confirm with exactly the keeps and reason the script names, SHALL leave a correction whose scripted confirmation says pending unconfirmed, and SHALL confirm a correction with none as it does today. AMENDED <date applied> by REQ-GEN-237.'"
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 8: as signed, with 'before it rebuilds both collections' results' replaced by 'before it rebuilds every collection's results', and the AMENDED line."
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 9: as signed, with 'TS-61, a cp-case-workers supply whose move is blocked because a later quarter inherits it' replaced by 'TS-61, an ED Presentations supply whose move is blocked because the quarter after Emergency Department's participation gap inherits it (REQ-GEN-251)', and the AMENDED line."
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 10: as signed, with this inserted after its first clause: 'every period whose slot a declared change alters SHALL hold no supply in any other collection on the changed calendar (REQ-GEN-237 criterion 3);' and the AMENDED line. (SUBSTANTIVE - Keith's empty-elsewhere rule.)"
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 11: 'THE SYSTEM SHALL place TS-57 to TS-61 in Emergency Department quarters (REQ-GEN-232, REQ-GEN-237), TS-61's before Emergency Department's participation gap (REQ-GEN-251), so that no existing scenario moves, and TS-62 on Birth Registrations, its correction dated a few days before the end of the history and its later arrival the next daily supply. AMENDED <date applied> by REQ-GEN-237.' (SUBSTANTIVE)"
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 13: as signed, with 'to the Child Protection calendar's real values' replaced by 'to the quarterly calendar's real values', and the AMENDED line."
+      - "NO AMENDMENT - REQ-GEN-205 criterion 15: it names no dataset ('TS-61's parked move as an outstanding item for as long as the quarter after it inherits'), so it reads true on ed-presentations as signed."
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 22: 'THE SYSTEM SHALL make each change the confirmed correction declares an edit to one Emergency Department quarter's date in the quarterly calendar's dates: list, one such edit per shape, each quarter empty in Child Protection (REQ-GEN-237 criterion 3), and SHALL NOT change a claim window or any other version-level value. AMENDED <date applied> by REQ-GEN-237.' (SUBSTANTIVE)"
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-205 criterion 23: as signed, with 'its Correction move waiting item on cp-case-workers' replaced by 'its Correction move waiting item on ed-presentations', and the AMENDED line."
+      - "CRITERION 1 APPLIED IN THE CHANGE THAT ADDED THIS REQUIREMENT (2026-10-18): REQ-GEN-044's appended decision and REQ-GEN-205 criteria 6, 8, 9, 10, 11, 13, 22 and 23, each carrying 'AMENDED 2026-10-18 by REQ-GEN-237'. REQ-GEN-205's and REQ-GEN-044's blocks were re-written by the YAML dumper in the file's existing style, which re-wrapped two hand-edited lines in each; no other value changed."
+    open_questions:
+      - "CHECK AT BUILD (not for Keith): that REQ-PIPE-169's impact preview runs over every collection on a calendar with the same implementation (REQ-PIPE-169 criterion 6), never a second rule."
+
+  - id: REQ-GEN-238
+    title: "Child Protection's grown history drops its oldest years down to what a fresh dry run of its remaining scenarios needs, amending REQ-GEN-207"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-15"
+    story: "As Keith, I want Child Protection's grown history cut back to the quarters its remaining scenarios need once the others have moved, so that the bootstrap gets back most of the 24 minutes the ten-year growth cost."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/running-thoughts.md #99 and plans/data-generation.md #12 Q4. Amendment wording on REQ-GEN-207 delegated by Keith to the main session. Re-drafted 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL re-run REQ-GEN-207 criterion 2's dry run over only the Child Protection scenarios still planned once REQ-GEN-235, REQ-GEN-236 and REQ-GEN-237 are applied - TS-42 and TS-80 with their lead-ins (REQ-GEN-203), TS-63 and its correction (REQ-GEN-218), TS-50, TS-55 and TS-81 (REQ-GEN-206) - and SHALL keep the fewest whole years that leave it with no refusal, recording the count and the output in this requirement's evidence."
+      - "THE SYSTEM SHALL remove the grown quarters older than that count, keeping the original fifteen and the remaining grown quarters' run plan, seeds, slot ids and delivery names as REQ-GEN-207 drew them, so that every kept quarter is byte-identical by REQ-TEST-239's S4."
+      - "THE SYSTEM SHALL move the effective_from of Child Protection's earliest participation_defaults version and each dataset's earliest participation version forward to the first kept quarter, each with a changelog line saying why, and SHALL leave the amber_setting and replacement_setting 2013 versions, and the quarterly calendar's 2013 version wherever Emergency Department's history still uses its dates, in place."
+      - "THE SYSTEM SHALL make tests/before_growth.py remove the grown versions by their dates after this change, and SHALL make it assert that each block it filters lost at least one version."
+      - "THE SYSTEM SHALL leave every Birth Registrations delivery and receipt byte-identical."
+      - "THE SYSTEM SHALL compare every surviving Child Protection supply's recorded status before and after and report any difference to Keith as a finding."
+      - "THE SYSTEM SHALL amend, in the change that adds this requirement, REQ-GEN-207 criteria 1 and 2 to the wording recorded in this requirement's decisions."
+    non_functional_requirements:
+      - "BYTE-IDENTICAL: kept quarters and Birth Registrations, by REQ-TEST-239's S4."
+      - "DETERMINISM: removing old quarters moves no index counted from the original fifteen."
+      - "AGREEMENT FREEZE: removing or later-dating a past version on a synthetic asset needs no declared correction - REQ-PIPE-111 criterion 9 as amended."
+      - "BOOTSTRAP TIME: measured from empty before and after and logged per collection; the target is REQ-PIPE-250's."
+    dependencies:
+      - REQ-GEN-207
+      - REQ-GEN-203
+      - REQ-GEN-218
+      - REQ-GEN-235
+      - REQ-GEN-236
+      - REQ-GEN-237
+      - REQ-PIPE-111
+    decisions:
+      - "DROP THE OLDEST GROWN YEARS TO WHAT A FRESH DRY RUN NEEDS; THE ORIGINAL FIFTEEN STAY BYTE-IDENTICAL (Keith, Q4). REJECTED re-packing the remaining scenarios into the quarters REQ-GEN-235 frees, and REJECTED going straight back to fifteen."
+      - "WHAT STAYS ON CHILD PROTECTION (Keith, 2026-10-15): a scenario needing a supply of several files, a cross-table check, or several datasets in one collection - and TS-63 (Keith, Q6)."
+      - "AMBER AND REPLACEMENT 2013 VERSIONS STAY (delivery-architect, 2026-10-15): they have no correction route and no synthetic exemption, and a version in force earlier than needed governs nothing."
+      - "tests/before_growth.py MUST ASSERT IT REMOVED SOMETHING (delivery-architect): it keys on the literal 2013-01-01, so once the participation versions move it would filter nothing and every test using it would silently change meaning."
+      - "THE FREEZE IS ANSWERED BY THE REGISTER (Keith, Q7): REQ-PIPE-111 criterion 9 was amended 2026-10-15 to exempt removing or later-dating a past version on a synthetic asset; depended on, not restated."
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-207 criterion 2, appended: 'AMENDED <date applied> by REQ-GEN-238: TS-3a, TS-3b and TS-57 to TS-61 moved to Emergency Department (Keith, 2026-10-15), and the growth was re-sized by the same dry run over the scenarios that stayed, to <N> years, dropping the oldest.'"
+      - "AMENDMENT, FINAL TEXT - REQ-GEN-207 criterion 1: as signed, with 'add Child Protection quarters before 2023-Q1' followed by ' - <N> years since REQ-GEN-238 re-sized it, from ten -', and 'AMENDED <date applied> by REQ-GEN-238.'"
+      - "CRITERION 7 WAITS FOR CRITERION 1 (2026-10-18, when this was moved into the register): its final amendment text carries <N>, the number of years criterion 1's dry run keeps, so REQ-GEN-207 is amended in the change that runs the dry run rather than the one that added this requirement. Departs from criterion 7's 'in the change that adds this requirement' only in timing, because the text cannot be written before the count exists."
+    open_questions: []
+
+  - id: REQ-PIPE-250
+    title: "A bootstrap from empty, all three collections, finishes within 12 minutes on this sandbox, its per-quarter cost profiled first"
+    signed_off:
+      by: Keith
+      date: "2026-10-18"
+    date_written: "2026-10-16"
+    story: "As Keith, I want a fresh bootstrap of the whole synthetic history to take at most twelve minutes, so that regenerating it - in a fresh session, in CI, after any history change - is something done without planning around it."
+    moscow: "must"
+    status: "not_started"
+    source: "Keith, plans/data-generation.md #12 Q5 (2026-10-15): 'a hard 12 minutes', confirmed after the architect's 15-17 minute estimate, with profiling in scope. Drafted by delivery-scoper 2026-10-16. SIGNED OFF by Keith 2026-10-18 ('You have my authority to proceed past 248 and into building the new Emergency Department dataset overnight as well'), the ten drafts as they stood, with wording stale against the registry updated as recorded in decisions; moved into requirements.yaml the same night."
+    acceptance_criteria:
+      - "THE SYSTEM SHALL profile a from-empty bootstrap by collection, stage and quarter, and SHALL record in this requirement's evidence where the time goes, including why Child Protection's per-quarter cost rose from about 21s to about 33s with the growth."
+      - "WHEN `mothman pipeline bootstrap` runs from empty on this sandbox with all three collections, THE SYSTEM SHALL finish within 12 minutes of wall clock, in each of three consecutive runs recorded in evidence."
+      - "WHEN a bootstrap finishes, THE SYSTEM SHALL print its wall clock against the 12-minute budget, and SHALL say plainly when it is over."
+      - "WHEN a speed-up changes pipeline code, THE SYSTEM SHALL show by REQ-TEST-239's compare that it changed nothing a bootstrap records."
+      - "THE SYSTEM SHALL record the CI deployment half's cache-miss bootstrap time alongside, without a budget of its own."
+    non_functional_requirements:
+      - "BEHAVIOUR-PRESERVING: a speed-up is a refactor in item 6's sense - byte-identical or not shipped as a speed-up."
+      - "NOT A CI GATE: timing varies by runner; the budget is an acceptance measurement on this sandbox, as CLAUDE.md's runtime log is."
+    dependencies:
+      - REQ-GEN-238
+      - REQ-PIPE-233
+      - REQ-TEST-239
+    decisions:
+      - "A HARD 12 MINUTES FROM EMPTY (Keith, Q5), BELOW the architect's 15-17 minute estimate for about thirty Child Protection quarters - which is why profiling is in scope, not optional."
+      - "'HARD' IS READ AS AN ACCEPTANCE MEASUREMENT ON THIS SANDBOX (three runs) AND A PRINTED BUDGET LINE, NOT A FAILING GATE (delivery-scoper, proposed): a wall-clock gate in CI fails on a slow runner rather than a slow pipeline. REJECTED a CI timing gate. CONFIRMED by Keith, 2026-10-18: a measurement, three runs on this sandbox and a printed budget line, not a CI gate; IF 12 minutes is not reached, the other nine ship and this requirement stays in progress, with the measured time, the profile and the next speed-ups written up."
+      - "A REQUIREMENT OF ITS OWN: the shrink (REQ-GEN-238) reduces how much work there is; this makes the remaining work fast enough. Either may turn out to be most of the answer."
     open_questions: []
