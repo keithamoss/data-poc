@@ -12,7 +12,7 @@ models:
               meta:
                 check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.arrival_datetime.not_null_dbt
                 category: completeness
-                introduced_date: "2023-01-01"
+                introduced_date: "2013-01-01"
                 description: >
                   This value must never be empty.
                 failure_indicates: >
@@ -25,7 +25,7 @@ models:
               meta:
                 check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.age_group.accepted_values_dbt
                 category: conformity
-                introduced_date: "2023-01-01"
+                introduced_date: "2013-01-01"
                 description: >
                   A single unrecognised value fails.
                 failure_indicates: >
@@ -41,7 +41,7 @@ models:
                 check_id: data-asset-1.department-of-health.emergency-department.ed-presentations.length_of_stay_minutes.accepted_range_dbt
                 name: Plausible length of stay
                 category: conformity
-                introduced_date: "2023-01-01"
+                introduced_date: "2013-01-01"
                 description: >
                   A stay must be no shorter than nothing and no longer than a plausible
                   ceiling; a few outliers warn, more fail.
