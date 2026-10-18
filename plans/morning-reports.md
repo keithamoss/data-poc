@@ -2138,5 +2138,5 @@ one or more component tags, and a date.
         capture). 248 goes up first, on its own.
     - **FOR THE MORNING, Keith's own list**: talk through the 77,000 lines
       of code (running-thoughts #107) and the test-duplication report
-      (scratchpad test-duplication.md, to be carried into a plans file so it
-      survives the container), plus anything else left for him overnight.
+      (now docs/drafts/item-6/test-duplication.md), plus anything else left
+      for him overnight.
