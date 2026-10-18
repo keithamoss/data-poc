@@ -605,25 +605,59 @@ def test_a_grown_delivery_leaves_case_workers_out_of_its_off_months(manifest, ra
         assert (_delivery_dir(raw_dir, e) / "cp_case_workers.csv").exists(), e["delivery"]
 
 
-class TestAScenarioInAGrownQuarterIsRefused:
-    """post-build-review #207 D3: the grown quarters' plan assumed no
-    scenario sits in them and ignored the injections - so the first scenario
-    planted there (REQ-GEN-203, 205, 206 all plan to) would silently swallow
-    a drawn amber, leave a lead-in unforced and drop a red. Refused, naming
-    the scenario, until the grown plan learns to move them as the original
-    fifteen's does."""
+class TestAScenarioInAGrownQuarter:
+    """REQ-GEN-203 and REQ-GEN-218 plant scenarios in the grown quarters
+    (REQ-GEN-207). Their plan moves a drawn amber off a scenario's quarter and
+    keeps its lead-in and following quarters clean, as the original fifteen's
+    does (post-build-review #207 D3, which refused it until now); a drawn red
+    there is refused, naming the scenario, never swallowed."""
 
-    def test_it_names_the_scenario(self):
+    @staticmethod
+    def _plan(anchor, **kw):
         from generator import scenario_injection as si
 
         grown = cp_provider.grown_periods()
-        injection = si.Injection("TS-99", "cp-clients", 0, "a test")
+        injection = si.Injection("TS-99", "cp-clients", anchor, "a test", **kw)
         placed = si.resolve(injection, grown)
-        with pytest.raises(si.CannotPlace) as refused:
-            cp_provider._grown_severities(grown, {placed.period: (injection, placed)})
-        assert "TS-99" in str(refused.value) and placed.period in str(refused.value)
+        before = [sev for _q, sev in cp_provider.grown_run_plan()[:len(grown)]]
+        after = cp_provider._grown_severities(grown, {placed.period: (injection, placed)})
+        return grown, placed, before, after
 
-    def test_the_real_plan_has_none_and_passes(self):
+    @staticmethod
+    def _index(grown, name):
+        return [p.name for p in grown].index(name)
+
+    def test_a_drawn_amber_moves_off_the_scenarios_quarter(self):
+        drawn = [i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan()) if sev == "amber"]
+        grown, placed, before, after = self._plan(drawn[0])
+        assert after[self._index(grown, placed.period)] is None
+        assert after.count("amber") == before.count("amber")
+
+    def test_a_clean_quarter_changes_nothing_else(self):
+        clean = [i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan())
+                 if sev is None and i > 0]
+        _grown, _placed, before, after = self._plan(clean[3])
+        assert after == before
+
+    def test_its_lead_in_and_following_quarters_are_clean(self):
+        from generator import scenario_injection as si
+
+        drawn = [i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan()) if sev == "amber"]
+        grown, placed, _before, after = self._plan(
+            drawn[2] + 1, arrivals=(si.ExtraArrival(0, "08:00", target=si.Target("green")),), lead_in=1)
+        assert placed.built_green
+        for name in placed.built_green:
+            assert after[self._index(grown, name)] is None, name
+
+    def test_a_drawn_red_there_is_refused_naming_the_scenario(self):
+        from generator import scenario_injection as si
+
+        red = next(i for i, (_q, sev) in enumerate(cp_provider.grown_run_plan()) if sev == "red")
+        with pytest.raises(si.CannotPlace) as refused:
+            self._plan(red)
+        assert "TS-99" in str(refused.value) and "red" in str(refused.value)
+
+    def test_the_real_plan_passes(self):
         _, injected = cp_provider._plan_injections(cp_provider.generated_periods())
         grown = cp_provider.grown_periods()
         assert len(cp_provider._grown_severities(grown, injected)) == len(grown)

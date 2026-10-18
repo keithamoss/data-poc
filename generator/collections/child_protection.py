@@ -668,13 +668,14 @@ def _plan_injections(periods):
     return resolved, by_period
 
 
-def _ordinary_severities(periods, injected_by_period) -> list:
+def _severities(plan, periods, injected_by_period) -> list:
     """Each drawn severity, with every ordinary amber that cannot be
     generated where it was drawn - in a `hold` amber-setting era, or on a
     period an injected scenario owns, whose chain ignores the drawn
     severity - moved to a clean period that can take it, so the number
     generated equals the number drawn (REQ-GEN-184 criterion 9;
-    post-build-review #154). The first period stays clean."""
+    post-build-review #154). The first period stays clean, and a lead-in or
+    following period is one clean delivery (REQ-GEN-185)."""
     from generator import targeting
 
     green = frozenset(name for _inj, placement in injected_by_period.values()
@@ -685,7 +686,7 @@ def _ordinary_severities(periods, injected_by_period) -> list:
                             if (p.name in injected_by_period
                                 and not injected_by_period[p.name][0].keeps_drawn_severity)
                             or p.name in green)
-    out = targeting.outside_hold([sev for _q, sev in run_plan()[:len(periods)]],
+    out = targeting.outside_hold([sev for _q, sev in plan[:len(periods)]],
                                  [p.date for p in periods], "cp-clients",
                                  keep_clean=frozenset({0}), unavailable=unavailable)
     # A LEAD-IN OR FOLLOWING PERIOD IS A SINGLE CLEAN DELIVERY (REQ-GEN-185):
@@ -693,31 +694,32 @@ def _ordinary_severities(periods, injected_by_period) -> list:
     return [None if p.name in green else sev for p, sev in zip(periods, out)]
 
 
+def _ordinary_severities(periods, injected_by_period) -> list:
+    """The original fifteen quarters' severities (_severities)."""
+    return _severities(run_plan(), periods, injected_by_period)
+
+
 def _grown_severities(periods, injected_by_period) -> list:
-    """The grown quarters' drawn severities (REQ-GEN-207), placed outside a
-    hold era as _ordinary_severities places the original fifteen's. No
-    scenario is planted in them in this change (criterion 7), so nothing
-    there is unavailable; the oldest stays clean, as the history's first.
+    """The grown quarters' severities (REQ-GEN-207), placed as the original
+    fifteen's are (_severities) - a drawn amber moved off a scenario's
+    quarter, its lead-in and following quarters clean (REQ-GEN-203 and 218
+    plant scenarios here; post-build-review #207 D3 refused one until then).
 
-    REFUSED, NAMING THE SCENARIO, the moment one is (post-build-review #207
-    D3): this plan does not move a drawn amber or red off a scenario's
-    quarter or force its lead-ins clean, so a scenario here would silently
-    swallow them. Teach it to, as _ordinary_severities does, before planting
-    one in a grown quarter."""
-    from generator import scenario_injection, targeting
+    A DRAWN RED ON A SCENARIO'S QUARTER, OR ITS LEAD-IN OR FOLLOWING ONE, IS
+    REFUSED naming the scenario: outside_hold moves ambers only, and the red
+    chain would be swallowed by the scenario's own arrivals."""
+    from generator import scenario_injection
 
-    names = {p.name for p in periods}
-    for period, (injection, _placement) in injected_by_period.items():
-        if period in names:
-            raise scenario_injection.CannotPlace(
-                f"{injection.scenario_id} sits in the grown quarter {period}, and the grown "
-                f"quarters' plan cannot yet move a drawn amber or red off a scenario's quarter "
-                f"or keep its lead-ins clean - teach _grown_severities to, as "
-                f"_ordinary_severities does, before planting a scenario there")
-
-    return targeting.outside_hold([sev for _q, sev in grown_run_plan()[:len(periods)]],
-                                  [p.date for p in periods], "cp-clients",
-                                  keep_clean=frozenset({0}), unavailable=frozenset())
+    plan = grown_run_plan()
+    drawn = {p.name: sev for p, (_q, sev) in zip(periods, plan)}
+    for period, (injection, placement) in injected_by_period.items():
+        for name in (period, *placement.built_green):
+            if drawn.get(name) == "red":
+                raise scenario_injection.CannotPlace(
+                    f"{injection.scenario_id}: an ordinary red is drawn for the grown quarter "
+                    f"{name}, which the scenario needs to itself - move its anchor to a "
+                    f"quarter whose own and lead-in quarters are drawn clean or amber")
+    return _severities(plan, periods, injected_by_period)
 
 
 #: The largest offset any derivation adds to a slot's own seed: generate()'s
