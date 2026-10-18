@@ -369,6 +369,14 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
                                   ("receipts", delivery.RECEIPTS_DIR))}
     book_before = (delivery.BOOKKEEPING_PATH.read_bytes()
                    if delivery.BOOKKEEPING_PATH.exists() else None)
+    # THE SCENARIO PLACEMENTS TOO (post-build-review #225): Child
+    # Protection's injected scenarios are written there on every
+    # generation, and the redirects below once missed it.
+    from generator import scenario_injection
+
+    real_placements = scenario_injection.PLACEMENTS_PATH
+    placements_before = (real_placements.stat().st_mtime_ns, real_placements.read_bytes()) \
+        if real_placements.exists() else None
     # NO PRECONDITION THAT THE REAL TREE EXISTS, and that was a real
     # bug in this test's first version - it asserted one, passed
     # locally where data/deliveries/ is populated, and failed in CI
@@ -381,6 +389,7 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
     monkeypatch.setattr(driver, "DELIVERIES_DIR", tmp_path / "deliveries")
     monkeypatch.setattr(driver, "RECEIPTS_DIR", tmp_path / "receipts")
     monkeypatch.setattr(driver, "BOOKKEEPING_PATH", tmp_path / "bookkeeping.json")
+    monkeypatch.setattr(scenario_injection, "PLACEMENTS_PATH", tmp_path / "scenario_placements.json")
 
     driver.generate("child-protection")
 
@@ -390,6 +399,9 @@ def test_generating_never_touches_the_real_delivery_tree(tmp_path, monkeypatch):
         assert _fingerprint(path) == before[name], f"the real {name} tree was written to by a test run"
     assert (delivery.BOOKKEEPING_PATH.read_bytes()
             if delivery.BOOKKEEPING_PATH.exists() else None) == book_before
+    assert ((real_placements.stat().st_mtime_ns, real_placements.read_bytes())
+            if real_placements.exists() else None) == placements_before, \
+        "the real scenario placements file was written to by a test run"
 
 
 # ---- Partial resupplies (REQ-GEN-040) --------------------------------

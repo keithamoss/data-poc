@@ -10266,3 +10266,41 @@ twice. It deliberately did not re-find the `TypeError`.
      "Rebuild every collection's results file under reports/ from its QA history
      recorded in the database." Wording only, so no failing test first; the next
      equivalence comparison shows it as an S7 difference, named here.
+
+225. **[done, 2026-10-18]** **[Testing & dev tooling]** **A generator test
+     rewrote the real scenario placements file on every run.** Found by the
+     duplication check Keith asked for over the registry-era tests, and
+     confirmed by running the test alone: `data/scenario_placements.json`'s
+     modification time moved and its bytes did not. tests/test_generate_cp_runs.py's
+     `test_generating_never_touches_the_real_delivery_tree` redirected the
+     delivery and receipt trees and the bookkeeping but not
+     `scenario_injection.PLACEMENTS_PATH`, and Child Protection's injected
+     scenarios are written there by every generation. The Birth Registrations
+     copy of the same test already guarded it. Today's content came out
+     identical, so nothing was lost; on a tree generated from different code it
+     would have been overwritten, which is how a fixture gets captured from a
+     polluted data/ (CLAUDE.md's handfiled incident, 2026-09-28).
+
+     FIXED TEST-FIRST: the test now also compares the real placements file's
+     modification time and bytes before and after, which failed against the old
+     redirects, and redirects it into its own tmp_path, which passes. LEFT
+     OPEN, smaller: tests/conftest.py's guard refuses a test write into the
+     real delivery tree but not into the placements file, so a new test could
+     make the same mistake unnoticed; extending the guard is a follow-up.
+
+226. **[todo, 2026-10-18 - FOR KEITH]** **[QA checks]** **A failing Soda
+     "failed rows" check records no invalid-row count, in both collections.**
+     Found by the REQ-QAC-247 flag-brief research and verified against the
+     recorded raw output: qa_tools/tools/run_soda.py reads the count from the
+     first diagnostics block's `totalFailingRows`, and Soda writes that key
+     only in a `failedRowsAnalysis` block. A custom "failed rows" check's block
+     is of type `file` and carries no such key, so its row_count_invalid is
+     recorded empty although Soda's own value is the failing-row count (22 on
+     one Child Protection run's date-of-birth range check). 66 failing or
+     warning results across 8 checks today.
+
+     NOT FIXED YET, deliberately: the fix changes recorded results, which makes
+     it a change to put to Keith rather than polish, and it would show up in
+     the middle of REQ-QAC-247's flag-by-flag comparisons. Proposed fix: take
+     a `file` block's count from the check's own value, test-first, as its own
+     change with a capture before and after.
