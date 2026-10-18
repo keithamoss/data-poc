@@ -42,14 +42,12 @@ FIXTURE_DATASET_STATS = {
         "arrival_record": FIXTURE_RUNS[0],
         "row_counts": {"birth_registrations": 3},
         "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
-        "arrival": {"birth_registrations": {"earliest_extract": "2026-09-01T10:00:00+00:00"}},
         "check_aggregates": {"birth_registrations.sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
     },
     "run_002": {
         "arrival_record": FIXTURE_RUNS[1],
         "row_counts": {"birth_registrations": 4},
         "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
-        "arrival": {"birth_registrations": {"earliest_extract": "2026-09-02T10:00:00+00:00"}},
         "check_aggregates": {"birth_registrations.sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,
                                       "values": [{"value": "X", "count": 1}]}},
     },
@@ -163,43 +161,6 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous(tmp_path, m
     # gets a byRun entry per run, all zero - never crashes or gets skipped
     uncovered = next(c for c in data["columns"] if c["name"] == "date_registered")
     assert set(uncovered["stats"]["byRun"]) == {"run_001", "run_002"}
-
-
-def test_the_suppliers_own_timestamp_no_longer_decides_punctuality(tmp_path, monkeypatch):
-    """REQ-PIPE-080 criterion 4, and this test used to assert the
-    opposite - deliberately rewritten rather than deleted, because
-    what it pinned is exactly what changed.
-
-    It read `test_arrival_status_is_genuinely_computed_from_real_cadence`
-    and proved that MUTATING `earliest_extract` flipped arrivalStatus
-    between onTime and late. That was true, and it is the defect:
-    `earliest_extract` is `MIN(extract_timestamp)` over a column
-    INSIDE THE SUPPLIER'S OWN FILE, so a supplier choosing what to
-    write there chose whether they were late.
-
-    Punctuality is now measured from OUR RECEIPT INSTANT against the
-    slot the supply is filed to, and recorded with the filing. So the
-    assertion inverts: moving the supplier's timestamp by four hours
-    must change NOTHING.
-    """
-    _no_retired_checks(monkeypatch)
-
-    def _build(extract_run_1, extract_run_2):
-        stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
-        stats["run_001"]["arrival"]["birth_registrations"]["earliest_extract"] = extract_run_1
-        stats["run_002"]["arrival"]["birth_registrations"]["earliest_extract"] = extract_run_2
-        path = tmp_path / f"results_{extract_run_1[-9:-6]}.json"
-        path.write_text(json.dumps({
-            "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": stats,
-        }))
-        monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
-        return bdd.build(_BDM)["datasets"][0]
-
-    inside = _build("2026-09-01T06:30:00+00:00", "2026-09-02T06:30:00+00:00")
-    outside = _build("2026-09-01T10:00:00+00:00", "2026-09-02T10:00:00+00:00")
-
-    assert ({r: v["arrivalStatus"] for r, v in inside["arrivalByRun"].items()}
-            == {r: v["arrivalStatus"] for r, v in outside["arrivalByRun"].items()}), "the supplier's own extract timestamp still moves the verdict"
 
 
 def test_a_retired_checks_metadata_is_carried_through(tmp_path, monkeypatch):
@@ -553,7 +514,7 @@ def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
         "runs": [*FIXTURE_RUNS, contested], "results": FIXTURE_RESULTS,
         "dataset_stats": {**FIXTURE_DATASET_STATS, "run_003": {
             "arrival_record": contested, "row_counts": {}, "value_counts": {},
-            "arrival": {}, "check_aggregates": {}}},
+            "check_aggregates": {}}},
     }))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))
 

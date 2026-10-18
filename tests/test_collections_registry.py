@@ -849,7 +849,6 @@ class TestTheSharedOrchestratorStatsAndRebuild:
         # The shared shape, not Birth Registrations' single-table one; the
         # generator's seed does not survive into the record.
         assert stats["row_counts"] == {FAKE_TABLE: 2}
-        assert stats["arrival"][FAKE_TABLE]["earliest_extract"].startswith("2026-01-01T08:00:00")
         assert stats["arrival_record"] == {k: entry[k] for k in
                                            ("run_id", "run_index", "received_at", "delivery")}
         assert stats["value_counts"] == {} and stats["check_aggregates"] == {}

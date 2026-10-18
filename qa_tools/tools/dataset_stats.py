@@ -1,6 +1,8 @@
 """Each run's presentation-layer statistics, for any collection (REQ-PIPE-243):
-row counts, value-count distributions, per-check aggregates of the failing
-values, and when each table's rows were extracted.
+row counts, value-count distributions and per-check aggregates of the
+failing values. NOT when the rows were extracted: that was `earliest_extract`,
+which nothing read once punctuality was measured from our own receipt
+(pipeline/recorded_arrival.py), and REQ-QAC-247 stopped recording it.
 
 COMPUTED HERE, ONCE, AT RUN TIME, and recorded (tool `dataset_stats`), because
 this is the one point with a legitimate connection to the supply rows. Keith's
@@ -27,7 +29,6 @@ from typing import Any
 
 from pipeline.aggregate_values import categorical_aggregate, numeric_date_aggregate
 from qa_tools import collections
-from qa_tools.common import asset_time
 
 __all__ = ["arrival_record", "compute_dataset_stats"]
 
@@ -91,19 +92,6 @@ def _value_counts(conn, table: str, column: str, known: list[str], rows: _Rows) 
     return out
 
 
-def _earliest_extract(conn, table: str, rows: _Rows, after_registration: bool, what: str):
-    condition, params = rows.where("extract_timestamp >= date_registered"
-                                   if after_registration else None)
-    sql = f"SELECT MIN(extract_timestamp) FROM {table}" + (f" WHERE {condition}" if condition else "")
-    earliest = conn.execute(sql, params).fetchone()[0]
-    if earliest is None and after_registration:
-        # Every row extracted before it was registered: the earliest of all.
-        condition, params = rows.where()
-        sql = f"SELECT MIN(extract_timestamp) FROM {table}" + (f" WHERE {condition}" if condition else "")
-        earliest = conn.execute(sql, params).fetchone()[0]
-    return {"earliest_extract": asset_time.record_source_instant(earliest, what)}
-
-
 def _count(conn, table: str, rows: _Rows) -> int:
     condition, params = rows.where()
     sql = f"SELECT COUNT(*) FROM {table}" + (f" WHERE {condition}" if condition else "")
@@ -122,7 +110,6 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict,
     legacy, spec = adapter.legacy, adapter.stats
     tables = [d.table for d in coll.datasets]
     rows = _Rows((data_run_id or entry["run_id"]) if "stats.rows_by_run_id" in legacy else None)
-    after_registration = "stats.arrival_after_registration" in legacy
     readable = _readable(conn)
 
     return {
@@ -132,7 +119,4 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict,
                          for (t, col), known in spec.value_counts.items() if t in readable},
         "check_aggregates": {f"{t}.{col}": _aggregate(conn, t, col, s, rows)
                              for (t, col), s in spec.aggregates.items() if t in readable},
-        "arrival": {t: _earliest_extract(conn, t, rows, after_registration,
-                                         f"earliest_extract for table {t}")
-                    for t in tables if t in readable},
     }

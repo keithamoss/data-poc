@@ -456,9 +456,8 @@ def _received_at(payload, received_date: date, where: str) -> str:
     excluded - those are `generator/dirty.py`'s deliberately disordered
     rows, planted for the "extract timestamp ordering" check to catch.
     Including them would let one corrupted row decide when the whole
-    supply arrived, which is the exact bug
-    qa_tools/tools/dataset_stats.py's own earliest_extract already
-    documents and filters against.
+    supply arrived - the bug the recorded `earliest_extract` once had to
+    filter against, before REQ-QAC-247 stopped recording it.
     """
     import pandas as pd
 
@@ -984,10 +983,8 @@ class CivilRegistration(Provider):
             due = slots.slot_instants(DATASET_ID, period.date)
             return asset_time.isoformat(due.due_at - timedelta(hours=1))
         # THE RECEIPT INSTANT IS THE DATA'S OWN: the earliest extract_timestamp
-        # in the file that just landed - the same value
-        # qa_tools/tools/dataset_stats.py computes downstream as
-        # earliest_extract, so the bookkeeping and the warehouse cannot
-        # disagree about when a supply turned up.
+        # in the file that just landed, so a synthetic supply turns up when
+        # its own rows say it was extracted.
         return _received_at(delivery_obj.payload, delivery_obj.received_date,
                             f"received_at for {entry['run_id']}")
 

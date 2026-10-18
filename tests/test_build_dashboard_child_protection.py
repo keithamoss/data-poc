@@ -33,22 +33,14 @@ FIXTURE_RUNS = [
 ]
 
 FIXTURE_DATASET_STATS = {
-    # earliest_extract values deliberately placed relative to CP's real
-    # quarterly cadence (contract/calendar.yaml - Feb/May/Aug/Nov day 1,
-    # 09:00 AWST, 8h grace) rather than each run's own run_date, so
-    # test_arrival_status_is_genuinely_computed_from_real_cadence below
-    # can tell a real onTime/late classification apart from a hardcoded
-    # one - see that test's own docstring.
     "cp_run_001": {
         "row_counts": {"cp_notifications": 3},
         "value_counts": {"concern_type": [["Neglect", 2], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"earliest_extract": "2025-11-01T05:00:00+00:00"}},
         "check_aggregates": {},
     },
     "cp_run_002": {
         "row_counts": {"cp_notifications": 4},
         "value_counts": {"concern_type": [["Neglect", 3], ["Physical abuse", 1]]},
-        "arrival": {"cp_notifications": {"earliest_extract": "2026-02-01T20:00:00+00:00"}},
         "check_aggregates": {},
     },
 }
@@ -89,33 +81,6 @@ def test_stats_by_run_carries_every_run_not_just_latest_and_previous():
     }
     # current/previous stay exactly as before, unaffected by byRun
     assert col["stats"]["current"]["valueCounts"] == [["Neglect", 3], ["Physical abuse", 1]]
-
-
-def test_the_suppliers_own_timestamp_no_longer_decides_punctuality():
-    """REQ-PIPE-080 criterion 4 - the Child Protection half, and the
-    counterpart of test_build_dashboard_data.py's own. See that one
-    for the full account of why this test now asserts the opposite of
-    what it used to.
-
-    In short: it proved that FIXTURE_DATASET_STATS' `earliest_extract`
-    values, placed inside and outside each cycle's grace window, drove
-    arrivalStatus to onTime and late. They did - and that value comes
-    from inside the supplier's own file, so the supplier was deciding
-    whether they were late. The verdict is now read from the recorded
-    filing, so moving those timestamps must change nothing."""
-    import json
-
-    moved = json.loads(json.dumps(FIXTURE_DATASET_STATS))
-    for run in moved.values():
-        run["arrival"]["cp_notifications"]["earliest_extract"] = "2026-02-01T23:59:00+00:00"
-
-    before = _table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS,
-                                  FIXTURE_DATASET_STATS, {})
-    after = _table("cp_notifications", FIXTURE_RESULTS, FIXTURE_RUNS, moved, {})
-
-    assert ({r: v["arrivalStatus"] for r, v in before["arrivalByRun"].items()}
-            == {r: v["arrivalStatus"] for r, v in after["arrivalByRun"].items()}), (
-        "the supplier's own extract timestamp still moves the verdict")
 
 
 def test_each_dataset_shows_its_own_runs():

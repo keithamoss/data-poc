@@ -108,6 +108,5 @@ ADAPTER = CollectionAdapter(
     legacy=frozenset({
         "stage.stamps_run_columns",
         "stats.rows_by_run_id",
-        "stats.arrival_after_registration",
     }),
 )
