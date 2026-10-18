@@ -168,3 +168,95 @@ class TestTheReplayConfirmsAsScripted:
         assert "TS-X cp-clients supply 0" in msg, "the proposed moves, by scenario"
         assert [p.reference for p in correction_apply.pending(conn)][0] == "CAB-1", \
             "never confirmed without the keep"
+
+
+class TestTheBootstrapRunsWhatTheConfirmationsOwe:
+    """Criterion 8: every run the confirmations owe, through
+    recheck.run_all_owed, under the replay clock, said before it starts, and
+    a run that does not complete stops the bootstrap naming it."""
+
+    @pytest.fixture
+    def owing(self, monkeypatch):
+        from qa_tools.common import bootstrap, recheck, replay_clock
+
+        calls: dict = {"rebuilt": []}
+        monkeypatch.setattr(correction_replay, "confirm_due", lambda **k: ["CAB-1"])
+        monkeypatch.setattr(correction_replay, "history_end", lambda conn: None)
+        def one(kind):
+            return recheck.Owed(**{c: (kind if c == "kind" else None)
+                                   for c in recheck._OWED_COLUMNS})
+        monkeypatch.setattr(recheck, "owed", lambda conn, dataset_id=None: [
+            one(recheck.RECHECK), one(recheck.REEVALUATE)])
+
+        def run_all(**kwargs):
+            calls["kinds"] = kwargs.get("kinds")
+            calls["clock"] = replay_clock.active()
+            return calls.get("outcomes", [recheck.Outcome(1, "cp_run_001", True, "ok")])
+        monkeypatch.setattr(recheck, "run_all_owed", run_all)
+        monkeypatch.setattr(bootstrap, "_rebuild_results", calls["rebuilt"].append)
+        return calls
+
+    def test_the_owed_runs_are_run_and_announced(self, owing, supply_dsn):
+        from qa_tools.common import bootstrap, recheck
+
+        lines, say = _say()
+        bootstrap._confirm_corrections(say)
+        assert set(owing["kinds"]) == {recheck.RECHECK, recheck.REEVALUATE}
+        assert owing["clock"], "under the replay clock"
+        assert any("2 run(s)" in line and "about a minute" in line for line in lines), lines
+        assert owing["rebuilt"], "results rebuilt after"
+
+    def test_a_run_that_does_not_complete_stops_the_bootstrap(self, owing, supply_dsn):
+        from qa_tools.common import bootstrap, recheck
+
+        owing["outcomes"] = [recheck.Outcome(7, "cp_run_042", False, "it broke")]
+        with pytest.raises(scripted_decisions.ScriptRefused, match="cp_run_042"):
+            bootstrap._confirm_corrections(lambda _m: None)
+        assert not owing["rebuilt"]
+
+    def test_a_run_the_backstop_froze_is_not_a_failure(self, owing, supply_dsn):
+        from qa_tools.common import bootstrap, recheck
+
+        owing["outcomes"] = [recheck.Outcome(7, "cp_run_042", False, "frozen", frozen=True)]
+        bootstrap._confirm_corrections(lambda _m: None)
+        assert owing["rebuilt"]
+
+
+class TestAResumeConfirmsAsABootstrapDoes:
+    """Criterion 19: a resumed bootstrap confirms the due corrections and
+    runs what they owe, inside its own pass lock, before its results."""
+
+    def test_it_confirms(self, monkeypatch):
+        import contextlib
+        from types import SimpleNamespace
+
+        import cli.pipeline
+        from qa_tools.common import (bootstrap, checkpoints, processing_pass,
+                                     replay_inputs)
+
+        order: list[str] = []
+        cp = SimpleNamespace(name="ck", collection_id="child-protection", before=3,
+                             pending_scripts=[], recorded=SimpleNamespace(
+                                 readable=True, arrivals=[SimpleNamespace(run_id="r")]))
+        monkeypatch.setattr(checkpoints, "require_synthetic", lambda: None)
+        monkeypatch.setattr(checkpoints, "find", lambda name: cp)
+        monkeypatch.setattr(checkpoints, "copy_for_resume",
+                            lambda c: "postgresql://u:p@localhost:5432/resumed")
+        monkeypatch.setattr(replay_inputs, "first_affected",
+                            lambda rec: replay_inputs.FirstAffected(4, "changed from 4"))
+        monkeypatch.setattr(cli.pipeline, "generated_collections", lambda: [])
+
+        @contextlib.contextmanager
+        def lock(_name):
+            order.append("lock")
+            yield
+            order.append("unlock")
+        monkeypatch.setattr(processing_pass, "pass_lock", lock)
+        monkeypatch.setattr(bootstrap, "_run_collection", lambda *a, **k: order.append("run"))
+        monkeypatch.setattr(bootstrap, "_confirm_corrections",
+                            lambda say: order.append("confirm"))
+        monkeypatch.setattr(bootstrap, "_rebuild_results", lambda s: order.append("rebuild"))
+        monkeypatch.setattr(bootstrap, "targets_agree", lambda names: ())
+        got = bootstrap.resume("ck")
+        assert got.replayed
+        assert order[:4] == ["lock", "run", "confirm", "unlock"], order

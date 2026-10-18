@@ -195,6 +195,9 @@ class TestStampedWhereTheHistoryEnds:
         from qa_tools.common import bootstrap
 
         monkeypatch.setattr(bootstrap, "_rebuild_results", lambda _short: None)
+        # The fixture's supply has no staged table to re-check (REQ-GEN-205
+        # criterion 8 runs what a confirmation owes; this is about the stamp).
+        monkeypatch.setattr(bootstrap, "_run_what_the_confirmations_owe", lambda say: None)
         monkeypatch.setattr(asset_time, "now", lambda: datetime(2031, 1, 1, tzinfo=PERTH))
         bootstrap._confirm_corrections(say=lambda _m: None)
         at = _applied_at(conn)

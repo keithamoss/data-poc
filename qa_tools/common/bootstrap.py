@@ -337,9 +337,36 @@ def _confirm_corrections(say) -> None:
             with supply_db.connect(label="mothman:bootstrap") as conn:
                 end = correction_replay.history_end(conn)
         done = correction_replay.confirm_due(history_end=end, say=say)
+        if done:
+            _run_what_the_confirmations_owe(say)
     if done:
         for short in _shorts():
             _rebuild_results(short)
+
+
+def _run_what_the_confirmations_owe(say) -> None:
+    """REQ-GEN-205 criterion 8: each moved or placed supply's re-check and
+    gate, and the knock-on re-evaluation of each period a move left or
+    reached, run here - inside the bootstrap's pass lock and under the
+    replay clock - rather than left owed in a history that ends. A run that
+    does not complete stops the bootstrap, as a refused scripted decision
+    does; one the backstop froze stays owed and is not a failure."""
+    from qa_tools.common import recheck
+    from qa_tools.common.scripted_decisions import ScriptRefused
+
+    with supply_db.connect(label="mothman:bootstrap") as conn:
+        n = len([o for o in recheck.owed(conn)
+                 if o.kind in (recheck.RECHECK, recheck.REEVALUATE)])
+    if not n:
+        return
+    say(f"Running the {n} run(s) the confirmed corrections owe - each takes about a minute")
+    outcomes = recheck.run_all_owed(kinds=(recheck.RECHECK, recheck.REEVALUATE))
+    failed = [o for o in outcomes if not o.completed and not o.frozen]
+    if failed:
+        raise ScriptRefused(
+            "The bootstrap stopped: a run the confirmed corrections owe did not complete - "
+            + "; ".join(f"{o.run_key or f'owed item {o.owed_id}'} ({o.message})"
+                        for o in failed))
 
 
 def _record_deliveries() -> None:
@@ -472,6 +499,9 @@ def resume(name: str, sequential: bool = False,
             say(f"Replaying {_label(short)} from arrival {cp.before}")
             _run_collection(short, sequential, record_deliveries=True,
                             start_at=cp.before, player=player)
+            # AS A BOOTSTRAP FROM EMPTY DOES (REQ-GEN-205 criterion 19): the
+            # copy holds every other collection's replay already.
+            _confirm_corrections(say)
         _rebuild_results(short)
         say("Comparing every targeted supply's recorded verdict with what it was built to")
         disagreements = targets_agree([short])
