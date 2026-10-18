@@ -10580,3 +10580,22 @@ twice. It deliberately did not re-find the `TypeError`.
      The product was left alone: forced colour in the real CLI's Actions
      logs is wanted. Local check: `GITHUB_ACTIONS=true uv run pytest` over
      the CLI modules is the cheap way to reproduce a runner before pushing.
+
+241. **[done, 2026-10-19]** **[Testing & dev tooling]** **The on-demand job
+     was still red after #239, on one test.** Run 39145044503 (9d9def0): 19
+     passed and 1 failed - tests/test_a_collection_is_a_small_adapter.py's
+     "nothing is written under the real tree [data]", which found dbt
+     targets under the real `data/dbt_scratch/`.
+     - TEST, FIXED: the equivalence harness redirected the delivery tree,
+       the receipts and the results, but not `supply_db.scratch_dir()`. Its
+       real bootstraps therefore wrote dbt's per-run targets and the
+       staging CSVs under the REAL `data/dbt_scratch/`, and removed them
+       only in teardown. The adapter module runs beside it on the same
+       xdist run and saw them mid-flight. A run of #239's two modules one
+       at a time could not show this. `equiv_support.apply_redirects` now
+       points `scratch_dir` into the corpus, keyed as before. Like every
+       other redirect it is reapplied in each spawned child.
+     - Proved by watching the real tree while the equivalence module ran:
+       40 new files under `data/dbt_scratch/` with the committed harness,
+       none with the fix. Then the whole on-demand set together, as the
+       job runs it: 20 passed.
