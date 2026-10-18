@@ -5624,6 +5624,39 @@ could never have computed it), and it belongs with batch 5's check work.
     same assumption; the alternative is a presentation file per agency folder,
     which would be a change to REQ-DASH-244's criterion 10.
 
+    KEITH'S ANSWERS, 2026-10-18 evening (through the question tool, after
+    the post-build critics on 246, 245, 244 and 252 reported):
+    1. PUSH: hold everything until REQ-PIPE-248 is done - not the finished
+       pieces first. The chain still pushes once, after asking him.
+    2. REQ-TEST-249 c3: ALLOW calendar.yaml and presentation.yaml to differ
+       too, only by the new collection's entries inserted whole. Amend the
+       criterion's text to say so.
+    3. MISSING RESULTS FILE: the dashboard build REFUSES, naming the collection
+       and `mothman dashboard rebuild-results` - reverses REQ-DASH-244's
+       recorded "no file reads as no runs" decision.
+    4. SODA FAILED-ROWS COUNT (post-build-review #226): FOLD INTO REQ-QAC-247,
+       alongside the flag retirements.
+    5. AGENCY SHORTS: rs (registry-services) and cpfs
+       (child-protection-family-support), as proposed.
+    6. REQ-DASH-244 WORDING: correct the title (the agency pill is KEPT) and
+       criterion 14's citation (criteria 12 and 13, not 11 and 12).
+    7. FILING MENU ORDER: hierarchy order at EVERY size, Birth Registrations
+       first - one visible change at two collections.
+    8. CONTRACT TEXT: the contract's RICHER text wins; the four descriptions
+       the dashboard's thinner words replaced are restored, and the page
+       changes with them (a changelog line).
+    9. SEEDS (REQ-GEN-246 c2): keep the declared-schedule check and ADD a test
+       recording the seeds actually drawn in the existing generation tests.
+    10. THIRD-COLLECTION HARDENING: FIX NOW as gate checks and clean refusals,
+        test-first - multi-table target trial, unknown lever set, provider
+        identity and orphan modules, adapter-less or provider-less collection
+        tracebacks, duplicate labels colliding in the TUI.
+    11. 252 POLISH: ONLY "filter on short and names" - the picker filter
+        matches short, id, label, dataset names and agency. Not the Closest
+        ranking, the <short> placeholder or the picker height cap.
+    12. FILING MENU LABELS: use the QA menu's label rule (Birth Registrations,
+        Child Protection), so the same word finds a collection in every menu.
+
 107. **[todo, 2026-10-18]** **[Docs & process]** **Why is there 77,000 lines
     of product code?** Keith, 2026-10-18: "how the fuck do we have 77,000
     lines of product code? That's ridiculous." Measured the same day: 76,720
