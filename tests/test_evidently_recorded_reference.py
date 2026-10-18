@@ -102,7 +102,7 @@ class TestReadingTheRealCommittedHistory:
         from qa_tools.common import qa_results_reader as reader
 
         for run_id in sorted(reader.list_run_ids(self.AGENCY, self.COLLECTION)):
-            if ec.recorded_row_count(self.AGENCY, self.COLLECTION, run_id):
+            if (ec.recorded_row_counts(self.AGENCY, self.COLLECTION, run_id) or {}).get("birth_registrations"):
                 return run_id
         raise AssertionError("the deployment has no run that measured anything")
 
@@ -114,7 +114,7 @@ class TestReadingTheRealCommittedHistory:
 
     def test_a_real_run_has_a_recorded_row_count(self, deployment_history):
         run_id = self._first_measured_run()
-        assert ec.recorded_row_count(self.AGENCY, self.COLLECTION, run_id) > 0
+        assert (ec.recorded_row_counts(self.AGENCY, self.COLLECTION, run_id) or {}).get("birth_registrations") > 0
 
     def test_the_recorded_count_and_distribution_agree(self, deployment_history):
         run_id = self._first_measured_run()
@@ -122,10 +122,10 @@ class TestReadingTheRealCommittedHistory:
         something other than the rows that landed."""
         counts = ec.reference_value_counts(self.AGENCY, self.COLLECTION, run_id, "sex")
         assert sum(c for _, c in counts) == \
-            ec.recorded_row_count(self.AGENCY, self.COLLECTION, run_id)
+            (ec.recorded_row_counts(self.AGENCY, self.COLLECTION, run_id) or {}).get("birth_registrations")
 
     def test_an_unknown_run_reads_as_absent_rather_than_raising(self, deployment_history):
         """Absence is ordinary - a run checked as a trial and never staged
         has no recorded stats, and the caller falls back."""
         assert ec.reference_value_counts(self.AGENCY, self.COLLECTION, "no_such_run", "sex") is None
-        assert ec.recorded_row_count(self.AGENCY, self.COLLECTION, "no_such_run") is None
+        assert ec.recorded_row_counts(self.AGENCY, self.COLLECTION, "no_such_run") is None

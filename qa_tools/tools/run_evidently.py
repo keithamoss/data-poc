@@ -30,7 +30,7 @@ from qa_tools import collections
 from qa_tools.common import asked_for, drift_reference, hierarchy, left_out, supply_db
 from qa_tools.common.evidently_common import (
     ENGINE_TAG, NO_REFERENCE, collection_checks, compute_psi, frame_from_value_counts,
-    recorded_row_count, recorded_row_counts, reference_value_counts, status_for,
+    recorded_row_counts, reference_value_counts, status_for,
 )
 from qa_tools.common.qa_results_writer import run_owner, write_qa_result
 
@@ -109,7 +109,6 @@ def _psi_result(coll, entry, check_id, table, run_id, run_timestamp, reference_r
         "engine": ENGINE_TAG,
         "reference_run_id": reference_run_id,
         "_snapshot": snapshot,
-        "_frame": current,
     }
 
 
@@ -180,40 +179,6 @@ def _volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id) -> 
     return out
 
 
-def _row_count_of(df) -> tuple[int, dict]:
-    """Evidently's own RowCount metric over a frame already in hand."""
-    from evidently import Report
-    from evidently.metrics import RowCount
-
-    snapshot = Report(metrics=[RowCount()]).run(df, None)
-    result = snapshot.dict()
-    return int(result["metrics"][0]["value"]), result
-
-
-def _volume_from_drift_frame(coll, checks, psi, run_id, run_timestamp, reference_run_id,
-                             raw_output) -> list[dict]:
-    """LEGACY `evidently.volume_from_drift_frame`: the one volume check
-    counted by Evidently's RowCount over the drift frame already read, its
-    snapshot kept in the raw output, a reference with no recorded count
-    counted from its rows, and a reference of zero rows read as no drop."""
-    [(table, check_id)] = checks.row_drop.items()
-    if table != _table_of(checks.psi):
-        raise ValueError(f"{coll.id}: evidently.volume_from_drift_frame needs the volume check "
-                         f"on the drift check's own table, not {table!r}")
-    entry = checks.checks[check_id]
-    current, raw_output["row_count"] = _row_count_of(psi["_frame"])
-    if reference_run_id is None:
-        rate_drop, status = None, NO_REFERENCE
-    else:
-        before = recorded_row_count(coll.agency_id, coll.id, reference_run_id)
-        if before is None:
-            before = _row_count_of(_current_frame(reference_run_id, table, psi["column_name"]))[0]
-        rate_drop = (before - current) / before if before else 0.0
-        status = status_for(rate_drop, entry)
-    return [_volume_result(coll, entry, check_id, table, entry["column"], run_id, run_timestamp,
-                           reference_run_id, current, rate_drop, status)]
-
-
 def _psi_applies(run_id: str, table: str) -> bool:
     """ONLY A RUN THAT CAN READ the drift check's table (2026-10-02), and only
     one that is FOR that table where the run names one: the check is about
@@ -234,7 +199,6 @@ def _unreadable(run_id: str, table: str) -> bool:
 def evaluate(collection_id: str, run_id: str, run_timestamp: str,
              reference_run_id: str | None = None, assessment=None) -> list[dict]:
     coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
     checks = collection_checks(coll.id)
     psi_entry, psi_table = checks.checks[checks.psi], _table_of(checks.psi)
 
@@ -244,13 +208,7 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
         results.append(_psi_result(coll, psi_entry, checks.psi, psi_table, run_id,
                                    run_timestamp, reference_run_id))
     raw_output = {"psi": results[0].pop("_snapshot") if results else None}
-    if "evidently.volume_from_drift_frame" in adapter.legacy:
-        results.extend(_volume_from_drift_frame(coll, checks, results[0], run_id, run_timestamp,
-                                                reference_run_id, raw_output))
-    else:
-        results.extend(_volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id))
-    for r in results:
-        r.pop("_frame", None)
+    results.extend(_volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id))
     evaluated = {r["check_id"] for r in results}
     left_out.note(run_id, "evidently", [
         c for c in (checks.psi, *checks.row_drop.values())

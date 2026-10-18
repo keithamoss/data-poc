@@ -90,12 +90,10 @@ def status_for(value: float, entry: dict) -> str:
 
 
 def recorded_row_counts(agency: str, collection: str, run_id: str) -> dict | None:
-    """One run's recorded per-table row counts, or None.
-
-    The plural counterpart to recorded_row_count(): Child Protection's
-    dataset_stats records `row_counts` per table, where Birth
-    Registrations, being one table, records a single `row_count`.
-    """
+    """One run's recorded per-table row counts, or None - measured from the
+    warehouse when that run was checked, never from the generator's own
+    bookkeeping. Every collection records `row_counts` by table since
+    REQ-PIPE-248 (Birth Registrations recorded one `row_count`)."""
     stats = recorded_stats(agency, collection, run_id)
     if not stats:
         return None
@@ -173,13 +171,6 @@ def reference_value_counts(agency: str, collection: str, run_id: str,
     if not stats:
         return None
     return (stats.get("value_counts") or {}).get(column)
-
-
-def recorded_row_count(agency: str, collection: str, run_id: str) -> int | None:
-    """One run's recorded row count - measured from the warehouse when
-    that run was checked, never from the generator's own bookkeeping."""
-    stats = recorded_stats(agency, collection, run_id)
-    return None if not stats else stats.get("row_count")
 
 
 def frame_from_value_counts(value_counts, column: str):

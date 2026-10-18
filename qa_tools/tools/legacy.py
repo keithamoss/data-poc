@@ -15,12 +15,6 @@ from __future__ import annotations
 
 #: name -> what it preserves.
 KNOWN: dict[str, str] = {
-    "evidently.volume_from_drift_frame": (
-        "the one volume check is counted by Evidently's RowCount over the drift "
-        "frame, with that snapshot kept in the raw output as `row_count`; a reference "
-        "with no recorded count is counted from its rows; a reference of zero rows "
-        "reads as no drop; and the result sits on the check's own column rather than "
-        "the table - Birth Registrations' single-table copy."),
     "stage.stamps_run_columns": (
         "every staged row is stamped with `run_id` and `run_date` columns, which "
         "Birth Registrations' dbt model selects and Child Protection's tables have "

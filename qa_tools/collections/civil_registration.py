@@ -106,7 +106,6 @@ ADAPTER = CollectionAdapter(
     ),
     claim_window_dataset="birth-registrations",
     legacy=frozenset({
-        "evidently.volume_from_drift_frame",
         "stage.stamps_run_columns",
         "stats.rows_by_run_id",
         "stats.arrival_after_registration",

@@ -655,9 +655,7 @@ class TestTheSharedToolModules:
         monkeypatch.setattr(ev, "_unreadable", lambda run_id, table: not readable)
         monkeypatch.setattr(ev, "_current_frame", lambda *a: pd.DataFrame({"kind": ["a", "b", "a"]}))
         monkeypatch.setattr(ev, "_current_row_counts", lambda run_id, tables: {FAKE_TABLE: 90})
-        monkeypatch.setattr(ev, "_row_count_of", lambda df: (len(df), {"rows": len(df)}))
         monkeypatch.setattr(ev, "recorded_row_counts", lambda *a: {FAKE_TABLE: 100})
-        monkeypatch.setattr(ev, "recorded_row_count", lambda *a: 100)
         monkeypatch.setattr(ev, "_reference_frame", lambda *a: pd.DataFrame({"kind": ["a", "b", "b"]}))
         monkeypatch.setattr(ev, "compute_psi", lambda current, reference, column: (0.05, {"psi": 0.05}))
         monkeypatch.setattr(ev.drift_reference, "judge", lambda results, assessment: None)
@@ -675,15 +673,6 @@ class TestTheSharedToolModules:
         assert (volume["column_name"], volume["metric_value"], volume["row_count_total"]) == \
             ("(table)", 10.0, 90)
         assert set(raw) == {"psi"} and notes == []
-
-    def test_evidently_volume_from_drift_frame_keeps_the_single_table_count(
-            self, third_collection, monkeypatch):
-        got, raw, _ = self._evidently(
-            monkeypatch, legacy=frozenset({"evidently.volume_from_drift_frame"}))
-        volume = got["evidently:row_count_growth"]
-        assert (volume["column_name"], volume["row_count_total"], volume["metric_value"]) == \
-            ("fake_id", 3, 97.0)
-        assert raw["row_count"] == {"rows": 3}
 
     def test_the_drift_check_over_an_unreadable_table_is_left_out_and_noted(
             self, third_collection, monkeypatch):

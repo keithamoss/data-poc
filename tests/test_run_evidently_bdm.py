@@ -49,6 +49,15 @@ def _patch(monkeypatch, bdm_delivery_dirs):
     monkeypatch.setattr(delivery, "DELIVERIES_DIR", deliveries)
     monkeypatch.setattr(delivery, "RECEIPTS_DIR", receipts)
     monkeypatch.setattr(run_evidently, "write_qa_result", lambda *a, **k: None)
+    # THE REFERENCE'S RECORDED ROW COUNT, as dataset_stats records it when
+    # that run is checked: these fixtures stage the reference without
+    # checking it, so nothing recorded one. Birth Registrations' old volume
+    # path recounted the reference's rows itself and hid that; the shared
+    # per-table path reads the record, as every real run's does
+    # (REQ-PIPE-248).
+    monkeypatch.setattr(run_evidently, "recorded_row_counts",
+                        lambda agency, collection, run_id: run_evidently._current_row_counts(
+                            run_id, _CHECKS.row_drop))
 
 
 def _run(monkeypatch, bdm_delivery_dirs, run_id, run_timestamp, **kw):
