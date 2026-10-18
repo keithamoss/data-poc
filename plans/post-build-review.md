@@ -10486,3 +10486,17 @@ twice. It deliberately did not re-find the `TypeError`.
        test helpers, and one test that duplicated its neighbour's column
        assertion deleted. Left: `entry_for`'s now-unused `collection_id`
        parameter, kept so the four step functions keep one signature.
+
+237. **[done, 2026-10-18]** **[Pipeline & publishing]** **REQ-PIPE-248's agency
+     shorts failed the schedule gate.** Criterion 7 added `short:` to each
+     agency in contract/data-asset.yaml, and the collections gate checks it, but
+     the strict configuration schema (`qa_tools/common/schemas.py`'s
+     AgencyConfig) did not know the key, so `mothman schedule validate` - and
+     every test of the real configuration - refused it as an unknown key. Not
+     caught at 248's commits because only `mothman check --docs` and named test
+     modules ran there; caught by Emergency Department's fast test half in its
+     worktree, before the push's full gate. FIXED: `short` is a required field
+     of AgencyConfig, as it is of CollectionConfig. The failing test was the
+     existing tests/test_validate_schedule.py
+     test_the_committed_configuration_is_valid (red before, green after, with
+     the schedule family's 390 tests).

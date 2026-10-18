@@ -601,6 +601,11 @@ class CollectionConfig(_Strict):
 class AgencyConfig(_Strict):
     id: NonEmptyStr
     name: NonEmptyStr
+    #: The agency's short name, which names its collections' report files
+    #: (REQ-PIPE-248 criterion 7). Required, as a collection's is: the
+    #: registry reads every collection's file names through it, and the
+    #: collections gate checks its uniqueness and shape.
+    short: NonEmptyStr
     collections: list[CollectionConfig] = Field(min_length=1)
 
 
