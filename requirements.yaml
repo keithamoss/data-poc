@@ -37725,6 +37725,9 @@ requirements:
     open_questions: []
   - id: REQ-GHUB-258
     title: Links to the dashboard are built from a configured address, not a hardcoded github.io URL
+    signed_off:
+      by: Keith
+      date: '2026-10-18'
     date_written: '2026-10-18'
     story: As a person following a link from a QA ticket, I want it to open the private dashboard, so that
       making the repository private does not leave every ticket pointing at a site that no longer exists.
@@ -37756,11 +37759,10 @@ requirements:
     - SEPARATE FROM THE PUBLISH REQUIREMENT because its user is a different person (whoever follows a ticket,
       not whoever publishes) and it lives in GHUB's code. It must be built before the flip in REQ-DOCS-259,
       or the flip breaks ticket links.
-    open_questions:
-    - EXISTING TICKETS. Any GitHub issue already written carries the github.io link. After the flip those
-      issues are themselves in a private repository and the link is dead. Rewriting old ticket bodies is
-      possible and is proposed as out of scope; say if it should be in.
-
+    - OLD TICKETS STAY AS THEY ARE (Keith, 2026-10-18, at sign-off). Issues written before the flip keep
+      their github.io links; those issues sit in the private repository after the flip and nobody outside
+      it follows them. Rewriting old ticket bodies was proposed as out of scope and Keith confirmed it.
+    open_questions: []
   - id: REQ-TEST-260
     title: Sessions push far less often, CI's measured usage is a command away, and a private repository's
       free allowance decides the flip
