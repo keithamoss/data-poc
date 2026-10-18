@@ -109,6 +109,22 @@ intro: >
   all three.
 
 releases:
+  - date: "2026-10-18"
+    summary: >
+      Every collection's supplies are now run, summarised and rebuilt by
+      one shared set of modules, so adding a collection no longer means
+      copying code.
+    changes:
+      - category: Improved
+        items:
+          - headline: One pipeline for every collection
+            components: ["Pipeline & publishing"]
+            description: >
+              Running a supply's checks, working out its row counts and
+              distributions, and rebuilding its results from recorded history
+              all go through one shared module each, reading what differs from
+              the collection's adapter. The last ten copied modules are gone,
+              and both collections record exactly what they did before.
   - date: "2026-10-16"
     summary: >
       Birth Registrations' history now opens with twelve days when each

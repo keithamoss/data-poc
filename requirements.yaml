@@ -349,7 +349,7 @@ requirements:
         needs Soda Cloud (change-over-time, anomaly) - those parse cleanly, so only
         the kind catches them.'
     implemented_by:
-    - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+    - qa_tools/tools/orchestrate.py::run_pipeline
     - qa_tools/tools/run_dbt.py::evaluate
     - qa_tools/tools/run_soda.py::evaluate
     - qa_tools/tools/run_datacontract.py::evaluate
@@ -415,7 +415,7 @@ requirements:
         needs Soda Cloud (change-over-time, anomaly) - those parse cleanly, so only
         the kind catches them.'
     implemented_by:
-    - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+    - qa_tools/tools/orchestrate.py::run_pipeline
     - qa_tools/tools/run_dbt.py::evaluate
     - qa_tools/tools/run_soda.py::evaluate
     - qa_tools/tools/run_datacontract.py::evaluate
@@ -526,8 +526,7 @@ requirements:
     implemented_by:
       - qa_tools/common/qa_results_writer.py::write_qa_result
       - qa_tools/common/qa_results_reader.py::read_qa_results
-      - qa_tools/bdm/build_results_from_history.py::build_results_from_history
-      - qa_tools/cp/build_results_from_history.py::build_results_from_history
+      - qa_tools/tools/results_history.py::build_results_from_history
 
   - id: REQ-PIPE-005
     title: CI-gated publish, no manual publish path
@@ -1145,8 +1144,7 @@ requirements:
       - qa_tools/common/supply_db.py::record_resolution
       - qa_tools/common/supply_db.py::drop_run_schemas
       - qa_tools/common/supply_db.py::drop_orphan_run_schemas
-      - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
-      - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
+      - qa_tools/tools/orchestrate.py::discard_run_schemas
       - cli/supply.py::tidy_command
       - qa_tools/common/supply_db.py::connect_dbt
       - qa_tools/tools/stage.py::stage_table
@@ -3719,8 +3717,7 @@ requirements:
       - qa_tools/common/qa_results_writer.py::_with_tables_read
       - qa_tools/common/qa_results_reader.py::run_is_complete
       - qa_tools/common/qa_results_reader.py::incomplete_runs
-      - qa_tools/bdm/orchestrate_bdm.py::_run_step
-      - qa_tools/cp/orchestrate_cp.py::_run_step
+      - qa_tools/tools/orchestrate.py::_run_step
       - qa_tools/common/check_lifecycle.py::_table_list
     evidence:
       - >
@@ -4915,8 +4912,7 @@ requirements:
       - qa_tools/common/check_id.py::validate_hierarchy_agreement
       - qa_tools/common/check_id.py::validate_tail_uniqueness
       - qa_tools/common/check_lifecycle.py::migrate_pre_039_check_id
-      - qa_tools/bdm/bdm_common.py::DATASET
-      - qa_tools/cp/cp_common.py::TABLES
+      - qa_tools/collections/__init__.py::by_id
       - contract/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
       - cli/dashboard.py::_validate_hierarchy
@@ -6408,7 +6404,7 @@ requirements:
       - generator/delivery_names.py::delivery_name
       - generator/generate_runs.py::_write_bookkeeping
       - generator/generate_cp_runs.py::_write_bookkeeping
-      - qa_tools/bdm/dataset_stats.py::_arrival_record
+      - qa_tools/tools/dataset_stats.py::arrival_record
       - qa_tools/tools/stage.py::build_all
       - cli/bdm.py::load_manifest
       - cli/cp.py::load_manifest
@@ -7312,9 +7308,8 @@ requirements:
       - qa_tools/common/asset_time.py::now
       - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/asset_time.py::end_of_day
-      - qa_tools/common/asset_time.py::wall_clock
       - qa_tools/common/arrival_classification.py::classify
-      - qa_tools/bdm/dataset_stats.py::_arrival
+      - qa_tools/tools/dataset_stats.py::_earliest_extract
       - contract/data-asset.yaml
       - dashboard/qa-reporting-dashboard.template.html
     evidence:
@@ -7541,7 +7536,6 @@ requirements:
       - qa_tools/common/schedule.py::candidate_dates
       - qa_tools/common/schedule.py::Calendar::version_in_force
       - qa_tools/common/agreement.py::load
-      - qa_tools/common/schedule.py::claim_window
       - cli/schedule.py::show_command
       - cli/schedule.py::candidate_dates_command
       - contract/data-asset.yaml
@@ -11262,8 +11256,7 @@ requirements:
     implemented_by:
       - qa_tools/common/arrival_classification.py::classify
       - qa_tools/common/arrival_classification.py::describe
-      - qa_tools/bdm/dataset_stats.py::_arrival
-      - qa_tools/cp/dataset_stats.py::_arrival
+      - qa_tools/tools/dataset_stats.py::_earliest_extract
     unmet_criteria:
       - criterion: >-
           Criterion 9, in part - recording the classification with the supply
@@ -12568,8 +12561,7 @@ requirements:
       - qa_tools/common/filing.py::supplies_of
       - qa_tools/common/filing.py::filled_slots
       - qa_tools/common/parallel_orchestrate.py::run_manifest
-      - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
-      - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+      - qa_tools/tools/orchestrate.py::run_pipeline
     linked_tests:
       - tests/test_promotion.py::TestPromotionMovesRatherThanCopies
       - tests/test_promotion_step.py::TestAGreenSupplyPromotesItself
@@ -14610,8 +14602,8 @@ requirements:
     - qa_tools/common/decision_log.py::_recorded_at
     - qa_tools/common/decision_log.py::follows
     - qa_tools/common/arrival_lifecycle.py::process_all
-    - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
-    - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
+    - qa_tools/tools/orchestrate.py::run_pipeline
+    - qa_tools/tools/orchestrate.py::run_pipeline
     - dashboard/qa-reporting-dashboard.template.html::decisionsChangingDate
     - dashboard/qa-reporting-dashboard.template.html::changedSinceNote
     linked_tests:
@@ -17288,8 +17280,8 @@ requirements:
     - cli/bdm.py::run_check_s3
     - qa_tools/common/trial.py::require_trial
     - qa_tools/common/trial.py::NotATrial
-    - qa_tools/bdm/orchestrate_bdm.py::run_single
-    - qa_tools/cp/orchestrate_cp.py::run_single
+    - qa_tools/tools/orchestrate.py::run_single_file
+    - qa_tools/tools/orchestrate.py::run_single
     linked_tests:
     - tests/test_terminal_routes.py::TestAReferenceIsATrialsOnly
     - tests/test_terminal_routes.py::TestAKeptFolderIsWhateverRecognitionPlaces
@@ -21317,7 +21309,7 @@ requirements:
       - generator/generate_cp_runs.py::main
       - generator/generate_runs.py::main
       - qa_tools/common/supply_db.py::_bounded
-      - qa_tools/bdm/orchestrate_bdm.py::run_single
+      - qa_tools/tools/orchestrate.py::run_single_file
       - cli/bdm.py::run_check_local_file
     evidence:
       - >
@@ -21608,8 +21600,8 @@ requirements:
     - cli/bdm.py::run_check_local_file
     - cli/cp.py::run_check_local_folder
     - cli/cp.py::run_check_single_table
-    - qa_tools/bdm/orchestrate_bdm.py::_discard_this_runs_schemas
-    - qa_tools/cp/orchestrate_cp.py::_discard_this_runs_schemas
+    - qa_tools/tools/orchestrate.py::discard_run_schemas
+    - qa_tools/tools/orchestrate.py::discard_run_schemas
     - qa_tools/tools/stage.py::stage_table
     - qa_tools/tools/stage.py::stage_table
     - qa_tools/common/delivery_log.py::_stated_instant
@@ -22007,10 +21999,10 @@ requirements:
       - qa_tools/common/arrivals.py::arrivals_for
       - qa_tools/common/delivery.py::write_delivery
       - qa_tools/common/period_overlay.py::build
-      - qa_tools/cp/orchestrate_cp.py::file_and_overlay
+      - qa_tools/tools/orchestrate.py::file_and_overlay
       - qa_tools/common/qa_results_reader.py::RESULT_TOOLS
       - pipeline/build_cp_dashboard_data.py::_not_evaluated_reason
-      - qa_tools/cp/orchestrate_cp.py::simultaneous_with
+      - qa_tools/tools/orchestrate.py::simultaneous_with
       - qa_tools/common/qa_results_writer.py::_scope_to_run
       - qa_tools/common/unrunnable.py::results_for
     evidence:
@@ -27882,12 +27874,12 @@ requirements:
     - qa_tools/common/unrunnable.py::results_for
     - qa_tools/common/soda_common.py::left_out_checks
     - qa_tools/tools/run_dbt.py::evaluate
-    - qa_tools/cp/orchestrate_cp.py::_run_one_inner
-    - qa_tools/bdm/orchestrate_bdm.py::_run_one_inner
+    - qa_tools/tools/orchestrate.py::_run_one_inner
+    - qa_tools/tools/orchestrate.py::_run_one_inner
     - dashboard/qa-reporting-dashboard.template.html::blockerOpenInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::rollup
     - dashboard/qa-reporting-dashboard.template.html::blockerHistoryRows
-    - qa_tools/cp/orchestrate_cp.py::_reconciles
+    - qa_tools/tools/orchestrate.py::_reconciles
     - qa_tools/common/unrunnable.py::results_for_trial
     - qa_tools/common/left_out.py::peek
     - qa_tools/common/held_blast_radius.py::results_for
@@ -28145,8 +28137,7 @@ requirements:
       - qa_tools/common/bootstrap.py::_run_concurrently
       - qa_tools/common/parallel_orchestrate.py::beside
       - qa_tools/common/delivery_log.py::record_all
-      - qa_tools/cp/orchestrate_cp.py::run_pipeline_cp
-      - qa_tools/bdm/orchestrate_bdm.py::run_pipeline
+      - qa_tools/tools/orchestrate.py::run_pipeline
     evidence:
       - >
         2026-10-03: tests/test_bootstrap.py (both collections dispatched
@@ -32629,8 +32620,8 @@ requirements:
     - generator/generate_runs.py::_plan_injections
     - generator/generate_cp_runs.py::_ordinary_severities
     - qa_tools/common/promotion.py::effective_at_for
-    - qa_tools/bdm/orchestrate_bdm.py::_claim_window
-    - qa_tools/cp/orchestrate_cp.py::_claim_window
+    - qa_tools/tools/orchestrate.py::_claim_window
+    - qa_tools/tools/orchestrate.py::_claim_window
     - contract/scripted_decisions.yaml
     evidence:
     - '2026-10-11: tests/test_generate_to_target.py''s lead-in tests - a targeted anchor claims two lead-in periods by default and the period after (c1, c3), configurable per injection (c1), none for an untargeted one; a lead-in before the history refuses; another scenario''s anchor or a suppressed day on a lead-in or the period after fails naming both (c5). Through the real generator: each lead-in and the period after is one green supply, received inside its due time and grace (tests/test_generate_runs.py, failing before #156''s fix), with every twin matched and no other period''s arrival on it (c1); the targeted supply and its churned green resend are exactly the last lead-in''s size, and so is the period after (c2, c3, c4). tests/test_promotion_waits_for_next_receipt.py: a replayed decision lands within the claim window, both orchestrators passing it. All decided from the placement and configuration alone - nothing reads the decision log or the database to place anything (c6, by construction).'
@@ -32807,11 +32798,10 @@ requirements:
       - qa_tools/common/asked_for.py::ask
       - qa_tools/common/asked_for.py::check_nothing_missing
       - qa_tools/common/qa_store.py::record_asked
-      - qa_tools/cp/orchestrate_cp.py::_run_one_inner
-      - qa_tools/bdm/orchestrate_bdm.py::_run_one_inner
+      - qa_tools/tools/orchestrate.py::_run_one_inner
       - qa_tools/common/knock_on.py::complete
       - qa_tools/common/recheck.py::_run_claimed
-      - qa_tools/cp/orchestrate_cp.py::_excusing_unreadable
+      - qa_tools/tools/orchestrate.py::_excusing_unreadable
       - qa_tools/common/qa_store.py::asked_for_run
     evidence:
       - "2026-10-12: tests/test_asked_for.py - the asked-for set comes from scope_of_run (c1), the whole collection for a run naming no table (c4), a missing in-scope check refuses naming check and tool (c6), one row per run, tool and check in qa.asked_check at schema 38, removed with its run (c8, c9), and Birth Registrations through all four real tools records what it was asked and refuses a dropped check (c10)."
@@ -36883,7 +36873,7 @@ requirements:
     date_written: "2026-10-15"
     story: "As someone adding a collection, I want the run orchestration, the dataset statistics and the rebuild of results from recorded history shared, so that a new collection's supplies are run, summarised and rebuilt without more copied modules."
     moscow: must
-    status: not_started
+    status: built
     source: "Keith, plans/publishing-and-history.md item 6 (2026-10-15 night); groundwork.md sections 1 and 4; main session position.md calls 1, 2, 12, 19 and 27. Drafted by delivery-scoper 2026-10-15, revised rounds 2 and 3/4; a PROPOSAL, not signed."
     acceptance_criteria:
       - "THE SYSTEM SHALL run every collection's single runs and batch pipeline through one shared orchestrator, compute every collection's dataset statistics through one shared module reading the adapter's .stats, and rebuild every collection's results from recorded history through one shared module."
@@ -36908,7 +36898,74 @@ requirements:
       - "THE claim-window FALLBACK silently defaults to a Child Protection dataset; a third collection would claim under cp-clients' window."
       - "THE SHAPE LEGACY FLAGS HERE ARE RETIRED BY REQ-PIPE-248: they change formats, not verdicts."
       - "REQ-GEN-246 LANDS STRAIGHT AFTER THIS ONE (main session's round-5 call 30, P2): its 'before' is this requirement's kept 'after', so the chain needs no extra full capture; REQ-DASH-244 and REQ-TEST-245 follow REQ-GEN-246."
+      - "ONE ORCHESTRATOR BUILT FROM CHILD PROTECTION'S COPY, Birth Registrations' differences as legacy flags (2026-10-17): the CP copy already handled many tables, siblings read from a period and an unreadable own table; BDM's single-table copy differed in nine places, each now a named flag in qa_tools/tools/legacy.py declared on its adapter - stats.single_table_shape, stats.rows_by_run_id, stats.zero_counts_kept, stats.arrival_after_registration, results.single_dataset_header, results.every_recorded_run, orchestrate.single_table_guard, orchestrate.files_one_arrival, orchestrate.entry_carries_csv_path - so criterion 7's byte-identical comparison could hold without a second code path."
+      - "WHAT A COLLECTION MEASURES IS ITS ADAPTER'S `.stats` (StatsSpec: aggregates keyed by (table, column), value_counts keyed the same), read by one compute_dataset_stats(collection_id, conn, entry); the dashboard builds read the same spec rather than their own copy of the aggregate list. REJECTED: keeping the aggregate dicts in pipeline/build_*_dashboard_data.py as well, which is the duplication this requirement removes."
+      - "THE CLAIM WINDOW IS THE SHORTEST OF THE DATASETS THE ARRIVAL CARRIES, else the adapter's `claim_window_dataset`, else none (criterion 2): the old CP `_claim_window` defaulted to cp-clients, which a third collection would have borrowed. Tested with the fake collection, whose adapter names none and gets None."
+      - "A COLLECTION WITH NO ADAPTER IS REFUSED BEFORE ANY STEP RUNS: orchestrate.steps() resolves the adapter eagerly and recheck.execute() resolves it before the period overlay, so REQ-PIPE-240 criterion 6's refusal-by-name survived the move from per-collection modules to lambdas (two third-collection tests went red when it did not)."
+      - "THE RESULTS FILE IS `<ROOT>/reports/<adapter.results_json>`, written by one results_history.write_results_file(); tests redirect it by patching results_history.ROOT rather than a per-module RESULTS_PATH, which is also how the equivalence harness redirects a capture's outputs."
+      - "THE `_provenance` STRINGS IN THE DASHBOARD JSON STILL NAME qa_tools/bdm/orchestrate_bdm.py AND qa_tools/cp/orchestrate_cp.py, deliberately: they are inside S5 and criterion 7 holds that surface byte-identical, so the rename rides REQ-DASH-244 (one dashboard-data build), which rebuilds that JSON anyway."
+      - "run_single() IS FOR AN ALREADY-STAGED ENTRY (Child Protection's shape) and run_single_file() stages one file and runs it (Birth Registrations' shape); both are trials only, as before. The test-only helper that redirects a rebuild (tests/rebuild_support.py) is parametrised over collection ids, not module names."
+      - "TESTS THAT ASSERTED ON BOTH ORCHESTRATORS' SOURCE (AST walks for the lifecycle, the reconciler, the overlap) now assert on the one shared module; tests that asserted on behaviour per collection are parametrised over collection ids and still run for both."
     open_questions: []
+    evidence:
+      - "2026-10-18, CRITERIA 1, 4, 6 AND 8: qa_tools/bdm/ and qa_tools/cp/ are deleted whole (ten modules), every caller - the bootstrap, the processing pass, re-checks, the dashboard rebuild, `mothman pipeline run`, `mothman bdm qa`, `mothman cp qa`, cli/common.py's RUN_STEPS - reaches qa_tools/tools/orchestrate.py, dataset_stats.py and results_history.py by collection id, and the five migration-allowlist entries those modules carried are removed; `mothman check --only collections` passes. The adapters lost the orchestrator and results-rebuild pointers and their orchestrator_module()/run_pipeline()/rebuild_results() methods."
+      - "2026-10-18, CRITERION 8's THIRD-COLLECTION TESTS: tests/test_collections_registry.py::TestAThirdCollectionAtEverySite (processing pass, re-check and bootstrap each reach the shared orchestrator under the fake collection's id, and a collection with no adapter is refused by name before any step) and ::TestTheSharedOrchestratorStatsAndRebuild (dataset stats count the fake table from the registry, the rebuild writes results_fk.json with the collection header, and the claim window is None where the adapter names no dataset): 74 passed on this tree."
+      - "2026-10-18, CRITERION 2: _claim_window() takes the shortest window of the datasets the arrival carries, else the adapter's claim_window_dataset, else None - the fake collection gets None and Child Protection still gets cp-clients'; _AGGREGATES in both dashboard builds and compute_dataset_stats() read the adapter's .stats."
+      - "2026-10-18, CRITERION 3: Birth Registrations' single-table stats shape (row_count, column-keyed aggregates, zeros kept) and single-dataset results header are behind stats.single_table_shape, stats.zero_counts_kept and results.single_dataset_header on its adapter; the shared compute_dataset_stats() was compared equal to both deleted modules on every fixture run (BDM dirty and reference; CP placements and notifications, dirty and reference) and the shared rebuild equal to both deleted rebuilds (8,880 and 12,317 results, generated_at aside) before the old modules went."
+      - "2026-10-18, CRITERION 5: every module under qa_tools/collections/ imports only dataclasses, typing, yaml-free registry code and qa_tools.common.hierarchy - no QA tool library; `uv run python -c 'import qa_tools.collections.civil_registration, qa_tools.collections.child_protection'` loads with no dbt, soda, datacontract or evidently module in sys.modules."
+      - "2026-10-18, DOCS NFR: CLAUDE.md's layout table, README.md's qa_tools/ tree and docs/components.md name qa_tools/tools/orchestrate.py, dataset_stats.py and results_history.py and no longer name the deleted packages, except where a sentence is explicitly history."
+    linked_tests:
+      - "tests/test_collections_registry.py::TestAThirdCollectionAtEverySite"
+      - "tests/test_collections_registry.py::TestTheSharedOrchestratorStatsAndRebuild"
+      - "tests/test_dataset_stats.py"
+      - "tests/test_build_results_from_history.py"
+      - "tests/test_orchestrate_single_run.py"
+      - "tests/test_orchestrate_reference_run.py"
+      - "tests/test_arrival_lifecycle.py"
+      - "tests/test_promotion_waits_for_next_receipt.py"
+      - "tests/test_promotion_actor.py"
+      - "tests/test_filing_before_checks.py"
+      - "tests/test_ticket_reconciler.py::TestTheReconcilerIsInvokedAfterEveryRun"
+      - "tests/test_run_single_is_for_trials.py"
+      - "tests/test_run_schema_lifecycle.py"
+      - "tests/test_cli_pipeline.py"
+      - "tests/test_cli_dashboard.py"
+      - "tests/test_bootstrap.py"
+      - "tests/test_processing_pass.py::TestTheLocks"
+      - "tests/test_recheck.py"
+      - "tests/test_cross_table_scope.py"
+      - "tests/test_atomic_file.py"
+      - "tests/test_readers_read_no_supply_rows.py"
+      - "tests/test_unreadable_own_table.py"
+    implemented_by:
+      - "qa_tools/tools/orchestrate.py::run_one"
+      - "qa_tools/tools/orchestrate.py::run_single"
+      - "qa_tools/tools/orchestrate.py::run_single_file"
+      - "qa_tools/tools/orchestrate.py::run_arrivals"
+      - "qa_tools/tools/orchestrate.py::run_pipeline"
+      - "qa_tools/tools/orchestrate.py::steps"
+      - "qa_tools/tools/orchestrate.py::file_and_overlay"
+      - "qa_tools/tools/orchestrate.py::promote_after"
+      - "qa_tools/tools/orchestrate.py::_claim_window"
+      - "qa_tools/tools/orchestrate.py::discard_run_schemas"
+      - "qa_tools/tools/dataset_stats.py::compute_dataset_stats"
+      - "qa_tools/tools/dataset_stats.py::arrival_record"
+      - "qa_tools/tools/results_history.py::build_results_from_history"
+      - "qa_tools/tools/results_history.py::write_results_file"
+      - "qa_tools/tools/results_history.py::results_path"
+      - "qa_tools/tools/legacy.py::KNOWN"
+      - "qa_tools/collections/base.py::StatsSpec"
+      - "qa_tools/collections/base.py::CollectionAdapter"
+      - "qa_tools/common/bootstrap.py::_run_collection"
+      - "qa_tools/common/processing_pass.py::_steps"
+      - "qa_tools/common/recheck.py::execute"
+      - "cli/dashboard.py::_rebuild_results"
+      - "cli/pipeline.py::_run_bdm"
+      - "cli/pipeline.py::_run_cp"
+      - "cli/bdm.py::_run_single_preserving_manifest"
+      - "pipeline/build_dashboard_data.py::_AGGREGATES"
+      - "pipeline/build_cp_dashboard_data.py::_AGGREGATES"
+      - "qa_tools/common/validate_collections.py::ALLOWLIST"
 
   - id: REQ-DASH-244
     title: "The dashboard is built for every collection by one Python builder and rendered from one COLLECTION_DATA const, with a dataset's GitHub link opening its contract and the agency pill removed"
