@@ -648,14 +648,10 @@ class TestTheSharedToolModules:
             ("fake_id", 3, 97.0)
         assert raw["row_count"] == {"rows": 3}
 
-    @pytest.mark.parametrize("legacy,evaluated,noted", [
-        (frozenset(), False, True),
-        (frozenset({"evidently.reads_unreadable_tables"}), True, False),
-    ])
-    def test_evidently_reads_unreadable_tables_always_runs_the_drift_check(
-            self, third_collection, monkeypatch, legacy, evaluated, noted):
-        got, _, notes = self._evidently(monkeypatch, legacy=legacy, readable=False)
-        assert ("drift:PSI" in got, bool(notes)) == (evaluated, noted)
+    def test_the_drift_check_over_an_unreadable_table_is_left_out_and_noted(
+            self, third_collection, monkeypatch):
+        got, _, notes = self._evidently(monkeypatch, readable=False)
+        assert ("drift:PSI" in got, bool(notes)) == (False, True)
 
     def _dbt(self, monkeypatch, tmp_path, legacy=frozenset(), status="pass", built=True,
              unreadable=frozenset(), asked=(), ran=True):

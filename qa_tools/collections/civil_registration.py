@@ -127,7 +127,6 @@ ADAPTER = CollectionAdapter(
     legacy=frozenset({
         "soda.scope_suffix",
         "soda.named_check_value_is_invalid_count",
-        "evidently.reads_unreadable_tables",
         "evidently.volume_from_drift_frame",
         "dbt.no_built_model_guard",
         "dbt.audits_skipped_tests",

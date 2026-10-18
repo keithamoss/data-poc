@@ -237,11 +237,10 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
     adapter = collections.adapter(coll)
     checks = collection_checks(coll.id)
     psi_entry, psi_table = checks.checks[checks.psi], _table_of(checks.psi)
-    reads_unreadable = "evidently.reads_unreadable_tables" in adapter.legacy
 
     asked_for.ask(run_id, run_timestamp, coll.agency_id, coll.id, "evidently")
     results = []
-    if reads_unreadable or _psi_applies(run_id, psi_table):
+    if _psi_applies(run_id, psi_table):
         results.append(_psi_result(coll, psi_entry, checks.psi, psi_table, run_id,
                                    run_timestamp, reference_run_id))
     raw_output = {"psi": results[0].pop("_snapshot") if results else None}
@@ -252,11 +251,10 @@ def evaluate(collection_id: str, run_id: str, run_timestamp: str,
         results.extend(_volume_per_table(coll, checks, run_id, run_timestamp, reference_run_id))
     for r in results:
         r.pop("_frame", None)
-    if not reads_unreadable:
-        evaluated = {r["check_id"] for r in results}
-        left_out.note(run_id, "evidently", [
-            c for c in (checks.psi, *checks.row_drop.values())
-            if c not in evaluated and _unreadable(run_id, _table_of(c))])
+    evaluated = {r["check_id"] for r in results}
+    left_out.note(run_id, "evidently", [
+        c for c in (checks.psi, *checks.row_drop.values())
+        if c not in evaluated and _unreadable(run_id, _table_of(c))])
 
     drift_reference.judge(results, assessment)
     write_qa_result(coll.agency_id, coll.id, run_id, run_timestamp, "evidently",
