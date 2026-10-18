@@ -1,8 +1,8 @@
 """
 Captures "who ran this" for the changelog/activity-feed feature
 (plans/publishing-and-history.md Phase 3's remaining item, 2026-09-16) -
-the local git identity of whoever is running orchestrate_bdm.py/
-orchestrate_cp.py, read once per invocation and stamped into that run's
+the local git identity of whoever is running the pipeline
+(qa_tools/tools/orchestrate.py), read once per invocation and stamped into that run's
 committed qa_results/ as `run_by` (qa_results_writer.py).
 
 Email, not name: `git config user.email` is required to make any git
@@ -55,7 +55,7 @@ import subprocess
 
 class MissingGitIdentityError(Exception):
     """Raised when `git config user.email` isn't set (or is empty) -
-    orchestrate_bdm.py/orchestrate_cp.py must fail before running any
+    qa_tools/tools/orchestrate.py must fail before running any
     real tool, not partway through, so nothing gets committed under a
     missing/guessed identity."""
 

@@ -3,7 +3,7 @@
 Synthetic and Local files source modes. Same wizard/flags duality as
 cli/bdm.py, adapted for CP's real differences from Birth Registrations:
 a 6-table-per-run collection (not one CSV), no row-count-growth check
-at all, and orchestrate_cp.run_single() needing all 6
+at all, and orchestrate.run_single() needing all 6
 tables already loaded into that run's warehouse (via
 qa_tools.tools.stage.stage_table()) before it's called at all.
 
@@ -11,7 +11,7 @@ The Local files mode (Phase 2) folds in qa_tools/cp/check_delivery.py's
 own retired standalone-CLI logic verbatim (that module is gone - this is
 now the only place it runs from, per CLAUDE.md's "mothman is the only
 programmatic access point" convention) - same real dbt-core/Soda Core/
-datacontract-cli/Evidently chain via orchestrate_cp.run_single(), just
+datacontract-cli/Evidently chain via orchestrate.run_single(), just
 reached from a browsable questionary.path() prompt or --folder/
 --reference-folder flags instead of a positional folder argument."""
 from __future__ import annotations
@@ -25,7 +25,8 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
-from qa_tools.cp import cp_common, orchestrate_cp
+from qa_tools import collections
+from qa_tools.tools import orchestrate
 from qa_tools.tools import stage
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
@@ -37,9 +38,10 @@ from qa_tools.common.qa_results_reader import list_run_ids
 from . import common, filing_tui
 from qa_tools.common import asset_time
 
-AGENCY_ID = cp_common.AGENCY_ID
-COLLECTION_ID = cp_common.COLLECTION_ID
-TABLES = cp_common.TABLES
+_COLLECTION = collections.by_id("child-protection")
+AGENCY_ID = _COLLECTION.agency_id
+COLLECTION_ID = _COLLECTION.id
+TABLES = [d.table for d in _COLLECTION.datasets]
 CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "child-protection-family-support", "child-protection-contract.yaml")
 
 console = Console()
@@ -229,7 +231,7 @@ def _load_delivery_from_folder(folder: str, run_id: str, received_at=None,
     browsed to)."""
     paths = _six_by_pattern(folder, recorded=recorded)
     for table in TABLES:
-        stage.stage_table(cp_common.COLLECTION_ID, run_id, table, paths[table],
+        stage.stage_table(COLLECTION_ID, run_id, table, paths[table],
                           received_at=received_at)
 
 
@@ -274,7 +276,7 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     a throwaway trial identity otherwise. See cli/bdm.py's run_check() for
     why it no longer writes into a throwaway directory first.
 
-    Unlike BDM, orchestrate_cp.run_single() has no manifest-clobbering
+    Unlike BDM, orchestrate.run_single() has no manifest-clobbering
     side effect to guard against (CP's manifest isn't touched by the
     real tool chain at all) - but it DOES require both this run's and
     the reference run's 6 tables already loaded into their own per-run
@@ -311,8 +313,8 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
         arrival = common.kept_arrival("child-protection", "cp_run_", run_id)
         common.record_delivery_of(arrival)
-        stage.stage_arrival(cp_common.COLLECTION_ID, arrival)
-        return orchestrate_cp.run_arrivals([arrival], run_by, on_step=on_step), run_id
+        stage.stage_arrival(COLLECTION_ID, arrival)
+        return orchestrate.run_arrivals(COLLECTION_ID, [arrival], run_by, on_step=on_step), run_id
     recorded_run_id = trial_mod.trial_run_id()
     entry = {**entry, "run_id": recorded_run_id}
 
@@ -324,20 +326,20 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         _load_delivery(reference_run_id)
     _load_delivery_from_folder(arrival_path(run_id), recorded_run_id, recorded=True)
 
-    results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id, run_by=run_by,
-                                        on_step=on_step)
+    results = orchestrate.run_single(COLLECTION_ID, entry, reference_run_id=reference_run_id,
+                                     run_by=run_by, on_step=on_step)
     return results, recorded_run_id
 
 
 def _check_filed_delivery(filed, run_by: str, on_step=None) -> list[dict]:
     """Stage, file, check and promote every arrival of a filed delivery,
     one at a time in the batch's own order - see
-    orchestrate_cp.run_arrivals(). The arrivals come back from
+    orchestrate.run_arrivals(). The arrivals come back from
     recognition, never from the folder's own listing."""
     found = hand_filing.arrivals_of(filed, "child-protection", "cp_run_")
     for arrival in found:
-        stage.stage_arrival(cp_common.COLLECTION_ID, arrival)
-    return orchestrate_cp.run_arrivals(found, run_by, on_step=on_step)
+        stage.stage_arrival(COLLECTION_ID, arrival)
+    return orchestrate.run_arrivals(COLLECTION_ID, found, run_by, on_step=on_step)
 
 
 def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
@@ -351,7 +353,7 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
     retired logic: loads both folder and reference_folder's 6 real
     tables (an arbitrary, already-downloaded delivery - not tied to any
     Synthetic manifest entry) via _load_delivery_from_folder(), then
-    reuses orchestrate_cp.run_single(), same entry point the Synthetic
+    reuses orchestrate.run_single(), same entry point the Synthetic
     flow above and Thread B's Lambda handler call. Returns (results,
     tmp_results_dir) - same tmp-dir-first Promote pattern as run_check()."""
     run_date = run_date or asset_time.now().date().isoformat()
@@ -421,8 +423,8 @@ def run_check_local_folder(folder: str, reference_folder: str, run_by: str,
                  filed.received_at
                  or asset_time.start_of_day(date.fromisoformat(run_date)))}
     try:
-        results = orchestrate_cp.run_single(entry, reference_run_id=reference_run_id,
-                                            run_by=run_by, on_step=on_step)
+        results = orchestrate.run_single(COLLECTION_ID, entry, reference_run_id=reference_run_id,
+                                         run_by=run_by, on_step=on_step)
     finally:
         common.discard_reference(reference_run_id)
     return results, filed
@@ -535,7 +537,7 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
 
     _load_delivery(other_tables_run_id)  # full 6-table warehouse, doubles as the Evidently reference
 
-    stage.stage_table(cp_common.COLLECTION_ID, run_id, table, file_path,
+    stage.stage_table(COLLECTION_ID, run_id, table, file_path,
                       received_at=filed.received_at)
     # THE OTHER FIVE ARE BORROWED, NEVER RE-STAGED (REQ-PIPE-103). They
     # were staged when they really arrived, in the run this one is
@@ -564,8 +566,8 @@ def run_check_single_table(table: str, file_path: str, run_by: str,
     # beside; the drift reference is which period's supply it is
     # measured against, which the orchestrator now resolves from the
     # records (REQ-QAC-108).
-    results = orchestrate_cp.run_single(entry, reference_run_id=None, run_by=run_by,
-                                        on_step=on_step)
+    results = orchestrate.run_single(COLLECTION_ID, entry, reference_run_id=None, run_by=run_by,
+                                     on_step=on_step)
     return results, filed
 
 
@@ -899,7 +901,7 @@ def generate_synthetic_data_command(yes: bool) -> None:
 @click.option("--s3-reference-delivery", default=None,
               help="S3 mode: a known-good reference delivery prefix to compare distribution drift against. "
                    "A trial's only: a kept supply is measured against the last promoted one.")
-@click.option("--table", type=click.Choice(cp_common.TABLES), default=None,
+@click.option("--table", type=click.Choice(TABLES), default=None,
               help="Single-table mode (plans/tooling.md #1 Phase 3.5): check just this one table (a real "
                    "partial resupply). Kept, it is one arrival, read beside whatever is filed for its period; "
                    "as a trial the other 5 tables come from the last promoted run. "

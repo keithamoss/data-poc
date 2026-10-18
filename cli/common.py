@@ -30,7 +30,7 @@ from questionary import Style
 from qa_tools.common import hand_filing, supply_db, trial
 # Both orchestrators define an identical RUN_STEPS; importing one keeps
 # this helper honest about the real step count rather than hardcoding 5.
-from qa_tools.bdm.orchestrate_bdm import RUN_STEPS
+from qa_tools.tools.orchestrate import RUN_STEPS
 
 # S3 QA source mode (plans/tooling.md #1 Phase 3) - the real raw-data
 # bucket to browse. Env-provided, never hardcoded, since CDK
@@ -352,7 +352,7 @@ class StepCounter:
 def chain_progress(label: str):
     """Context manager for the real check chain's own progress indicator,
     yielding an `on_step` callback to hand to
-    orchestrate_bdm/cp.run_single() (plans/tooling.md #13).
+    orchestrate.run_single() (plans/tooling.md #13).
 
     The chain takes ~13.5s and used to print exactly one line and then
     nothing at all for the whole stretch - a static screen with no sign

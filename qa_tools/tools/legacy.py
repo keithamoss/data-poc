@@ -73,4 +73,13 @@ KNOWN: dict[str, str] = {
     "results.every_recorded_run": (
         "the rebuild from history reads the results of every recorded run, superseded "
         "re-runs included, rather than only each supply's current run's."),
+    "orchestrate.single_table_guard": (
+        "the own-table guard always runs, on the collection's one table, whatever the "
+        "run id names - Child Protection's guards only a run whose id names a table."),
+    "orchestrate.files_one_arrival": (
+        "each arrival is filed on its own, never with the arrivals sharing its receipt "
+        "instant."),
+    "orchestrate.entry_carries_csv_path": (
+        "each run entry, and so the batch's results file, also names the arrival's "
+        "file, or its delivery directory where two files contest the dataset."),
 }

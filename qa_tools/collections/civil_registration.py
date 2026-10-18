@@ -25,9 +25,6 @@ def _sql_list(values: list[str]) -> str:
 ADAPTER = CollectionAdapter(
     collection_id="civil-registration",
     label="Birth Registrations",
-    orchestrator="qa_tools.bdm.orchestrate_bdm",
-    run_pipeline_function="run_pipeline",
-    results_rebuild="qa_tools.bdm.build_results_from_history",
     generator="cli.bdm:generate_synthetic_data",
     target_datasets=("birth-registrations",),
     results_json="results_bdm.json",
@@ -146,5 +143,8 @@ ADAPTER = CollectionAdapter(
         "stats.arrival_after_registration",
         "results.single_dataset_header",
         "results.every_recorded_run",
+        "orchestrate.single_table_guard",
+        "orchestrate.files_one_arrival",
+        "orchestrate.entry_carries_csv_path",
     }),
 )

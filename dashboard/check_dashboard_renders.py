@@ -20,7 +20,7 @@ fallback mechanism (genDataset(), the same illustrative-mock generator
 the other 14 non-real datasets already use) this check verifies.
 
 Doesn't build anything itself - run this after the full rebuild
-(qa_tools.bdm/cp.build_results_from_history, pipeline.
+(qa_tools.tools.results_history, pipeline.
 build_dashboard_data/build_cp_dashboard_data, dashboard.
 embed_dashboard_data) has already produced the file. Needs Playwright's
 Chromium already available (see pyproject.toml's dev dependency group).

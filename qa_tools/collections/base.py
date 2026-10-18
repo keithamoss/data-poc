@@ -89,13 +89,6 @@ class CollectionAdapter:
     #: How the bootstrap names this collection's work when it reports it -
     #: the words it has always used, so nothing it prints changes.
     label: str
-    #: TEMPORARY POINTER (1), removed by REQ-PIPE-243: the collection's own
-    #: orchestrator module, and its whole-history run function.
-    orchestrator: str
-    run_pipeline_function: str
-    #: TEMPORARY POINTER (3), removed by REQ-PIPE-243: the results-from-history
-    #: rebuild.
-    results_rebuild: str
     #: TEMPORARY POINTER (4), removed by REQ-GEN-246: the generator entry point.
     generator: str
     #: TEMPORARY POINTER (5), removed by REQ-GEN-246, which moves it to the
@@ -126,15 +119,6 @@ class CollectionAdapter:
     #: would produce. Every name is in qa_tools/tools/legacy.py, which says
     #: what it preserves; `mothman check` refuses one that is not.
     legacy: frozenset = frozenset()
-
-    def orchestrator_module(self):
-        return importlib.import_module(self.orchestrator)
-
-    def run_pipeline(self, **kwargs):
-        return getattr(self.orchestrator_module(), self.run_pipeline_function)(**kwargs)
-
-    def rebuild_results(self):
-        return _attr(f"{self.results_rebuild}:build_results_from_history")()
 
     def generate(self, *, trial: bool) -> None:
         _attr(self.generator)(trial=trial)

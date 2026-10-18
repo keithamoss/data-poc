@@ -43,9 +43,6 @@ def _sql_list(values: list[str]) -> str:
 ADAPTER = CollectionAdapter(
     collection_id="child-protection",
     label="Child Protection",
-    orchestrator="qa_tools.cp.orchestrate_cp",
-    run_pipeline_function="run_pipeline_cp",
-    results_rebuild="qa_tools.cp.build_results_from_history",
     generator="cli.cp:generate_synthetic_data",
     target_datasets=("cp-clients",),
     results_json="results_cp.json",

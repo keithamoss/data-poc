@@ -1,5 +1,5 @@
 """
-Reshapes reports/results_cp.json (qa_tools/cp/orchestrate_cp.py's
+Reshapes reports/results_cp.json (qa_tools/tools/orchestrate.py's
 output) into the exact JSON shape the QA reporting dashboard's drawer/chart
 code expects - the Child Protection counterpart to build_dashboard_data.py.
 
@@ -36,12 +36,17 @@ from qa_tools.common import turned_off
 from pipeline import owed_nothing, placements
 from qa_tools.common import amber_setting, census, drift_reference
 from qa_tools.common import hierarchy, qa_store
-from qa_tools.cp import cp_common
-from qa_tools.cp.dataset_stats import AGGREGATE_SPEC
+from qa_tools import collections
 from qa_tools.common.validate_check_lifecycle import collect_checks
 from qa_tools.common import agreement
 from qa_tools.common import asset_time
 from pipeline.dashboard_check_labels import rank_for_headline, display_name, dashboard_status, measure, pooled_url_key, tool_ref, url_key
+
+_CP = collections.by_id("child-protection")
+_TABLES = [d.table for d in _CP.datasets]
+# Which checks an aggregate attaches to, by (table, column) - the adapter's
+# .stats, the same table the statistics are computed from (REQ-PIPE-243).
+_AGGREGATES = collections.adapter(_CP).stats.aggregates
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 RESULTS_PATH = os.path.join(ROOT, "reports", "results_cp.json")
@@ -371,7 +376,7 @@ def build_one_table(table: str, results: list[dict], manifest: list[dict], datas
     for col in all_columns:
         logical_type, desc = column_meta[col]
         checks_for_col = by_column.get(col, {})
-        agg_spec = AGGREGATE_SPEC.get((table, col))
+        agg_spec = _AGGREGATES.get((table, col))
 
         checks_out = []
         for slot in checks_for_col.values():
@@ -786,10 +791,10 @@ def build() -> dict:
     lifecycle_by_id = {c.check_id: c for c in collect_checks(None)}
 
     by_table = {t: [r for r in results if r["dataset_id"] == hierarchy.dataset_for_table(t).dataset_id]
-                for t in cp_common.TABLES}
+                for t in _TABLES}
     share_cross_table_results(results, by_table)
     datasets = [build_one_table(t, by_table[t], own_runs(manifest, t), dataset_stats, lifecycle_by_id)
-                for t in cp_common.TABLES]
+                for t in _TABLES]
     return {"datasets": datasets}
 
 

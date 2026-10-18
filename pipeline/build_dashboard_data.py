@@ -1,5 +1,5 @@
 """
-Reshapes reports/results_bdm.json (qa_tools/bdm/orchestrate_bdm.py's real,
+Reshapes reports/results_bdm.json (qa_tools/tools/orchestrate.py's real,
 computed check output - actual dbt-core/Soda Core/datacontract-cli/
 Evidently runs) into the exact JSON shape the QA reporting dashboard's
 drawer/chart code expects for a dataset - the "reskin the same 3-tier
@@ -29,7 +29,7 @@ import json
 import os
 from datetime import datetime
 
-from qa_tools.bdm.dataset_stats import AGGREGATE_SPEC
+from qa_tools import collections
 from qa_tools.common import schedule_ended
 from qa_tools.common import turned_off
 from pipeline import owed_nothing, placements
@@ -43,6 +43,11 @@ from pipeline.dashboard_check_labels import rank_for_headline, display_name, das
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 REAL_RESULTS_PATH = os.path.join(ROOT, "reports", "results_bdm.json")
+
+# Which checks an aggregate attaches to, by column - the same table the
+# statistics are computed from (REQ-PIPE-243: the adapter's .stats).
+_AGGREGATES = {col: spec for (_t, col), spec in
+               collections.adapter(collections.by_id("civil-registration")).stats.aggregates.items()}
 OUT_PATH = os.path.join(ROOT, "reports", "birth_registrations_dashboard.json")
 CONTRACT_PATH = os.path.join(ROOT, "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
@@ -248,7 +253,7 @@ def build() -> dict:
         logical_type, desc = COLUMN_META[col]
         checks_for_col = by_column.get(col, {})
 
-        agg_spec = AGGREGATE_SPEC.get(col)
+        agg_spec = _AGGREGATES.get(col)
 
         checks_out = []
         for slot in checks_for_col.values():

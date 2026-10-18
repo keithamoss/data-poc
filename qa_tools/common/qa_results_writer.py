@@ -396,7 +396,7 @@ def write_qa_result(agency: str, collection: str, run_id: str, run_timestamp: st
     `run_by` (qa_tools/common/git_identity.py's get_run_by(), the local
     git user.email) is the changelog feature's attribution field
     (plans/publishing-and-history.md Phase 3, 2026-09-16) - only
-    orchestrate_bdm.py's/orchestrate_cp.py's own `dataset_stats` write
+    qa_tools/tools/orchestrate.py's own `dataset_stats` write
     passes it, since one value per run is all the changelog needs
     (qa_tools/common/changelog.py reads it from there); the other 8
     run_*.py callers leave it None, same "always present as a key,

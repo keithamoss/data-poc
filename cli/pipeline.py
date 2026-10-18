@@ -32,22 +32,22 @@ console = Console()
 
 def _run_bdm(sequential: bool) -> None:
     from . import bdm
-    from qa_tools.bdm.orchestrate_bdm import run_pipeline
+    from qa_tools.tools import orchestrate
 
     console.print("Generating synthetic data (Birth Registrations)...", style="dim")
     bdm.generate_synthetic_data()
     console.print("Running the real tools against every BDM run...", style="dim")
-    run_pipeline(sequential=sequential)
+    orchestrate.run_pipeline("civil-registration", sequential=sequential)
 
 
 def _run_cp(sequential: bool) -> None:
     from . import cp
-    from qa_tools.cp.orchestrate_cp import run_pipeline_cp
+    from qa_tools.tools import orchestrate
 
     console.print("Generating synthetic data (Child Protection)...", style="dim")
     cp.generate_synthetic_data()
     console.print("Running the real tools against every CP run...", style="dim")
-    run_pipeline_cp(sequential=sequential)
+    orchestrate.run_pipeline("child-protection", sequential=sequential)
 
 
 @click.group("pipeline")

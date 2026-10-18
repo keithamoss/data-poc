@@ -10,7 +10,7 @@ The Local files mode (Phase 2) folds in qa_tools/bdm/check_file.py's own
 retired standalone-CLI logic verbatim (that module is gone - this is now
 the only place it runs from, per CLAUDE.md's "mothman is the only
 programmatic access point" convention) - same real dbt-core/Soda Core/
-datacontract-cli/Evidently chain via orchestrate_bdm.run_single(), just
+datacontract-cli/Evidently chain via orchestrate.run_single_file(), just
 reached from a browsable questionary.path() prompt or --file/
 --reference-file flags instead of a positional CSV argument."""
 from __future__ import annotations
@@ -23,7 +23,8 @@ import rich_click as click
 from rich.console import Console
 from rich.table import Table
 
-from qa_tools.bdm import bdm_common, orchestrate_bdm
+from qa_tools import collections
+from qa_tools.tools import orchestrate
 from qa_tools.tools import stage
 from qa_tools.common import s3_source
 from qa_tools.common.git_identity import get_run_by
@@ -33,8 +34,11 @@ from qa_tools.common import hand_filing
 from . import common, filing_tui
 from qa_tools.common import asset_time
 
-AGENCY_ID = orchestrate_bdm.AGENCY_ID
-COLLECTION_ID = orchestrate_bdm.COLLECTION_ID
+_COLLECTION = collections.by_id("civil-registration")
+AGENCY_ID = _COLLECTION.agency_id
+COLLECTION_ID = _COLLECTION.id
+DATASET_ID = "birth-registrations"
+TABLE = "birth_registrations"
 CONTRACT_PATH = os.path.join(os.path.dirname(__file__), "..", "contract", "registry-services", "bdm-birth-registrations-contract.yaml")
 
 console = Console()
@@ -144,7 +148,7 @@ def try_targets(say=None) -> int:
         raise TargetTrialFailed(f"what the generator built could not be read, so the "
                                 f"deliveries just written were removed: {exc}") from exc
     tried = [b for b in built
-             if b.injected and b.dataset_id == bdm_common.DATASET_ID]
+             if b.injected and b.dataset_id == DATASET_ID]
     found = []
     for built in tried:
         say(f"Trying {built.label} against the real tools (built to {built.target})")
@@ -253,8 +257,8 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
         common.refuse_reference_for_kept(keep, reference_run_id, "--reference-run-id")
         arrival = common.kept_arrival("civil-registration", "run_", run_id)
         common.record_delivery_of(arrival)
-        stage.stage_arrival(orchestrate_bdm.COLLECTION_ID, arrival)
-        return orchestrate_bdm.run_arrivals([arrival], run_by, on_step=on_step), run_id
+        stage.stage_arrival(COLLECTION_ID, arrival)
+        return orchestrate.run_arrivals(COLLECTION_ID, [arrival], run_by, on_step=on_step), run_id
 
     csv_path = entry["csv_path"]
 
@@ -279,8 +283,8 @@ def run_check(run_id: str, run_by: str, reference_run_id: str | None = None,
     return results, recorded_run_id
 
 
-def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
-    """Calls orchestrate_bdm.run_single(*args, **kwargs).
+def _run_single_preserving_manifest(run_id, *args, **kwargs) -> list[dict]:
+    """Calls orchestrate.run_single_file(COLLECTION_ID, run_id, TABLE, *args, **kwargs).
 
     THIS USED TO BACK UP AND RESTORE raw_dir()'s manifest.json around
     the call, because run_single() overwrote it with its own synthetic
@@ -291,10 +295,10 @@ def _run_single_preserving_manifest(*args, **kwargs) -> list[dict]:
     writes no manifest at all now, and the picker recognises arrivals
     from disk instead of reading one. The wrapper is kept as a single
     named seam for the two callers that share it, and because deleting
-    it would spread orchestrate_bdm.run_single() across two more call
+    it would spread orchestrate.run_single_file() across two more call
     sites for no gain.
     """
-    return orchestrate_bdm.run_single(*args, **kwargs)
+    return orchestrate.run_single_file(COLLECTION_ID, run_id, TABLE, *args, **kwargs)
 
 
 def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
@@ -308,7 +312,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     retired logic: stages the reference CSV under a real run_id
     (there's no synthetic manifest[0] to fall back on for a real,
     manually-downloaded file - a real reference is required, not
-    defaulted), then reuses orchestrate_bdm.run_single(), same entry
+    defaulted), then reuses orchestrate.run_single_file(), same entry
     point both the Synthetic flow above and Thread B's Lambda handler
     call.
 
@@ -342,8 +346,8 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
         # Keith, 2026-10-02). --reference-file applies to a trial only.
         found = hand_filing.arrivals_of(filed, "civil-registration", "run_")
         for arrival in found:
-            stage.stage_arrival(orchestrate_bdm.COLLECTION_ID, arrival)
-        return orchestrate_bdm.run_arrivals(found, run_by, on_step=on_step), filed
+            stage.stage_arrival(COLLECTION_ID, arrival)
+        return orchestrate.run_arrivals(COLLECTION_ID, found, run_by, on_step=on_step), filed
     run_id = filed.run_id
     csv_path = filed.paths[0]
     # A KEPT FILE THAT FELL BACK TO A TRIAL (filing refused it) still needs
@@ -359,7 +363,7 @@ def run_check_local_file(csv_path: str, reference_csv: str, run_by: str,
     # this flow that was checked against a file rather than the
     # warehouse. Child Protection's own local-folder mode already
     # staged both sides; this is BDM catching up.
-    stage.stage_table(orchestrate_bdm.COLLECTION_ID, reference_run_id, bdm_common.TABLE,
+    stage.stage_table(COLLECTION_ID, reference_run_id, TABLE,
                       reference_csv, run_date=run_date)
 
     try:

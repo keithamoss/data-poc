@@ -1,7 +1,7 @@
 """
 Generic parallel-or-sequential dispatch across an independent-runs
-manifest, shared by qa_tools/bdm/orchestrate_bdm.py and
-qa_tools/cp/orchestrate_cp.py rather than each reimplementing it -
+manifest, used by qa_tools/tools/orchestrate.py (REQ-PIPE-243; it was
+shared by the two per-collection orchestrators before that) -
 the two scripts' actual per-run tool calls differ (different argument
 shapes, different qa_tools/<dataset>/*.py modules), but "run N
 independent things, collect results in manifest order, abort on first

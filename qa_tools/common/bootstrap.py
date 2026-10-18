@@ -346,8 +346,10 @@ def _run_collection(name: str, sequential: bool, record_deliveries: bool = False
     TOP LEVEL, so a spawned process can import it by name.
     """
     started = time.monotonic()
-    _adapter(name).run_pipeline(sequential=sequential, record_deliveries=record_deliveries,
-                                **replay)
+    from qa_tools.tools import orchestrate
+
+    orchestrate.run_pipeline(_adapter(name).collection_id, sequential=sequential,
+                             record_deliveries=record_deliveries, **replay)
     return time.monotonic() - started
 
 
@@ -484,7 +486,9 @@ def _rebuild_results(short: str) -> None:
     import io
 
     with contextlib.redirect_stdout(io.StringIO()):
-        _adapter(short).rebuild_results()
+        from qa_tools.tools import results_history
+
+        results_history.build_results_from_history(_adapter(short).collection_id)
 
 
 def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:

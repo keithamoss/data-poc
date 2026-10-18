@@ -20,10 +20,11 @@ def dashboard_group() -> None:
 
 
 def _rebuild_results() -> None:
-    from qa_tools.bdm.build_results_from_history import build_results_from_history as build_bdm
-    from qa_tools.cp.build_results_from_history import build_results_from_history as build_cp
-    build_bdm()
-    build_cp()
+    from qa_tools import collections
+    from qa_tools.tools import results_history
+
+    for coll in collections.all_collections():
+        results_history.build_results_from_history(coll.id)
 
 
 @dashboard_group.command("rebuild-results")

@@ -310,10 +310,10 @@ def _red(results) -> bool:
     return any((r or {}).get("status") in ("fail", "error") for r in results or ())
 
 
-def _orchestrator(collection_id):
-    from qa_tools import collections
+def _steps(collection_id):
+    from qa_tools.tools import orchestrate
 
-    return collections.adapter(collections.by_id(collection_id)).orchestrator_module()
+    return orchestrate.steps(collection_id)
 
 
 def run_pass(*, run_by: str | None = None, say=print, deadline: float | None = None,
@@ -560,7 +560,7 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
         state = state_of(arrival, recorded(conn))
     if state == PROCESSED:
         return
-    orchestrator = _orchestrator(arrival.collection_id)
+    steps = _steps(arrival.collection_id)
     if state == UNGATED:
         # CHECKED BUT NOT GATED: its recorded results, the gate, nothing
         # re-run - a second set of results under the same run id is what
@@ -580,13 +580,13 @@ def _one(arrival, among, run_timestamp, run_by, report: PassReport, say) -> None
         for record in results:
             record.setdefault("run_id", record.get("run_key"))
         say(f"{arrival.run_id}: checked earlier - applying the gate")
-        orchestrator.STEPS.promote_after(arrival, results, run_by)
+        steps.promote_after(arrival, results, run_by)
         report.gated_only.append(arrival.run_id)
         if _red(results):
             report.red = True
     else:
         # The run step prints its own "--- <run> ---" header (#120 D13).
-        got = arrival_lifecycle.process(arrival, steps=orchestrator.STEPS, among=among,
+        got = arrival_lifecycle.process(arrival, steps=steps, among=among,
                                         run_timestamp=run_timestamp, run_by=run_by)
         report.processed.append(arrival.run_id)
         if _red(got):

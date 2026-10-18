@@ -8,8 +8,8 @@ reports/child_protection_dashboard.json (pipeline/build_dashboard_
 data.py's/build_cp_dashboard_data.py's output), and writes the result
 to the real, viewable HTML - gitignored, never committed, rebuilt fresh
 by CI on every push and locally by `mothman pipeline run`/`mothman
-dashboard rebuild`. Run this last, after orchestrate_bdm.py/
-orchestrate_cp.py and the two build_*_dashboard_data.py scripts,
+dashboard rebuild`. Run this last, after the pipeline (qa_tools/tools/
+orchestrate.py) and the two build_*_dashboard_data.py scripts,
 whenever the pipeline is regenerated.
 
 `const AS_OF_OFFSET_DAYS` used to be re-embedded here too, from

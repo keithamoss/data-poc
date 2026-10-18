@@ -40,9 +40,8 @@ RECHECK = "recheck"
 REEVALUATE = "reevaluate"
 TABLE = f'"{qa_store.SCHEMA}".owed_run'
 
-#: The orchestrator per collection comes from its adapter (REQ-PIPE-240),
-#: imported lazily, so importing this does not import every collection's
-#: tools.
+#: The shared orchestrator (qa_tools/tools/orchestrate.py, REQ-PIPE-243) is
+#: imported lazily, so importing this does not import the QA tools.
 
 
 class RecheckRefused(RuntimeError):
@@ -204,8 +203,8 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     entry_ds = hierarchy.dataset(dataset_id)
     from qa_tools import collections
 
-    adapter = collections.adapter(collections.by_id(entry_ds.collection_id))
-    module = adapter.orchestrator_module()
+    from qa_tools.tools import orchestrate
+
     tables = [d.table for d in collections.by_id(entry_ds.collection_id).datasets]
     from qa_tools.common import supply_files
 
@@ -237,10 +236,10 @@ def execute(*, dataset_id: str, supply_id: str, run_key: str, purpose: dict,
     except Exception:
         # The run's own clean-up is in _run_one's `finally`, which an overlay
         # that broke half-built never reaches (#114, minor).
-        module._discard_this_runs_schemas(run_key)
+        orchestrate.discard_run_schemas(run_key)
         raise
-    results = module._run_one(entry, _replay_clock.now().isoformat(),
-                              run_by or get_run_by(), on_step=on_step)
+    results = orchestrate.run_one(entry_ds.collection_id, entry, _replay_clock.now().isoformat(),
+                                  run_by or get_run_by(), on_step=on_step)
     return arrival, results
 
 
