@@ -256,6 +256,9 @@ class TestTheMenusAtThirty:
         for key, value in {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "user.email",
                            "GIT_CONFIG_VALUE_0": DECIDER}.items():
             monkeypatch.setenv(key, value)
+        # A person decides here: on a runner GITHUB_ACTIONS would name the
+        # workflow ahead of that git identity (post-build-review #240).
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
         session = self._session(thirty)
         try:
             session.send("down")

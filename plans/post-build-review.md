@@ -10556,3 +10556,27 @@ twice. It deliberately did not re-find the `TypeError`.
      a full local gate cannot prove this job. A push touching the bootstrap,
      the generator or the adapter tests should run
      `pytest --run-on-demand -m on_demand` first.
+
+240. **[done, 2026-10-19]** **[Testing & dev tooling]** **The 248 push's
+     fast test half went red on six tests that pass everywhere but a GitHub
+     runner.** Run 39142366483, 6 failed / 5,313 passed, all reproduced
+     locally by setting `GITHUB_ACTIONS=true` and fixed once in the tests:
+     - TEST, FIXED (five tests): Typer and rich-click each read
+       `GITHUB_ACTIONS` at import and force a terminal. Rich then writes
+       ANSI-coded output into a CliRunner's buffer, so a phrase a test
+       looks for ("Known: bdm (civil-registration)...", "mothman dashboard
+       rebuild-results", "COLLECTION" in help) is split by colour codes.
+       tests/conftest.py now sets Typer's own `_TYPER_FORCE_DISABLE_TERMINAL`
+       and `PY_COLORS=0`, before either library is imported. rich-click
+       reads `PY_COLORS` before `GITHUB_ACTIONS`, and Rich itself ignores
+       it. The settings reach every CLI subprocess a test starts.
+       `FORCE_COLOR=0` was rejected: Rich treats any non-empty
+       `FORCE_COLOR` as forcing colour on.
+     - TEST, FIXED (one test): the thirty-collection filing menu test gives
+       its decider as a git identity, but `git_identity.get_run_by` puts the
+       runner's `github-actions:...` identity ahead of git. On a runner the
+       menu therefore never reached "Which collection". The test now removes
+       `GITHUB_ACTIONS`, as tests/test_git_identity.py already does.
+     The product was left alone: forced colour in the real CLI's Actions
+     logs is wanted. Local check: `GITHUB_ACTIONS=true uv run pytest` over
+     the CLI modules is the cheap way to reproduce a runner before pushing.
