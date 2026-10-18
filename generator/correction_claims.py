@@ -280,6 +280,18 @@ def _injected_instants(injections, generated) -> dict[str, list]:
     return out
 
 
+def _carries(entry, dataset_id) -> bool:
+    """Whether a written arrival carries the dataset: by the tables its entry
+    counts, or every dataset where it counts none. An arrival that does not
+    carry a dataset has no filing of it for a correction to change."""
+    counts = entry.get("row_counts")
+    if not counts:
+        return True
+    from qa_tools.common import hierarchy
+
+    return hierarchy.dataset(dataset_id).table in counts
+
+
 def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=None) -> None:
     """After the deliveries are written: no ORDINARY arrival's filing may be
     changed by a version-level correction (REQ-GEN-205 criterion 10, REQ-GEN-237
@@ -299,6 +311,8 @@ def check_written(dataset_ids, entries, injected_periods=frozenset(), *, docs=No
             if e.get("period") in injected_periods or not e.get("received_at"):
                 continue
             for dataset_id in dataset_ids:
+                if not _carries(e, dataset_id):
+                    continue
                 at = asset_time.parse_instant(e["received_at"], e["run_id"])
                 moved = filing_changes(reference, dataset_id, [at], docs=docs)
                 if moved:

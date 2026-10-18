@@ -2198,6 +2198,40 @@ one or more component tags, and a date.
         synthetic asset. REQ-PIPE-111 criterion 9 allows "adding a new
         dataset's calendar membership", and the code exempted the versions
         but not the membership. CI would have refused the ED push.
+    - **248'S CI RED, AND WHY A GREEN LOCAL GATE MISSED IT** (run
+      39142366483). The configuration, JS and deployment jobs were green; two
+      others were red, and neither cause shows up in a local gate:
+      - **The on-demand job** (#239): eight failures. The equivalence test
+        stubbed generation on the two old per-collection CLIs, so the
+        bootstrap regenerated the corpus under empty scripts. And the job
+        never installed Chromium for REQ-TEST-252's browser check. `mothman
+        check` deselects on_demand tests, so the gate could not see either.
+      - **The fast half** (#240): six failures that happen only on a GitHub
+        runner. Typer and rich-click force a coloured terminal whenever
+        `GITHUB_ACTIONS` is set, so CliRunner output carries ANSI codes
+        through the phrases tests look for. Separately, a filing test's git
+        identity is outranked by the runner's own identity.
+      Both fixed in the tests and pushed together as 9d9def0, after
+      reproducing them locally with `GITHUB_ACTIONS=true` (6 failed, then 83
+      passed with the variable set and without). The CI result is at the
+      next entry.
+    - **TS-62 MOVED, PROVISIONAL.** TS-62 was planned three days before the
+      history's end, with an open-ended six-hour claim window from
+      2026-09-19. It could not be placed there: a correction claims its day
+      and the day either side, and TS-45's following day and TS-46's lead-in
+      take those. Nothing in the last month of the Birth Registrations
+      history has two free days. It now sits at 2026-07-25 under a
+      **one-day** version (6h on 07-25, 4h again from 07-26, both changes in
+      the one correction REQ-GEN-205-TS62). Late July lies outside the
+      ordinary reds' and ambers' days, and with a one-day version no other
+      scenario's day falls under a window it was not built for. What it
+      loses: the correction no longer governs "every supply after it", so
+      the history does not end under a pending window. It stays pending to
+      the history's end, and its link still runs to HISTORY_END. If the
+      open-ended form matters, the Birth Registrations history needs room at
+      its end, which is a growth call for you. The old bootstrap never
+      caught the clash because it had loaded its configuration before TS-62
+      existed; a fresh one refused in 3 seconds.
     - **FOR THE MORNING, Keith's own list**: talk through the 77,000 lines
       of code (running-thoughts #107) and the test-duplication report
       (now docs/drafts/item-6/test-duplication.md), plus anything else left

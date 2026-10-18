@@ -329,6 +329,19 @@ _CHURN_TABLES = ["cp_notifications", "cp_investigations", "cp_placements"]
 _CHURN_MODIFY_RATE = 0.02
 
 
+def _turned_off_files(periods) -> dict[str, tuple[str, ...]]:
+    """Each period's files for datasets turned off in it (REQ-PIPE-179)."""
+    from qa_tools.common import turned_off
+
+    out: dict[str, tuple[str, ...]] = {}
+    for p in periods:
+        files = tuple(f"{d.table}.csv" for d in hierarchy.datasets_in_collection("child-protection")
+                      if turned_off.gap_for_period(d.dataset_id, p.name) is not None)
+        if files:
+            out[p.name] = files
+    return out
+
+
 class ChildProtectionProvider:
     """The DatasetProvider (generator/resupply.py) for Child Protection -
     payload is a dict[str, pd.DataFrame], one entry per real table
@@ -927,7 +940,8 @@ class ChildProtection(Provider):
                                               in injected_by_period.values()
                                               for name in placement.built_green),
                            "case_workers_owed": {p.name for p in schedule.periods_for_dataset(
-                               _CASE_WORKERS) if p.expected}})
+                               _CASE_WORKERS) if p.expected},
+                           "turned_off": _turned_off_files(periods)})
 
     def slot(self, plan: Plan, job: Job) -> list:
         from generator.resupply import run_slot_chain
@@ -963,8 +977,15 @@ class ChildProtection(Provider):
         ))
 
     def entries(self, plan: Plan, job: Job, deliveries: list, run_index_start: int) -> list[dict]:
-        return _cp_manifest_entries_for_slot(deliveries, job.slot_id, job.period.name,
-                                             run_index_start, job.seed)
+        entries = _cp_manifest_entries_for_slot(deliveries, job.slot_id, job.period.name,
+                                                run_index_start, job.seed)
+        if job.period.name not in plan.injected_by_period:
+            # WHAT files() SENDS: a table turned off for this quarter is not
+            # sent, so it is not counted either (REQ-PIPE-179).
+            off = {fn.removesuffix(".csv") for fn in plan.state["turned_off"].get(job.period.name, ())}
+            for e in entries:
+                e["row_counts"] = {t: c for t, c in e["row_counts"].items() if t not in off}
+        return entries
 
     def received_at(self, plan: Plan, job: Job, n: int, delivery_obj, entry: dict) -> str:
         injected = plan.injected_by_period.get(job.period.name)
@@ -992,6 +1013,12 @@ class ChildProtection(Provider):
             csvs.pop(f"{hierarchy.dataset(_CASE_WORKERS).table}.csv")
         first = asset_time.parse_instant(entry["received_at"], entry["run_id"])
         injected = plan.injected_by_period.get(period)
+        if injected is None:
+            # A TURNED-OFF DATASET IS NOT SENT (REQ-PIPE-179): a supplier does
+            # not supply a dataset for a quarter it is turned off in. Only a
+            # scenario's own arrival carries one (TS-63a's gap supply).
+            for fn in plan.state["turned_off"].get(period, ()):
+                csvs.pop(fn, None)
         if injected is not None:
             # THE SCENARIO'S OWN FILE SET AND ITS OWN INSTANT. Three of these
             # scenarios ARE a file set - an unreadable table, a duplicate

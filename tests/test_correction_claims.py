@@ -172,3 +172,23 @@ class TestAVersionLevelChangeClaimsOnlyTheFilingsItChanges:
     def test_it_is_a_version_level_change(self, widened, docs):
         assert cc.is_version_level("CAB-W", docs=widened)
         assert not cc.is_version_level("CAB-1", docs=docs)
+
+
+class TestAWrittenArrivalIsCheckedOnlyForWhatItCarries:
+    """correction_claims.check_written asks a version-level correction about
+    the datasets an ordinary arrival carries, by the tables its entry counts
+    (2026-10-19): Child Protection's routine 2022-Q1 delivery, which no longer
+    sends the turned-off cp_carers, has no cp_carers filing for REQ-GEN-218 to
+    change."""
+
+    def _entry(self, tables):
+        return {"run_id": "cp_run_x", "period": "2022-Q1",
+                "received_at": "2022-02-01T08:30:00+08:00",
+                "row_counts": {t: 10 for t in tables}}
+
+    def test_an_arrival_counting_the_turned_off_table_is_refused(self):
+        with pytest.raises(si.CannotPlace, match="cp-carers"):
+            cc.check_written(["cp-carers"], [self._entry(["cp_carers", "cp_clients"])])
+
+    def test_an_arrival_without_it_is_not(self):
+        cc.check_written(["cp-carers"], [self._entry(["cp_clients"])])
