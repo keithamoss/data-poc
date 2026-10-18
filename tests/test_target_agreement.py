@@ -464,7 +464,10 @@ class TestAPipelineRunComparesToo:
         out = CliRunner().invoke(pipeline.run_command, ["--publish"], env={"COLUMNS": "400"})
         said = " ".join(out.output.split())
         assert out.exit_code != 0 and "TS-43" in said and "did not read as built" in said
-        assert calls["compared"] == [["bdm", "cp"]] and calls["published"] == []
+        from qa_tools import collections
+
+        shorts = [c.short for c in collections.all_collections()]
+        assert calls["compared"] == [shorts] and calls["published"] == []
 
     def test_agreement_lets_it_publish(self, monkeypatch):
         from cli import pipeline

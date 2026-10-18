@@ -33,6 +33,8 @@ from pathlib import Path
 
 import pytest
 
+from qa_tools import collections as _registry
+
 from qa_tools.common.qa_results_reader import list_run_ids, read_dataset_stats
 
 # NEEDS A BOOTSTRAPPED DEPLOYMENT (plans/tooling.md #27). This module
@@ -4340,7 +4342,8 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
     point (their accessible name) says the same, at the build's own date and
     at an earlier one."""
 
-    _AGENCIES = ["registry-services", "child-protection-family-support"]
+    # Read from the hierarchy, never listed (REQ-DASH-234 criterion 5).
+    _AGENCIES = list(dict.fromkeys(c.agency_id for c in _registry.all_collections()))
 
     def _rows(self, page):
         return page.evaluate("""() => [...document.querySelectorAll('tr[data-nav]')]
@@ -4462,7 +4465,8 @@ class TestDatasetsNotGreenOnCardsAndHeadings:
     datasets it counts on the agency tier, and its weekly trend ends on the
     same numbers - at the build's own date and at an earlier one."""
 
-    _AGENCIES = ["registry-services", "child-protection-family-support"]
+    # Read from the hierarchy, never listed (REQ-DASH-234 criterion 5).
+    _AGENCIES = list(dict.fromkeys(c.agency_id for c in _registry.all_collections()))
 
     @staticmethod
     def _said(text):

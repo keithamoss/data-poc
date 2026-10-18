@@ -220,7 +220,9 @@ class TestCollectionsRunSideBySide:
     def test_both_collections_are_dispatched_together(self, spy):
         _called, dispatched = spy
         boot.bootstrap(collection="all")
-        assert dispatched == [["bdm", "cp"]]
+        from qa_tools import collections
+
+        assert dispatched == [[c.short for c in collections.all_collections()]]
 
     def test_the_unclaimed_deliveries_are_recorded_once_after_both_run(self, spy):
         """REQ-TEST-159 reversed REQ-TEST-116's record-everything-first: each

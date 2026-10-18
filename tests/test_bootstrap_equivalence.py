@@ -205,7 +205,9 @@ class TestTheCorpusIsWorthComparing:
         sequential, _ = both
         cols, runs = sequential["qa.run"]
         collections = {json.loads(row[cols.index("collection_id")]) for row in runs}
-        assert collections == {"civil-registration", "child-protection"}, collections
+        from qa_tools import collections as registry
+
+        assert collections == {c.id for c in registry.all_collections()}, collections
 
     def test_every_tool_recorded_results(self, both):
         sequential, _ = both

@@ -128,7 +128,9 @@ class TestTheSeedSchedule:
 
     def test_the_real_providers_derive_only_seeds_they_declare(self):
         found = providers.providers()
-        assert [p.collection_id for p in found] == ["civil-registration", "child-protection"]
+        from qa_tools import collections
+
+        assert [p.collection_id for p in found] == [c.id for c in collections.all_collections()]
         for provider in found:
             assert provider.seed_schedule(), provider.collection_id
             provider.check_seeds()

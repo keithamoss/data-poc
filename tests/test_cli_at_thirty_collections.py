@@ -94,7 +94,10 @@ class TestHelpAtThirty:
         collections_panel = _panel(out.stdout, "Collections")
         tools_panel = _panel(out.stdout, "Tools")
         shorts = [row.split()[0] for row in collections_panel if row and not row.startswith(" ")]
-        expected = ["bdm", "cp"] + [c["short"] for c in thirty_collections.added()]
+        from qa_tools import collections
+
+        expected = ([c.short for c in collections.all_collections()]
+                    + [c["short"] for c in thirty_collections.added()])
         assert [s for s in shorts if s in expected] == expected, "in hierarchy order"
         assert not set(expected) & {row.split()[0] for row in tools_panel if row}
         joined = " ".join(" ".join(collections_panel).split())

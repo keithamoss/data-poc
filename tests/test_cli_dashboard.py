@@ -22,7 +22,9 @@ def test_rebuild_results_rebuilds_every_registered_collection(monkeypatch):
     result = _runner.invoke(dashboard_cli.dashboard_group, ["rebuild-results"])
 
     assert result.exit_code == 0, result.output
-    assert called == ["civil-registration", "child-protection"]
+    from qa_tools import collections
+
+    assert called == [c.id for c in collections.all_collections()]
 
 
 def test_build_data_writes_every_collections_output(monkeypatch, tmp_path):

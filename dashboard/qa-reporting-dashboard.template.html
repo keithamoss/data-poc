@@ -968,7 +968,7 @@ footer{color:var(--ink-faint); font-size:12px; padding-block:30px 40px; border-t
   <main id="view"></main>
 
   <footer>
-    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Registry Services → Civil Registration → <strong>Birth Registrations</strong> is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli, and Evidently AI binaries against real generated pipeline runs. The Department for Child Protection and Family Support → Child Protection collection (all 6 datasets) is also real, computed the same way — including cross-table foreign-key and business-rule checks, not just single-column rules. Every dataset on this page is real — the illustrative mock datasets that used to sit alongside them were removed on 2026-09-23.
+    Proof-of-concept reporting layer over the central QA pipeline — worst-of status rollup, Agency → Data Collection → Dataset → Column. Every dataset on this page is real: its figures are computed by running the actual dbt-core, Soda Core, datacontract-cli and Evidently AI binaries against generated synthetic supplies, including cross-table foreign-key and business-rule checks where a collection has more than one table.
     <br><br>
     <em>Internal project codename: Mothman.</em>
   </footer>

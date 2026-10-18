@@ -30,7 +30,7 @@ A scenario marked **not injected** has no generated data behind it.
 Either it is a pure unit test with nothing to look at, or it is meant
 for injection and has not been placed yet.
 
-**0 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
+**14 of 57 scenarios marked for injection have data behind them today.** 95 scenarios are registered in all; the rest are unit tests with nothing to look at.
 
 ## Slot assignment
 
@@ -66,13 +66,23 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 *Config: quarterly, calendar Feb 2 / May 1 / Aug 3 / Nov 2, early window 14 days. Feb and May filled. Supply arrives 19 July - one day outside August's window, which opens 20 July.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202504161000000800` |
+| Period | 2025-Q2 |
+| Set the in-place-on date to | 2025-05-01 |
 
 ### TS-3b - Quarterly, prior slot UNFILLED
 
 **What it demonstrates.** May is still the open period -> fills **May, ~79 days late**.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | ed-presentations |
+| Supplies | `ed_presentations__202604161000000800` |
+| Period | 2026-Q2 |
+| Set the in-place-on date to | 2026-05-01 |
 
 ### TS-3c - Daily, prior slot FILLED
 
@@ -258,7 +268,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it demonstrates.** - The five are staged, QA'd, green, and auto-promoted. Their August slots are **filled**, and their own checks are unaffected - they are not dragged down. - `cp_clients` is **red** (a supply that cannot be loaded is a red QA finding), rejected, and its August slot stays **unfilled**. - Every check declaring `depends_on: [cp_clients]` - including "Client reference", which is DEFINED on `cp_notifications` - **cannot run**, and reads **red with a qualifying chip naming `cp_clients` as the blocker**. - That red lands at **collection** level, since cross-table checks are lifted there. `cp_notifications` keeps its own green status and carries only an informational pointer: fully verified against its own data, unverified against its relationships.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
+| Period | 2025-Q2 |
+| Set the in-place-on date to | 2025-05-02 |
 
 ### TS-13 - Six tables landing seconds apart
 
@@ -272,7 +287,12 @@ Reframed from daily during Keith's review: the original example (22:00 due, 21:5
 
 **What it demonstrates.** It arrives as **its own delivery** and triggers QA. Its slot is clients' own August slot - per-table slot sequences mean there is no "resupply of table X within delivery Y" concept to implement; it is just clients' August supply, arriving late. The previously blocked cross-table check now runs. If green, clients promotes and August's slot fills. The recorded QA history keeps **both** runs - the period's current state is the latest, its history is all of them. Clients arriving also re-evaluates the waiting placements' reading checks and re-gates them (REQ-PIPE-121). *Used to say* `qa_results/` kept both runs - REQ-PIPE-089 moved the history into the database. *In the data since 2026-10-15 (REQ-GEN-044 criterion 1)*, riding TS-12's placement: TS-12's cp_clients is refused in 2025-Q2, and the corrected cp_clients arrives alone 28 days later, 10:00 on 2025-05-29, filed to 2025-Q2's still-empty slot. TS-12's link sits between the two; TS-14's lands on the correction's day.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202505010900000800`, `cp_clients__202505291000000800` |
+| Period | 2025-Q2 |
+| Set the in-place-on date to | 2025-05-29 |
 
 ### TS-15a - An UNEXPECTED TABLE - recognised, but not owed
 
@@ -444,7 +464,12 @@ The negative case, and it exists for the same reason TS-33b does: the rejected d
 
 **What it demonstrates.** The matched files are attributed and processed; the unmatched ones are reported as unrecognised artefacts at **warning** level. Critically, the supply is **NOT** silently treated as complete - the warning is the only thing standing between this and a promoted, green, HALF supply. Had the resupplies matched, this would instead be the duplicate-match hold of TS-34, which is louder still.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202602010900000800` |
+| Period | 2026-Q1 |
+| Set the in-place-on date to | 2026-02-01 |
 
 ### TS-39 - A split extract, once patterns are regexes
 
@@ -580,7 +605,12 @@ NOT IN THE DATA - FOR KEITH. A good file superseded by a bad later one, the bad 
 
 In the data since 2026-10-15 (REQ-GEN-044 criterion 1; Keith, 2026-10-14, Q13): demonstrated by TS-76's placement - cp-placements' 2025-Q1 substituted by a scripted person onto 2024-Q4, whose cp-placements supply was promoted green - with its own link while the substitution stands. CORRECTED 2026-10-16 (post-build-review #207 D1): REQ-GEN-207 moved the ordinary amber drawn for 2026-Q3 to 2024-Q4 and this entry then said "promoted amber", but that amber dirties only cp_carers and cp_clients, so cp-placements' 2024-Q4 supply is still green and promoted. Whether it should be amber is with Keith. The script's `stands_on` field (REQ-GEN-200) answered the old blocker.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | — |
+| Period | 2025-Q1 |
+| Set the in-place-on date to | 2025-02-17 |
 
 ### TS-55 - A period whose _manifest lists all three kinds
 
@@ -596,7 +626,12 @@ NOT IN THE DATA YET: needs TS-54's substitution beside an inheritance in one per
 
 *Config: quarterly, Feb/May/Aug/Nov.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-carers |
+| Supplies | `cp_carers__202608010900000800` |
+| Period | 2026-Q3 |
+| Set the in-place-on date to | 2026-08-01 |
 
 ## Calendar corrections
 
@@ -678,7 +713,12 @@ Cp-clients, 2024-Q1: the whole delivery on time at 09:00 on 1 February with cp_c
 
 *Config: quarterly, due 09:00 on the 1st; a person rejects it at 09:00 on 22 February; a corrected cp_clients alone arrives at 10:00 on 29 February.*
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
+| Period | 2024-Q1 |
+| Set the in-place-on date to | 2024-02-08 |
 
 ### TS-75b - A supply rejected after it waited - after it was rejected
 
@@ -686,7 +726,12 @@ The same placement, on 25 February. **Expect** (REQ-DASH-197), in the same panel
 
 **What it would look like if the rule were wrong.** The panel naming the corrected supply, or still "nobody had decided".
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-clients |
+| Supplies | `cp_clients__202402010900000800`, `cp_clients__202402291000000800` |
+| Period | 2024-Q1 |
+| Set the in-place-on date to | 2024-02-25 |
 
 ### TS-76 - A substitution later removed
 
@@ -694,7 +739,12 @@ Cp-placements, 2025-Q1: the delivery leaves cp_placements out; a person substitu
 
 **What it would look like if the rule were wrong.** No pill on 17 February; or "Since replaced".
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | — |
+| Period | 2025-Q1 |
+| Set the in-place-on date to | 2025-02-17 |
 
 ### TS-77a - A substitution later replaced - while it stood
 
@@ -702,7 +752,12 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 
 **What it would look like if the rule were wrong.** No pill; or "Since removed".
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | `cp_placements__202306081000000800` |
+| Period | 2023-Q2 |
+| Set the in-place-on date to | 2023-05-17 |
 
 ### TS-77b - Known wrong today (post-build-review #164): A substitution later replaced - the day the late file waited
 
@@ -710,7 +765,12 @@ Cp-placements, 2023-Q2: the delivery leaves cp_placements out; a person substitu
 
 **What it would look like if the rule were wrong.** A different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-placements |
+| Supplies | `cp_placements__202306081000000800` |
+| Period | 2023-Q2 |
+| Set the in-place-on date to | 2023-06-08 |
 
 ### TS-78a - A supply promoted after a newer one - the day it was promoted
 
@@ -734,7 +794,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 **What it would look like if the rule were wrong.** No pill; or a stale date after ANCHOR_DATE moves.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-case-workers |
+| Supplies | — |
+| Period | 2026-Q2 |
+| Set the in-place-on date to | 2026-06-16 |
 
 ### TS-79b - An inherited quarter - the oldest of the original fifteen
 
@@ -742,7 +807,12 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
 
 **What it would look like if the rule were wrong.** No pill.
 
-**not injected - nothing to look at yet**
+| Where to look | |
+|---|---|
+| Dataset | cp-case-workers |
+| Supplies | — |
+| Period | 2023-Q2 |
+| Set the in-place-on date to | 2023-06-16 |
 
 
 <!-- scenario-map-data
@@ -797,7 +867,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-PIPE-131"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__202504161000000800"
+    ],
+    "period": "2025-Q2",
+    "inPlaceOn": "2025-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-3b",
@@ -808,7 +886,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": null,
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "ed-presentations",
+    "supplies": [
+     "ed_presentations__202604161000000800"
+    ],
+    "period": "2026-Q2",
+    "inPlaceOn": "2026-05-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-3c",
@@ -994,7 +1080,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-148",
     "REQ-DASH-097"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202505010900000800",
+     "cp_clients__202505291000000800"
+    ],
+    "period": "2025-Q2",
+    "inPlaceOn": "2025-05-02",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-13",
@@ -1020,7 +1115,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-PIPE-089",
     "REQ-GEN-044"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202505010900000800",
+     "cp_clients__202505291000000800"
+    ],
+    "period": "2025-Q2",
+    "inPlaceOn": "2025-05-29",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-15a",
@@ -1353,7 +1457,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": null,
    "config": null,
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202602010900000800"
+    ],
+    "period": "2026-Q1",
+    "inPlaceOn": "2026-02-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-39",
@@ -1576,7 +1688,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-207",
     "REQ-GEN-200"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [],
+    "period": "2025-Q1",
+    "inPlaceOn": "2025-02-17",
+    "subject": "substitution-drill-down"
+   }
   },
   {
    "id": "TS-55",
@@ -1606,7 +1724,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-GEN-044",
     "REQ-GEN-207"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-carers",
+    "supplies": [
+     "cp_carers__202608010900000800"
+    ],
+    "period": "2026-Q3",
+    "inPlaceOn": "2026-08-01",
+    "subject": "supply-history-row"
+   }
   },
   {
    "id": "TS-57",
@@ -1842,7 +1968,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-197"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202402010900000800",
+     "cp_clients__202402291000000800"
+    ],
+    "period": "2024-Q1",
+    "inPlaceOn": "2024-02-08",
+    "subject": "as-at-panel"
+   }
   },
   {
    "id": "TS-75b",
@@ -1855,7 +1990,16 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-197"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-clients",
+    "supplies": [
+     "cp_clients__202402010900000800",
+     "cp_clients__202402291000000800"
+    ],
+    "period": "2024-Q1",
+    "inPlaceOn": "2024-02-25",
+    "subject": "as-at-panel"
+   }
   },
   {
    "id": "TS-76",
@@ -1869,7 +2013,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
     "REQ-DASH-198",
     "REQ-GEN-199"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [],
+    "period": "2025-Q1",
+    "inPlaceOn": "2025-02-17",
+    "subject": "substitution-drill-down"
+   }
   },
   {
    "id": "TS-77a",
@@ -1882,7 +2032,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-198"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [
+     "cp_placements__202306081000000800"
+    ],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-05-17",
+    "subject": "substitution-drill-down"
+   }
   },
   {
    "id": "TS-77b",
@@ -1893,7 +2051,15 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "breaksAs": "A different reason line in the panel means #164 was decided, not a regression; any other change on that date - the drill-down's sentences included - is a regression.",
    "config": null,
    "requirements": [],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-placements",
+    "supplies": [
+     "cp_placements__202306081000000800"
+    ],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-06-08",
+    "subject": "as-at-panel"
+   }
   },
   {
    "id": "TS-78a",
@@ -1932,7 +2098,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-DASH-198"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-case-workers",
+    "supplies": [],
+    "period": "2026-Q2",
+    "inPlaceOn": "2026-06-16",
+    "subject": "standing-in-pill"
+   }
   },
   {
    "id": "TS-79b",
@@ -1945,7 +2117,13 @@ Cp-case-workers, the newest quarter before the build's own in which it is not de
    "requirements": [
     "REQ-GEN-207"
    ],
-   "coordinates": null
+   "coordinates": {
+    "dataset": "cp-case-workers",
+    "supplies": [],
+    "period": "2023-Q2",
+    "inPlaceOn": "2023-06-16",
+    "subject": "standing-in-pill"
+   }
   }
  ]
 }
