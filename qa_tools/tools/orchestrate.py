@@ -377,12 +377,9 @@ def file_and_overlay(collection_id: str, arrival, among=None) -> None:
     receipt instant are filed with it, because the overlay reads only FILED
     siblings - filing each file just before its own run left a zip's first
     file blind to the rest. Filing is per dataset and write-once, so filing a
-    sibling here and again at its own turn is the same filing. Under
-    `orchestrate.files_one_arrival` only this arrival is filed."""
+    sibling here and again at its own turn is the same filing."""
     coll = collections.by_id(collection_id)
-    adapter = collections.adapter(coll)
-    filing.file_arrivals([arrival] if "orchestrate.files_one_arrival" in adapter.legacy
-                         else simultaneous_with(arrival, among))
+    filing.file_arrivals(simultaneous_with(arrival, among))
     period_overlay.rebuild_for_arrival(arrival, tables=[d.table for d in coll.datasets])
 
 
