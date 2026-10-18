@@ -5541,3 +5541,17 @@ could never have computed it), and it belongs with batch 5's check work.
     building. Same conversation: watch the built page's size during
     development and flag it at 20 MiB (REQ-PIPE-255 now does, every
     build), and talk about optimising or splitting the file when it fires.
+
+106. **[in-progress, 2026-10-18]** **[Testing & dev tooling]** **Item 6's
+    chain: REQ-TEST-245 straight after REQ-GEN-246, and no push until the
+    whole chain is done.** Keith, 2026-10-18, after asking whether
+    cli/bdm.py and cli/cp.py are still needed ("Yes, do 245 straight after
+    246. But don't worry about pushing until we've done this whole chain of
+    stuff here. And then check with me before you push."). So the order is
+    now REQ-GEN-246, REQ-TEST-245, REQ-DASH-244, then REQ-TEST-252,
+    REQ-TEST-249, REQ-QAC-247 and REQ-PIPE-248 - swapped because nothing
+    ties 244 before 245; they touch different files. Every piece is still
+    gated before its own local commit (rule D's checkpoints), the chain is
+    pushed once at the end, and ONLY AFTER ASKING KEITH. This overrides the
+    one-push-per-finished-piece default for this chain alone. Record the
+    swap in REQ-TEST-245's decisions when it is built.
