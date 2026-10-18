@@ -77,26 +77,30 @@ common/check_lifecycle.py`'s own `check_id` convention.
    dashboard-readability entries). Decide replace vs. supplement before
    committing to either.
 
-4. **[todo, 2026-09-18]** **[Dashboard UI]** Secure/authenticated hosting for the
-   dashboard - Cloudflare Access or equivalent - near-term work Keith
-   flagged, not scoped yet. Directly relevant to item #2 above: the
-   dashboard is currently public with zero access control at all
-   (`https://keithamoss.github.io/data-poc/`, GitHub Pages free-tier, no
-   login of any kind), because the repo itself is public. This is a
-   different, narrower question than item #2's "move the repo back to
-   private" - auth-gating the *deployed site* is a real option
-   regardless of whether the underlying repo is public or private, and
-   item #2's own "don't pre-solve this" stance was specifically about
-   not reaching for paid Pages tiers/alternate hosts before the
-   repo-privacy question was live; this is Keith asking for exactly that
-   now, on its own merits, not contingent on the repo going private. Not
-   scoped: which mechanism (Cloudflare Access sitting in front of the
-   existing GitHub Pages URL vs. moving hosting to Cloudflare Pages
-   directly vs. a different provider entirely), who needs access (just
-   Keith, a small reviewer group, anyone with a shared password), and
-   whether the `.github/workflows/deploy-pages.yml` auto-publish-on-push
-   flow needs to change at all or just gets a login wall in front of it.
-
+4. **[in-progress, 2026-10-18]** **[Dashboard UI]** **[Pipeline & publishing]**
+   Private hosting for the dashboard, then a private repository - SCOPED
+   2026-10-18 with Keith over five rounds of questions (his answers in
+   `plans/running-thoughts.md` #104), now five UNSIGNED requirements:
+   REQ-PIPE-255 (the one publish path uploads to Cloudflare Pages by
+   direct upload from the sandbox, replacing the gh-pages push; a build
+   fingerprint so an unchanged dashboard is neither uploaded nor
+   snapshotted), REQ-PIPE-257 (Cloudflare Access one-time code to named
+   work emails on every hostname, checked before and after each upload,
+   configured by hand from a committed runbook), REQ-GHUB-258 (ticket
+   links from configuration rather than github.io), REQ-TEST-260 (CI
+   minutes: push once per gate-green piece of work, `mothman github
+   ci-usage` measures it, the flip waits on a measured week fitting
+   2,000 minutes a month) and REQ-DOCS-259 (the flip, last, behind a
+   checklist Keith completes himself). Settled and recorded in their
+   decisions: no paid GitHub plan; Entra ID, GitHub identity and a
+   shared credential rejected for sign-in; automatic publishing at the
+   end of a run proposed and rejected the same day, REQ-PIPE-092's
+   opt-in rule stands; private only once the new site is live and a
+   teammate has signed in. Item 2's parked "don't pre-solve hosting"
+   note is answered by the same set; both items go when REQ-DOCS-259 is
+   built. REQ-PIPE-255 amends REQ-PIPE-092 criteria 12 and 13 (delivery
+   by git push becomes delivery by upload), which Keith must approve in
+   wording at sign-off.
 5. **[done, 2026-09-16]** **[Dashboard UI]** "Time travel" - the ability
    to go back and see the entire reporting solution exactly as it was
    for any previous run, not just a single check's own history (which

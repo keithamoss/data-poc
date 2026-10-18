@@ -37328,3 +37328,608 @@ requirements:
       - "3. BUDGET: is no more than 2% slower on a full bootstrap the right bar for criterion 14, or should the timing only be reported?"
       - "4. GUARD: should mothman check fail on a new functools.lru_cache or functools.cache under qa_tools/ that is not on an allowlist naming why it is safe, or is a rule in config_yaml's docstring enough?"
       - "5. NOT ASKED YET: hierarchy, asset_time and validate_schedule each hold their own DATA_ASSET_YAML constant, so a test that patches one reads the real file through the others. Proposed out of scope as its own item; it does not change what this requirement builds."
+
+  - id: REQ-PIPE-255
+    title: The one publish path uploads the gated site to a Cloudflare Pages project by direct upload, and
+      only when its content has changed
+    date_written: '2026-10-18'
+    story: As Keith, I want `mothman dashboard publish` to upload the built, gated dashboard site to a Cloudflare
+      Pages project from the sandbox when I ask it to, and to do nothing when nothing has changed, so that
+      the dashboard can be hosted behind a sign-in without a paid GitHub plan, without GitHub ever building
+      it or holding a database credential, and without identical deployments and snapshots piling up.
+    moscow: must
+    status: not_started
+    source: 'Keith, scoped in conversation 2026-10-18 over two rounds of questions, then answers to delivery-scoper''s
+      six questions the same day (sandbox as the one publisher; one snapshot per publish, publishing only
+      when the content has changed - his own suggestion; publishing stays opt-in; no --force). Answers plans/dashboard.md
+      #4 and the parked half of #2. Drafted by delivery-scoper 2026-10-18. A PROPOSAL, not signed.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL deliver the published dashboard by uploading the whole tree prepare_deploy_site()
+      builds - index.html, fonts/, vendor/, snapshots/ with every decompressed snapshot, and snapshots/manifest.json
+      - to a Cloudflare Pages project by direct upload.
+    - THE SYSTEM SHALL make that upload the transport inside cli/dashboard.py's existing publish(), replacing
+      the push to the gh-pages branch rather than sitting beside it, so that `mothman dashboard publish`,
+      the post-QA prompt and `mothman pipeline run --publish` still reach one publish path.
+    - THE SYSTEM SHALL run the existing build and real-browser render gate before the upload, and SHALL
+      NOT upload a site that did not pass it.
+    - THE SYSTEM SHALL run wrangler as a subprocess of mothman, at a version pinned exactly in the repository's
+      package.json and package-lock.json, and SHALL NOT download or run an unpinned wrangler at publish
+      time.
+    - IF wrangler is not installed where the publish runs, THEN THE SYSTEM SHALL refuse before building
+      anything, naming the one-time setup command that installs it.
+    - THE SYSTEM SHALL read the Cloudflare API token from CLOUDFLARE_API_TOKEN and the account from CLOUDFLARE_ACCOUNT_ID,
+      and SHALL NOT read either from any committed file.
+    - IF CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is unset or empty, THEN THE SYSTEM SHALL refuse before
+      building or uploading anything, naming each missing variable, in the same plain shape as the refusal
+      for an unset MOTHMAN_ENVIRONMENT.
+    - THE SYSTEM SHALL take the Pages project name, its production branch name, the dashboard's address
+      and the expected Access sign-in domain from contract/data-asset.yaml, one site per data-asset deployment,
+      and SHALL NOT hardcode any of them in code.
+    - THE SYSTEM SHALL pass the project name and the configured production branch to wrangler explicitly
+      on every upload, so that a publish from a checkout on any git branch makes a production deployment
+      and never a preview deployment.
+    - THE SYSTEM SHALL pass the token and the account id to wrangler through its process environment only,
+      and SHALL NOT place the token on a command line, in a log line, in an exception message, or in any
+      `mothman debug` or `mothman env` output.
+    - IF wrangler's output or error text contains the token, THEN THE SYSTEM SHALL replace it with a fixed
+      placeholder before printing or raising it.
+    - THE SYSTEM SHALL turn off wrangler's usage telemetry for every invocation it makes.
+    - IF any file in the site tree is larger than 25 MiB, THEN THE SYSTEM SHALL refuse before uploading,
+      naming the file, its size and the limit.
+    - WHEN any file in the site tree is larger than 20 MiB, THE SYSTEM SHALL warn, naming the file, its
+      size and the 25 MiB limit, and SHALL still publish.
+    - IF the upload fails, THEN THE SYSTEM SHALL exit non-zero showing wrangler's error with the token redacted,
+      and SHALL NOT retry on its own.
+    - WHEN the upload succeeds, THE SYSTEM SHALL print the new deployment's own URL and the production URL
+      now serving it.
+    - THE SYSTEM SHALL pass the short commit the code was built from to wrangler as the deployment's commit,
+      so that Cloudflare's own deployment list names it beside the artifact's build stamp (REQ-PIPE-092
+      criterion 17).
+    - WHERE --dry-run is given, THE SYSTEM SHALL build, gate and prepare the site, say whether the content
+      has changed since the last publish, report the file count, the total size, the largest file and the
+      wrangler arguments it would use with every credential elided, and SHALL NOT invoke wrangler, archive
+      a snapshot or record a publish.
+    - THE SYSTEM SHALL build what it uploads from recorded QA results and committed configuration only,
+      and SHALL NOT read supply rows.
+    - 'IF the stated environment''s entry in contract/environments.yaml does not declare `publishes: true`,
+      THEN THE SYSTEM SHALL refuse before building, naming the stated environment and the environment that
+      publishes.'
+    - 'THE SYSTEM SHALL declare `sandbox` as the one environment with `publishes: true`, and `production`
+      as `publishes: false` until a production deployment exists, keeping the existing rule that at most
+      one environment publishes.'
+    - THE SYSTEM SHALL compute a content fingerprint for each build - a SHA-256 over the built index.html
+      with its build-provenance stamp and every embedded generated_at value replaced by fixed placeholders,
+      together with every file under fonts/ and vendor/ - and SHALL exclude snapshots/ from it, because
+      the archive only changes as a result of publishing.
+    - WHEN the dashboard is built twice in a row from unchanged recorded results, unchanged configuration
+      and an unchanged template, THE SYSTEM SHALL produce the same fingerprint both times, and the test
+      suite SHALL prove it.
+    - WHEN the fingerprint of a gated build equals the fingerprint of the last successful publish recorded
+      for the stated environment, THE SYSTEM SHALL archive no snapshot, upload nothing, record nothing,
+      print one line saying the dashboard is unchanged since that publish and when it happened, and exit
+      zero.
+    - WHEN the fingerprint differs, or no successful publish is recorded for the stated environment, THE
+      SYSTEM SHALL archive one snapshot, prepare the site and upload it, in that order, and SHALL compare
+      before archiving so that an unchanged build never leaves a snapshot behind.
+    - WHEN an upload succeeds, THE SYSTEM SHALL record the publish as a row in a qa.publish table in the
+      metadata database - time, stated environment, git identity of whoever ran it, commit, fingerprint,
+      deployment URL and outcome - and SHALL record a failed upload with its outcome, never as the last
+      successful publish.
+    - THE SYSTEM SHALL offer no flag, variable or setting that publishes, or archives a snapshot for, a
+      build whose fingerprint is unchanged.
+    - 'THE SYSTEM SHALL keep publishing opt-in, as REQ-PIPE-092 criterion 16 requires: a pipeline run or
+      processing pass SHALL publish only when `mothman pipeline run --publish`, `mothman dashboard publish`
+      or the post-QA prompt asks it to, and `mothman pipeline run --publish` SHALL keep its current meaning.'
+    - IF a publish reached from the post-QA prompt or `mothman pipeline run --publish` fails after the run's
+      results are recorded, THEN THE SYSTEM SHALL keep those results and the locally built dashboard, report
+      that the results are recorded and the published site is unchanged, name `mothman dashboard publish`
+      as the retry, and exit non-zero.
+    - WHEN the test suite runs, THE SYSTEM SHALL drive `mothman dashboard publish` end to end against a
+      stub wrangler placed first on PATH that records its arguments and environment, including an unchanged
+      second publish that invokes the stub zero times, and SHALL NOT need a Cloudflare account, a token
+      or network access.
+    - WHEN this requirement is built, THE SYSTEM SHALL contain no code that pushes the dashboard to a git
+      branch, and `mothman dashboard publish` SHALL carry no option naming a git branch.
+    non_functional_requirements:
+    - SECURITY - LEAST PRIVILEGE. The token is a custom, account-scoped token with the single permission
+      Account > Cloudflare Pages > Edit, on the one account, with no zone, DNS or Access permission, so
+      that a leaked publish token can replace the site but cannot change who may read it. The runbook says
+      how to create and rotate it.
+    - SECURITY - THE TOKEN NEVER REACHES ARGV. A command-line argument is visible to every process on the
+      machine through the process list; an environment variable passed only to the child is not.
+    - SECURITY - CONFIGURATION, NOT SECRETS, IN THE REPOSITORY. The project name, production branch, dashboard
+      address and Access sign-in domain are configuration and are committed in contract/data-asset.yaml;
+      the token is a secret and is not; the account id is deployment-local like MOTHMAN_SUPPLY_DSN and lives
+      beside it (Keith's call).
+    - SECURITY - ONE NEW WRITE GRANT. REQ-PIPE-089 gives the publisher a read-only role on the metadata
+      schema. Recording a publish needs INSERT on qa.publish and on nothing else; the grant is that narrow.
+    - PORTABILITY - NODE BECOMES A PUBLISHING DEPENDENCY. Until now Node was only needed to run the JS tests;
+      the publishing environment now needs Node and `npm ci` as well as `uv sync`. The one-time setup in
+      README and CLAUDE.md says so, beside `playwright install chromium`.
+    - 'PORTABILITY - NETWORK. The publishing environment must reach api.cloudflare.com and Cloudflare''s
+      upload endpoints, and the Access checks in REQ-PIPE-257 must reach *.pages.dev and the cloudflareaccess.com
+      sign-in domain. THE SANDBOX - NOW THE PUBLISHING ENVIRONMENT - CANNOT REACH ANY OF THEM TODAY: api.cloudflare.com,
+      developers.cloudflare.com, *.pages.dev, cloudflareaccess.com and dash.cloudflare.com all return a
+      proxy 403 (tested 2026-10-18). Until Keith allow-lists them, no publish can happen from anywhere.
+      The CLAUDE.md blocked-domains list should carry that.'
+    - 'PERFORMANCE - UPLOAD BUDGET. index.html is 14.7 MB today (measured 2026-10-18), and each decompressed
+      snapshot up to that again. wrangler uploads by content hash, so unchanged snapshots, fonts and vendor
+      files are not re-sent after the first publish. Proposed budget for the upload step after the first:
+      under two minutes. Measure on the first real publish and record the figure on the requirement.'
+    - PERFORMANCE - THE UNCHANGED CASE IS CHEAP. Computing the fingerprint is one read of a 15 MB file and
+      a few hundred KB of fonts and vendor files, plus one query; the build and render gate still run first,
+      because the fingerprint is of the gated artifact.
+    - IDEMPOTENCY - NO CHANGE, NO PUBLISH (Keith, 2026-10-18, his own suggestion). Publishing the same content
+      twice makes no new deployment and no new snapshot, so the archive grows only when what people can
+      see has changed. This replaces the earlier draft's 'every publish makes a new deployment, accepted'
+      position.
+    - RELIABILITY - THE FINGERPRINT MUST BE DETERMINISTIC. If any other value changes on every build (an
+      embedded 'today', a random id), every build counts as changed and the guard quietly does nothing.
+      Criterion 23 tests for exactly that, and any newly found volatile field is added to the named placeholder
+      list in code, not worked around.
+    - RELIABILITY - THE SANDBOX FORGETS ITS PUBLISHES. The sandbox database does not survive the container,
+      so a fresh session has no qa.publish row and its first publish always uploads, even if the content
+      matches what is live. One extra deployment and snapshot per fresh container is accepted; reading the
+      live site back to avoid it is rejected (see decisions). This is also the only route by which identical
+      content is ever published twice, since there is no --force.
+    - RELIABILITY - RECORD FIRST, PUBLISH SECOND, FAIL LOUDLY. Where a publish follows a QA run (the post-QA
+      prompt, `mothman pipeline run --publish`), the results are recorded and the local dashboard built
+      before anything is uploaded, and a failed upload exits non-zero with the retry named. Retrying a publish
+      is one command; re-running the pipeline is minutes to tens of minutes.
+    - RELIABILITY - NO HALF-PUBLISHED SITE. A Pages deployment only goes live once complete, so a failed
+      or interrupted upload leaves the previous deployment serving. The REQ-PIPE-092 criterion 8 behaviour
+      (an unreachable database fails before anything is uploaded) carries over unchanged.
+    - SCALE - THE 25 MIB CEILING IS CLOSER THAN IT LOOKS. index.html is at 59% of Cloudflare Pages' 25 MiB
+      per-file limit with two collections; at roughly thirty collections on the quarterly asset it will
+      not fit. This requirement only refuses loudly and warns early; solving it is a separate piece of work
+      (see open questions).
+    - SCALE - ONE PAGES PROJECT PER DATA ASSET DEPLOYMENT. The project name comes from contract/data-asset.yaml,
+      so a second data asset, deployed separately by a different team in its own cloud environment and Cloudflare
+      account, names its own project and needs no code change. Cloudflare's free plan allows 100 Pages projects
+      per account.
+    - LIMITS - FILE COUNT. 20,000 files per site on the free plan. Today's tree is under 30 files and grows
+      by one snapshot per changed publish, so this is decades away.
+    - MAINTAINABILITY. wrangler is a large package with a native binary (workerd) and releases often. Pinned
+      exactly, upgraded deliberately, and the js-tests CI job's `npm ci` gets heavier because the same package.json
+      now carries it.
+    - OBSERVABILITY. qa.publish answers 'what was published, when, by whom, from which commit' in the database
+      the dashboard already reads; Cloudflare's deployment list is a second view; the committed snapshot
+      archive remains the durable, browser-only record, as REQ-PIPE-092 decided.
+    - COST. Cloudflare Pages' free plan covers this. Its documented 500-builds-a-month limit is worded for
+      Git-integrated builds; whether direct-upload deployments count against it was NOT verified (the docs
+      page is blocked here and the docs' source does not say). Opt-in publishing, and only on change, makes
+      it unlikely to matter.
+    - PRIVACY - IF THIS IS EVER POINTED AT REAL DATA. The build reads recorded QA results, never supply
+      rows, but a recorded result can carry sample values from a failing check. With real birth registrations
+      or child protection data, that puts personal information on a US-headquartered provider's network,
+      behind an access list Keith administers by hand. Fine for synthetic data; a real deployment needs
+      its own answer, and production may still go to S3 or SharePoint as REQ-PIPE-092's NFR already records.
+    dependencies:
+    - REQ-PIPE-092
+    - REQ-PIPE-093
+    - REQ-PIPE-089
+    decisions:
+    - NO PAID GITHUB PLAN (Keith, 2026-10-18). Private GitHub Pages needs a paid plan and Keith will not
+      get one; GitHub Copilot does not provide it. He already uses Cloudflare.
+    - CLOUDFLARE PAGES BY DIRECT UPLOAD, FROM THE ENVIRONMENT THAT BUILDS (Keith, 2026-10-18). The build
+      reads the database, so GitHub Actions cannot do it (REQ-PIPE-092); the artifact travels, the build
+      does not.
+    - 'THE SANDBOX IS THE ONE PUBLISHER UNTIL PRODUCTION EXISTS (Keith, 2026-10-18, choosing to turn on
+      one environment, and naming sandbox). The one-publisher rule in environments.py stays, so production''s
+      `publishes` goes to false meanwhile. Rejected: a separate ''may publish'' property with one Pages
+      project per environment (two sites and two Access setups for a PoC), and several environments sharing
+      one project with the last publish winning (the race that rule exists to prevent).'
+    - THE SANDBOX'S DASHBOARD LOSES ITS 'NOT PRODUCTION' MARKER WHILE IT PUBLISHES, and that is accepted
+      rather than overlooked. REQ-DASH-094 and cli/common.py key the marker off `publishes`, never the name,
+      so a publishing sandbox reads as the system of record. The masthead still names the environment as
+      the Claude Code sandbox; only the visual 'not production' distinction goes. When production exists
+      and takes `publishes` back, the marker returns with no code change.
+    - HOSTING CONFIGURATION LIVES IN contract/data-asset.yaml (follows from the above, Keith 2026-10-18).
+      A data asset is a deployment, and one site serves one deployment, so the project name, production
+      branch, dashboard address and sign-in domain are facts about the asset, not about an environment.
+    - ONE SNAPSHOT PER PUBLISH, AND A PUBLISH ONLY WHEN THE CONTENT HAS CHANGED (Keith, 2026-10-18). His
+      first answer was one snapshot per publish; shown that per-run publishing would add a snapshot every
+      run, he chose to keep it and publish only when something has changed - his own suggestion, comparing
+      the current and new file hashes.
+    - '''CHANGED'' MEANS THE NORMALISED ARTIFACT, NOT THE RAW FILE AND NOT THE DATA ALONE. A raw hash of
+      index.html differs on every build, because the build stamp (REQ-PIPE-092 criteria 7 and 17) and every
+      embedded generated_at value change each time, so it would never say unchanged. Rejected: hashing only
+      the embedded data payloads - a template change, a font or a vendored player upgrade changes what people
+      see without changing the data, and has to publish. Chosen: the gated index.html with the build stamp
+      and generated_at blanked, plus fonts/ and vendor/. A code-only commit that renders identically therefore
+      does not publish, which is right - the commit in the stamp only says which code rendered it.'
+    - 'THE LAST PUBLISH IS A ROW IN qa.publish, NOT A FILE AND NOT READ BACK FROM CLOUDFLARE. A publish
+      is a recorded fact, like a run, and the repository holds configuration, not state, so a committed
+      marker file is out. Rejected: reading the fingerprint back from the live deployment. Fetching the
+      site goes through Access, so the publisher would need an Access service token - a second credential
+      that can read the private site. Reading Cloudflare''s deployment metadata ties the record to one vendor''s
+      API and to wrangler''s JSON output format. The one cost of the database answer, a fresh sandbox forgetting
+      its last publish, is an extra deployment, not a wrong one.'
+    - COMPARE BEFORE ARCHIVING. publish() today takes the snapshot before preparing the site. The fingerprint
+      has to be computed and compared before that, or an unchanged build would leave a committed snapshot
+      behind for a publish that never happened.
+    - 'AUTOMATIC PUBLISHING WAS PROPOSED AND REJECTED (Keith, 2026-10-18). A draft requirement (once REQ-PIPE-256,
+      never in the register) had `mothman pipeline run` and `mothman pipeline process` publish at the end
+      of every run, with --no-publish to opt out. Keith chose to keep publishing opt-in, so REQ-PIPE-092
+      criterion 16 and its 2026-09-27 decision ''A PIPELINE RUN PUBLISHES ONLY WHEN ASKED'' stand unchanged.
+      The reason: a deliberate act of publishing matches a deliberate snapshot - one snapshot per publish
+      only makes sense when a person chose to publish. The no-change guard stays, because an explicit publish
+      of an unchanged dashboard is still worth refusing politely.'
+    - 'NO --force (Keith, 2026-10-18). Proposed for a deployment lost or rolled back in the Cloudflare console,
+      and rejected: any change to the page changes the fingerprint, so an unchanged fingerprint means there
+      is nothing new to publish. A lost deployment is a Cloudflare console matter (roll back there), and
+      a fresh sandbox already publishes once because it has no record.'
+    - 'RECORD FIRST, THEN FAIL - CONFIRMED (Keith, 2026-10-18) for the explicit publish after a QA run.
+      Results are recorded and the local dashboard built, then the publish, then a non-zero exit with the
+      retry named. Rejected: failing before recording (throws away real work for a transport problem) and
+      exiting zero (a stale site nobody notices).'
+    - THIS AMENDS REQ-PIPE-092 CRITERIA 12 AND 13, which are built and signed. Criterion 12 says the artifact
+      is delivered by pushing to a branch GitHub Pages serves; criterion 13 keeps that branch separate from
+      the source. Criterion 12 becomes upload to the configured Pages project; criterion 13's purpose (a
+      build output can never be staged beside the code) is kept by construction, because the upload reads
+      a directory and touches no git ref at all. Recorded so the amendment is signed knowingly rather than
+      discovered.
+    - REPLACE THE GH-PAGES TRANSPORT, DO NOT RUN BOTH. Publishing to both would keep a second, public copy
+      current, and that is the thing being removed. keithamoss.github.io/data-poc keeps serving its last
+      publish (commit 0d210d0, 2026-09-27, checked live 2026-10-18) until the flip in REQ-DOCS-259 removes
+      it, and Keith accepted that gap.
+    - 'WRANGLER, PINNED, NOT A PYTHON CLIENT. Rejected: calling Cloudflare''s direct-upload API from Python.
+      It is a multi-step, content-hash upload protocol that wrangler implements and Cloudflare documents
+      only through wrangler, so a hand-written client is one more thing to keep in step with an API that
+      is not ours. Rejected: `npx wrangler@latest`, which fetches whatever was released that morning at
+      publish time - an unreviewed dependency on the one path with a credential in it.'
+    - 'WRANGLER LIVES IN THE EXISTING package.json. A second Node manifest just for publishing was considered
+      and not chosen: `npm ci` is already a documented one-time step, and two manifests means two lockfiles
+      to keep current. It still fits ''mothman is the only entry point'', because nobody runs wrangler -
+      mothman does, exactly as it runs dbt.'
+    - THE PRODUCTION BRANCH IS PASSED EXPLICITLY. wrangler reads the current git branch when run inside
+      a git checkout, and this project is routinely worked on claude/* branches, so without it most publishes
+      would quietly be preview deployments at a hash URL while the production site stayed stale.
+    - THE TOKEN IS AN ENVIRONMENT VARIABLE BESIDE THE OTHERS (Keith, 2026-10-18), never in the repository,
+      and the refusal when it is missing mirrors MOTHMAN_ENVIRONMENT's - a publish that guesses is worse
+      than one that stops.
+    - 'THE WHOLE _site TREE (Keith, 2026-10-18): the current dashboard and every time-travel snapshot, so
+      nothing that was public on github.io is lost to the private site.'
+    - A SIZE CHECK BEFORE WRANGLER'S. wrangler would also reject a file over 25 MiB, but after the gate
+      and mid-upload, with its own wording. Checking first costs a directory walk and names the file in
+      this project's terms.
+    open_questions:
+    - THE 25 MIB CEILING. index.html is 14.7 MB with two collections. Splitting the build, moving embedded
+      data to sibling files, or serving large files from R2 are all possible; none is in scope here, but
+      the warning in criterion 14 will fire well before thirty collections, and this needs an owner.
+    - WHETHER DIRECT-UPLOAD DEPLOYMENTS COUNT AGAINST THE FREE PLAN'S 500 A MONTH. Not verifiable from this
+      sandbox. Check in the Cloudflare dashboard after the first week of publishing.
+
+  - id: REQ-PIPE-257
+    title: Every address the dashboard is served at needs a one-time code sent to a named work email, and
+      the publisher checks that before and after it uploads
+    date_written: '2026-10-18'
+    story: As Keith, I want every address the published dashboard can be reached at to ask for a one-time
+      code sent to an allow-listed work email, and the publisher to refuse to upload where that is not true,
+      so that a missing, disabled or misconfigured Access policy is caught by the tool rather than found
+      by a stranger.
+    moscow: must
+    status: not_started
+    source: Keith, scoped in conversation 2026-10-18 (Cloudflare Access one-time code to the allow-listed
+      work emails of a handful of named team members), then answering delivery-scoper's question 4 the same
+      day (option A - by hand in the console from a committed runbook). Drafted by delivery-scoper 2026-10-18.
+      A PROPOSAL, not signed.
+    acceptance_criteria:
+    - THE SYSTEM SHALL require Cloudflare Access sign-in for the Pages project's production hostname, <project>.pages.dev,
+      and for every deployment and branch-alias hostname under *.<project>.pages.dev.
+    - THE SYSTEM SHALL offer One-time PIN as the only sign-in method on those Access applications.
+    - THE SYSTEM SHALL admit only email addresses listed one by one in the Access policy, and SHALL NOT
+      admit by email domain, by an Everyone rule, or by a Bypass or Service Auth rule.
+    - WHERE a custom domain is attached to the Pages project, THE SYSTEM SHALL protect it with its own Access
+      application under the same policy.
+    - THE SYSTEM SHALL keep the allow-listed email addresses in Cloudflare only, and SHALL NOT commit any
+      of them to the repository.
+    - THE SYSTEM SHALL carry a committed runbook, docs/dashboard-hosting.md, giving every console step that
+      creates the Pages project, creates the least-privilege API token, enables One-time PIN, creates both
+      Access applications and the policy, sets the session duration, and adds and removes a person.
+    - 'THE SYSTEM SHALL include in that runbook the one-time setup for publishing from a Claude Code cloud
+      session: where CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set as the cloud environment''s
+      secrets, beside MOTHMAN_ENVIRONMENT and the database variables, and that api.cloudflare.com, *.pages.dev
+      and the account''s cloudflareaccess.com sign-in domain must be allow-listed for a session to publish
+      or verify - all three refused by the session proxy as measured 2026-10-18.'
+    - THE SYSTEM SHALL take the Access sign-in domain it expects (the account's <team>.cloudflareaccess.com)
+      from contract/data-asset.yaml beside the project name.
+    - WHEN a publish is about to upload, THE SYSTEM SHALL request the production hostname with no credentials
+      and without following redirects, and SHALL upload only if the answer is a redirect to the configured
+      sign-in domain.
+    - IF that request returns any 2xx, a redirect anywhere else, or cannot be made, THEN THE SYSTEM SHALL
+      refuse to upload, saying which of the three it saw, and SHALL NOT offer any flag, variable or setting
+      that skips the check.
+    - WHEN an upload completes, THE SYSTEM SHALL request the new deployment's own hash URL the same way,
+      and IF that URL is not behind the sign-in, THEN THE SYSTEM SHALL exit non-zero naming the URL as reachable
+      without sign-in.
+    - THE SYSTEM SHALL provide `mothman dashboard verify-access`, which runs the same check against the
+      production hostname and the most recent deployment's URL without uploading anything, and exits non-zero
+      if either is reachable without sign-in.
+    - WHEN the test suite runs, THE SYSTEM SHALL exercise both checks against a local HTTP stub answering
+      with a sign-in redirect, a 200 dashboard, a redirect elsewhere, a 404 and a refused connection, with
+      no network access.
+    - 'WHEN this requirement is first built, THE SYSTEM SHALL be verified once from an environment that
+      can reach Cloudflare: an unauthenticated curl of the production URL and of a deployment URL each returning
+      the Access sign-in redirect, and one allow-listed person other than Keith signing in and seeing the
+      dashboard. The evidence records who and when, not the email address.'
+    non_functional_requirements:
+    - 'SECURITY - THE PAGES TOGGLE IS NOT ENOUGH, and this is the trap the criteria exist for. Cloudflare''s
+      own docs: Settings > Enable access policy ''will only protect your preview deployments ... and not
+      your *.pages.dev domain or custom domain''. Protecting the production hostname needs the extra steps
+      on Cloudflare''s Pages known-issues page. A dashboard that looks protected on a preview link and is
+      wide open on the main one is the exact failure criterion 1 and the pre-upload check guard against.'
+    - SECURITY - EVERY DEPLOYMENT KEEPS ITS OWN URL FOREVER. Cloudflare keeps each deployment reachable
+      at <hash>.<project>.pages.dev; an old one is not removed when a new one goes live. That is why the
+      wildcard is in criterion 1 and why the post-upload check tests the hash URL, not just the main one.
+    - SECURITY - FAIL CLOSED. If the pre-upload check cannot be made (a network blip, Cloudflare down),
+      the publish refuses. A publish that skipped the check when it could not run would let a dropped connection
+      disable the one control that keeps the site private.
+    - 'SECURITY - SESSION LENGTH, SET ON PURPOSE. Proposed: 24 hours, written into the runbook, so a lost
+      or shared laptop does not hold access for a month by default.'
+    - SECURITY - THE PUBLISH TOKEN CANNOT CHANGE ACCESS. Access is configured by hand in the console, so
+      the publishing token needs no Access permission (REQ-PIPE-255's least-privilege NFR). A leaked token
+      can replace the site; it cannot widen who reads it, and the next publish's check would catch a policy
+      someone turned off.
+    - SECURITY - SECRETS IN THE CLOUD ENVIRONMENT, NOT THE SESSION. The token is set as a secret of the
+      cloud environment the sessions run in, so it is present for a session without ever being typed into
+      a conversation, committed, or echoed by a hook.
+    - PRIVACY. The allow-list is real staff work email addresses; keeping it out of the repository keeps
+      that personal information out of git history, which is permanent and, until the flip, public.
+    - COMPATIBILITY - AGENCY MAIL. A one-time code arrives by email from Cloudflare. A government mail gateway
+      may delay, quarantine or strip it. That is why the first-build check needs a sign-in by someone other
+      than Keith, at a real agency address, before the repository is flipped.
+    - OBSERVABILITY - PER-PERSON AUDIT. Access logs each sign-in with the email and time, which is the per-person
+      audit Keith chose a one-time code over a shared credential for. How long the free plan keeps those
+      logs was not verified.
+    - MAINTAINABILITY - MANUAL CONSOLE STEPS DRIFT. Mitigated by checking the outcome on every publish (the
+      site really does demand sign-in), not the configuration. A person removed from the policy is not checked
+      by anything; the runbook says how to remove someone and why it matters.
+    - COST. Cloudflare Zero Trust's free plan allows up to 50 users; 'a handful' fits easily, and so would
+      a production team per data asset.
+    - SCALE. One pair of Access applications per Pages project, so one per data asset deployment, each in
+      that team's own Cloudflare account.
+    dependencies:
+    - REQ-PIPE-255
+    decisions:
+    - CLOUDFLARE ACCESS ONE-TIME CODE TO NAMED WORK EMAILS (Keith, 2026-10-18), for a handful of named people
+      in his team.
+    - CONFIGURED BY HAND IN THE CONSOLE FROM A COMMITTED RUNBOOK (Keith, 2026-10-18, option A). The allow-list
+      stays in Cloudflare; mothman checks the outcome on every publish rather than owning the configuration.
+    - REJECTED - MOTHMAN CONFIGURING ACCESS THROUGH THE API (Keith, 2026-10-18). It would need a token with
+      Access write permission, so the credential on the publish path could change who may read the site;
+      and the allow-list would have to be committed, putting staff emails in git.
+    - REJECTED - TERRAFORM (Keith, 2026-10-18). A new tool to install and keep current, for configuration
+      a handful of console steps covers.
+    - REJECTED - MICROSOFT ENTRA ID (Keith, 2026-10-18). The right answer eventually, but it needs his agency's
+      tenant admin to register an application, which is not in his gift for a PoC.
+    - REJECTED - GITHUB IDENTITY (Keith, 2026-10-18). It needs everyone who reads the dashboard to have
+      a GitHub account, and most of his team do not.
+    - REJECTED - ONE SHARED CREDENTIAL (Keith, 2026-10-18). No per-person audit of who looked, and removing
+      one person means rotating it for everyone.
+    - REJECTED - ADMITTING BY EMAIL DOMAIN. It would admit everyone at the agency rather than a handful
+      of named people, which is not what Keith asked for.
+    - REJECTED - RELYING ON THE PAGES PROJECT'S 'ENABLE ACCESS POLICY' SETTING ALONE. Cloudflare documents
+      it as protecting preview deployments only.
+    - CHECK BEFORE AND AFTER, NOT JUST IN A SEPARATE COMMAND. A verify command nobody runs catches nothing.
+      One unauthenticated request before each upload and one after costs about a second.
+    - ACCESS BEFORE THE FIRST REAL UPLOAD. The pre-upload check refuses on a project with no Access application,
+      so the first real publish cannot happen until Access is in place, and there is never a moment when
+      the new site is public. This is why REQ-PIPE-255's first live publish waits on this requirement.
+    open_questions: []
+
+  - id: REQ-GHUB-258
+    title: Links to the dashboard are built from a configured address, not a hardcoded github.io URL
+    date_written: '2026-10-18'
+    story: As a person following a link from a QA ticket, I want it to open the private dashboard, so that
+      making the repository private does not leave every ticket pointing at a site that no longer exists.
+    moscow: must
+    status: not_started
+    source: 'Found by delivery-scoper 2026-10-18 while scoping Keith''s private-hosting work (Keith, 2026-10-18):
+      qa_tools/common/ticket_check_summary.py:46 hardcodes DASHBOARD_BASE_URL = "https://keithamoss.github.io/data-poc/",
+      and check_url() builds every ticket''s dashboard link from it. A PROPOSAL, not signed.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL take the published dashboard's address from contract/data-asset.yaml, beside the
+      Pages project name, and SHALL NOT hardcode a dashboard address in product code.
+    - WHEN a ticket body links to a check, dataset or slot on the dashboard, THE SYSTEM SHALL build that
+      link from the configured address.
+    - IF the stated environment turns ticketing on and no dashboard address is configured, THEN THE SYSTEM
+      SHALL refuse before connecting, naming the missing key, as REQ-PIPE-093 does for a missing ticket
+      repository.
+    - THE SYSTEM SHALL NOT rewrite the bodies of tickets already written. (See open question.)
+    non_functional_requirements:
+    - SCALE. A second data asset is a second deployment with its own dashboard address, so the address is
+      per-deployment configuration in that deployment's data-asset.yaml, never a constant.
+    - COMPATIBILITY. A link into the private site lands a reader who is not signed in on the Access sign-in
+      page, then on the right dashboard view once signed in; the hash route has to survive the round trip.
+      Verify that once, live, because it is the one part a stub cannot prove.
+    dependencies:
+    - REQ-PIPE-255
+    decisions:
+    - THE ADDRESS LIVES IN contract/data-asset.yaml (Keith, 2026-10-18, by way of his answer that hosting
+      configuration is one site per data-asset deployment).
+    - SEPARATE FROM THE PUBLISH REQUIREMENT because its user is a different person (whoever follows a ticket,
+      not whoever publishes) and it lives in GHUB's code. It must be built before the flip in REQ-DOCS-259,
+      or the flip breaks ticket links.
+    open_questions:
+    - EXISTING TICKETS. Any GitHub issue already written carries the github.io link. After the flip those
+      issues are themselves in a private repository and the link is dead. Rewriting old ticket bodies is
+      possible and is proposed as out of scope; say if it should be in.
+
+  - id: REQ-TEST-260
+    title: Sessions push far less often, CI's measured usage is a command away, and a private repository's
+      free allowance decides the flip
+    date_written: '2026-10-18'
+    story: As Keith, I want each piece of work pushed once its local gate is green rather than at every
+      checkpoint, with CI's real billable minutes measured before and after, so that the repository can
+      go private on GitHub's free plan without CI stopping a few days into each month.
+    moscow: must
+    status: not_started
+    source: Keith, answering delivery-scoper's question 5 on 2026-10-18 (option A - cut CI first, as a precondition
+      of the flip), then the follow-up the same day (option C - push far less, using the existing local
+      checkpoint commits, cadence rule D, and keep validate-config on every push). Drafted by delivery-scoper
+      2026-10-18 from GitHub API measurements made the same day. A PROPOSAL, not signed.
+    acceptance_criteria:
+    - THE SYSTEM SHALL keep test.yml's push trigger on claude/** and its workflow_dispatch trigger, and
+      SHALL keep validate-config.yml running on every push to claude/**.
+    - THE SYSTEM SHALL keep test.yml's per-branch concurrency group with cancel-in-progress, so that a newer
+      push or dispatch for the same branch replaces an older run.
+    - THE SYSTEM SHALL keep restoring the bootstrapped database from REQ-TEST-117's cache, and bootstrapping
+      on a miss.
+    - 'THE SYSTEM SHALL amend CLAUDE.md''s commit-cadence bullet so that, for a private repository, rule
+      D is the default rather than an option: work is committed locally as checkpoints with no test claims,
+      and pushed once per finished, gate-green piece of work, not once per checkpoint, with rules A to C
+      applying to that one push.'
+    - THE SYSTEM SHALL amend CLAUDE.md's standing rule to check the real CI run after every push so that
+      it stays true under the new cadence - one push per finished piece of work, its run checked at the
+      next natural pause - and SHALL state the monthly budget beside it.
+    - THE SYSTEM SHALL provide `mothman github ci-usage --days N`, which reads the GitHub API and reports,
+      per workflow and in total, the runs, the cancelled runs, the pushes and the billable job-minutes (each
+      job's duration rounded up to a whole minute, the way GitHub bills) for the last N days, and the figure
+      scaled to a 30-day month against a 2,000-minute allowance.
+    - WHEN this requirement is built, THE SYSTEM SHALL record as evidence the before figure measured on
+      2026-10-18 and an after figure from `mothman github ci-usage --days 7` covering a full working week
+      under the new cadence.
+    - IF that measured week scales to more than 2,000 billable minutes a month, THEN THE SYSTEM SHALL record
+      the requirement as not met, and the flip in REQ-DOCS-259 SHALL wait on one of the fallbacks recorded
+      in this requirement's decisions.
+    - WHEN the test suite runs, THE SYSTEM SHALL test `mothman github ci-usage`'s arithmetic against recorded
+      API responses, including a cancelled run and a job with no completion time, with no network access.
+    non_functional_requirements:
+    - COST - THE BEFORE FIGURE (measured 2026-10-18 through the GitHub API). In the week 2026-10-10 to 2026-10-17,
+      test.yml ran 342 times and validate-config.yml 315 times - roughly 320 pushes. The 100 most recent
+      test.yml runs billed 3,120 job-minutes, 31 a run on average with cancelled runs included. A successful
+      full run bills about 39 (test 10-19, test-deployment 10-33, on-demand 3, js-tests 2, coverage 1).
+      That is roughly 10,900 billable minutes a week, against a private free allowance of 2,000 a MONTH
+      - about 23 times over.
+    - COST - THE ARITHMETIC FOR THE NEW CADENCE. At ~39 billable minutes per successful full run, 2,000
+      a month is about 51 runs; with validate-config's minute per push added it is about 50 pushes a month,
+      which is about 12 pushes a week, or under two a day. Against roughly 320 last week, that is a 96%
+      cut.
+    - COST - IS THAT REALISTIC? Honestly, it is tight. It means a session pushing once or twice in a day
+      rather than dozens of times, and it has no slack. A red run followed by a fix is two pushes, not one.
+      A cache miss (a new claude/* branch every session, and caches dropped after 7 days unused) makes the
+      deployment half rebuild from empty, about 32 minutes since REQ-GEN-207, putting that run nearer 60
+      minutes than 39. And a manual dispatch costs the same as a push. Measured as normal working weeks,
+      a figure near 2,000 is likely to come in over it. The REQ-DOCS-259 precondition - a measured week
+      that scales to at most 2,000 a month - decides it, not this estimate.
+    - 'CANCELLED RUNS - THE LEVER IS FEWER RUNS, NOT A SETTING. Cancelling in progress already happens (concurrency
+      group test-${{ github.ref }}, cancel-in-progress: true), and GitHub still bills the minutes a cancelled
+      job used - 53 of the 100 sampled runs were cancelled. Pushing once per finished piece of work makes
+      superseded runs rare, so most of that waste goes with the push count.'
+    - RELIABILITY - A RED FOUND LATER. Fewer pushes means a regression is found when the finished work is
+      pushed, not minutes after the checkpoint that caused it. The local gate (`mothman check`, commit-cadence
+      rules A to C) is the guard in between, as it already nominally is.
+    - RELIABILITY - CACHE MISSES GET MORE LIKELY. GitHub evicts a cache entry unused for 7 days, and a branch
+      can restore only its own caches and the default branch's. With fewer runs, and a new claude/* branch
+      every session, a session's first push is likely to miss and bootstrap from empty. Budget it at ~60
+      minutes.
+    - MEASURABLE BEFORE THE FLIP. Job durations are reported for public repositories too, so the after figure
+      can be measured while the repository is still public and free; nothing has to break to find out whether
+      it fits.
+    - OBSERVABILITY. `mothman github ci-usage` makes the monthly figure something anyone can check in one
+      command, and a session can check it before pushing late in a month, rather than it being a number
+      in a requirement that goes stale the way CLAUDE.md's CI timing table did.
+    - MAINTAINABILITY - A HABIT, NOT A MECHANISM. Nothing enforces the push cadence; it is a CLAUDE.md rule.
+      That is why the measured week and the command exist - they are what show whether the habit is holding.
+    dependencies:
+    - REQ-TEST-117
+    decisions:
+    - CUT CI FIRST, AS A PRECONDITION OF THE FLIP (Keith, 2026-10-18, option A). He first asked why CI publishes;
+      it does not and never will - the minutes are the test suite, which on a private repository is metered.
+    - 'PUSH FAR LESS, KEEP THE TRIGGERS (Keith, 2026-10-18, option C). test.yml keeps its push and workflow_dispatch
+      triggers, validate-config keeps running on every push, and the lever is the number of pushes: commit-cadence
+      rule D''s local checkpoints become the default, with one push per gate-green piece of work.'
+    - REJECTED FOR NOW, KEPT AS FALLBACKS IF THE MEASURED WEEK DOES NOT FIT. (1) Test-suite jobs only on
+      demand (workflow_dispatch), validate-config alone per push - room for ~16 full runs a month at today's
+      push rate, more at the new one. (2) Everything on demand with the local `mothman check --docs` as
+      the per-push guard - room for ~45 full runs a month. (3) A self-hosted runner on Keith's own machine,
+      which GitHub does not meter - per-push CI could stay as it is, but the machine has to be on and becomes
+      something to secure.
+    - NOT NIGHTLY. GitHub's schedule trigger runs only on the default branch, which is claude/new-session-en9qen,
+      a session branch nobody works on, while each session's work is on a new claude/* branch. Recorded
+      so a nightly run is not proposed again without first giving the repository a long-lived default branch.
+    - THE CACHE STAYS (REQ-TEST-117). A restored database makes the slow half ~10 minutes rather than ~33,
+      and the cache is keyed only on the inputs that shape it.
+    - REJECTED - A PAID PLAN TO RAISE THE ALLOWANCE. Keith's standing decision of 2026-10-18 is no paid
+      GitHub plan.
+    - A MEASURING COMMAND, NOT A ONE-OFF SCRIPT, because the flip's precondition and every month after it
+      need the same number, and CLAUDE.md requires anything run more than once to be a mothman command.
+    open_questions: []
+
+  - id: REQ-DOCS-259
+    title: The repository is made private only once the private dashboard is live, a teammate has signed
+      in, and CI fits the free allowance
+    date_written: '2026-10-18'
+    story: As Keith, I want the repository made private only after the Cloudflare-hosted dashboard is serving,
+      someone other than me has signed in to it, and CI fits a private repository's free minutes, so that
+      there is never a day with no dashboard anywhere, and nothing that depended on the repository being
+      public is left silently broken.
+    moscow: must
+    status: not_started
+    source: Keith, scoped in conversation 2026-10-18 (private only AFTER the private host is live and the
+      team can get in; taking keithamoss.github.io/data-poc down is accepted then), then answering delivery-scoper's
+      questions 5 and 6 the same day. Drafted by delivery-scoper 2026-10-18. A PROPOSAL, not signed.
+    acceptance_criteria:
+    - THE SYSTEM SHALL carry, in docs/dashboard-hosting.md, a pre-flip checklist naming every precondition
+      below, for Keith to complete before he changes the repository's visibility.
+    - THE SYSTEM SHALL NOT have the repository made private until REQ-PIPE-255, REQ-PIPE-257 and REQ-GHUB-258
+      are built, a real publish is serving the current dashboard and every snapshot from the private host,
+      and an allow-listed person other than Keith has signed in to it.
+    - THE SYSTEM SHALL NOT have the repository made private until REQ-TEST-260 is built and `mothman github
+      ci-usage --days 7`, run over a full working week under its push-cadence rule, reports a figure that
+      scales to at most 2,000 billable minutes a month.
+    - THE SYSTEM SHALL NOT have the repository made private until it is confirmed that the agent sessions
+      this project is worked in can still clone and push it.
+    - 'WHEN the repository has been made private, THE SYSTEM SHALL be verified: an anonymous request for
+      the repository and for keithamoss.github.io/data-poc each returning 404, `mothman dashboard verify-access`
+      passing, and a test.yml run on the private repository completing.'
+    - WHEN the flip is verified, THE SYSTEM SHALL have the gh-pages branch deleted, since nothing publishes
+      to it and every publish it holds is also in the committed snapshot archive.
+    - WHEN this requirement is built, THE SYSTEM SHALL state, in CLAUDE.md, README.md and docs/project-context-for-agents.md,
+      that the repository is private, where the dashboard is hosted, how a person is given access, and which
+      environment variables a publishing environment needs, and SHALL contain no statement that the repository
+      is public or that the dashboard is at keithamoss.github.io.
+    - WHEN this requirement is built, THE SYSTEM SHALL remove plans/dashboard.md items 2 and 4, moving anything
+      they hold that no requirement carries into these requirements' decisions first.
+    non_functional_requirements:
+    - 'COST - CI MINUTES. Public repositories get GitHub Actions minutes free and unmetered; a private repository
+      on the free plan gets 2,000 a month. Measured 2026-10-18 at roughly 10,900 billable minutes a week
+      under today''s triggers - about 23 times the allowance - which is why REQ-TEST-260 is a hard precondition
+      rather than a follow-up. Its lever is pushing far less: about 12 pushes a week where there were about
+      320.'
+    - COMPATIBILITY - NOTHING ELSE MAY ASSUME PUBLIC. raw.githubusercontent.com links, anonymous clones
+      and the `gh` CLI used without auth all stop working. The CLAUDE.md sweep in criterion 7 should grep
+      for each.
+    - PRIVACY - THE FLIP DOES NOT RETRACT. Anything cloned, forked, cached or archived while the repository
+      and the github.io site were public stays wherever it went. Acceptable because the data has always
+      been synthetic; worth saying so it is not mistaken for a clean-up.
+    - 'RELIABILITY - NO GAP. The ordering in criterion 2 is the whole point: the private site serves and
+      someone can get in before the public one goes.'
+    - OBSERVABILITY. The flip is a settings change no tool records in git, so the CHANGELOG.yaml entry for
+      it carries the date it happened, and the requirement's evidence carries the checklist's outcome.
+    dependencies:
+    - REQ-PIPE-255
+    - REQ-PIPE-257
+    - REQ-GHUB-258
+    - REQ-TEST-260
+    decisions:
+    - PRIVATE ONLY AFTER THE PRIVATE HOST IS LIVE AND THE TEAM CAN GET IN (Keith, 2026-10-18). No gap with
+      no dashboard anywhere. Taking keithamoss.github.io/data-poc down is accepted once the private site
+      is up.
+    - CI MUST FIT BEFORE THE FLIP (Keith, 2026-10-18, question 5 option A, then option C for how), proved
+      by a measured week rather than an estimate. If the measured week does not fit, the flip waits on one
+      of REQ-TEST-260's recorded fallbacks.
+    - 'THE DASHBOARD''S GITHUB LINKS ARE FOR MAINTAINERS (Keith, 2026-10-18, question 6 option A). Links
+      to issues, commits and plans source will 404 for team members who are not collaborators, which is
+      most of the people being given access. Accepted: those links serve whoever maintains the pipeline.
+      Rejected: adding the team as collaborators (needs the GitHub accounts he ruled out for sign-in), and
+      labelling the links maintainer-only on the page (a DASH change nobody has asked for yet).'
+    - KEITH CHANGES THE SETTING HIMSELF. No tool in this project should hold a credential that can change
+      a repository's visibility, so the flip is a manual step with a checklist rather than a mothman command.
+    - DOCS, NOT PIPE. The flip's outcome is about the repository and this project's own working process
+      and documentation; the dashboard's hosting is already PIPE-255 and PIPE-257's.
+    - 'BUILD ORDER: REQ-PIPE-255, then REQ-PIPE-257 before any real upload, then REQ-GHUB-258; REQ-TEST-260
+      in parallel with any of them, and measured for a week; then this. Automatic publishing (once REQ-PIPE-256)
+      was dropped by Keith on 2026-10-18 and is not part of this set.'
+    open_questions: []
