@@ -10500,3 +10500,15 @@ twice. It deliberately did not re-find the `TypeError`.
      existing tests/test_validate_schedule.py
      test_the_committed_configuration_is_valid (red before, green after, with
      the schedule family's 390 tests).
+
+238. **[done, 2026-10-18]** **[Pipeline & publishing]** **Inheritance read a
+     dataset's newest participation, not the one in force for the period.**
+     Found planning REQ-GEN-205 (Emergency Department's participation gap,
+     REQ-GEN-251): `inheritance._does_not_participate` asked
+     `schedule.delivery_months(dataset)` with no date, which returns the NEWEST
+     version's `participates`. A gap that is a middle version - owed, then not,
+     then owed again - read as owed, so the gap quarter would never inherit.
+     Child Protection's case workers never showed it because their versions
+     all say the same months. FIXED TEST-FIRST: tests/test_participation_gap.py
+     (the gap quarter failed as owed before, passes now, and the quarters either
+     side stay owed); the period's own date is passed.

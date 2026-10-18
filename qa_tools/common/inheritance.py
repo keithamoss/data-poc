@@ -115,7 +115,11 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
     # "is it one of my slots?" of every period in the asset, so Birth
     # Registrations' daily periods read as Case Workers declining them
     # and were each recorded as a refused inheritance.
-    months = schedule.delivery_months(dataset_id)
+    # THE VERSION IN FORCE FOR THIS PERIOD, never the newest (a defect found
+    # planning REQ-GEN-205): a gap that is a middle participation version -
+    # owed, then not, then owed again - read as owed under the newest.
+    on = _period_dates(dataset_id).get(period_name)
+    months = schedule.delivery_months(dataset_id, on=on) if on else None
     if (months and period_name in _calendar_period_names(dataset_id)
             and period_name not in _slot_names(dataset_id)):
         import calendar
@@ -124,6 +128,15 @@ def _does_not_participate(dataset_id: str, period_name: str) -> tuple[bool, str]
         return True, (f"{dataset_id} is delivered in {' and '.join(names)} only "
                       f"(its participation in contract/calendar.yaml), so nothing is owed for {period_name}")
     return False, ""
+
+
+def _period_dates(dataset_id: str) -> dict:
+    """Each period of this dataset's own calendar, by name, to its date."""
+    try:
+        name = schedule.calendar_for_dataset(dataset_id).name
+        return {p.name: p.date for p in schedule.periods_for_calendar(name)}
+    except schedule.ScheduleConfigError:
+        return {}
 
 
 def _calendar_period_names(dataset_id: str) -> frozenset[str]:
