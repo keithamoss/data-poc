@@ -1668,15 +1668,20 @@ class TestSupplyAndTableLevelSections:
             return !!(wrap.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING);
         }""")
 
-    def test_a_section_is_omitted_rather_than_rendered_empty(
+    def test_an_empty_table_section_shows_and_a_one_table_cross_table_section_does_not(
             self, clean_page, built_dashboard_html):
-        """Real on today's data, not hypothetical - Birth Registrations
-        has supply-level checks and no table-level ones. This is the
-        case that choosing two sections over one grouped section made
-        load-bearing."""
+        """Real on today's data - Birth Registrations has supply-level checks
+        and no table-level ones. It used to leave the empty section out;
+        since REQ-QAC-247 (Keith, 2026-10-18) a missing rule is shown, as it
+        always was for Child Protection, but a collection with one table
+        never shows a Cross-table section it could not fill."""
         _goto(clean_page, built_dashboard_html, _BDM)
 
-        assert [s["scope"] for s in self._sections(clean_page)] == ["supply"]
+        sections = self._sections(clean_page)
+        assert [s["scope"] for s in sections] == ["supply", "table"]
+        table = sections[1]
+        assert [r["name"] for r in table["rows"]] == ["No automated quality rule defined"]
+        assert table["status"] == "No rule defined"
 
     def test_each_section_carries_its_own_status(self, clean_page, built_dashboard_html):
         _goto(clean_page, built_dashboard_html, self._CP)

@@ -118,6 +118,5 @@ ADAPTER = CollectionAdapter(
         "orchestrate.entry_carries_csv_path",
         "dashboard.single_dataset_document",
         "dashboard.supply_section_first",
-        "dashboard.drops_empty_sections",
     }),
 )

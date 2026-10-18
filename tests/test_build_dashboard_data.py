@@ -100,12 +100,14 @@ def test_build_produces_one_entry_per_known_column(tmp_path, monkeypatch):
 
     data = bdd.build(_BDM)
 
-    # Every REAL column, in order. The two pseudo-columns are in
-    # ALL_COLUMNS too but only appear when the dataset actually has a
-    # table-level check to put in them - this fixture has none, and an
-    # empty "(supply-level checks)" tile would be noise.
+    # Every REAL column, in order, then the sections. This fixture has no
+    # section-level check, so each shows its grey "no rule" card - except
+    # Cross-table, which a one-table collection never shows (REQ-QAC-247,
+    # Keith 2026-10-18).
+    names = [col["name"] for col in data["columns"]]
     real_columns = [c for c in _COLUMNS if c not in bdd._PSEUDO_COLUMNS]
-    assert [col["name"] for col in data["columns"]] == real_columns
+    assert names[:len(real_columns)] == real_columns
+    assert set(names[len(real_columns):]) == set(bdd._PSEUDO_COLUMNS) - {bdd.CROSS_TABLE_PSEUDO_COLUMN}
     assert data["rowCount"] == 4  # latest run (run_02)'s n_rows_generated
     assert data["prevRowCount"] == 3
 

@@ -457,9 +457,11 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
             })
 
         _disambiguate_pooled_keys(checks_out)
-        if not checks_out and col in _PSEUDO_COLUMNS and "dashboard.drops_empty_sections" in legacy:
-            # Birth Registrations' sections with no checks do not exist
-            # (legacy flag); every other collection's say so below.
+        if not checks_out and col == CROSS_TABLE_PSEUDO_COLUMN and len(coll.datasets) == 1:
+            # A ONE-TABLE COLLECTION HAS NO CROSS-TABLE GAP TO REPORT
+            # (REQ-QAC-247, Keith 2026-10-18). Every other empty section says
+            # so below, Table-level included, because a missing rule is
+            # something a reader should see.
             continue
         if not checks_out:
             checks_out = [{

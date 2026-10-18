@@ -88,8 +88,19 @@ class TestAThirdCollectionIsBuilt:
         assert ds["id"] == FAKE_DATASET and ds["provider"] == "The Fake Agency"
         assert ds["runs"] == [] and ds["arrivalHistory"] == [] and ds["lastArrival"] is None
         assert ds["_provenance"] == "Built from fakes. (One row per fake thing.)"
-        # Every column is there, each saying no rule is defined - never a crash.
+        # Every column shown says no rule is defined - never a crash.
         assert {c["checks"][0]["key"] for c in ds["columns"]} == {"no_rule_defined"}
+
+    def test_a_one_table_collection_shows_table_level_but_no_cross_table_section(
+            self, described):
+        """REQ-QAC-247 (Keith, 2026-10-18): a missing rule is visible, so an
+        empty Table-level section shows its grey card - but a collection with
+        one table has no cross-table gap to report, so that section is left
+        out rather than shown empty."""
+        (ds,) = bdd.build_datasets(FAKE_ID)
+        names = [c["name"] for c in ds["columns"]]
+        assert bdd.TABLE_LEVEL_PSEUDO_COLUMN in names
+        assert bdd.CROSS_TABLE_PSEUDO_COLUMN not in names
 
     def test_it_is_written_in_the_shape_every_collection_now_has(self, described, tmp_path,
                                                                monkeypatch):

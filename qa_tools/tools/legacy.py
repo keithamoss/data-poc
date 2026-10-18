@@ -49,7 +49,4 @@ KNOWN: dict[str, str] = {
         "the Supply-level section's pseudo-column is listed before the Table-level "
         "one in the dashboard file. The page orders the sections itself, so no reader "
         "sees it; the file's order is kept so the build's output is unchanged."),
-    "dashboard.drops_empty_sections": (
-        "a section with no checks is left out of the dataset, rather than shown with "
-        "a 'No automated quality rule defined' card as every other collection's is."),
 }
