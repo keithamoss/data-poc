@@ -108,7 +108,6 @@ ADAPTER = CollectionAdapter(
     legacy=frozenset({
         "evidently.volume_from_drift_frame",
         "stage.stamps_run_columns",
-        "stats.single_table_shape",
         "stats.rows_by_run_id",
         "stats.arrival_after_registration",
     }),

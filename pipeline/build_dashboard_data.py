@@ -19,9 +19,9 @@ Python. Nothing about a collection is code here any more:
   come from contract/presentation.yaml (criterion 10);
 - which value-count distribution and aggregates a column shows come from
   the adapter's .stats, the same table the statistics are computed from;
-- the few places Birth Registrations' output has always differed are
-  named legacy flags on its adapter (qa_tools/tools/legacy.py), never a
-  comparison of collection ids (criterion 11).
+- nothing differs by collection id (criterion 11): the places Birth
+  Registrations' output differed were legacy flags, all retired by
+  REQ-QAC-247 and REQ-PIPE-248.
 
 A BUILD MAY READ RECORDED QA RESULTS, NEVER ACTUAL DATA, AND NEVER ANYTHING
 ELSE (Keith, 2026-09-27): every input below is a results file, a decision
@@ -124,10 +124,6 @@ _SUPPLY_LEVEL_CHECK_NAMES = {"row_count", "datacontract:row_count", "evidently:r
 
 # ---- what differs by collection, read from configuration --------------------
 
-def _legacy(coll) -> frozenset:
-    return collections.adapter(coll).legacy
-
-
 def _contract(contract: str) -> dict:
     """A collection's contract, beside the hierarchy that names it."""
     return _contract_at(str(hierarchy.DATA_ASSET_YAML.parent / contract))
@@ -183,17 +179,12 @@ def _presented(coll) -> dict:
     return presentation.for_collection(coll.id)
 
 
-# ---- the statistics, in either recorded shape --------------------------------
+# ---- the statistics, in the one recorded shape (REQ-PIPE-248) ---------------
 
-def _row_count(stats: dict | None, table: str, single: bool):
+def _row_count(stats: dict | None, table: str):
     """A run's recorded row count for `table` - absent, never zero, where the
     run could not read it (REQ-PIPE-105)."""
-    stats = stats or {}
-    return stats.get("row_count") if single else (stats.get("row_counts") or {}).get(table)
-
-
-def _aggregate_key(table: str, col: str, single: bool) -> str:
-    return col if single else f"{table}.{col}"
+    return ((stats or {}).get("row_counts") or {}).get(table)
 
 
 def _value_counts(dataset_stats: dict, run_id: str, col: str):
@@ -314,8 +305,6 @@ def share_cross_table_results(results: list[dict], by_table: dict[str, list[dict
 def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], dataset_stats: dict,
                     lifecycle_by_id: dict) -> dict:
     table, dataset_id = dataset.table, dataset.dataset_id
-    legacy = _legacy(coll)
-    single = "stats.single_table_shape" in legacy
     meta = column_meta(coll, dataset)
     all_columns = list(meta)
     stats_spec = collections.adapter(coll).stats
@@ -372,13 +361,13 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     # (REQ-PIPE-105): a run whose table was contested or held has nothing of
     # its own to show. None for a dataset never supplied (criterion 6).
     measured = [r for r in run_ids_in_order
-                if _row_count(dataset_stats.get(r), table, single) is not None]
+                if _row_count(dataset_stats.get(r), table) is not None]
     measured = measured or run_ids_in_order
     latest_run = measured[-1] if measured else None
     prev_run = measured[-2] if len(measured) > 1 else latest_run
     # A run measures only what it could read (REQ-PIPE-105), so a table can
     # be missing from a run's counts - absent here, never zero.
-    row_count_by_run = {run_id: _row_count(st, table, single)
+    row_count_by_run = {run_id: _row_count(st, table)
                         for run_id, st in dataset_stats.items()}
 
     columns_out = []
@@ -398,7 +387,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                 aggregate_values = None
                 if attach_aggregate:
                     aggregate_values = (dataset_stats.get(run_id) or {}).get(
-                        "check_aggregates", {}).get(_aggregate_key(table, col, single))
+                        "check_aggregates", {}).get(f"{table}.{col}")
                 # Why this run's check could NOT be evaluated, or None for a
                 # real verdict - never a value or a pass.
                 not_evaluated = slot["not_evaluated"].get(run_id)

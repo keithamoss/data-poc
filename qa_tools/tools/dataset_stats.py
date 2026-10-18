@@ -12,8 +12,9 @@ BUILT FROM CHILD PROTECTION'S COPY: every table the run can read, each counted
 on its own, and a table with no view left out rather than counted - which is
 what "not measured" honestly looks like, since REQ-PIPE-105 a sibling can be
 held, contested or filed elsewhere. What each collection measures is its
-adapter's `.stats`; Birth Registrations' single-table copy differed in four
-places, kept behind its legacy flags (qa_tools/tools/legacy.py).
+adapter's `.stats`; Birth Registrations' single-table shape went with
+REQ-PIPE-248, so a one-table collection records `row_counts` by table and
+aggregates keyed `table.column` like any other.
 
 THE ARRIVAL RECORD, NOT THE GENERATOR'S MANIFEST ENTRY (REQ-GEN-043 criterion
 7): which run this is, when WE received it, which delivery it came from - an
@@ -124,21 +125,6 @@ def compute_dataset_stats(collection_id: str, conn, entry: dict,
     after_registration = "stats.arrival_after_registration" in legacy
     readable = _readable(conn)
 
-    if "stats.single_table_shape" in legacy:
-        [table] = tables
-        if table not in readable:
-            return {"arrival_record": arrival_record(entry), "row_count": None,
-                    "value_counts": {}, "arrival": {}, "check_aggregates": {}}
-        return {
-            "arrival_record": arrival_record(entry),
-            "row_count": _count(conn, table, rows),
-            "value_counts": {col: _value_counts(conn, t, col, known, rows)
-                             for (t, col), known in spec.value_counts.items()},
-            "arrival": _earliest_extract(conn, table, rows, after_registration,
-                                         f"earliest_extract for run {data_run_id or entry['run_id']}"),
-            "check_aggregates": {col: _aggregate(conn, t, col, s, rows)
-                                 for (t, col), s in spec.aggregates.items()},
-        }
     return {
         "arrival_record": arrival_record(entry),
         "row_counts": {t: _count(conn, t, rows) for t in tables if t in readable},

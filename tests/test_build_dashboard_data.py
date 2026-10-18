@@ -40,17 +40,17 @@ FIXTURE_RUNS = [
 FIXTURE_DATASET_STATS = {
     "run_001": {
         "arrival_record": FIXTURE_RUNS[0],
-        "row_count": 3,
+        "row_counts": {"birth_registrations": 3},
         "value_counts": {"sex": [["M", 1], ["F", 2], ["X", 0]]},
-        "arrival": {"earliest_extract": "2026-09-01T10:00:00+00:00"},
-        "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
+        "arrival": {"birth_registrations": {"earliest_extract": "2026-09-01T10:00:00+00:00"}},
+        "check_aggregates": {"birth_registrations.sex": {"type": "categorical", "suppressed": False, "total_invalid": 0, "values": []}},
     },
     "run_002": {
         "arrival_record": FIXTURE_RUNS[1],
-        "row_count": 4,
+        "row_counts": {"birth_registrations": 4},
         "value_counts": {"sex": [["M", 2], ["F", 1], ["X", 1]]},
-        "arrival": {"earliest_extract": "2026-09-02T10:00:00+00:00"},
-        "check_aggregates": {"sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,
+        "arrival": {"birth_registrations": {"earliest_extract": "2026-09-02T10:00:00+00:00"}},
+        "check_aggregates": {"birth_registrations.sex": {"type": "categorical", "suppressed": False, "total_invalid": 1,
                                       "values": [{"value": "X", "count": 1}]}},
     },
 }
@@ -186,8 +186,8 @@ def test_the_suppliers_own_timestamp_no_longer_decides_punctuality(tmp_path, mon
 
     def _build(extract_run_1, extract_run_2):
         stats = json.loads(json.dumps(FIXTURE_DATASET_STATS))
-        stats["run_001"]["arrival"]["earliest_extract"] = extract_run_1
-        stats["run_002"]["arrival"]["earliest_extract"] = extract_run_2
+        stats["run_001"]["arrival"]["birth_registrations"]["earliest_extract"] = extract_run_1
+        stats["run_002"]["arrival"]["birth_registrations"]["earliest_extract"] = extract_run_2
         path = tmp_path / f"results_{extract_run_1[-9:-6]}.json"
         path.write_text(json.dumps({
             "runs": FIXTURE_RUNS, "results": FIXTURE_RESULTS, "dataset_stats": stats,
@@ -552,7 +552,7 @@ def test_a_run_that_measured_nothing_is_not_current(tmp_path, monkeypatch):
     path.write_text(json.dumps({
         "runs": [*FIXTURE_RUNS, contested], "results": FIXTURE_RESULTS,
         "dataset_stats": {**FIXTURE_DATASET_STATS, "run_003": {
-            "arrival_record": contested, "row_count": None, "value_counts": {},
+            "arrival_record": contested, "row_counts": {}, "value_counts": {},
             "arrival": {}, "check_aggregates": {}}},
     }))
     monkeypatch.setattr(bdd, "results_path", lambda _cid: str(path))

@@ -25,11 +25,6 @@ KNOWN: dict[str, str] = {
         "every staged row is stamped with `run_id` and `run_date` columns, which "
         "Birth Registrations' dbt model selects and Child Protection's tables have "
         "never carried."),
-    "stats.single_table_shape": (
-        "dataset statistics carry one `row_count` rather than `row_counts` by table, "
-        "value counts and aggregates keyed by column rather than `table.column`, one "
-        "`arrival` rather than one per table, and an empty record with a null count "
-        "when the table cannot be read - Birth Registrations' single-table shape."),
     "stats.rows_by_run_id": (
         "every statistic is scoped by the `run_id` column each staged row carries, "
         "as well as by the run's view schema."),

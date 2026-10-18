@@ -41,11 +41,12 @@ def test_bdm_compute_dataset_stats_shape():
     assert stats["arrival_record"] == {"run_id": "run_01", "run_index": 1,
                                         "delivery": "BDM_20200105",
                                         "received_at": "2020-01-05T06:00:00+00:00"}
-    assert stats["row_count"] == 3, "measured from the warehouse, not taken from the arrival"
+    assert stats["row_counts"] == {"birth_registrations": 3}, \
+        "measured from the warehouse, not taken from the arrival"
     assert stats["value_counts"]["sex"] == [["M", 1], ["F", 1], ["X", 0], ["(invalid code)", 1]]
-    assert stats["check_aggregates"]["sex"]["total_invalid"] == 1  # the 'Q' row
+    assert stats["check_aggregates"]["birth_registrations.sex"]["total_invalid"] == 1  # 'Q'
     # scoped to run_01 only, not run_02's later data
-    assert "2021" not in str(stats["arrival"]["earliest_extract"])
+    assert "2021" not in str(stats["arrival"]["birth_registrations"]["earliest_extract"])
 
 
 def test_bdm_check_aggregates_are_scoped_by_run_id():
@@ -65,7 +66,7 @@ def test_bdm_check_aggregates_are_scoped_by_run_id():
     stats = dataset_stats.compute_dataset_stats(BDM, conn, {"run_id": "run_01", "received_at": "2020-01-05T06:00:00+00:00"})
 
     # run_02's invalid 'Q' must not leak into run_01's own aggregate
-    assert stats["check_aggregates"]["sex"]["total_invalid"] == 0
+    assert stats["check_aggregates"]["birth_registrations.sex"]["total_invalid"] == 0
 
 
 def test_bdm_earliest_extract_ignores_disordered_rows():
@@ -95,7 +96,7 @@ def test_bdm_earliest_extract_ignores_disordered_rows():
         ('run_01', 'M', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-05 14:00:00')
     """)
 
-    arrival = dataset_stats.compute_dataset_stats(BDM, conn, {"run_id": "run_01"})["arrival"]
+    arrival = dataset_stats.compute_dataset_stats(BDM, conn, {"run_id": "run_01"})["arrival"]["birth_registrations"]
 
     assert arrival["earliest_extract"] == "2020-01-05T09:00:00+00:00"
 
@@ -119,7 +120,7 @@ def test_bdm_earliest_extract_falls_back_to_min_if_every_row_disordered():
         ('run_01', 'F', 'Fremantle', '2020-01-01', '2020-01-05', '2020-01-04 22:00:00')
     """)
 
-    arrival = dataset_stats.compute_dataset_stats(BDM, conn, {"run_id": "run_01"})["arrival"]
+    arrival = dataset_stats.compute_dataset_stats(BDM, conn, {"run_id": "run_01"})["arrival"]["birth_registrations"]
 
     assert arrival["earliest_extract"] == "2020-01-04T20:00:00+00:00"
 
