@@ -10,6 +10,8 @@ test_cli_bdm.py and test_cli_cp.py, which drive the same factory.
 """
 from __future__ import annotations
 
+import re
+
 import json
 import subprocess
 import sys
@@ -151,13 +153,17 @@ class TestTheSharedCollectionOption:
         assert out.exit_code == 0, out.output
         assert asked == [FAKE_ID]
 
-    def test_the_short_option_refuses_naming_every_short(self, third_collection):
+    def test_the_option_refuses_naming_every_collection_at_three(self, third_collection):
         from cli import debug as debug_cli
 
         out = _runner.invoke(debug_cli.debug_group,
                              ["run-dbt", "--collection", "zz", "--run-id", "x"])
         assert out.exit_code == 2
-        assert "'bdm', 'cp', 'fk'" in out.output or "bdm, cp, fk" in out.output, out.output
+        # REQ-TEST-252 criterion 13: at N_LIST or fewer the refusal still lists
+        # every collection, short and id, and says where they are all listed.
+        flat = " ".join(re.sub(r"[│╭╮╰╯─]", " ", out.output).split())
+        assert "Known: bdm (civil-registration), cp (child-protection), fk (fake-collection)" in flat, flat
+        assert "mothman collections" in flat, flat
 
     @pytest.mark.parametrize("value", [FAKE_SHORT, FAKE_ID])
     def test_supply_takes_a_third_collection_by_short_or_id(self, third_collection,

@@ -20,11 +20,15 @@ import time
 from pathlib import Path
 
 import pytest
+import yaml
 
 import thirty_collections
 from cli import common
 
 ROOT = Path(__file__).resolve().parent.parent
+#: Who decides in the filing menu: a person of the COPY's own people.yaml,
+#: named to git through the environment, so no real identity is borrowed.
+DECIDER = "thirty-collections@example.com"
 HEAVY = ("pandas", "numpy", "duckdb", "soda", "dbt", "datacontract", "evidently")
 
 
@@ -32,6 +36,10 @@ HEAVY = ("pandas", "numpy", "duckdb", "soda", "dbt", "datacontract", "evidently"
 def thirty(tmp_path_factory) -> Path:
     tree = thirty_collections.build(tmp_path_factory.mktemp("thirty") / "tree")
     assert (tree / "contract" / "data-asset.yaml").is_file()
+    people = tree / "contract" / "people.yaml"
+    doc = yaml.safe_load(people.read_text())
+    doc["people"].append({"email": DECIDER, "name": "Thirty Collections", "github": "thirty-collections"})
+    people.write_text(yaml.safe_dump(doc, sort_keys=False))
     return tree
 
 
@@ -39,6 +47,12 @@ def _run(tree: Path, *argv: str, columns: int = 120) -> subprocess.CompletedProc
     env = {**os.environ, "NO_COLOR": "1", "COLUMNS": str(columns), "TERM": "dumb"}
     return subprocess.run([sys.executable, "-m", "cli.app", *argv], cwd=tree, env=env,
                           capture_output=True, text=True, timeout=120)
+
+
+def _flat(text: str) -> str:
+    """One line of words, rich's box characters removed - a sentence the
+    error box wraps over a border reads whole again."""
+    return " ".join(re.sub(r"[│╭╮╰╯─]", " ", text).split())
 
 
 def _panel(text: str, title: str) -> list[str]:
@@ -121,7 +135,7 @@ class TestTheCollectionOptionAtThirty:
     def test_an_unknown_one_is_refused_with_the_closest_and_where_to_look(self, thirty, argv):
         out = _run(thirty, *argv, "--collection", "emergncy-department-presentatons")
         assert out.returncode == 2
-        flat = " ".join(out.stderr.split()) + " ".join(out.stdout.split())
+        flat = _flat(out.stderr) + " " + _flat(out.stdout)
         assert "emergency-department-presentations" in flat
         assert "mothman collections" in flat
         assert "Known:" not in flat, "every collection is never listed above N_LIST"
@@ -224,7 +238,10 @@ class TestTheMenusAtThirty:
         finally:
             session.close()
 
-    def test_the_filing_menu_groups_filters_and_reaches_its_collection(self, thirty):
+    def test_the_filing_menu_groups_filters_and_reaches_its_collection(self, thirty, monkeypatch):
+        for key, value in {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "user.email",
+                           "GIT_CONFIG_VALUE_0": DECIDER}.items():
+            monkeypatch.setenv(key, value)
         session = self._session(thirty)
         try:
             session.send("down")

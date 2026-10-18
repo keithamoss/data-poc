@@ -178,7 +178,7 @@ def grouped_select(message: str, groups: list[tuple[str, list[str]]], flag_hint:
     prompt saying so. `top` choices sit above every group and are never
     filtered out. Back and Ctrl-C return None, as from select()."""
     if not many:
-        return select(message, [*top, *(c for _, cs in groups for c in cs)], flag_hint)
+        return select(message, [*top, *(c for _, cs in groups for c in cs)], flag_hint=flag_hint)
     require_tty(flag_hint)
     answer = _ask(_filtered_question(message, groups, top))
     if answer is None or answer == BACK:
