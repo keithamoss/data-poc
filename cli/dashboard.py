@@ -34,17 +34,13 @@ def rebuild_results_command() -> None:
 
 
 def _build_data() -> None:
-    import json
-    import os
+    from pipeline import build_dashboard_data
+    from qa_tools import collections
 
-    from pipeline import build_dashboard_data, build_cp_dashboard_data
-
-    for module in (build_dashboard_data, build_cp_dashboard_data):
-        data = module.build()
-        os.makedirs(os.path.dirname(module.OUT_PATH), exist_ok=True)
-        with open(module.OUT_PATH, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-        console.print(f"Wrote {module.OUT_PATH}", style="green")
+    # EVERY REGISTERED COLLECTION, through the one builder (REQ-DASH-244
+    # criteria 1 and 9).
+    for coll in collections.all_collections():
+        console.print(f"Wrote {build_dashboard_data.write(coll.id)}", style="green")
     # THE CENSUS WARNING ON THE SANCTIONED PATH (REQ-PIPE-081 criterion 16,
     # #113): a WARNING, and the build still publishes.
     from qa_tools.common import census
