@@ -2116,3 +2116,27 @@ one or more component tags, and a date.
          the volume check and earliest_extract moved in from 247), the shape
          flags gone, its capture, then deleting item 6's thread whole.
       5. Fresh bootstrap, full gate, push, CI.
+    - **KEITH, ~21:35 Perth: PAST 248 INTO EMERGENCY DEPARTMENT.** "You have
+      my authority to proceed past 248 and into building the new Emergency
+      Department dataset overnight as well." Asked about the ten drafts
+      (REQ-QAC-231 to REQ-PIPE-250, docs/drafts/emergency-department/,
+      unsigned): **his message tonight IS THEIR SIGN-OFF as they stand**,
+      with stale wording updated to the registry and each update recorded,
+      and a stop at any open question that would change what gets built -
+      "but let's settle any existing open questions now". The drafts' own
+      three were already settled (two answered 2026-10-16, one a build-time
+      check), and REQ-PIPE-170 criterion 31 already says every collection.
+      Settled the same minute:
+      - **REQ-PIPE-250's "hard 12 minutes" is a measurement**, three runs on
+        this sandbox plus a printed budget line after every bootstrap, never
+        a failing CI gate.
+      - **If 12 minutes is not reached overnight**, ship the other nine and
+        leave REQ-PIPE-250 in progress with the measured time, the profile
+        and the next speed-ups written up for him.
+      - **A SECOND PUSH after Emergency Department**, on the same three
+        conditions as 248's (fresh bootstrap, green full gate, predicted
+        capture). 248 goes up first, on its own.
+    - **FOR THE MORNING, Keith's own list**: talk through the 77,000 lines
+      of code (running-thoughts #107) and the test-duplication report
+      (scratchpad test-duplication.md, to be carried into a plans file so it
+      survives the container), plus anything else left for him overnight.
