@@ -424,6 +424,16 @@ class TestThePassNotesIt:
         assert item.kind == outstanding.PENDING_CORRECTION
         assert item.severity == outstanding.NEEDS_ACTION and "CAB-1" in item.headline
         assert "cp-clients" in [ds for _a, _c, ds in item.affects]
+        # ITS OWN DATE, so the page lists it only from then (REQ-DASH-263
+        # criterion 3), and one full stop where the reason ends in its own.
+        [p] = correction_apply.pending(conn, docs)
+        assert item.as_record()["dated"] == str(p.date)
+        assert ".." not in item.detail
+        # NO RAW DATE IN ITS WORDS (the page's display standard): the page
+        # writes `dated` in its own style, and the reason - free text that
+        # may hold an ISO date - stays with `mothman supply corrections`.
+        import re
+        assert not re.search(r"\b\d{4}-\d{2}-\d{2}\b", item.detail), item.detail
         correction_apply.confirm(conn, "CAB-1", actor=manager, effective_at=AT, docs=docs)
         assert outstanding._from_pending_corrections(conn) == []
 

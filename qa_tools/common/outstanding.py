@@ -160,6 +160,10 @@ class Item:
     #: The datasets an ASSET-WIDE item affects, each (agency, collection,
     #: dataset), so the page links each (REQ-DASH-172 criterion 11).
     affects: tuple[tuple[str, str, str], ...] = ()
+    #: The date an item stands from, where it has one - a pending
+    #: correction's own date, before which the page leaves it out
+    #: (REQ-DASH-263 criterion 3).
+    dated: str | None = None
 
     def as_record(self) -> dict:
         return {"kind": self.kind, "severity": self.severity, "blocking": self.blocking,
@@ -167,6 +171,7 @@ class Item:
                 "agencyId": self.agency_id, "collectionId": self.collection_id,
                 "datasetId": self.dataset_id, "observedAt": self.observed_at,
                 "responses": list(self.responses), "actionable": self.actionable,
+                "dated": self.dated,
                 "affects": [{"agencyId": a, "collectionId": c, "datasetId": d,
                              "name": _name_of(d)} for a, c, d in self.affects]}
 
@@ -633,10 +638,14 @@ def _from_pending_corrections(conn=None) -> list[Item]:
     return [Item(
         kind=PENDING_CORRECTION, severity=NEEDS_ACTION, blocking=False,
         headline=f"Calendar correction {p.reference} awaits the data asset's manager",
-        detail=(f"Declared {p.date} on {p.label}: {p.reason}. Until it is confirmed, the "
+        # NO DATE OR REASON IN THE WORDS (REQ-DASH-263): the page writes `dated`
+        # in its own style, and the reason, free text that may hold an ISO
+        # date, is what `mothman supply corrections` shows.
+        detail=(f"On {p.label}. Until it is confirmed, the "
                 f"supplies it affects keep their period and verdict, and the moves it makes "
                 f"are worked out when it is opened."),
         affects=tuple((*_scope_of(ds), ds) for ds in affected[p.reference]),
+        dated=str(p.date),
         responses=(f"see its moves: mothman supply corrections --reference {p.reference}",
                    "the data asset's manager confirms it, keeping any supply where it is"))
         for p in found]

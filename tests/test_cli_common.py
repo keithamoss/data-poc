@@ -209,3 +209,40 @@ def test_the_progress_count_restarts_for_each_arrival():
     seen = [counter.step(label) for label in list(common.RUN_STEPS) * 2]
     assert max(done for done, _ in seen) < len(common.RUN_STEPS)
     assert [n for _, n in seen] == [1] * len(common.RUN_STEPS) + [2] * len(common.RUN_STEPS)
+
+
+def _commands(group, path=()):
+    import click
+
+    for name, cmd in group.commands.items():
+        if isinstance(cmd, click.Group):
+            yield from _commands(cmd, path + (name,))
+        else:
+            yield path + (name,), cmd
+
+
+class TestARequiredCollectionIsRequired:
+    """post-build-review #254: `--collection` declared required with an
+    explicit `default=None`, which click 8.5 counts as a value given, so
+    `mothman supply queue` with no `--collection` ran with None and crashed
+    with a traceback. Every command whose --collection is required must stop
+    at the parser instead, before any of its own code runs."""
+
+    def test_each_one_refuses_a_missing_collection(self, monkeypatch):
+        import click
+        from click.testing import CliRunner
+
+        from cli.app import cli
+
+        # EVERY REQUIRED OPTION, not only --collection: the trap is click's,
+        # so any option declared required with an explicit default has it.
+        required = [(path, cmd) for path, cmd in _commands(cli)
+                    if any(isinstance(p, click.Option) and p.required for p in cmd.params)]
+        assert any(p.name == "collection_id" for _, c in required for p in c.params), (
+            "no command requires --collection - the test proves nothing")
+        ran = []
+        for path, cmd in required:
+            monkeypatch.setattr(cmd, "callback", lambda *a, _p=path, **k: ran.append(_p))
+            got = CliRunner().invoke(cli, list(path))
+            assert got.exit_code == 2 and "Missing option" in got.output, (path, got.output)
+        assert ran == []

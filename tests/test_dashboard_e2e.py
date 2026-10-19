@@ -5527,3 +5527,26 @@ class TestTheGitHubLinks:
             href, title = link.get_attribute("href"), link.get_attribute("title")
             assert href.endswith(f"/contract/{agency_id}"), (agency_id, href)
             assert f"contract/{agency_id}/" in title, (agency_id, title)
+
+
+class TestAPendingCorrectionIsANeedsActionItem:
+    """REQ-DASH-263 criterion 5, on the bootstrapped history: Birth
+    Registrations' page lists REQ-GEN-205-WINDOW among the things waiting for
+    a person from the correction's own date, and not before it."""
+
+    DS = {"tier": "dataset", "agencyId": "registry-services",
+          "collectionId": "civil-registration", "datasetId": "birth-registrations"}
+    REF = "REQ-GEN-205-WINDOW"
+
+    def _items(self, page, html, on):
+        _goto(page, html, state=self.DS, in_place_on=on)
+        return [t for t in page.locator(".notice-queue .queue-item").all_inner_texts()
+                if self.REF in t]
+
+    def test_listed_from_its_date(self, clean_page, built_dashboard_html):
+        [item] = self._items(clean_page, built_dashboard_html, "2026-09-25")
+        assert "Calendar correction to confirm" in item
+        assert f"mothman supply corrections --reference {self.REF}" in item
+
+    def test_not_listed_before_it(self, clean_page, built_dashboard_html):
+        assert self._items(clean_page, built_dashboard_html, "2026-09-23") == []

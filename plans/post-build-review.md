@@ -10847,11 +10847,20 @@ twice. It deliberately did not re-find the `TypeError`.
        screenshots of how it looks now. REQ-DASH-263 is built in the same
        piece of work. Recorded as REQ-GEN-203 criterion 13, unmet.
 
-254. **[todo, 2026-10-19]** **[Testing & dev tooling]** **`mothman supply
+254. **[done, 2026-10-19]** **[Testing & dev tooling]** **`mothman supply
      queue` with no `--collection` crashes with a traceback.** Found
      settling TS-62. `id_collection_option(required=True)` is declared, but
      the command receives None and `slot_state.states_for` raises
      `UnknownDatasetError: None is not a collection`. It also happens on the
      pushed after-248 code, so it is older than the Emergency Department
-     work. Minor bug, to fix test-first after the push: why `required` is not
-     enforced, and whether other commands using the same option share it.
+     work. Minor bug; Keith asked for it fixed before the push.
+     - CAUSE: click 8.5 counts an explicit `default=None` as a value given,
+       so `required` never fired. Both collection options
+       (cli/common.py's `short_collection_option`, `id_collection_option`)
+       passed one, which affected nine commands.
+     - TEST FIRST: tests/test_cli_common.py's
+       `TestARequiredCollectionIsRequired` invokes every command with a
+       required option (25) with none, and expects click's "Missing option"
+       and no code run. It failed before the fix on
+       `mothman debug build-warehouses`.
+     - FIX: no default on a required option (`_default_unless_required`).

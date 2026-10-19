@@ -39429,7 +39429,7 @@ requirements:
       confirmed to sit among the things needing action on each dataset it affects, so that a correction nobody has
       confirmed is not only a banner I might scroll past.
     moscow: should
-    status: not_started
+    status: built
     source: 'Keith, 2026-10-19, settling TS-62''s register entry ("Those three plus the page''s Needs action list"):
       the banner, `mothman supply corrections` and the TUI''s corrections menu already show a pending correction
       (REQ-PIPE-170 criterion 20), and the page''s Needs action list should too. Drafted in the main session.'
@@ -39453,8 +39453,34 @@ requirements:
     dependencies:
     - REQ-PIPE-170
     - REQ-GEN-205
+    linked_tests:
+    - tests-js/pending-correction-queue.test.js
+    - tests/test_correction_apply.py::TestThePassNotesIt::test_a_pending_correction_needs_action_until_applied
+    - tests/test_dashboard_e2e.py::TestAPendingCorrectionIsANeedsActionItem::test_listed_from_its_date
+    - tests/test_dashboard_e2e.py::TestAPendingCorrectionIsANeedsActionItem::test_not_listed_before_it
+    implemented_by:
+    - qa_tools/common/outstanding.py::Item
+    - qa_tools/common/outstanding.py::_from_pending_corrections
+    - dashboard/qa-reporting-dashboard.template.html::outstandingItems
+    - dashboard/qa-reporting-dashboard.template.html::inPlaceOnQueueItems
+    evidence:
+    - >-
+      2026-10-19, on the bootstrap of that day: Birth Registrations' page lists REQ-GEN-205-WINDOW as "Calendar
+      correction to confirm" with `mothman supply corrections --reference REQ-GEN-205-WINDOW` on 2026-09-25 and not
+      on 2026-09-23 (tests/test_dashboard_e2e.py, 2 passed). tests-js/pending-correction-queue.test.js (4 passed)
+      covers the scopes, the single count and the date; three of its tests failed before the change.
     decisions:
-    - 'SIGNED AS DRAFTED (Keith, 2026-10-19). Built after the Emergency Department push, in the same piece of work
-      as post-build-review #253, which Keith parked for a walkthrough.'
+    - 'SIGNED AS DRAFTED (Keith, 2026-10-19), and then BUILT BEFORE THE EMERGENCY DEPARTMENT PUSH at his ask
+      ("happy for you to push once these two are fixed" - this and post-build-review #254), not with #253.'
+    - 'NO NEW ITEM - THE ONE THAT EXISTED: outstanding.py already built a pending-correction item (REQ-PIPE-170
+      criterion 3), asset-wide, its datasets in `affects` and no ids of its own, so every scope but the asset''s
+      filtered it out. outstandingItems() now matches a scope through `affects` too, which also gives criterion 2 -
+      one item, so one count, in a collection or agency however many of its datasets it affects.'
+    - 'ITS DATE IS A FIELD OF ITS OWN (`dated`), not `observedAt`: the page shows observedAt as an instant on the
+      item, and a correction''s date is a date. inPlaceOnQueueItems() leaves it out before that date.'
+    - 'NO RAW DATE ON THE PAGE (caught by the gate''s display-standard test, 2026-10-19): the detail used to say
+      "Declared 2026-09-24 on ...: <reason>", and the reason is free text holding an ISO date. The detail now
+      says only the calendar, and the page writes `dated` as "Dated <day>" through fmtDay; the reason stays with
+      `mothman supply corrections`. The asset-level queue had shown the raw dates all along - no test looked there.'
     - 'REJECTED: adding the correction to `mothman supply queue` - Keith named the page''s list only; the terminal
       already has the TUI''s "Calendar corrections awaiting confirmation" menu and `mothman supply corrections`.'

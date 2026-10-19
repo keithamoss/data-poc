@@ -1309,12 +1309,20 @@ def short_collection_option(*, help: str, all_choice: bool = False, required: bo
     """`--collection`, handed to the command as the collection's short (and
     `all`, where the command runs every collection by default)."""
     return click.option("--collection", type=CollectionParam("short", all_choice),
-                        default="all" if all_choice else None, required=required,
-                        help=_collection_help(help))
+                        required=required, help=_collection_help(help),
+                        **_default_unless_required("all" if all_choice else None, required))
 
 
 def id_collection_option(*, help: str, required: bool = False):
     """`--collection`, handed to the command as the collection id
     (`collection_id`)."""
     return click.option("--collection", "collection_id", type=CollectionParam("id"),
-                        default=None, required=required, help=_collection_help(help))
+                        required=required, help=_collection_help(help),
+                        **_default_unless_required(None, required))
+
+
+def _default_unless_required(default, required: bool) -> dict:
+    """NO DEFAULT ON A REQUIRED OPTION (post-build-review #254): click 8.5
+    counts an explicit `default=None` as a value given, so `required` never
+    fired and a command ran with None."""
+    return {} if required else {"default": default}

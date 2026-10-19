@@ -5956,7 +5956,11 @@ function outstandingItems(scope, id, source){
   }
   if(!scope || !id) return items;
   const key = scope==="agency" ? "agencyId" : scope==="collection" ? "collectionId" : "datasetId";
-  return items.filter(i=> i[key] === id);
+  // AN ASSET-WIDE ITEM IN EVERY SCOPE IT AFFECTS (REQ-DASH-263 criteria 1 and
+  // 2): a pending correction carries no ids of its own, only `affects`, so it
+  // is listed on each affected dataset and counted once - it is one item - in
+  // its collection and its agency, however many of their datasets it touches.
+  return items.filter(i=> i[key] === id || (i.affects || []).some(a=> a[key] === id));
 }
 
 // THE QUEUE AS AT THE DATE ON SHOW (REQ-DASH-133 criterion 9, and the
@@ -5977,7 +5981,10 @@ function gapItemCount(ds){ return (ds && ds.noSupply) ? ds.noSupply.length : 0; 
 function inPlaceOnQueueItems(items, data){
   const kept = items.filter(i=> i.kind !== "closed-unfilled-slot"
     && !(i.observedAt && typeof CURRENT_IN_PLACE_ON !== "undefined"
-         && assetDateStrOf(i.observedAt) > CURRENT_IN_PLACE_ON));
+         && assetDateStrOf(i.observedAt) > CURRENT_IN_PLACE_ON)
+    // A CORRECTION FROM ITS OWN DATE (REQ-DASH-263 criterion 3): before it, a
+    // reader could not have known of it.
+    && !(i.dated && typeof CURRENT_IN_PLACE_ON !== "undefined" && i.dated > CURRENT_IN_PLACE_ON));
   const gaps = [];
   data.agencies.forEach(ag=> ag.collections.forEach(col=> col.datasets.forEach(ds=>{
     (ds.noSupply || []).forEach(g=> gaps.push({
@@ -6132,7 +6139,7 @@ function outstandingItemHtml(item){
       <span class="pill ${(item.blocking||item.redsDataset)?"ev ev-action":"ev ev-info"} sm"><span class="ico"></span>${item.blocking?"Blocks a supply":item.redsDataset?"Makes its dataset red":"Needs review"}</span>
       ${when}
     </div>
-    <div class="queue-detail">${escHtml(item.detail||"")}</div>
+    <div class="queue-detail">${item.dated ? `Dated ${escHtml(fmtDay(item.dated))}. ` : ""}${escHtml(item.detail||"")}</div>
     ${affectsLinks(item)}
     ${queueItemLink(item)}
     ${outstandingResponses(item)}
