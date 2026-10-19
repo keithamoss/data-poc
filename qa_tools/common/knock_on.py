@@ -296,6 +296,25 @@ def _shout(conn, item, period: str, failing: list[tuple[str, str, str]], *,
         reason=reason, caused_by_decision=item.caused_by_decision))
 
 
+def follow_up_stream(collection_id: str, *, run_by: str | None = None, on_step=None) -> list:
+    """`follow_up` for every collection sharing a calendar with this one
+    (post-build-review #251): a promotion that opens a period makes every
+    owe-nothing dataset on that calendar inherit, so the re-evaluations it
+    owes can belong to another collection. The streams a bootstrap replays
+    together are exactly these (REQ-PIPE-262), so they are asked rather
+    than worked out again."""
+    from qa_tools import collections
+    from qa_tools.common import bootstrap
+
+    short = collections.by_id(collection_id).short
+    stream = next(s for s in bootstrap.streams([c.short for c in collections.all_collections()])
+                  if short in s)
+    done = []
+    for name in stream:
+        done += follow_up(collections.by_short(name).id, run_by=run_by, on_step=on_step)
+    return done
+
+
 def follow_up(collection_id: str, *, run_by: str | None = None, on_step=None) -> list:
     """Complete every re-evaluation this collection owes - called right after
     a batch's promotions and after a person's decision, so the knock-on is

@@ -380,3 +380,44 @@ class TestEveryDatasetACheckCountsTowardIsAReader:
 
         assert [(r.dataset_id, r.supply) for r in got] == [("cp-clients", "cp-clients@k")]
         assert got[0].stale and got[0].tables == {"cp_investigations"}
+
+
+class TestAKnockOnRunsAcrossItsStream:
+    """post-build-review #251: a promotion's knock-on is owed to every
+    dataset that reads the period it changed, and inheritance crosses the
+    collections that share a calendar. The replay followed up only the
+    promoting arrival's own collection, and a scripted decision followed up
+    none, so Child Protection's re-evaluations of a quarter Emergency
+    Department opened - and TS-80's readers after its scripted settlement -
+    waited months for that collection's next arrival."""
+
+    def test_the_follow_up_covers_every_collection_on_the_calendar(self, monkeypatch):
+        done = []
+        monkeypatch.setattr(knock_on, "follow_up",
+                            lambda cid, **kw: done.append(cid) or [])
+        knock_on.follow_up_stream("child-protection")
+        assert sorted(done) == ["child-protection", "emergency-department"]
+
+    def test_a_collection_alone_on_its_calendar_follows_up_alone(self, monkeypatch):
+        done = []
+        monkeypatch.setattr(knock_on, "follow_up",
+                            lambda cid, **kw: done.append(cid) or [])
+        knock_on.follow_up_stream("civil-registration")
+        assert done == ["civil-registration"]
+
+    def test_no_knock_on_waits_in_a_replayed_history(self, deployment_history):
+        """Against the bootstrapped history: every re-evaluation clears within
+        a week of being owed. A quarterly collection's next arrival is months
+        away, which is what a missed follow-up waited for; Birth
+        Registrations' daily ones clear within two days."""
+        from qa_tools.common import supply_db
+
+        with supply_db.connect(read_only=True, label="test-251") as conn:
+            total = conn.execute("SELECT count(*) FROM qa.owed_run "
+                                 "WHERE kind = 'reevaluate'").fetchone()[0]
+            late = conn.execute(
+                "SELECT id, dataset_id, period, owed_at::date, cleared_at::date "
+                "FROM qa.owed_run WHERE kind = 'reevaluate' AND cleared_at IS NOT NULL "
+                "AND cleared_at - owed_at > interval '7 days' ORDER BY id").fetchall()
+        assert total, "the history records no re-evaluation"
+        assert late == [], f"re-evaluations that waited more than a week: {late}"

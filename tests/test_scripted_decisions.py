@@ -665,3 +665,34 @@ class TestAnEmptiedQuarterIsMarkedNotSupplied:
         marks = {(s.dataset_id, s.period) for s in sd.load()
                  if s.period is not None and s.operation == "mark-not-supplied"}
         assert marks == expected
+
+
+class TestAScriptedDecisionsKnockOnRunsAtItsInstant:
+    """post-build-review #251: a person's decision is followed by the knock-on
+    it owes (cli/filing_tui._follow_up); a scripted one was not, so TS-80's
+    readers re-checked only at Child Protection's next arrival, three months
+    later. Playback follows up the decision's stream at its own instant."""
+
+    def test_playback_follows_up_at_the_decisions_instant(self, monkeypatch):
+        from qa_tools.common import filing_decisions as fd, knock_on, replay_clock
+
+        at = datetime.fromisoformat("2020-11-02T03:00:00+00:00")
+        seen = []
+        monkeypatch.setattr(fd, "consequences", lambda conn, req: SimpleNamespace(key=None))
+        monkeypatch.setattr(fd, "apply", lambda req, **kw: SimpleNamespace(
+            changed=True, owed=(), message="ok"))
+        monkeypatch.setattr(sd, "_connect", lambda: _NullConn())
+        monkeypatch.setattr(knock_on, "follow_up_stream", lambda cid, **kw: seen.append(
+            (cid, replay_clock.now() if replay_clock.active() else None)))
+        with replay_clock.replaying():
+            sd._apply(sd.Timed(_script(dataset_id="cp-clients"), at, "s", "2020-Q4"))
+        assert [cid for cid, _ in seen] == ["child-protection"]
+        assert timedelta(0) <= seen[0][1] - at < timedelta(seconds=5), seen
+
+
+class _NullConn:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False

@@ -678,6 +678,13 @@ def _apply(t: Timed) -> None:
     # settlement owes one per file that became a supply.
     for owed_id in outcome.owed:
         _run_the_re_check_it_owed(t, owed_id)
+    # AND THE KNOCK-ON IT OWES, at the same instant, as a person's decision is
+    # followed (cli/filing_tui._follow_up; post-build-review #251): TS-80's
+    # readers otherwise waited for Child Protection's next arrival.
+    from qa_tools import collections
+    from qa_tools.common import knock_on
+
+    knock_on.follow_up_stream(collections.collection_of(s.dataset_id).id)
 
 
 def _run_the_re_check_it_owed(t: Timed, owed_id: int) -> None:

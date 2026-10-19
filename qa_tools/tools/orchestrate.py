@@ -405,7 +405,7 @@ def promote_after(collection_id: str, arrival, got: list[dict], run_by: str) -> 
             arrival.received_at, seed=arrival.run_id,
             before=promotion.next_receipt(arrival),
             within=_claim_window(coll.id, arrival)).isoformat()))
-    knock_on.follow_up(coll.id, run_by=run_by)
+    knock_on.follow_up_stream(coll.id, run_by=run_by)
 
 
 def entry_for(collection_id: str, arrival) -> dict:

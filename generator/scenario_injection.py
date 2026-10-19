@@ -184,7 +184,8 @@ class Link:
     """
 
     scenario_id: str
-    days: int
+    #: Or LAST_DAY: the day before the second event.
+    days: int | str
     #: An int is an arrival index; a str is a scripted decision's name.
     first: int | str
     second: int | str
@@ -196,6 +197,11 @@ class Link:
 #: THE HISTORY'S END as a link's bounding event (REQ-GEN-205 criterion 12):
 #: the first instant after its last day, so a link on that day stands.
 HISTORY_END = "end of the history"
+#: A LINK ON THE DAY BEFORE ITS SECOND EVENT, in place of a count of days
+#: (post-build-review #252): with HISTORY_END that is the history's last day,
+#: wherever the anchor has moved it - TS-57b to TS-61b show what the replay's
+#: confirmation recorded there.
+LAST_DAY = "last day"
 _CORRECTION = "correction "
 
 
@@ -817,7 +823,8 @@ def link_dates(injection: Injection, placement: Placement,
     for link in injection.links:
         where = f"{injection.scenario_id}'s link for {link.scenario_id}"
         first, second = event(link.first), event(link.second)
-        if isinstance(link.days, bool) or not isinstance(link.days, int):
+        if link.days != LAST_DAY and (isinstance(link.days, bool)
+                                      or not isinstance(link.days, int)):
             out.append(LinkDate(link.scenario_id, None, first[:2], second[:2],
                                 f"{where}: days {link.days!r} is not a whole number of "
                                 f"asset days - give an int, 0 being the first event's day"))
@@ -833,7 +840,8 @@ def link_dates(injection: Injection, placement: Placement,
             out.append(LinkDate(link.scenario_id, None, first[:2], second[:2],
                                 f"{where}: {broken}"))
             continue
-        on = asset_time.local_date(first[1]) + timedelta(days=link.days)
+        on = (asset_time.local_date(second[1]) - timedelta(days=1) if link.days == LAST_DAY
+              else asset_time.local_date(first[1]) + timedelta(days=link.days))
         end = asset_time.end_of_day(on)
         problem = None
         if second[0] == HISTORY_END and not end < second[1]:
@@ -1670,9 +1678,10 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-57b",),
         correction="REQ-GEN-205",
         # 'a' while the correction awaits confirmation, 'b' on the history's
-        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12;
+        # LAST_DAY follows the anchor, post-build-review #252).
         links=(Link("TS-57a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
-               Link("TS-57b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+               Link("TS-57b", LAST_DAY, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
     Injection(
         scenario_id="TS-58a",
@@ -1686,9 +1695,10 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-58b",),
         correction="REQ-GEN-205",
         # 'a' while the correction awaits confirmation, 'b' on the history's
-        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12;
+        # LAST_DAY follows the anchor, post-build-review #252).
         links=(Link("TS-58a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
-               Link("TS-58b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+               Link("TS-58b", LAST_DAY, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
     Injection(
         scenario_id="TS-59a",
@@ -1702,9 +1712,10 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-59b",),
         correction="REQ-GEN-205",
         # 'a' while the correction awaits confirmation, 'b' on the history's
-        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12;
+        # LAST_DAY follows the anchor, post-build-review #252).
         links=(Link("TS-59a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
-               Link("TS-59b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+               Link("TS-59b", LAST_DAY, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
     Injection(
         scenario_id="TS-60a",
@@ -1718,9 +1729,10 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-60b",),
         correction="REQ-GEN-205",
         # 'a' while the correction awaits confirmation, 'b' on the history's
-        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12;
+        # LAST_DAY follows the anchor, post-build-review #252).
         links=(Link("TS-60a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
-               Link("TS-60b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+               Link("TS-60b", LAST_DAY, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
     Injection(
         scenario_id="TS-61a",
@@ -1736,9 +1748,10 @@ INJECTIONS: tuple[Injection, ...] = (
         also_demonstrates=("TS-61b",),
         correction="REQ-GEN-205",
         # 'a' while the correction awaits confirmation, 'b' on the history's
-        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12).
+        # last day, after the replay has confirmed it (REQ-GEN-205 criterion 12;
+        # LAST_DAY follows the anchor, post-build-review #252).
         links=(Link("TS-61a", 7, correction_event("REQ-GEN-205"), HISTORY_END),
-               Link("TS-61b", 21, correction_event("REQ-GEN-205"), HISTORY_END)),
+               Link("TS-61b", LAST_DAY, correction_event("REQ-GEN-205"), HISTORY_END)),
     ),
     # A CORRECTION MERGED AND NOT YET CONFIRMED (REQ-GEN-205, TS-62): Birth
     # Registrations' claim window widens to six hours from 2026-09-25 - a new

@@ -396,3 +396,33 @@ class TestALinkMayBeBoundedByACorrectionAndTheHistorysEnd:
     def test_an_undeclared_correction_is_refused_naming_it(self):
         got = self._resolve(si.Link("TS-75a", 1, 0, si.correction_event("CAB-9")))
         assert got.problem and "CAB-9" in got.problem and "not a declared correction" in got.problem
+
+
+class TestALinkCanStandOnTheHistorysLastDay:
+    """post-build-review #252: TS-57b to TS-61b show REQ-GEN-205 after the
+    replay confirms it, which is at the history's end. They counted 21 days
+    from the correction, which was the last day until the anchor moved to
+    2026-09-25 for TS-62 - then they opened three days before the state they
+    show. `days=LAST_DAY` follows the anchor instead."""
+
+    def test_last_day_is_the_day_before_the_history_ends(self, monkeypatch):
+        monkeypatch.setattr(si, "_history_last_day", lambda: ANCHOR + timedelta(days=8))
+        inj = _injection(si.Link("TS-75b", si.LAST_DAY, 0, si.HISTORY_END))
+        [d] = si.link_dates(inj, si.resolve(_injection(), _periods()), scripts=[])
+        assert d.problem is None, d.problem
+        assert d.on == ANCHOR + timedelta(days=8)
+
+    def test_the_req_gen_205_b_links_are_on_the_last_day(self):
+        from generator.collections import emergency_department as ed
+
+        periods = ed.generated_periods()
+        found = {}
+        for injection in si.INJECTIONS:
+            if injection.correction != "REQ-GEN-205":
+                continue
+            for d in si.link_dates(injection, si.resolve(injection, periods)):
+                if d.scenario_id.endswith("b"):
+                    found[d.scenario_id] = (d.on, d.problem)
+        assert sorted(found) == ["TS-57b", "TS-58b", "TS-59b", "TS-60b", "TS-61b"]
+        last = si._history_last_day()
+        assert all(v == (last, None) for v in found.values()), found
