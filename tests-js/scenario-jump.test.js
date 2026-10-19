@@ -242,7 +242,8 @@ describe("a subject pushed past the fold after the jump", () => {
     w.scrollBy = (o) => calls.push(o.top);
     const el = { getBoundingClientRect: () => ({ top: 656.78, bottom: 799.28, height: 142.5 }) };
     w.keepSubjectInsideFold(el, 800);
-    expect(calls).toEqual([-1]);
+    // Scrolling DOWN brings a subject below the fold up into view.
+    expect(calls).toEqual([1]);
   });
 
   it("is left alone when it is already inside", () => {

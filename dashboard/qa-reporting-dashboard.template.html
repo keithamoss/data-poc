@@ -9295,7 +9295,9 @@ function landOnScenarioSubject(entry, on){
 function keepSubjectInsideFold(el, height){
   const r = el.getBoundingClientRect();
   if(r.height >= height || r.bottom <= height - 1) return;
-  window.scrollBy({top: -Math.ceil(r.bottom - (height - 1)), behavior: "instant"});
+  // Down, which lifts the subject (post-build-review #259: a first version
+  // scrolled up and pushed it a pixel further out).
+  window.scrollBy({top: Math.ceil(r.bottom - (height - 1)), behavior: "instant"});
 }
 // ONE LINE IN THE STALE-LINK NOTICE (criteria 7 and 9). An id is named only
 // once it has matched the panel's own (criterion 11).

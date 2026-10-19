@@ -11020,3 +11020,11 @@ twice. It deliberately did not re-find the `TypeError`.
      failing first). The e2e test measures after that point. The cause on the
      runner is inferred, not reproduced, so if it goes red again the next
      step is to log the subject's box on the runner rather than guess again.
+     - IT DID GO RED AGAIN, on af18783 (run 39297654456): 657.78-800.28px,
+       a pixel WORSE. The nudge scrolled the wrong way: `scrollBy` with a
+       negative top scrolls up, which moves a subject further down. My unit
+       test asserted the same wrong sign, so it passed - a test written from
+       the same mistaken model as the code proves nothing. Fixed test-first
+       (the test now expects a downward scroll and failed against the code),
+       and checked in a real Chromium: a subject pushed to 801.03px comes back
+       to 798.03px. CI's reload case should land at 798.28px.

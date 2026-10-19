@@ -2370,8 +2370,12 @@ one or more component tags, and a date.
      - CI on db4b11e: config validation, the fast test half, the JS suite
        and the on-demand tests all passed. The deployment half failed one
        test: TS-78a's scenario jump, which crossed the fold by 0.28px after
-       a cold reload (#259). It is fixed in the second push. Check that
-       push's run first thing.
+       a cold reload (#259).
+     - af18783, the second push: the same test failed again, a pixel worse.
+       My fix scrolled the wrong way, and its unit test asserted the same
+       wrong direction, so it passed. The direction is fixed test-first and
+       checked in a real browser (#259) in a third push. Check that push's
+       run first thing.
    - **BUILT TONIGHT**:
      - REQ-DASH-264 criterion 7, widened to arrivals in your wording.
      - REQ-GEN-237 criterion 4: `correction_claims.check_written` now asks
