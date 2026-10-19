@@ -2374,8 +2374,10 @@ one or more component tags, and a date.
      - af18783, the second push: the same test failed again, a pixel worse.
        My fix scrolled the wrong way, and its unit test asserted the same
        wrong direction, so it passed. The direction is fixed test-first and
-       checked in a real browser (#259) in a third push. Check that push's
-       run first thing.
+       checked in a real browser (#259) in a third push, 04c7123.
+     - 04c7123: CI passed in full - Run test suite (run 39307537381) and
+       Validate committed configuration (39307537390). This note is a local
+       commit, not pushed on its own.
    - **BUILT TONIGHT**:
      - REQ-DASH-264 criterion 7, widened to arrivals in your wording.
      - REQ-GEN-237 criterion 4: `correction_claims.check_written` now asks
