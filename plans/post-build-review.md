@@ -10757,3 +10757,24 @@ twice. It deliberately did not re-find the `TypeError`.
      - THE CLASS, for next time: a test listing collections by name rather
        than reading the registry goes quietly blind when a collection is
        added - the same lesson as REQ-TEST-249.
+
+248. **[done, 2026-10-19]** **[Data generation]** **Emergency Department's
+     ordinary ambers were compared under no dataset, so every one read as a
+     disagreement.** Found by tests/test_target_agreement.py's deployment
+     test on the grown-history scouting run. Its provider
+     (generator/collections/emergency_department.py) declared no
+     `target_datasets` or `amber_dataset`, and `generator/targets.written()`
+     builds a non-trial collection's ambers under `amber_dataset`, so all 14
+     came out with `dataset_id` None. Remapped by hand to ed-presentations,
+     all 14 agree with the recorded verdicts: the supplies were right, only
+     the record of what they were built to was blind. Minor bug, fixed
+     without asking.
+     - TEST FIRST: `TestWhatWasBuilt` gained one test that ED's ambers name
+       their dataset and one that `written()` refuses ambers from a provider
+       declaring no `amber_dataset`. Both failed before the fix.
+     - FIX: ED's provider declares both, and `written()` now refuses rather
+       than writing None. The deployment test's expected set of datasets is
+       derived from the providers, where it named two.
+     - THE CLASS: the same as #247 - a default that is silently empty
+       (`amber_dataset = None`) goes unnoticed when a collection is added.
+       A refusal makes the next one loud.

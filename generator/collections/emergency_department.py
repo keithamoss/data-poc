@@ -175,6 +175,9 @@ class EmergencyDepartment(Provider):
     dataset_id = DATASET_ID
     seed_ranges = ((60_000, 70_000),)
     generating_note = "one table, quarterly"
+    # ITS ORDINARY AMBERS ARE ITS ONE TABLE'S (post-build-review #248).
+    target_datasets = (DATASET_ID,)
+    amber_dataset = DATASET_ID
 
     def seed_schedule(self) -> list[tuple[str, int, int]]:
         out = [("the run plan", _RUN_PLAN_SEED, _RUN_PLAN_SEED)]

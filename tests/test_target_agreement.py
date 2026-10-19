@@ -128,6 +128,31 @@ class TestWhatWasBuilt:
         with pytest.raises(ValueError, match="TS-43.*2026-09-05 14:00"):
             targets.written(book, placed)
 
+    def test_every_ordinary_amber_names_its_dataset(self, tmp_path):
+        """post-build-review #248: Emergency Department's provider declared no
+        amber_dataset, so its ordinary ambers were compared under dataset
+        None and every one read as a disagreement in a real deployment."""
+        path = tmp_path / "book.json"
+        path.write_text(json.dumps({"ed-presentations": [
+            _entry("2015-Q3", "edamb", severity="amber")]}))
+        built = targets.written(path, tmp_path / "absent.json")
+        assert [b.dataset_id for b in built] == ["ed-presentations"]
+
+    def test_an_amber_from_a_provider_naming_no_dataset_is_refused(self, tmp_path,
+                                                                   monkeypatch):
+        from generator import collections
+
+        class _Nameless:
+            target_trial = False
+            amber_dataset = None
+            collection_id = "nameless"
+
+        monkeypatch.setattr(collections, "for_dataset", lambda key: _Nameless())
+        path = tmp_path / "book.json"
+        path.write_text(json.dumps({"x-table": [_entry("2015-Q3", "a", severity="amber")]}))
+        with pytest.raises(ValueError, match="nameless.*amber_dataset"):
+            targets.written(path, tmp_path / "absent.json")
+
     def test_nothing_generated_is_nothing_built(self, tmp_path):
         assert targets.written(tmp_path / "absent.json", tmp_path / "absent2.json") == []
 
@@ -301,7 +326,11 @@ class TestAfterAReplay:
             after = {t: conn.execute(f"SELECT count(*) FROM qa.{t}").fetchall() for t in counted}
         assert [str(d) for d in found] == []
         assert before == after
-        assert {b.dataset_id for b in built} == {DS, "cp-clients"}
+        # Every collection's targets, from what its provider declares, so a
+        # new collection is covered without editing this (#248).
+        from generator import collections
+        declared = {p.amber_dataset for p in collections.providers()} - {None}
+        assert {b.dataset_id for b in built} == declared
         assert any(b.injected for b in built) and any(b.target == "green" for b in built)
 
 

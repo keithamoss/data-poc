@@ -81,9 +81,16 @@ def written(bookkeeping: Path | None = None, placements: Path | None = None) -> 
         if owners[key].target_trial:
             out += _trialled(key, book[key], placed)
         else:
+            ambers = [e for e in book[key] if e.get("dirty_severity") == "amber"]
+            # AN AMBER COMPARED UNDER NO DATASET IS A DISAGREEMENT NOBODY CAN
+            # READ (post-build-review #248), so a provider that builds one
+            # without naming where it lands is refused here.
+            if ambers and not owners[key].amber_dataset:
+                raise ValueError(f"{owners[key].collection_id} built ordinary ambers but "
+                                 f"its provider declares no amber_dataset to compare them in")
             out += [Built(f"the ordinary amber for {entry['period']}", owners[key].amber_dataset,
                           entry["delivery"], "amber")
-                    for entry in book[key] if entry.get("dirty_severity") == "amber"]
+                    for entry in ambers]
     return out
 
 
