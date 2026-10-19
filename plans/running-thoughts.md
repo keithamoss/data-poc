@@ -5684,34 +5684,11 @@ could never have computed it), and it belongs with batch 5's check work.
     grown more surface than the model needs. Ask Keith which he wants
     looked at, and when, after item 6's chain.
 
-108. **[superseded, 2026-10-19]** **[Pipeline & publishing]** **A calendar is a
-    template each collection takes its own copy of.** Keith, 2026-10-19,
-    answering post-build-review #245 (Emergency Department and Child
-    Protection corrupting each other's inheritances in the parallel
-    bootstrap): "A calendar is just a place for each collection / dataset
-    to place its things, they should NOT compete for space in the calendar.
-    They both have their own 'copy' or instance of it they're using."
-    So the fix is not replay order. A period's opening, and the inheritance
-    that fills it, belong to one collection's instance of the calendar,
-    never to the asset as a whole. This changes signed design: today
-    `period_schema.open_period` opens a period once for the asset, and
-    `inheritance.inherit_into` fills every dataset (REQ-PIPE-098 criterion
-    4). Not scoped yet; it needs a requirement and sign-off before it is
-    built. The Emergency Department push waits on it. Same day, for TS-62:
-    "Grow BR's end", so Birth Registrations' history gets days at its end
-    and TS-62 lands after 2026-09-08.
-     SUPERSEDED THE SAME MORNING (Keith, 2026-10-19): once it was clear the
-     race is only the bootstrap's, he kept the model as built - one opening
-     per period, inheriting for every owe-nothing dataset in the asset - and
-     chose post-build-review #245's option (a), replaying shared-calendar
-     collections together (REQ-PIPE-262). The "copy" was meant
-     metaphorically: every collection's datasets in the same schema.
-
 109. **[todo, 2026-10-19]** **[Pipeline & publishing]** **What a period
      schema IS: a release of the asset, or a supply's cadence? Two new
      datasets to stress-test it, and maybe two asset configurations.**
      Keith, 2026-10-19 morning, prompted by the Emergency Department work
-     and #245/#108. His words: "I've kind of been designing this so at the
+     and the parallel-bootstrap race REQ-PIPE-262 fixed. His words: "I've kind of been designing this so at the
      data asset level, there is one schema for each quote unquote release
      of the asset. Rather than multiple schemas that depend exactly on the
      cadence of particular data sets and data collections." He suspects it

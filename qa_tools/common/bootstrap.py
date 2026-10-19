@@ -242,7 +242,7 @@ def bootstrap(collection: str = "all", force: bool = False,
         else:
             # BY STREAM (REQ-PIPE-262): collections sharing a calendar are one
             # receipt-ordered stream, as the live pass is, so who opens a
-            # period never depends on which process ran ahead (#245).
+            # period never depends on which process ran ahead.
             # GENERATION FIRST, all of it - 4.6s measured, not worth
             # overlapping - so no pipeline recognises a delivery tree a
             # generator is still writing.

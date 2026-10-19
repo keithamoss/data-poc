@@ -562,8 +562,8 @@ def run_stream(collection_ids: list[str], sequential: bool = False,
                record_deliveries: bool = True) -> list[dict]:
     """Collections that share a calendar, replayed as ONE stream in receipt
     order, as the live pass does (REQ-PIPE-262): who opens each period first
-    is then the arrival received first, never whichever process ran ahead
-    (post-build-review #245). Each arrival goes through its own collection's
+    is then the arrival received first, never whichever process ran ahead.
+    Each arrival goes through its own collection's
     steps; each collection still ends with its own results file (criterion 5).
     """
     if len(collection_ids) == 1:

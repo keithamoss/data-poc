@@ -2273,7 +2273,7 @@ one or more component tags, and a date.
       the January cp_carers filed late to 2021-Q4, the March one held as
       turned off. REQ-GEN-205-WINDOW left pending, as scripted.
     - **THE EMERGENCY DEPARTMENT PUSH IS HELD - A DEFECT THAT NEEDS YOUR
-      CALL (post-build-review #245).** With a third collection on the
+      CALL (post-build-review #245, now REQ-PIPE-262 - built).** With a third collection on the
       quarterly calendar, the parallel bootstrap is no longer deterministic.
       Emergency Department opens each quarter first, because it is about
       seven times faster than Child Protection. Opening a quarter fills it

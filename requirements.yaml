@@ -39263,7 +39263,7 @@ requirements:
       order, exactly as the live processing pass does, so that the synthetic history every comparison and sign-off is measured against
       is the same on every run and is the history a real pass would have recorded.
     moscow: must
-    status: in_progress
+    status: built
     source: 'Keith, answering plans/post-build-review.md #245 with option (a), 2026-10-19, after withdrawing per-collection opening
       (the unregistered REQ-PIPE-261 draft). Drafted by delivery-scoper 2026-10-19. A PROPOSAL, not signed.'
     acceptance_criteria:
@@ -39370,6 +39370,7 @@ requirements:
     - 'REJECTED ACCEPTING THE NONDETERMINISM for a synthetic history (#245 option c): it breaks REQ-TEST-116''s parallel-equals-sequential
       equivalence and every capture comparison, and leaves every Child Protection inheritance into a quarter Emergency Department
       opened first, 2013 to 2026, standing on the wrong supply.'
+    - 'THE "COPY" WAS A METAPHOR (Keith, 2026-10-19): "each collection has its own copy of the calendar" meant every collection''s datasets land in the same period schema, not a per-collection instance of it - which is why per-collection opening was withdrawn.'
     - 'REQ-PIPE-179 CRITERION 22 STANDS (Keith, 2026-10-19): a turned-off period inherits, which is why cp-carers'' TS-63 quarters
       2022-Q1 and 2022-Q2 are in criterion 12.'
     - 'WHY THIS IS A BOOTSTRAP-ONLY FIX AND NOT A SYMPTOM PATCH. The live processing pass does not race: it processes every collection
@@ -39408,6 +39409,45 @@ requirements:
       inheritance.inherit_into, outside any one transaction by design (inheritance writes decisions of its own). A failure part-way
       leaves the period recorded as opened with some datasets never inherited, and the opened() check means it is never revisited.
       A replay order fix does not touch it.
+    linked_tests:
+    - tests/test_bootstrap_streams.py::TestStreamsComeFromConfiguration::test_the_real_configuration_puts_cp_and_ed_together_and_bdm_alone
+    - tests/test_bootstrap_streams.py::TestStreamsComeFromConfiguration::test_moving_a_collection_to_another_calendar_moves_it_to_another_stream
+    - tests/test_bootstrap_streams.py::TestStreamsComeFromConfiguration::test_sharing_is_transitive
+    - tests/test_bootstrap_streams.py::TestStreamsComeFromConfiguration::test_a_dataset_with_no_calendar_joins_nothing
+    - tests/test_bootstrap_streams.py::TestStreamsComeFromConfiguration::test_an_unresolvable_calendar_is_refused_naming_collection_and_dataset
+    - tests/test_bootstrap_streams.py::TestStreamsComeFromConfiguration::test_the_refusal_comes_before_anything_is_generated
+    - tests/test_bootstrap_streams.py::TestAStreamIsProcessedInTheLivePassesOrder::test_arrivals_interleave_by_receipt_then_sequence_then_run_id
+    - tests/test_bootstrap_streams.py::TestAStreamIsProcessedInTheLivePassesOrder::test_every_collections_decisions_play_before_any_later_arrival
+    - tests/test_bootstrap_streams.py::TestAStreamRunsOnTheReplayClock::test_the_replay_clock_is_running_while_a_stream_is_processed
+    - tests/test_bootstrap.py::TestWhatItRuns::test_all_does_every_stream
+    - tests/test_bootstrap.py::TestWhatItRuns::test_sequential_runs_one_stream_after_another
+    - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_every_stream_is_dispatched_together
+    - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_corrections_are_confirmed_once_both_replays_finish
+    - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_unclaimed_deliveries_are_recorded_once_after_both_run
+    - tests/test_bootstrap.py::TestCollectionsRunSideBySide::test_the_wall_clock_is_reported
+    - tests/test_bootstrap_equivalence.py::TestASharedCalendarIsReplayedInReceiptOrder::test_eds_gap_inherits_its_newest_supply
+    - tests/test_bootstrap_equivalence.py::TestParallelRecordsTheSameHistory::test_identical_apart_from_the_named_exclusions
+    - tests/test_inheritance.py::TestAPeriodIsOpenedWholeOrNotAtAll::test_a_failure_partway_leaves_it_unopened_and_nothing_inherited
+    implemented_by:
+    - qa_tools/common/bootstrap.py (streams, StreamRefused, _run_stream, bootstrap)
+    - qa_tools/tools/orchestrate.py (merged_arrivals, StreamPlayer, run_stream, _begin/_end)
+    - qa_tools/common/arrival_lifecycle.py (process_stream)
+    - qa_tools/common/period_schema.py (open_period in one decision transaction, post-build-review #246)
+    - cli/pipeline.py (run and bootstrap group by stream; --sequential help)
+    - tests/equiv_support.py and tests/test_bootstrap_equivalence.py (KEEP corpus with ED deliveries)
+    evidence:
+    - >-
+      2026-10-19, a fresh bootstrap from empty into a scratch database (225 deliveries, all three collections, exit 0):
+      Birth Registrations 514s, Child Protection and Emergency Department 1349s, in total 1467s, reported in those words
+      (criterion 10). Criterion 11's query (every rule inheritance against the dataset's newest supply promoted before its
+      period opened, over qa.decision and qa.period) returned 0 mismatches over 28 rule inheritances. Criterion 12:
+      cp-case-workers 2021-Q4 inherits cp-case-workers@202108010104000000, cp-carers 2022-Q1 and 2022-Q2 inherit
+      cp-carers@202201051000000800, ed-presentations 2015-Q4 inherits ed-presentations@201507221000000800.
+    - >-
+      2026-10-19, tests/test_bootstrap_equivalence.py with --run-on-demand after the replay-clock fix: 8 passed (criteria 13
+      and 14 - parallel and sequential identical apart from the named exclusions, and ED's 2015-Q4 gap inheriting ED's
+      newest supply in both). Before that fix the same bootstrap failed REQ-GEN-205's confirmation with "proposed moves:
+      none", which is what a stream off the replay clock produces.
     open_questions:
     - Grouping by calendar assumes no two calendars ever name the same period. Nothing enforces that. If a future calendar (a financial-year
       quarterly, say) could, should mothman check refuse it, or should grouping follow period names? Not urgent at three collections;
