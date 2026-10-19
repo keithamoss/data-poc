@@ -3974,8 +3974,10 @@ REQ-GEN-205-WINDOW - is awaiting the data asset's manager to confirm it",
 and `mothman supply corrections` lists it as pending. `mothman schedule
 check-agreement` exits 0: REQ-PIPE-173's backstop does NOT go red, because
 a declared but unapplied correction accounts for the difference
-(REQ-PIPE-170 criteria 20-21). The queue does not list the pending
-correction as needing action - noted for Keith.
+(REQ-PIPE-170 criteria 20-21). The TUI lists it under "Calendar
+corrections awaiting confirmation". The page's Needs action list does not
+yet: REQ-DASH-263 (signed 2026-10-19, Keith) adds it there, and
+`mothman supply queue` stays as it is.
 **Breaks as**: the backstop's "configuration problem on our side" red;
 or the arrival judged against the old date.
 

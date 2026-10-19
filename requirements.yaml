@@ -39422,3 +39422,39 @@ requirements:
     - Grouping by calendar assumes no two calendars ever name the same period. Nothing enforces that. If a future calendar (a financial-year
       quarterly, say) could, should mothman check refuse it, or should grouping follow period names? Not urgent at three collections;
       not relayed.
+  - id: REQ-DASH-263
+    title: A correction awaiting confirmation is a Needs action item on the page
+    date_written: '2026-10-19'
+    story: As a data asset manager reading the dashboard, I want a calendar correction that is merged but not yet
+      confirmed to sit among the things needing action on each dataset it affects, so that a correction nobody has
+      confirmed is not only a banner I might scroll past.
+    moscow: should
+    status: not_started
+    source: 'Keith, 2026-10-19, settling TS-62''s register entry ("Those three plus the page''s Needs action list"):
+      the banner, `mothman supply corrections` and the TUI''s corrections menu already show a pending correction
+      (REQ-PIPE-170 criterion 20), and the page''s Needs action list should too. Drafted in the main session.'
+    signed_off:
+      by: Keith
+      date: '2026-10-19'
+    acceptance_criteria:
+    - WHILE a merged correction awaits confirmation, THE SYSTEM SHALL list one Needs action item on each dataset page
+      it affects, naming the change reference and its date, saying it waits for the data asset's manager, and giving
+      `mothman supply corrections --reference <ref>` as the next step.
+    - THE SYSTEM SHALL count each pending correction once in a collection's and an agency's needs-action counts, not
+      once per affected dataset, so a correction across thirty datasets does not read as thirty problems.
+    - THE SYSTEM SHALL list the item only for in-place-on dates on or after the correction's own date, and never once
+      the correction is confirmed (Keith, 2026-10-19 - a past correction is never shown as awaiting).
+    - THE SYSTEM SHALL leave `mothman supply queue` unchanged.
+    - THE SYSTEM SHALL be tested in a real browser on the bootstrapped history - Birth Registrations lists
+      REQ-GEN-205-WINDOW's item on 2026-09-25 and not on 2026-09-23.
+    non_functional_requirements:
+    - At thirty collections the counts stay per correction (criterion 2), so the agency card does not multiply one
+      correction by its datasets.
+    dependencies:
+    - REQ-PIPE-170
+    - REQ-GEN-205
+    decisions:
+    - 'SIGNED AS DRAFTED (Keith, 2026-10-19). Built after the Emergency Department push, in the same piece of work
+      as post-build-review #253, which Keith parked for a walkthrough.'
+    - 'REJECTED: adding the correction to `mothman supply queue` - Keith named the page''s list only; the terminal
+      already has the TUI''s "Calendar corrections awaiting confirmation" menu and `mothman supply corrections`.'

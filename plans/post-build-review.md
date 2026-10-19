@@ -10811,7 +10811,7 @@ twice. It deliberately did not re-find the `TypeError`.
      - FIX: `scenario_injection.LAST_DAY`, used by the five b links, so they
        follow the anchor wherever it moves.
 
-253. **[todo, 2026-10-19]** **[Dashboard]** **A knock-on re-evaluation never
+253. **[parked, 2026-10-19]** **[Dashboard]** **A knock-on re-evaluation never
      reaches the page: readers stay red until their own next arrival -
      KEITH'S CALL.** Found by the evidence pass after #251's fix. TS-80's
      readers (cp-notifications, cp-investigations, cp-placements) are
@@ -10827,7 +10827,31 @@ twice. It deliberately did not re-find the `TypeError`.
        run records the decision but no check results of its own, and the
        page shows each reader its own latest arrival run, which holds the
        contested fails.
-     - NOT FIXED: whether the page should show a reader the re-evaluation's
-       outcome, or the knock-on should record results under the reader, is
-       a design question (REQ-PIPE-121, REQ-DASH-126). Recorded as
-       REQ-GEN-203 criterion 13, unmet.
+     - UNDERSTOOD, 2026-10-19 afternoon. cp-clients' re-check records
+       passing cross-table results for the three readers under its own run,
+       by design ("own + readers", REQ-PIPE-105). The gate reads each check's
+       newest result from any run, so it promoted the readers (decisions
+       404-406). The page shows a dataset only its own runs (`own_runs`), so
+       the readers keep their arrival run's contested fails. The gate and
+       the page disagree about the same records. It is hidden in an
+       ordinary delivery because every table's own run follows at the same
+       instant; a lone re-check or resupply exposes it.
+     - THE FIX'S SHAPE, not built: a re-evaluation entry in a check's
+       history, recorded under another table's run, which counts for the
+       checks it re-ran but is not an arrival. Five consumers read that
+       history: the in-place-on picker, the trend charts, per-run row
+       counts, the Python status mirror (dataset_status.py), and the e2e
+       status-versus-verdict test.
+     - PARKED BY KEITH until after the Emergency Department push (2026-10-19):
+       he wants a proper conversation first, a scenario walked through and
+       screenshots of how it looks now. REQ-DASH-263 is built in the same
+       piece of work. Recorded as REQ-GEN-203 criterion 13, unmet.
+
+254. **[todo, 2026-10-19]** **[Testing & dev tooling]** **`mothman supply
+     queue` with no `--collection` crashes with a traceback.** Found
+     settling TS-62. `id_collection_option(required=True)` is declared, but
+     the command receives None and `slot_state.states_for` raises
+     `UnknownDatasetError: None is not a collection`. It also happens on the
+     pushed after-248 code, so it is older than the Emergency Department
+     work. Minor bug, to fix test-first after the push: why `required` is not
+     enforced, and whether other commands using the same option share it.
