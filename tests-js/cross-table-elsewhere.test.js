@@ -107,3 +107,72 @@ describe("a held table's page", () => {
     expect(ds.columns[1].checks.every((ck) => dashboard.window.checkStatus(ck) === "nodata")).toBe(true);
   });
 });
+
+// REQ-DASH-264 criterion 1: "recorded on or before the in-place-on date" holds
+// for a dataset's OWN re-check too - its run is dated by the supply it
+// re-checked, but its result exists only from when it was recorded.
+describe("an own re-check recorded after the date on show", () => {
+  it("is not on the page before it was recorded", () => {
+    dashboard = loadDashboard();
+    const ds = notifications();
+    ds.runs.push({ run_id: "cp_notifications__202011010820000800__1__r1", run_date: "2020-11-01" });
+    ds.columns[0].checks[0].history = [
+      ds.columns[0].checks[0].history[0],
+      { run_id: "cp_notifications__202011010820000800__1__r1", run_date: "2020-11-01", value: 0,
+        status: "green", recorded_at: "2020-11-02T11:00:00+08:00", recorded_by: null },
+    ];
+    const on1 = dashboard.window.clipDatasetToInPlaceOn(ds, "2020-11-01").columns[0].checks[0];
+    expect(on1.current_status).toBe("red");
+    const on2 = dashboard.window.clipDatasetToInPlaceOn(ds, "2020-11-02").columns[0].checks[0];
+    expect(on2.current_status).toBe("green");
+  });
+});
+
+// REQ-DASH-225 criterion 18 with REQ-DASH-264: a result recorded under another
+// table's run counts against the dataset's own run it follows, so the list's
+// latest count and the page agree.
+describe("unitCounts with a result from another table's run", () => {
+  it("counts it on the dataset's own run it follows, replacing that run's verdict", () => {
+    dashboard = loadDashboard();
+    const own = { run_id: "own_1", run_date: "2020-11-01", status: "red", recorded_at: "2020-11-01T08:20:00+08:00",
+                  recorded_by: null };
+    const later = { run_id: "other_r1", run_date: "2020-11-01", status: "green",
+                    recorded_at: "2020-11-02T11:00:00+08:00", recorded_by: "cp-clients" };
+    const units = [
+      { name: "a_column", checks: [{ history: [{ ...own, status: "green" }] }] },
+      { name: "Cross-table", scope: "cross-table", checks: [{ history: [own, later] }] },
+    ];
+    const counts = dashboard.window.unitCounts(units);
+    expect(counts.map((c) => c.runId)).toEqual(["own_1"]);
+    expect(counts[0]).toMatchObject({ counted: 2, red: 0, amber: 0 });
+  });
+});
+
+// REQ-DASH-264 criteria 7-9 (Keith 2026-10-19, approved as worded).
+describe("a result from another table's re-check says so", () => {
+  const col = { datasets: [{ id: "cp-clients", name: "Client Register" }, { id: "cp-notifications", name: "Notifications" }] };
+
+  it("names when and which table was re-checked", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.recheckNote(col, {
+      recorded_by: "cp-clients", recorded_in: "re-check", recorded_at: "2020-11-02T11:00:00+08:00",
+    })).toBe("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was re-checked.");
+  });
+
+  it("says nothing for the dataset's own run or another table's arrival", () => {
+    dashboard = loadDashboard();
+    expect(dashboard.window.recheckNote(col, { recorded_by: null, recorded_at: "2020-11-01T08:20:00+08:00" })).toBe("");
+    expect(dashboard.window.recheckNote(col, {
+      recorded_by: "cp-notifications", recorded_in: "arrival", recorded_at: "2020-11-01T08:20:00+08:00",
+    })).toBe("");
+  });
+
+  it("dates its point on the chart by when it was recorded", () => {
+    dashboard = loadDashboard();
+    const ds = notifications();
+    ds.columns[0].checks[0].history[1].recorded_in = "re-check";
+    const built = dashboard.window.buildRealDataset(dashboard.window.clipDatasetToInPlaceOn(ds, "2020-11-03"));
+    const last = built.columns[0].checks[0].history.at(-1);
+    expect(dashboard.window.assetDateStrOf(last.date.toISOString())).toBe("2020-11-02");
+  });
+});

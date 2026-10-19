@@ -10903,7 +10903,7 @@ twice. It deliberately did not re-find the `TypeError`.
        position is one `checkpoints.snapped` leaves alone, so the next
        corpus change fails with that message rather than as a diff.
 
-257. **[todo, 2026-10-19]** **[Dashboard UI]** **REQ-DASH-264 built but not
+257. **[done, 2026-10-19]** **[Dashboard UI]** **REQ-DASH-264 built but not
      pushed: four browser tests disagree with it.** The full gate on the
      REQ-DASH-264 tree was stopped by the 30-minute background limit with two
      failures showing; `tests/test_dashboard_e2e.py` run alone (serially,
@@ -10933,6 +10933,23 @@ twice. It deliberately did not re-find the `TypeError`.
        when it was recorded. Found walking TS-80: on Notifications' 3 November
        panel nothing said where the green came from, and the chart put it on
        1 November, the day it was red.
-     NEXT: diagnose each against the requirement, fix test-first where the
-     code is wrong, build criteria 7-9, then one full gate with a long
-     timeout (it now takes over 30 minutes), then one push.
+     - DIAGNOSED AND FIXED, the same night (Keith: "feel free to build it
+       tonight"):
+       - 2015-11-01 was right, the test wrong: the Client Register arrived at
+         09:08:10 (its own run "not evaluated", Placements not yet due), and
+         Placements at 09:09:25, whose run checked the relationship green -
+         the newest result recorded that day. The past-dates test now derives
+         the expected verdict from criterion 1 itself, from the raw history.
+       - A REAL DEFECT under it: a dataset's OWN re-check run is dated by the
+         supply it re-checked, so the page showed the Client Register's 2
+         November re-check on 1 November. Every entry is now filtered by its
+         recording time (tests-js/cross-table-elsewhere.test.js, failing
+         first).
+       - THE COUNT MISMATCH, a real defect: `unitCounts` keyed each entry by
+         its run, so a result from another table's run became a "run" of its
+         own holding one unit, and the list's latest point said 1 counted
+         where the page counted 11. Such a result now counts on the
+         dataset's own run it follows (test failing first). The trend test's
+         precondition failed for the same reason.
+     - Criteria 7-9 built, with criterion 7 narrowed to another table's
+       RE-CHECK run - PROVISIONAL, for Keith (REQ-DASH-264's decisions).

@@ -234,6 +234,9 @@ class TestACrossTableResultFromAnotherTablesRunReachesThePage:
         assert by_run[self._RECHECK]["recorded_at"] == "2020-11-02T11:00:00+08:00"
         assert by_run[self._OWN]["recorded_by"] is None
         assert by_run[self._OWN]["recorded_at"] == "2020-11-01T08:20:00+08:00"
+        # Criterion 7: only a re-check run is said to be one.
+        assert by_run[self._RECHECK]["recorded_in"] == "re-check"
+        assert by_run[self._OWN]["recorded_in"] is None
 
     def test_the_newest_result_is_the_current_one(self):
         card = self._card()

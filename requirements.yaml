@@ -39487,7 +39487,7 @@ requirements:
       own supply is waiting on a person, so that the page agrees with the promotion gate and tells me which
       relationship is at fault.
     moscow: must
-    status: in_progress
+    status: built
     source: 'Keith, 2026-10-19, walking TS-80 through post-build-review #253 with screenshots: option (a) - keep a
       cross-table check on the page of every table it reads (REQ-QAC-037 criteria 6 and 7, "counts against both"),
       label each row with its tables, and show each check''s latest result "whether it was run by its own arrival or
@@ -39517,7 +39517,7 @@ requirements:
     - THE SYSTEM SHALL be tested in a real browser on the bootstrapped history with TS-80 - cp-notifications' Client
       reference reading green on 3 November 2020, and cp-clients' cross-table rows reading red and its own column
       checks 'No data' on 1 November 2020.
-    - 'WHERE the result a row shows was recorded under another table''s run, THE SYSTEM SHALL say so on the row, after
+    - 'WHERE the result a row shows was recorded under another table''s RE-CHECK run, THE SYSTEM SHALL say so on the row, after
       the tool name, as "Re-checked <time and day>, when the <table> was re-checked." - e.g. "Re-checked 11:00am
       Monday, 2 November 2020, when the Client Register was re-checked." - the table named from the data. ADDED
       2026-10-19 (Keith, approved as worded).'
@@ -39540,6 +39540,9 @@ requirements:
     - tests-js/cross-table-elsewhere.test.js
     - tests/test_dashboard_e2e.py::TestACrossTableCheckOnTS80
     - tests/test_dashboard_e2e.py::TestAHeldOrContestedDatasetReadsRed::test_none_of_its_own_checks_reads_as_passing
+    - tests/test_dashboard_e2e.py::TestStatusMatchesEachToolsOwnVerdict::test_on_every_past_date_too
+    - tests/test_dashboard_e2e.py::TestColumnsNotGreenMatchesTheDatasetPage
+    - tests/test_dashboard_e2e.py::TestTheDatasetPageSaysWhatItsTrendPlots
     implemented_by:
     - pipeline/build_dashboard_data.py::build_one_table
     - pipeline/build_dashboard_data.py::_merged_by_time
@@ -39547,6 +39550,8 @@ requirements:
     - dashboard/qa-reporting-dashboard.template.html::clipDatasetToInPlaceOn
     - dashboard/qa-reporting-dashboard.template.html::crossTableBetween
     - dashboard/qa-reporting-dashboard.template.html::blockChecksWhileHeld
+    - dashboard/qa-reporting-dashboard.template.html::recheckNote
+    - dashboard/qa-reporting-dashboard.template.html::unitCounts
     evidence:
     - >-
       2026-10-19, on a scratch database bootstrapped that day: TS-80 on the built page - cp-notifications' three
@@ -39555,6 +39560,13 @@ requirements:
       reader and red, and its cross-table section pill red (tests/test_dashboard_e2e.py, TestACrossTableCheckOnTS80
       and test_none_of_its_own_checks_reads_as_passing, 3 passed). tests/test_build_dashboard_child_protection.py (10
       passed); tests-js/cross-table-elsewhere.test.js with blocked-dataset and agreement-refusal (42 passed).
+    - >-
+      2026-10-19, late the same night, criteria 7-9 and post-build-review #257's fixes, on the same database:
+      Notifications' Client reference row on 3 November 2020 reads "Re-checked 11:00am Monday, 2 November 2020, when
+      the Client Register was re-checked.", its panel says Latest result with the same sentence and its chart ends on
+      2 November (TestACrossTableCheckOnTS80, 3 passed); TestColumnsNotGreenMatchesTheDatasetPage and
+      TestTheDatasetPageSaysWhatItsTrendPlots at 15 May 2025 (3 passed); TestStatusMatchesEachToolsOwnVerdict (passed,
+      with TestAHeldOrContestedDatasetReadsRed - 13 passed with the three failing that run); npm test (850 passed).
     decisions:
     - 'Option (a) over (b), Keith 2026-10-19: under (b), each page showing only the checks declared on its own table,
       the Client Register''s page would have no cross-table section and a broken Client Register would never turn
@@ -39570,4 +39582,14 @@ requirements:
     - 'Option 2 for a held table, Keith 2026-10-19: the cross-table checks did run that day, on the readers'' own
       supplies, so "No data" understated them and "none of them ran" was untrue. The guard against an earlier
       supply''s result standing in is kept by counting only results recorded at or after the held receipt.'
+    - 'PROVISIONAL, for Keith (2026-10-19, building criteria 7-9 the same night): criterion 7 narrowed from "another
+      table''s run" to "another table''s RE-CHECK run" (`__r<N>`). A cross-table result also comes from a reader''s
+      own ARRIVAL in every ordinary delivery - that is "counts against both" - and "when the Notifications was
+      re-checked" would be untrue there. Such a row says nothing extra.'
+    - 'Criterion 1''s "recorded on or before the in-place-on date" holds for a dataset''s OWN runs too: a re-check
+      run is dated by the supply it re-checked (`run_date`), so it used to show on dates before it ran - found by
+      the e2e past-dates test on TS-80''s 1 November. The page filters every entry by its recording time.'
+    - 'A result from another table''s run counts, in the list''s unit counts and sparkline, on the dataset''s own run
+      it follows, replacing that run''s verdict for the check - so the list and the page agree (REQ-DASH-225
+      criterion 18). Counted as a run of its own, it made a one-unit "run" the list''s latest.'
     open_questions: []

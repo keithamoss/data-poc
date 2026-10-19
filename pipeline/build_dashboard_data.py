@@ -347,7 +347,7 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
     run in the collection, so a result recorded under another table's run -
     a re-check re-running this table's cross-table checks - is placed in
     time and named (post-build-review #253)."""
-    from qa_tools.common import tables_read
+    from qa_tools.common import supply_db, tables_read
     from qa_tools.common.qa_results_writer import run_owner
 
     table, dataset_id = dataset.table, dataset.dataset_id
@@ -450,6 +450,10 @@ def build_one_table(coll, dataset, results: list[dict], manifest: list[dict], da
                     # another table's (post-build-review #253).
                     "recorded_at": slot["at"].get(run_id),
                     "recorded_by": None if own else (run_owner(run_id) or (None,))[0],
+                    # WHICH KIND OF RUN (REQ-DASH-264 criterion 7): only a
+                    # re-check is said to be one on the page.
+                    "recorded_in": None if own else (
+                        "re-check" if supply_db.RERUN_MARK in run_id else "arrival"),
                     "value": slot["by_run"][run_id],
                     "row_count_total": slot["row_count_total"].get(run_id),
                     "row_count_invalid": slot["row_count_invalid"].get(run_id),

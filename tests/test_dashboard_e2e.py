@@ -1230,10 +1230,21 @@ class TestStatusMatchesEachToolsOwnVerdict:
             const date = String(r.run_date).slice(0, 10);
             const clipped = clipDatasetToInPlaceOn(d, date);
             if (!clipped || !clipped.runs.length) continue;
-            const shown = clipped.runs[clipped.runs.length - 1].run_id;
+            // THE NEWEST RESULT RECORDED BY THEN (REQ-DASH-264 criterion 1):
+            // from the dataset's own runs on show or any other table's run,
+            // by when it was recorded - worked out here from the raw history,
+            // not from the page's own filter.
+            const own = new Set(clipped.runs.map(x => x.run_id));
+            const raw = new Map(d.columns.flatMap(c => c.checks).map(ck => [ck.check_id || ck.key, ck]));
             const built = buildRealDataset(clipped);
             built.columns.forEach(c => c.checks.forEach(ck => {
-              const h = ck.history.find(x => x.run_id === shown);
+              if (ck.blockedThisPeriod) return;   // a held table's own check: criterion 3, tested apart
+              let h = null;
+              for (const x of (raw.get(ck.check_id || ck.key) || {history: []}).history) {
+                if (!(own.has(x.run_id) || x.recorded_by)) continue;
+                if (x.recorded_at && assetDateStrOf(x.recorded_at) > date) continue;
+                if (!h || !x.recorded_at || !h.recorded_at || Date.parse(x.recorded_at) >= Date.parse(h.recorded_at)) h = x;
+              }
               if (!h || !h.status) return;
               compared++;
               const got = checkStatus(ck);
@@ -1252,7 +1263,9 @@ class TestStatusMatchesEachToolsOwnVerdict:
         """dashboard UX critic on 8a942e7, H2: a past date kept each check's
         NEWEST status, so 96 of 227 checks as of 2 May 2026 rendered a
         colour their own run did not record - a check red that day read
-        green. This test only ever looked at the default date."""
+        green. This test only ever looked at the default date. Since
+        REQ-DASH-264 the expected verdict is the newest one RECORDED by the
+        date, whichever table's run recorded it."""
         _goto(clean_page, built_dashboard_html)
         result = clean_page.evaluate(self._IN_PLACE_ON_JS)
         assert result["compared"] > 100, result
@@ -4400,7 +4413,8 @@ class TestColumnsNotGreenMatchesTheDatasetPage:
         assert m, f"unexpected cell text {text!r}"
         return {"red": 0, "amber": 0, "counted": int(m.group(1))}
 
-    @pytest.mark.parametrize("in_place_on", [None, "2025-06-15"])
+    # 15 May 2025: the readers are red there (see TestTheDatasetPageSaysWhatItsTrendPlots).
+    @pytest.mark.parametrize("in_place_on", [None, "2025-05-15"])
     def test_each_rows_count_matches_its_dataset_page(self, clean_page, built_dashboard_html, in_place_on):
         import re
         checked, not_green = 0, 0
@@ -4441,8 +4455,10 @@ class TestTheDatasetPageSaysWhatItsTrendPlots:
     # A date with a Child Protection unit not green in place. The build's own
     # date need not have one (since REQ-GEN-207 every dataset is all green
     # there), and a test that depends on the newest quarter being red has a
-    # shelf life of one quarter.
-    _ON = "2025-06-15"
+    # shelf life of one quarter. 15 May, not 15 June, since REQ-DASH-264: the
+    # readers' Client reference is red from their 1 May supply until the Client
+    # Register's late supply re-checks it green on 29 May.
+    _ON = "2025-05-15"
 
     def test_trend_title_axis_and_table_agree_with_the_list_and_the_panel(
             self, clean_page, built_dashboard_html):
@@ -5581,6 +5597,24 @@ class TestACrossTableCheckOnTS80:
                 if r.startswith("Client reference")]
         assert len(rows) == 3, rows
         assert all("Notifications → Client Register" in r and "Green" in r for r in rows), rows
+        # Criterion 7: the row says where its result came from.
+        assert all("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was "
+                   "re-checked." in r for r in rows), rows
+
+    def test_the_panel_says_latest_result_and_where_it_came_from(self, clean_page, built_dashboard_html):
+        """Criterion 8."""
+        self._rows(clean_page, built_dashboard_html, "cp-notifications", "2020-11-03")
+        clean_page.locator('.scope-section[data-scope="cross-table"] .scope-check',
+                           has_text="Client reference").filter(has_text="dbt:relationships").first.click()
+        clean_page.wait_for_selector("[data-recheck-note]")
+        panel = " ".join(clean_page.locator("[data-recheck-note]")
+                         .locator("xpath=ancestor::aside[1]").inner_text().split())
+        # The labels are upper-cased by CSS, and inner_text keeps that.
+        assert "latest result" in panel.lower() and "current run" not in panel.lower(), panel[:400]
+        # Criterion 9: the chart's last date is when the result was recorded.
+        assert panel.rstrip().endswith("Monday, 2 November 2020 View as table"), panel[-200:]
+        assert ("Re-checked 11:00am Monday, 2 November 2020, when the Client Register was "
+                "re-checked.") in panel
 
     def test_the_held_register_shows_its_cross_table_rows_red_and_its_own_checks_not_run(
             self, clean_page, built_dashboard_html):

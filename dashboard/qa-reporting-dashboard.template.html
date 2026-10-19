@@ -719,6 +719,9 @@ span.scenario-subject-label{display:inline-block; margin:0 6px 0 0;}
 /* #253: the tables a cross-table check is between, after its name. */
 .scope-check .label .bt{font-size:12.5px; color:var(--ink-muted); margin-left:8px;}
 .scope-check .label .bt:empty{display:none;}
+.scope-check .label .rc{font-size:12px; color:var(--ink-muted); margin-left:8px;}
+.scope-check .label .rc:empty{display:none;}
+.recheck-note{font-size:12.5px; color:var(--ink-muted); margin-top:8px;}
 .red-promoted{display:inline-flex; flex-direction:column; align-items:flex-start; gap:2px; vertical-align:top; max-width:46ch;}
 .red-promoted .rp-why{font-size:11.5px; color:var(--ink-muted); white-space:normal; line-height:1.35;}
 .scope-check .label .ds{display:block; font-size:12px; color:var(--ink-muted); margin-top:2px;}
@@ -2325,7 +2328,10 @@ function buildRealDataset(d){
       // Each history entry keeps everything it arrived with - including
       // `status`, that run's own real tool verdict, which historyStatus()
       // reads in preference to threshold math.
-      history: ck.history.map((h,i)=>({ ...h, idx:i, date: toDate(h.run_date) })),
+      // A RESULT FROM ANOTHER TABLE'S RUN IS DATED BY WHEN IT WAS RECORDED
+      // (REQ-DASH-264 criterion 9), not by that table's supply's receipt.
+      history: ck.history.map((h,i)=>({ ...h, idx:i,
+        date: toDate(h.recorded_by && h.recorded_at ? assetDateStrOf(h.recorded_at) : h.run_date) })),
     }));
     // Same rule as the check map above, and it was an allowlist until
     // REQ-DASH-033 - which is how the fix for one got applied without
@@ -2879,8 +2885,11 @@ function clipDatasetToInPlaceOn(d, inPlaceOnDateStr){
         // one's cross-table checks under its own run, and the promotion
         // gate reads that result. It counts here from the day it was
         // recorded; the build has already placed it in time.
-        const history = ck.history.filter(h => eligibleRunIds.has(h.run_id)
-          || (h.recorded_by && h.recorded_at && assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr));
+        // AND NEVER BEFORE IT WAS RECORDED, the dataset's own runs included
+        // (REQ-DASH-264 criterion 1): a re-check's run is dated by the supply
+        // it re-checked, but its result exists only from when it ran.
+        const history = ck.history.filter(h => (eligibleRunIds.has(h.run_id) || h.recorded_by)
+          && (!h.recorded_at || assetDateStrOf(h.recorded_at) <= inPlaceOnDateStr));
         if(!history.length) return null;
         const last = history[history.length-1], prev = history.length>1 ? history[history.length-2] : last;
         // THE STATUS OF THE RUN ON SHOW, not the newest run's (dashboard UX
@@ -3602,12 +3611,21 @@ function unitCounts(units){
     const worst = new Map();
     (u.checks || []).forEach(ck=>{
       if(ck.retired) return;
+      // A RESULT RECORDED UNDER ANOTHER TABLE'S RUN (REQ-DASH-264) counts on
+      // this dataset's own run it follows and replaces that run's verdict for
+      // the check, as the page shows it; it is never a run of its own.
+      const perRun = new Map(), dateOf = new Map();
+      let ownRun = null;
       ck.history.forEach(h=>{
-        const s = historyStatus(h, ck);
+        if(!h.recorded_by){ ownRun = h.run_id; dateOf.set(h.run_id, h.date); }
+        const runId = h.recorded_by ? ownRun : h.run_id;
+        if(runId != null) perRun.set(runId, historyStatus(h, ck));
+      });
+      perRun.forEach((s, runId)=>{
         if(s !== "red" && s !== "amber" && s !== "green") return;
-        if(!byRun.has(h.run_id)) byRun.set(h.run_id, {runId:h.run_id, date:h.date, counted:0, red:0, amber:0, sectionNames:[]});
-        const was = worst.get(h.run_id);
-        if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(h.run_id, s);
+        if(!byRun.has(runId)) byRun.set(runId, {runId, date:dateOf.get(runId), counted:0, red:0, amber:0, sectionNames:[]});
+        const was = worst.get(runId);
+        if(!was || STATUS_ORDER[s] > STATUS_ORDER[was]) worst.set(runId, s);
       });
     });
     worst.forEach((s, runId)=>{
@@ -5025,6 +5043,16 @@ function crossTableBetween(col, check){
   if(!b) return "";
   const nameOf = id=> ((col.datasets || []).find(d=> d.id === id) || {}).name || id;
   return `${nameOf(b.declared_on)} → ${(b.reads || []).map(nameOf).join(", ")}`;
+}
+// WHERE A RESULT CAME FROM ANOTHER TABLE'S RE-CHECK (REQ-DASH-264 criteria 7
+// and 8, Keith 2026-10-19, approved as worded): said on its row and in its
+// panel, so a page that changed with no new supply of its own says why. A
+// result from another table's ARRIVAL is the ordinary "counts against both"
+// case and says nothing. Empty where it does not apply.
+function recheckNote(col, point){
+  if(!point || !point.recorded_by || point.recorded_in !== "re-check" || !point.recorded_at) return "";
+  const ds = (col.datasets || []).find(d=> d.id === point.recorded_by);
+  return `Re-checked ${fmtInstant(point.recorded_at)}, when the ${ds ? ds.name : point.recorded_by} was re-checked.`;
 }
 function collectionCrossTableSection(ag, col){
   const entries = collectionCrossTableChecks(col);
@@ -7689,7 +7717,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     const worst = quiet ? "nodata" : rollupStatuses(checks.map(checkStatus));
     const rows = columns.flatMap(c=> (c.checks||[]).filter(ck=> !ck.retired).map(ck=> `
       <button class="scope-check" data-col="${columnKey(c)}" data-check="${ck.key}">
-        <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="ds"></span></span>
+        <span class="label"><span class="nm"></span><span class="bt"></span><span class="tr"></span><span class="rc"></span><span class="ds"></span></span>
         ${pill(checkStatus(ck),"sm")}
       </button>`)).join("");
     return `<div class="scope-section" data-scope="${sc.scope}">
@@ -7734,6 +7762,7 @@ function renderDataset(view, agencyId, collectionId, datasetId){
     // it is the tool_ref line that tells them apart. Same job here.
     btn.querySelector(".tr").textContent = check.tool_ref || "";
     btn.querySelector(".bt").textContent = crossTableBetween(col, check);
+    btn.querySelector(".rc").textContent = recheckNote(col, (check.history || [])[(check.history || []).length - 1]);
     btn.querySelector(".ds").textContent = check.description || "";
     btn.setAttribute("aria-label", `${check.name} — view current and historical run detail`);
     btn.addEventListener("click", ()=>{
@@ -8157,6 +8186,11 @@ function openCheckPanel(ag, col, ds, column, check, opts){
   // history length anyway - cheap insurance either way).
   const n = check.history.length;
   const currentPoint = check.history[n-1];
+  // ANOTHER TABLE'S RE-CHECK (REQ-DASH-264 criterion 8): the result is the
+  // latest, not this table's run, and the panel says where it came from.
+  const recheckLine = recheckNote(col, currentPoint);
+  const currentLabel = recheckLine ? "Latest result" : "Current run";
+  const recheckHtml = recheckLine ? `<div class="recheck-note" data-recheck-note>${escHtml(recheckLine)}</div>` : "";
   // #45 follow-up (2026-09-15, Keith's question): what does this look
   // like for a check's very first run ever - a brand new column or
   // dataset, n===1, genuinely no previous run to compare against at
@@ -8205,8 +8239,9 @@ function openCheckPanel(ag, col, ds, column, check, opts){
           <div class="k">Compared run</div>
           <div class="v" style="font-size:14px; color:var(--ink-faint);">None yet</div>
         </div>
-        <div class="compare-col"><div class="k">Current run</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
+        <div class="compare-col"><div class="k">${currentLabel}</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
       </div>
+      ${recheckHtml}
       <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">This is the first run for this check - there's no previous run yet to compare against.</div>
     </div>`;
   } else if(notEvaluated(comparePoint)){
@@ -8215,8 +8250,9 @@ function openCheckPanel(ag, col, ds, column, check, opts){
       <h4>This run vs. a chosen run</h4>
       <div class="compare-grid">
         <div class="compare-col"><div class="k">Compared run</div><div class="v not-evaluated-tag" style="font-size:14px;">Not evaluated</div></div>
-        <div class="compare-col"><div class="k">Current run</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
+        <div class="compare-col"><div class="k">${currentLabel}</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
       </div>
+      ${recheckHtml}
       <div style="font-size:12.5px; color:var(--ink-muted); margin-top:8px;">The compared run could not evaluate this check, so there is no difference to show. Pick another run on the trend chart below.</div>
     </div>`;
   } else {
@@ -8238,8 +8274,9 @@ function openCheckPanel(ag, col, ds, column, check, opts){
           <select id="check-compare-select" class="compare-run-select" ${n<3?"disabled":""}>${runOptions}</select>
           <div class="v">${fmtMetric(comparePoint.value, check.unit)}</div>
         </div>
-        <div class="compare-col"><div class="k">Current run</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
+        <div class="compare-col"><div class="k">${currentLabel}</div><div class="v">${fmtMetric(currentPoint.value, check.unit)}</div></div>
       </div>
+      ${recheckHtml}
       <div class="delta ${deltaClass}">${deltaClass==="up"?"↑":deltaClass==="down"?"↓":"–"} ${Math.abs(delta).toFixed(2)}${deltaUnitTag} — ${deltaWord}</div>
       ${n>2 ? `<div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">Pick any past run above, or click a point on the trend chart below, to compare it against the current run.</div>` : ""}
     </div>`;
@@ -8300,8 +8337,8 @@ function openCheckPanel(ag, col, ds, column, check, opts){
     <div class="drawer-section">
       <h4>Row-level detail</h4>
       <div class="stat-row">
-        <div class="stat"><div class="k">Rows checked, current run</div><div class="v">${fmtInt(currentPoint.row_count_total)}</div></div>
-        <div class="stat"><div class="k">Rows flagged, current run</div><div class="v">${currentPoint.row_count_invalid!=null ? fmtInt(currentPoint.row_count_invalid) : "—"}</div></div>
+        <div class="stat"><div class="k">Rows checked, ${currentLabel.toLowerCase()}</div><div class="v">${fmtInt(currentPoint.row_count_total)}</div></div>
+        <div class="stat"><div class="k">Rows flagged, ${currentLabel.toLowerCase()}</div><div class="v">${currentPoint.row_count_invalid!=null ? fmtInt(currentPoint.row_count_invalid) : "—"}</div></div>
         ${(hasCompareRun && comparePoint.row_count_invalid!=null) ? `<div class="stat"><div class="k">Rows flagged, compared run</div><div class="v">${fmtInt(comparePoint.row_count_invalid)}</div></div>` : ""}
       </div>
       ${sampleBlock}
