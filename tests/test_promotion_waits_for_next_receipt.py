@@ -28,7 +28,7 @@ def test_the_promotion_lands_before_the_next_receipt(collection_id, monkeypatch)
     monkeypatch.setattr(promotion, "after_runs",
                         lambda arrivals, got, **k: stamped.append(k["effective_at"]))
     monkeypatch.setattr(promotion, "report", lambda *a, **k: None)
-    monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: None)
+    monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: [])
     # A run id whose seeded lag is far longer than thirty seconds, so the
     # cap is what keeps it before the next receipt.
     arrival = SimpleNamespace(received_at=RECEIVED, run_id="run_lag_probe")
@@ -115,7 +115,7 @@ class TestWithinTheClaimWindowInAReplay:
         monkeypatch.setattr(promotion, "next_receipt", lambda arrival: None)
         monkeypatch.setattr(promotion, "after_runs", lambda *a, **k: None)
         monkeypatch.setattr(promotion, "report", lambda *a, **k: None)
-        monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: None)
+        monkeypatch.setattr(knock_on, "follow_up", lambda *a, **k: [])
         # The arrival carries ITS collection's dataset: the shared orchestrator
         # takes the window from the files carried (REQ-PIPE-243 criterion 2),
         # and only the adapter's claim-window dataset where none are named.

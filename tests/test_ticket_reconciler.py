@@ -330,18 +330,21 @@ class TestTheReconcilerIsInvokedAfterEveryRun:
             out.append((".".join(reversed(parts)), node.lineno))
         return out
 
-    @pytest.mark.parametrize("module,func", [("qa_tools.tools.orchestrate", "run_pipeline")])
-    def test_it_is_called(self, module, func):
-        names = [n for n, _ in self._calls(module, func)]
+    # A COLLECTION'S RUN ENDS IN `_end`, whether it ran alone or in a stream
+    # (REQ-PIPE-262), so the reconciler is called there and both entry
+    # points reach `_end` only after their arrivals are processed.
+    def test_it_is_called(self):
+        names = [n for n, _ in self._calls("qa_tools.tools.orchestrate", "_end")]
         assert "ticket_reconciler.after_runs" in names, names
 
-    @pytest.mark.parametrize("module,func", [("qa_tools.tools.orchestrate", "run_pipeline")])
-    def test_it_is_called_AFTER_the_runs(self, module, func):
+    @pytest.mark.parametrize("func,processed", [
+        ("run_pipeline", "arrival_lifecycle.process_all"),
+        ("run_stream", "arrival_lifecycle.process_stream")])
+    def test_it_is_called_AFTER_the_runs(self, func, processed):
         """Criterion 16: only after the change is durably recorded, so a
         ticket can never say something the decision log does not."""
-        calls = dict(self._calls(module, func))
-        assert calls["ticket_reconciler.after_runs"] > \
-            calls["arrival_lifecycle.process_all"]
+        calls = dict(self._calls("qa_tools.tools.orchestrate", func))
+        assert calls["_end"] > calls[processed], calls
 
 
 class TestNoTicketingConfiguredIsNotABrokenRun:

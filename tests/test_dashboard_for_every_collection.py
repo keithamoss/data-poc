@@ -52,6 +52,9 @@ def described(third_collection, tmp_path, monkeypatch, supply_dsn):
 
     cal = yaml.safe_load(agreement.CALENDAR_YAML.read_text())
     cp = next(c for c in cal["collections"] if c["id"] == "child-protection")
+    # REPLACED, not appended: the third_collection fixture already puts it on
+    # the quarterly calendar (REQ-PIPE-262's streams need one).
+    cal["collections"] = [c for c in cal["collections"] if c["id"] != FAKE_ID]
     cal["collections"].append({**cp, "id": FAKE_ID})
     clients = next(d for d in cal["datasets"] if d["id"] == "cp-clients")
     cal["datasets"].append({**clients, "id": FAKE_DATASET})
