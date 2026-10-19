@@ -32,6 +32,7 @@ from qa_tools.common import bootstrap as _bootstrap  # noqa: E402
 #: to point here - otherwise the in-process (sequential) path would call
 #: this wrapper, which would call the patched name, which is this wrapper.
 _REAL_RUN_COLLECTION = _bootstrap._run_collection
+_REAL_RUN_STREAM = _bootstrap._run_stream
 
 
 def apply_redirects(root: Path) -> dict:
@@ -103,6 +104,23 @@ def redirected_run_collection(name: str, sequential: bool,
             f"against this repo's real delivery tree")
     apply_redirects(Path(root))
     return _REAL_RUN_COLLECTION(name, sequential, record_deliveries=record_deliveries, **replay)
+
+
+def redirected_run_stream(key: str, sequential: bool) -> float:
+    """`bootstrap._run_stream` (REQ-PIPE-262), with the corpus redirection
+    applied first - the same wrapper in both modes, for the reason
+    redirected_run_collection gives. A stream of one collection goes
+    through redirected_run_collection, as the real one goes through
+    _run_collection."""
+    root = os.environ.get(CORPUS_ENV)
+    if not root:
+        raise RuntimeError(
+            f"{CORPUS_ENV} is not set - refusing to run a stream's pipelines "
+            f"against this repo's real delivery tree")
+    apply_redirects(Path(root))
+    if _bootstrap.STREAM_JOIN not in key:
+        return redirected_run_collection(key, sequential)
+    return _REAL_RUN_STREAM(key, sequential)
 
 
 # --------------------------------------------------------------------------

@@ -65,6 +65,15 @@ def _hierarchy(tmp_path, *, bare: bool) -> None:
             "datasets": [{"id": "bare-things", "name": "Bare Things", "table": "bare_things",
                           "arrival_pattern": r"bare_things[^/]*\.csv"}]})
     (contract_dir / "data-asset.yaml").write_text(yaml.safe_dump(doc, sort_keys=False))
+    # ITS CALENDAR, as a real collection declares one (REQ-PIPE-262 criterion
+    # 9 refuses a bootstrap of a collection whose calendar cannot be
+    # resolved): the quarterly one, so it replays in Child Protection's stream.
+    from qa_tools.common import agreement
+
+    cal = yaml.safe_load(agreement.CALENDAR_YAML.read_text())
+    for cid in [FAKE_ID] + ([BARE_ID] if bare else []):
+        cal["collections"].append({"id": cid, "calendar": "quarterly"})
+    (contract_dir / "calendar.yaml").write_text(yaml.safe_dump(cal, sort_keys=False))
     # How the dashboard describes the asset sits beside the hierarchy
     # (REQ-DASH-244); the third collection has no entry until a test gives it one.
     shutil.copy(hierarchy.DATA_ASSET_YAML.parent / "presentation.yaml",
@@ -100,6 +109,9 @@ def _provider(calls: list) -> types.ModuleType:
 def _install(monkeypatch, tmp_path, *, bare: bool) -> list:
     _hierarchy(tmp_path, bare=bare)
     monkeypatch.setattr(hierarchy, "DATA_ASSET_YAML", tmp_path / "contract" / "data-asset.yaml")
+    from qa_tools.common import agreement
+
+    monkeypatch.setattr(agreement, "CALENDAR_YAML", tmp_path / "contract" / "calendar.yaml")
     hierarchy._load.cache_clear()
     collections._load.cache_clear()
     calls: list = []

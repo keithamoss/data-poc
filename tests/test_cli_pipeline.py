@@ -37,6 +37,17 @@ def _stub_generation(monkeypatch, record=None):
 
 
 @pytest.fixture(autouse=True)
+def _a_stream_goes_through_the_stubbed_run_pipeline(monkeypatch):
+    """A STREAM (REQ-PIPE-262) runs each of its collections through whatever
+    run_pipeline the test stubbed, unless the test stubs run_stream itself -
+    so a test that stubs only run_pipeline never reaches the real tools."""
+    monkeypatch.setattr(orchestrate, "run_stream",
+                        lambda collection_ids, sequential=False, **_: [
+                            orchestrate.run_pipeline(c, sequential=sequential)
+                            for c in collection_ids])
+
+
+@pytest.fixture(autouse=True)
 def _no_history_yet(monkeypatch):
     """These tests stub the real work, on a worker database other modules
     have already written history into - so `pipeline run` would refuse
@@ -60,6 +71,7 @@ class TestCorrectionsAfterAFullRun:
         import qa_tools.common.bootstrap as boot
         calls = []
         monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
+        monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
         monkeypatch.setattr(boot, "_confirm_corrections", lambda say: calls.append("confirm"))
         _patch_dashboard_build_embed(monkeypatch, calls)
         _patch_snapshot(monkeypatch, calls)
@@ -84,6 +96,7 @@ class TestARunOverRecordedHistoryIsRefused:
         monkeypatch.setattr(boot, "holds_history", lambda conn: True)
         calls = []
         monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
+        monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
         result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
         assert result.exit_code != 0 and calls == []
         flat = " ".join(result.output.split())
@@ -110,15 +123,23 @@ def test_run_default_dataset_runs_both_bdm_and_cp(monkeypatch):
     monkeypatch.setattr(orchestrate, "run_pipeline",
                         lambda collection_id, sequential=False:
                         calls.append((f"{_SHORT[collection_id]}-run", sequential)))
+    # COLLECTIONS SHARING A CALENDAR RUN AS ONE STREAM (REQ-PIPE-262).
+    monkeypatch.setattr(orchestrate, "run_stream",
+                        lambda collection_ids, sequential=False:
+                        calls.append(("+".join(_SHORT[c] for c in collection_ids) + "-run",
+                                      sequential)))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
     result = _runner.invoke(pipeline_cli.pipeline_group, ["run"])
 
     assert result.exit_code == 0, result.output
+    from qa_tools.common import bootstrap
+
     expected = []
-    for short in shorts:
-        expected += [f"{short}-generate", (f"{short}-run", False)]
+    for group in bootstrap.streams(shorts):
+        expected += [f"{short}-generate" for short in group] + [("+".join(group) + "-run", False)]
+    assert any(len(g) > 1 for g in bootstrap.streams(shorts)), "no merged stream exercised"
     assert calls == [*expected, "build-data", "embed", "sync"]
 
 
@@ -174,6 +195,9 @@ def test_run_sequential_flag_forwards_to_both_orchestrators(monkeypatch):
     monkeypatch.setattr(orchestrate, "run_pipeline",
                         lambda collection_id, sequential=False:
                         seen.__setitem__(_SHORT[collection_id], sequential))
+    monkeypatch.setattr(orchestrate, "run_stream",
+                        lambda collection_ids, sequential=False:
+                        seen.update({_SHORT[c]: sequential for c in collection_ids}))
     _patch_dashboard_build_embed(monkeypatch, [])
     _patch_snapshot(monkeypatch, [])
 
@@ -270,6 +294,7 @@ def test_running_the_pipeline_does_not_destroy_the_committed_delivery_log(
 
     calls = []
     monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
+    monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 
@@ -306,6 +331,7 @@ def test_a_delivery_still_present_keeps_its_record_across_a_run(
 
     calls = []
     monkeypatch.setattr(pipeline_cli, "_run_collection", lambda coll, sequential: calls.append(coll.short))
+    monkeypatch.setattr(pipeline_cli, "_run_stream", lambda colls, sequential: calls.extend(c.short for c in colls))
     _patch_dashboard_build_embed(monkeypatch, calls)
     _patch_snapshot(monkeypatch, calls)
 

@@ -256,29 +256,36 @@ def open_period(conn, period_name: str, *, opened_by: str,
     NOT INSIDE ANOTHER TRANSACTION. Inheritance writes decision-log
     entries of its own, so callers open the period BEFORE they begin
     their own decision. promotion.promote() and substitution.substitute()
-    both do.
+    both do. The opening is its own transaction (#246).
 
     ensure_period_schema() REMAINS THE PLAIN, UNRECORDED CREATE, and the
     two are not the same thing: that one is idempotent scaffolding a
     view needs, this one is an event.
     """
-    from qa_tools.common import asset_time, inheritance
+    from qa_tools.common import asset_time, decision_log, inheritance
 
     schema = ensure_period_schema(conn, period_name)
     if opened(conn, period_name):
         return False
-    conn.execute(
-        f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by, opened_at) VALUES (?, ?, ?) '
-        "ON CONFLICT (name) DO NOTHING",
-        [period_name, opened_by, _replay_clock.now()])
-    if not opened(conn, period_name):
-        # Somebody else won the race. Theirs inherited; ours must not.
-        return False
-    # `caused_by` is the supply whose promotion is opening it, recorded on
-    # each inheritance (REQ-TEST-150 criterion 6); None for a person's open.
-    inheritance.inherit_into(conn, period_name,
-                              effective_at=effective_at or asset_time.now().isoformat(),
-                              caused_by=caused_by)
+    # OPENED WHOLE OR NOT AT ALL (post-build-review #246): the row and every
+    # inheritance it makes are one transaction. The row used to commit
+    # first, so a failure partway through left the period recorded as
+    # opened with only some of its inheritances - and, being opened, it was
+    # never revisited (criterion 2). A concurrent opener waits on the row's
+    # key until this commits, then finds it there and inherits nothing.
+    with decision_log.decision_transaction(conn):
+        inserted = conn.execute(
+            f'INSERT INTO "{qa_store.SCHEMA}".period (name, opened_by, opened_at) '
+            "VALUES (?, ?, ?) ON CONFLICT (name) DO NOTHING RETURNING name",
+            [period_name, opened_by, _replay_clock.now()]).fetchall()
+        if not inserted:
+            # Somebody else won the race. Theirs inherited; ours must not.
+            return False
+        # `caused_by` is the supply whose promotion is opening it, recorded on
+        # each inheritance (REQ-TEST-150 criterion 6); None for a person's open.
+        inheritance.inherit_into(conn, period_name,
+                                  effective_at=effective_at or asset_time.now().isoformat(),
+                                  caused_by=caused_by)
     return bool(schema)
 
 

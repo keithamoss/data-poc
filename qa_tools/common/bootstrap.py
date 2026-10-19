@@ -168,6 +168,15 @@ def bootstrap(collection: str = "all", force: bool = False,
             return BootstrapResult(populated=False, staged_before=0, staged_after=0,
                                    refused=True, reason=str(exc))
 
+    # THE STREAMS, OR NOTHING RUNS (REQ-PIPE-262 criterion 9): a collection
+    # whose calendar cannot be resolved is refused before anything is
+    # generated, naming the collection and the dataset.
+    try:
+        groups = streams([n for n in _shorts() if collection in ("all", n)])
+    except StreamRefused as exc:
+        return BootstrapResult(populated=False, staged_before=0, staged_after=0,
+                               refused=True, reason=str(exc))
+
     say("Checking what this environment already holds")
     with supply_db.connect(label="mothman:bootstrap") as conn:
         supply_db.ensure_schemas(conn)
@@ -215,10 +224,10 @@ def bootstrap(collection: str = "all", force: bool = False,
         started = time.monotonic()
         names = [n for n in _shorts() if collection in ("all", n)]
 
-        if sequential or len(names) < 2:
-            # ONE AFTER THE OTHER - the reference REQ-TEST-116 criterion 4
-            # compares a parallel bootstrap against, and what a single
-            # collection always was.
+        if checkpoint_before is not None or len(names) < 2:
+            # ONE COLLECTION - what a checkpoint, and a one-collection
+            # bootstrap, always replay (REQ-PIPE-262's Q1: left as is, Keith,
+            # 2026-10-19; plans/running-thoughts.md #111).
             timings = {}
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
@@ -231,19 +240,29 @@ def bootstrap(collection: str = "all", force: bool = False,
                 timings[name] = _run_collection(name, sequential, record_deliveries=True,
                                                 after_each=after_each)
         else:
-            # SIDE BY SIDE (REQ-TEST-116 criterion 1). The two collections
-            # share no dataset, slot or promotion, so neither's order depends
-            # on the other's. GENERATION FIRST, both of it - 4.6s measured, not
-            # worth overlapping - so neither pipeline recognises a delivery
-            # tree the other generator is still writing. Each collection
-            # records a delivery at its first arrival (REQ-TEST-159); THE
-            # DELIVERIES NEITHER CLAIMED are recorded once both are done.
+            # BY STREAM (REQ-PIPE-262): collections sharing a calendar are one
+            # receipt-ordered stream, as the live pass is, so who opens a
+            # period never depends on which process ran ahead (#245).
+            # GENERATION FIRST, all of it - 4.6s measured, not worth
+            # overlapping - so no pipeline recognises a delivery tree a
+            # generator is still writing.
             for name in names:
                 say(f"Generating synthetic data ({_label(name)})")
                 _generate(name, trial=not skip_target_trial)
-            say("Running the real checks against every supply - "
-                + " and ".join(_label(n) for n in names) + " side by side")
-            timings = _run_concurrently(names, sequential)
+            keys = [_stream_key(g) for g in groups]
+            if sequential:
+                # ONE STREAM AFTER ANOTHER (criterion 7): --sequential changes
+                # concurrency only, never which collection reaches a period first.
+                timings = {}
+                for key in keys:
+                    say(f"Running the real checks against every {_label(key)} supply")
+                    timings[key] = _run_stream(key, sequential)
+            else:
+                # SIDE BY SIDE, A PROCESS PER STREAM (criterion 6).
+                say("Running the real checks against every supply - "
+                    + " beside ".join(_label(k) for k in keys))
+                timings = _run_concurrently(keys, sequential)
+            # THE DELIVERIES NO STREAM CLAIMED, once all are done.
             _record_deliveries()
         if collection == "all":
             # EACH DUE CORRECTION CONFIRMED ONCE BOTH COLLECTIONS ARE REPLAYED
@@ -293,8 +312,83 @@ def _generate(short: str, *, trial: bool) -> None:
 
 
 def _label(key: str) -> str:
-    """How a collection's work is named when it is reported - or the total."""
-    return "in total" if key == "total" else _adapter(key).label
+    """How a collection's work is named when it is reported - a stream's by
+    each of its collections (REQ-PIPE-262 criterion 10) - or the total."""
+    if key == "total":
+        return "in total"
+    return " and ".join(_adapter(k).label for k in key.split(STREAM_JOIN))
+
+
+#: A stream's key: its collections' shorts, joined (REQ-PIPE-262).
+STREAM_JOIN = "+"
+
+
+def _stream_key(group: list[str]) -> str:
+    return STREAM_JOIN.join(group)
+
+
+class StreamRefused(ValueError):
+    """A collection's datasets' calendars cannot be resolved, so which
+    stream it belongs to is unknown (REQ-PIPE-262 criterion 9)."""
+
+
+def _collection_datasets(short: str) -> list:
+    from qa_tools.common import hierarchy
+
+    return hierarchy.datasets_in_collection(_collection(short).id)
+
+
+def _calendar_name(dataset_id: str) -> str:
+    from qa_tools.common import schedule
+
+    return schedule.calendar_for_dataset(dataset_id).name
+
+
+def streams(names: list[str]) -> list[list[str]]:
+    """The collections replayed together (REQ-PIPE-262 criteria 1 and 2):
+    two share a stream whenever any dataset of one resolves to a calendar any
+    dataset of the other resolves to, transitively. FROM CONFIGURATION ALONE -
+    no list of collections or calendars is held here. A dataset declared to
+    have no calendar joins nothing. Registry order, within and across
+    streams."""
+    from qa_tools.common import schedule
+
+    calendars: dict[str, set[str]] = {}
+    for name in names:
+        found = set()
+        for d in _collection_datasets(name):
+            try:
+                found.add(_calendar_name(d.dataset_id))
+            except schedule.NoCalendarAgreed:
+                continue
+            except (schedule.ScheduleConfigError, LookupError) as exc:
+                raise StreamRefused(
+                    f"collection {name!r}: the calendar of dataset {d.dataset_id!r} cannot be "
+                    f"resolved ({exc}), so which stream it replays in is unknown - nothing "
+                    f"was run") from exc
+        calendars[name] = found
+    groups: list[list[str]] = []
+    for name in names:
+        joined = [g for g in groups if any(calendars[name] & calendars[o] for o in g)]
+        merged = [n for g in joined for n in g] + [name]
+        groups = [g for g in groups if g not in joined] + [merged]
+    order = {n: i for i, n in enumerate(names)}
+    return sorted((sorted(g, key=order.get) for g in groups), key=lambda g: order[g[0]])
+
+
+def _run_stream(key: str, sequential: bool) -> float:
+    """Run one stream's pipeline (REQ-PIPE-262); return how long it took.
+    A stream of one collection is that collection's own run. TOP LEVEL, so a
+    spawned process can import it by name."""
+    names = key.split(STREAM_JOIN)
+    if len(names) == 1:
+        return _run_collection(names[0], sequential)
+    started = time.monotonic()
+    from qa_tools.tools import orchestrate
+
+    orchestrate.run_stream([_adapter(n).collection_id for n in names],
+                           sequential=sequential, record_deliveries=False)
+    return time.monotonic() - started
 
 
 def targets_agree(names) -> tuple[str, ...]:
@@ -554,5 +648,5 @@ def _run_concurrently(names: list[str], sequential: bool) -> dict[str, float]:
 
     context = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(max_workers=len(names), mp_context=context) as pool:
-        futures = {n: pool.submit(_run_collection, n, sequential) for n in names}
+        futures = {n: pool.submit(_run_stream, n, sequential) for n in names}
         return {n: f.result() for n, f in futures.items()}

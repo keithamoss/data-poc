@@ -240,6 +240,7 @@ class TestSkippingTheTrial:
         monkeypatch.setattr("cli.pipeline.generate_collection",
                             lambda collection_id, *, trial: seen.append((collection_id, trial)))
         monkeypatch.setattr(boot, "_run_collection", lambda *a, **k: 0.0)
+        monkeypatch.setattr(boot, "_run_stream", lambda *a, **k: 0.0)
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
         monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
         monkeypatch.setattr(boot, "staged_table_count", lambda conn: 0)
@@ -456,6 +457,7 @@ class TestAPipelineRunComparesToo:
         calls = {"compared": [], "published": []}
         monkeypatch.setattr(boot, "holds_history", lambda conn: False)
         monkeypatch.setattr(pipeline, "_run_collection", lambda coll, s: None)
+        monkeypatch.setattr(pipeline, "_run_stream", lambda colls, sequential: None)
         monkeypatch.setattr(boot, "_confirm_corrections", lambda say: None)
         monkeypatch.setattr(boot, "targets_agree",
                             lambda names: calls["compared"].append(list(names)) or disagreements)

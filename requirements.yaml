@@ -20578,6 +20578,11 @@ requirements:
     dependencies: [REQ-PIPE-087, REQ-PIPE-084, REQ-PIPE-049]
     open_questions: []
     unmet_criteria:
+      - criterion: "Criterion 4, in part - the explicit instruction to open a period. Openings by promotion and by substitution are built; no command or function a person can call opens a period before its first promotion."
+        why: "Found reviewing the withdrawn REQ-PIPE-261 draft (delivery-architect, 2026-10-19): open_period is reached only from promotion.py and substitution.py, and nothing in cli/ opens one. Reopened at Keith's answer to REQ-PIPE-262's Q2 ('Reopen as unmet'), unowned until something needs a period opened early."
+        owner: "nobody yet - Keith, 2026-10-19"
+        blocked_by:
+          unowned: true
       - criterion: >
           All seventeen criteria are met by the code, and NONE of them
           is exercised by this repository's own configuration: no
@@ -28324,13 +28329,20 @@ requirements:
       through delivery-scoper - flagged to Keith at sign-off.
     acceptance_criteria:
       - >
-        THE SYSTEM SHALL run the Birth Registrations and Child Protection
-        pipelines concurrently, since they share no datasets, slots or
-        promotions.
+        THE SYSTEM SHALL run concurrently only collections whose datasets
+        share no calendar, since those share no dataset, slot, promotion or
+        period opening; collections whose datasets share a calendar share
+        each period's opening, and are replayed as one stream in receipt
+        order (REQ-PIPE-262). AMENDED 2026-10-19 by REQ-PIPE-262 criterion
+        15 - it said "the Birth Registrations and Child Protection pipelines
+        concurrently, since they share no datasets, slots or promotions",
+        true only while each collection was alone on its calendar.
       - >
-        WITHIN a collection, THE SYSTEM SHALL still process arrivals one at
-        a time in receipt order, because each filing depends on the
-        promotion before it.
+        WITHIN a collection, and across the collections of one stream
+        (REQ-PIPE-262), THE SYSTEM SHALL process arrivals one at a time in
+        receipt order, because each filing depends on the promotion before
+        it and each period's inheritances on who opened it first. AMENDED
+        2026-10-19 by REQ-PIPE-262 criterion 15.
       - >
         WITHIN one run, THE SYSTEM SHALL evaluate the four QA tools
         concurrently.
@@ -39239,3 +39251,157 @@ requirements:
       - "NOT YET BUILT (2026-10-19, read on ed-build): criterion 1's profile by collection, stage and quarter has not been taken; criterion 3's budget line is not printed - qa_tools/common/bootstrap.bootstrap says 'Took <collection> Ns, ..., total Ns' with no budget; criterion 2's three runs and criterion 5's CI figure are not recorded. No speed-up has been made, so criterion 4 has nothing to show yet."
       - "THE NEXT SPEED-UP IS REQ-GEN-238'S SHRINK, which waits on REQ-GEN-206's sign-off: Child Protection's 55 quarters are the 1184s, and the shrink takes its grown years down to what TS-42, TS-80 and TS-63 need."
     open_questions: []
+  - id: REQ-PIPE-262
+    title: A bootstrap replays the collections that share a calendar as one receipt-ordered stream, as the live pass does, so who
+      opens a period never depends on process timing
+    signed_off:
+      by: Keith
+      date: '2026-10-19'
+    date_written: '2026-10-19'
+    story: As whoever maintains the pipeline, I want a bootstrap to process the collections that share a calendar in one receipt
+      order, exactly as the live processing pass does, so that the synthetic history every comparison and sign-off is measured against
+      is the same on every run and is the history a real pass would have recorded.
+    moscow: must
+    status: in_progress
+    source: 'Keith, answering plans/post-build-review.md #245 with option (a), 2026-10-19, after withdrawing per-collection opening
+      (the unregistered REQ-PIPE-261 draft). Drafted by delivery-scoper 2026-10-19. A PROPOSAL, not signed.'
+    acceptance_criteria:
+    - THE SYSTEM SHALL group a bootstrap's collections into streams derived from configuration alone, two collections falling in
+      one stream whenever any dataset of one resolves (schedule.calendar_for_dataset) to a calendar any dataset of the other resolves
+      to, transitively, and SHALL hold no list of collections or calendars of its own.
+    - WHERE a dataset declares it has no calendar (REQ-PIPE-106), THE SYSTEM SHALL leave it out of the grouping, so that a collection
+      none of whose datasets names a calendar is a stream of its own.
+    - WHEN a bootstrap replays a stream of more than one collection, THE SYSTEM SHALL process every arrival of every collection in
+      the stream one at a time, in the live pass's own order (receipt instant, then the receipt's sequence, then the run id - processing_pass.all_arrivals),
+      each through its own collection's steps and per-arrival lifecycle.
+    - WHILE a stream of more than one collection is replayed, THE SYSTEM SHALL play each of its collections' scripted decisions (REQ-GEN-135)
+      before any arrival of any collection in the stream received after the decision's instant, not only before that collection's
+      own next arrival.
+    - WHEN a stream finishes, THE SYSTEM SHALL do for each of its collections what a one-collection replay does once its arrivals
+      are done - recording the deliveries no arrival claimed, reconciling its tickets, and writing its results file.
+    - WHEN a bootstrap of every collection runs without --sequential, THE SYSTEM SHALL run its streams side by side, each in a process
+      of its own, so that a collection on a calendar no other collection uses (Birth Registrations, daily) still runs beside the
+      quarterly stream.
+    - WHEN a bootstrap runs with --sequential, THE SYSTEM SHALL run the same streams one after another, each still merged in receipt
+      order, so that --sequential changes only concurrency and never which collection reaches a period first.
+    - THE SYSTEM SHALL confirm the due corrections (REQ-PIPE-170 criterion 31) only once every stream has finished.
+    - IF a collection's datasets' calendars cannot be resolved, THEN THE SYSTEM SHALL refuse the bootstrap before anything is generated,
+      naming the collection and the dataset, and SHALL run nothing.
+    - WHEN a bootstrap finishes, THE SYSTEM SHALL report each stream's wall clock, naming the collections in it, alongside the total
+      (REQ-TEST-116 criterion 6).
+    - THE SYSTEM SHALL record, for every inheritance in a bootstrapped history, the dataset's newest supply promoted before the instant
+      its period was opened, in the stream's receipt order - checkable by one query over qa.decision and qa.period.
+    - WHEN the synthetic history is bootstrapped from empty with all three collections, THE SYSTEM SHALL record cp-case-workers'
+      2021-Q4 inheriting its 2021-Q3 supply (cp-case-workers@202108010104000000 on today's seed), cp-carers' 2022-Q1 and 2022-Q2
+      inheriting its 2021-Q4 supply (cp-carers@202201051000000800), and ed-presentations' 2015-Q4 inheriting its 2015-Q3 supply (REQ-GEN-251
+      criterion 3).
+    - WHEN a parallel and a sequential bootstrap run from the same seed, THE SYSTEM SHALL record the same decision log, filings and
+      check results, timestamps and ids aside, over a corpus that includes a second collection on Child Protection's calendar (REQ-TEST-116
+      criterion 4).
+    - THE SYSTEM SHALL extend tests/test_bootstrap_equivalence.py's KEEP corpus with Emergency Department deliveries, including one
+      received in a quarter before any Child Protection arrival in it, and one in a quarter where a Child Protection dataset owes
+      nothing - and SHALL first show that test failing against the code before this change.
+    - THE SYSTEM SHALL amend, in the change that adds this requirement to requirements.yaml, REQ-TEST-116 criteria 1 and 2 to the
+      wording recorded in this requirement's decisions.
+    non_functional_requirements:
+    - 'DETERMINISM: what a bootstrap records SHALL be a function of the configuration, the seed and the receipt order alone - the
+      same on every run, in parallel or sequentially, on any machine.'
+    - 'FAITHFUL TO THE LIVE PASS: a bootstrap stream SHALL order and dispatch arrivals by the same key and the same per-arrival lifecycle
+      the processing pass uses (REQ-PIPE-151 criterion 9), shared code rather than a second copy, so the two cannot drift on what
+      order means.'
+    - 'TIME COST, ACCEPTED NOT HIDDEN: Child Protection and Emergency Department run in series, so the quarterly stream costs roughly
+      their sum - about 1072s against this morning''s 1045s total (CP 942s plus ED 130s), or about 1236s against the earlier 1179s
+      (CP 1078s plus ED 158s) - while Birth Registrations (434s to 492s) stays off the critical path. Estimated, not measured; the
+      first grouped bootstrap''s timings go in evidence.'
+    - 'SCALE: at roughly 30 collections on the quarterly asset the quarterly stream is fully serial, so a bootstrap approaches the
+      live pass''s own cost, which is serial already under one pass lock. Any later speed-up SHALL come from inside a run or arrival
+      (REQ-PIPE-250), never by splitting a stream back apart.'
+    - 'REQ-PIPE-250 IS AFFECTED: its 12-minute budget (720s) was already exceeded at about 1045s, and this raises the critical path''s
+      floor by about 30s to 60s today, more with every quarterly collection added. Its profile (criterion 1) and its three timed
+      runs (criterion 2) SHALL be taken on the grouped bootstrap, not today''s.'
+    - 'NO NEW FAILURE MODE: a failure in any stream fails the bootstrap, as a failure in either collection does today, and REQ-TEST-116''s
+      NFR - anything streams write once is safe to run together - still stands for streams run side by side.'
+    - 'SYNTHETIC ONLY, AND SAID SO: this changes how a synthetic history is replayed and nothing a live pass does over real data;
+      it reads no supply rows anywhere it did not before.'
+    - 'NO MIGRATION: no stored shape changes, so no SCHEMA_VERSION bump; a database bootstrapped before this is rebuilt with mothman
+      env reset-synthetic and mothman pipeline bootstrap if its history matters.'
+    dependencies:
+    - REQ-TEST-116
+    - REQ-PIPE-098
+    - REQ-PIPE-151
+    - REQ-PIPE-170
+    - REQ-GEN-135
+    - REQ-GEN-251
+    - REQ-PIPE-250
+    decisions:
+    - 'BUILT IN, BUILDER''S CALLS (main session, 2026-10-19): (1) `mothman pipeline run` on an empty database replays by stream
+      too (cli/pipeline.py _run_stream) - it is the same batch replay, and left per collection it would leave ED''s 2015-Q4 gap
+      empty exactly as the old --sequential did. (2) The third-collection test fixture (tests/third_collection.py) now declares
+      its collection''s calendar in a copy of contract/calendar.yaml, as a real collection must - criterion 9 refuses a bootstrap
+      of one whose calendar cannot be resolved, and the fixture had never declared one. (3) A stream of one collection is that
+      collection''s own run (bootstrap._run_stream -> _run_collection), so a one-calendar collection runs exactly as before;
+      checkpoints and resume stay per collection (Keith''s Q1). (4) The equivalence corpus''s three added deliveries were chosen
+      so the old code fails deterministically, not by timing: run against the previous commit in a separate checkout, the new
+      test failed in both modes while the old parallel-equals-sequential comparison still passed.'
+    - 'KEITH''S ANSWERS, 2026-10-19: Q1 ''Leave as is, follow-up'' - a one-collection bootstrap (--collection) and REQ-TEST-159''s
+      checkpoints and resume keep replaying one collection alone; their history can differ from that collection''s slice of a full
+      bootstrap where it shares a calendar, which is recorded here and logged as a follow-up (plans/running-thoughts.md #111). REJECTED
+      widening them to the whole stream in this requirement. Q2 ''Reopen as unmet'' - REQ-PIPE-098 criterion 4''s explicit-open instruction
+      goes into 098''s unmet_criteria, unowned, in the change that adds this requirement. Q3 ''Fix as a defect'' - open_period''s
+      half-inherited failure is fixed test-first as a post-build-review defect alongside this build, not as a criterion here. Q4
+      ''Stands; measure after'' - REQ-PIPE-250''s 12-minute budget stands, its profile and timed runs taken on the grouped bootstrap
+      once this is built.'
+    - 'KEITH''S CALL, 2026-10-19 - KEEP THE MODEL AS BUILT. One shared schema per period, opened once for the whole asset by the
+      first promotion into it, every owe-nothing dataset of every collection and cadence inheriting at that moment. His words: "when
+      the next period schema opens, I kind of want to have all the inheritance set up at that point in time... breaking it down to
+      only things of the same collection trigger inheritance for their collection, it just gets really fiddly." So a CP inheritance
+      CAUSED by an ED supply is correct whenever ED''s arrival came first in receipt order; criterion 11 checks what an inheritance
+      stands on, never which collection caused it.'
+    - 'REJECTED PER-COLLECTION OPENING (post-build-review #245 option b; the withdrawn REQ-PIPE-261 draft, never registered - 261
+      is not reused). It changed signed design (REQ-PIPE-098 criteria 1, 3, 4), needed a new trigger for a collection owed nothing
+      in a period (ED''s 2015-Q4), a new command, a keyed qa.period and a schema bump.'
+    - 'REJECTED ACCEPTING THE NONDETERMINISM for a synthetic history (#245 option c): it breaks REQ-TEST-116''s parallel-equals-sequential
+      equivalence and every capture comparison, and leaves every Child Protection inheritance into a quarter Emergency Department
+      opened first, 2013 to 2026, standing on the wrong supply.'
+    - 'REQ-PIPE-179 CRITERION 22 STANDS (Keith, 2026-10-19): a turned-off period inherits, which is why cp-carers'' TS-63 quarters
+      2022-Q1 and 2022-Q2 are in criterion 12.'
+    - 'WHY THIS IS A BOOTSTRAP-ONLY FIX AND NOT A SYMPTOM PATCH. The live processing pass does not race: it processes every collection
+      in one global receipt order under one pass lock (processing_pass.py, REQ-PIPE-151 criterion 9). The bootstrap alone split collections
+      into processes, on REQ-TEST-116 criterion 1''s ground that they share no dataset, slot or promotion - true while Birth Registrations
+      was alone on its calendar, false once ED joined CP on the quarterly one, because they share period openings.'
+    - 'THE EVIDENCE ON ed_probe, 2026-10-19, read-only: 20 of Child Protection''s 23 inheritances have an ED caused_by_supply; cp-case-workers''
+      2021-Q4 (decision 117) stands on 2016-Q1 when cp-case-workers@202108010104000000 was promoted into 2021-Q3 on 2021-08-03; cp-carers''
+      2022-Q1 and 2022-Q2 (121, 123) stand on 2016-Q2 when cp-carers@202201051000000800 was promoted into 2021-Q4 on 2022-01-05;
+      ED''s 2015-Q4 (76) inherits 2015-Q3, caused by cp-carers@201511010102130000.'
+    - WHY --sequential MUST MERGE TOO (criterion 7). Today's sequential path runs Child Protection to the end and then Emergency
+      Department, which leaves ED's 2015-Q4 gap with nothing to inherit, and ED first is the race. Neither collection-at-a-time ordering
+      is right, so a --sequential that kept that order would make criterion 13's equivalence fail by construction.
+    - WHY GROUP BY CALENDAR AND NOT BY PERIOD NAME (PROPOSED, NOT KEITH'S). The real coupling is a shared qa.period row, keyed by
+      period name. Calendar is the configuration that produces those names, and today the daily and quarterly calendars' names cannot
+      collide. See the open question on that assumption.
+    - WHY SCRIPTED DECISIONS NEED CRITERION 4 (PROPOSED). scripted_decisions.Player is per collection and plays before that collection's
+      own next arrival (Player.before). In a merged stream a Child Protection decision timed between two ED arrivals would otherwise
+      land late, after an ED promotion it should precede, and could change what an opening inherits.
+    - 'REJECTED FOR NOW, NOT PROPOSED: running a stream''s arrivals concurrently where they touch different periods. It would recover
+      some of the series cost, but whether two arrivals touch the same period is only known once they are filed, which is the dependency
+      REQ-TEST-116 criterion 2 already serialises on.'
+    - 'AMENDMENT WORDING, APPROVED WITH THIS REQUIREMENT (Keith, 2026-10-19) - REQ-TEST-116 criterion 1. OLD: ''THE SYSTEM SHALL
+      run the Birth Registrations and Child Protection pipelines concurrently, since they share no datasets, slots or promotions.''
+      NEW: ''THE SYSTEM SHALL run concurrently only collections whose datasets share no calendar, since those share no dataset, slot,
+      promotion or period opening; collections whose datasets share a calendar share each period''s opening, and are replayed as
+      one stream in receipt order (REQ-PIPE-262).'''
+    - 'AMENDMENT WORDING, APPROVED WITH THIS REQUIREMENT - REQ-TEST-116 criterion 2. OLD: ''WITHIN a collection, THE SYSTEM SHALL
+      still process arrivals one at a time in receipt order, because each filing depends on the promotion before it.'' NEW: ''WITHIN
+      a collection, and across the collections of one stream (REQ-PIPE-262), THE SYSTEM SHALL process arrivals one at a time in receipt
+      order, because each filing depends on the promotion before it and each period''s inheritances on who opened it first.'''
+    - 'NOTICED, NOT THIS REQUIREMENT''S (Keith to decide) - REQ-PIPE-098 criterion 4 is marked built, yet no explicit instruction
+      to open a period exists: period_schema.open_period''s only callers are promotion.py and substitution.py (grepped 2026-10-19).
+      Unaffected by this fix either way.'
+    - NOTICED, NOT THIS REQUIREMENT'S (Keith to decide) - period_schema.open_period inserts the qa.period row and only then calls
+      inheritance.inherit_into, outside any one transaction by design (inheritance writes decisions of its own). A failure part-way
+      leaves the period recorded as opened with some datasets never inherited, and the opened() check means it is never revisited.
+      A replay order fix does not touch it.
+    open_questions:
+    - Grouping by calendar assumes no two calendars ever name the same period. Nothing enforces that. If a future calendar (a financial-year
+      quarterly, say) could, should mothman check refuse it, or should grouping follow period names? Not urgent at three collections;
+      not relayed.

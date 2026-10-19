@@ -64,10 +64,22 @@ pytestmark = pytest.mark.on_demand
 #: is not a fill. Trimmed to that one
 #: file because each file is a whole run, and the other five add a minute
 #: without adding a kind of record.
+#:
+#: Emergency Department (REQ-PIPE-262 criterion 14) - on Child Protection's
+#: calendar, so the two replay as ONE receipt-ordered stream. Its 2013-Q1
+#: supply is received on 22 January, before any Child Protection arrival in
+#: that quarter. Its 2015-Q3 supply comes before Child Protection's 2015-Q4
+#: delivery (one file kept), which opens 2015-Q4: ED's participation gap
+#: (REQ-GEN-251) inherits, and so does case workers, who owe nothing in Q4.
+#: Before REQ-PIPE-262, --sequential ran Child Protection to its end and
+#: then ED, so 2015-Q4 opened with ED's 2015-Q3 supply not yet promoted -
+#: and its gap inherited nothing.
 KEEP = {"birth-registrations": ("run_001", "run_002", "run_009", "run_017"),
-        "cp-clients": ("cp_run_001", "cp_run_002")}
+        "cp-clients": ("cp_run_001", "cp_run_002", "cp_run_025"),
+        "ed-presentations": ("ed_run_001", "ed_run_011")}
 #: Deliveries kept only in part: run id -> the files kept.
-KEEP_ONLY_FILES = {"cp_run_002": {"cp_case_workers.csv"}}
+KEEP_ONLY_FILES = {"cp_run_002": {"cp_case_workers.csv"},
+                   "cp_run_025": {"cp_clients.csv"}}
 
 ADMIN_DSN_ENV = "MOTHMAN_TEST_DSN"
 
@@ -167,6 +179,7 @@ def _bootstrap_into(corpus: Path, db_name: str, *, sequential: bool) -> tuple[di
         mp.setattr(boot, "_generate", lambda name, *, trial: None)
         # BOTH MODES through the same wrapper - see its docstring.
         mp.setattr(boot, "_run_collection", equiv_support.redirected_run_collection)
+        mp.setattr(boot, "_run_stream", equiv_support.redirected_run_stream)
         # bootstrap() sets this per process from `sequential`; put it back.
         from qa_tools.common import parallel_orchestrate
         mp.setattr(parallel_orchestrate, "TOOLS_CONCURRENTLY",
@@ -239,6 +252,26 @@ class TestTheCorpusIsWorthComparing:
         cols, rows = sequential["qa.filing"]
         branches = {json.loads(row[cols.index("branch")]) for row in rows}
         assert branches - {"open-slot-unfilled"}, branches
+
+
+class TestASharedCalendarIsReplayedInReceiptOrder:
+    """REQ-PIPE-262 criteria 12 and 14, in both modes: Emergency Department's
+    2015-Q4 gap inherits its 2015-Q3 supply, because that supply was promoted
+    before Child Protection's 2015-Q4 delivery opened the quarter."""
+
+    @staticmethod
+    def _gap(history):
+        cols, rows = history["qa.decision"]
+        at = {c: cols.index(c) for c in ("dataset_id", "to_slot", "action", "stands_on")}
+        return [{c: json.loads(row[i]) for c, i in at.items()} for row in rows
+                if json.loads(row[at["dataset_id"]]) == "ed-presentations"
+                and json.loads(row[at["to_slot"]]) == "2015-Q4"]
+
+    @pytest.mark.parametrize("mode", ["sequential", "parallel"])
+    def test_eds_gap_inherits_its_2015_q3_supply(self, both, mode):
+        history = dict(zip(("sequential", "parallel"), both))[mode]
+        found = self._gap(history)
+        assert [(e["action"], e["stands_on"]) for e in found] == [("inherit", "2015-Q3")], found
 
 
 class TestParallelRecordsTheSameHistory:

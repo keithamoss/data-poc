@@ -227,13 +227,16 @@ class TestAThirdCollectionAtEverySite:
         monkeypatch.setattr(__import__("cli.collection_cli", fromlist=["of"]).of("bdm"), "try_targets", lambda **_: 0)
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, *_, **__: self.ran.append(collection_id))
+        # A STREAM of collections sharing a calendar (REQ-PIPE-262).
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream",
+                            lambda collection_ids, *_, **__: self.ran.extend(collection_ids))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: None)
         monkeypatch.setattr(boot, "targets_agree", lambda names: ())
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due", lambda **k: [])
 
         def run(names, sequential):
             dispatched.append(list(names))
-            return {n: boot._run_collection(n, sequential) for n in names}
+            return {n: boot._run_stream(n, sequential) for n in names}
         monkeypatch.setattr(boot, "_run_concurrently", run)
         return dispatched
 
@@ -247,10 +250,12 @@ class TestAThirdCollectionAtEverySite:
         result = boot.bootstrap(collection="all")
         assert result.populated
         declared = _declared()
-        assert dispatched == [[c["short"] for _a, c in declared]]
-        assert dispatched[0][-1] == FAKE_SHORT
+        # EVERY STREAM AT ONCE (REQ-PIPE-262 criterion 6), the new collection in one.
+        streams = boot.streams([c["short"] for _a, c in declared])
+        assert dispatched == [[boot.STREAM_JOIN.join(g) for g in streams]]
+        assert any(FAKE_SHORT in g for g in streams)
         assert [c[0] for c in third_collection] == ["generate"]
-        assert self.ran == [c["id"] for _a, c in declared] and self.ran[-1] == FAKE_ID
+        assert sorted(self.ran) == sorted(c["id"] for _a, c in declared) and FAKE_ID in self.ran
 
     def test_a_bootstrap_refuses_one_with_no_adapter_before_anything_runs(
             self, without_adapter, empty_db, monkeypatch):

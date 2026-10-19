@@ -834,3 +834,40 @@ class TestAnInheritanceNamesThePromotionThatCausedIt:
         _promote_into(conn, annual, first)
         period_schema.open_period(conn, second, opened_by="Keith")
         assert self._caused_by(conn, annual, second) == [(None,)]
+
+
+class TestAPeriodIsOpenedWholeOrNotAtAll:
+    """post-build-review #246: open_period recorded the period as opened and
+    only then inherited, so a failure partway through left it opened with
+    some of its inheritances and, being opened, it was never revisited
+    (criterion 2). Opening and every inheritance it makes now stand or fall
+    together."""
+
+    def test_a_failure_partway_leaves_it_unopened_and_nothing_inherited(
+            self, conn, annual, periods, owes_nothing, monkeypatch):
+        first, second = periods
+        other = hierarchy.dataset("cp-case-workers")
+        both = [annual, other]
+        monkeypatch.setattr(inheritance.hierarchy, "all_datasets", lambda: both)
+        monkeypatch.setattr(inheritance.schedule, "not_expected_periods",
+                            lambda ds: {second: REASON})
+        _promote_into(conn, annual, first)
+        real = inheritance._most_recent_promoted
+
+        def failing(c, dataset_id, period_name):
+            if dataset_id == other.dataset_id:
+                raise RuntimeError("the database went away mid-opening")
+            return real(c, dataset_id, period_name)
+
+        monkeypatch.setattr(inheritance, "_most_recent_promoted", failing)
+        with pytest.raises(RuntimeError, match="went away"):
+            period_schema.open_period(conn, second, opened_by="Keith")
+        assert period_schema.opened(conn, second) is False
+        assert not [e for e in dl.decisions_for(conn, annual.dataset_id)
+                    if e["to_slot"] == second], "an inheritance outlived the failed opening"
+
+        # AND IT CAN BE OPENED AGAIN once the cause is gone.
+        monkeypatch.setattr(inheritance, "_most_recent_promoted", real)
+        assert period_schema.open_period(conn, second, opened_by="Keith") is True
+        assert [e["action"] for e in dl.decisions_for(conn, annual.dataset_id)
+                if e["to_slot"] == second] == [dl.INHERIT]

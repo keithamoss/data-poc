@@ -26,6 +26,13 @@ from qa_tools.common import supply_db
 _SHORT = {c.id: c.short for c in collections.all_collections()}
 #: In hierarchy order, Birth Registrations and Child Protection first.
 SHORTS = list(_SHORT.values())
+#: THE STREAMS THE REAL CONFIGURATION MAKES (REQ-PIPE-262), by key - derived,
+#: so a collection moving calendar moves the expectation with it.
+STREAMS = [boot.STREAM_JOIN.join(g) for g in boot.streams(SHORTS)]
+
+
+def _key(collection_ids) -> str:
+    return boot.STREAM_JOIN.join(_SHORT[c] for c in collection_ids)
 assert SHORTS[:2] == ["bdm", "cp"], SHORTS
 
 
@@ -103,6 +110,8 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream",
+                            lambda collection_ids, **k: called.append((_key(collection_ids), k)))
         # The corrections step is its own subject (test_correction_replay.py):
         # over this empty history a committed scripted keep has nothing to keep.
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
@@ -111,8 +120,8 @@ class TestItDoesNotRebuildWhatIsAlreadyThere:
 
         result = boot.bootstrap(force=True)
         assert result.populated is True
-        for short in SHORTS:
-            assert (short, {"sequential": False, "record_deliveries": False}) in called
+        for key in STREAMS:
+            assert (key, {"sequential": False, "record_deliveries": False}) in called
 
 
 class TestWhatItRuns:
@@ -125,6 +134,8 @@ class TestWhatItRuns:
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append(_SHORT[collection_id]))
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream",
+                            lambda collection_ids, **k: called.append(_key(collection_ids)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
@@ -132,17 +143,22 @@ class TestWhatItRuns:
         _in_process(monkeypatch, called)
         return called
 
-    def test_all_does_both_collections(self, spy):
+    def test_all_does_every_stream(self, spy):
         boot.bootstrap(collection="all")
         # Each collection records a delivery at its first arrival; the ones
-        # neither claimed are recorded once both finish (REQ-TEST-159).
-        assert spy == [*(f"gen-{s}" for s in SHORTS), "concurrently", *SHORTS, "record"]
+        # no stream claimed are recorded once all finish (REQ-TEST-159).
+        assert spy == [*(f"gen-{s}" for s in SHORTS), "concurrently", *STREAMS, "record"]
 
-    def test_sequential_does_one_collection_then_the_other(self, spy):
-        """REQ-TEST-116 criterion 5 - the reference a parallel bootstrap
-        is compared against, so it has to be the old behaviour exactly."""
+    def test_the_real_configuration_makes_more_than_one_stream_of_several(self):
+        """Otherwise the tests here would not exercise a merged stream."""
+        assert len(STREAMS) > 1 and any(boot.STREAM_JOIN in k for k in STREAMS), STREAMS
+
+    def test_sequential_runs_one_stream_after_another(self, spy):
+        """REQ-TEST-116 criterion 5's reference, as REQ-PIPE-262 criterion 7
+        has it: --sequential changes concurrency only, never which collection
+        reaches a period first - so a shared-calendar stream stays merged."""
         boot.bootstrap(collection="all", sequential=True)
-        assert spy == [step for s in SHORTS for step in (f"gen-{s}", s)]
+        assert spy == [*(f"gen-{s}" for s in SHORTS), *STREAMS, "record"]
 
     def test_one_collection_leaves_the_other_alone(self, spy):
         boot.bootstrap(collection="bdm")
@@ -175,7 +191,7 @@ def _in_process(monkeypatch, called=None):
     def run(names, sequential):
         if called is not None:
             called.append("concurrently")
-        return {n: boot._run_collection(n, sequential) for n in names}
+        return {n: boot._run_stream(n, sequential) for n in names}
     monkeypatch.setattr(boot, "_run_concurrently", run)
 
 
@@ -191,6 +207,8 @@ class TestCollectionsRunSideBySide:
                             lambda cid, **_: called.append(f"gen-{_SHORT[cid]}"))
         monkeypatch.setattr("qa_tools.tools.orchestrate.run_pipeline",
                             lambda collection_id, **k: called.append((_SHORT[collection_id], k)))
+        monkeypatch.setattr("qa_tools.tools.orchestrate.run_stream",
+                            lambda collection_ids, **k: called.append((_key(collection_ids), k)))
         monkeypatch.setattr(boot, "_record_deliveries", lambda: called.append("record"))
         # The corrections step is its own subject (test_correction_replay.py).
         monkeypatch.setattr("qa_tools.common.correction_replay.confirm_due",
@@ -199,7 +217,7 @@ class TestCollectionsRunSideBySide:
 
         def run(names, sequential):
             dispatched.append(list(names))
-            return {n: boot._run_collection(n, sequential) for n in names}
+            return {n: boot._run_stream(n, sequential) for n in names}
         monkeypatch.setattr(boot, "_run_concurrently", run)
         return called, dispatched
 
@@ -227,12 +245,10 @@ class TestCollectionsRunSideBySide:
         boot.bootstrap(collection="bdm")
         assert "confirm" not in called
 
-    def test_both_collections_are_dispatched_together(self, spy):
+    def test_every_stream_is_dispatched_together(self, spy):
         _called, dispatched = spy
         boot.bootstrap(collection="all")
-        from qa_tools import collections
-
-        assert dispatched == [[c.short for c in collections.all_collections()]]
+        assert dispatched == [STREAMS]
 
     def test_the_unclaimed_deliveries_are_recorded_once_after_both_run(self, spy):
         """REQ-TEST-159 reversed REQ-TEST-116's record-everything-first: each
@@ -262,5 +278,5 @@ class TestCollectionsRunSideBySide:
     def test_the_wall_clock_is_reported(self, spy):
         """Criterion 6: the gain is measured rather than estimated."""
         result = boot.bootstrap(collection="all")
-        assert set(result.timings) == {*SHORTS, "total"}
+        assert set(result.timings) == {*STREAMS, "total"}
         assert all(isinstance(v, float) for v in result.timings.values())

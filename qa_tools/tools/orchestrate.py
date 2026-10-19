@@ -21,6 +21,8 @@ a collection's `qa` command, never bare.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import shutil
 from collections.abc import Callable
 
@@ -446,16 +448,44 @@ def run_pipeline(collection_id: str, sequential: bool = False,
                  record_deliveries: bool = True, *, start_at: int = 1, after_each=None,
                  player=None) -> dict:
     """Every recognised arrival of one collection, then its results file."""
+    # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
+    parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
+    run = _begin(collection_id, player)
+    # A RESUME'S CLOCK STARTS AT ITS FIRST ARRIVAL (REQ-TEST-159 criterion 4).
+    if start_at > 1 and replay_clock.active():
+        replay_clock.anchor(run.arrivals[start_at - 1].received_at)
+
+    # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME, through the one per-arrival
+    # lifecycle; SCRIPTED PERSON DECISIONS played back between arrivals
+    # (REQ-GEN-135), refused unless the asset declares itself synthetic; EACH
+    # ARRIVAL STAGED AS IT COMES (REQ-TEST-159).
+    all_results = arrival_lifecycle.process_all(
+        run.arrivals, steps=run.steps, run_by=run.run_by, run_timestamp=run.run_timestamp,
+        player=run.player, prepare=run.prepare, start_at=start_at, after_each=after_each)
+    return _end(run, all_results, record_deliveries)
+
+
+@dataclass
+class _CollectionRun:
+    """What one collection's replay carries from its first arrival to its
+    results file."""
+
+    coll: object
+    arrivals: list
+    manifest: list
+    steps: object
+    prepare: object
+    player: object
+    run_by: str
+    run_timestamp: str
+
+
+def _begin(collection_id: str, player=None) -> _CollectionRun:
     from qa_tools.common import scripted_decisions
 
     coll = collections.by_id(collection_id)
-    # A RUN'S TOOLS OVERLAP unless told not to (REQ-TEST-116 criteria 3, 5).
-    parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
     # RECOGNISED FROM DISK, never read from a declaration (REQ-GEN-043).
     found_arrivals = arrivals.arrivals_for(coll.id, coll.run_prefix)
-    # A RESUME'S CLOCK STARTS AT ITS FIRST ARRIVAL (REQ-TEST-159 criterion 4).
-    if start_at > 1 and replay_clock.active():
-        replay_clock.anchor(found_arrivals[start_at - 1].received_at)
 
     # WHAT THIS RUN SAW IN FLIGHT (REQ-PIPE-057 criteria 5 and 7), on every run
     # with no threshold: a delivery whose boundary never closes must be visible
@@ -466,22 +496,19 @@ def run_pipeline(collection_id: str, sequential: bool = False,
               f"({len(entry.files)} file(s): {', '.join(entry.files) or 'none'}) - "
               f"not processed.")
     in_flight_log.record(coll.id, asset_time.now().isoformat(), still_arriving)
-    manifest = [entry_for(coll.id, a) for a in found_arrivals]
-
-    run_timestamp = asset_time.now().isoformat()
-    # Fails loudly here, before any real tool runs, if git identity is unset.
-    run_by = get_run_by()
-
-    # IN RECEIPT ORDER, ONE ARRIVAL AT A TIME, through the one per-arrival
-    # lifecycle; SCRIPTED PERSON DECISIONS played back between arrivals
-    # (REQ-GEN-135), refused unless the asset declares itself synthetic; EACH
-    # ARRIVAL STAGED AS IT COMES (REQ-TEST-159).
-    all_results = arrival_lifecycle.process_all(
-        found_arrivals, steps=steps(coll.id), run_by=run_by, run_timestamp=run_timestamp,
-        player=player if player is not None else scripted_decisions.Player(coll.id),
+    return _CollectionRun(
+        coll=coll, arrivals=found_arrivals,
+        manifest=[entry_for(coll.id, a) for a in found_arrivals],
+        steps=steps(coll.id),
         prepare=arrival_lifecycle.staged_as_it_arrives(stage.stager(coll.id)),
-        start_at=start_at, after_each=after_each)
+        player=player if player is not None else scripted_decisions.Player(coll.id),
+        run_timestamp=asset_time.now().isoformat(),
+        # Fails loudly here, before any real tool runs, if git identity is unset.
+        run_by=get_run_by())
 
+
+def _end(run: _CollectionRun, all_results: list, record_deliveries: bool) -> dict:
+    coll = run.coll
     # A DELIVERY NO ARRIVAL CLAIMED is recorded once the arrivals are done.
     if record_deliveries:
         delivery_log.record_all()
@@ -493,10 +520,62 @@ def run_pipeline(collection_id: str, sequential: bool = False,
     # Read back rather than threaded through - the same path the rebuild from
     # history uses, so the two cannot drift on how statistics are assembled.
     stats_by_run = {}
-    for arrival in found_arrivals:
+    for arrival in run.arrivals:
         stats = read_dataset_stats(coll.agency_id, coll.id, arrival.run_id)
         if stats is not None:
             stats_by_run[arrival.run_id] = stats
     return results_history.write_results_file(
-        coll.id, runs=manifest, dataset_stats=stats_by_run, results=all_results,
-        generated_at=run_timestamp)
+        coll.id, runs=run.manifest, dataset_stats=stats_by_run, results=all_results,
+        generated_at=run.run_timestamp)
+
+
+def merged_arrivals(by_collection: dict) -> list[tuple[str, object]]:
+    """Every collection's arrivals as (collection id, arrival), in THE LIVE
+    PASS'S OWN ORDER (REQ-PIPE-262 criterion 3; processing_pass.all_arrivals):
+    receipt instant, then the receipt's sequence, then the run id."""
+    pairs = [(collection_id, a) for collection_id, found in by_collection.items()
+             for a in found]
+    pairs.sort(key=lambda pair: (pair[1].received_at, pair[1].sequence, pair[1].run_id))
+    return pairs
+
+
+class StreamPlayer:
+    """Every collection's scripted decisions, played across one stream
+    (REQ-PIPE-262 criterion 4): before ANY arrival of the stream received
+    after a decision's instant, not only that collection's own next one."""
+
+    def __init__(self, players):
+        self.players = list(players)
+
+    def before(self, arrival) -> int:
+        return sum(p.before(arrival) or 0 for p in self.players)
+
+    def finish(self) -> int:
+        return sum(p.finish() or 0 for p in self.players)
+
+
+def run_stream(collection_ids: list[str], sequential: bool = False,
+               record_deliveries: bool = True) -> list[dict]:
+    """Collections that share a calendar, replayed as ONE stream in receipt
+    order, as the live pass does (REQ-PIPE-262): who opens each period first
+    is then the arrival received first, never whichever process ran ahead
+    (post-build-review #245). Each arrival goes through its own collection's
+    steps; each collection still ends with its own results file (criterion 5).
+    """
+    if len(collection_ids) == 1:
+        return [run_pipeline(collection_ids[0], sequential=sequential,
+                             record_deliveries=record_deliveries)]
+    parallel_orchestrate.TOOLS_CONCURRENTLY = not sequential
+    runs = {cid: _begin(cid) for cid in collection_ids}
+    player = StreamPlayer(run.player for run in runs.values())
+    results: dict[str, list] = {cid: [] for cid in collection_ids}
+    arrival_lifecycle.process_stream(
+        merged_arrivals({cid: run.arrivals for cid, run in runs.items()}),
+        {cid: (run.arrivals, run.steps, run.prepare, run.run_by, run.run_timestamp)
+         for cid, run in runs.items()},
+        player=player, results=results)
+    # ONE DELIVERY RECORD for the stream, after its last arrival (criterion 5).
+    out = [_end(runs[cid], results[cid], record_deliveries=False) for cid in collection_ids]
+    if record_deliveries:
+        delivery_log.record_all()
+    return out

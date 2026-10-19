@@ -134,6 +134,24 @@ def process_all(arrivals: Iterable, *, steps: Steps, run_by: str,
     return results
 
 
+def process_stream(order, runs: dict, *, player, results: dict) -> None:
+    """`process()` a stream's arrivals - several collections', interleaved in
+    receipt order (REQ-PIPE-262) - one at a time, each through ITS OWN
+    collection's steps, staging and results, with one player for the whole
+    stream. `order` is [(collection id, arrival)]; `runs` maps a collection
+    id to (its arrivals, steps, prepare, run_by, run_timestamp)."""
+    positions = {cid: 0 for cid in runs}
+    for collection_id, arrival in order:
+        arrivals, steps, prepare, run_by, run_timestamp = runs[collection_id]
+        positions[collection_id] += 1
+        with _as_it_stood(arrival):
+            _one_of_many(arrival, arrivals, positions[collection_id], steps=steps,
+                         run_by=run_by, run_timestamp=run_timestamp, on_step=None,
+                         player=player, prepare=prepare, after_each=None,
+                         results=results[collection_id])
+    player.finish()
+
+
 def _as_it_stood(arrival):
     """THE AGREEMENT AS IT STOOD AT THIS ARRIVAL'S RECEIPT, during a replay
     (REQ-PIPE-170 criterion 23; Keith, 2026-10-11, (n)): a correction merged

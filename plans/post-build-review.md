@@ -10713,3 +10713,25 @@ twice. It deliberately did not re-find the `TypeError`.
      - The Emergency Department push WAITS ON THIS. Its three conditions
        cannot honestly be met over a timing-dependent Child Protection
        history.
+
+246. **[done, 2026-10-19]** **[Pipeline & publishing]** **A period could be
+     left opened with only some of its inheritances, and never revisited.**
+     Found by delivery-architect reviewing the withdrawn REQ-PIPE-261 draft,
+     and confirmed against the code. period_schema.open_period inserted its
+     qa.period row, which committed on its own, and only then ran
+     inheritance.inherit_into, each inheritance in a transaction of its own.
+     An exception partway through (a lost connection, a fault reading one
+     dataset's promotions) left the period recorded as opened with some
+     datasets inherited and the rest not. Because `opened()` is the guard
+     against inheriting twice (REQ-PIPE-098 criterion 2), nothing ever came
+     back to fill the rest. Not seen in any bootstrap; a latent defect.
+     Minor bug, fixed without asking (CLAUDE.md's amended sign-off rule).
+     Keith's answer to REQ-PIPE-262's Q3 was "Fix as a defect".
+     - TEST FIRST: tests/test_inheritance.py
+       TestAPeriodIsOpenedWholeOrNotAtAll fails on the old code at
+       `opened() is False` (it was True after the failure), and passes after
+       the fix, including re-opening once the cause is gone.
+     - FIX: the row and every inheritance are one decision_transaction. Each
+       inheritance's own transaction is now a savepoint inside it. The insert
+       uses RETURNING, so a concurrent opener that lost the race returns
+       without inheriting, as before.

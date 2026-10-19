@@ -45,6 +45,22 @@ def _run_collection(coll, sequential: bool) -> None:
     orchestrate.run_pipeline(coll.id, sequential=sequential)
 
 
+def _run_stream(colls, sequential: bool) -> None:
+    """Collections that share a calendar, generated and then replayed as ONE
+    receipt-ordered stream, as the live pass is (REQ-PIPE-262) - so who opens
+    each period first never depends on which collection ran first."""
+    from cli.collection_cli import label, of
+    from qa_tools.tools import orchestrate
+
+    for coll in colls:
+        console.print(f"Generating synthetic data ({label(coll)})...", style="dim")
+        of(coll.id).generate_synthetic_data()
+    console.print("Running the real tools against every "
+                  + " and ".join(c.short.upper() for c in colls)
+                  + " run, as one stream in receipt order...", style="dim")
+    orchestrate.run_stream([c.id for c in colls], sequential=sequential)
+
+
 @click.group("pipeline")
 def pipeline_group() -> None:
     """Full real-tool batch pipeline run - Tier 2 (CI/automation, integration-test parity)."""
@@ -55,7 +71,7 @@ def pipeline_group() -> None:
     all_choice=True,
     help="Which collection's full manifest to regenerate and run - {legend}. Default: {every}.")
 @click.option("--sequential", is_flag=True,
-              help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted.")
+              help="Run each supply's four QA tools one after another rather than dbt beside the other three - slower, and easier to read when debugging. Arrivals always run one at a time, because each filing depends on what the one before it promoted - and collections that share a calendar always run as one stream in receipt order.")
 @click.option("--snapshot", is_flag=True,
               help="Also archive a dashboard snapshot afterward (same as SNAPSHOT_DASHBOARD=1).")
 @click.option("--publish", "do_publish", is_flag=True,
@@ -101,9 +117,18 @@ def run_command(collection: str, sequential: bool, snapshot: bool, do_publish: b
         with processing_pass.pass_lock("run"):
             from qa_tools import collections
 
-            for coll in collections.all_collections():
-                if collection in (coll.short, "all"):
-                    _run_collection(coll, sequential)
+            chosen = [c.short for c in collections.all_collections()
+                      if collection in (c.short, "all")]
+            try:
+                groups = bootstrap_mod.streams(chosen)
+            except bootstrap_mod.StreamRefused as exc:
+                raise click.ClickException(str(exc)) from exc
+            for group in groups:
+                colls = [collections.by_short(short) for short in group]
+                if len(colls) == 1:
+                    _run_collection(colls[0], sequential)
+                else:
+                    _run_stream(colls, sequential)
             if collection == "all":
                 # EACH DUE CORRECTION CONFIRMED once both are replayed (Keith,
                 # 2026-10-11, (n)), as a bootstrap does.
@@ -386,7 +411,7 @@ def cache_key_command() -> None:
                    "history - that is refused; `mothman env reset-synthetic` starts "
                    "from empty.")
 @click.option("--sequential", is_flag=True,
-              help="Check one collection after the other instead of side by side - slower, and the reference a parallel bootstrap should match. Arrivals within a collection always run one at a time, because each filing depends on what the one before it promoted.")
+              help="Check one stream after the other instead of side by side - slower, and the reference a parallel bootstrap should match. Collections that share a calendar are always one stream, their arrivals interleaved in receipt order as the live pass does; arrivals always run one at a time, because each filing depends on what the one before it promoted.")
 @click.option("--checkpoint-before", "checkpoint_before", type=int, default=None,
               metavar="N",
               help="Keep a copy of the database as it stood once arrival N-1 was processed, "

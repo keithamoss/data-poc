@@ -5748,3 +5748,17 @@ could never have computed it), and it belongs with batch 5's check work.
      temporary turn-off we probably do want to inherit it"), Keith kept it
      as signed - a turned-off period inherits. Nothing changes; #77 still
      holds the larger question of a dataset removed for good.
+
+111. **[todo, 2026-10-19]** **[Testing & dev tooling]** **A one-collection
+     bootstrap, checkpoint or resume of a collection that shares a calendar
+     is not its slice of a full bootstrap.** REQ-PIPE-262 replays the
+     collections sharing a calendar (Child Protection and Emergency
+     Department, quarterly) as one receipt-ordered stream. A `--collection
+     cp` bootstrap, and REQ-TEST-159's checkpoints and resume, still replay
+     one collection alone, so ED's arrivals do not interleave. The result can
+     differ from that collection's part of a full bootstrap: who opened each
+     quarter first, and so what each owe-nothing dataset inherits. Keith,
+     2026-10-19, answering REQ-PIPE-262's Q1: "Leave as is, follow-up". The
+     alternative was widening them to the whole stream (`--collection cp`
+     replays ED too, and checkpoint numbers count the merged stream). Not
+     scoped.
